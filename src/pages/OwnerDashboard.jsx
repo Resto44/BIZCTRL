@@ -206,14 +206,14 @@ const AlertRow = memo(({ icon: Icon, title, count, severity = 'amber', onClick }
 // ─────────────────────────────────────────────────────────────────────────────
 // BRANCH SELECTOR COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-const BranchSelector = memo(({ branches, selectedBranch, onSelect }) => {
+const BranchSelector = memo(({ branches, selectedBranch, onSelect, t }) => {
   const [open, setOpen] = useState(false);
 
   const selectedLabel = useMemo(() => {
-    if (selectedBranch === 'all') return 'All Branches';
+    if (selectedBranch === 'all') return t('all_branches');
     const b =  (branches || []).find(br => (br.key || br.id) === selectedBranch);
     return b ? (b.name || b.key || selectedBranch) : selectedBranch;
-  }, [selectedBranch, branches]);
+  }, [selectedBranch, branches, t]);
 
   const isAll = selectedBranch === 'all';
 
@@ -229,7 +229,7 @@ const BranchSelector = memo(({ branches, selectedBranch, onSelect }) => {
             : <MapPin className="w-4 h-4 text-primary shrink-0" />
           }
           <div className="text-left">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider leading-none mb-0.5">Selected Branch</p>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider leading-none mb-0.5">{t('selected_branch')}</p>
             <p className="text-sm font-bold text-foreground leading-tight">{selectedLabel}</p>
           </div>
         </div>
@@ -245,8 +245,8 @@ const BranchSelector = memo(({ branches, selectedBranch, onSelect }) => {
           >
             <Globe className="w-4 h-4 text-primary shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-foreground">All Branches</p>
-              <p className="text-[10px] text-muted-foreground">Aggregate data from every branch</p>
+              <p className="text-sm font-semibold text-foreground">{t('all_branches')}</p>
+              <p className="text-[10px] text-muted-foreground">{t('aggregate_all_branches')}</p>
             </div>
             {selectedBranch === 'all' && <CheckCircle2 className="w-4 h-4 text-primary ml-auto shrink-0" />}
           </button>
@@ -276,7 +276,7 @@ const BranchSelector = memo(({ branches, selectedBranch, onSelect }) => {
           })}
 
           { (branches || []).length === 0 && (
-            <div className="px-4 py-3 text-xs text-muted-foreground">No branches configured.</div>
+            <div className="px-4 py-3 text-xs text-muted-foreground">{t('no_branches_configured')}</div>
           )}
         </div>
       )}
@@ -370,10 +370,10 @@ export default function OwnerDashboard() {
 
   // Branch display info for the badge
   const selectedBranchLabel = useMemo(() => {
-    if (selectedBranch === 'all') return 'All Branches';
+    if (selectedBranch === 'all') return t('all_branches');
     const b =  (branches || []).find(br => (br.key || br.id) === selectedBranch);
     return b ? (b.name || b.key || selectedBranch) : selectedBranch;
-  }, [selectedBranch, branches]);
+  }, [selectedBranch, branches, t]);
 
   const today       = format(new Date(), 'yyyy-MM-dd');
   const yesterday   = format(subDays(new Date(), 1), 'yyyy-MM-dd');
@@ -1036,7 +1036,7 @@ export default function OwnerDashboard() {
         <div>
           <div className="flex items-center gap-2">
             <LayoutDashboard className="w-5 h-5 text-primary" />
-            <h1 className="text-xl font-black text-foreground tracking-tight">Executive Dashboard</h1>
+            <h1 className="text-xl font-black text-foreground tracking-tight">{t('executive_dashboard')}</h1>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5 ml-7">{format(new Date(), 'EEEE, MMMM d yyyy')}</p>
         </div>
@@ -1047,7 +1047,7 @@ export default function OwnerDashboard() {
               className="bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5 transition-colors cursor-pointer active:scale-95"
               aria-label={`${totalAlerts} alerts`}
             >
-              {totalAlerts} alerts
+              {totalAlerts} {totalAlerts === 1 ? t('active_alert') : t('active_alerts')}
             </button>
           )}
           <ModeBadge />
@@ -1063,6 +1063,7 @@ export default function OwnerDashboard() {
           branches={branches}
           selectedBranch={selectedBranch}
           onSelect={setSelectedBranch}
+          t={t}
         />
         {/* Branch badge below selector */}
         <div className="flex items-center gap-1.5 px-1">
@@ -1071,9 +1072,9 @@ export default function OwnerDashboard() {
             : <MapPin className="w-3.5 h-3.5 text-primary" />
           }
           <span className="text-[11px] text-muted-foreground">
-            Showing data for:{' '}
+            {t('showing_data_for')}{' '}
             <strong className="text-foreground">
-              {selectedBranch === 'all' ? '🌐 All Branches' : `📍 ${selectedBranchLabel}`}
+              {selectedBranch === 'all' ? `🌐 ${t('all_branches')}` : `📍 ${selectedBranchLabel}`}
             </strong>
           </span>
         </div>
@@ -1084,49 +1085,49 @@ export default function OwnerDashboard() {
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
         <section>
-          <SectionHeader icon={LayoutDashboard} title="Executive Summary" subtitle="Today's key performance indicators" color="blue" />
+          <SectionHeader icon={LayoutDashboard} title={t('executive_summary')} subtitle={t('todays_kpi')} color="blue" />
           {loadingSales ? (
             <div className="grid grid-cols-2 gap-3">
               {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              <MetricCard title="Today's Sales"      value={fmt(execSummary.salesToday)}       subtitle={`Cash ${fmt(execSummary.cashSalesToday)} · Net ${fmt(execSummary.networkSalesToday)} · Credit ${fmt(execSummary.creditSalesToday)}`} icon={DollarSign}   color="green"  large onClick={() => navigate('/sales')} />
-              <MetricCard title="Today's Purchases"  value={fmt(execSummary.purchasesToday)}   subtitle="Approved invoices"          icon={ShoppingCart}  color="amber"  large onClick={() => navigate('/enterprise-purchases')} />
-              <MetricCard title="Gross Profit"       value={fmt(execSummary.grossProfit)}      subtitle="Sales − Purchases"          icon={execSummary.grossProfit >= 0 ? TrendingUp : TrendingDown} color={execSummary.grossProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
-              <MetricCard title="Today's Net Profit" value={fmt(periodProfit.today.netProfit)} subtitle="Sales − Purchases − Variable − Daily Fixed" icon={periodProfit.today.netProfit >= 0 ? TrendingUp : TrendingDown} color={periodProfit.today.netProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
-              <MetricCard title="Cash in Register"   value={fmt(execSummary.cashInRegister)}   subtitle="Latest closing cash"        icon={Banknote}      color="blue"   onClick={() => navigate('/sales')} />
+              <MetricCard title={t('todays_sales')}      value={fmt(execSummary.salesToday)}       subtitle={`${t('cash_label') || 'Cash'} ${fmt(execSummary.cashSalesToday)} · ${t('network_label') || 'Net'} ${fmt(execSummary.networkSalesToday)} · ${t('credit_label') || 'Credit'} ${fmt(execSummary.creditSalesToday)}`} icon={DollarSign}   color="green"  large onClick={() => navigate('/sales')} />
+              <MetricCard title={t('todays_purchases')}  value={fmt(execSummary.purchasesToday)}   subtitle={t('approved_invoices')}          icon={ShoppingCart}  color="amber"  large onClick={() => navigate('/enterprise-purchases')} />
+              <MetricCard title={t('gross_profit')}       value={fmt(execSummary.grossProfit)}      subtitle={t('sales_minus_purchases')}          icon={execSummary.grossProfit >= 0 ? TrendingUp : TrendingDown} color={execSummary.grossProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
+              <MetricCard title={t('todays_net_profit')} value={fmt(periodProfit.today.netProfit)} subtitle={t('net_profit_subtitle_daily')} icon={periodProfit.today.netProfit >= 0 ? TrendingUp : TrendingDown} color={periodProfit.today.netProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
+              <MetricCard title={t('cash_in_register')}   value={fmt(execSummary.cashInRegister)}   subtitle={t('latest_closing_cash')}        icon={Banknote}      color="blue"   onClick={() => navigate('/sales')} />
               <MetricCard
-                title="Daily Expenses"
+                title={t('daily_expenses')}
                 value={fmtDecimal(expenseSummary.dailyExpense)}
-                subtitle="Monthly Expenses ÷ Calendar Days"
+                subtitle={t('monthly_expenses_div_days')}
                 icon={Receipt}
                 color="amber"
                 onClick={() => navigate('/expenses')}
               />
               <MetricCard
-                title="Monthly Expenses"
+                title={t('monthly_expenses')}
                 value={fmt(expenseSummary.monthlyTotal)}
-                subtitle={`Fixed ${fmt(expenseSummary.monthlyFixed)} + Variable ${fmt(expenseSummary.monthlyVariable)}`}
+                subtitle={`${t('fixed_label')} ${fmt(expenseSummary.monthlyFixed)} + ${t('variable_label')} ${fmt(expenseSummary.monthlyVariable)}`}
                 icon={Receipt}
                 color={expenseSummary.monthlyTotal > 0 ? 'red' : 'green'}
                 onClick={() => navigate('/expenses')}
               />
-              <MetricCard title="Yesterday Net Profit" value={fmt(periodProfit.yesterday.netProfit)} subtitle="Sales − Purchases − Variable − Daily Fixed" icon={periodProfit.yesterday.netProfit >= 0 ? TrendingUp : TrendingDown} color={periodProfit.yesterday.netProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
-              <MetricCard title="Weekly Net Profit" value={fmt(periodProfit.week.netProfit)} subtitle="Sales − Purchases − Variable − Weekly Fixed" icon={periodProfit.week.netProfit >= 0 ? TrendingUp : TrendingDown} color={periodProfit.week.netProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
-              <MetricCard title="Monthly Net Profit" value={fmt(periodProfit.month.netProfit)} subtitle="Sales − Purchases − Variable − Fixed" icon={periodProfit.month.netProfit >= 0 ? TrendingUp : TrendingDown} color={periodProfit.month.netProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
+              <MetricCard title={t('yesterdays_net_profit')} value={fmt(periodProfit.yesterday.netProfit)} subtitle={t('net_profit_subtitle_daily')} icon={periodProfit.yesterday.netProfit >= 0 ? TrendingUp : TrendingDown} color={periodProfit.yesterday.netProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
+              <MetricCard title={t('weekly_net_profit')} value={fmt(periodProfit.week.netProfit)} subtitle={t('net_profit_subtitle_weekly')} icon={periodProfit.week.netProfit >= 0 ? TrendingUp : TrendingDown} color={periodProfit.week.netProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
+              <MetricCard title={t('monthly_net_profit')} value={fmt(periodProfit.month.netProfit)} subtitle={t('net_profit_subtitle_monthly')} icon={periodProfit.month.netProfit >= 0 ? TrendingUp : TrendingDown} color={periodProfit.month.netProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
               {/* NETWORK BALANCE — 3-column row: Today / Yesterday / Month */}
               <div className="col-span-2 grid grid-cols-3 gap-2">
-                <MetricCard title="Network Today"     value={fmt(execSummary.networkToday)}     subtitle="POS/Network today"          icon={Wifi}  color="cyan"   onClick={() => navigate('/network-management')} />
-                <MetricCard title="Network Yesterday" value={fmt(execSummary.networkYesterday)} subtitle="POS/Network yesterday"      icon={Wifi}  color="cyan"   onClick={() => navigate('/network-management')} />
-                <MetricCard title="Month Network"     value={fmt(execSummary.networkMonth)}     subtitle="POS/Network month-to-date"  icon={Wifi}  color="cyan"   onClick={() => navigate('/network-management')} />
+                <MetricCard title={t('network_today')}     value={fmt(execSummary.networkToday)}     subtitle={t('pos_network_today')}          icon={Wifi}  color="cyan"   onClick={() => navigate('/network-management')} />
+                <MetricCard title={t('network_yesterday')} value={fmt(execSummary.networkYesterday)} subtitle={t('pos_network_yesterday')}      icon={Wifi}  color="cyan"   onClick={() => navigate('/network-management')} />
+                <MetricCard title={t('month_network')}     value={fmt(execSummary.networkMonth)}     subtitle={t('pos_network_month')}  icon={Wifi}  color="cyan"   onClick={() => navigate('/network-management')} />
               </div>
-              <MetricCard title="Customer Credit"    value={fmt(execSummary.customerCredit)}   subtitle="Outstanding receivables"    icon={CreditCard}    color="purple" onClick={() => navigate('/debt-management')} />
-              <MetricCard title="Inventory Value"    value={fmt(execSummary.inventoryValue)}   subtitle="At cost price"              icon={Package}       color="indigo" onClick={() => navigate('/inventory')} />
-              <MetricCard title="Supplier Payables"  value={fmt(execSummary.supplierPayables)} subtitle="Outstanding invoices"       icon={Truck}         color="orange" onClick={() => navigate('/suppliers')} />
-              <MetricCard title="Owner Capital Today" value={fmt(execSummary.ownerCapitalToday)} subtitle="Cash injected today"     icon={Wallet}        color="slate" />
-              <MetricCard title="Cash Shortage Today" value={fmt(execSummary.cashShortageToday)} subtitle="Not sales · Not profit"  icon={AlertTriangle} color={execSummary.cashShortageToday > 0 ? 'red' : 'green'} />
-              <MetricCard title="Cash Overage Today"  value={fmt(execSummary.cashOverageToday)}  subtitle="Excess cash on hand"     icon={CheckCircle2}  color={execSummary.cashOverageToday > 0 ? 'green' : 'slate'} />
+              <MetricCard title={t('customer_credit')}    value={fmt(execSummary.customerCredit)}   subtitle={t('outstanding_receivables')}    icon={CreditCard}    color="purple" onClick={() => navigate('/debt-management')} />
+              <MetricCard title={t('inventory_value')}    value={fmt(execSummary.inventoryValue)}   subtitle={t('at_cost_price')}              icon={Package}       color="indigo" onClick={() => navigate('/inventory')} />
+              <MetricCard title={t('supplier_payables')}  value={fmt(execSummary.supplierPayables)} subtitle={t('outstanding_invoices')}       icon={Truck}         color="orange" onClick={() => navigate('/suppliers')} />
+              <MetricCard title={t('owner_capital_today')} value={fmt(execSummary.ownerCapitalToday)} subtitle={t('cash_injected_today')}     icon={Wallet}        color="slate" />
+              <MetricCard title={t('cash_shortage_today')} value={fmt(execSummary.cashShortageToday)} subtitle={t('not_sales_not_profit')}  icon={AlertTriangle} color={execSummary.cashShortageToday > 0 ? 'red' : 'green'} />
+              <MetricCard title={t('cash_overage_today')}  value={fmt(execSummary.cashOverageToday)}  subtitle={t('excess_cash_on_hand')}     icon={CheckCircle2}  color={execSummary.cashOverageToday > 0 ? 'green' : 'slate'} />
             </div>
           )}
         </section>
@@ -1137,12 +1138,12 @@ export default function OwnerDashboard() {
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
         <section>
-          <SectionHeader icon={Scale} title="Operating Result" subtitle="Sales Revenue − Approved Purchases" color="green" />
+          <SectionHeader icon={Scale} title={t('operating_result')} subtitle={t('sales_revenue_minus_purchases')} color="green" />
           <Card className={`border-2 ${operatingResult.result >= 0 ? 'border-emerald-200 dark:border-emerald-800' : 'border-red-200 dark:border-red-800'}`}>
             <CardContent className="p-4 space-y-1">
-              <LedgerRow label="Sales Revenue"      value={fmt(operatingResult.salesRevenue)}      color="green" bold />
-              <LedgerRow label="Approved Purchases" value={`− ${fmt(operatingResult.approvedPurchases)}`} color="amber" />
-              <LedgerRow label="Operating Result"   value={fmt(operatingResult.result)}            color={operatingResult.result >= 0 ? 'green' : 'red'} bold separator />
+              <LedgerRow label={t('sales_revenue')}      value={fmt(operatingResult.salesRevenue)}      color="green" bold />
+              <LedgerRow label={t('approved_purchases')} value={`− ${fmt(operatingResult.approvedPurchases)}`} color="amber" />
+              <LedgerRow label={t('operating_result')}   value={fmt(operatingResult.result)}            color={operatingResult.result >= 0 ? 'green' : 'red'} bold separator />
             </CardContent>
           </Card>
         </section>
@@ -1153,16 +1154,16 @@ export default function OwnerDashboard() {
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
         <section>
-          <SectionHeader icon={Wallet} title="Cash Reconciliation" subtitle="Today's cash position" color="amber" action={{ label: 'Treasury', onClick: () => navigate('/treasury') }} />
+          <SectionHeader icon={Wallet} title={t('cash_reconciliation')} subtitle={t('todays_cash_position')} color="amber" action={{ label: t('treasury') || 'Treasury', onClick: () => navigate('/treasury') }} />
           <Card>
             <CardContent className="p-4 space-y-1">
-              <LedgerRow label="Opening Cash"        value={fmt(cashRecon.openingCash)}   color="blue" />
-              <LedgerRow label="Expected Cash"       value={fmt(cashRecon.expectedCash)}  color="blue" />
-              <LedgerRow label="Actual Cash"         value={fmt(cashRecon.actualCash)}    color={cashRecon.actualCash >= cashRecon.expectedCash ? 'green' : 'red'} />
-              <LedgerRow label="Cash Difference"     value={fmt(cashRecon.cashDiff)}      color={cashRecon.cashDiff === 0 ? 'green' : cashRecon.cashDiff > 0 ? 'green' : 'red'} separator />
-              <LedgerRow label="Owner Contribution"  value={fmt(cashRecon.ownerContrib)}  color="purple" />
-              <LedgerRow label="Remaining Difference" value={fmt(cashRecon.remainingDiff)} color={cashRecon.remainingDiff === 0 ? 'green' : 'red'} />
-              <LedgerRow label="Closing Cash"        value={fmt(cashRecon.closingCash)}   color="green" bold separator />
+              <LedgerRow label={t('opening_cash')}        value={fmt(cashRecon.openingCash)}   color="blue" />
+              <LedgerRow label={t('expected_cash')}       value={fmt(cashRecon.expectedCash)}  color="blue" />
+              <LedgerRow label={t('actual_cash')}         value={fmt(cashRecon.actualCash)}    color={cashRecon.actualCash >= cashRecon.expectedCash ? 'green' : 'red'} />
+              <LedgerRow label={t('cash_difference')}     value={fmt(cashRecon.cashDiff)}      color={cashRecon.cashDiff === 0 ? 'green' : cashRecon.cashDiff > 0 ? 'green' : 'red'} separator />
+              <LedgerRow label={t('owner_contribution')}  value={fmt(cashRecon.ownerContrib)}  color="purple" />
+              <LedgerRow label={t('remaining_difference')} value={fmt(cashRecon.remainingDiff)} color={cashRecon.remainingDiff === 0 ? 'green' : 'red'} />
+              <LedgerRow label={t('closing_cash')}        value={fmt(cashRecon.closingCash)}   color="green" bold separator />
             </CardContent>
           </Card>
         </section>
@@ -1173,17 +1174,17 @@ export default function OwnerDashboard() {
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
         <section>
-          <SectionHeader icon={BarChart3} title="Sales Analytics" subtitle="Multi-period sales performance" color="green" action={{ label: 'Reports', onClick: () => navigate('/reports') }} />
+          <SectionHeader icon={BarChart3} title={t('sales_analytics')} subtitle={t('multi_period_sales')} color="green" action={{ label: t('reports') || 'Reports', onClick: () => navigate('/reports') }} />
           <div className="grid grid-cols-2 gap-3">
-            <MetricCard title="Today"            value={fmt(salesAnalytics.todayAmt)}     icon={DollarSign}    color="green" />
-            <MetricCard title="Yesterday"        value={fmt(salesAnalytics.yesterdayAmt)} icon={Clock}         color="slate" />
-            <MetricCard title="This Week"        value={fmt(salesAnalytics.weekAmt)}      icon={Activity}      color="blue"   trend={salesAnalytics.weekGrowth}  trendLabel="vs last week" />
-            <MetricCard title="This Month"       value={fmt(salesAnalytics.monthAmt)}     icon={BarChart3}     color="purple" trend={salesAnalytics.monthGrowth} trendLabel="vs last month" />
-            <MetricCard title="This Year"        value={fmt(salesAnalytics.yearAmt)}      icon={TrendingUp}    color="indigo" />
-            <MetricCard title="Growth %"         value={fmtPct(salesAnalytics.monthGrowth)} icon={TrendingUp}  color={salesAnalytics.monthGrowth >= 0 ? 'green' : 'red'} />
-            <MetricCard title="Avg Daily Sales"  value={fmt(salesAnalytics.avgDailySales)} icon={Target}       color="cyan" />
-            <MetricCard title="Highest Sales Day" value={fmt(salesAnalytics.highestDay)}  icon={ArrowUpRight}  color="green" />
-            <MetricCard title="Lowest Sales Day"  value={fmt(salesAnalytics.lowestDay)}   icon={ArrowDownRight} color="amber" />
+            <MetricCard title={t('today_label')}            value={fmt(salesAnalytics.todayAmt)}     icon={DollarSign}    color="green" />
+            <MetricCard title={t('yesterday_label')}        value={fmt(salesAnalytics.yesterdayAmt)} icon={Clock}         color="slate" />
+            <MetricCard title={t('this_week')}        value={fmt(salesAnalytics.weekAmt)}      icon={Activity}      color="blue"   trend={salesAnalytics.weekGrowth}  trendLabel={t('vs_last_week')} />
+            <MetricCard title={t('this_month')}       value={fmt(salesAnalytics.monthAmt)}     icon={BarChart3}     color="purple" trend={salesAnalytics.monthGrowth} trendLabel={t('vs_last_month')} />
+            <MetricCard title={t('this_year')}        value={fmt(salesAnalytics.yearAmt)}      icon={TrendingUp}    color="indigo" />
+            <MetricCard title={t('growth_pct')}         value={fmtPct(salesAnalytics.monthGrowth)} icon={TrendingUp}  color={salesAnalytics.monthGrowth >= 0 ? 'green' : 'red'} />
+            <MetricCard title={t('avg_daily_sales')}  value={fmt(salesAnalytics.avgDailySales)} icon={Target}       color="cyan" />
+            <MetricCard title={t('highest_sales_day')} value={fmt(salesAnalytics.highestDay)}  icon={ArrowUpRight}  color="green" />
+            <MetricCard title={t('lowest_sales_day')}  value={fmt(salesAnalytics.lowestDay)}   icon={ArrowDownRight} color="amber" />
           </div>
         </section>
       </WidgetErrorBoundary>
@@ -1198,10 +1199,10 @@ export default function OwnerDashboard() {
           <section>
             <SectionHeader
               icon={Building2}
-              title="Additional Sales Sources"
-              subtitle="Delivery, Catering, Talabat, HungerStation & custom channels"
+              title={t('additional_sales_sources')}
+              subtitle={t('delivery_catering_subtitle')}
               color="purple"
-              action={{ label: 'Reports', onClick: () => navigate('/reports') }}
+              action={{ label: t('reports') || 'Reports', onClick: () => navigate('/reports') }}
             />
             <div className="grid grid-cols-2 gap-3">
               {additionalSources.map((src, i) => {
@@ -1212,11 +1213,11 @@ export default function OwnerDashboard() {
                     key={src.key || src.name}
                     title={src.name}
                     value={fmt(src.today)}
-                    subtitle={`Yesterday: ${fmt(src.yesterday)} · Month: ${fmt(src.month)}`}
+                    subtitle={`${t('yesterday_label')}: ${fmt(src.yesterday)} · ${t('this_month')}: ${fmt(src.month)}`}
                     icon={ShoppingBag}
                     color={color}
                     trend={src.growth}
-                    trendLabel="vs yesterday"
+                    trendLabel={t('yesterday_label')}
                   />
                 );
               })}
@@ -1230,13 +1231,13 @@ export default function OwnerDashboard() {
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
         <section>
-          <SectionHeader icon={ShoppingCart} title="Purchase Analytics" subtitle="Approved invoices · branch-filtered" color="amber" action={{ label: 'Purchases', onClick: () => navigate('/enterprise-purchases') }} />
+          <SectionHeader icon={ShoppingCart} title={t('purchase_analytics')} subtitle={t('approved_invoices_branch')} color="amber" action={{ label: t('purchases') || 'Purchases', onClick: () => navigate('/enterprise-purchases') }} />
           <div className="grid grid-cols-2 gap-3">
             {/* A) Today's Purchases Card — approved invoices only */}
             <MetricCard
-              title="Today's Purchases"
+              title={t('today_purchases')}
               value={fmt(purchaseAnalytics.todayAmt)}
-              subtitle={`${purchaseAnalytics.todayCount} invoice${purchaseAnalytics.todayCount !== 1 ? 's' : ''} · approved`}
+              subtitle={`${purchaseAnalytics.todayCount} ${t('approved_invoices')}`}
               icon={ShoppingCart}
               color="amber"
               large
@@ -1244,31 +1245,31 @@ export default function OwnerDashboard() {
             />
             {/* B) Monthly Purchases Card — with branch filter */}
             <MetricCard
-              title="Monthly Purchases"
+              title={t('monthly_purchases')}
               value={fmt(purchaseAnalytics.monthAmt)}
-              subtitle={`${purchaseAnalytics.monthCount} invoices · ${selectedBranch === 'all' ? 'All branches' : selectedBranchLabel}`}
+              subtitle={`${purchaseAnalytics.monthCount} ${t('approved_invoices')} · ${selectedBranch === 'all' ? t('all_branches') : selectedBranchLabel}`}
               icon={BarChart3}
               color="purple"
               large
               onClick={() => navigate('/enterprise-purchases')}
             />
-            <MetricCard title="Weekly Purchases"  value={fmt(purchaseAnalytics.weekAmt)}         icon={Activity}     color="blue" />
-            <MetricCard title="Largest Invoice"   value={fmt(purchaseAnalytics.largestPurchase)} icon={ArrowUpRight} color="red" />
-            <MetricCard title="Avg Invoice"       value={fmt(purchaseAnalytics.avgPurchase)}     icon={Target}       color="slate" />
+            <MetricCard title={t('weekly_purchases')}  value={fmt(purchaseAnalytics.weekAmt)}         icon={Activity}     color="blue" />
+            <MetricCard title={t('largest_invoice')}   value={fmt(purchaseAnalytics.largestPurchase)} icon={ArrowUpRight} color="red" />
+            <MetricCard title={t('avg_invoice')}       value={fmt(purchaseAnalytics.avgPurchase)}     icon={Target}       color="slate" />
             {/* Supplier Payables = unpaid approved invoices */}
             <MetricCard
-              title="Supplier Payables"
+              title={t('supplier_payables')}
               value={fmt(purchaseAnalytics.outstandingPayables)}
-              subtitle="Unpaid approved invoices"
+              subtitle={t('unpaid_approved_invoices')}
               icon={CreditCard}
               color="orange"
               onClick={() => navigate('/enterprise-purchases')}
             />
             {/* Overdue Payables */}
             <MetricCard
-              title="Overdue Payables"
+              title={t('overdue_payables')}
               value={fmt(purchaseAnalytics.overduePayables)}
-              subtitle="Past due date"
+              subtitle={t('past_due_date')}
               icon={AlertTriangle}
               color={purchaseAnalytics.overduePayables > 0 ? 'red' : 'green'}
               onClick={() => navigate('/enterprise-purchases')}
@@ -1277,7 +1278,7 @@ export default function OwnerDashboard() {
           {purchaseAnalytics.supplierRanking.length > 0 && (
             <Card className="mt-3">
               <CardContent className="p-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Supplier Ranking (Approved)</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t('supplier_ranking') || 'Supplier Ranking (Approved)'}</p>
                 <div className="space-y-1.5">
                   {purchaseAnalytics.supplierRanking.map(([name, amount, count], i) => (
                     <div key={name} className="flex items-center justify-between">
@@ -1303,10 +1304,10 @@ export default function OwnerDashboard() {
         <section>
           <SectionHeader
             icon={BarChart3}
-            title="Product Consumption Analytics"
-            subtitle={`Purchase items · ${selectedBranch === 'all' ? 'All branches' : selectedBranchLabel}`}
+            title={t('product_consumption_analytics')}
+            subtitle={`${t('purchase_items_branch')} · ${selectedBranch === 'all' ? t('all_branches') : selectedBranchLabel}`}
             color="purple"
-            action={{ label: 'Purchases', onClick: () => navigate('/enterprise-purchases') }}
+            action={{ label: t('purchases') || 'Purchases', onClick: () => navigate('/enterprise-purchases') }}
           />
 
           {/* ── ERP KPI Summary Cards ───────────────────────────────────────── */}
@@ -1314,7 +1315,7 @@ export default function OwnerDashboard() {
             {productQuantityAnalytics.topConsumedToday && (
               <Card className="border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20">
                 <CardContent className="p-3">
-                  <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mb-1">Top Today</p>
+                  <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mb-1">{t('top_today')}</p>
                   <p className="text-xs font-bold text-foreground truncate">{productQuantityAnalytics.topConsumedToday.productName}</p>
                   <p className="text-[11px] font-black text-purple-700 dark:text-purple-400">
                     {productQuantityAnalytics.topConsumedToday.totalQuantity % 1 === 0
@@ -1328,7 +1329,7 @@ export default function OwnerDashboard() {
             {productQuantityAnalytics.topConsumedMonth && (
               <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
                 <CardContent className="p-3">
-                  <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider mb-1">Top This Month</p>
+                  <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider mb-1">{t('top_this_month')}</p>
                   <p className="text-xs font-bold text-foreground truncate">{productQuantityAnalytics.topConsumedMonth.productName}</p>
                   <p className="text-[11px] font-black text-blue-700 dark:text-blue-400">
                     {productQuantityAnalytics.topConsumedMonth.totalQuantity % 1 === 0
@@ -1342,7 +1343,7 @@ export default function OwnerDashboard() {
             {productQuantityAnalytics.topConsumedPrevMonth && (
               <Card className="border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/20">
                 <CardContent className="p-3">
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Top Prev Month</p>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{t('top_prev_month')}</p>
                   <p className="text-xs font-bold text-foreground truncate">{productQuantityAnalytics.topConsumedPrevMonth.productName}</p>
                   <p className="text-[11px] font-black text-slate-600 dark:text-slate-400">
                     {productQuantityAnalytics.topConsumedPrevMonth.totalQuantity % 1 === 0
@@ -1356,7 +1357,7 @@ export default function OwnerDashboard() {
             {productQuantityAnalytics.highestCostMonth && (
               <Card className="border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20">
                 <CardContent className="p-3">
-                  <p className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider mb-1">Highest Cost</p>
+                  <p className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider mb-1">{t('highest_cost')}</p>
                   <p className="text-xs font-bold text-foreground truncate">{productQuantityAnalytics.highestCostMonth.productName}</p>
                   <p className="text-[11px] font-black text-orange-700 dark:text-orange-400">{fmt(productQuantityAnalytics.highestCostMonth.totalCost)}</p>
                 </CardContent>
@@ -1365,7 +1366,7 @@ export default function OwnerDashboard() {
             {productQuantityAnalytics.fastestGrowing && (
               <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
                 <CardContent className="p-3">
-                  <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mb-1">Fastest Growing ↑</p>
+                  <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mb-1">{t('fastest_growing')}</p>
                   <p className="text-xs font-bold text-foreground truncate">{productQuantityAnalytics.fastestGrowing.productName}</p>
                   <p className="text-[11px] font-black text-emerald-700 dark:text-emerald-400">
                     +{productQuantityAnalytics.fastestGrowing.diff % 1 === 0
@@ -1379,7 +1380,7 @@ export default function OwnerDashboard() {
             {productQuantityAnalytics.mostReduced && (
               <Card className="border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20">
                 <CardContent className="p-3">
-                  <p className="text-[10px] font-semibold text-red-600 uppercase tracking-wider mb-1">Most Reduced ↓</p>
+                  <p className="text-[10px] font-semibold text-red-600 uppercase tracking-wider mb-1">{t('most_reduced')}</p>
                   <p className="text-xs font-bold text-foreground truncate">{productQuantityAnalytics.mostReduced.productName}</p>
                   <p className="text-[11px] font-black text-red-700 dark:text-red-400">
                     {productQuantityAnalytics.mostReduced.diff % 1 === 0
@@ -1397,18 +1398,18 @@ export default function OwnerDashboard() {
             <Card className="border-dashed border-border/60">
               <CardContent className="p-4 text-center">
                 <Package className="w-6 h-6 text-muted-foreground/40 mx-auto mb-1" />
-                <p className="text-xs text-muted-foreground">No purchase items recorded</p>
+                <p className="text-xs text-muted-foreground">{t('no_purchase_items')}</p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-2">
               {/* Header row */}
               <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-1 px-3 py-1">
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Product</p>
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider text-right w-12">Today</p>
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider text-right w-14">This Mo.</p>
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider text-right w-14">Prev Mo.</p>
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider text-right w-10">Trend</p>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{t('product_col')}</p>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider text-right w-12">{t('today_col')}</p>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider text-right w-14">{t('this_mo_col')}</p>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider text-right w-14">{t('prev_mo_col')}</p>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider text-right w-10">{t('trend_col')}</p>
               </div>
               {productQuantityAnalytics.combinedProducts.slice(0, 15).map((p) => {
                 const trendColor = p.trend === '↑' ? 'text-emerald-600' : p.trend === '↓' ? 'text-red-500' : 'text-muted-foreground';
@@ -1419,9 +1420,9 @@ export default function OwnerDashboard() {
                       <p className="text-xs font-semibold text-foreground truncate">{p.productName}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[9px] text-muted-foreground">{p.unit}</span>
-                        <span className="text-[9px] text-muted-foreground">Cost: {fmt(p.monthCost)}</span>
+                        <span className="text-[9px] text-muted-foreground">{t('cost_label')} {fmt(p.monthCost)}</span>
                         {p.prevMonthCost > 0 && (
-                          <span className="text-[9px] text-muted-foreground">Prev: {fmt(p.prevMonthCost)}</span>
+                          <span className="text-[9px] text-muted-foreground">{t('prev_label')} {fmt(p.prevMonthCost)}</span>
                         )}
                       </div>
                     </div>
@@ -1452,7 +1453,7 @@ export default function OwnerDashboard() {
           {productQuantityAnalytics.weeklyTrend.some(d => d.totalQuantity > 0) && (
             <Card className="border-border/60 mt-3">
               <CardContent className="p-3">
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">7-Day Quantity Trend</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t('seven_day_trend')}</p>
                 <div className="flex items-end gap-1 h-16">
                   {productQuantityAnalytics.weeklyTrend.map((d) => {
                     const maxQty = Math.max(...productQuantityAnalytics.weeklyTrend.map(x => x.totalQuantity), 1);
@@ -1487,22 +1488,22 @@ export default function OwnerDashboard() {
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
         <section>
-          <SectionHeader icon={Package} title="Inventory Analytics" subtitle="Stock health overview" color="indigo" action={{ label: 'Inventory', onClick: () => navigate('/inventory') }} />
+          <SectionHeader icon={Package} title={t('inventory_analytics')} subtitle={t('stock_health_overview')} color="indigo" action={{ label: t('inventory') || 'Inventory', onClick: () => navigate('/inventory') }} />
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <MetricCard title="Inventory Value"  value={fmt(inventoryAnalytics.inventoryValue)} icon={Package}       color="indigo" large />
-            <MetricCard title="Low Stock Items"  value={inventoryAnalytics.lowStock.length}      icon={AlertTriangle} color={inventoryAnalytics.lowStock.length > 0 ? 'amber' : 'green'} large onClick={() => navigate('/inventory')} />
-            <MetricCard title="Out of Stock"     value={inventoryAnalytics.outOfStock.length}    icon={XCircle}       color={inventoryAnalytics.outOfStock.length > 0 ? 'red' : 'green'} onClick={() => navigate('/inventory')} />
-            <MetricCard title="Dead Stock Items" value={inventoryAnalytics.deadStock.length}     icon={Layers}        color="slate" />
+            <MetricCard title={t('inventory_value')}  value={fmt(inventoryAnalytics.inventoryValue)} icon={Package}       color="indigo" large />
+            <MetricCard title={t('low_stock_items_label')}  value={inventoryAnalytics.lowStock.length}      icon={AlertTriangle} color={inventoryAnalytics.lowStock.length > 0 ? 'amber' : 'green'} large onClick={() => navigate('/inventory')} />
+            <MetricCard title={t('out_of_stock_label')}     value={inventoryAnalytics.outOfStock.length}    icon={XCircle}       color={inventoryAnalytics.outOfStock.length > 0 ? 'red' : 'green'} onClick={() => navigate('/inventory')} />
+            <MetricCard title={t('dead_stock_items')} value={inventoryAnalytics.deadStock.length}     icon={Layers}        color="slate" />
           </div>
           {inventoryAnalytics.lowStock.length > 0 && (
             <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
               <CardContent className="p-3">
-                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2">Low Stock Items</p>
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2">{t('low_stock_items_label')}</p>
                 <div className="space-y-1">
                   { (inventoryAnalytics.lowStock || []).slice(0, 5).map(item => (
                     <div key={item.id} className="flex items-center justify-between">
                       <span className="text-xs text-foreground truncate max-w-[160px]">{item.product_name}</span>
-                      <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700">{item.quantity} left</Badge>
+                      <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700">{item.quantity} {t('left_label')}</Badge>
                     </div>
                   ))}
                 </div>
@@ -1512,12 +1513,12 @@ export default function OwnerDashboard() {
           {inventoryAnalytics.outOfStock.length > 0 && (
             <Card className="border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20 mt-2">
               <CardContent className="p-3">
-                <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2">Out of Stock</p>
+                <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2">{t('out_of_stock_label')}</p>
                 <div className="space-y-1">
                   { (inventoryAnalytics.outOfStock || []).slice(0, 5).map(item => (
                     <div key={item.id} className="flex items-center justify-between">
                       <span className="text-xs text-foreground truncate max-w-[160px]">{item.product_name}</span>
-                      <Badge variant="destructive" className="text-[10px]">0 units</Badge>
+                      <Badge variant="destructive" className="text-[10px]">{t('zero_units')}</Badge>
                     </div>
                   ))}
                 </div>
@@ -1532,14 +1533,14 @@ export default function OwnerDashboard() {
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
         <section>
-          <SectionHeader icon={Activity} title="Cash Flow" subtitle="Today's money movement" color="cyan" action={{ label: 'Treasury', onClick: () => navigate('/treasury') }} />
+          <SectionHeader icon={Activity} title={t('cash_flow')} subtitle={t('todays_money_movement')} color="cyan" action={{ label: t('treasury') || 'Treasury', onClick: () => navigate('/treasury') }} />
           <Card>
             <CardContent className="p-4 space-y-1">
-              <LedgerRow label="Money In"      value={fmt(cashFlow.moneyIn)}                  color="green" />
-              <LedgerRow label="Money Out"     value={`− ${fmt(cashFlow.moneyOut)}`}          color="red" />
-              <LedgerRow label="Owner Capital" value={fmt(cashFlow.ownerCapital)}             color="purple" />
-              <LedgerRow label="Expenses"      value={`− ${fmt(cashFlow.expenses)}`}          color="amber" />
-              <LedgerRow label="Net Cash Flow" value={fmt(cashFlow.netCashFlow)}              color={cashFlow.netCashFlow >= 0 ? 'green' : 'red'} bold separator />
+              <LedgerRow label={t('money_in')}      value={fmt(cashFlow.moneyIn)}                  color="green" />
+              <LedgerRow label={t('money_out')}     value={`− ${fmt(cashFlow.moneyOut)}`}          color="red" />
+              <LedgerRow label={t('owner_capital')} value={fmt(cashFlow.ownerCapital)}             color="purple" />
+              <LedgerRow label={t('expenses_label')}      value={`− ${fmt(cashFlow.expenses)}`}          color="amber" />
+              <LedgerRow label={t('net_cash_flow')} value={fmt(cashFlow.netCashFlow)}              color={cashFlow.netCashFlow >= 0 ? 'green' : 'red'} bold separator />
             </CardContent>
           </Card>
         </section>
@@ -1550,11 +1551,11 @@ export default function OwnerDashboard() {
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
         <section>
-          <SectionHeader icon={TrendingUp} title="Product Price Intelligence" subtitle="Price changes & trends (last 30 days)" color="purple" action={{ label: 'Products', onClick: () => navigate('/product-management') }} />
+          <SectionHeader icon={TrendingUp} title={t('price_intelligence')} subtitle={t('price_changes_subtitle')} color="purple" action={{ label: t('products') || 'Products', onClick: () => navigate('/product-management') }} />
           {priceIntelligence.length === 0 ? (
             <Card>
               <CardContent className="p-4 text-center text-xs text-muted-foreground">
-                No price changes recorded in the last 30 days.
+                {t('no_price_changes')}
               </CardContent>
             </Card>
           ) : (
@@ -1571,24 +1572,24 @@ export default function OwnerDashboard() {
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-[11px]">
                       <div>
-                        <p className="text-muted-foreground">Latest</p>
+                        <p className="text-muted-foreground">{t('latest_label')}</p>
                         <p className="font-bold text-foreground">{fmt(item.latestPrice)}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Previous</p>
+                        <p className="text-muted-foreground">{t('previous_label')}</p>
                         <p className="font-semibold text-muted-foreground">{fmt(item.previousPrice)}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Difference</p>
+                        <p className="text-muted-foreground">{t('difference_label')}</p>
                         <p className={`font-bold ${item.diff > 0 ? 'text-red-600' : item.diff < 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
                           {item.diff >= 0 ? '+' : ''}{fmt(item.diff)}
                         </p>
                       </div>
                     </div>
                     <div className="flex gap-3 mt-2 text-[10px] text-muted-foreground">
-                      <span>Weekly: <strong>{item.weeklyTrend}</strong></span>
-                      <span>Monthly: <strong>{item.monthlyTrend}</strong></span>
-                      <span>Yearly: <strong>{item.yearlyTrend}</strong></span>
+                      <span>{t('weekly_label')} <strong>{item.weeklyTrend}</strong></span>
+                      <span>{t('monthly_label')} <strong>{item.monthlyTrend}</strong></span>
+                      <span>{t('yearly_label')} <strong>{item.yearlyTrend}</strong></span>
                     </div>
                   </CardContent>
                 </Card>
@@ -1603,14 +1604,14 @@ export default function OwnerDashboard() {
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
         <section>
-          <SectionHeader icon={AlertTriangle} title="Alerts" subtitle={`${totalAlerts} active alert${totalAlerts !== 1 ? 's' : ''}`} color="red" />
+          <SectionHeader icon={AlertTriangle} title={t('alerts_label')} subtitle={`${totalAlerts} ${totalAlerts === 1 ? t('active_alert') : t('active_alerts')}`} color="red" />
           <div className="space-y-2">
-            <AlertRow icon={ShoppingBag}  title="Missing Purchases"       count={alerts.missingPurchaseDays}    severity={alerts.missingPurchaseDays > 0 ? 'amber' : 'green'}    onClick={() => navigate('/enterprise-purchases')} />
-            <AlertRow icon={AlertTriangle} title="Cash Shortage (today)"  count={alerts.cashShortage}           severity={alerts.cashShortage > 0 ? 'critical' : 'green'}        onClick={() => navigate('/sales')} />
-            <AlertRow icon={TrendingDown}  title="Negative Profit"        count={alerts.negativeProfit}         severity={alerts.negativeProfit > 0 ? 'critical' : 'green'}      onClick={() => navigate('/profit-loss')} />
-            <AlertRow icon={Package}       title="Inventory Alerts"       count={alerts.inventoryAlerts}        severity={alerts.inventoryAlerts > 0 ? 'amber' : 'green'}        onClick={() => navigate('/inventory')} />
-            <AlertRow icon={Users}         title="Customer Credit Alerts" count={alerts.customerCreditAlerts}   severity={alerts.customerCreditAlerts > 0 ? 'blue' : 'green'}    onClick={() => navigate('/debt-management')} />
-            <AlertRow icon={Truck}         title="Supplier Due Alerts"    count={alerts.supplierDueAlerts}      severity={alerts.supplierDueAlerts > 0 ? 'high' : 'green'}       onClick={() => navigate('/suppliers')} />
+            <AlertRow icon={ShoppingBag}  title={t('missing_purchases')}       count={alerts.missingPurchaseDays}    severity={alerts.missingPurchaseDays > 0 ? 'amber' : 'green'}    onClick={() => navigate('/enterprise-purchases')} />
+            <AlertRow icon={AlertTriangle} title={t('cash_shortage_alert')}  count={alerts.cashShortage}           severity={alerts.cashShortage > 0 ? 'critical' : 'green'}        onClick={() => navigate('/sales')} />
+            <AlertRow icon={TrendingDown}  title={t('negative_profit')}        count={alerts.negativeProfit}         severity={alerts.negativeProfit > 0 ? 'critical' : 'green'}      onClick={() => navigate('/profit-loss')} />
+            <AlertRow icon={Package}       title={t('inventory_alerts')}       count={alerts.inventoryAlerts}        severity={alerts.inventoryAlerts > 0 ? 'amber' : 'green'}        onClick={() => navigate('/inventory')} />
+            <AlertRow icon={Users}         title={t('customer_credit_alerts')} count={alerts.customerCreditAlerts}   severity={alerts.customerCreditAlerts > 0 ? 'blue' : 'green'}    onClick={() => navigate('/debt-management')} />
+            <AlertRow icon={Truck}         title={t('supplier_due_alerts')}    count={alerts.supplierDueAlerts}      severity={alerts.supplierDueAlerts > 0 ? 'high' : 'green'}       onClick={() => navigate('/suppliers')} />
           </div>
         </section>
       </WidgetErrorBoundary>
@@ -1629,8 +1630,8 @@ export default function OwnerDashboard() {
         <section>
           <SectionHeader
             icon={Layers}
-            title="Mode-Specific Insights"
-            subtitle="Widgets adapt automatically to your Business Type"
+            title={t('mode_specific_insights')}
+            subtitle={t('mode_specific_subtitle')}
             color="indigo"
           />
           <ModeSpecificDashboardSection

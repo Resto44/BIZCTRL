@@ -28,14 +28,14 @@ function pctColor(pct) {
   return 'text-gray-500';
 }
 
-function relativeDate(dateStr) {
+function relativeDate(dateStr, t) {
   const d = new Date(dateStr);
   const now = new Date();
   const diffMs = now - d;
   const diffDays = Math.floor(diffMs / 86400000);
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays === 0) return t('today_label');
+  if (diffDays === 1) return t('yesterday_label');
+  if (diffDays < 7) return `${diffDays} ${t('days_ago') || 'days ago'}`;
   return format(d, 'dd MMM');
 }
 
@@ -43,7 +43,7 @@ function relativeDate(dateStr) {
 export default function PriceChangesWidget() {
   const { ownerFilter } = useTenant();
   const { user } = useAuth();
-  const { currency } = useLanguage();
+  const { currency, t } = useLanguage();
 
   const createdBy = user?.email || ownerFilter?.created_by;
 
@@ -96,12 +96,12 @@ export default function PriceChangesWidget() {
             <DollarSign className="w-4 h-4 text-indigo-600" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold">Price Changes</h3>
-            <p className="text-xs text-muted-foreground">Last 30 days · {stats.uniqueProducts} products</p>
+            <h3 className="text-sm font-semibold">{t('price_changes_title')}</h3>
+            <p className="text-xs text-muted-foreground">{t('price_changes_last30')} · {stats.uniqueProducts} {t('products') || 'products'}</p>
           </div>
         </div>
         <Link to="/product-management" className="text-xs text-primary flex items-center gap-0.5 hover:underline">
-          View All <ArrowRight className="w-3 h-3" />
+          {t('view_all')} <ArrowRight className="w-3 h-3" />
         </Link>
       </div>
 
@@ -109,12 +109,12 @@ export default function PriceChangesWidget() {
       <div className="flex gap-2 mb-3">
         {stats.increases > 0 && (
           <Badge className="bg-red-100 text-red-700 text-xs flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" /> {stats.increases} Increase{stats.increases !== 1 ? 's' : ''}
+            <TrendingUp className="w-3 h-3" /> {stats.increases} {t('increases_label')}
           </Badge>
         )}
         {stats.decreases > 0 && (
           <Badge className="bg-green-100 text-green-700 text-xs flex items-center gap-1">
-            <TrendingDown className="w-3 h-3" /> {stats.decreases} Decrease{stats.decreases !== 1 ? 's' : ''}
+            <TrendingDown className="w-3 h-3" /> {stats.decreases} {t('decreases_label')}
           </Badge>
         )}
       </div>
@@ -130,8 +130,8 @@ export default function PriceChangesWidget() {
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold truncate">{row.product_name}</p>
                 <div className="flex flex-wrap gap-x-2 gap-y-0 text-[11px] text-muted-foreground mt-0.5">
-                  <span>{relativeDate(row.recorded_at)}: <strong className="text-foreground">{currency}{(row.previous_price || 0).toFixed(2)}</strong></span>
-                  <span>Now: <strong className="text-foreground">{currency}{(row.new_price || 0).toFixed(2)}</strong></span>
+                  <span>{relativeDate(row.recorded_at, t)}: <strong className="text-foreground">{currency}{(row.previous_price || 0).toFixed(2)}</strong></span>
+                  <span>{t('now_label')} <strong className="text-foreground">{currency}{(row.new_price || 0).toFixed(2)}</strong></span>
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
@@ -149,8 +149,8 @@ export default function PriceChangesWidget() {
 
       {stats.total > 6 && (
         <p className="text-xs text-muted-foreground text-center mt-2">
-          +{stats.total - 6} more changes ·{' '}
-          <Link to="/product-management" className="text-primary hover:underline">View all</Link>
+          +{stats.total - 6} {t('more_changes')} ·{' '}
+          <Link to="/product-management" className="text-primary hover:underline">{t('view_all_lower')}</Link>
         </p>
       )}
     </Card>

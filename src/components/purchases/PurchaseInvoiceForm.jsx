@@ -245,6 +245,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
     invoice_number: invoice?.invoice_number || '',
     supplier_id: invoice?.supplier_id || '',
     supplier_name: invoice?.supplier_name || '',
+    supplier_email: invoice?.supplier_email || '',
     branch: invoice?.branch || '',
     date: invoice?.date || format(new Date(), 'yyyy-MM-dd'),
     due_date: invoice?.due_date || '',
@@ -419,10 +420,15 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
       const selectedBranch = branches.find(b => b.key === form.branch || b.branch_key === form.branch);
       const branchId = selectedBranch?.id || null;
 
+      // Resolve supplier email from suppliers list if not already set
+      const supplierObj = supplierId ? suppliers.find(s => s.id === supplierId) : null;
+      const supplierEmail = form.supplier_email || supplierObj?.email || null;
+
       const invoicePayload = {
         ...form,
         supplier_id: supplierId, // Sanitize: ensure "" becomes null for UUID column
         supplier_name: supplierName || form.supplier_name,
+        supplier_email: supplierEmail || null,
         attachment_urls: attachments,
         // Always include restaurant_id and branch_id so RLS erp_scope_insert passes
         restaurant_id: restaurantId || null,
@@ -526,7 +532,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
           <Label className="text-xs text-muted-foreground">Supplier *</Label>
           <Select value={form.supplier_id} onValueChange={v => {
             const s = suppliers.find(s => s.id === v);
-            setForm(f => ({ ...f, supplier_id: v, supplier_name: s?.name || '' }));
+            setForm(f => ({ ...f, supplier_id: v, supplier_name: s?.name || '', supplier_email: s?.email || '' }));
           }}>
             <SelectTrigger className="h-9 w-full min-w-0">
               <SelectValue placeholder="Select supplier..." />

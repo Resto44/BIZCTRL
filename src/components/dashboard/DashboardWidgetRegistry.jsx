@@ -13,6 +13,7 @@
 
 import React, { useMemo } from 'react';
 import { useBusinessMode } from '@/lib/BusinessModeContext';
+import { useLanguage } from '@/lib/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -156,13 +157,14 @@ export function useModeDashboardConfig() {
 
 export function ModeSpecificDashboardSection({ lowStockItems = [], expiryAlerts = [], pendingOrders = [] }) {
   const { isRetail } = useBusinessMode();
+  const { t } = useLanguage();
 
   if (isRetail) {
     return (
       <div className="space-y-4">
         {/* Retail: Low Stock */}
         <AlertWidget
-          title="Low Stock Alerts"
+          title={t('low_stock_alerts')}
           icon={AlertTriangle}
           color="amber"
           linkTo="/inventory"
@@ -171,21 +173,21 @@ export function ModeSpecificDashboardSection({ lowStockItems = [], expiryAlerts 
             value: `${item.current_stock || item.opening_stock || 0} ${item.unit || ''}`,
             valueColor: 'text-amber-600',
           }))}
-          emptyMsg="All products are well-stocked"
+          emptyMsg={t('all_products_stocked')}
         />
 
         {/* Retail: Expiry Alerts */}
         <AlertWidget
-          title="Expiry Alerts"
+          title={t('expiry_alerts')}
           icon={Calendar}
           color="red"
           linkTo="/retail/expiry"
           items={expiryAlerts.map(item => ({
             label: item.products?.name || item.name,
-            value: item.expiry_date ? `Exp: ${new Date(item.expiry_date).toLocaleDateString()}` : 'No date',
+            value: item.expiry_date ? `${t('exp_label')} ${new Date(item.expiry_date).toLocaleDateString()}` : t('no_date_label'),
             valueColor: 'text-red-600',
           }))}
-          emptyMsg="No expiry alerts"
+          emptyMsg={t('no_expiry_alerts')}
         />
       </div>
     );
@@ -196,7 +198,7 @@ export function ModeSpecificDashboardSection({ lowStockItems = [], expiryAlerts 
     <div className="space-y-4">
       {/* Restaurant: Low Ingredients */}
       <AlertWidget
-        title="Low Ingredients"
+        title={t('low_ingredients')}
         icon={AlertTriangle}
         color="amber"
         linkTo="/inventory"
@@ -205,21 +207,21 @@ export function ModeSpecificDashboardSection({ lowStockItems = [], expiryAlerts 
           value: `${item.current_stock || item.opening_stock || 0} ${item.unit || ''}`,
           valueColor: 'text-amber-600',
         }))}
-        emptyMsg="All ingredients are stocked"
+        emptyMsg={t('all_ingredients_stocked')}
       />
 
       {/* Restaurant: Pending Orders */}
       <AlertWidget
-        title="Pending Orders"
+        title={t('pending_label')}
         icon={Clock}
         color="blue"
         linkTo="/order-management"
         items={pendingOrders.map(order => ({
-          label: `Order #${order.id?.slice(-6) || '—'}`,
-          value: order.total_amount ? `${order.total_amount}` : 'Pending',
+          label: `${t('order_label')}${order.id?.slice(-6) || '—'}`,
+          value: order.total_amount ? `${order.total_amount}` : t('pending_label'),
           valueColor: 'text-blue-600',
         }))}
-        emptyMsg="No pending orders"
+        emptyMsg={t('no_pending_orders')}
       />
     </div>
   );
