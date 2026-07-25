@@ -78,21 +78,40 @@ export function computeExecutiveSummary(sales, purchases, expenses, revenueSourc
   const yearSales      = filterByDate(sales, yStart, yEnd);
   const prevMonthSales = filterByDate(sales, pmStart, pmEnd);
 
+  const todayPurchases = filterByDate(purchases, today, today);
+  const yesterdayPurchases = filterByDate(purchases, yesterday, yesterday);
   const monthPurchases = filterByDate(purchases, mStart, mEnd);
   const yearPurchases  = filterByDate(purchases, yStart, yEnd);
 
-  // Tag expenses with _is_fixed from categories for correct proration
+  // Tag expenses with _is_fixed from categories for correct proration.
+  // The daily calls receive the complete applicable month pool for fixed costs.
   const taggedExpenses = tagExpensesWithCategories(expenses, expenseCategories);
   const monthExpenses  = filterByDate(taggedExpenses, mStart, mEnd);
   const yearExpenses   = filterByDate(taggedExpenses, yStart, yEnd);
   const todayExpenses  = filterByDate(taggedExpenses, today, today);
+  const yesterdayExpenses = filterByDate(taggedExpenses, yesterday, yesterday);
+  const yesterdayDate = subDays(new Date(), 1);
+  const yesterdayMonthExpenses = filterByDate(
+    taggedExpenses,
+    format(startOfMonth(yesterdayDate), 'yyyy-MM-dd'),
+    format(endOfMonth(yesterdayDate), 'yyyy-MM-dd'),
+  );
 
-  const realDaysInMonth = new Date().getMonth() === 1 ? (new Date().getFullYear() % 4 === 0 ? 29 : 28) : [3, 5, 8, 10].includes(new Date().getMonth()) ? 30 : 31;
-  const todayMetrics     = computeDashboardMetrics(todaySales, [], todayExpenses, 'day', revenueSources, 1, realDaysInMonth);
-  const yesterdayMetrics = computeDashboardMetrics(yesterdaySales, [], [], 'day', revenueSources);
-  const monthMetrics     = computeDashboardMetrics(monthSales, monthPurchases, monthExpenses, 'month', revenueSources);
-  const yearMetrics      = computeDashboardMetrics(yearSales, yearPurchases, yearExpenses, 'year', revenueSources);
-  const prevMonthMetrics = computeDashboardMetrics(prevMonthSales, filterByDate(purchases, pmStart, pmEnd), filterByDate(taggedExpenses, pmStart, pmEnd), 'month', revenueSources);
+  const todayMetrics = computeDashboardMetrics(
+    todaySales, todayPurchases, todayExpenses, 'day', revenueSources, 1, null,
+    { monthlyExpenses: monthExpenses, asOfDate: today },
+  );
+  const yesterdayMetrics = computeDashboardMetrics(
+    yesterdaySales, yesterdayPurchases, yesterdayExpenses, 'day', revenueSources, 1, null,
+    { monthlyExpenses: yesterdayMonthExpenses, asOfDate: yesterday },
+  );
+  const monthMetrics = computeDashboardMetrics(monthSales, monthPurchases, monthExpenses, 'month', revenueSources, null, null, { monthlyExpenses: monthExpenses, asOfDate: mEnd });
+  const yearMetrics = computeDashboardMetrics(yearSales, yearPurchases, yearExpenses, 'year', revenueSources, null, null, { monthlyExpenses: yearExpenses, asOfDate: yEnd });
+  const prevMonthExpenses = filterByDate(taggedExpenses, pmStart, pmEnd);
+  const prevMonthMetrics = computeDashboardMetrics(
+    prevMonthSales, filterByDate(purchases, pmStart, pmEnd), prevMonthExpenses, 'month', revenueSources, null, null,
+    { monthlyExpenses: prevMonthExpenses, asOfDate: pmEnd },
+  );
 
   // Sales Growth % (month vs prev month)
   const salesGrowth = prevMonthMetrics.totalSales > 0

@@ -10,6 +10,7 @@ import { getDateRange, getPreviousDateRange, formatDate, computeDashboardMetrics
 import { useExpenseCategories } from '@/components/expenses/ExpenseCategoryManager';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 
 const RANGES = ['week', 'month', 'year'];
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -117,10 +118,18 @@ export default function ProfitLoss() {
     }));
   }, [expenses, expenseCategories]);
   const fExp = useMemo(() => expensesTagged.filter(e => e.date >= fromStr && e.date <= toStr), [expensesTagged, fromStr, toStr]);
+  const monthlyExpensePool = useMemo(() => {
+    const monthStart = format(startOfMonth(dateRange.to), 'yyyy-MM-dd');
+    const monthEnd = format(endOfMonth(dateRange.to), 'yyyy-MM-dd');
+    return expensesTagged.filter(expense => expense.date >= monthStart && expense.date <= monthEnd);
+  }, [dateRange.to, expensesTagged]);
   const fWaste = useMemo(() => wastes.filter(w => w.date >= fromStr && w.date <= toStr), [wastes, fromStr, toStr]);
   const totalWasteCost = useMemo(() => fWaste.reduce((s, w) => s + (w.total_loss || 0), 0), [fWaste]);
 
-  const metrics = useMemo(() => computeDashboardMetrics(fSales, fPurch, fExp, rangeType), [fSales, fPurch, fExp, rangeType]);
+  const metrics = useMemo(() => computeDashboardMetrics(
+    fSales, fPurch, fExp, rangeType, [], null, null,
+    { monthlyExpenses: monthlyExpensePool, asOfDate: toStr },
+  ), [fSales, fPurch, fExp, monthlyExpensePool, rangeType, toStr]);
 
   // Previous period comparison
   const prevDateRange = useMemo(() => getPreviousDateRange(rangeType), [rangeType]);
@@ -129,7 +138,15 @@ export default function ProfitLoss() {
   const prevSales = useMemo(() => sales.filter(s => s.date >= prevFromStr && s.date <= prevToStr), [sales, prevFromStr, prevToStr]);
   const prevPurch = useMemo(() => purchases.filter(p => p.date >= prevFromStr && p.date <= prevToStr), [purchases, prevFromStr, prevToStr]);
   const prevExp = useMemo(() => expensesTagged.filter(e => e.date >= prevFromStr && e.date <= prevToStr), [expensesTagged, prevFromStr, prevToStr]);
-  const prevMetrics = useMemo(() => computeDashboardMetrics(prevSales, prevPurch, prevExp, rangeType), [prevSales, prevPurch, prevExp, rangeType]);
+  const prevMonthlyExpensePool = useMemo(() => {
+    const monthStart = format(startOfMonth(prevDateRange.to), 'yyyy-MM-dd');
+    const monthEnd = format(endOfMonth(prevDateRange.to), 'yyyy-MM-dd');
+    return expensesTagged.filter(expense => expense.date >= monthStart && expense.date <= monthEnd);
+  }, [expensesTagged, prevDateRange.to]);
+  const prevMetrics = useMemo(() => computeDashboardMetrics(
+    prevSales, prevPurch, prevExp, rangeType, [], null, null,
+    { monthlyExpenses: prevMonthlyExpensePool, asOfDate: prevToStr },
+  ), [prevSales, prevPurch, prevExp, prevMonthlyExpensePool, prevToStr, rangeType]);
 
   const pctChange = (cur, prev) => {
     if (!prev || prev === 0) return null;
@@ -186,12 +203,16 @@ export default function ProfitLoss() {
     const bs = fSales.filter(s => s.branch === b.key);
     const bp = fPurch.filter(p => p.branch === b.key);
     const be = fExp.filter(e => e.branch === b.key || e.branch === 'all');
-    const bm = computeDashboardMetrics(bs, bp, be, rangeType);
+    const branchMonthlyExpensePool = monthlyExpensePool.filter(e => e.branch === b.key || e.branch === 'all');
+    const bm = computeDashboardMetrics(
+      bs, bp, be, rangeType, [], null, null,
+      { monthlyExpenses: branchMonthlyExpensePool, asOfDate: toStr },
+    );
     const bWaste = fWaste.filter(w => w.branch === b.key).reduce((s, w) => s + (w.total_loss || 0), 0);
     const adjNet = bm.netProfit - bWaste;
     const nm = bm.totalSales > 0 ? (adjNet / bm.totalSales * 100).toFixed(1) : null;
     return { name: b.label, ...bm, netProfit: adjNet, wasteCost: bWaste, netMargin: nm };
-  }), [branches, fSales, fPurch, fExp, fWaste]);
+  }), [branches, fSales, fPurch, fExp, fWaste, monthlyExpensePool, rangeType, toStr]);
 
   const exportCSV = () => {
     const rows = [

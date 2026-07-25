@@ -40,6 +40,9 @@ export async function createSalesInvoice({ invoiceNumber, saleId, saleData, rest
     invoice_number:  invoiceNumber,
     sale_id:         saleId,
     restaurant_id:   restaurantId || null,
+    branch_id:        saleData.branch_id || null,
+    // `tenant_id` preserves the active organization scope on legacy invoice rows.
+    tenant_id:        saleData.tenant_id || restaurantId || '',
     branch:          saleData.branch,
     sale_date:       saleData.date,
     opening_cash:    Number(saleData.opening_cash || 0),
@@ -59,7 +62,7 @@ export async function createSalesInvoice({ invoiceNumber, saleId, saleData, rest
     manager_approved_by: saleData.manager_approved_by || '',
     pos_entries_json: saleData.pos_entries_json || '',
     credit_entries_json: saleData.credit_entries_json || '',
-    created_by:      createdBy || ''
+    created_by:      createdBy || saleData.created_by || ''
   };
 
   // Requirement 5: Use a single transaction-like call if possible.

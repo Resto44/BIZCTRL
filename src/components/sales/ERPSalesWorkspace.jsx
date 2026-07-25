@@ -951,10 +951,30 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       return;
     }
 
+    const selectedBranch = branches.find((branch) =>
+      branch.id === form.branch_id ||
+      branch.key === form.branch ||
+      branch.branch_key === form.branch,
+    );
+    const branchId = selectedBranch?.id || form.branch_id || null;
+    const createdBy = user?.email || ownerFilter?.created_by || '';
+    const tenantId = activeRestaurant?.id || user?.organization_id || user?.restaurant_id || '';
+
+    if (!activeRestaurant?.id || !branchId || !createdBy) {
+      toast.error('An active business, branch, and authenticated user are required to close sales.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const payload = {
         ...form,
+        branch: selectedBranch?.key || selectedBranch?.branch_key || form.branch,
+        branch_id: branchId,
+        // `tenant_id` carries the active organization scope on legacy sales tables.
+        tenant_id: tenantId,
+        // `created_by` is the authenticated user mapping required by downstream RLS checks.
+        created_by: createdBy,
         restaurant_cash: cashSales,
         cash: cashSales,
         restaurant_network: networkTotal,

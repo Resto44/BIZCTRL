@@ -429,7 +429,7 @@ export default function Sales() {
           saleId: saleId,
           saleData: data,
           restaurantId: data.restaurant_id,
-          createdBy: user?.email
+          createdBy: data.created_by || user?.email
         });
       } catch (invErr) {
         console.warn('[Sales] Manual invoice creation failed (might already exist via trigger):', invErr.message);

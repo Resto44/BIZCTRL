@@ -40,7 +40,7 @@ import { useRole } from '@/lib/RoleContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useNetworkSettlement } from '@/hooks/useNetworkSettlement';
 import { useNotify } from '@/lib/useNotify';
-import { getSaleCash, getSaleNetwork, calculateSalesRevenue, computeDashboardMetrics, computeProductQuantityAnalytics } from '@/lib/helpers';
+import { calculateSalesRevenue, calculateERPAccounting, tagExpensesWithCategories, computeProductQuantityAnalytics } from '@/lib/helpers';
 import { computeAdditionalSources } from '@/services/salesAnalyticsEngine';
 import { useSalesSources } from '@/hooks/useSalesSources';
 import { Card, CardContent } from '@/components/ui/card';
@@ -68,7 +68,7 @@ import {
 } from 'lucide-react';
 import {
   format, startOfMonth, startOfWeek, startOfYear,
-  subDays, subWeeks, subMonths, getDaysInMonth, differenceInCalendarDays,
+  subDays, subWeeks, subMonths,
 } from 'date-fns';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -608,94 +608,94 @@ export default function OwnerDashboard() {
      (arr || []).reduce((s, p) => s + ((p.qty || 0) * (p.used_price || p.current_price || 0)), 0), []);
 
   // ── Expense and Net-Profit Inputs ─────────────────────────────────────────────
-  // Expenses are intentionally computed without reference to sales or purchases.
-  // Fixed expenses are allocated once per period; variable expenses are summed only
-  // from records in that period.
-  const expenseSummary = useMemo(() => {
-    const categoryById = new Map(
-      (expenseCategories || []).map(category => [category.id, category]),
-    );
-    const isFixedExpense = (expense) => Boolean(
-      expense?._is_fixed
-      || expense?.is_fixed
-      || categoryById.get(expense?.category_id)?.is_fixed
-      || categoryById.get(expense?.expense_category_id)?.is_fixed,
-    );
-    const amountOf = (expense) => Number(expense?.amount) || 0;
-    const variableTotal = (expenses) => (expenses || [])
-      .filter(expense => !isFixedExpense(expense))
-      .reduce((total, expense) => total + amountOf(expense), 0);
-    const fixedTotal = (expenses) => (expenses || [])
-      .filter(expense => isFixedExpense(expense))
-      .reduce((total, expense) => total + amountOf(expense), 0);
-
-    const daysInMonth = getDaysInMonth(new Date());
-    const monthlyFixed = fixedTotal(monthExpenses);
-    const monthlyVariable = variableTotal(monthExpenses);
-    const dailyFixedAllocation = monthlyFixed / daysInMonth;
-    const weekDaysElapsed = Math.min(7, Math.max(1, differenceInCalendarDays(new Date(), startOfWeek(new Date(), { weekStartsOn: 6 })) + 1));
-
-    return {
-      daysInMonth,
-      monthlyFixed,
-      monthlyVariable,
-      monthlyTotal: monthlyFixed + monthlyVariable,
-      dailyFixedAllocation,
-      dailyExpense: (monthlyFixed + monthlyVariable) / daysInMonth,
-      todayVariable: variableTotal(todayExpenses),
-      yesterdayVariable: variableTotal(yesterdayExpenses),
-      weekVariable: variableTotal(weekExpenses),
-      weekFixedAllocation: dailyFixedAllocation * weekDaysElapsed,
-      weekDaysElapsed,
-    };
-  }, [expenseCategories, monthExpenses, todayExpenses, yesterdayExpenses, weekExpenses]);
+  // The shared accounting engine receives a full calendar-month fixed-cost pool
+  // and period-only variable expenses, so every owner KPI uses the same formulas.
+  const taggedMonthExpenses = useMemo(
+    () => tagExpensesWithCategories(monthExpenses, expenseCategories),
+    [expenseCategories, monthExpenses],
+  );
+  const taggedPreviousMonthExpenses = useMemo(
+    () => tagExpensesWithCategories(prevMonthExpenses, expenseCategories),
+    [expenseCategories, prevMonthExpenses],
+  );
+  const taggedTodayExpenses = useMemo(
+    () => tagExpensesWithCategories(todayExpenses, expenseCategories),
+    [expenseCategories, todayExpenses],
+  );
+  const taggedYesterdayExpenses = useMemo(
+    () => tagExpensesWithCategories(yesterdayExpenses, expenseCategories),
+    [expenseCategories, yesterdayExpenses],
+  );
+  const taggedWeekExpenses = useMemo(
+    () => tagExpensesWithCategories(weekExpenses, expenseCategories),
+    [expenseCategories, weekExpenses],
+  );
 
   const periodProfit = useMemo(() => {
-    const isApprovedInvoice = (invoice) => (
+    const isApprovedInvoice = invoice => (
       ['approved', 'auto_approved'].includes(invoice.approval_status)
       || ['approved', 'paid', 'partial', 'unpaid'].includes(invoice.status)
       || !invoice.approval_status
     );
-    const sumApprovedInvoices = (startDate, endDate) => (supplierInvoices || [])
-      .filter(invoice => isApprovedInvoice(invoice) && invoice.date >= startDate && invoice.date <= endDate)
-      .reduce((total, invoice) => total + (Number(invoice.total_amount || invoice.amount) || 0), 0);
-    const createPeriod = (sales, purchases, variableExpenses, fixedAllocation) => ({
-      sales,
-      purchases,
-      variableExpenses,
-      fixedAllocation,
-      grossProfit: sales - purchases,
-      expenses: variableExpenses + fixedAllocation,
-      netProfit: sales - purchases - variableExpenses - fixedAllocation,
-    });
+    const approvedInvoices = (supplierInvoices || []).filter(isApprovedInvoice);
+    const invoicesFor = (startDate, endDate) => approvedInvoices
+      .filter(invoice => invoice.date >= startDate && invoice.date <= endDate);
+    const weekDaysElapsed = Math.max(1, Math.round((new Date(`${today}T12:00:00`) - new Date(`${weekStart}T12:00:00`)) / 86400000) + 1);
+    const createPeriod = ({ sales, startDate, endDate, expenses, fixedPool, rangeType, daysInPeriod }) => {
+      const metrics = calculateERPAccounting({
+        sales,
+        purchases: invoicesFor(startDate, endDate),
+        periodExpenses: expenses,
+        monthlyExpenses: fixedPool,
+        rangeType,
+        revenueSources,
+        daysInPeriod,
+        asOfDate: endDate,
+      });
+      return {
+        ...metrics,
+        sales: metrics.totalSales,
+        purchases: metrics.totalPurchaseCost,
+        variableExpenses: metrics.totalVariableExpenses,
+        fixedAllocation: metrics.fixedDeduction,
+        expenses: metrics.totalExpenses,
+      };
+    };
+    const yesterdayFixedPool = yesterday < monthStart ? taggedPreviousMonthExpenses : taggedMonthExpenses;
 
     return {
-      today: createPeriod(
-        sumSales(todaySales),
-        sumApprovedInvoices(today, today),
-        expenseSummary.todayVariable,
-        expenseSummary.dailyFixedAllocation,
-      ),
-      yesterday: createPeriod(
-        sumSales(yesterdaySales),
-        sumApprovedInvoices(yesterday, yesterday),
-        expenseSummary.yesterdayVariable,
-        expenseSummary.dailyFixedAllocation,
-      ),
-      week: createPeriod(
-        sumSales(weekSales),
-        sumApprovedInvoices(weekStart, today),
-        expenseSummary.weekVariable,
-        expenseSummary.weekFixedAllocation,
-      ),
-      month: createPeriod(
-        sumSales(monthSales),
-        sumApprovedInvoices(monthStart, today),
-        expenseSummary.monthlyVariable,
-        expenseSummary.monthlyFixed,
-      ),
+      today: createPeriod({
+        sales: todaySales, startDate: today, endDate: today, expenses: taggedTodayExpenses,
+        fixedPool: taggedMonthExpenses, rangeType: 'day', daysInPeriod: 1,
+      }),
+      yesterday: createPeriod({
+        sales: yesterdaySales, startDate: yesterday, endDate: yesterday, expenses: taggedYesterdayExpenses,
+        fixedPool: yesterdayFixedPool, rangeType: 'day', daysInPeriod: 1,
+      }),
+      week: createPeriod({
+        sales: weekSales, startDate: weekStart, endDate: today, expenses: taggedWeekExpenses,
+        fixedPool: taggedMonthExpenses, rangeType: 'week', daysInPeriod: Math.min(7, weekDaysElapsed),
+      }),
+      month: createPeriod({
+        sales: monthSales, startDate: monthStart, endDate: today, expenses: taggedMonthExpenses,
+        fixedPool: taggedMonthExpenses, rangeType: 'month', daysInPeriod: null,
+      }),
     };
-  }, [expenseSummary, monthSales, monthStart, sumSales, supplierInvoices, today, todaySales, weekSales, weekStart, yesterday, yesterdaySales]);
+  }, [calculateERPAccounting, monthSales, monthStart, revenueSources, supplierInvoices, taggedMonthExpenses, taggedPreviousMonthExpenses, taggedTodayExpenses, taggedWeekExpenses, taggedYesterdayExpenses, today, todaySales, weekSales, weekStart, yesterday, yesterdaySales]);
+
+  const expenseSummary = useMemo(() => ({
+    daysInMonth: periodProfit.today.calendarDays,
+    monthlyFixed: periodProfit.month.totalFixedExpenses,
+    monthlyVariable: periodProfit.month.totalVariableExpenses,
+    monthlyTotal: periodProfit.month.totalFixedExpenses + periodProfit.month.totalVariableExpenses,
+    dailyFixedAllocation: periodProfit.today.fixedDeduction,
+    dailyExpense: periodProfit.today.totalExpenses,
+    todayVariable: periodProfit.today.totalVariableExpenses,
+    yesterdayVariable: periodProfit.yesterday.totalVariableExpenses,
+    weekVariable: periodProfit.week.totalVariableExpenses,
+    weekFixedAllocation: periodProfit.week.fixedDeduction,
+    weekDaysElapsed: periodProfit.week.periodDays,
+  }), [periodProfit]);
 
   // ── Section 1: Executive Summary ──────────────────────────────────────────────
   const execSummary = useMemo(() => {

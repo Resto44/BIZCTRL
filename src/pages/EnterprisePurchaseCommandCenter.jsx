@@ -74,6 +74,7 @@ import PurchaseInvoiceForm from '@/components/purchases/PurchaseInvoiceForm';
 // ── Procurement engine ────────────────────────────────────────────────────────
 import {
   computeProcurementKPIs,
+  deletePurchaseInvoiceWithRollback,
   getOverdueInfo,
 } from '@/lib/procurementEngine';
 
@@ -177,15 +178,16 @@ export default function EnterprisePurchaseCommandCenter() {
 
   // ── Delete mutation ─────────────────────────────────────────────────────────
   const deleteMut = useMutation({
-    mutationFn: async (inv) => {
-      const { error } = await supabase
-        .from('supplier_invoices')
-        .delete()
-        .eq('id', inv.id);
-      if (error) throw error;
-    },
+    mutationFn: async (inv) => deletePurchaseInvoiceWithRollback(inv.id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['supplier_invoices'] });
+      qc.invalidateQueries({ queryKey: ['supplier_invoices_dash'] });
+      qc.invalidateQueries({ queryKey: ['supplier_payments'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      qc.invalidateQueries({ queryKey: ['debt_records'] });
+      qc.invalidateQueries({ queryKey: ['purchases'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
       setDeleting(null);
     },
   });

@@ -27,7 +27,7 @@ import {
   Plus, BarChart3, BookOpen, Receipt, Filter, Search, AlertCircle, Clock
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getOverdueInfo } from '@/lib/procurementEngine';
+import { deletePurchaseInvoiceWithRollback, getOverdueInfo } from '@/lib/procurementEngine';
 
 const STATUS_FILTERS = ['all', 'draft', 'pending', 'approved', 'paid', 'partial', 'unpaid', 'cancelled'];
 
@@ -62,13 +62,16 @@ export default function Purchases() {
 
   // ── Delete mutation ────────────────────────────────────────────────────
   const deleteMut = useMutation({
-    mutationFn: async (inv) => {
-      const { error } = await supabase.from('supplier_invoices').delete().eq('id', inv.id);
-      if (error) throw error;
-    },
+    mutationFn: async (inv) => deletePurchaseInvoiceWithRollback(inv.id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['supplier_invoices'] });
       qc.invalidateQueries({ queryKey: ['supplier_invoices_dash'] });
+      qc.invalidateQueries({ queryKey: ['supplier_payments'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      qc.invalidateQueries({ queryKey: ['debt_records'] });
+      qc.invalidateQueries({ queryKey: ['purchases'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
       setDeleting(null);
     },
   });

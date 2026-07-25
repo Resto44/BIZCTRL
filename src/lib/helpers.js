@@ -34,22 +34,104 @@ export const getSaleCash    = r => Number(r.restaurant_cash    ?? r.cash    ?? 0
 export const getSaleNetwork = r => Number(r.restaurant_network ?? r.network ?? 0);
 
 /**
- * computeDashboardMetrics
+ * Shared ERP accounting engine.
  *
- * rangeType: 'day' | 'week' | 'month' | 'year'
- *
- * Fixed-expense deduction rule:
- *  - 'month' | 'year' | undefined → ALL expenses are deducted (full period).
- *  - 'day' → Fixed monthly expenses are prorated: (monthly_fixed / days_in_month).
- *    Variable expenses (non-fixed) are always deducted in full regardless of range.
- *  - 'week' → Fixed monthly expenses are prorated: (monthly_fixed / days_in_month) * 7.
- *
- * An expense is considered fixed when its category has is_fixed = true OR
- * the expense record itself has _is_fixed = true.
- * If category info is not available, treat all expenses as variable (deduct in full).
- *
- * daysInPeriod (optional): actual calendar days in the period (for day/week proration).
- * daysInMonth  (optional): actual days in the current month (28/29/30/31).
+ * Gross Profit = Sales - Purchases.  Expenses never affect Gross Profit.
+ * Daily and weekly fixed-cost deductions are allocated from the complete
+ * calendar-month fixed-expense pool; variable expenses are deducted only when
+ * they are recorded inside the requested period.
+ */
+export function calculateERPAccounting({
+  sales = [],
+  purchases = [],
+  periodExpenses = [],
+  monthlyExpenses = periodExpenses,
+  rangeType = 'month',
+  revenueSources = [],
+  daysInPeriod = null,
+  asOfDate = null,
+} = {}) {
+  const safeSales = Array.isArray(sales) ? sales : [];
+  const safePurchases = Array.isArray(purchases) ? purchases : [];
+  const safePeriodExpenses = Array.isArray(periodExpenses) ? periodExpenses : [];
+  const safeMonthlyExpenses = Array.isArray(monthlyExpenses) ? monthlyExpenses : [];
+
+  let totalSales = 0;
+  let totalCash = 0;
+  let totalNetwork = 0;
+  let totalCredit = 0;
+  let totalCustomSources = 0;
+
+  safeSales.forEach(record => {
+    const revenue = calculateSalesRevenue(record, revenueSources);
+    totalSales += revenue.total;
+    totalCash += revenue.cash;
+    totalNetwork += revenue.network;
+    totalCredit += revenue.credit;
+    totalCustomSources += revenue.customSources;
+  });
+
+  const totalPurchaseCost = safePurchases.reduce(
+    (sum, record) => sum + (Number(record?.total_amount) || (Number(record?.qty) || 0) * (Number(record?.used_price ?? record?.current_price) || 0)),
+    0,
+  );
+
+  const isFixedExpense = expense => Boolean(expense?._is_fixed || expense?.is_fixed);
+  const amountOf = expense => Number(expense?.amount) || 0;
+  const totalFixedExpenses = safeMonthlyExpenses
+    .filter(isFixedExpense)
+    .reduce((sum, expense) => sum + amountOf(expense), 0);
+  const totalVariableExpenses = safePeriodExpenses
+    .filter(expense => !isFixedExpense(expense))
+    .reduce((sum, expense) => sum + amountOf(expense), 0);
+
+  const accountingDate = asOfDate ? new Date(`${asOfDate}T12:00:00`) : new Date();
+  const calendarDays = Number.isNaN(accountingDate.getTime())
+    ? new Date().getDate()
+    : new Date(accountingDate.getFullYear(), accountingDate.getMonth() + 1, 0).getDate();
+  const defaultPeriodDays = rangeType === 'day' ? 1 : rangeType === 'week' ? 7 : calendarDays;
+  const periodDays = Math.max(1, Number(daysInPeriod) || defaultPeriodDays);
+
+  let fixedDeduction = totalFixedExpenses;
+  if (rangeType === 'day' || rangeType === 'week') {
+    fixedDeduction = (totalFixedExpenses / calendarDays) * periodDays;
+  }
+
+  const totalExpenses = totalVariableExpenses + fixedDeduction;
+  const grossProfit = totalSales - totalPurchaseCost;
+  const netProfit = grossProfit - totalExpenses;
+  const margin = totalSales > 0 ? (grossProfit / totalSales) * 100 : 0;
+  const netMargin = totalSales > 0 ? (netProfit / totalSales) * 100 : 0;
+  const creditPct = totalSales > 0 ? (totalCredit / totalSales) * 100 : 0;
+
+  return {
+    totalSales,
+    totalCredit,
+    totalCash,
+    totalNetwork,
+    totalAdditionalSources: totalCustomSources,
+    totalPurchaseCost,
+    totalExpenses,
+    totalExpensesAll: totalFixedExpenses + totalVariableExpenses,
+    totalFixedExpenses,
+    totalVariableExpenses,
+    fixedDeduction,
+    fixedExpensesExcluded: (rangeType === 'day' || rangeType === 'week') && totalFixedExpenses > 0,
+    calendarDays,
+    periodDays,
+    profit: grossProfit,
+    grossProfit,
+    netProfit,
+    margin,
+    netMargin,
+    creditPct,
+  };
+}
+
+/**
+ * Backwards-compatible dashboard wrapper.  All callers now delegate to the
+ * shared ERP accounting engine and may provide the calendar-month fixed pool
+ * in the optional final argument.
  */
 export function computeDashboardMetrics(
   sales,
@@ -59,75 +141,35 @@ export function computeDashboardMetrics(
   revenueSources = [],
   daysInPeriod = null,
   daysInMonth = null,
+  options = {},
 ) {
-  let totalSales = 0;
-  let totalCash = 0;
-  let totalNetwork = 0;
-  let totalCredit = 0;
-  let totalCustomSources = 0;
-
-  sales.forEach(r => {
-    const revenue = calculateSalesRevenue(r, revenueSources);
-    totalSales += revenue.total;
-    totalCash += revenue.cash;
-    totalNetwork += revenue.network;
-    totalCredit += revenue.credit;
-    totalCustomSources += revenue.customSources;
+  const asOfDate = options.asOfDate || null;
+  const metrics = calculateERPAccounting({
+    sales,
+    purchases,
+    periodExpenses: expenses,
+    monthlyExpenses: options.monthlyExpenses || expenses,
+    rangeType,
+    revenueSources,
+    daysInPeriod,
+    asOfDate,
   });
-  const totalPurchaseCost = purchases.reduce(
-    (s, r) => s + (Number(r.total_amount) || (r.qty || 0) * (r.used_price || r.current_price || 0)),
-    0
-  );
-  const totalAdditionalSources = totalCustomSources;
 
-  // Separate fixed vs variable expenses
-  const fixedExpenses    = (expenses || []).filter(e => !!e._is_fixed || !!e.is_fixed);
-  const variableExpenses = (expenses || []).filter(e => !e._is_fixed && !e.is_fixed);
-
-  const totalFixedExpenses    = fixedExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const totalVariableExpenses = variableExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const totalExpensesAll      = totalFixedExpenses + totalVariableExpenses;
-
-  // Determine how much of fixed expenses to deduct based on range
-  let fixedDeduction = totalFixedExpenses; // default: deduct in full (month/year)
-  let fixedExpensesExcluded = false;
-
-  if (rangeType === 'day' || rangeType === 'week') {
-    // Prorate: daily allocation = monthly_fixed / real_days_in_month
-    const realDaysInMonth = daysInMonth || (new Date().getMonth() === 1 ? (new Date().getFullYear() % 4 === 0 ? 29 : 28) : [3, 5, 8, 10].includes(new Date().getMonth()) ? 30 : 31);
-    const periodDays = rangeType === 'day' ? (daysInPeriod || 1) : (daysInPeriod || 7);
-    fixedDeduction = (totalFixedExpenses / realDaysInMonth) * periodDays;
-    fixedExpensesExcluded = totalFixedExpenses > 0;
+  if (daysInMonth && (rangeType === 'day' || rangeType === 'week')) {
+    const fixedDeduction = (metrics.totalFixedExpenses / Number(daysInMonth)) * metrics.periodDays;
+    const totalExpenses = metrics.totalVariableExpenses + fixedDeduction;
+    const netProfit = metrics.grossProfit - totalExpenses;
+    return {
+      ...metrics,
+      calendarDays: Number(daysInMonth),
+      fixedDeduction,
+      totalExpenses,
+      netProfit,
+      netMargin: metrics.totalSales > 0 ? (netProfit / metrics.totalSales) * 100 : 0,
+    };
   }
 
-  // Total expenses actually deducted
-  const totalExpenses = totalVariableExpenses + fixedDeduction;
-
-  const grossProfit = totalSales - totalPurchaseCost;
-  const netProfit   = totalSales - totalPurchaseCost - totalExpenses;
-  const margin      = totalSales > 0 ? (grossProfit / totalSales) * 100 : 0;
-  const netMargin   = totalSales > 0 ? (netProfit   / totalSales) * 100 : 0;
-  const creditPct   = totalSales > 0 ? (totalCredit / totalSales) * 100 : 0;
-
-  return {
-    totalSales,
-    totalCredit,
-    totalCash,
-    totalNetwork,
-    totalAdditionalSources,  // custom sources from sales_sources_json
-    totalPurchaseCost,
-    totalExpenses,           // expenses actually deducted from net profit
-    totalExpensesAll,        // all expenses (for display)
-    totalFixedExpenses,
-    totalVariableExpenses,
-    fixedDeduction,          // prorated fixed amount used in net profit
-    fixedExpensesExcluded,
-    profit: grossProfit,
-    netProfit,
-    margin,
-    netMargin,
-    creditPct,
-  };
+  return metrics;
 }
 
 export function computeBranchMetrics(sales, purchases, expenses, branchKey) {

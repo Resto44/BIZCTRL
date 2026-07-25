@@ -90,6 +90,16 @@ export async function createPurchaseInvoice({
   return invoice;
 }
 
+// ── Delete Purchase Invoice with Complete Rollback ─────────────────────────
+export async function deletePurchaseInvoiceWithRollback(invoiceId) {
+  const { data, error } = await supabase.rpc('delete_supplier_invoice_with_rollback', {
+    p_invoice_id: invoiceId,
+  });
+
+  if (error) throw new Error(`Purchase invoice deletion failed: ${error.message}`);
+  return data;
+}
+
 // ── Update Purchase Invoice ────────────────────────────────────────────────
 export async function updatePurchaseInvoice({
   invoiceId,

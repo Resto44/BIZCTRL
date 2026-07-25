@@ -18,7 +18,7 @@ import SmartInsights from '@/components/dashboard/SmartInsights';
 import { Card } from '@/components/ui/card';
 import { DollarSign, TrendingUp, TrendingDown, Percent, ShoppingCart, AlertTriangle, Receipt, Wallet, Scale, BarChart3 } from 'lucide-react';
 import { computeBranchSettlements } from '@/components/treasury/BranchSettlementLedger';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -127,12 +127,31 @@ export default function Dashboard() {
     [allWaste, fromStr, toStr, branch]
   );
 
-  // Tag expenses with _is_fixed flag from their category before computing metrics
+  // Tag expenses with _is_fixed flag from their category before computing metrics.
+  // Fixed costs come from the full calendar-month pool; variable costs remain
+  // limited to the selected period inside the shared accounting engine.
   const taggedFilteredExpenses = useMemo(() =>
     tagExpensesWithCategories(filteredExpenses, expenseCategories),
     [filteredExpenses, expenseCategories]
   );
-  const metrics = useMemo(() => computeDashboardMetrics(filteredSales, filteredPurchases, taggedFilteredExpenses, rangeType, revenueSources), [filteredSales, filteredPurchases, taggedFilteredExpenses, rangeType, revenueSources]);
+  const taggedMonthlyExpenses = useMemo(() => {
+    const monthStart = format(startOfMonth(dateRange.to), 'yyyy-MM-dd');
+    const monthEnd = format(endOfMonth(dateRange.to), 'yyyy-MM-dd');
+    return tagExpensesWithCategories(
+      allExpenses.filter(e => e.date >= monthStart && e.date <= monthEnd && (branch === 'all' || e.branch === branch || e.branch === 'all')),
+      expenseCategories,
+    );
+  }, [allExpenses, branch, dateRange.to, expenseCategories]);
+  const metrics = useMemo(() => computeDashboardMetrics(
+    filteredSales,
+    filteredPurchases,
+    taggedFilteredExpenses,
+    rangeType,
+    revenueSources,
+    null,
+    null,
+    { monthlyExpenses: taggedMonthlyExpenses, asOfDate: toStr },
+  ), [filteredSales, filteredPurchases, taggedFilteredExpenses, rangeType, revenueSources, taggedMonthlyExpenses, toStr]);
 
   const prevRange = useMemo(() => {
     const diffMs = dateRange.to - dateRange.from;
@@ -147,7 +166,24 @@ export default function Dashboard() {
     tagExpensesWithCategories(prevExpenses, expenseCategories),
     [prevExpenses, expenseCategories]
   );
-  const prevMetrics = useMemo(() => computeDashboardMetrics(prevSales, prevPurchases, taggedPrevExpenses, rangeType, revenueSources), [prevSales, prevPurchases, taggedPrevExpenses, rangeType, revenueSources]);
+  const taggedPrevMonthlyExpenses = useMemo(() => {
+    const monthStart = format(startOfMonth(prevRange.to), 'yyyy-MM-dd');
+    const monthEnd = format(endOfMonth(prevRange.to), 'yyyy-MM-dd');
+    return tagExpensesWithCategories(
+      allExpenses.filter(e => e.date >= monthStart && e.date <= monthEnd && (branch === 'all' || e.branch === branch || e.branch === 'all')),
+      expenseCategories,
+    );
+  }, [allExpenses, branch, expenseCategories, prevRange.to]);
+  const prevMetrics = useMemo(() => computeDashboardMetrics(
+    prevSales,
+    prevPurchases,
+    taggedPrevExpenses,
+    rangeType,
+    revenueSources,
+    null,
+    null,
+    { monthlyExpenses: taggedPrevMonthlyExpenses, asOfDate: prevTo },
+  ), [prevSales, prevPurchases, taggedPrevExpenses, rangeType, revenueSources, taggedPrevMonthlyExpenses, prevTo]);
 
   const walletBalances = useMemo(() => {
     const calc = (walletKey) => walletTx.filter(tx => tx.wallet === walletKey)
