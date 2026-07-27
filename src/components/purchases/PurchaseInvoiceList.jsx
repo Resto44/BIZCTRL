@@ -4,12 +4,12 @@
  * status badges, and quick actions.
  */
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/lib/LanguageContext';
-import { Pencil, Trash2, CheckCircle2, Clock, AlertCircle, Eye } from 'lucide-react';
+import { Pencil, Trash2, CheckCircle2, Clock, AlertCircle, Eye, Square, CheckSquare } from 'lucide-react';
 import { getOverdueInfo } from '@/lib/procurementEngine';
 import { approveInvoice } from '@/lib/procurementEngine';
 import { useQueryClient } from '@tanstack/react-query';
@@ -32,12 +32,30 @@ const OVERDUE_COLORS = {
   red:    'border-l-4 border-l-red-500 bg-red-50/30',
 };
 
-export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, onView }) {
+export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, onBulkDelete, onView }) {
   const { currency } = useLanguage();
   const { user } = useAuth();
   const { role } = useRole();
   const qc = useQueryClient();
   const isOwner = role === ROLES.OWNER;
+  const canDelete = role === ROLES.OWNER || role === ROLES.MANAGER || role === ROLES.GENERAL_MANAGER;
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  const toggleSelect = useCallback((id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === invoices.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(invoices.map(i => i.id)));
+    }
+  }, [selectedIds.size, invoices]);
 
   const handleApprove = async (invoice) => {
     try {
@@ -61,6 +79,31 @@ export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, o
 
   return (
     <div className="space-y-2">
+      {/* Bulk action toolbar */}
+      {canDelete && (
+        <div className="flex items-center gap-2 py-1">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={toggleSelectAll}
+          >
+            {selectedIds.size === invoices.length && invoices.length > 0
+              ? <CheckSquare className="w-4 h-4 text-primary" />
+              : <Square className="w-4 h-4" />}
+            {selectedIds.size === invoices.length && invoices.length > 0 ? 'Deselect All' : 'Select All'}
+          </button>
+          {selectedIds.size > 0 && onBulkDelete && (
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-xs text-destructive hover:text-destructive/80 ml-auto"
+              onClick={() => { onBulkDelete(Array.from(selectedIds)); setSelectedIds(new Set()); }}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete Selected ({selectedIds.size})
+            </button>
+          )}
+        </div>
+      )}
       {invoices.map(inv => {
         const { isOverdue, daysOverdue, color } = getOverdueInfo(inv);
         const statusCfg = STATUS_CONFIG[inv.status] || STATUS_CONFIG.draft;
@@ -68,8 +111,14 @@ export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, o
         const remaining = (inv.total_amount || 0) - (inv.paid_amount || 0);
 
         return (
-          <Card key={inv.id} className={`p-3 ${isOverdue ? OVERDUE_COLORS[color] : ''}`}>
+          <Card key={inv.id} className={`p-3 ${isOverdue ? OVERDUE_COLORS[color] : ''} ${selectedIds.has(inv.id) ? 'ring-2 ring-primary/50' : ''}`}>
+
             <div className="flex items-start gap-3">
+              {canDelete && (
+                <button type="button" onClick={() => toggleSelect(inv.id)} className="text-muted-foreground hover:text-primary mt-0.5 flex-shrink-0">
+                  {selectedIds.has(inv.id) ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}
+                </button>
+              )}
               <div className="flex-1 min-w-0">
                 {/* Top row */}
                 <div className="flex items-center gap-2 flex-wrap">
@@ -138,8 +187,8 @@ export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, o
                     <CheckCircle2 className="w-3.5 h-3.5" />
                   </Button>
                 )}
-                {onDelete && isOwner && inv.status === 'draft' && (
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(inv)}>
+                {onDelete && canDelete && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(inv)} title="Delete Invoice">
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 )}

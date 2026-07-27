@@ -263,6 +263,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
   );
 
   const [payments, setPayments] = useState([emptyPayment()]);
+  const [payFullAmount, setPayFullAmount] = useState(false);
   const [showAdditionalCosts, setShowAdditionalCosts] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
   const [showOcr, setShowOcr] = useState(false);
@@ -316,9 +317,28 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
 
   // ── Totals ─────────────────────────────────────────────────────────────
   const totals = calcInvoiceTotals(items, additionalCosts);
-  const paymentTotal = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
-  const remaining = totals.grandTotal - paymentTotal;
+  const paymentTotal = payFullAmount
+    ? totals.grandTotal
+    : payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+  const remaining = payFullAmount ? 0 : totals.grandTotal - paymentTotal;
   const approvalStatus = computeApprovalStatus(totals.grandTotal);
+
+  // ── Pay Full Amount handler ────────────────────────────────────────────
+  const handlePayFullAmount = (checked) => {
+    setPayFullAmount(checked);
+    if (checked && totals.grandTotal > 0) {
+      setPayments([{ ...emptyPayment(), amount: totals.grandTotal.toFixed(2) }]);
+    } else if (!checked) {
+      setPayments([emptyPayment()]);
+    }
+  };
+
+  // Sync payment amount when grand total changes while Pay Full Amount is on
+  useEffect(() => {
+    if (payFullAmount && totals.grandTotal > 0) {
+      setPayments(prev => [{ ...(prev[0] || emptyPayment()), amount: totals.grandTotal.toFixed(2) }]);
+    }
+  }, [payFullAmount, totals.grandTotal]);
 
   // ── Item handlers ──────────────────────────────────────────────────────
   const updateItem = useCallback((id, field, value) => {
@@ -681,12 +701,43 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
           {paymentTotal > 0 && (
             <span className="text-xs text-muted-foreground ms-1">(Paid: {currencySymbol}{paymentTotal.toLocaleString()})</span>
           )}
+          {totals.grandTotal > 0 && (
+            <span className={`ms-2 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+              remaining <= 0
+                ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                : paymentTotal > 0
+                  ? 'bg-orange-100 text-orange-700 border-orange-200'
+                  : 'bg-gray-100 text-gray-600 border-gray-200'
+            }`}>
+              {remaining <= 0 ? 'Paid' : paymentTotal > 0 ? 'Partial' : 'Draft'}
+            </span>
+          )}
           <span className="ms-auto">{showPayments ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</span>
         </button>
 
         {showPayments && (
           <div className="mt-3 space-y-2">
-            {payments.map((pmt, idx) => (
+            {/* ☑ Pay Full Amount */}
+            <div className="flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/20 px-3 py-2">
+              <input
+                id="pay-full-amount"
+                type="checkbox"
+                checked={payFullAmount}
+                onChange={e => handlePayFullAmount(e.target.checked)}
+                className="w-4 h-4 accent-primary cursor-pointer"
+              />
+              <label htmlFor="pay-full-amount" className="text-xs font-semibold text-foreground cursor-pointer select-none flex-1">
+                Pay Full Amount
+              </label>
+              {payFullAmount && totals.grandTotal > 0 && (
+                <span className="text-xs font-bold text-primary">
+                  {currencySymbol}{totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+              )}
+            </div>
+
+            {/* Payment rows — hidden when Pay Full Amount is checked */}
+            {!payFullAmount && payments.map((pmt, idx) => (
               <div key={pmt._id} className="rounded-lg border border-border p-2.5 space-y-2 bg-secondary/20 overflow-hidden">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-muted-foreground">Payment {idx + 1}</span>
@@ -723,18 +774,58 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
               </div>
             ))}
 
-            <Button type="button" variant="outline" size="sm" onClick={addPayment} className="gap-1 text-xs h-7 w-full">
-              <Plus className="w-3 h-3" /> Add Payment
-            </Button>
+            {/* When Pay Full Amount: show method/date/notes only */}
+            {payFullAmount && (
+              <div className="rounded-lg border border-border p-2.5 space-y-2 bg-secondary/20 overflow-hidden">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="min-w-0">
+                    <Label className="text-[10px] text-muted-foreground">Method</Label>
+                    <Select value={payments[0]?.payment_method || 'cash'} onValueChange={v => setPayments(prev => [{ ...(prev[0] || emptyPayment()), payment_method: v }])}>
+                      <SelectTrigger className="h-8 text-xs w-full min-w-0"><SelectValue /></SelectTrigger>
+                      <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="min-w-0">
+                    <Label className="text-[10px] text-muted-foreground">Date</Label>
+                    <Input type="date" value={payments[0]?.date || format(new Date(), 'yyyy-MM-dd')} onChange={e => setPayments(prev => [{ ...(prev[0] || emptyPayment()), date: e.target.value }])} className="h-8 text-xs w-full min-w-0" />
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <Label className="text-[10px] text-muted-foreground">Notes</Label>
+                  <Input value={payments[0]?.notes || ''} onChange={e => setPayments(prev => [{ ...(prev[0] || emptyPayment()), notes: e.target.value }])} placeholder="..." className="h-8 text-xs w-full min-w-0" />
+                </div>
+              </div>
+            )}
 
-            {/* Remaining balance */}
+            {!payFullAmount && (
+              <Button type="button" variant="outline" size="sm" onClick={addPayment} className="gap-1 text-xs h-7 w-full">
+                <Plus className="w-3 h-3" /> Add Payment
+              </Button>
+            )}
+
+            {/* Remaining balance summary */}
             {totals.grandTotal > 0 && (
-              <div className={`flex justify-between items-center rounded-lg px-3 py-2.5 gap-2 ${remaining > 0 ? 'bg-red-50 dark:bg-red-950' : 'bg-emerald-50 dark:bg-emerald-950'}`}>
-                <span className={`text-xs font-medium ${remaining > 0 ? 'text-red-700' : 'text-emerald-700'}`}>Remaining Balance</span>
+              <div className={`flex justify-between items-center rounded-lg px-3 py-2.5 gap-2 ${
+                remaining <= 0 ? 'bg-emerald-50 dark:bg-emerald-950' :
+                paymentTotal > 0 ? 'bg-orange-50 dark:bg-orange-950' :
+                'bg-red-50 dark:bg-red-950'
+              }`}>
+                <div>
+                  <p className={`text-xs font-medium ${
+                    remaining <= 0 ? 'text-emerald-700' :
+                    paymentTotal > 0 ? 'text-orange-700' : 'text-red-700'
+                  }`}>Remaining Balance</p>
+                  {paymentTotal > 0 && (
+                    <p className="text-[10px] text-muted-foreground">Paid: {currencySymbol}{paymentTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   {remaining <= 0 ? <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
-                  <span className={`text-base font-bold truncate ${remaining > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
-                    {currencySymbol}{Math.abs(remaining).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  <span className={`text-base font-bold truncate ${
+                    remaining <= 0 ? 'text-emerald-700' :
+                    paymentTotal > 0 ? 'text-orange-700' : 'text-red-700'
+                  }`}>
+                    {currencySymbol}{Math.max(0, remaining).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>

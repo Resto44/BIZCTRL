@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
@@ -12,7 +12,8 @@ import {
   ChefHat, Truck, AlertTriangle, CheckCircle2, Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { calculateERPAccounting, tagExpensesWithCategories } from '@/lib/helpers';
 
 function StatCard({ title, value, sub, icon: Icon, color = 'text-slate-400' }) {
   return (
@@ -65,19 +66,78 @@ export default function ManagerDashboardERP() {
 function ManagerContent({ user, logout, activeBranch, today }) {
   const branchId = activeBranch?.id;
 
+  const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+  const monthEnd   = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+
   const { data: todaySales = [] } = useQuery({
     queryKey: ['manager-today-sales', branchId, today],
     queryFn: async () => {
       if (!branchId) return [];
       const { data, error } = await supabase
         .from('daily_sales')
-        .select('total_sales, total_expenses, net_profit, cash_sales, card_sales')
+        .select('*')
         .eq('date', today)
         .eq('branch_id', branchId);
       if (error) throw error;
       return data || [];
     },
     enabled: !!branchId,
+  });
+
+  const { data: todayPurchases = [] } = useQuery({
+    queryKey: ['manager-today-purchases', branchId, today],
+    queryFn: async () => {
+      if (!branchId) return [];
+      const { data, error } = await supabase
+        .from('supplier_invoices')
+        .select('id, total_amount, date')
+        .eq('branch_id', branchId)
+        .eq('date', today);
+      if (error) return [];
+      return data || [];
+    },
+    enabled: !!branchId,
+  });
+
+  const { data: todayExpenses = [] } = useQuery({
+    queryKey: ['manager-today-expenses', branchId, today],
+    queryFn: async () => {
+      if (!branchId) return [];
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('id, amount, date, category_id')
+        .eq('branch_id', branchId)
+        .eq('date', today);
+      if (error) return [];
+      return data || [];
+    },
+    enabled: !!branchId,
+  });
+
+  const { data: monthExpenses = [] } = useQuery({
+    queryKey: ['manager-month-expenses', branchId, monthStart],
+    queryFn: async () => {
+      if (!branchId) return [];
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('id, amount, date, category_id')
+        .eq('branch_id', branchId)
+        .gte('date', monthStart)
+        .lte('date', monthEnd);
+      if (error) return [];
+      return data || [];
+    },
+    enabled: !!branchId,
+  });
+
+  const { data: expenseCategories = [] } = useQuery({
+    queryKey: ['manager-expense-categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('expense_categories').select('id, is_fixed').limit(200);
+      if (error) return [];
+      return data || [];
+    },
+    staleTime: 300000,
   });
 
   const { data: pendingOrders = [] } = useQuery({
@@ -129,9 +189,23 @@ function ManagerContent({ user, logout, activeBranch, today }) {
     enabled: !!branchId,
   });
 
-  const totalRevenue = todaySales.reduce((s, r) => s + (r.total_sales || 0), 0);
-  const totalExpenses = todaySales.reduce((s, r) => s + (r.total_expenses || 0), 0);
-  const netProfit = todaySales.reduce((s, r) => s + (r.net_profit || 0), 0);
+  const todayMetrics = useMemo(() => {
+    const taggedToday   = tagExpensesWithCategories(todayExpenses, expenseCategories);
+    const taggedMonthly = tagExpensesWithCategories(monthExpenses, expenseCategories);
+    return calculateERPAccounting({
+      sales: todaySales,
+      purchases: todayPurchases,
+      periodExpenses: taggedToday,
+      monthlyExpenses: taggedMonthly,
+      rangeType: 'day',
+      daysInPeriod: 1,
+      asOfDate: today,
+    });
+  }, [todaySales, todayPurchases, todayExpenses, monthExpenses, expenseCategories, today]);
+
+  const totalRevenue = todayMetrics.totalSales;
+  const totalExpenses = todayMetrics.totalExpenses;
+  const netProfit = todayMetrics.netProfit;
 
   const navItems = [
     { label: 'Sales', icon: BarChart3, href: '/sales', color: 'from-emerald-600 to-teal-700' },

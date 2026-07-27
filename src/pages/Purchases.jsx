@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import {
-  Plus, BarChart3, BookOpen, Receipt, Filter, Search, AlertCircle, Clock
+  Plus, BarChart3, BookOpen, Receipt, Filter, Search, AlertCircle, Clock, Trash2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { deletePurchaseInvoiceWithRollback, getOverdueInfo } from '@/lib/procurementEngine';
@@ -38,10 +38,12 @@ export default function Purchases() {
   const { role } = useRole();
   const qc = useQueryClient();
   const isOwner = role === ROLES.OWNER;
+  const canDelete = role === ROLES.OWNER || role === ROLES.MANAGER || role === ROLES.GENERAL_MANAGER;
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [bulkDeletingIds, setBulkDeletingIds] = useState(null);
   const [filterBranch, setFilterBranch] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,19 +62,36 @@ export default function Purchases() {
     enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
   });
 
+  const invalidatePurchaseQueries = () => {
+    qc.invalidateQueries({ queryKey: ['supplier_invoices'] });
+    qc.invalidateQueries({ queryKey: ['supplier_invoices_dash'] });
+    qc.invalidateQueries({ queryKey: ['supplier_payments'] });
+    qc.invalidateQueries({ queryKey: ['inventory'] });
+    qc.invalidateQueries({ queryKey: ['debt_records'] });
+    qc.invalidateQueries({ queryKey: ['purchases'] });
+    qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
+    qc.invalidateQueries({ queryKey: ['reports'] });
+    qc.invalidateQueries({ queryKey: ['procurement_kpis'] });
+  };
+
   // ── Delete mutation ────────────────────────────────────────────────────
   const deleteMut = useMutation({
     mutationFn: async (inv) => deletePurchaseInvoiceWithRollback(inv.id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['supplier_invoices'] });
-      qc.invalidateQueries({ queryKey: ['supplier_invoices_dash'] });
-      qc.invalidateQueries({ queryKey: ['supplier_payments'] });
-      qc.invalidateQueries({ queryKey: ['inventory'] });
-      qc.invalidateQueries({ queryKey: ['debt_records'] });
-      qc.invalidateQueries({ queryKey: ['purchases'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
-      qc.invalidateQueries({ queryKey: ['reports'] });
+      invalidatePurchaseQueries();
       setDeleting(null);
+    },
+  });
+
+  const bulkDeleteMut = useMutation({
+    mutationFn: async (ids) => {
+      for (const id of ids) {
+        await deletePurchaseInvoiceWithRollback(id);
+      }
+    },
+    onSuccess: () => {
+      invalidatePurchaseQueries();
+      setBulkDeletingIds(null);
     },
   });
 
@@ -200,7 +219,8 @@ export default function Purchases() {
         <PurchaseInvoiceList
           invoices={filtered}
           onEdit={(inv) => { setEditing(inv); setShowForm(true); }}
-          onDelete={(inv) => setDeleting(inv)}
+          onDelete={canDelete ? (inv) => setDeleting(inv) : null}
+          onBulkDelete={canDelete ? (ids) => setBulkDeletingIds(ids) : null}
         />
       )}
 
@@ -221,13 +241,13 @@ export default function Purchases() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
+      {/* Single Delete Confirmation */}
       <AlertDialog open={!!deleting} onOpenChange={open => { if (!open) setDeleting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Invoice?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete invoice {deleting?.invoice_number || deleting?.id?.slice(0, 8)} from {deleting?.supplier_name}. This action cannot be undone.
+              This will permanently delete invoice {deleting?.invoice_number || deleting?.id?.slice(0, 8)} from {deleting?.supplier_name}, roll back inventory, and remove all related payment records. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -236,7 +256,28 @@ export default function Purchases() {
               className="bg-destructive text-destructive-foreground"
               onClick={() => deleteMut.mutate(deleting)}
             >
-              Delete
+              {deleteMut.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={!!bulkDeletingIds} onOpenChange={open => { if (!open) setBulkDeletingIds(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {bulkDeletingIds?.length} Invoice{bulkDeletingIds?.length !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {bulkDeletingIds?.length} invoice{bulkDeletingIds?.length !== 1 ? 's' : ''}, roll back inventory, and remove all related payment records. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground"
+              onClick={() => bulkDeleteMut.mutate(bulkDeletingIds)}
+            >
+              {bulkDeleteMut.isPending ? 'Deleting...' : 'Delete All'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

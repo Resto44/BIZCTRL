@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, ShieldCheck, Clock, CheckCircle2, Store } from 'lucide-react';
+import { Pencil, Trash2, ShieldCheck, Clock, CheckCircle2, Store, Square, CheckSquare } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import RiskBadge from '@/components/shared/RiskBadge';
 import { useQuery } from '@tanstack/react-query';
@@ -15,7 +15,7 @@ const SETTLE_BADGE = {
   rejected: { label: 'Rejected', icon: null, cls: 'text-red-600 bg-red-50' },
 };
 
-export default function SalesListItem({ sale, onEdit, onDelete }) {
+export default function SalesListItem({ sale, onEdit, onDelete, selected = false, onToggleSelect = null }) {
   const { t, currency } = useLanguage();
   const { branches } = useTenant();
 
@@ -37,9 +37,14 @@ export default function SalesListItem({ sale, onEdit, onDelete }) {
   const badge = settlement ? SETTLE_BADGE[settlement.status] || SETTLE_BADGE.pending : null;
 
   return (
-    <Card className="p-3 mb-2 bg-card w-full max-w-full overflow-hidden">
+    <Card className={`p-3 mb-2 bg-card w-full max-w-full overflow-hidden ${selected ? 'ring-2 ring-primary/50' : ''}`}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
+          {onToggleSelect && (
+            <button type="button" onClick={() => onToggleSelect(sale.id)} className="text-muted-foreground hover:text-primary flex-shrink-0">
+              {selected ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}
+            </button>
+          )}
           <span className="text-xs font-medium text-muted-foreground">{sale.date}</span>
           <span className="text-xs bg-secondary px-2 py-0.5 rounded-full text-secondary-foreground">{branchLabel}</span>
         </div>
@@ -47,9 +52,11 @@ export default function SalesListItem({ sale, onEdit, onDelete }) {
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(sale)}>
             <Pencil className="w-3.5 h-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(sale)}>
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>
+          {onDelete && (
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(sale)}>
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 

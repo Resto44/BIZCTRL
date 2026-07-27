@@ -681,7 +681,7 @@ export default function OwnerDashboard() {
         fixedPool: taggedMonthExpenses, rangeType: 'month', daysInPeriod: null,
       }),
     };
-  }, [calculateERPAccounting, monthSales, monthStart, revenueSources, supplierInvoices, taggedMonthExpenses, taggedPreviousMonthExpenses, taggedTodayExpenses, taggedWeekExpenses, taggedYesterdayExpenses, today, todaySales, weekSales, weekStart, yesterday, yesterdaySales]);
+  }, [monthSales, monthStart, revenueSources, supplierInvoices, taggedMonthExpenses, taggedPreviousMonthExpenses, taggedTodayExpenses, taggedWeekExpenses, taggedYesterdayExpenses, today, todaySales, weekSales, weekStart, yesterday, yesterdaySales]);
 
   const expenseSummary = useMemo(() => ({
     daysInMonth: periodProfit.today.calendarDays,

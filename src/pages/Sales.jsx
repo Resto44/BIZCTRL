@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -8,7 +8,7 @@ import ERPSalesWorkspace from '@/components/sales/ERPSalesWorkspace';
 import SalesListItem from '@/components/sales/SalesListItem';
 import EmptyState from '@/components/shared/EmptyState';
 import { Button } from '@/components/ui/button';
-import { Plus, Download, SlidersHorizontal, BarChart3, FileText, Share2, Printer, MessageCircle } from 'lucide-react';
+import { Plus, Download, SlidersHorizontal, BarChart3, FileText, Share2, Printer, MessageCircle, Trash2, CheckSquare, Square } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { downloadCSV, downloadPDF, buildSalesCSV, buildSalesPDF } from '@/lib/exportUtils';
@@ -18,6 +18,7 @@ import { useNotify } from '@/lib/useNotify';
 import { useNetworkSettlement } from '@/hooks/useNetworkSettlement';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
+import { useRole, ROLES } from '@/lib/RoleContext';
 import { format } from 'date-fns';
 import CustomerCollections from '@/components/sales/CustomerCollections';
 import DailySummary from '@/components/sales/DailySummary';
@@ -40,11 +41,15 @@ export default function Sales() {
   const qc = useQueryClient();
   const notif = useNotify();
   const { user } = useAuth();
+  const { role } = useRole();
+  const canDelete = role === ROLES.OWNER || role === ROLES.MANAGER || role === ROLES.GENERAL_MANAGER;
   const { orgId, ownerFilter, activeRestaurant } = useTenant();
   const { autoSettle } = useNetworkSettlement({ orgId, user, currency });
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showFinancialPanel, setShowFinancialPanel] = useState(false);
@@ -519,24 +524,59 @@ export default function Sales() {
     },
   });
 
+  const invalidateSalesQueries = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ['sales'] });
+    qc.invalidateQueries({ queryKey: ['sales_today'] });
+    qc.invalidateQueries({ queryKey: ['sales_month'] });
+    qc.invalidateQueries({ queryKey: ['sales_yesterday'] });
+    qc.invalidateQueries({ queryKey: ['sales_week'] });
+    qc.invalidateQueries({ queryKey: ['sales_today_live'] });
+    qc.invalidateQueries({ queryKey: ['sales_yesterday_live'] });
+    qc.invalidateQueries({ queryKey: ['sales_month_live'] });
+    qc.invalidateQueries({ queryKey: ['sales_sources'] });
+    qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
+    qc.invalidateQueries({ queryKey: ['reports'] });
+    qc.invalidateQueries({ queryKey: ['wallet_transactions'] });
+    qc.invalidateQueries({ queryKey: ['supplier_invoices_dash'] });
+  }, [qc]);
+
   const deleteMut = useMutation({
     mutationFn: async (sale) => {
       await base44.entities.DailySales.delete(sale.id);
       await notif.sale({ branch: sale.branch, action: 'delete' });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sales'] });
-      qc.invalidateQueries({ queryKey: ['sales_today'] });
-      qc.invalidateQueries({ queryKey: ['sales_month'] });
-      qc.invalidateQueries({ queryKey: ['sales_today_live'] });
-      qc.invalidateQueries({ queryKey: ['sales_yesterday_live'] });
-      qc.invalidateQueries({ queryKey: ['sales_month_live'] });
-      qc.invalidateQueries({ queryKey: ['sales_sources'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
-      qc.invalidateQueries({ queryKey: ['reports'] });
+      invalidateSalesQueries();
       setDeleting(null);
     },
   });
+
+  const bulkDeleteMut = useMutation({
+    mutationFn: async (ids) => {
+      await Promise.all(ids.map(id => base44.entities.DailySales.delete(id)));
+    },
+    onSuccess: () => {
+      invalidateSalesQueries();
+      setSelectedIds(new Set());
+      setBulkDeleting(false);
+    },
+  });
+
+  const toggleSelect = useCallback((id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(s => s.id)));
+    }
+  }, [selectedIds.size, filtered]);
 
   const handleSave = async (data, proofUrl, ocr) => {
     // Ensure restaurant_id is included for correct scoping in Cash Register Center
@@ -643,7 +683,35 @@ export default function Sales() {
         )}
 
         <div className="flex-1 min-w-0 w-full">
-          {filtered.length > 0 && (
+          {/* Bulk action toolbar */}
+          {canDelete && filtered.length > 0 && (
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={toggleSelectAll}
+              >
+                {selectedIds.size === filtered.length && filtered.length > 0
+                  ? <CheckSquare className="w-4 h-4 text-primary" />
+                  : <Square className="w-4 h-4" />}
+                {selectedIds.size === filtered.length && filtered.length > 0 ? 'Deselect All' : 'Select All'}
+              </button>
+              {selectedIds.size > 0 && (
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 text-xs text-destructive hover:text-destructive/80 ml-auto"
+                  onClick={() => setBulkDeleting(true)}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete Selected ({selectedIds.size})
+                </button>
+              )}
+              {selectedIds.size === 0 && (
+                <span className="text-xs text-muted-foreground ml-auto">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
+              )}
+            </div>
+          )}
+          {!canDelete && filtered.length > 0 && (
             <p className="text-xs text-muted-foreground mb-2">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</p>
           )}
           {isLoading ? (
@@ -657,7 +725,9 @@ export default function Sales() {
                   key={s.id}
                   sale={s}
                   onEdit={(sale) => { setEditing(sale); setShowForm(false); }}
-                  onDelete={(sale) => setDeleting(sale)}
+                  onDelete={canDelete ? (sale) => setDeleting(sale) : null}
+                  selected={selectedIds.has(s.id)}
+                  onToggleSelect={canDelete ? toggleSelect : null}
                 />
               ))}
             </div>
@@ -694,16 +764,35 @@ export default function Sales() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
+      {/* Single Delete Confirmation */}
       <AlertDialog open={!!deleting} onOpenChange={(open) => { if (!open) setDeleting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('confirm_delete')}</AlertDialogTitle>
-            <AlertDialogDescription></AlertDialogDescription>
+            <AlertDialogDescription>Delete sales record for {deleting?.branch} on {deleting?.date}? This cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteMut.mutate(deleting)}>{t('delete')}</AlertDialogAction>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={() => deleteMut.mutate(deleting)}>{t('delete')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleting} onOpenChange={(open) => { if (!open) setBulkDeleting(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Sales Record{selectedIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>This will permanently delete {selectedIds.size} selected sales record{selectedIds.size !== 1 ? 's' : ''}. This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground"
+              onClick={() => bulkDeleteMut.mutate(Array.from(selectedIds))}
+            >
+              Delete All
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
