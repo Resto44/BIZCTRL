@@ -383,7 +383,7 @@ export default function Sales() {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Fetch the generated invoice from the DB
-      const { data: invoices } = await base44.entities.SalesInvoice.filter({ sale_id: saleId });
+      const invoices = await base44.entities.SalesInvoice.filter({ sale_id: saleId });
       const invoice = invoices && invoices[0];
 
       if (!invoice) {
@@ -395,7 +395,7 @@ export default function Sales() {
       try {
         await generateAndUploadPDF(invoice, 'RestoCTRL', currency);
         // Re-fetch to get the pdf_url
-        const { data: updatedInv } = await base44.entities.SalesInvoice.filter({ id: invoice.id });
+        const updatedInv = await base44.entities.SalesInvoice.filter({ id: invoice.id });
         if (updatedInv && updatedInv[0]) {
           setSavedInvoice(updatedInv[0]);
         } else {

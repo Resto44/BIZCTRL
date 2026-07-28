@@ -20,7 +20,7 @@ export async function linkSaleToCashRegister(saleData, saleId) {
     }
 
     // Get latest cash register entry for today
-    const { data: todaysSales } = await base44.entities.DailySales.filter({
+    const todaysSales = await base44.entities.DailySales.filter({
       date: today,
       branch: saleData.branch,
       restaurant_id: saleData.restaurant_id,
@@ -66,7 +66,7 @@ export async function linkSaleToCashRegister(saleData, saleId) {
  */
 export async function syncCashFromLatestSale(restaurantId, branch, date) {
   try {
-    const { data: sales } = await base44.entities.DailySales.filter({
+    const sales = await base44.entities.DailySales.filter({
       restaurant_id: restaurantId,
       branch,
       date,
@@ -170,7 +170,7 @@ export function calculateNetProfit(dailyProfit, monthlyFixedExpenses, isMonthEnd
  */
 export async function verifyERPConsistency(saleId, restaurantId) {
   try {
-    const { data: sale } = await base44.entities.DailySales.filter({ id: saleId });
+    const sale = await base44.entities.DailySales.filter({ id: saleId });
     
     if (!sale || !sale[0]) {
       throw new Error('Sale not found');

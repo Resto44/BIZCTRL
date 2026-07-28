@@ -240,7 +240,7 @@ export async function getActiveOrders(restaurantId, status = null) {
     const filter = { restaurant_id: restaurantId };
     if (status) filter.status = status;
 
-    const { data: orders } = await base44.entities.Order.filter(filter, '-created_at', 100);
+    const orders = await base44.entities.Order.filter(filter, '-created_at', 100);
     return orders || [];
   } catch (err) {
     console.error('[OnlineOrdering] getActiveOrders error:', err);
@@ -253,7 +253,7 @@ export async function getActiveOrders(restaurantId, status = null) {
  */
 export async function getOrderTracking(orderId) {
   try {
-    const { data: tracking } = await base44.entities.OrderTracking.filter(
+    const tracking = await base44.entities.OrderTracking.filter(
       { order_id: orderId },
       'timestamp',
       100

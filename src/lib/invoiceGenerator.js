@@ -12,7 +12,7 @@ import { base44 } from '@/api/base44Client';
 export async function generateInvoiceNumber(restaurantId, date) {
   try {
     // Get all invoices for this restaurant on this date
-    const { data: invoices } = await base44.entities.SalesInvoice.filter({
+    const invoices = await base44.entities.SalesInvoice.filter({
       restaurant_id: restaurantId,
       date,
     }, '-created_date', 1000);
@@ -98,7 +98,7 @@ export async function storeInvoice(invoiceData, saleId, restaurantId) {
     };
 
     // Check if invoice already exists
-    const { data: existing } = await base44.entities.SalesInvoice.filter({
+    const existing = await base44.entities.SalesInvoice.filter({
       invoice_number: invoiceData.invoiceNumber,
     });
 
@@ -233,7 +233,7 @@ export function generateInvoiceHTML(invoice) {
  */
 export async function getInvoiceHistory(restaurantId, limit = 100) {
   try {
-    const { data: invoices } = await base44.entities.SalesInvoice.filter({
+    const invoices = await base44.entities.SalesInvoice.filter({
       restaurant_id: restaurantId,
     }, '-date', limit);
 
@@ -249,7 +249,7 @@ export async function getInvoiceHistory(restaurantId, limit = 100) {
  */
 export async function downloadInvoicePDF(invoiceNumber) {
   try {
-    const { data: invoices } = await base44.entities.SalesInvoice.filter({
+    const invoices = await base44.entities.SalesInvoice.filter({
       invoice_number: invoiceNumber,
     });
 
