@@ -508,6 +508,22 @@ export default function OwnerDashboard() {
     select: (data) => data.filter(expense => expense.date >= prevMonthStart && expense.date < monthStart && isRecordInActiveBranchScope(expense, 'branch_key')),
   });
 
+  // ── Year-to-date purchases (for Oracle Accounting Engine) ────────────────
+  const { data: yearPurchases = [] } = useQuery({
+    queryKey: ['purchases_year', branchFilter, yearStart, selectedBranch, activeBranchSignature],
+    queryFn: () => base44.entities.Purchase.filter(branchFilter || {}, '-date', 5000),
+    staleTime: 120000,
+    enabled,
+    select: (data) => data.filter(purchase => purchase.date >= yearStart && isRecordInActiveBranchScope(purchase, 'branch')),
+  });
+  // ── Year-to-date expenses (for Oracle Accounting Engine) ─────────────────
+  const { data: yearExpenses = [] } = useQuery({
+    queryKey: ['expenses_year', expenseBranchFilter, yearStart, selectedBranch, activeBranchSignature],
+    queryFn: () => base44.entities.Expense.filter(expenseBranchFilter || {}, '-date', 5000),
+    staleTime: 120000,
+    enabled,
+    select: (data) => data.filter(expense => expense.date >= yearStart && isRecordInActiveBranchScope(expense, 'branch_key')),
+  });
   // Expense categories — needed to tag fixed vs variable expenses
   // IMPORTANT: filter by restaurant_id to avoid cross-restaurant category pollution
   const { data: expenseCategories = [] } = useQuery({
@@ -695,7 +711,55 @@ export default function OwnerDashboard() {
     weekVariable: periodProfit.week.totalVariableExpenses,
     weekFixedAllocation: periodProfit.week.fixedDeduction,
     weekDaysElapsed: periodProfit.week.periodDays,
-  }), [periodProfit]);
+    }), [periodProfit]);
+
+  // ── Oracle Accounting Engine ─────────────────────────────────────────────────
+  const oracleEngine = useMemo(() => {
+    // Year-to-date accounting
+    const ytd = calculateERPAccounting({
+      sales: yearSales,
+      purchases: yearPurchases,
+      periodExpenses: yearExpenses,
+      monthlyExpenses: yearExpenses,
+      rangeType: 'year',
+      revenueSources,
+    });
+    // Days elapsed in year so far
+    const now = new Date();
+    const yearStartDate = new Date(now.getFullYear(), 0, 1);
+    const daysElapsed = Math.max(1, Math.ceil((now - yearStartDate) / 86400000));
+    const avgDailyRevenue = ytd.totalSales / daysElapsed;
+    const avgDailyProfit  = ytd.netProfit  / daysElapsed;
+    // Ratio metrics
+    const grossMarginPct   = ytd.totalSales > 0 ? (ytd.grossProfit / ytd.totalSales) * 100 : 0;
+    const netMarginPct     = ytd.totalSales > 0 ? (ytd.netProfit   / ytd.totalSales) * 100 : 0;
+    const expenseRatioPct  = ytd.totalSales > 0 ? (ytd.totalExpenses / ytd.totalSales) * 100 : 0;
+    const purchaseRatioPct = ytd.totalSales > 0 ? (ytd.totalPurchaseCost / ytd.totalSales) * 100 : 0;
+    // Monthly trend: last 6 months of sales + profit
+    const monthlyTrend = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = subMonths(now, i);
+      const mStart = format(startOfMonth(d), 'yyyy-MM-dd');
+      const mEnd   = format(new Date(d.getFullYear(), d.getMonth() + 1, 0), 'yyyy-MM-dd');
+      const mSales = yearSales.filter(s => s.date >= mStart && s.date <= mEnd);
+      // Also include sales from previous months not in yearSales (yearSales only has current year)
+      const mPurchases = yearPurchases.filter(p => p.date >= mStart && p.date <= mEnd);
+      const mExpenses  = yearExpenses.filter(e => e.date >= mStart && e.date <= mEnd);
+      const mAccounting = calculateERPAccounting({
+        sales: mSales, purchases: mPurchases,
+        periodExpenses: mExpenses, monthlyExpenses: mExpenses,
+        rangeType: 'month', revenueSources,
+      });
+      monthlyTrend.push({
+        label: format(d, 'MMM'),
+        sales: mAccounting.totalSales,
+        profit: mAccounting.netProfit,
+        purchases: mAccounting.totalPurchaseCost,
+        expenses: mAccounting.totalExpenses,
+      });
+    }
+    return { ytd, avgDailyRevenue, avgDailyProfit, grossMarginPct, netMarginPct, expenseRatioPct, purchaseRatioPct, monthlyTrend, daysElapsed };
+  }, [yearSales, yearPurchases, yearExpenses, revenueSources]);
 
   // ── Section 1: Executive Summary ──────────────────────────────────────────────
   const execSummary = useMemo(() => {
@@ -1226,6 +1290,129 @@ export default function OwnerDashboard() {
         </WidgetErrorBoundary>
       )}
 
+      {/* ══════════════════════════════════════════════════════════════════════
+          ORACLE ACCOUNTING ENGINE — Multi-period KPIs + Trend Analytics
+      ══════════════════════════════════════════════════════════════════════ */}
+      <WidgetErrorBoundary>
+        <section>
+          <SectionHeader
+            icon={BarChart3}
+            title={t('oracle_accounting_engine')}
+            subtitle={t('oracle_engine_subtitle')}
+            color="indigo"
+            action={{ label: t('profit_loss') || 'P&L', onClick: () => navigate('/profit-loss') }}
+          />
+          {/* Row 1: YTD KPIs */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <MetricCard
+              title={t('yearly_net_profit')}
+              value={fmt(oracleEngine.ytd.netProfit)}
+              subtitle={t('net_profit_subtitle_yearly')}
+              icon={oracleEngine.ytd.netProfit >= 0 ? TrendingUp : TrendingDown}
+              color={oracleEngine.ytd.netProfit >= 0 ? 'green' : 'red'}
+              onClick={() => navigate('/profit-loss')}
+            />
+            <MetricCard
+              title={t('avg_daily_profit')}
+              value={fmt(oracleEngine.avgDailyProfit)}
+              subtitle={`${oracleEngine.daysElapsed} ${t('ytd_label')}`}
+              icon={Target}
+              color={oracleEngine.avgDailyProfit >= 0 ? 'cyan' : 'amber'}
+            />
+            <MetricCard
+              title={t('gross_margin_pct')}
+              value={`${oracleEngine.grossMarginPct.toFixed(1)}%`}
+              subtitle={t('ytd_label')}
+              icon={Scale}
+              color={oracleEngine.grossMarginPct >= 30 ? 'green' : oracleEngine.grossMarginPct >= 15 ? 'amber' : 'red'}
+            />
+            <MetricCard
+              title={t('net_margin_pct')}
+              value={`${oracleEngine.netMarginPct.toFixed(1)}%`}
+              subtitle={t('ytd_label')}
+              icon={Activity}
+              color={oracleEngine.netMarginPct >= 10 ? 'green' : oracleEngine.netMarginPct >= 0 ? 'amber' : 'red'}
+            />
+            <MetricCard
+              title={t('expense_ratio_pct')}
+              value={`${oracleEngine.expenseRatioPct.toFixed(1)}%`}
+              subtitle={t('ytd_label')}
+              icon={Zap}
+              color={oracleEngine.expenseRatioPct <= 20 ? 'green' : oracleEngine.expenseRatioPct <= 35 ? 'amber' : 'red'}
+            />
+            <MetricCard
+              title={t('purchase_ratio_pct')}
+              value={`${oracleEngine.purchaseRatioPct.toFixed(1)}%`}
+              subtitle={t('ytd_label')}
+              icon={ShoppingCart}
+              color={oracleEngine.purchaseRatioPct <= 50 ? 'green' : oracleEngine.purchaseRatioPct <= 70 ? 'amber' : 'red'}
+            />
+          </div>
+          {/* Row 2: Monthly Trend Sparkline Chart */}
+          <Card className="border border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/30 dark:bg-indigo-950/20">
+            <CardContent className="p-4">
+              <p className="text-xs font-bold text-foreground mb-3">{t('monthly_trend')}</p>
+              {oracleEngine.monthlyTrend.length > 0 ? (
+                <div className="space-y-2">
+                  {/* Bar chart using inline divs */}
+                  {(() => {
+                    const maxVal = Math.max(...oracleEngine.monthlyTrend.map(m => Math.max(m.sales, 1)));
+                    return (
+                      <div className="flex items-end gap-1.5 h-24">
+                        {oracleEngine.monthlyTrend.map((m, i) => {
+                          const salesH = Math.max(4, (m.sales / maxVal) * 96);
+                          const profitH = Math.max(2, (Math.abs(m.profit) / maxVal) * 96);
+                          const profitPos = m.profit >= 0;
+                          return (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                              <div className="w-full flex items-end gap-0.5 justify-center" style={{ height: '96px' }}>
+                                <div
+                                  className="flex-1 rounded-t-sm bg-indigo-400/70 dark:bg-indigo-500/60"
+                                  style={{ height: `${salesH}px` }}
+                                  title={`${m.label} Sales: ${fmt(m.sales)}`}
+                                />
+                                <div
+                                  className={`flex-1 rounded-t-sm ${profitPos ? 'bg-emerald-400/80' : 'bg-red-400/80'}`}
+                                  style={{ height: `${profitH}px` }}
+                                  title={`${m.label} Profit: ${fmt(m.profit)}`}
+                                />
+                              </div>
+                              <span className="text-[9px] text-muted-foreground font-medium">{m.label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                  {/* Legend */}
+                  <div className="flex items-center gap-4 mt-1">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-2 rounded-sm bg-indigo-400/70" />
+                      <span className="text-[10px] text-muted-foreground">{t('sales_revenue') || 'Sales'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-2 rounded-sm bg-emerald-400/80" />
+                      <span className="text-[10px] text-muted-foreground">{t('net_profit') || 'Net Profit'}</span>
+                    </div>
+                  </div>
+                  {/* Summary table */}
+                  <div className="mt-2 grid grid-cols-3 gap-1.5 text-[10px]">
+                    {oracleEngine.monthlyTrend.map((m, i) => (
+                      <div key={i} className="bg-background/80 rounded-lg p-1.5 border border-border/40">
+                        <p className="font-bold text-foreground">{m.label}</p>
+                        <p className="text-indigo-600 dark:text-indigo-400">{fmt(m.sales)}</p>
+                        <p className={m.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}>{fmt(m.profit)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">{t('no_data')}</p>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+      </WidgetErrorBoundary>
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 5 — PURCHASE ANALYTICS
       ══════════════════════════════════════════════════════════════════════ */}
