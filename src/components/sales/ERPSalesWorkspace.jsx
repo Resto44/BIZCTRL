@@ -857,9 +857,8 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     {
       key: 'purchases',
       label: 'Purchases Recorded',
-      // Non-blocking warning: zero-purchase days are valid (e.g. new orgs, zero-purchase shifts)
-      passed: true,
-      message: approvedPurchasesForDate.length > 0 ? `${approvedPurchasesForDate.length} approved` : 'None (zero-purchase day)',
+      passed: approvedPurchasesForDate.length > 0,
+      message: approvedPurchasesForDate.length > 0 ? `${approvedPurchasesForDate.length} approved` : 'No approved purchases',
     },
     {
       key: 'pos',
@@ -925,9 +924,9 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Soft warning only — do not hard-block on zero purchases (valid for zero-purchase days or new orgs)
     if (!approvedPurchasesForDate.length) {
-      toast.warning("No approved purchases found for this date. Proceeding without purchase data.");
+      toast.error("Please record today's purchases before closing daily sales.");
+      return;
     }
 
     if (remainingDifference !== 0 && remainingDifference !== null && !managerApproved) {
