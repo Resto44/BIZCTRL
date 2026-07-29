@@ -35,15 +35,18 @@ import {
   shareInvoiceWhatsApp,
 } from '@/lib/salesInvoiceService';
 
+const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
+const firstRecord = (value) => asRecordArray(value).at(0) || null;
+
 export default function Sales() {
   const { t, currency } = useLanguage();
-  const { branches } = useTenant();
+  const { branches: tenantBranches, orgId, ownerFilter, activeRestaurant } = useTenant();
+  const branches = asRecordArray(tenantBranches);
   const qc = useQueryClient();
   const notif = useNotify();
   const { user } = useAuth();
   const { role } = useRole();
   const canDelete = role === ROLES.OWNER || role === ROLES.MANAGER || role === ROLES.GENERAL_MANAGER;
-  const { orgId, ownerFilter, activeRestaurant } = useTenant();
   const { autoSettle } = useNetworkSettlement({ orgId, user, currency });
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -60,11 +63,13 @@ export default function Sales() {
   const [savedInvoice, setSavedInvoice] = useState(null);
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
 
-  const { data: sales = [], isLoading } = useQuery({
+  const { data: salesData, isLoading, isError } = useQuery({
     queryKey: ['sales', ownerFilter],
-    queryFn: () => base44.entities.DailySales.filter(ownerFilter || {}, '-date', 2000), staleTime: 120000,
+    queryFn: async () => asRecordArray(await base44.entities.DailySales.filter(ownerFilter || {}, '-date', 2000)),
+    staleTime: 120000,
     enabled: !!ownerFilter?.created_by,
   });
+  const sales = asRecordArray(salesData);
 
   // Only create wallet transactions for COUNTER (restaurant) sales.
   const autoWalletTx = async (saleData, saleId, prevSale = null) => {
@@ -79,7 +84,7 @@ export default function Sales() {
       };
 
       if (prevSale) {
-        const existing = await base44.entities.WalletTransaction.filter({ reference_id: prevSale.id, auto_generated: true });
+        const existing = asRecordArray(await base44.entities.WalletTransaction.filter({ reference_id: prevSale.id, auto_generated: true }));
         await Promise.all(existing.map(tx => base44.entities.WalletTransaction.delete(tx.id)));
       }
 
@@ -134,10 +139,10 @@ export default function Sales() {
 
     try {
       // Remove any existing owner-capital txs for this sale to avoid duplicates
-      const existing = await base44.entities.WalletTransaction.filter({
+      const existing = asRecordArray(await base44.entities.WalletTransaction.filter({
         reference_id: saleId,
         auto_generated: true,
-      });
+      }));
       const prev = existing.filter(tx => tx.type === 'owner_capital_contribution');
       await Promise.all(prev.map(tx => base44.entities.WalletTransaction.delete(tx.id)));
 
@@ -201,10 +206,10 @@ export default function Sales() {
 
     try {
       // Remove any existing shortage/overage tx for this sale
-      const existing = await base44.entities.WalletTransaction.filter({
+      const existing = asRecordArray(await base44.entities.WalletTransaction.filter({
         reference_id: saleId,
         auto_generated: true,
-      });
+      }));
       const prev = existing.filter(tx =>
         tx.description && (tx.description.includes('Cash Shortage') || tx.description.includes('Cash Overage'))
       );
@@ -261,7 +266,7 @@ export default function Sales() {
   const autoSaveCreditDebts = async (saleData, saleId) => {
     if (!saleData.credit_entries_json) return;
     let entries = [];
-    try { entries = JSON.parse(saleData.credit_entries_json); } catch { return; }
+    try { entries = asRecordArray(JSON.parse(saleData.credit_entries_json)); } catch { return; }
     if (!entries.length) return;
 
     for (const entry of entries) {
@@ -275,16 +280,16 @@ export default function Sales() {
         // Fetch or create DebtRecord for this customer
         let debtRecord = null;
         if (customerId) {
-          const existing = await base44.entities.DebtRecord.filter({ id: customerId });
-          debtRecord = existing[0];
+          const existing = asRecordArray(await base44.entities.DebtRecord.filter({ id: customerId }));
+          debtRecord = firstRecord(existing);
         } else {
           // Look up by name + branch + type=receivable to avoid duplicates
-          const existing = await base44.entities.DebtRecord.filter({ 
-            party_name: customerName, 
-            branch: saleData.branch, 
-            type: 'receivable' 
-          });
-          debtRecord = existing[0];
+          const existing = asRecordArray(await base44.entities.DebtRecord.filter({
+            party_name: customerName,
+            branch: saleData.branch,
+            type: 'receivable'
+          }));
+          debtRecord = firstRecord(existing);
         }
 
         if (debtRecord) {
@@ -343,11 +348,11 @@ export default function Sales() {
         // UPDATE CUSTOMER OUTSTANDING BALANCE (BUG 2)
         // We look up the customer by name or ID and increment their balance
         try {
-          const customers = await base44.entities.Customer.filter(
+          const customers = asRecordArray(await base44.entities.Customer.filter(
             customerId ? { id: customerId } : { customer_name: customerName }
-          );
-          if (customers[0]) {
-            const c = customers[0];
+          ));
+          const c = firstRecord(customers);
+          if (c) {
             await base44.entities.Customer.update(c.id, {
               outstanding_balance: (Number(c.outstanding_balance) || 0) + amt
             });
@@ -383,8 +388,8 @@ export default function Sales() {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Fetch the generated invoice from the DB
-      const { data: invoices } = await base44.entities.SalesInvoice.filter({ sale_id: saleId });
-      const invoice = invoices && invoices[0];
+      const invoices = asRecordArray(await base44.entities.SalesInvoice.filter({ sale_id: saleId }));
+      const invoice = firstRecord(invoices);
 
       if (!invoice) {
         console.warn('[Sales] Invoice not found in DB after trigger');
@@ -395,9 +400,10 @@ export default function Sales() {
       try {
         await generateAndUploadPDF(invoice, 'RestoCTRL', currency);
         // Re-fetch to get the pdf_url
-        const { data: updatedInv } = await base44.entities.SalesInvoice.filter({ id: invoice.id });
-        if (updatedInv && updatedInv[0]) {
-          setSavedInvoice(updatedInv[0]);
+        const updatedInvoices = asRecordArray(await base44.entities.SalesInvoice.filter({ id: invoice.id }));
+        const updatedInvoice = firstRecord(updatedInvoices);
+        if (updatedInvoice) {
+          setSavedInvoice(updatedInvoice);
         } else {
           setSavedInvoice(invoice);
         }
@@ -562,6 +568,19 @@ export default function Sales() {
     },
   });
 
+  const filtered = useMemo(() => {
+    return sales.filter(s => {
+      if (!s?.date) return false;
+      if (filters.branch !== 'all' && s.branch !== filters.branch) return false;
+      if (filters.from && s.date < filters.from) return false;
+      if (filters.to && s.date > filters.to) return false;
+      const total = (Number(s.restaurant_cash) || Number(s.cash) || 0) + (Number(s.restaurant_network) || Number(s.network) || 0) + (Number(s.credit) || 0);
+      if (filters.minTotal && total < Number(filters.minTotal)) return false;
+      if (filters.maxTotal && total > Number(filters.maxTotal)) return false;
+      return true;
+    });
+  }, [sales, filters]);
+
   const toggleSelect = useCallback((id) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -593,19 +612,6 @@ export default function Sales() {
       await createMut.mutateAsync({ data, proofUrl, ocr });
     }
   };
-
-  const filtered = useMemo(() => {
-    return sales.filter(s => {
-      if (!s.date) return false;
-      if (filters.branch !== 'all' && s.branch !== filters.branch) return false;
-      if (filters.from && s.date < filters.from) return false;
-      if (filters.to && s.date > filters.to) return false;
-      const total = (Number(s.restaurant_cash) || Number(s.cash) || 0) + (Number(s.restaurant_network) || Number(s.network) || 0) + (Number(s.credit) || 0);
-      if (filters.minTotal && total < Number(filters.minTotal)) return false;
-      if (filters.maxTotal && total > Number(filters.maxTotal)) return false;
-      return true;
-    });
-  }, [sales, filters]);
 
   const handleExport = ({ format: fmt, from, to, branch }) => {
     const data = sales.filter(s => {
@@ -717,7 +723,14 @@ export default function Sales() {
           {isLoading ? (
             <p className="text-center text-muted-foreground text-sm py-8">{t('loading')}</p>
           ) : filtered.length === 0 ? (
-            <EmptyState />
+            <div>
+              {isError && (
+                <p role="status" className="mb-3 text-center text-sm text-muted-foreground">
+                  Saved sales could not be refreshed. You can still add a sales record.
+                </p>
+              )}
+              <EmptyState />
+            </div>
           ) : (
             <div className="space-y-2">
               {filtered.map(s => (

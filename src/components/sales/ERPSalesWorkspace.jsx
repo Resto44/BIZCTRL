@@ -65,6 +65,9 @@ function getSourceIcon(iconName) {
   return SOURCE_ICON_MAP[iconName] || BanknoteIcon;
 }
 
+const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
+const firstRecord = (value) => asRecordArray(value).at(0) || null;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS — Material 3 / ERP
 // ─────────────────────────────────────────────────────────────────────────────
@@ -396,7 +399,8 @@ const StickySummary = memo(function StickySummary({ totalSales, operatingResult,
 export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   const { currency } = useLanguage();
   const { user } = useAuth();
-  const { ownerFilter, branches, managerBranch, activeRestaurant } = useTenant();
+  const { ownerFilter, branches: tenantBranches, managerBranch, activeRestaurant } = useTenant();
+  const branches = asRecordArray(tenantBranches);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -407,7 +411,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   // ── Form meta state ───────────────────────────────────────────────────────
   const [form, setForm] = useState({
     date: initial?.date || format(new Date(), 'yyyy-MM-dd'),
-    branch: initial?.branch || managerBranch || branches[0]?.key || '',
+    branch: initial?.branch || managerBranch || branches.at(0)?.key || '',
     shift: initial?.shift || 'Morning',
     cashier_name: initial?.cashier_name || '',
     cashier_employee_id: initial?.cashier_employee_id || '',
@@ -432,7 +436,10 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   // ── POS entries ───────────────────────────────────────────────────────────
   const parsePosEntries = () => {
     if (initial?.pos_entries_json) {
-      try { return JSON.parse(initial.pos_entries_json).map((e, i) => ({ ...e, id: Date.now() + i })); } catch { /* ignore */ }
+      try {
+        const parsed = asRecordArray(JSON.parse(initial.pos_entries_json));
+        if (parsed.length) return parsed.map((e, i) => ({ ...e, id: Date.now() + i }));
+      } catch { /* ignore */ }
     }
     return [{ id: Date.now(), device_id: '', device_name: '', amount: '', notes: '' }];
   };
@@ -441,7 +448,10 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   // ── Credit entries ────────────────────────────────────────────────────────
   const parseCreditEntries = () => {
     if (initial?.credit_entries_json) {
-      try { return JSON.parse(initial.credit_entries_json).map((e, i) => ({ ...e, id: Date.now() + i })); } catch { /* ignore */ }
+      try {
+        const parsed = asRecordArray(JSON.parse(initial.credit_entries_json));
+        if (parsed.length) return parsed.map((e, i) => ({ ...e, id: Date.now() + i }));
+      } catch { /* ignore */ }
     }
     return [];
   };
@@ -455,12 +465,13 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   const updateCredit = (id, field, value) => setCreditEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
 
   // ── Dynamic Sales Sources ───────────────────────────────────────────────────────────────
-  const { customSources, isLoading: sourcesLoading } = useSalesSources({ branchKey: form.branch });
+  const { customSources: customSourcesData, isLoading: sourcesLoading } = useSalesSources({ branchKey: form.branch });
+  const customSources = asRecordArray(customSourcesData);
   // Amounts keyed by source.id
   const [customSourceAmounts, setCustomSourceAmounts] = useState(() => {
     if (initial?.sales_sources_json) {
       try {
-        const parsed = JSON.parse(initial.sales_sources_json);
+        const parsed = asRecordArray(JSON.parse(initial.sales_sources_json));
         const map = {};
         parsed.forEach(e => { map[e.source_id] = String(e.amount || ''); });
         return map;
@@ -475,13 +486,13 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   );
 
   // ── Employees ─────────────────────────────────────────────────────────────
-  const { data: employees = [], isLoading: empLoading } = useQuery({
+  const { data: employeesData, isLoading: empLoading } = useQuery({
     queryKey: ['employees_cashiers', ownerFilter?.created_by, ownerFilter?.branch, form.branch],
     queryFn: async () => {
       if (!ownerFilter?.created_by && !ownerFilter?.branch) return [];
-      const all = await base44.entities.Employee.filter(
+      const all = asRecordArray(await base44.entities.Employee.filter(
         { ...ownerFilter, is_active: true }, 'full_name', 200
-      );
+      ));
       const branchFiltered = form.branch
         ? all.filter(e => !e.branch || e.branch === form.branch || e.branch === 'all')
         : all;
@@ -496,13 +507,15 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     staleTime: 60000,
     enabled: !!ownerFilter?.created_by || !!ownerFilter?.branch,
   });
+  const employees = asRecordArray(employeesData);
 
   // Auto-select single cashier
   useEffect(() => {
-    if (employees.length === 1 && !form.cashier_name) {
-      setForm(prev => ({ ...prev, cashier_name: employees[0].full_name, cashier_employee_id: employees[0].id }));
+    const employee = firstRecord(employees);
+    if (employees.length === 1 && !form.cashier_name && employee) {
+      setForm(prev => ({ ...prev, cashier_name: employee.full_name || '', cashier_employee_id: employee.id || '' }));
     }
-  }, [employees]);
+  }, [employees, form.cashier_name]);
 
   // Rule 9: Auto-populate Opening Cash from previous shift's Closing Cash
   useEffect(() => {
@@ -515,23 +528,21 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         .order('date', { ascending: false })
         .order('created_date', { ascending: false })
         .limit(1)
-        .then(({ data }) => {
-          if (data?.[0]) {
-            setOpeningCash(data[0].closing_cash ?? 0);
-          } else {
-            setOpeningCash(0);
-          }
-        });
+        .then((result = {}) => {
+          const previousSale = firstRecord(result.data);
+          setOpeningCash(previousSale?.closing_cash ?? 0);
+        })
+        .catch(() => setOpeningCash(0));
     }
   }, [ownerFilter?.created_by, form.branch, initial?.id]);
 
   // ── POS devices ───────────────────────────────────────────────────────────
-  const { data: posDevices = [], isLoading: posLoading } = useQuery({
+  const { data: posDevicesData, isLoading: posLoading } = useQuery({
     queryKey: ['pos_devices_form', activeRestaurant?.id, ownerFilter?.created_by, form.branch],
     queryFn: async () => {
       const createdBy = ownerFilter?.created_by;
       if (!createdBy) return [];
-      const all = await base44.entities.NetworkAccount.filter({ created_by: createdBy }, '-created_date', 200);
+      const all = asRecordArray(await base44.entities.NetworkAccount.filter({ created_by: createdBy }, '-created_date', 200));
       if (!form.branch) return all.filter(a => a.status === 'active' || a.is_active);
       return all.filter(a =>
         (a.status === 'active' || a.is_active) &&
@@ -541,9 +552,10 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     staleTime: 30000,
     enabled: !!ownerFilter?.created_by,
   });
+  const posDevices = asRecordArray(posDevicesData);
 
   // ── Customers ─────────────────────────────────────────────────────────────
-  const { data: allCustomers = [], isLoading: custLoading } = useQuery({
+  const { data: allCustomersData, isLoading: custLoading } = useQuery({
     queryKey: ['customers_form', ownerFilter?.created_by, activeRestaurant?.id],
     queryFn: async () => {
       if (!ownerFilter?.created_by) return [];
@@ -562,11 +574,12 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         console.error('[ERPSalesWorkspace] Customer fetch error:', error);
         return [];
       }
-      return data || [];
+      return asRecordArray(data);
     },
     staleTime: 0, // Always fresh
     enabled: !!ownerFilter?.created_by,
   });
+  const allCustomers = asRecordArray(allCustomersData);
 
   // ── Filter customers by selected branch ──────────────────────────────────────
   const customers = useMemo(() => {
@@ -577,7 +590,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   }, [allCustomers, form.branch]);
 
   // ── Approved Purchases ────────────────────────────────────────────────────
-  const { data: approvedPurchasesForDate = [], isLoading: purchasesLoading } = useQuery({
+  const { data: approvedPurchasesForDateData, isLoading: purchasesLoading } = useQuery({
     queryKey: ['approved_purchases_for_date', ownerFilter?.created_by, form.date],
     queryFn: async () => {
       if (!ownerFilter?.created_by || !form.date) return [];
@@ -589,14 +602,15 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         .in('approval_status', ['approved', 'auto_approved'])
         .limit(100);
       if (error) return [];
-      return data || [];
+      return asRecordArray(data);
     },
     staleTime: 15000,
     enabled: !!ownerFilter?.created_by && !!form.date,
   });
+  const approvedPurchasesForDate = asRecordArray(approvedPurchasesForDateData);
 
   // Pending purchases (not approved)
-  const { data: pendingPurchases = [], isLoading: pendingLoading } = useQuery({
+  const { data: pendingPurchasesData, isLoading: pendingLoading } = useQuery({
     queryKey: ['pending_purchases_for_date', ownerFilter?.created_by, form.date],
     queryFn: async () => {
       if (!ownerFilter?.created_by || !form.date) return [];
@@ -608,11 +622,12 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         .in('approval_status', ['pending'])
         .limit(50);
       if (error) return [];
-      return data || [];
+      return asRecordArray(data);
     },
     staleTime: 15000,
     enabled: !!ownerFilter?.created_by && !!form.date,
   });
+  const pendingPurchases = asRecordArray(pendingPurchasesData);
 
   // ── Real daily_sales for Live Sales Summary ─────────────────────────────────
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -620,7 +635,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   const monthStartStr = format(startOfMonth(new Date()), 'yyyy-MM-dd');
 
   // Today's real sales from daily_sales (all branches or selected branch)
-  const { data: realTodaySales = [], isLoading: realTodayLoading } = useQuery({
+  const { data: realTodaySalesData, isLoading: realTodayLoading } = useQuery({
     queryKey: ['sales_today_live', ownerFilter?.created_by, todayStr, form.branch],
     queryFn: async () => {
       if (!ownerFilter?.created_by) return [];
@@ -633,14 +648,15 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
       const { data, error } = await q;
       if (error) return [];
-      return data || [];
+      return asRecordArray(data);
     },
     staleTime: 10000,
     enabled: !!ownerFilter?.created_by,
   });
+  const realTodaySales = asRecordArray(realTodaySalesData);
 
   // Yesterday's real sales from daily_sales
-  const { data: realYesterdaySales = [] } = useQuery({
+  const { data: realYesterdaySalesData } = useQuery({
     queryKey: ['sales_yesterday_live', ownerFilter?.created_by, yesterdayStr, form.branch],
     queryFn: async () => {
       if (!ownerFilter?.created_by) return [];
@@ -653,14 +669,15 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
       const { data, error } = await q;
       if (error) return [];
-      return data || [];
+      return asRecordArray(data);
     },
     staleTime: 60000,
     enabled: !!ownerFilter?.created_by,
   });
+  const realYesterdaySales = asRecordArray(realYesterdaySalesData);
 
   // Month-to-date real sales from daily_sales
-  const { data: realMonthSales = [] } = useQuery({
+  const { data: realMonthSalesData } = useQuery({
     queryKey: ['sales_month_live', ownerFilter?.created_by, monthStartStr, form.branch],
     queryFn: async () => {
       if (!ownerFilter?.created_by) return [];
@@ -673,14 +690,15 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
       const { data, error } = await q;
       if (error) return [];
-      return data || [];
+      return asRecordArray(data);
     },
     staleTime: 30000,
     enabled: !!ownerFilter?.created_by,
   });
+  const realMonthSales = asRecordArray(realMonthSalesData);
 
   // Yesterday's sales for growth comparison (legacy — kept for growthVsYesterday calc)
-  const { data: yesterdaySales = [] } = useQuery({
+  const { data: yesterdaySalesData } = useQuery({
     queryKey: ['yesterday_sales', ownerFilter?.created_by, form.date, form.branch],
     queryFn: async () => {
       if (!ownerFilter?.created_by || !form.date) return [];
@@ -694,16 +712,17 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         .eq('date', yStr)
         .limit(20);
       if (error) return [];
-      return data || [];
+      return asRecordArray(data);
     },
     staleTime: 60000,
     enabled: !!ownerFilter?.created_by && !!form.date,
   });
+  const yesterdaySales = asRecordArray(yesterdaySalesData);
 
   // ── Calculations (RULE-COMPLIANT — DO NOT MODIFY) ─────────────────────────
   const cashSales    = useMemo(() => Math.max(0, Number(cashSalesInput) || 0), [cashSalesInput]);
-  const networkTotal = useMemo(() => posEntries.reduce((s, e) => s + (Number(e.amount) || 0), 0), [posEntries]);
-  const creditTotal  = useMemo(() => creditEntries.reduce((s, e) => s + (Number(e.amount) || 0), 0), [creditEntries]);
+  const networkTotal = useMemo(() => asRecordArray(posEntries).reduce((s, e) => s + (Number(e.amount) || 0), 0), [posEntries]);
+  const creditTotal  = useMemo(() => asRecordArray(creditEntries).reduce((s, e) => s + (Number(e.amount) || 0), 0), [creditEntries]);
   // totalSales now includes dynamic custom sources (Rule 1 extended)
   const totalSales   = useMemo(() => cashSales + networkTotal + creditTotal + customTotal, [cashSales, networkTotal, creditTotal, customTotal]);
 
@@ -785,14 +804,14 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   // ── Real daily_sales aggregation for Live Sales Summary ─────────────────────
   // Helper: sum a field across an array of daily_sales records
   const sumField = (arr, field1, field2) =>
-    (arr || []).reduce((s, r) => s + (Number(r[field1]) || (field2 ? Number(r[field2]) : 0) || 0), 0);
+    asRecordArray(arr).reduce((s, r) => s + (Number(r[field1]) || (field2 ? Number(r[field2]) : 0) || 0), 0);
 
   // Helper: sum custom sources from sales_sources_json + custom_sources_total fallback
   const sumCustom = (arr) =>
-    (arr || []).reduce((s, r) => {
+    asRecordArray(arr).reduce((s, r) => {
       if (r.sales_sources_json) {
         try {
-          const entries = JSON.parse(r.sales_sources_json);
+          const entries = asRecordArray(JSON.parse(r.sales_sources_json));
           return s + entries.reduce((cs, e) => cs + (Number(e.amount) || 0), 0);
         } catch { /* ignore */ }
       }
@@ -925,8 +944,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     e.preventDefault();
 
     if (!approvedPurchasesForDate.length) {
-      toast.error("Please record today's purchases before closing daily sales.");
-      return;
+      toast.warning("No approved purchases found for this date. Proceeding without purchase data.");
     }
 
     if (remainingDifference !== 0 && remainingDifference !== null && !managerApproved) {
@@ -979,7 +997,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         cash: cashSales,
         restaurant_network: networkTotal,
         network: networkTotal,
-        restaurant_network_account_id: posEntries[0]?.device_id || '',
+        restaurant_network_account_id: posEntries.at(0)?.device_id || '',
         credit: creditTotal,
         total_sales: totalSales,
         pos_entries_json: JSON.stringify(posEntries.map(({ id, ...rest }) => rest)),

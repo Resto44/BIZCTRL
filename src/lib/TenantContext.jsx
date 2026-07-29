@@ -4,6 +4,8 @@ import { useAuth } from '@/lib/AuthContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
+
 const TenantContext = createContext({
   restaurants: [], loadingRestaurants: false, activeRestaurant: null, activeRestaurantId: null,
   setActiveRestaurant: () => {}, branches: [], allBranches: [], createRestaurant: async () => {},
@@ -38,7 +40,7 @@ export function TenantProvider({ children }) {
   const isCustomer = normalizedRole === ROLES.CUSTOMER;
   const isSponsor = normalizedRole === ROLES.SPONSOR;
 
-  const { data: restaurants = [], isLoading: loadingRestaurants, refetch: refetchRestaurants } = useQuery({
+  const { data: restaurantsData, isLoading: loadingRestaurants, refetch: refetchRestaurants } = useQuery({
     queryKey: ['restaurants', user?.id, user?.role],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -89,15 +91,17 @@ export function TenantProvider({ children }) {
     enabled: !!user?.id && !isLoadingAuth,
     staleTime: 60000,
   });
+  const restaurants = asRecordArray(restaurantsData);
 
-  // Auto-select first restaurant if none selected
+  // Auto-select the first valid restaurant if none is selected.
   useEffect(() => {
-    if (restaurants.length > 0 && !activeRestaurantId) {
-      setActiveRestaurantIdRaw(restaurants[0].id);
+    const firstRestaurant = restaurants.at(0);
+    if (firstRestaurant?.id && !activeRestaurantId) {
+      setActiveRestaurantIdRaw(firstRestaurant.id);
     }
   }, [restaurants, activeRestaurantId]);
 
-  const activeRestaurant = restaurants.find(r => r.id === activeRestaurantId) || restaurants[0] || null;
+  const activeRestaurant = restaurants.find(r => r.id === activeRestaurantId) || restaurants.at(0) || null;
 
   const setActiveRestaurant = useCallback((id) => {
     setActiveRestaurantIdRaw(id);
@@ -107,7 +111,7 @@ export function TenantProvider({ children }) {
   }, [user?.email, queryClient]);
 
   // Load branches from the branches table (not from JSON column)
-  const { data: branchesFromDB = [] } = useQuery({
+  const { data: branchesFromDBData } = useQuery({
     queryKey: ['branches', activeRestaurant?.id],
     queryFn: async () => {
       if (!activeRestaurant?.id) return [];
@@ -117,7 +121,7 @@ export function TenantProvider({ children }) {
         .eq('restaurant_id', activeRestaurant.id)
         .order('name');
       if (error) return [];
-      return (data || []).map(b => ({
+      return asRecordArray(data).map(b => ({
         ...b,
         key: b.branch_key,
         label: b.name,
@@ -126,6 +130,7 @@ export function TenantProvider({ children }) {
     enabled: !!activeRestaurant?.id,
     staleTime: 60000,
   });
+  const branchesFromDB = asRecordArray(branchesFromDBData);
 
   // Also parse branches from active restaurant JSON column (for backward compat)
   const branchesFromJSON = React.useMemo(() => {

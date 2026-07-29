@@ -9,6 +9,8 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
 
+const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
+
 export function useSalesSources({ branchKey } = {}) {
   const { activeRestaurant, managerBranch } = useTenant();
   const activeRestaurantId = activeRestaurant?.id ? String(activeRestaurant.id) : null;
@@ -16,17 +18,19 @@ export function useSalesSources({ branchKey } = {}) {
   // Determine effective branch key: explicit prop > manager branch
   const effectiveBranch = branchKey || managerBranch || null;
 
-  const { data: allSources = [], isLoading, error, refetch } = useQuery({
+  const { data: allSourcesData, isLoading, error, refetch } = useQuery({
     queryKey: ['sales_sources_active', activeRestaurantId],
     queryFn: async () => {
       const all = await base44.entities.SalesSource.list('sort_order', 200);
       // Return: system sources (created_by IS NULL) + current restaurant/tenant sources + current user created sources
       // RLS will filter what the user can actually see based on their role and permissions
-      return all;
+      return asRecordArray(all);
     },
     staleTime: 60000,
     enabled: !!activeRestaurantId,
   });
+
+  const allSources = asRecordArray(allSourcesData);
 
   // Filter: active only, and respect branch scoping
   const sources = allSources
