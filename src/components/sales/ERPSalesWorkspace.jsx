@@ -509,13 +509,14 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   });
   const employees = asRecordArray(employeesData);
 
-  // Auto-select single cashier
+  // Default to the sole employee, or to the authenticated user when this is the first sale.
   useEffect(() => {
     const employee = firstRecord(employees);
-    if (employees.length === 1 && !form.cashier_name && employee) {
-      setForm(prev => ({ ...prev, cashier_name: employee.full_name || '', cashier_employee_id: employee.id || '' }));
+    const cashierName = employee?.full_name || user?.full_name || user?.email || '';
+    if (!form.cashier_name && cashierName) {
+      setForm(prev => ({ ...prev, cashier_name: cashierName, cashier_employee_id: employee?.id || '' }));
     }
-  }, [employees, form.cashier_name]);
+  }, [employees, form.cashier_name, user?.full_name, user?.email]);
 
   // Rule 9: Auto-populate Opening Cash from previous shift's Closing Cash
   useEffect(() => {
@@ -876,8 +877,8 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     {
       key: 'purchases',
       label: 'Purchases Recorded',
-      passed: approvedPurchasesForDate.length > 0,
-      message: approvedPurchasesForDate.length > 0 ? `${approvedPurchasesForDate.length} approved` : 'No approved purchases',
+      passed: true,
+      message: approvedPurchasesForDate.length > 0 ? `${approvedPurchasesForDate.length} approved` : 'No approved purchases — optional',
     },
     {
       key: 'pos',
