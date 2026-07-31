@@ -377,13 +377,10 @@ export default function Sales() {
     qc.invalidateQueries({ queryKey: ['debt_records_customers'] });
   };
 
-  // Auto-generate invoice after sale save
+  // Auto-generate invoice after sale save — SILENT BACKGROUND PDF GENERATION
   const autoGenerateInvoice = async (saleData, saleId) => {
+    // Fired in background — do NOT await this in handleSave to keep UI fast.
     try {
-      // The invoice is now auto-created by the DB trigger (AFTER INSERT/UPDATE).
-      // We just need to wait a moment and fetch it to show the dialog/PDF.
-      const restaurantId = activeRestaurant?.id;
-      
       // Give the DB a moment to process the trigger
       await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -391,32 +388,17 @@ export default function Sales() {
       const invoices = asRecordArray(await base44.entities.SalesInvoice.filter({ sale_id: saleId }));
       const invoice = firstRecord(invoices);
 
-      if (!invoice) {
-        console.warn('[Sales] Invoice not found in DB after trigger');
-        return;
-      }
+      if (!invoice) return;
 
-      // Phase 8: Generate and store permanent PDF
+      // Generate and store permanent PDF in background
       try {
         await generateAndUploadPDF(invoice, 'RestoCTRL', currency);
-        // Re-fetch to get the pdf_url
-        const updatedInvoices = asRecordArray(await base44.entities.SalesInvoice.filter({ id: invoice.id }));
-        const updatedInvoice = firstRecord(updatedInvoices);
-        if (updatedInvoice) {
-          setSavedInvoice(updatedInvoice);
-        } else {
-          setSavedInvoice(invoice);
-        }
+        qc.invalidateQueries({ queryKey: ['sales_invoices'] });
       } catch (pdfErr) {
-        console.error('[Sales] PDF generation failed:', pdfErr);
-        setSavedInvoice(invoice);
+        console.warn('[Sales] Silent PDF generation failed:', pdfErr);
       }
-
-      setShowInvoiceDialog(true);
-      qc.invalidateQueries({ queryKey: ['sales_invoices'] });
-      return invoice;
     } catch (err) {
-      console.warn('[Sales] Invoice generation failed:', err.message);
+      console.warn('[Sales] Background invoice task failed:', err.message);
     }
   };
 
@@ -453,8 +435,8 @@ export default function Sales() {
       try { await autoSettle(data, saleId, proofUrl || null, ocr || null, null); } catch (e) { console.warn('autoSettle skipped:', e.message); }
       await autoSaveCreditDebts(data, saleId);
       
-      // 5. Finalize invoice (PDF generation etc)
-      await autoGenerateInvoice(data, saleId);
+      // 5. Finalize invoice (PDF generation etc) — SILENT BACKGROUND TASK
+      autoGenerateInvoice(data, saleId);
       
       const total = (data.restaurant_cash || 0) + (data.restaurant_network || 0) + (data.credit || 0);
       await notif.sale({ branch: data.branch, amount: total, action: 'create' });
@@ -485,6 +467,7 @@ export default function Sales() {
       qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
       qc.invalidateQueries({ queryKey: ['reports'] });
       setShowForm(false);
+      setEditing(null); // Clear editing state just in case
     },
   });
 
@@ -499,8 +482,8 @@ export default function Sales() {
       try { await autoSettle(data, id, proofUrl || null, ocr || null, prev); } catch (e) { console.warn('autoSettle skipped:', e.message); }
       // Save customer credit entries to Debt Management (single source of truth)
       await autoSaveCreditDebts(data, id);
-      // Re-generate invoice on update (upsert by invoice_number)
-      await autoGenerateInvoice({ ...data, invoice_number: prev?.invoice_number }, id);
+      // Re-generate invoice on update (upsert by invoice_number) — SILENT BACKGROUND TASK
+      autoGenerateInvoice({ ...data, invoice_number: prev?.invoice_number }, id);
       const total = (data.restaurant_cash || 0) + (data.restaurant_network || 0) + (data.credit || 0);
       await notif.sale({ branch: data.branch, amount: total, action: 'update' });
       return sale;
@@ -527,6 +510,7 @@ export default function Sales() {
       qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
       qc.invalidateQueries({ queryKey: ['reports'] });
       setEditing(null);
+      setShowForm(false); // Ensure form closes on update too
     },
   });
 
@@ -816,72 +800,7 @@ export default function Sales() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Invoice Share/Download Dialog */}
-      <Dialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary" />
-              Invoice Generated
-            </DialogTitle>
-          </DialogHeader>
-          {savedInvoice && (
-            <div className="space-y-4">
-              <div className="rounded-xl bg-primary/5 border border-primary/20 px-4 py-3 text-center">
-                <p className="text-xs text-muted-foreground mb-1">Invoice Number</p>
-                <p className="text-xl font-bold text-primary">{savedInvoice.invoice_number}</p>
-                <p className="text-xs text-muted-foreground mt-1">{savedInvoice.branch} · {savedInvoice.sale_date}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-2 h-11"
-                  onClick={() => downloadInvoicePDF(savedInvoice, 'RestoCTRL', currency)}
-                >
-                  <Download className="w-4 h-4" />
-                  Download
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-2 h-11"
-                  onClick={() => openInvoicePrint(savedInvoice, 'RestoCTRL', currency)}
-                >
-                  <FileText className="w-4 h-4" />
-                  View PDF
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-2 h-11"
-                  onClick={() => shareInvoiceNative(savedInvoice, 'RestoCTRL', currency)}
-                >
-                  <Share2 className="w-4 h-4" />
-                  Share PDF
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-2 h-11"
-                  onClick={() => printInvoice(savedInvoice, 'RestoCTRL', currency)}
-                >
-                  <Printer className="w-4 h-4" />
-                  Print
-                </Button>
-                <Button
-                  className="flex items-center gap-2 h-11 col-span-2 bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => shareInvoiceWhatsApp(savedInvoice, currency)}
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  WhatsApp Share
-                </Button>
-              </div>
-
-              <Button variant="ghost" className="w-full" onClick={() => setShowInvoiceDialog(false)}>
-                Close
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Invoice Share/Download Dialog removed to prevent blocking UI */}
 
       <ExportDialog open={showExport} onClose={() => setShowExport(false)} onExport={handleExport} title={t('daily_sales')} />
     </div>

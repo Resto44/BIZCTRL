@@ -1049,29 +1049,8 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   };
 
   // ── RENDER ────────────────────────────────────────────────────────────────
-  if (saveSuccess) {
-    return (
-      <div className="p-6 space-y-4">
-        <div className="text-center space-y-3">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-8 h-8 text-emerald-600" />
-          </div>
-          <h3 className="text-lg font-bold text-foreground">Shift Closed Successfully</h3>
-          <p className="text-sm text-muted-foreground">All records have been saved to the database.</p>
-        </div>
-        <div className="space-y-2">
-          {recordsToCreate.map(r => (
-            <div key={r.key} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-              <r.icon className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-              <span className="text-xs font-medium text-emerald-800">{r.label}</span>
-            </div>
-          ))}
-        </div>
-        <Button className="w-full h-11" onClick={onCancel}>Done</Button>
-      </div>
-    );
-  }
+  // Requirement: Remove blocking success state.
+  // Save returns immediately to Daily Sales via onSubmit callback.
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
