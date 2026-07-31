@@ -1563,50 +1563,17 @@ export default function OwnerDashboard() {
             title="Variable Expenses"
             subtitle="Variable costs only — fixed expenses excluded"
             color="amber"
-            action={{ label: 'Expenses', onClick: () => navigate('/expenses') }}
+            action={{ label: t('expenses_label') || 'Expenses', onClick: () => navigate('/expenses') }}
           />
-          <div className="grid grid-cols-2 gap-3">
-            <MetricCard
-              title="Today’s Variable"
-              value={fmtDecimal(expenseSummary.todayVariable)}
-              subtitle="Variable expenses today"
-              icon={Receipt}
-              color={expenseSummary.todayVariable > 0 ? 'red' : 'green'}
-              onClick={() => navigate('/expenses')}
-            />
-            <MetricCard
-              title="Yesterday Variable"
-              value={fmtDecimal(expenseSummary.yesterdayVariable)}
-              subtitle="Variable expenses yesterday"
-              icon={Receipt}
-              color="slate"
-              onClick={() => navigate('/expenses')}
-            />
-            <MetricCard
-              title="Weekly Variable"
-              value={fmt(expenseSummary.weekVariable)}
-              subtitle="Variable expenses this week"
-              icon={Activity}
-              color="amber"
-              onClick={() => navigate('/expenses')}
-            />
-            <MetricCard
-              title="Monthly Variable"
-              value={fmt(expenseSummary.monthlyVariable)}
-              subtitle="Variable expenses this month"
-              icon={BarChart3}
-              color="orange"
-              onClick={() => navigate('/expenses')}
-            />
-            <MetricCard
-              title="Yearly Variable"
-              value={fmt(expenseSummary.yearVariable)}
-              subtitle="Variable expenses year-to-date"
-              icon={TrendingUp}
-              color="red"
-              onClick={() => navigate('/expenses')}
-            />
-          </div>
+          <Card className="border-amber-100 dark:border-amber-900/60">
+            <CardContent className="p-4 space-y-1">
+              <LedgerRow label="Today Variable Expenses"     value={fmt(expenseSummary.todayVariable)}     color={expenseSummary.todayVariable > 0 ? 'red' : 'green'} bold />
+              <LedgerRow label="Yesterday Variable Expenses" value={fmt(expenseSummary.yesterdayVariable)} color="slate" />
+              <LedgerRow label="Weekly Variable Expenses"    value={fmt(expenseSummary.weekVariable)}      color="amber" separator />
+              <LedgerRow label="Monthly Variable Expenses"   value={fmt(expenseSummary.monthlyVariable)}   color="orange" />
+              <LedgerRow label="Yearly Variable Expenses"    value={fmt(expenseSummary.yearVariable)}    color="red" bold separator />
+            </CardContent>
+          </Card>
         </section>
       </WidgetErrorBoundary>
 

@@ -178,7 +178,11 @@ export default function Expenses() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses'] });
       qc.invalidateQueries({ queryKey: ['expenses_today'] });
+      qc.invalidateQueries({ queryKey: ['expenses_yesterday'] });
+      qc.invalidateQueries({ queryKey: ['expenses_week'] });
       qc.invalidateQueries({ queryKey: ['expenses_month'] });
+      qc.invalidateQueries({ queryKey: ['expenses_year'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
       setShowForm(false);
     }
   });
@@ -191,7 +195,11 @@ export default function Expenses() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses'] });
       qc.invalidateQueries({ queryKey: ['expenses_today'] });
+      qc.invalidateQueries({ queryKey: ['expenses_yesterday'] });
+      qc.invalidateQueries({ queryKey: ['expenses_week'] });
       qc.invalidateQueries({ queryKey: ['expenses_month'] });
+      qc.invalidateQueries({ queryKey: ['expenses_year'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
       setEditing(null);
     }
   });
@@ -228,7 +236,10 @@ export default function Expenses() {
       // Invalidate all expense-related query keys
       qc.invalidateQueries({ queryKey: ['expenses'] });
       qc.invalidateQueries({ queryKey: ['expenses_today'] });
+      qc.invalidateQueries({ queryKey: ['expenses_yesterday'] });
+      qc.invalidateQueries({ queryKey: ['expenses_week'] });
       qc.invalidateQueries({ queryKey: ['expenses_month'] });
+      qc.invalidateQueries({ queryKey: ['expenses_year'] });
       // Invalidate dashboard KPI queries that depend on expenses
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['reports'] });
