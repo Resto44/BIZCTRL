@@ -68,8 +68,12 @@ import {
 } from 'lucide-react';
 import {
   format, startOfMonth, startOfWeek, startOfYear,
-  subDays, subWeeks, subMonths,
+  endOfMonth, subDays, subWeeks, subMonths,
 } from 'date-fns';
+import {
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
+} from 'recharts';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PRIMITIVE COMPONENTS
@@ -382,6 +386,8 @@ export default function OwnerDashboard() {
   const yearStart   = format(startOfYear(new Date()), 'yyyy-MM-dd');
   const prevWeekStart  = format(subWeeks(new Date(), 1), 'yyyy-MM-dd');
   const prevMonthStart = format(subMonths(new Date(), 1), 'yyyy-MM-dd');
+  // 6-month trend: start of the month 5 months ago
+  const sixMonthStart = format(startOfMonth(subMonths(new Date(), 5)), 'yyyy-MM-dd');
 
   const enabled = !!(activeRestaurant?.id);
 
@@ -719,6 +725,46 @@ export default function OwnerDashboard() {
     weekDaysElapsed: periodProfit.week.periodDays,
     yearVariable: yearVariableExpenses,
   }), [periodProfit, yearVariableExpenses]);
+
+  // ── 6-Month Trend Analytics ──────────────────────────────────────────────────
+  // Aggregates Sales, Purchases, Fixed Expenses, Variable Expenses,
+  // Gross Profit, and Net Profit for each of the last 6 calendar months.
+  // Uses yearSales, supplierInvoices, yearExpenses, expenseCategories already
+  // fetched above — no extra network requests.
+  const sixMonthTrend = useMemo(() => {
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = subMonths(new Date(), i);
+      const mStart = format(startOfMonth(d), 'yyyy-MM-dd');
+      const mEnd   = format(endOfMonth(d),   'yyyy-MM-dd');
+      const label  = format(d, 'MMM yy');
+
+      // Sales
+      const mSales = (yearSales || []).filter(s => s.date >= mStart && s.date <= mEnd);
+      const totalSales = mSales.reduce((s, r) => s + (calculateSalesRevenue(r, revenueSources)?.total || 0), 0);
+
+      // Purchases (approved supplier invoices)
+      const isApproved = inv => (
+        ['approved', 'auto_approved'].includes(inv.approval_status)
+        || ['approved', 'paid', 'partial', 'unpaid'].includes(inv.status)
+        || !inv.approval_status
+      );
+      const mInvoices = (supplierInvoices || []).filter(inv => isApproved(inv) && inv.date >= mStart && inv.date <= mEnd);
+      const totalPurchases = mInvoices.reduce((s, inv) => s + (Number(inv.total_amount) || 0), 0);
+
+      // Expenses — tag and split fixed vs variable
+      const mExpenses = (yearExpenses || []).filter(e => e.date >= mStart && e.date <= mEnd);
+      const taggedM   = tagExpensesWithCategories(mExpenses, expenseCategories);
+      const fixedExp  = taggedM.filter(e => e._is_fixed || e.is_fixed).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      const varExp    = taggedM.filter(e => !e._is_fixed && !e.is_fixed).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+      const grossProfit = totalSales - totalPurchases;
+      const netProfit   = grossProfit - fixedExp - varExp;
+
+      months.push({ month: label, Sales: Math.round(totalSales), Purchases: Math.round(totalPurchases), FixedExp: Math.round(fixedExp), VarExp: Math.round(varExp), GrossProfit: Math.round(grossProfit), NetProfit: Math.round(netProfit) });
+    }
+    return months;
+  }, [yearSales, supplierInvoices, yearExpenses, expenseCategories, revenueSources]);
 
   // ── Section 1: Executive Summary ──────────────────────────────────────────────
   const execSummary = useMemo(() => {
@@ -1102,6 +1148,59 @@ export default function OwnerDashboard() {
           </span>
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECTION 0B — 6-MONTH TREND ANALYTICS
+          Shows Sales, Purchases, Fixed Expenses, Variable Expenses,
+          Gross Profit, and Net Profit for the last 6 calendar months.
+          Supports All Branches and Single Branch via selectedBranch.
+          Auto-updates when any query key changes (transactions, branch).
+      ══════════════════════════════════════════════════════════════════════ */}
+      <WidgetErrorBoundary>
+        <section>
+          <SectionHeader
+            icon={BarChart3}
+            title="6-Month Trend Analytics"
+            subtitle={`${selectedBranchLabel} — Last 6 calendar months`}
+            color="indigo"
+            action={{ label: 'Reports', onClick: () => navigate('/reports') }}
+          />
+          <Card className="border-indigo-100 dark:border-indigo-900/60">
+            <CardContent className="p-3">
+              {/* Legend summary row */}
+              <div className="flex flex-wrap gap-2 mb-3 text-[10px] font-semibold">
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />Sales</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />Purchases</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-slate-400 inline-block" />Fixed Exp</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-orange-400 inline-block" />Var Exp</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-1.5 rounded-sm bg-blue-500 inline-block" /><span className="w-1 inline-block" />Gross Profit</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-1.5 rounded-sm bg-purple-500 inline-block" /><span className="w-1 inline-block" />Net Profit</span>
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={sixMonthTrend} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => {
+                    if (Math.abs(v) >= 1000000) return `${(v/1000000).toFixed(1)}M`;
+                    if (Math.abs(v) >= 1000) return `${(v/1000).toFixed(0)}k`;
+                    return v;
+                  }} />
+                  <RechartsTooltip
+                    formatter={(value, name) => [`${currency}${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, name]}
+                    contentStyle={{ fontSize: 11, borderRadius: 8 }}
+                  />
+                  <Bar dataKey="Sales"     fill="#10b981" radius={[3,3,0,0]} maxBarSize={28} />
+                  <Bar dataKey="Purchases" fill="#f59e0b" radius={[3,3,0,0]} maxBarSize={28} />
+                  <Bar dataKey="FixedExp"  fill="#94a3b8" name="Fixed Exp"  radius={[3,3,0,0]} maxBarSize={28} />
+                  <Bar dataKey="VarExp"    fill="#fb923c" name="Var Exp"    radius={[3,3,0,0]} maxBarSize={28} />
+                  <Line type="monotone" dataKey="GrossProfit" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Gross Profit" />
+                  <Line type="monotone" dataKey="NetProfit"   stroke="#a855f7" strokeWidth={2} dot={{ r: 3 }} name="Net Profit" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </section>
+      </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 1 — EXECUTIVE SUMMARY
@@ -1565,15 +1664,51 @@ export default function OwnerDashboard() {
             color="amber"
             action={{ label: t('expenses_label') || 'Expenses', onClick: () => navigate('/expenses') }}
           />
-          <Card className="border-amber-100 dark:border-amber-900/60">
-            <CardContent className="p-4 space-y-1">
-              <LedgerRow label="Today Variable Expenses"     value={fmt(expenseSummary.todayVariable)}     color={expenseSummary.todayVariable > 0 ? 'red' : 'green'} bold />
-              <LedgerRow label="Yesterday Variable Expenses" value={fmt(expenseSummary.yesterdayVariable)} color="slate" />
-              <LedgerRow label="Weekly Variable Expenses"    value={fmt(expenseSummary.weekVariable)}      color="amber" separator />
-              <LedgerRow label="Monthly Variable Expenses"   value={fmt(expenseSummary.monthlyVariable)}   color="orange" />
-              <LedgerRow label="Yearly Variable Expenses"    value={fmt(expenseSummary.yearVariable)}    color="red" bold separator />
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-2 gap-3">
+            <MetricCard
+              title="Today Variable"
+              value={fmt(expenseSummary.todayVariable)}
+              subtitle="Variable expenses today"
+              icon={Receipt}
+              color={expenseSummary.todayVariable > 0 ? 'red' : 'green'}
+              onClick={() => navigate('/expenses')}
+            />
+            <MetricCard
+              title="Yesterday Variable"
+              value={fmt(expenseSummary.yesterdayVariable)}
+              subtitle="Variable expenses yesterday"
+              icon={Receipt}
+              color="slate"
+              onClick={() => navigate('/expenses')}
+            />
+            <MetricCard
+              title="Week Variable"
+              value={fmt(expenseSummary.weekVariable)}
+              subtitle="Variable expenses this week"
+              icon={Receipt}
+              color="amber"
+              onClick={() => navigate('/expenses')}
+            />
+            <MetricCard
+              title="Month Variable"
+              value={fmt(expenseSummary.monthlyVariable)}
+              subtitle="Variable expenses this month"
+              icon={Receipt}
+              color="orange"
+              onClick={() => navigate('/expenses')}
+            />
+            <div className="col-span-2">
+              <MetricCard
+                title="Year Variable"
+                value={fmt(expenseSummary.yearVariable)}
+                subtitle="Variable expenses year-to-date"
+                icon={Receipt}
+                color={expenseSummary.yearVariable > 0 ? 'red' : 'green'}
+                large
+                onClick={() => navigate('/expenses')}
+              />
+            </div>
+          </div>
         </section>
       </WidgetErrorBoundary>
 

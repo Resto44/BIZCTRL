@@ -390,8 +390,10 @@ export async function addInvoicePayment({
   const isCash = !paymentMethod || paymentMethod === 'cash';
 
   // 2. Insert payment record
-  // Include payment_date and cash_amount so the DB trigger
-  // (trg_supplier_payments_cash_movement) fires and posts a cash_movement.
+  // Only use columns that exist in the supplier_payments schema:
+  // id, date, branch, supplier_id, supplier_name, amount, payment_method,
+  // notes, created_by, created_date, updated_date, invoice_id, restaurant_id,
+  // branch_id, tenant_id
   const { data: payment, error: payError } = await supabase
     .from('supplier_payments')
     .insert({
@@ -401,8 +403,6 @@ export async function addInvoicePayment({
       branch: invoice.branch,
       amount,
       payment_method: paymentMethod || 'cash',
-      payment_date: paymentDate,
-      cash_amount: isCash ? amount : 0,
       restaurant_id: invoice.restaurant_id || null,
       notes,
       date: paymentDate,
@@ -443,8 +443,6 @@ export async function addInvoicePayment({
       .from('wallet_transactions')
       .insert({
         transaction_date: paymentDate,
-        date: paymentDate,
-        type: 'branch_purchase_payment',
         transaction_type: 'branch_purchase_payment',
         flow_type: 'branch_purchase_payment',
         direction: 'out',
@@ -463,26 +461,8 @@ export async function addInvoicePayment({
     console.warn('[procurementEngine] WalletTransaction creation failed (non-fatal):', txErr.message);
   }
 
-  // 6. Update supplier outstanding balance if supplier_id is present.
-  //    This keeps the supplier ledger balance in sync.
-  if (invoice.supplier_id) {
-    try {
-      const { data: supplier } = await supabase
-        .from('suppliers')
-        .select('outstanding_balance')
-        .eq('id', invoice.supplier_id)
-        .single();
-      if (supplier) {
-        const newBalance = Math.max(0, (Number(supplier.outstanding_balance) || 0) - amount);
-        await supabase
-          .from('suppliers')
-          .update({ outstanding_balance: newBalance, updated_date: new Date().toISOString() })
-          .eq('id', invoice.supplier_id);
-      }
-    } catch (supErr) {
-      console.warn('[procurementEngine] Supplier balance update failed (non-fatal):', supErr.message);
-    }
-  }
+  // 6. Supplier balance is computed from supplier_invoices (no outstanding_balance column on suppliers).
+  //    Nothing to update on the suppliers table — the ledger reads live from invoices.
 
   return { payment, newStatus, remaining: Math.max(0, remaining) };
 }
