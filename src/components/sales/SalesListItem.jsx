@@ -23,7 +23,24 @@ export default function SalesListItem({ sale, onEdit, onDelete, selected = false
   const rCash = Number(sale.restaurant_cash ?? sale.cash ?? 0);
   const rNet  = Number(sale.restaurant_network ?? sale.network ?? 0);
   const credit = Number(sale.credit) || 0;
-  const total = rCash + rNet + credit;
+
+  // Include additional sales sources in the grand total
+  const customSourcesTotal = (() => {
+    // Prefer the pre-computed column when available
+    if (Number(sale.custom_sources_total) > 0) return Number(sale.custom_sources_total);
+    // Otherwise parse the JSON snapshot
+    if (sale.sales_sources_json) {
+      try {
+        const entries = JSON.parse(sale.sales_sources_json);
+        if (Array.isArray(entries)) {
+          return entries.reduce((s, e) => s + (Number(e?.amount) || 0), 0);
+        }
+      } catch { /* ignore */ }
+    }
+    return 0;
+  })();
+
+  const total = rCash + rNet + credit + customSourcesTotal;
   const branchLabel = branches.find(b => b.key === sale.branch)?.label || sale.branch;
   const hasNetwork = rNet > 0;
 
@@ -73,6 +90,11 @@ export default function SalesListItem({ sale, onEdit, onDelete, selected = false
         {credit > 0 && (
           <span className="text-[10px] text-muted-foreground">
             Cred: <span className="font-semibold text-foreground">{currency}{credit.toLocaleString()}</span>
+          </span>
+        )}
+        {customSourcesTotal > 0 && (
+          <span className="text-[10px] text-muted-foreground">
+            Other: <span className="font-semibold text-foreground">{currency}{customSourcesTotal.toLocaleString()}</span>
           </span>
         )}
         <div className="flex-1 flex justify-end">

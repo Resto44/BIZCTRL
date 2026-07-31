@@ -574,7 +574,14 @@ export default function Sales() {
       if (filters.branch !== 'all' && s.branch !== filters.branch) return false;
       if (filters.from && s.date < filters.from) return false;
       if (filters.to && s.date > filters.to) return false;
-      const total = (Number(s.restaurant_cash) || Number(s.cash) || 0) + (Number(s.restaurant_network) || Number(s.network) || 0) + (Number(s.credit) || 0);
+      const customSrc = (() => {
+        if (Number(s.custom_sources_total) > 0) return Number(s.custom_sources_total);
+        if (s.sales_sources_json) {
+          try { const e = JSON.parse(s.sales_sources_json); if (Array.isArray(e)) return e.reduce((a, x) => a + (Number(x?.amount) || 0), 0); } catch { /* ignore */ }
+        }
+        return 0;
+      })();
+      const total = (Number(s.restaurant_cash) || Number(s.cash) || 0) + (Number(s.restaurant_network) || Number(s.network) || 0) + (Number(s.credit) || 0) + customSrc;
       if (filters.minTotal && total < Number(filters.minTotal)) return false;
       if (filters.maxTotal && total > Number(filters.maxTotal)) return false;
       return true;
@@ -602,11 +609,10 @@ export default function Sales() {
     if (activeRestaurant?.id) {
       data.restaurant_id = activeRestaurant.id;
     }
-    const existing = sales.find(s => s.date === data.date && s.branch === data.branch);
-    if (existing && !editing) {
-      await updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });
-      setShowForm(false);
-    } else if (editing) {
+    // Bug fix: always create a NEW record unless explicitly editing an existing one.
+    // Previous behaviour found any record for the same date+branch and overwrote it,
+    // which destroyed history.  Now every submission creates its own record.
+    if (editing) {
       await updateMut.mutateAsync({ id: editing.id, data, prev: editing, proofUrl, ocr });
     } else {
       await createMut.mutateAsync({ data, proofUrl, ocr });

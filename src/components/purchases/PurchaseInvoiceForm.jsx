@@ -491,6 +491,12 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
       qc.invalidateQueries({ queryKey: ['inventory'] });
       qc.invalidateQueries({ queryKey: ['debt_records'] });
       qc.invalidateQueries({ queryKey: ['purchases'] });
+      // Refresh treasury, supplier ledger, and dashboard after payment
+      qc.invalidateQueries({ queryKey: ['wallet_transactions'] });
+      qc.invalidateQueries({ queryKey: ['wallet_transactions_dash'] });
+      qc.invalidateQueries({ queryKey: ['supplier_payments'] });
+      qc.invalidateQueries({ queryKey: ['suppliers'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
 
       onSuccess?.(savedInvoice);
     } catch (err) {

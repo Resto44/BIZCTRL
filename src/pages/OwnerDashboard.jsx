@@ -508,6 +508,15 @@ export default function OwnerDashboard() {
     select: (data) => data.filter(expense => expense.date >= prevMonthStart && expense.date < monthStart && isRecordInActiveBranchScope(expense, 'branch_key')),
   });
 
+  // Year-to-date expenses — needed for Yearly Variable Expense KPI
+  const { data: yearExpenses = [] } = useQuery({
+    queryKey: ['expenses_year', expenseBranchFilter, yearStart, selectedBranch, activeBranchSignature],
+    queryFn: () => base44.entities.Expense.filter(expenseBranchFilter || {}, '-date', 2000),
+    staleTime: 120000,
+    enabled,
+    select: (data) => data.filter(expense => expense.date >= yearStart && isRecordInActiveBranchScope(expense, 'branch_key')),
+  });
+
   // Expense categories — needed to tag fixed vs variable expenses
   // IMPORTANT: filter by restaurant_id to avoid cross-restaurant category pollution
   const { data: expenseCategories = [] } = useQuery({
@@ -630,6 +639,10 @@ export default function OwnerDashboard() {
     () => tagExpensesWithCategories(weekExpenses, expenseCategories),
     [expenseCategories, weekExpenses],
   );
+  const taggedYearExpenses = useMemo(
+    () => tagExpensesWithCategories(yearExpenses, expenseCategories),
+    [expenseCategories, yearExpenses],
+  );
 
   const periodProfit = useMemo(() => {
     const isApprovedInvoice = invoice => (
@@ -683,6 +696,15 @@ export default function OwnerDashboard() {
     };
   }, [monthSales, monthStart, revenueSources, supplierInvoices, taggedMonthExpenses, taggedPreviousMonthExpenses, taggedTodayExpenses, taggedWeekExpenses, taggedYesterdayExpenses, today, todaySales, weekSales, weekStart, yesterday, yesterdaySales]);
 
+  // Year variable expenses — computed outside periodProfit to avoid re-running the full engine
+  // Variable = NOT fixed (same logic as calculateERPAccounting: !_is_fixed && !is_fixed)
+  const yearVariableExpenses = useMemo(
+    () => taggedYearExpenses
+      .filter(e => !e._is_fixed && !e.is_fixed)
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0),
+    [taggedYearExpenses],
+  );
+
   const expenseSummary = useMemo(() => ({
     daysInMonth: periodProfit.today.calendarDays,
     monthlyFixed: periodProfit.month.totalFixedExpenses,
@@ -695,7 +717,8 @@ export default function OwnerDashboard() {
     weekVariable: periodProfit.week.totalVariableExpenses,
     weekFixedAllocation: periodProfit.week.fixedDeduction,
     weekDaysElapsed: periodProfit.week.periodDays,
-  }), [periodProfit]);
+    yearVariable: yearVariableExpenses,
+  }), [periodProfit, yearVariableExpenses]);
 
   // ── Section 1: Executive Summary ──────────────────────────────────────────────
   const execSummary = useMemo(() => {
@@ -1525,6 +1548,65 @@ export default function OwnerDashboard() {
               </CardContent>
             </Card>
           )}
+        </section>
+      </WidgetErrorBoundary>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECTION 6B — VARIABLE EXPENSE KPIs
+          Values come ONLY from Variable Expense records (non-fixed categories).
+          Fixed Expenses are excluded.
+      ══════════════════════════════════════════════════════════════════════ */}
+      <WidgetErrorBoundary>
+        <section>
+          <SectionHeader
+            icon={Receipt}
+            title="Variable Expenses"
+            subtitle="Variable costs only — fixed expenses excluded"
+            color="amber"
+            action={{ label: 'Expenses', onClick: () => navigate('/expenses') }}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <MetricCard
+              title="Today’s Variable"
+              value={fmtDecimal(expenseSummary.todayVariable)}
+              subtitle="Variable expenses today"
+              icon={Receipt}
+              color={expenseSummary.todayVariable > 0 ? 'red' : 'green'}
+              onClick={() => navigate('/expenses')}
+            />
+            <MetricCard
+              title="Yesterday Variable"
+              value={fmtDecimal(expenseSummary.yesterdayVariable)}
+              subtitle="Variable expenses yesterday"
+              icon={Receipt}
+              color="slate"
+              onClick={() => navigate('/expenses')}
+            />
+            <MetricCard
+              title="Weekly Variable"
+              value={fmt(expenseSummary.weekVariable)}
+              subtitle="Variable expenses this week"
+              icon={Activity}
+              color="amber"
+              onClick={() => navigate('/expenses')}
+            />
+            <MetricCard
+              title="Monthly Variable"
+              value={fmt(expenseSummary.monthlyVariable)}
+              subtitle="Variable expenses this month"
+              icon={BarChart3}
+              color="orange"
+              onClick={() => navigate('/expenses')}
+            />
+            <MetricCard
+              title="Yearly Variable"
+              value={fmt(expenseSummary.yearVariable)}
+              subtitle="Variable expenses year-to-date"
+              icon={TrendingUp}
+              color="red"
+              onClick={() => navigate('/expenses')}
+            />
+          </div>
         </section>
       </WidgetErrorBoundary>
 

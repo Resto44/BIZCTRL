@@ -386,8 +386,12 @@ export async function addInvoicePayment({
   const newPaidAmount = (invoice.paid_amount || 0) + amount;
   const remaining = (invoice.total_amount || 0) - newPaidAmount;
   const newStatus = computeInvoiceStatus(invoice.total_amount, newPaidAmount);
+  const paymentDate = date || new Date().toISOString().split('T')[0];
+  const isCash = !paymentMethod || paymentMethod === 'cash';
 
   // 2. Insert payment record
+  // Include payment_date and cash_amount so the DB trigger
+  // (trg_supplier_payments_cash_movement) fires and posts a cash_movement.
   const { data: payment, error: payError } = await supabase
     .from('supplier_payments')
     .insert({
@@ -397,8 +401,11 @@ export async function addInvoicePayment({
       branch: invoice.branch,
       amount,
       payment_method: paymentMethod || 'cash',
+      payment_date: paymentDate,
+      cash_amount: isCash ? amount : 0,
+      restaurant_id: invoice.restaurant_id || null,
       notes,
-      date: date || new Date().toISOString().split('T')[0],
+      date: paymentDate,
       created_by: createdBy,
     })
     .select()
@@ -427,6 +434,54 @@ export async function addInvoicePayment({
         updated_date: new Date().toISOString(),
       })
       .eq('id', invoice.debt_record_id);
+  }
+
+  // 5. Create Treasury (WalletTransaction) record so the payment appears
+  //    in the Treasury page and is included in dashboard refreshes.
+  try {
+    await supabase
+      .from('wallet_transactions')
+      .insert({
+        transaction_date: paymentDate,
+        date: paymentDate,
+        type: 'branch_purchase_payment',
+        transaction_type: 'branch_purchase_payment',
+        flow_type: 'branch_purchase_payment',
+        direction: 'out',
+        wallet: 'branch_cash',
+        branch: invoice.branch,
+        amount,
+        payment_method: isCash ? 'cash' : 'network',
+        description: `Supplier Payment — ${invoice.supplier_name || 'Supplier'} — Invoice ${invoice.invoice_number || invoiceId}`,
+        reference_id: invoiceId,
+        auto_generated: true,
+        recorded_by: createdBy,
+        created_by: createdBy,
+        restaurant_id: invoice.restaurant_id || null,
+      });
+  } catch (txErr) {
+    console.warn('[procurementEngine] WalletTransaction creation failed (non-fatal):', txErr.message);
+  }
+
+  // 6. Update supplier outstanding balance if supplier_id is present.
+  //    This keeps the supplier ledger balance in sync.
+  if (invoice.supplier_id) {
+    try {
+      const { data: supplier } = await supabase
+        .from('suppliers')
+        .select('outstanding_balance')
+        .eq('id', invoice.supplier_id)
+        .single();
+      if (supplier) {
+        const newBalance = Math.max(0, (Number(supplier.outstanding_balance) || 0) - amount);
+        await supabase
+          .from('suppliers')
+          .update({ outstanding_balance: newBalance, updated_date: new Date().toISOString() })
+          .eq('id', invoice.supplier_id);
+      }
+    } catch (supErr) {
+      console.warn('[procurementEngine] Supplier balance update failed (non-fatal):', supErr.message);
+    }
   }
 
   return { payment, newStatus, remaining: Math.max(0, remaining) };
