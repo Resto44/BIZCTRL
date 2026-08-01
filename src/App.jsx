@@ -68,6 +68,10 @@ const Reports             = lazy(() => import('@/pages/Reports'));
 const SalesDashboard      = lazy(() => import('@/pages/SalesDashboard'));
 const ProfitLoss          = lazy(() => import('@/pages/ProfitLoss'));
 const CashFlow            = lazy(() => import('@/pages/CashFlow'));
+const OracleAnalytics     = lazy(() => import('@/pages/OracleAnalytics'));
+const BalanceSheet        = lazy(() => import('@/pages/BalanceSheet'));
+const BranchAnalytics     = lazy(() => import('@/pages/BranchAnalytics'));
+const CEODashboard        = lazy(() => import('@/pages/CEODashboard'));
 const PriceOptimization   = lazy(() => import('@/pages/PriceOptimization'));
 const ActivityLogs        = lazy(() => import('@/pages/ActivityLogs'));
 const ScheduledReports    = lazy(() => import('@/pages/ScheduledReports'));
@@ -287,6 +291,10 @@ const SubscribedRoutes = () => {
         <Route path="/sales-dashboard" element={<RoleGuard permission="viewReports"><SalesDashboard /></RoleGuard>} />
         <Route path="/profit-loss" element={<RoleGuard permission="viewReports"><ProfitLoss /></RoleGuard>} />
         <Route path="/cashflow" element={<RoleGuard permission="viewReports"><CashFlow /></RoleGuard>} />
+        <Route path="/oracle-analytics" element={<RoleGuard permission="viewReports"><OracleAnalytics /></RoleGuard>} />
+        <Route path="/balance-sheet" element={<RoleGuard permission="viewReports"><BalanceSheet /></RoleGuard>} />
+        <Route path="/branch-analytics" element={<RoleGuard permission="viewReports"><BranchAnalytics /></RoleGuard>} />
+        <Route path="/ceo-dashboard" element={<RoleGuard permission="viewDashboard"><CEODashboard /></RoleGuard>} />
         <Route path="/price-optimization" element={<RoleGuard permission="viewReports"><PriceOptimization /></RoleGuard>} />
         <Route path="/activity-logs" element={<RoleGuard permission="viewActivityLogs"><ActivityLogs /></RoleGuard>} />
         <Route path="/scheduled-reports" element={<RoleGuard permission="exportPDF"><ScheduledReports /></RoleGuard>} />

@@ -1150,6 +1150,113 @@ export default function OwnerDashboard() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
+          ENTERPRISE FINANCIAL CENTER — Quick Access Cards
+          Six cards linking to: P&L, Oracle Analytics, Cash Flow,
+          Balance Sheet, Branch Analytics, CEO Dashboard.
+      ══════════════════════════════════════════════════════════════════════ */}
+      <WidgetErrorBoundary>
+        <section>
+          <SectionHeader
+            icon={LayoutDashboard}
+            title="Enterprise Financial Center"
+            subtitle="Quick access to enterprise reports"
+            color="purple"
+          />
+          <div className="grid grid-cols-2 gap-3">
+            {/* 1. Profit & Loss */}
+            <button
+              onClick={() => navigate('/profit-loss')}
+              className="group flex flex-col items-start gap-2 p-3.5 rounded-2xl border border-emerald-100 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 active:scale-95 transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
+                <FileText className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground leading-tight">Profit &amp; Loss</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Financial Report</p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-emerald-500 self-end ml-auto" />
+            </button>
+
+            {/* 2. Oracle Analytics */}
+            <button
+              onClick={() => navigate('/oracle-analytics')}
+              className="group flex flex-col items-start gap-2 p-3.5 rounded-2xl border border-indigo-100 dark:border-indigo-900/60 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 active:scale-95 transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
+                <BarChart3 className="w-4 h-4 text-indigo-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground leading-tight">Oracle Analytics</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">6 Month Trend</p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-indigo-500 self-end ml-auto" />
+            </button>
+
+            {/* 3. Cash Flow */}
+            <button
+              onClick={() => navigate('/cashflow')}
+              className="group flex flex-col items-start gap-2 p-3.5 rounded-2xl border border-blue-100 dark:border-blue-900/60 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 active:scale-95 transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
+                <Wallet className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground leading-tight">Cash Flow</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Cash In / Out</p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-blue-500 self-end ml-auto" />
+            </button>
+
+            {/* 4. Balance Sheet */}
+            <button
+              onClick={() => navigate('/balance-sheet')}
+              className="group flex flex-col items-start gap-2 p-3.5 rounded-2xl border border-amber-100 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-950/50 active:scale-95 transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+                <Scale className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground leading-tight">Balance Sheet</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Assets / Liabilities</p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-amber-500 self-end ml-auto" />
+            </button>
+
+            {/* 5. Branch Analytics */}
+            <button
+              onClick={() => navigate('/branch-analytics')}
+              className="group flex flex-col items-start gap-2 p-3.5 rounded-2xl border border-cyan-100 dark:border-cyan-900/60 bg-cyan-50 dark:bg-cyan-950/30 hover:bg-cyan-100 dark:hover:bg-cyan-950/50 active:scale-95 transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-cyan-100 dark:bg-cyan-900/50 flex items-center justify-center">
+                <Building2 className="w-4 h-4 text-cyan-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground leading-tight">Branch Analytics</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Compare Branches</p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-cyan-500 self-end ml-auto" />
+            </button>
+
+            {/* 6. Executive Dashboard */}
+            <button
+              onClick={() => navigate('/ceo-dashboard')}
+              className="group flex flex-col items-start gap-2 p-3.5 rounded-2xl border border-purple-100 dark:border-purple-900/60 bg-purple-50 dark:bg-purple-950/30 hover:bg-purple-100 dark:hover:bg-purple-950/50 active:scale-95 transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center">
+                <Activity className="w-4 h-4 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground leading-tight">Executive Dashboard</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">CEO View</p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-purple-500 self-end ml-auto" />
+            </button>
+          </div>
+        </section>
+      </WidgetErrorBoundary>
+
+      {/* ══════════════════════════════════════════════════════════════════════
           SECTION 0B — 6-MONTH TREND ANALYTICS
           Shows Sales, Purchases, Fixed Expenses, Variable Expenses,
           Gross Profit, and Net Profit for the last 6 calendar months.
