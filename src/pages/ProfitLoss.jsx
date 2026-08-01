@@ -1,450 +1,684 @@
-import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { jsPDF } from 'jspdf';
+import {
+  BarChart3,
+  Building2,
+  CalendarDays,
+  ChevronDown,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  LineChart as LineChartIcon,
+  Printer,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+  WalletCards,
+} from 'lucide-react';
+
+import { base44, supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { formatCurrency } from '@/lib/helpers';
+import { useSalesSources } from '@/hooks/useSalesSources';
+import {
+  buildFinancialTrend,
+  calculateBranchComparison,
+  calculateFinancialReport,
+  exportRows,
+  formatFinancialPercentage,
+  previousFinancialDateRange,
+  resolveFinancialDateRange,
+} from '@/services/analytics/financialAnalysis';
 import PageHeader from '@/components/shared/PageHeader';
-import { getDateRange, getPreviousDateRange, formatDate, computeDashboardMetrics, formatCurrency } from '@/lib/helpers';
-import { useExpenseCategories } from '@/components/expenses/ExpenseCategoryManager';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
-const RANGES = ['week', 'month', 'year'];
-const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const DATE_PRESETS = [
+  ['today', 'Today'],
+  ['yesterday', 'Yesterday'],
+  ['thisWeek', 'This Week'],
+  ['lastWeek', 'Last Week'],
+  ['month', 'This Month'],
+  ['lastMonth', 'Last Month'],
+  ['quarter', 'Quarter'],
+  ['year', 'Year'],
+  ['custom', 'Custom Range'],
+];
 
-const ui = {
-  en: {
-    title: 'Profit & Loss', totalRevenue: 'Total Revenue', purchaseCost: 'Purchase Cost',
-    grossProfit: 'Gross Profit', totalExpenses: 'Total Expenses', netProfit: 'Net Profit',
-    wasteCost: 'Waste Cost', wastePct: 'Waste % of Revenue',
-    grossMargin: 'Gross Margin', netMargin: 'Net Margin', expensePct: 'Expenses % of Revenue',
-    byBranch: 'By Branch', expenseBreakdown: 'Expense Breakdown', revenueTrend: 'Revenue Trend',
-    week: 'Week', month: 'Month', year: 'Year', rent: 'Rent', salaries: 'Salaries',
-    utilities: 'Utilities', other: 'Other', noData: 'No data for period', branch: 'Branch',
-    revenue: 'Revenue', profit: 'Profit', expenses: 'Expenses', summary: 'P&L Summary',
-    cashSales: 'Cash Sales', networkSales: 'Network Sales', creditSales: 'Credit Sales',
-    prevPeriod: 'vs Prev Period', growth: 'Growth', exportCSV: 'Export CSV', comparePeriod: 'Compare',
-  },
-  ar: {
-    title: 'الأرباح والخسائر', totalRevenue: 'إجمالي الإيرادات', purchaseCost: 'تكلفة المشتريات',
-    grossProfit: 'إجمالي الربح', totalExpenses: 'إجمالي المصاريف', netProfit: 'صافي الربح',
-    wasteCost: 'تكلفة الهدر', wastePct: 'نسبة الهدر من الإيرادات',
-    grossMargin: 'هامش الربح الإجمالي', netMargin: 'هامش الربح الصافي', expensePct: 'نسبة المصاريف',
-    byBranch: 'حسب الفرع', expenseBreakdown: 'تفصيل المصاريف', revenueTrend: 'اتجاه الإيرادات',
-    week: 'أسبوع', month: 'شهر', year: 'سنة', rent: 'إيجار', salaries: 'رواتب',
-    utilities: 'خدمات', other: 'أخرى', noData: 'لا توجد بيانات', branch: 'الفرع',
-    revenue: 'الإيرادات', profit: 'الربح', expenses: 'المصاريف', summary: 'ملخص الأرباح والخسائر',
-    cashSales: 'مبيعات نقداً', networkSales: 'مبيعات شبكة', creditSales: 'مبيعات آجل',
-    prevPeriod: 'مقابل الفترة السابقة', growth: 'نمو', exportCSV: 'تصدير CSV', comparePeriod: 'مقارنة',
-  },
-  fa: {
-    title: 'سود و زیان', totalRevenue: 'درآمد کل', purchaseCost: 'هزینه خرید',
-    grossProfit: 'سود ناخالص', totalExpenses: 'مجموع هزینه‌ها', netProfit: 'سود خالص',
-    wasteCost: 'هزینه ضایعات', wastePct: 'درصد ضایعات از درآمد',
-    grossMargin: 'حاشیه سود ناخالص', netMargin: 'حاشیه سود خالص', expensePct: 'درصد هزینه از درآمد',
-    byBranch: 'بر اساس فرع', expenseBreakdown: 'تفکیک هزینه‌ها', revenueTrend: 'روند درآمد',
-    week: 'هفته', month: 'ماه', year: 'سال', rent: 'اجاره', salaries: 'حقوق',
-    utilities: 'آب و برق', other: 'سایر', noData: 'داده‌ای وجود ندارد', branch: 'فرع',
-    revenue: 'درآمد', profit: 'سود', expenses: 'هزینه‌ها', summary: 'خلاصه سود و زیان',
-    cashSales: 'فروش نقد', networkSales: 'فروش شبکه', creditSales: 'فروش نسیه',
-    prevPeriod: 'در مقایسه با دوره قبل', growth: 'رشد', exportCSV: 'خروجی CSV', comparePeriod: 'مقایسه',
-  },
+const TREND_OPTIONS = [
+  ['daily', 'Daily'],
+  ['weekly', 'Weekly'],
+  ['monthly', 'Monthly'],
+  ['yearly', 'Yearly'],
+  ['sixMonths', '6 Months'],
+  ['twelveMonths', '12 Months'],
+];
+
+const FINANCIAL_TABLES = [
+  'daily_sales',
+  'purchases',
+  'supplier_invoices',
+  'expenses',
+  'expense_categories',
+  'orders',
+  'order_items',
+  'products',
+  'categories',
+  'customers',
+  'suppliers',
+  'sales_sources',
+];
+
+const EMPTY_DATA = {
+  sales: [],
+  purchases: [],
+  supplierInvoices: [],
+  expenses: [],
+  expenseCategories: [],
+  orders: [],
+  orderItems: [],
+  products: [],
+  categories: [],
+  customers: [],
+  suppliers: [],
 };
 
-function KPICard({ label, value, sub, positive, neutral }) {
-  const color = neutral ? 'text-foreground' : positive ? 'text-emerald-600' : 'text-red-500';
-  const Icon = neutral ? Minus : positive ? TrendingUp : TrendingDown;
+const money = (value, currency) => formatCurrency(value || 0, currency);
+const pct = (value) => formatFinancialPercentage(value || 0);
+const titleCase = (value) => String(value || '')
+  .replace(/([A-Z])/g, ' $1')
+  .replace(/^./, (char) => char.toUpperCase())
+  .trim();
+
+function downloadBlob(contents, filename, mime) {
+  const blob = new Blob([contents], { type: mime });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+
+function csvValue(value) {
+  const text = String(value ?? '');
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function csvFromRows(rows) {
+  return rows.map((row) => row.map(csvValue).join(',')).join('\n');
+}
+
+function xlsFromRows(rows) {
+  const cell = (value) => `<td>${String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')}</td>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8" /></head><body><table>${rows
+    .map((row) => `<tr>${row.map(cell).join('')}</tr>`)
+    .join('')}</table></body></html>`;
+}
+
+function printableTable(rows) {
+  const cell = (value, tag = 'td') => `<${tag}>${String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')}</${tag}>`;
+  return `<table>${rows.map((row, index) => `<tr>${row.map((value) => cell(value, index === 0 ? 'th' : 'td')).join('')}</tr>`).join('')}</table>`;
+}
+
+function MetricCard({ label, value, subtitle, tone = 'neutral', icon: Icon }) {
+  const toneClasses = {
+    positive: 'text-emerald-600',
+    negative: 'text-red-500',
+    warning: 'text-amber-600',
+    neutral: 'text-foreground',
+  };
   return (
-    <Card className="p-4">
-      <p className="text-xs text-muted-foreground mb-1">{label}</p>
-      <div className="flex items-center gap-2">
-        <Icon className={`w-4 h-4 shrink-0 ${color}`} />
-        <p className={`text-lg font-bold ${color}`}>{value}</p>
+    <Card className="p-4 min-w-0">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs text-muted-foreground leading-5">{label}</p>
+        {Icon && <Icon className={`h-4 w-4 shrink-0 ${toneClasses[tone]}`} />}
       </div>
-      {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+      <p className={`mt-1 truncate text-lg font-bold ${toneClasses[tone]}`}>{value}</p>
+      {subtitle && <p className="mt-1 truncate text-xs text-muted-foreground">{subtitle}</p>}
     </Card>
   );
 }
 
-export default function ProfitLoss() {
-  const { lang, currency } = useLanguage();
-  const { branches, activeRestaurant } = useTenant();
-  const m = ui[lang] || ui.en;
-  const [rangeType, setRangeType] = useState('month');
-  const [showComparison, setShowComparison] = useState(false);
-
-  const { data: sales = [] } = useQuery({
-    queryKey: ['sales', activeRestaurant?.id],
-    queryFn: () => base44.entities.DailySales.filter(activeRestaurant?.id ? { restaurant_id: activeRestaurant.id, organization_id: activeRestaurant.org_id } : {}, '-date', 2000),
-    enabled: !!activeRestaurant?.id,
-    staleTime: 120000
-  });
-  const { data: purchases = [] } = useQuery({
-    queryKey: ['purchases', activeRestaurant?.id],
-    queryFn: () => base44.entities.Purchase.filter(activeRestaurant?.id ? { restaurant_id: activeRestaurant.id, organization_id: activeRestaurant.org_id } : {}, '-date', 2000),
-    enabled: !!activeRestaurant?.id,
-    staleTime: 120000
-  });
-  const { data: expenses = [] } = useQuery({
-    queryKey: ['expenses', activeRestaurant?.id],
-    queryFn: () => base44.entities.Expense.filter(activeRestaurant?.id ? { restaurant_id: activeRestaurant.id, organization_id: activeRestaurant.org_id } : {}, '-date', 2000),
-    enabled: !!activeRestaurant?.id,
-    staleTime: 120000
-  });
-  const { data: expenseCategories = [] } = useExpenseCategories();
-  const { data: wastes = [] } = useQuery({
-    queryKey: ['inventory_waste', activeRestaurant?.id],
-    queryFn: () => base44.entities.InventoryWaste.filter(activeRestaurant?.id ? { restaurant_id: activeRestaurant.id, organization_id: activeRestaurant.org_id } : {}, '-date', 2000),
-    enabled: !!activeRestaurant?.id,
-    staleTime: 120000
-  });
-
-  const dateRange = useMemo(() => getDateRange(rangeType), [rangeType]);
-  const fromStr = formatDate(dateRange.from);
-  const toStr = formatDate(dateRange.to);
-
-  const fSales = useMemo(() => sales.filter(s => s.date >= fromStr && s.date <= toStr), [sales, fromStr, toStr]);
-  const fPurch = useMemo(() => purchases.filter(p => p.date >= fromStr && p.date <= toStr), [purchases, fromStr, toStr]);
-  // Tag each expense with _is_fixed based on its category
-  const expensesTagged = useMemo(() => {
-    const catMap = {};
-    expenseCategories.forEach(c => { catMap[c.id] = !!c.is_fixed; });
-    return expenses.map(e => ({
-      ...e,
-      _is_fixed: catMap[e.category_id] ?? catMap[e.expense_category_id] ?? false,
-    }));
-  }, [expenses, expenseCategories]);
-  const fExp = useMemo(() => expensesTagged.filter(e => e.date >= fromStr && e.date <= toStr), [expensesTagged, fromStr, toStr]);
-  const monthlyExpensePool = useMemo(() => {
-    const monthStart = format(startOfMonth(dateRange.to), 'yyyy-MM-dd');
-    const monthEnd = format(endOfMonth(dateRange.to), 'yyyy-MM-dd');
-    return expensesTagged.filter(expense => expense.date >= monthStart && expense.date <= monthEnd);
-  }, [dateRange.to, expensesTagged]);
-  const fWaste = useMemo(() => wastes.filter(w => w.date >= fromStr && w.date <= toStr), [wastes, fromStr, toStr]);
-  const totalWasteCost = useMemo(() => fWaste.reduce((s, w) => s + (w.total_loss || 0), 0), [fWaste]);
-
-  const metrics = useMemo(() => computeDashboardMetrics(
-    fSales, fPurch, fExp, rangeType, [], null, null,
-    { monthlyExpenses: monthlyExpensePool, asOfDate: toStr },
-  ), [fSales, fPurch, fExp, monthlyExpensePool, rangeType, toStr]);
-
-  // Previous period comparison
-  const prevDateRange = useMemo(() => getPreviousDateRange(rangeType), [rangeType]);
-  const prevFromStr = formatDate(prevDateRange.from);
-  const prevToStr = formatDate(prevDateRange.to);
-  const prevSales = useMemo(() => sales.filter(s => s.date >= prevFromStr && s.date <= prevToStr), [sales, prevFromStr, prevToStr]);
-  const prevPurch = useMemo(() => purchases.filter(p => p.date >= prevFromStr && p.date <= prevToStr), [purchases, prevFromStr, prevToStr]);
-  const prevExp = useMemo(() => expensesTagged.filter(e => e.date >= prevFromStr && e.date <= prevToStr), [expensesTagged, prevFromStr, prevToStr]);
-  const prevMonthlyExpensePool = useMemo(() => {
-    const monthStart = format(startOfMonth(prevDateRange.to), 'yyyy-MM-dd');
-    const monthEnd = format(endOfMonth(prevDateRange.to), 'yyyy-MM-dd');
-    return expensesTagged.filter(expense => expense.date >= monthStart && expense.date <= monthEnd);
-  }, [expensesTagged, prevDateRange.to]);
-  const prevMetrics = useMemo(() => computeDashboardMetrics(
-    prevSales, prevPurch, prevExp, rangeType, [], null, null,
-    { monthlyExpenses: prevMonthlyExpensePool, asOfDate: prevToStr },
-  ), [prevSales, prevPurch, prevExp, prevMonthlyExpensePool, prevToStr, rangeType]);
-
-  const pctChange = (cur, prev) => {
-    if (!prev || prev === 0) return null;
-    return ((cur - prev) / Math.abs(prev) * 100).toFixed(1);
-  };
-
-  const adjustedNetProfit = metrics.netProfit - totalWasteCost;
-  const grossMargin = metrics.totalSales > 0 ? (metrics.profit / metrics.totalSales * 100).toFixed(1) : null;
-  const netMargin = metrics.totalSales > 0 ? (adjustedNetProfit / metrics.totalSales * 100).toFixed(1) : null;
-  const expensePct = metrics.totalSales > 0 ? (metrics.totalExpenses / metrics.totalSales * 100).toFixed(1) : null;
-  const wastePct = metrics.totalSales > 0 ? (totalWasteCost / metrics.totalSales * 100).toFixed(1) : null;
-
-  // Expense by category
-  const expByCat = useMemo(() => {
-    const map = {};
-    fExp.forEach(e => { map[e.category] = (map[e.category] || 0) + (e.amount || 0); });
-    return Object.entries(map).map(([cat, val]) => ({
-      name: m[cat] || cat,
-      value: val,
-    }));
-  }, [fExp, m]);
-
-  // Revenue trend by month
-  const monthlyTrend = useMemo(() => {
-    const map = {};
-    fSales.forEach(s => {
-      const mo = s.date?.slice(0, 7);
-      if (!mo) return;
-      if (!map[mo]) map[mo] = { revenue: 0, cost: 0, exp: 0 };
-      map[mo].revenue += (s.cash || 0) + (s.network || 0) + (s.credit || 0);
-    });
-    fPurch.forEach(p => {
-      const mo = p.date?.slice(0, 7);
-      if (!mo) return;
-      if (!map[mo]) map[mo] = { revenue: 0, cost: 0, exp: 0 };
-      map[mo].cost += (p.qty || 0) * (p.used_price || p.current_price || 0);
-    });
-    fExp.forEach(e => {
-      const mo = e.date?.slice(0, 7);
-      if (!mo) return;
-      if (!map[mo]) map[mo] = { revenue: 0, cost: 0, exp: 0 };
-      map[mo].exp += e.amount || 0;
-    });
-    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([mo, v]) => ({
-      name: mo.slice(5),
-      revenue: v.revenue,
-      grossProfit: v.revenue - v.cost,
-      netProfit: v.revenue - v.cost - v.exp,
-    }));
-  }, [fSales, fPurch, fExp]);
-
-  // By branch P&L (including waste)
-  const branchPL = useMemo(() => branches.map(b => {
-    const bs = fSales.filter(s => s.branch === b.key);
-    const bp = fPurch.filter(p => p.branch === b.key);
-    const be = fExp.filter(e => e.branch === b.key || e.branch === 'all');
-    const branchMonthlyExpensePool = monthlyExpensePool.filter(e => e.branch === b.key || e.branch === 'all');
-    const bm = computeDashboardMetrics(
-      bs, bp, be, rangeType, [], null, null,
-      { monthlyExpenses: branchMonthlyExpensePool, asOfDate: toStr },
-    );
-    const bWaste = fWaste.filter(w => w.branch === b.key).reduce((s, w) => s + (w.total_loss || 0), 0);
-    const adjNet = bm.netProfit - bWaste;
-    const nm = bm.totalSales > 0 ? (adjNet / bm.totalSales * 100).toFixed(1) : null;
-    return { name: b.label, ...bm, netProfit: adjNet, wasteCost: bWaste, netMargin: nm };
-  }), [branches, fSales, fPurch, fExp, fWaste, monthlyExpensePool, rangeType, toStr]);
-
-  const exportCSV = () => {
-    const rows = [
-      ['Metric', 'Current Period', 'Previous Period'],
-      ['Total Revenue', metrics.totalSales, prevMetrics.totalSales],
-      ['Purchase Cost', metrics.totalPurchaseCost, prevMetrics.totalPurchaseCost],
-      ['Gross Profit', metrics.profit, prevMetrics.profit],
-      ['Total Expenses', metrics.totalExpenses, prevMetrics.totalExpenses],
-      ['Waste Cost', totalWasteCost, ''],
-      ['Net Profit', adjustedNetProfit, prevMetrics.netProfit],
-      ['Gross Margin %', grossMargin, prevMetrics.totalSales > 0 ? (prevMetrics.profit / prevMetrics.totalSales * 100).toFixed(1) : ''],
-      ['Net Margin %', netMargin, prevMetrics.totalSales > 0 ? (prevMetrics.netProfit / prevMetrics.totalSales * 100).toFixed(1) : ''],
-    ];
-    const csv = rows.map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `pl_${fromStr}_${toStr}.csv`;
-    a.click();
-  };
-
+function StatementRow({ label, value, currency, emphasis, negative, percent }) {
+  const className = emphasis
+    ? 'border-t border-border pt-2 mt-2 font-semibold'
+    : 'text-muted-foreground';
+  const valueClass = negative && value > 0
+    ? 'text-red-500'
+    : emphasis && value < 0
+      ? 'text-red-500'
+      : emphasis && value > 0
+        ? 'text-emerald-600'
+        : '';
   return (
-    <div>
-      <PageHeader title={m.title} action={
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setShowComparison(v => !v)}>
-            {m.comparePeriod}
-          </Button>
-          <Button size="sm" variant="outline" onClick={exportCSV}>
-            {m.exportCSV} ↓
-          </Button>
-        </div>
-      } />
+    <div className={`flex items-center justify-between gap-4 py-1 text-sm ${className}`}>
+      <span className="min-w-0 truncate">{label}</span>
+      <span className={`shrink-0 font-medium ${valueClass}`}>
+        {percent ? pct(value) : negative && value > 0 ? `(${money(value, currency)})` : money(value, currency)}
+      </span>
+    </div>
+  );
+}
 
-      {/* Range selector */}
-      <div className="flex gap-2 mb-5">
-        {RANGES.map(r => (
-          <Button key={r} size="sm" variant={rangeType === r ? 'default' : 'outline'} onClick={() => setRangeType(r)}>
-            {m[r]}
-          </Button>
-        ))}
-      </div>
+function TrendLegend({ label, color }) {
+  return <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />{label}</span>;
+}
 
-      {/* Fixed expenses excluded notice */}
-      {metrics.fixedExpensesExcluded && (
-        <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
-          <p className="text-xs text-amber-800 font-medium">
-            ⚠️ Fixed monthly expenses ({formatCurrency(metrics.totalFixedExpenses, currency)}) are excluded from Net Profit on weekly/daily view. Switch to Month or Year to include them.
-          </p>
-        </div>
-      )}
-
-      {/* KPI Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
-        <KPICard label={m.totalRevenue} value={formatCurrency(metrics.totalSales, currency)} neutral />
-        <KPICard label={m.purchaseCost} value={formatCurrency(metrics.totalPurchaseCost, currency)} positive={false} neutral={false} />
-        <KPICard label={m.grossProfit} value={formatCurrency(metrics.profit, currency)} positive={metrics.profit >= 0} />
-        <KPICard label={m.totalExpenses} value={formatCurrency(metrics.totalExpenses, currency)} positive={false} neutral />
-        <KPICard label={m.wasteCost} value={formatCurrency(totalWasteCost, currency)} positive={totalWasteCost === 0} neutral={totalWasteCost === 0} />
-        <KPICard label={m.netProfit} value={formatCurrency(adjustedNetProfit, currency)} positive={adjustedNetProfit >= 0} />
-        <KPICard
-          label={m.netMargin}
-          value={netMargin !== null ? `${netMargin}%` : '—'}
-          sub={grossMargin !== null ? `${m.grossMargin}: ${grossMargin}%` : undefined}
-          positive={Number(netMargin) >= 0}
-          neutral={netMargin === null}
-        />
-      </div>
-
-      {/* Period Comparison */}
-      {showComparison && (
-        <Card className="p-4 mb-5 border-blue-200 bg-blue-50/30">
-          <h3 className="text-sm font-semibold mb-3 text-blue-700">{m.prevPeriod}</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { label: m.totalRevenue, cur: metrics.totalSales, prev: prevMetrics.totalSales },
-              { label: m.grossProfit, cur: metrics.profit, prev: prevMetrics.profit },
-              { label: m.totalExpenses, cur: metrics.totalExpenses, prev: prevMetrics.totalExpenses },
-              { label: m.netProfit, cur: adjustedNetProfit, prev: prevMetrics.netProfit },
-            ].map((item, i) => {
-              const chg = pctChange(item.cur, item.prev);
-              const isPos = chg !== null && Number(chg) >= 0;
-              return (
-                <div key={i} className="bg-white dark:bg-card rounded-lg p-3 border border-border">
-                  <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
-                  <p className="text-sm font-bold">{formatCurrency(item.cur, currency)}</p>
-                  <p className="text-xs text-muted-foreground">{m.prevPeriod}: {formatCurrency(item.prev, currency)}</p>
-                  {chg !== null && (
-                    <p className={`text-xs font-semibold mt-1 ${isPos ? 'text-emerald-600' : 'text-red-500'}`}>
-                      {isPos ? '▲' : '▼'} {Math.abs(chg)}%
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
-      {/* P&L Summary statement */}
-      <Card className="p-4 mb-5">
-        <h3 className="text-sm font-semibold mb-3">{m.summary}</h3>
-        <div className="space-y-1.5">
-          {[
-            { label: m.cashSales, value: metrics.totalCash, indent: false },
-            { label: m.networkSales, value: metrics.totalNetwork, indent: false },
-            { label: m.creditSales, value: metrics.totalCredit, indent: false },
-            { label: m.totalRevenue, value: metrics.totalSales, bold: true, border: true },
-            { label: `— ${m.purchaseCost}`, value: -metrics.totalPurchaseCost, indent: true, negative: true },
-            { label: m.grossProfit, value: metrics.profit, bold: true, border: true, colored: true },
-            { label: `— ${m.totalExpenses}`, value: -metrics.totalExpenses, indent: true, negative: true },
-            { label: `— ${m.wasteCost}`, value: -totalWasteCost, indent: true, negative: true },
-            { label: m.netProfit, value: metrics.netProfit - totalWasteCost, bold: true, border: true, colored: true, large: true },
-          ].map((row, i) => (
-            <div key={i} className={`flex justify-between items-center py-1 text-sm ${row.border ? 'border-t border-border mt-1 pt-2' : ''} ${row.indent ? 'ps-4' : ''}`}>
-              <span className={`${row.bold ? 'font-semibold' : 'text-muted-foreground'} ${row.large ? 'text-base' : ''}`}>{row.label}</span>
-              <span className={`font-${row.bold ? 'bold' : 'medium'} ${row.large ? 'text-base' : ''} ${row.colored ? (row.value >= 0 ? 'text-emerald-600' : 'text-red-500') : row.negative ? 'text-red-500' : ''}`}>
-                {row.negative
-                  ? `(${formatCurrency(Math.abs(row.value), currency)})`
-                  : formatCurrency(row.value, currency)}
-              </span>
+function ListCard({ title, items, currency, inverse = false }) {
+  return (
+    <Card className="p-4">
+      <h3 className="mb-3 text-sm font-semibold">{title}</h3>
+      {items.length ? (
+        <div className="space-y-2">
+          {items.map((item, index) => (
+            <div key={`${item.name}-${index}`} className="flex items-center justify-between gap-3 text-xs">
+              <span className="min-w-0 truncate text-muted-foreground"><span className="mr-2 text-foreground/70">{index + 1}.</span>{item.name}</span>
+              <span className={`shrink-0 font-semibold ${inverse ? 'text-red-500' : ''}`}>{money(item.value, currency)}</span>
             </div>
           ))}
         </div>
+      ) : <p className="text-xs text-muted-foreground">No live records for this period.</p>}
+    </Card>
+  );
+}
 
-        {expensePct !== null && (
-          <div className="mt-3 pt-3 border-t border-border text-xs text-muted-foreground flex justify-between">
-            <span>{m.expensePct}</span>
-            <span className={`font-semibold ${Number(expensePct) > 40 ? 'text-red-500' : 'text-muted-foreground'}`}>{expensePct}%</span>
+function BranchSelector({
+  branches,
+  isManager,
+  scopeMode,
+  setScopeMode,
+  selectedBranchKeys,
+  setSelectedBranchKeys,
+}) {
+  const selectable = branches.filter((branch) => branch?.key || branch?.branch_key);
+  const currentKey = selectedBranchKeys[0] || selectable[0]?.key || selectable[0]?.branch_key || '';
+  const toggleBranch = (key) => {
+    setSelectedBranchKeys((previous) => {
+      const selected = previous.includes(key);
+      if (selected && previous.length === 1) return previous;
+      return selected ? previous.filter((value) => value !== key) : [...previous, key];
+    });
+  };
+
+  if (isManager) {
+    return (
+      <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+        Assigned branch access only
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <select
+        aria-label="Financial reporting scope"
+        value={scopeMode}
+        onChange={(event) => setScopeMode(event.target.value)}
+        className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+      >
+        <option value="organization">Organization Total</option>
+        <option value="all">All Branches</option>
+        <option value="single">Single Branch</option>
+        <option value="multi">Multi Branch</option>
+      </select>
+      {scopeMode === 'single' && (
+        <select
+          aria-label="Select branch"
+          value={currentKey}
+          onChange={(event) => setSelectedBranchKeys([event.target.value])}
+          className="h-9 max-w-[220px] rounded-md border border-input bg-background px-3 text-sm"
+        >
+          {selectable.map((branch) => {
+            const key = branch.key || branch.branch_key;
+            return <option key={key} value={key}>{branch.label || branch.name || key}</option>;
+          })}
+        </select>
+      )}
+      {scopeMode === 'multi' && (
+        <div className="flex max-w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-input bg-background px-3 py-2">
+          {selectable.map((branch) => {
+            const key = branch.key || branch.branch_key;
+            return (
+              <label key={key} className="flex cursor-pointer items-center gap-1.5 text-xs">
+                <input type="checkbox" checked={selectedBranchKeys.includes(key)} onChange={() => toggleBranch(key)} />
+                <span>{branch.label || branch.name || key}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ProfitLoss() {
+  const { currency } = useLanguage();
+  const {
+    activeRestaurant,
+    branches = [],
+    managerBranch,
+    isManager,
+  } = useTenant();
+  const queryClient = useQueryClient();
+  const { allSources: salesSources = [] } = useSalesSources();
+
+  const [datePreset, setDatePreset] = useState('month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [scopeMode, setScopeMode] = useState('organization');
+  const [selectedBranchKeys, setSelectedBranchKeys] = useState([]);
+  const [trendMode, setTrendMode] = useState('monthly');
+  const [exportOpen, setExportOpen] = useState(false);
+
+  const availableBranches = useMemo(
+    () => branches.filter((branch) => branch?.key || branch?.branch_key),
+    [branches],
+  );
+  const branchKeys = useMemo(
+    () => availableBranches.map((branch) => String(branch.key || branch.branch_key)).filter(Boolean),
+    [availableBranches],
+  );
+
+  useEffect(() => {
+    if (isManager) {
+      setScopeMode('single');
+      const assigned = managerBranch || branchKeys[0] || '';
+      if (assigned) setSelectedBranchKeys([assigned]);
+      return;
+    }
+    setSelectedBranchKeys((previous) => {
+      const retained = previous.filter((key) => branchKeys.includes(key));
+      return retained.length ? retained : branchKeys.slice(0, 1);
+    });
+  }, [branchKeys.join('|'), isManager, managerBranch]);
+
+  const restaurantId = activeRestaurant?.id;
+  const { data: financialData = EMPTY_DATA, isFetching, dataUpdatedAt } = useQuery({
+    queryKey: ['financial-analysis', restaurantId],
+    enabled: Boolean(restaurantId),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      if (!restaurantId) return EMPTY_DATA;
+      const scope = { restaurant_id: restaurantId };
+      const [
+        sales,
+        purchases,
+        supplierInvoices,
+        expenses,
+        expenseCategories,
+        orders,
+        orderItems,
+        products,
+        categories,
+        customers,
+        suppliers,
+      ] = await Promise.all([
+        base44.entities.DailySales.filter(scope, '-date', 5000),
+        base44.entities.Purchase.filter(scope, '-date', 5000),
+        base44.entities.SupplierInvoice.filter(scope, '-date', 5000),
+        base44.entities.Expense.filter(scope, '-date', 5000),
+        base44.entities.ExpenseCategory.filter(scope, 'sort_order', 500),
+        base44.entities.Order.filter(scope, '-created_date', 5000),
+        base44.entities.OrderItem.filter(scope, '-created_date', 10000),
+        base44.entities.Product.filter(scope, 'name', 5000),
+        base44.entities.Category.filter(scope, 'name_en', 1000),
+        base44.entities.Customer.filter(scope, 'name', 5000),
+        base44.entities.Supplier.filter(scope, 'name', 5000),
+      ]);
+      return {
+        sales,
+        purchases,
+        supplierInvoices,
+        expenses,
+        expenseCategories,
+        orders,
+        orderItems,
+        products,
+        categories,
+        customers,
+        suppliers,
+      };
+    },
+  });
+
+  useEffect(() => {
+    if (!restaurantId) return undefined;
+    const channel = supabase
+      .channel(`financial-analysis-${restaurantId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: FINANCIAL_TABLES[0], filter: `restaurant_id=eq.${restaurantId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['financial-analysis', restaurantId] });
+      });
+    FINANCIAL_TABLES.slice(1).forEach((table) => {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `restaurant_id=eq.${restaurantId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['financial-analysis', restaurantId] });
+      });
+    });
+    channel.subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [queryClient, restaurantId]);
+
+  const range = useMemo(
+    () => resolveFinancialDateRange(datePreset, customFrom, customTo),
+    [datePreset, customFrom, customTo],
+  );
+  const previousRange = useMemo(() => previousFinancialDateRange(range), [range]);
+  const effectiveScope = useMemo(() => {
+    if (isManager) {
+      return { mode: 'single', branchKeys: [managerBranch || selectedBranchKeys[0]].filter(Boolean), includeGlobal: false };
+    }
+    return {
+      mode: scopeMode,
+      branchKeys: selectedBranchKeys,
+      includeGlobal: !['single', 'multi'].includes(scopeMode),
+    };
+  }, [isManager, managerBranch, scopeMode, selectedBranchKeys]);
+
+  const reportInput = useMemo(() => ({ ...financialData, salesSources }), [financialData, salesSources]);
+  const report = useMemo(
+    () => calculateFinancialReport({ ...reportInput, range, scope: effectiveScope, branches: availableBranches }),
+    [availableBranches, effectiveScope, range, reportInput],
+  );
+  const trendData = useMemo(
+    () => buildFinancialTrend({ trend: trendMode, range, scope: effectiveScope, branches: availableBranches, data: reportInput }),
+    [availableBranches, effectiveScope, range, reportInput, trendMode],
+  );
+  const branchComparison = useMemo(
+    () => calculateBranchComparison({
+      branches: availableBranches,
+      range,
+      previousRange,
+      data: reportInput,
+      accessibleBranchKeys: isManager ? [managerBranch].filter(Boolean) : [],
+    }),
+    [availableBranches, isManager, managerBranch, previousRange, range, reportInput],
+  );
+
+  const topBranches = branchComparison.slice(0, 5).map((entry) => ({
+    name: entry.branch?.label || entry.branch?.name || entry.key,
+    value: entry.netProfit,
+  }));
+  const worstBranches = [...branchComparison]
+    .sort((a, b) => a.netProfit - b.netProfit)
+    .slice(0, 5)
+    .map((entry) => ({ name: entry.branch?.label || entry.branch?.name || entry.key, value: entry.netProfit }));
+  const exportData = useMemo(() => exportRows(report, branchComparison), [branchComparison, report]);
+
+  const downloadCSV = () => downloadBlob(csvFromRows(exportData), `financial-analysis_${range.from}_${range.to}.csv`, 'text/csv;charset=utf-8');
+  const downloadExcel = () => downloadBlob(xlsFromRows(exportData), `financial-analysis_${range.from}_${range.to}.xls`, 'application/vnd.ms-excel');
+  const downloadPDF = () => {
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+    const lines = [
+      'ERP Financial Analysis',
+      `Period: ${range.from} to ${range.to}`,
+      '',
+      ...exportData.map((row) => row.filter((value) => value !== undefined && value !== null && value !== '').join('   |   ')),
+    ];
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    let y = 42;
+    lines.forEach((line) => {
+      const wrapped = pdf.splitTextToSize(line, 510);
+      wrapped.forEach((part) => {
+        if (y > pageHeight - 42) {
+          pdf.addPage();
+          y = 42;
+        }
+        pdf.text(part, 42, y);
+        y += 14;
+      });
+    });
+    pdf.save(`financial-analysis_${range.from}_${range.to}.pdf`);
+  };
+  const printReport = () => {
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+    if (!printWindow) return;
+    printWindow.document.write(`<!doctype html><html><head><title>ERP Financial Analysis</title><style>body{font-family:Arial,sans-serif;color:#111827;padding:28px}h1{font-size:20px;margin:0 0 6px}p{color:#4b5563;font-size:12px;margin:0 0 18px}table{border-collapse:collapse;width:100%;font-size:11px;margin-bottom:20px}th,td{border:1px solid #d1d5db;padding:6px;text-align:left}th{background:#f3f4f6}</style></head><body><h1>ERP Financial Analysis</h1><p>${range.from} to ${range.to}</p>${printableTable(exportData)}</body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  const scopeLabel = isManager
+    ? availableBranches.find((branch) => (branch.key || branch.branch_key) === managerBranch)?.label || 'Assigned Branch'
+    : scopeMode === 'single'
+      ? availableBranches.find((branch) => (branch.key || branch.branch_key) === selectedBranchKeys[0])?.label || 'Selected Branch'
+      : scopeMode === 'multi'
+        ? `${selectedBranchKeys.length} Branches`
+        : scopeMode === 'all'
+          ? 'All Branches'
+          : 'Organization Total';
+
+  return (
+    <div>
+      <PageHeader
+        title="Profit & Loss"
+        action={
+          <div className="relative flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ['financial-analysis', restaurantId] })} disabled={!restaurantId}>
+              <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setExportOpen((open) => !open)}>
+              <Download className="mr-1.5 h-3.5 w-3.5" /> Export <ChevronDown className="ml-1 h-3.5 w-3.5" />
+            </Button>
+            {exportOpen && (
+              <div className="absolute right-0 top-10 z-30 w-44 rounded-md border border-border bg-popover p-1 shadow-lg">
+                <button type="button" className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm hover:bg-muted" onClick={() => { downloadPDF(); setExportOpen(false); }}><FileText className="h-4 w-4" /> PDF</button>
+                <button type="button" className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm hover:bg-muted" onClick={() => { downloadExcel(); setExportOpen(false); }}><FileSpreadsheet className="h-4 w-4" /> Excel</button>
+                <button type="button" className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm hover:bg-muted" onClick={() => { downloadCSV(); setExportOpen(false); }}><Download className="h-4 w-4" /> CSV</button>
+                <button type="button" className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm hover:bg-muted" onClick={() => { printReport(); setExportOpen(false); }}><Printer className="h-4 w-4" /> Print</button>
+              </div>
+            )}
           </div>
-        )}
-        {wastePct !== null && totalWasteCost > 0 && (
-          <div className="mt-1 text-xs text-muted-foreground flex justify-between">
-            <span>{m.wastePct}</span>
-            <span className={`font-semibold ${Number(wastePct) > 5 ? 'text-red-500' : 'text-amber-600'}`}>{wastePct}%</span>
+        }
+      />
+
+      <Card className="mb-5 p-4">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <select
+              aria-label="Date range"
+              value={datePreset}
+              onChange={(event) => setDatePreset(event.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              {DATE_PRESETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            {datePreset === 'custom' && (
+              <>
+                <input aria-label="Custom range start" type="date" value={customFrom} onChange={(event) => setCustomFrom(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm" />
+                <input aria-label="Custom range end" type="date" value={customTo} onChange={(event) => setCustomTo(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm" />
+              </>
+            )}
           </div>
-        )}
+          <BranchSelector
+            branches={availableBranches}
+            isManager={isManager}
+            scopeMode={scopeMode}
+            setScopeMode={setScopeMode}
+            selectedBranchKeys={selectedBranchKeys}
+            setSelectedBranchKeys={setSelectedBranchKeys}
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+          <span><Building2 className="mr-1 inline h-3.5 w-3.5" />{scopeLabel} · {range.from} to {range.to}</span>
+          <span>{dataUpdatedAt ? `Live data refreshed ${new Date(dataUpdatedAt).toLocaleTimeString()}` : 'Loading live ERP data…'}</span>
+        </div>
       </Card>
 
-      {/* Monthly trend */}
-      {monthlyTrend.length > 0 && (
-        <Card className="p-4 mb-5">
-          <h3 className="text-sm font-semibold mb-3">{m.revenueTrend}</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={monthlyTrend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip formatter={v => formatCurrency(v, currency)} />
-              <Bar dataKey="revenue" fill="#2563eb" name={m.revenue} radius={[3, 3, 0, 0]} />
-              <Bar dataKey="grossProfit" fill="#10b981" name={m.grossProfit} radius={[3, 3, 0, 0]} />
-              <Bar dataKey="netProfit" fill="#8b5cf6" name={m.netProfit} radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      )}
-
-      {/* Expense breakdown */}
-      {expByCat.length > 0 && (
-        <Card className="p-4 mb-5">
-          <h3 className="text-sm font-semibold mb-3">{m.expenseBreakdown}</h3>
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={expByCat} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10 }} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={70} />
-              <Tooltip formatter={v => formatCurrency(v, currency)} />
-              <Bar dataKey="value" radius={[0, 3, 3, 0]}>
-                {expByCat.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      )}
-
-      {/* Waste Cost Breakdown */}
-      {totalWasteCost > 0 && (
-        <Card className="p-4 mb-5 border-red-200 bg-red-50/30">
-          <h3 className="text-sm font-semibold mb-1 text-red-700">⚠️ {m.wasteCost}</h3>
-          <p className="text-xs text-muted-foreground mb-3">Waste is deducted from Net Profit</p>
-          <div className="space-y-2">
-            {fWaste.reduce((acc, w) => {
-              const key = w.product_name || w.product_id;
-              const ex = acc.find(a => a.name === key);
-              if (ex) ex.loss += (w.total_loss || 0);
-              else acc.push({ name: key, loss: w.total_loss || 0 });
-              return acc;
-            }, []).sort((a, b) => b.loss - a.loss).slice(0, 5).map((item, i) => (
-              <div key={i} className="flex justify-between text-xs">
-                <span className="text-muted-foreground">{item.name}</span>
-                <span className="font-semibold text-red-600">({formatCurrency(item.loss, currency)})</span>
-              </div>
-            ))}
-            <div className="flex justify-between text-xs font-bold border-t border-red-200 pt-2 mt-1">
-              <span>Total Waste Loss</span>
-              <span className="text-red-700">({formatCurrency(totalWasteCost, currency)})</span>
+      {!restaurantId ? (
+        <Card className="p-6 text-center text-sm text-muted-foreground">Select an organization to view its financial analysis.</Card>
+      ) : (
+        <>
+          <section className="mb-5">
+            <div className="mb-3 flex items-center gap-2"><WalletCards className="h-4 w-4 text-primary" /><h2 className="text-sm font-semibold">Financial KPIs</h2></div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+              <MetricCard label="Revenue" value={money(report.revenue.netRevenue, currency)} tone="neutral" icon={TrendingUp} />
+              <MetricCard label="Purchases" value={money(report.purchases.netPurchaseCost, currency)} tone="warning" icon={WalletCards} />
+              <MetricCard label="COGS" value={money(report.purchases.cogs, currency)} tone="warning" icon={WalletCards} />
+              <MetricCard label="Gross Profit" value={money(report.profit.grossProfit, currency)} tone={report.profit.grossProfit >= 0 ? 'positive' : 'negative'} icon={report.profit.grossProfit >= 0 ? TrendingUp : TrendingDown} />
+              <MetricCard label="Operating Expense" value={money(report.expenses.operating, currency)} tone="warning" icon={WalletCards} />
+              <MetricCard label="Fixed Expense" value={money(report.expenses.fixed, currency)} tone="warning" icon={WalletCards} />
+              <MetricCard label="Variable Expense" value={money(report.expenses.variable, currency)} tone="warning" icon={WalletCards} />
+              <MetricCard label="Operating Profit" value={money(report.profit.operatingProfit, currency)} tone={report.profit.operatingProfit >= 0 ? 'positive' : 'negative'} icon={report.profit.operatingProfit >= 0 ? TrendingUp : TrendingDown} />
+              <MetricCard label="Net Profit" value={money(report.profit.netProfit, currency)} tone={report.profit.netProfit >= 0 ? 'positive' : 'negative'} icon={report.profit.netProfit >= 0 ? TrendingUp : TrendingDown} />
+              <MetricCard label="Profit Margin" value={pct(report.profit.netMargin)} tone={report.profit.netMargin >= 0 ? 'positive' : 'negative'} />
+              <MetricCard label="Expense Ratio" value={pct(report.profit.expenseRatio)} tone="neutral" />
+              <MetricCard label="Purchase Ratio" value={pct(report.profit.purchaseRatio)} tone="neutral" />
+              <MetricCard label="Average Daily Revenue" value={money(report.profit.averageDailyRevenue, currency)} tone="neutral" />
+              <MetricCard label="Average Daily Profit" value={money(report.profit.averageDailyProfit, currency)} tone={report.profit.averageDailyProfit >= 0 ? 'positive' : 'negative'} />
             </div>
-          </div>
-        </Card>
-      )}
+          </section>
 
-      {/* Branch P&L */}
-      {branchPL.some(b => b.totalSales > 0) && (
-        <Card className="p-4 mb-5">
-          <h3 className="text-sm font-semibold mb-3">{m.byBranch}</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border text-muted-foreground">
-                  <th className="text-start pb-2">{m.branch}</th>
-                  <th className="text-end pb-2">{m.revenue}</th>
-                  <th className="text-end pb-2">{m.grossProfit}</th>
-                  <th className="text-end pb-2">{m.expenses}</th>
-                  <th className="text-end pb-2">{m.netProfit}</th>
-                  <th className="text-end pb-2">{m.netMargin}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {branchPL.map(b => (
-                  <tr key={b.name} className="border-b border-border/50 last:border-0">
-                    <td className="py-2 font-medium">{b.name}</td>
-                    <td className="py-2 text-end">{formatCurrency(b.totalSales, currency)}</td>
-                    <td className="py-2 text-end">{formatCurrency(b.profit, currency)}</td>
-                    <td className="py-2 text-end text-red-500">{formatCurrency(b.totalExpenses, currency)}</td>
-                    <td className={`py-2 text-end font-semibold ${b.netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{formatCurrency(b.netProfit, currency)}</td>
-                    <td className={`py-2 text-end ${b.netMargin !== null && Number(b.netMargin) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{b.netMargin !== null ? `${b.netMargin}%` : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mb-5 grid gap-5 xl:grid-cols-2">
+            <Card className="p-4">
+              <h2 className="mb-3 text-sm font-semibold">Revenue</h2>
+              <StatementRow label="Cash Sales" value={report.revenue.cash} currency={currency} />
+              <StatementRow label="POS / Network Sales" value={report.revenue.network} currency={currency} />
+              <StatementRow label="Credit Sales" value={report.revenue.credit} currency={currency} />
+              <StatementRow label="Delivery Sales" value={report.revenue.delivery} currency={currency} />
+              <StatementRow label="Online Orders" value={report.revenue.online} currency={currency} />
+              <StatementRow label="Wallet Payments" value={report.revenue.wallet} currency={currency} />
+              <StatementRow label="Other Revenue" value={report.revenue.other} currency={currency} />
+              <StatementRow label="Discounts" value={report.revenue.discounts} currency={currency} negative />
+              <StatementRow label="Returns" value={report.revenue.returns} currency={currency} negative />
+              <StatementRow label="Net Revenue" value={report.revenue.netRevenue} currency={currency} emphasis />
+            </Card>
+            <Card className="p-4">
+              <h2 className="mb-3 text-sm font-semibold">Purchase Analysis</h2>
+              <StatementRow label="Raw Material Purchases" value={report.purchases.rawMaterial} currency={currency} />
+              <StatementRow label="Packaging Purchases" value={report.purchases.packaging} currency={currency} />
+              <StatementRow label="Other Purchases" value={report.purchases.other} currency={currency} />
+              <StatementRow label="Purchase Returns" value={report.purchases.returns} currency={currency} negative />
+              <StatementRow label="Net Purchase Cost" value={report.purchases.netPurchaseCost} currency={currency} emphasis />
+              <StatementRow label="COGS" value={report.purchases.cogs} currency={currency} emphasis />
+              <div className="mt-4 border-t border-border pt-3">
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">Purchase Trend</p>
+                <div className="h-[150px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip formatter={(value) => money(value, currency)} />
+                      <Bar dataKey="purchases" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </Card>
           </div>
-        </Card>
+
+          <div className="mb-5 grid gap-5 xl:grid-cols-3">
+            <Card className="p-4">
+              <h2 className="mb-3 text-sm font-semibold">Fixed Expenses</h2>
+              {Object.entries(report.expenses.fixedBreakdown).length ? Object.entries(report.expenses.fixedBreakdown)
+                .sort(([, a], [, b]) => b - a)
+                .map(([label, value]) => <StatementRow key={label} label={label} value={value} currency={currency} negative />)
+                : <p className="text-xs text-muted-foreground">No fixed expenses recorded for this period.</p>}
+              <StatementRow label="Total Fixed Expenses" value={report.expenses.fixed} currency={currency} emphasis negative />
+            </Card>
+            <Card className="p-4">
+              <h2 className="mb-3 text-sm font-semibold">Variable Expenses</h2>
+              {Object.entries(report.expenses.variableBreakdown).length ? Object.entries(report.expenses.variableBreakdown)
+                .sort(([, a], [, b]) => b - a)
+                .map(([label, value]) => <StatementRow key={label} label={label} value={value} currency={currency} negative />)
+                : <p className="text-xs text-muted-foreground">No variable expenses recorded for this period.</p>}
+              <StatementRow label="Total Variable Expenses" value={report.expenses.variable} currency={currency} emphasis negative />
+            </Card>
+            <Card className="p-4">
+              <h2 className="mb-3 text-sm font-semibold">Expense Cadence</h2>
+              <StatementRow label="Daily Variable" value={report.expenses.variableCadence.daily} currency={currency} negative />
+              <StatementRow label="Monthly Variable" value={report.expenses.variableCadence.monthly} currency={currency} negative />
+              <StatementRow label="Yearly Variable" value={report.expenses.variableCadence.yearly} currency={currency} negative />
+              <StatementRow label="Operating Expenses" value={report.expenses.operating} currency={currency} emphasis negative />
+            </Card>
+          </div>
+
+          <Card className="mb-5 p-4">
+            <h2 className="mb-3 text-sm font-semibold">Profit</h2>
+            <div className="grid gap-x-8 lg:grid-cols-2">
+              <div>
+                <StatementRow label="Net Revenue" value={report.revenue.netRevenue} currency={currency} />
+                <StatementRow label="Less: COGS" value={report.purchases.cogs} currency={currency} negative />
+                <StatementRow label="Gross Profit" value={report.profit.grossProfit} currency={currency} emphasis />
+                <StatementRow label="Less: Operating Expenses" value={report.expenses.operating} currency={currency} negative />
+                <StatementRow label="Operating Profit" value={report.profit.operatingProfit} currency={currency} emphasis />
+                <StatementRow label="Net Profit" value={report.profit.netProfit} currency={currency} emphasis />
+              </div>
+              <div>
+                <StatementRow label="Gross Margin %" value={report.profit.grossMargin} percent />
+                <StatementRow label="Operating Margin %" value={report.profit.operatingMargin} percent />
+                <StatementRow label="Net Margin %" value={report.profit.netMargin} percent />
+                <StatementRow label="Expense Ratio" value={report.profit.expenseRatio} percent />
+                <StatementRow label="Purchase Ratio" value={report.profit.purchaseRatio} percent />
+              </div>
+            </div>
+          </Card>
+
+          <Card className="mb-5 p-4">
+            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2"><LineChartIcon className="h-4 w-4 text-primary" /><h2 className="text-sm font-semibold">Trend Analytics</h2></div>
+              <div className="flex flex-wrap gap-1">
+                {TREND_OPTIONS.map(([value, label]) => <Button key={value} size="sm" variant={trendMode === value ? 'default' : 'outline'} onClick={() => setTrendMode(value)}>{label}</Button>)}
+              </div>
+            </div>
+            <div className="mb-3 flex flex-wrap gap-3"><TrendLegend label="Revenue" color="#2563eb" /><TrendLegend label="Purchases" color="#f59e0b" /><TrendLegend label="Fixed Expenses" color="#ec4899" /><TrendLegend label="Variable Expenses" color="#f97316" /><TrendLegend label="Gross Profit" color="#10b981" /><TrendLegend label="Net Profit" color="#8b5cf6" /></div>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(value) => money(value, currency)} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#2563eb" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="purchases" name="Purchases" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="fixedExpenses" name="Fixed Expenses" stroke="#ec4899" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="variableExpenses" name="Variable Expenses" stroke="#f97316" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="grossProfit" name="Gross Profit" stroke="#10b981" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="netProfit" name="Net Profit" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card className="mb-5 p-4">
+            <div className="mb-3 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" /><h2 className="text-sm font-semibold">Branch Comparison</h2></div>
+            {branchComparison.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-xs">
+                  <thead><tr className="border-b border-border text-muted-foreground"><th className="pb-2 text-left">Rank</th><th className="pb-2 text-left">Branch</th><th className="pb-2 text-right">Sales</th><th className="pb-2 text-right">Purchases</th><th className="pb-2 text-right">Expenses</th><th className="pb-2 text-right">Gross Profit</th><th className="pb-2 text-right">Net Profit</th><th className="pb-2 text-right">Profit Margin</th><th className="pb-2 text-right">Growth</th></tr></thead>
+                  <tbody>{branchComparison.map((branch) => <tr key={branch.key} className="border-b border-border/60 last:border-0"><td className="py-2 font-semibold">#{branch.rank}</td><td className="py-2 font-medium">{branch.branch?.label || branch.branch?.name || branch.key}</td><td className="py-2 text-right">{money(branch.sales, currency)}</td><td className="py-2 text-right text-amber-600">{money(branch.purchases, currency)}</td><td className="py-2 text-right text-red-500">{money(branch.expenses, currency)}</td><td className={`py-2 text-right font-semibold ${branch.grossProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{money(branch.grossProfit, currency)}</td><td className={`py-2 text-right font-semibold ${branch.netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{money(branch.netProfit, currency)}</td><td className="py-2 text-right">{pct(branch.profitMargin)}</td><td className={`py-2 text-right ${branch.growth >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{pct(branch.growth)}</td></tr>)}</tbody>
+                </table>
+              </div>
+            ) : <p className="text-sm text-muted-foreground">No branch data is available for this scope and period.</p>}
+          </Card>
+
+          <section className="mb-5">
+            <h2 className="mb-3 text-sm font-semibold">Top Lists</h2>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <ListCard title="Top 10 Products" items={report.topLists.products} currency={currency} />
+              <ListCard title="Top Categories" items={report.topLists.categories} currency={currency} />
+              <ListCard title="Top Customers" items={report.topLists.customers} currency={currency} />
+              <ListCard title="Top Suppliers" items={report.topLists.suppliers} currency={currency} />
+              <ListCard title="Top Expense Categories" items={report.topLists.expenseCategories} currency={currency} inverse />
+              <ListCard title="Top Performing Branches" items={topBranches} currency={currency} />
+              <ListCard title="Worst Performing Branches" items={worstBranches} currency={currency} inverse />
+            </div>
+          </section>
+        </>
       )}
     </div>
   );
