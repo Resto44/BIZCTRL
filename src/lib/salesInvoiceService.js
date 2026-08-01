@@ -69,7 +69,7 @@ export async function createSalesInvoice({ invoiceNumber, saleId, saleData, rest
   // Requirement 4: Insert sales_invoices using exactly that Sale ID.
   const { data, error } = await supabase
     .from('sales_invoices')
-    .upsert(payload, { onConflict: 'invoice_number' })
+    .upsert(payload, { onConflict: 'restaurant_id,invoice_number' })
     .select()
     .single();
 
