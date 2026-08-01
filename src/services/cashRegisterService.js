@@ -21,7 +21,7 @@ const today = () => format(new Date(), 'yyyy-MM-dd');
  * Get or create the daily cash settlement for a given date/branch.
  * The opening_cash is automatically set from the previous day's expected_closing_cash.
  */
-export async function getOrCreateSettlement({ date, branch, createdBy, restaurantId }) {
+export async function getOrCreateSettlement({ date, branch, branchId, createdBy, restaurantId }) {
   const d = date || today();
 
   // Try to find existing settlement
@@ -51,6 +51,8 @@ export async function getOrCreateSettlement({ date, branch, createdBy, restauran
     date: d,
     branch,
     restaurant_id: restaurantId || null,
+    // RLS required scope field
+    branch_id: branchId || null,
     opening_cash: openingCash,
     status: 'Draft',
   });
@@ -109,6 +111,7 @@ export async function refreshSettlement(settlementId) {
 export async function postCashMovement({
   date,
   branch,
+  branchId,          // UUID branch_id — required for RLS
   restaurantId,
   createdBy,
   direction,         // 'in' | 'out'
@@ -127,6 +130,7 @@ export async function postCashMovement({
   const settlement = await getOrCreateSettlement({
     date: d,
     branch,
+    branchId,
     createdBy,
     restaurantId,
   });
@@ -136,6 +140,8 @@ export async function postCashMovement({
     date: d,
     branch,
     restaurant_id: restaurantId || null,
+    // RLS required scope field
+    branch_id: branchId || null,
     direction,
     amount: Number(amount),
     movement_type: movementType,
@@ -217,6 +223,7 @@ export async function reverseCashMovement(sourceModule, sourceRecordId, branch) 
 export async function createOwnerCashInjection({
   date,
   branch,
+  branchId,
   restaurantId,
   amount,
   reason,
@@ -232,6 +239,8 @@ export async function createOwnerCashInjection({
     date: d,
     branch,
     restaurant_id: restaurantId || null,
+    // RLS required scope field
+    branch_id: branchId || null,
     amount: Number(amount),
     reason: reason || 'Operational Funding',
     notes: notes || '',
@@ -249,6 +258,8 @@ export async function createOwnerCashInjection({
     wallet: 'branch_cash',
     direction: 'in',
     branch,
+    restaurant_id: restaurantId || null,
+    branch_id: branchId || null,
     amount: Number(amount),
     payment_method: 'cash',
     description: `Owner Cash Injection: ${reason || 'Operational Funding'}`,
@@ -266,6 +277,7 @@ export async function createOwnerCashInjection({
   await postCashMovement({
     date: d,
     branch,
+    branchId,
     restaurantId,
     createdBy,
     direction: 'in',
@@ -322,6 +334,8 @@ export async function submitSettlement({ settlementId, cashCounted, notes, manag
       date: settlement.date,
       branch: settlement.branch,
       restaurant_id: settlement.restaurant_id || null,
+      // RLS required scope field
+      branch_id: settlement.branch_id || null,
       settlement_id: settlementId,
       expected_amount: computed.expected_closing_cash,
       actual_amount: cashCountedNum,

@@ -404,6 +404,9 @@ export async function addInvoicePayment({
       amount,
       payment_method: paymentMethod || 'cash',
       restaurant_id: invoice.restaurant_id || null,
+      // RLS required scope fields — branch_id must be present for policy check
+      branch_id: invoice.branch_id || null,
+      tenant_id: invoice.tenant_id || null,
       notes,
       date: paymentDate,
       created_by: createdBy,

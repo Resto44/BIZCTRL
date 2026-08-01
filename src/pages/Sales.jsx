@@ -80,7 +80,9 @@ export default function Sales() {
         branch: saleData.branch, 
         auto_generated: true, 
         reference_id: saleId,
-        restaurant_id: saleData.restaurant_id || activeRestaurant?.id
+        restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
+        // RLS required scope field
+        branch_id: saleData.branch_id || null,
       };
 
       if (prevSale) {
@@ -163,7 +165,8 @@ export default function Sales() {
           auto_generated: true,
           recorded_by: user?.email || '',
           notes: 'Cash reconciliation: owner covered register shortage. Not classified as sales revenue.',
-          restaurant_id: saleData.restaurant_id || activeRestaurant?.id
+          restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
+          branch_id: saleData.branch_id || null,
         }));
       }
 
@@ -182,7 +185,8 @@ export default function Sales() {
           auto_generated: true,
           recorded_by: user?.email || '',
           notes: `Operating loss covered by owner. Sales=${saleData.total_sales || 0}, Purchases=${saleData.approved_purchases_total || 0}. Not classified as sales revenue.`,
-          restaurant_id: saleData.restaurant_id || activeRestaurant?.id
+          restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
+          branch_id: saleData.branch_id || null,
         }));
       }
 
@@ -231,7 +235,8 @@ export default function Sales() {
           auto_generated: true,
           recorded_by: saleData.manager_approved_by || '',
           notes: 'Reconciliation audit entry. Sales Total is unchanged.',
-          restaurant_id: saleData.restaurant_id || activeRestaurant?.id
+          restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
+          branch_id: saleData.branch_id || null,
         });
       }
 
@@ -251,7 +256,8 @@ export default function Sales() {
           auto_generated: true,
           recorded_by: saleData.manager_approved_by || '',
           notes: 'Reconciliation audit entry. Sales Total is unchanged.',
-          restaurant_id: saleData.restaurant_id || activeRestaurant?.id
+          restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
+          branch_id: saleData.branch_id || null,
         });
       }
 
@@ -313,7 +319,9 @@ export default function Sales() {
             notes: `Credit sale — ${saleData.date} — Branch: ${saleData.branch}`,
             recorded_by: user?.email || '',
             recorded_by_name: user?.full_name || user?.email || '',
-            restaurant_id: saleData.restaurant_id || activeRestaurant?.id
+            restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
+            branch_id: saleData.branch_id || null,
+            branch: saleData.branch || '',
           });
         } else {
           // Create new DebtRecord
@@ -330,7 +338,8 @@ export default function Sales() {
             status: 'open',
             description: `Credit sale — ${saleData.date}`,
             notes: entry.notes || '',
-            restaurant_id: saleData.restaurant_id || activeRestaurant?.id
+            restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
+            branch_id: saleData.branch_id || null,
           });
           
           await base44.entities.DebtPayment.create({
@@ -341,7 +350,9 @@ export default function Sales() {
             payment_method: 'credit',
             notes: `Credit sale — ${saleData.date}`,
             recorded_by: user?.email || '',
-            restaurant_id: saleData.restaurant_id || activeRestaurant?.id
+            restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
+            branch_id: saleData.branch_id || null,
+            branch: saleData.branch || '',
           });
         }
 

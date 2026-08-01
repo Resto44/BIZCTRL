@@ -18,7 +18,7 @@ import { isWhatsAppConfigured } from '@/lib/whatsappService';
 export default function PaymentForm({ debt, onSave, onCancel }) {
   const notif = useNotify();
   const { user } = useAuth();
-  const { activeRestaurantId } = useTenant();
+  const { activeRestaurantId, branches, allBranches } = useTenant();
   const d = useDebtI18n();
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('cash');
@@ -36,6 +36,12 @@ export default function PaymentForm({ debt, onSave, onCancel }) {
 
     try {
       // 1. Create payment record
+      // Resolve branch_id from debt.branch (text key) if not already set
+      const branchLookup = [...(allBranches || [])].find(
+        b => b.key === debt.branch || b.branch_key === debt.branch
+      );
+      const resolvedBranchId = debt.branch_id || branchLookup?.id || null;
+
       const payment = await base44.entities.DebtPayment.create({
         debt_id: debt.id,
         party_name: debt.party_name,
@@ -45,6 +51,10 @@ export default function PaymentForm({ debt, onSave, onCancel }) {
         notes,
         recorded_by: user?.email,
         recorded_by_name: user?.full_name || user?.email,
+        // RLS required scope fields
+        restaurant_id: debt.restaurant_id || activeRestaurantId || null,
+        branch_id: resolvedBranchId,
+        branch: debt.branch || '',
       });
 
       // 2. Update debt record

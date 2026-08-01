@@ -26,7 +26,7 @@ const REASONS = [
 
 export default function OwnerCashInjectionForm({ onSuccess, onCancel, shortageId, shortageAmount, defaultBranch }) {
   const { user } = useAuth();
-  const { branches, activeRestaurantId } = useTenant();
+  const { branches, allBranches, activeRestaurantId } = useTenant();
   const { currency } = useLanguage();
   const notif = useNotify();
   const qc = useQueryClient();
@@ -40,17 +40,25 @@ export default function OwnerCashInjectionForm({ onSuccess, onCancel, shortageId
   });
 
   const mutation = useMutation({
-    mutationFn: () => createOwnerCashInjection({
-      date: form.date,
-      branch: form.branch,
-      restaurantId: activeRestaurantId,
-      amount: Number(form.amount),
-      reason: form.reason,
-      notes: form.notes,
-      createdBy: user?.email,
-      createdByName: user?.full_name || user?.email,
-      shortageId: shortageId || null,
-    }),
+    mutationFn: () => {
+      // Resolve branch UUID for RLS
+      const branchObj = [...(allBranches || [])].find(
+        b => b.key === form.branch || b.branch_key === form.branch
+      );
+      const branchId = branchObj?.id || null;
+      return createOwnerCashInjection({
+        date: form.date,
+        branch: form.branch,
+        branchId,
+        restaurantId: activeRestaurantId,
+        amount: Number(form.amount),
+        reason: form.reason,
+        notes: form.notes,
+        createdBy: user?.email,
+        createdByName: user?.full_name || user?.email,
+        shortageId: shortageId || null,
+      });
+    },
     onSuccess: (data) => {
       notif.success(`Cash injection of ${currency}${Number(form.amount).toLocaleString()} recorded successfully.`);
       qc.invalidateQueries({ queryKey: ['daily_cash_settlements'] });
