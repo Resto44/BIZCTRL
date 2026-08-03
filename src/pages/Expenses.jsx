@@ -120,10 +120,14 @@ export default function Expenses() {
   const [showScanner, setShowScanner] = useState(false);
   const [scannedData, setScannedData] = useState(null);
 
+  const expenseFilter = ownerFilter?.branch
+    ? { branch_key: ownerFilter.branch }
+    : ownerFilter;
+
   const { data: expenses = [], isLoading } = useQuery({
-    queryKey: ['expenses', ownerFilter],
-    queryFn: () => base44.entities.Expense.filter(ownerFilter || {}, '-date', 2000), staleTime: 120000,
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    queryKey: ['expenses', expenseFilter],
+    queryFn: () => base44.entities.Expense.filter(expenseFilter || {}, '-date', 2000), staleTime: 120000,
+    enabled: !!(expenseFilter?.created_by || expenseFilter?.branch_key),
   });
 
   const { data: categories = [] } = useExpenseCategories();

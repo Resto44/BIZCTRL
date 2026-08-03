@@ -485,13 +485,20 @@ export default function CustomerManagement() {
       const total = Number(form.total_amount);
       const remaining = total - paid;
       const status = remaining <= 0 ? 'paid' : paid > 0 ? 'partial' : 'open';
+      const branch = form.branch || managerBranch || '';
+      const branchId = branches.find(b => b.key === branch)?.id || null;
+      if (!activeRestaurantId || !branchId) {
+        throw new Error('An active organization and branch are required to save a credit sale.');
+      }
       const { data, error } = await supabase.from('debt_records').insert({
         party_type: 'customer', type: 'receivable',
         party_name: form.party_name, party_phone: form.party_phone,
         invoice_number: form.invoice_number, date: form.date,
         due_date: form.due_date || null, total_amount: total,
         paid_amount: paid, remaining_amount: remaining, status,
-        notes: form.notes, branch: form.branch,
+        notes: form.notes, branch,
+        restaurant_id: activeRestaurantId,
+        branch_id: branchId,
         created_by: user?.email || '',
         created_date: new Date().toISOString(),
         updated_date: new Date().toISOString(),
@@ -512,9 +519,16 @@ export default function CustomerManagement() {
     mutationFn: async (form) => {
       const { data: { user } } = await supabase.auth.getUser();
       const amount = Number(form.amount);
+      const branch = form.branch || managerBranch || '';
+      const branchId = branches.find(b => b.key === branch)?.id || null;
+      if (!activeRestaurantId || !branchId) {
+        throw new Error('An active organization and branch are required to save a collection.');
+      }
       const { data: col, error: colErr } = await supabase.from('customer_collections').insert({
         customer_name: form.customer_name, amount, date: form.date,
-        payment_method: form.payment_method, notes: form.notes, branch: form.branch,
+        payment_method: form.payment_method, notes: form.notes, branch,
+        restaurant_id: activeRestaurantId,
+        branch_id: branchId,
         created_by: user?.email || '',
         created_date: new Date().toISOString(),
         updated_date: new Date().toISOString(),
