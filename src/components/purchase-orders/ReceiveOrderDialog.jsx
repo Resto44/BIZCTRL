@@ -7,12 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useTenant } from '@/lib/TenantContext';
 import { format } from 'date-fns';
 import { PackageCheck } from 'lucide-react';
 
 export default function ReceiveOrderDialog({ order, open, onClose }) {
   const { currency } = useLanguage();
   const queryClient = useQueryClient();
+  const { activeRestaurantId, branches } = useTenant();
 
   const orderedItems = (() => { try { return JSON.parse(order?.items || '[]'); } catch { return []; } })();
 
@@ -35,6 +37,9 @@ export default function ReceiveOrderDialog({ order, open, onClose }) {
 
     if (isNoneReceived) { setLoading(false); return; }
 
+    // Resolve branch_id UUID from order.branch key string for RLS scope
+    const orderBranch = branches.find(b => b.key === order.branch || b.branch_key === order.branch);
+    const orderBranchId = order.branch_id || orderBranch?.id || null;
     // Create Purchase records for each received item
     const purchasePromises = orderedItems
       .filter(it => parseFloat(receivedQtys[it.product_id] || 0) > 0)
@@ -46,6 +51,9 @@ export default function ReceiveOrderDialog({ order, open, onClose }) {
         qty: parseFloat(receivedQtys[it.product_id]),
         current_price: it.unit_price || 0,
         used_price: it.unit_price || 0,
+        // RLS required scope fields
+        restaurant_id: activeRestaurantId || null,
+        branch_id: orderBranchId,
       }));
 
     await Promise.all(purchasePromises);

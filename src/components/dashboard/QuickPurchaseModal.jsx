@@ -97,7 +97,7 @@ export default function QuickPurchaseModal({ open, onOpenChange }) {
   const u = UI[lang] || UI.en;
   const qc = useQueryClient();
   const notif = useNotify();
-  const { ownerFilter } = useTenant();
+  const { ownerFilter, activeRestaurantId, branches } = useTenant();
   const qtyRef = useRef(null);
 
   const [form, setForm] = useState(defaultForm());
@@ -154,6 +154,9 @@ export default function QuickPurchaseModal({ open, onOpenChange }) {
       ? Number(form.current_price)
       : (selectedProduct?.default_cost || selectedProduct?.default_price || 0);
     const selectedCat = categoryOptions.find(c => c.value === form.category);
+    // Resolve branch_id UUID from branch key string for RLS scope
+    const selectedBranch = branches.find(b => b.key === form.branch || b.branch_key === form.branch);
+    const branchId = selectedBranch?.id || null;
     return {
       date: form.date,
       branch: form.branch,
@@ -166,6 +169,9 @@ export default function QuickPurchaseModal({ open, onOpenChange }) {
       notes: form.notes,
       category: selectedCat ? (selectedCat.cat.name_en || selectedCat.cat.name_ar || selectedCat.cat.name_fa) : '',
       category_id: form.category,
+      // RLS required scope fields
+      restaurant_id: activeRestaurantId || null,
+      branch_id: branchId,
     };
   };
 

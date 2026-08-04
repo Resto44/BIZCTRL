@@ -94,7 +94,7 @@ export default function FinancialPurchaseForm({ initial, onSuccess, onCancel }) 
   const { language, currency } = useLanguage();
   const lbl = LABELS[language] || LABELS.en;
   const qc = useQueryClient();
-  const { ownerFilter, managerBranch, branches } = useTenant();
+  const { ownerFilter, managerBranch, branches, activeRestaurantId } = useTenant();
 
   const [form, setForm] = useState({
     ...emptyForm,
@@ -127,6 +127,9 @@ export default function FinancialPurchaseForm({ initial, onSuccess, onCancel }) 
       // Sanitize UUID: never send empty string to supplier_id UUID column
       const supplierId = data.supplier_id && data.supplier_id.trim() !== '' ? data.supplier_id : null;
 
+      // Resolve branch_id UUID from branch key string for RLS scope
+      const selectedBranch = branches.find(b => b.key === data.branch || b.branch_key === data.branch);
+      const branchId = selectedBranch?.id || null;
       const invoiceData = {
         ...(supplierId ? { supplier_id: supplierId } : {}),
         supplier_name: data.supplier_name,
@@ -138,6 +141,9 @@ export default function FinancialPurchaseForm({ initial, onSuccess, onCancel }) 
         status,
         notes: data.notes,
         ...(ownerFilter || {}),
+        // RLS required scope fields — always override ownerFilter to ensure UUID values
+        restaurant_id: activeRestaurantId || null,
+        branch_id: branchId,
       };
       const invoice = await base44.entities.SupplierInvoice.create(invoiceData);
       return invoice;
