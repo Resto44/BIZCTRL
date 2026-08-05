@@ -37,20 +37,19 @@ export default function SupplierInvoices({ supplier, onBack, embedded = false })
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data) => editing
-      ? base44.entities.SupplierInvoice.update(editing.id, data)
-      : base44.entities.SupplierInvoice.create({
-          ...data,
-          supplier_id: supplier.id,
-          supplier_name: supplier.name,
-          // BUG 1 FIX: explicitly pass restaurant_id and branch_id so the
-          // erp_can_write_scope_text RLS check can match the owner's org.
-          restaurant_id: supplier.restaurant_id || activeRestaurantId,
-          branch_id: supplier.branch_id || null,
-          // BUG 2 FIX: stamp supplier_email so the supplier can see this
-          // invoice in their dashboard via the RLS self-select policy.
-          supplier_email: supplier.email || null,
-        }),
+    mutationFn: (data) => {
+      const selectedBranch = branches.find(b => b.key === data.branch || b.branch_key === data.branch);
+      return editing
+        ? base44.entities.SupplierInvoice.update(editing.id, data)
+        : base44.entities.SupplierInvoice.create({
+            ...data,
+            supplier_id: supplier.id,
+            supplier_name: supplier.name,
+            restaurant_id: supplier.restaurant_id || activeRestaurantId,
+            branch_id: selectedBranch?.id || null,
+            supplier_email: supplier.email || null,
+          });
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['supplier_invoices', supplier.id] }); qc.invalidateQueries({ queryKey: ['all_invoices'] }); setShowForm(false); setEditing(null); },
   });
 
@@ -62,7 +61,7 @@ export default function SupplierInvoices({ supplier, onBack, embedded = false })
 
   const totalOwed = invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + (i.amount - (i.paid_amount || 0)), 0);
 
-  const openAdd = () => { setEditing(null); setForm(emptyForm); setShowForm(true); };
+  const openAdd = () => { setEditing(null); setForm({ ...emptyForm, branch: branches.length === 1 ? branches[0].key : '' }); setShowForm(true); };
   const openEdit = (inv) => { setEditing(inv); setForm({ invoice_number: inv.invoice_number || '', date: inv.date || '', due_date: inv.due_date || '', amount: inv.amount, paid_amount: inv.paid_amount || 0, status: inv.status, notes: inv.notes || '', branch: inv.branch || '' }); setShowForm(true); };
 
   return (
