@@ -6,78 +6,155 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── RestoCTRL Enterprise Design System ─────────────────────────────────── */
 @layer base {
   :root {
-    --font-inter: 'Inter', sans-serif;
-    --background: 220 20% 97%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 217 91% 50%;
+    /* ── Brand ── */
+    --primary:            217 91% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
+    --secondary:          210 40% 96%;
     --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 172 66% 50%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
+    --accent:             172 66% 50%;
+    --accent-foreground:  0 0% 100%;
+
+    /* ── Semantic ── */
+    --success:            142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --success-light:      142 71% 95%;
+    --warning:            38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --warning-light:      38 92% 95%;
+    --info:               199 89% 48%;
+    --info-foreground:    0 0% 100%;
+    --info-light:         199 89% 95%;
+
+    /* ── Destructive / Danger ── */
+    --destructive:        0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 217 91% 50%;
+    --danger:             0 84% 60%;
+    --danger-foreground:  0 0% 98%;
+    --danger-light:       0 84% 96%;
+
+    /* ── Surface ── */
+    --background:         220 20% 97%;
+    --foreground:         222 47% 11%;
+    --card:               0 0% 100%;
+    --card-foreground:    222 47% 11%;
+    --popover:            0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --muted:              210 40% 96%;
+    --muted-foreground:   215 16% 47%;
+
+    /* ── Border & Input ── */
+    --border:             214 32% 91%;
+    --border-strong:      214 32% 82%;
+    --input:              214 32% 91%;
+    --ring:               217 91% 50%;
+
+    /* ── Radius ── */
+    --radius:    0.75rem;
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+
+    /* ── Charts ── */
     --chart-1: 217 91% 50%;
     --chart-2: 172 66% 50%;
     --chart-3: 43 96% 56%;
     --chart-4: 0 84% 60%;
     --chart-5: 262 83% 58%;
-    --radius: 0.75rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-    --bottom-nav-height: 64px;
+    --chart-6: 142 71% 45%;
+    --chart-7: 199 89% 48%;
+
+    /* ── Sidebar ── */
+    --sidebar-background:          220 20% 97%;
+    --sidebar-foreground:          222 47% 11%;
+    --sidebar-primary:             217 91% 50%;
+    --sidebar-primary-foreground:  0 0% 100%;
+    --sidebar-accent:              217 91% 95%;
+    --sidebar-accent-foreground:   217 91% 30%;
+    --sidebar-border:              214 32% 91%;
+    --sidebar-ring:                217 91% 50%;
+
+    /* ── Layout ── */
+    --bottom-nav-height:     64px;
+    --erp-header-height:     60px;
+    --erp-sidebar-width:     260px;
+    --erp-sidebar-collapsed: 64px;
+
+    /* ── KPI accent colors ── */
+    --kpi-sales:     217 91% 50%;
+    --kpi-cash:      142 71% 45%;
+    --kpi-purchases: 38 92% 50%;
+    --kpi-expenses:  0 84% 60%;
+    --kpi-inventory: 262 83% 58%;
+    --kpi-treasury:  172 66% 45%;
+    --kpi-credit:    199 89% 48%;
+    --kpi-staff:     38 92% 50%;
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
+    /* ── Brand ── */
+    --primary:            217 91% 60%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 217 33% 17%;
+    --secondary:          217 33% 17%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 55%;
-    --accent: 172 66% 45%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 63% 31%;
+    --accent:             172 66% 45%;
+    --accent-foreground:  0 0% 100%;
+
+    /* ── Semantic ── */
+    --success:            142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --success-light:      142 71% 12%;
+    --warning:            38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --warning-light:      38 92% 12%;
+    --info:               199 89% 48%;
+    --info-foreground:    0 0% 100%;
+    --info-light:         199 89% 12%;
+
+    /* ── Destructive / Danger ── */
+    --destructive:        0 63% 31%;
     --destructive-foreground: 0 0% 98%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 217 91% 60%;
+    --danger:             0 63% 55%;
+    --danger-foreground:  0 0% 98%;
+    --danger-light:       0 63% 12%;
+
+    /* ── Surface ── */
+    --background:         222 47% 6%;
+    --foreground:         210 40% 98%;
+    --card:               222 47% 9%;
+    --card-foreground:    210 40% 98%;
+    --popover:            222 47% 9%;
+    --popover-foreground: 210 40% 98%;
+    --muted:              217 33% 17%;
+    --muted-foreground:   215 20% 55%;
+
+    /* ── Border & Input ── */
+    --border:             217 33% 17%;
+    --border-strong:      217 33% 25%;
+    --input:              217 33% 17%;
+    --ring:               217 91% 60%;
+
+    /* ── Charts ── */
     --chart-1: 217 91% 60%;
     --chart-2: 172 66% 45%;
     --chart-3: 43 96% 56%;
     --chart-4: 0 84% 60%;
     --chart-5: 262 83% 58%;
-    --sidebar-background: 222 47% 6%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 217 91% 60%;
+    --chart-6: 142 71% 45%;
+    --chart-7: 199 89% 48%;
+
+    /* ── Sidebar ── */
+    --sidebar-background:          222 47% 6%;
+    --sidebar-foreground:          210 40% 98%;
+    --sidebar-primary:             217 91% 60%;
+    --sidebar-primary-foreground:  0 0% 100%;
+    --sidebar-accent:              217 33% 17%;
+    --sidebar-accent-foreground:   210 40% 98%;
+    --sidebar-border:              217 33% 17%;
+    --sidebar-ring:                217 91% 60%;
   }
 }
 
@@ -86,19 +163,18 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground font-inter;
+    @apply bg-background text-foreground;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
   }
 }
 
-/* RTL support */
+/* ─── RTL support ─────────────────────────────────────────────────────────── */
 [dir="rtl"] {
   text-align: right;
   font-family: 'Vazirmatn', 'Noto Sans Arabic', sans-serif;
   font-size: 1.05rem;
   line-height: 1.6;
 }
-
-/* RTL typography scale — larger and more readable */
 [dir="rtl"] h1, [dir="rtl"] .page-title { font-size: 1.875rem; font-weight: 700; }
 [dir="rtl"] h2, [dir="rtl"] .section-title { font-size: 1.375rem; font-weight: 600; }
 [dir="rtl"] .kpi-value { font-size: 2.125rem; font-weight: 800; }
@@ -107,19 +183,117 @@
 [dir="rtl"] button, [dir="rtl"] .btn { font-size: 1.0625rem; font-weight: 700; }
 [dir="rtl"] .card { padding: 1.25rem; }
 [dir="rtl"] tr { height: 2.75rem; }
-[dir="rtl"] .text-xs { font-size: 0.875rem !important; }
-[dir="rtl"] .text-sm { font-size: 1rem !important; }
+[dir="rtl"] .text-xs  { font-size: 0.875rem !important; }
+[dir="rtl"] .text-sm  { font-size: 1rem !important; }
 [dir="rtl"] .text-base { font-size: 1.0625rem !important; }
-[dir="rtl"] .text-lg { font-size: 1.25rem !important; }
-[dir="rtl"] .text-xl { font-size: 1.5rem !important; }
+[dir="rtl"] .text-lg  { font-size: 1.25rem !important; }
+[dir="rtl"] .text-xl  { font-size: 1.5rem !important; }
 [dir="rtl"] .text-2xl { font-size: 1.75rem !important; }
 [dir="rtl"] .text-3xl { font-size: 2rem !important; }
 
-/* Hide scrollbar on mobile nav */
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
+/* ─── Scrollbar utilities ─────────────────────────────────────────────────── */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+
+/* ─── ERP Layout ──────────────────────────────────────────────────────────── */
+.erp-layout {
+  display: flex;
+  min-height: 100dvh;
 }
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+
+.erp-sidebar {
+  width: var(--erp-sidebar-width);
+  flex-shrink: 0;
+  transition: width 200ms ease;
 }
+
+.erp-sidebar.collapsed {
+  width: var(--erp-sidebar-collapsed);
+}
+
+.erp-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.erp-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ─── ERP Section title ───────────────────────────────────────────────────── */
+.erp-section-title {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  padding: 0.375rem 0.75rem;
+}
+
+/* ─── KPI card hover ──────────────────────────────────────────────────────── */
+.kpi-card-hover {
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+.kpi-card-hover:hover {
+  box-shadow: 0 4px 12px -2px rgb(0 0 0 / 0.12);
+  transform: translateY(-1px);
+}
+
+/* ─── Status dots ─────────────────────────────────────────────────────────── */
+.status-dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 9999px; }
+.status-dot-active   { background: hsl(var(--success)); }
+.status-dot-pending  { background: hsl(var(--warning)); }
+.status-dot-inactive { background: hsl(var(--muted-foreground)); }
+.status-dot-error    { background: hsl(var(--danger)); }
+
+/* ─── Sidebar nav item active state ──────────────────────────────────────── */
+.nav-item-active {
+  background: hsl(var(--sidebar-accent));
+  color: hsl(var(--sidebar-primary));
+  font-weight: 600;
+}
+
+/* ─── Breadcrumb separator ───────────────────────────────────────────────── */
+.breadcrumb-sep::before {
+  content: '/';
+  margin: 0 0.375rem;
+  color: hsl(var(--muted-foreground));
+  opacity: 0.5;
+}
+
+/* ─── Animations ──────────────────────────────────────────────────────────── */
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes fade-in-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+.animate-slide-in-left  { animation: slide-in-left  200ms ease forwards; }
+.animate-slide-in-right { animation: slide-in-right 200ms ease forwards; }
+.animate-fade-in-up     { animation: fade-in-up     200ms ease forwards; }
+
+/* ─── Accordion animations (Radix) ───────────────────────────────────────── */
+@keyframes accordion-down {
+  from { height: 0; }
+  to   { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to   { height: 0; }
+}
+.animate-accordion-down { animation: accordion-down 0.2s ease-out; }
+.animate-accordion-up   { animation: accordion-up   0.2s ease-out; }

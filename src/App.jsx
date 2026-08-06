@@ -96,6 +96,7 @@ const AIRecommendations   = lazy(() => import('@/pages/AIRecommendations'));
 const SettingsPage        = lazy(() => import('@/pages/SettingsPage'));
 const BrandSettings       = lazy(() => import('@/pages/BrandSettings'));
 const BranchManagement    = lazy(() => import('@/pages/BranchManagement'));
+const RolePermissionCenter = lazy(() => import('@/pages/RolePermissionCenter'));
 const RestaurantManager   = lazy(() => import('@/pages/RestaurantManager'));
 
 const EnterpriseCategoryManager = lazy(() => import('@/components/categories/CategoryManager'));
@@ -327,6 +328,7 @@ const SubscribedRoutes = () => {
         <Route path="/brand" element={<RoleGuard permission="viewBrandSettings"><BrandSettings /></RoleGuard>} />
         <Route path="/restaurants" element={<RoleGuard permission="viewBrandSettings"><RestaurantManager /></RoleGuard>} />
         <Route path="/branch-management" element={<RoleGuard permission="viewBrandSettings"><BranchManagement /></RoleGuard>} />
+        <Route path="/role-permissions" element={<RoleGuard permission="manageBranches"><RolePermissionCenter /></RoleGuard>} />
 
         <Route path="/approval-policy" element={<RoleGuard permission="viewBrandSettings"><ApprovalPolicy /></RoleGuard>} />
         <Route path="/approval-center" element={<Navigate to="/erp-approval-center" replace />} />

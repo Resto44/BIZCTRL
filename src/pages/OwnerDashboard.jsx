@@ -1098,7 +1098,7 @@ export default function OwnerDashboard() {
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 pb-28 max-w-2xl mx-auto">
+    <div className="space-y-6 pb-8">
 
       {/* ── HEADER ── */}
       <div className="flex items-center justify-between pt-2">

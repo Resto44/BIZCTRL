@@ -176,6 +176,7 @@ function logSecurityEvent(_user, _type, detail) {
 }
 export function RoleProvider({ children }) {
   const { user, isLoadingAuth } = useAuth();
+
   const role = useMemo(() => {
     // Do not resolve role until auth has finished loading
     if (isLoadingAuth || !user) return ROLES.OWNER;
@@ -186,7 +187,20 @@ export function RoleProvider({ children }) {
     if (r === 'staff') return ROLES.EMPLOYEE;
     return ROLES.OWNER; // Safe default
   }, [user, isLoadingAuth]);
-  const can = useMemo(() => buildCan(role), [role]);
+
+  const can = useMemo(() => {
+    // Start with role-based defaults
+    const base = buildCan(role);
+    // Merge with per-user DB permissions (from user.permissions JSONB)
+    // DB permissions can only GRANT additional permissions, never revoke owner-level
+    const dbPerms = user?.permissions;
+    if (!dbPerms || typeof dbPerms !== 'object') return base;
+    // For owner: always full access, ignore DB overrides
+    if (role === ROLES.OWNER) return base;
+    // Merge: DB permissions override defaults for non-owner roles
+    return { ...base, ...dbPerms };
+  }, [role, user?.permissions]);
+
   return (
     <RoleContext.Provider value={{ role, can, user, isLoadingAuth }}>
       {children}
