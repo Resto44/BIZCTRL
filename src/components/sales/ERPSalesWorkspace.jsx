@@ -471,7 +471,10 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
 
   // ── Cash Reconciliation inputs ────────────────────────────────────────────
   const [openingCash, setOpeningCash] = useState(initial?.opening_cash ?? '');
-  const [actualCashCount, setActualCashCount] = useState(initial?.actual_cash_count ?? '');
+  const [actualCashCount, setActualCashCount] = useState(() => {
+    if (initial?.closing_cash == null) return '';
+    return String(Number(initial.closing_cash) - Number(initial.owner_cash_injection || 0));
+  });
   const [ownerContributionInput, setOwnerContributionInput] = useState(initial?.owner_cash_injection ?? '');
   const [cashNotes, setCashNotes] = useState(initial?.cash_notes || '');
   const [managerApproved, setManagerApproved] = useState(initial?.manager_approval || false);
@@ -1130,8 +1133,12 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     try {
       console.log('[ERPSalesWorkspace] Building payload...');
       const payload = {
-        ...form,
+        date: form.date,
         branch: selectedBranch?.key || selectedBranch?.branch_key || form.branch,
+        shift: form.shift,
+        cashier_name: form.cashier_name,
+        cashier_employee_id: form.cashier_employee_id,
+        sales_notes: form.sales_notes,
         branch_id: branchId,
         // `tenant_id` carries the active organization scope on legacy sales tables.
         tenant_id: tenantId,
@@ -1146,7 +1153,6 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         customer_id: customerId,
         pos_device_id: posDeviceId,
         credit: creditTotal,
-        total_sales: totalSales,
         pos_entries_json: JSON.stringify(posEntries.map(({ id, ...rest }) => rest)),
         credit_entries_json: JSON.stringify(creditEntries.map(({ id, ...rest }) => rest)),
         // Dynamic Sales Sources — full snapshot for reporting
@@ -1165,13 +1171,9 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         custom_sources_total: customTotal,
 
         opening_cash: opening,
+        // The live schema stores the actual count plus any owner injection as closing_cash.
         closing_cash: closingCash,
-        actual_cash_count: actualCount ?? opening,
-        expected_cash: expectedCash,
         cash_difference: cashDifference ?? 0,
-        remaining_difference: remainingDifference ?? 0,
-        cash_shortage_amount: cashShortageAmount,
-        cash_overage_amount: cashOverageAmount,
         cash_status: cashReconcStatus || 'Balanced',
         cash_notes: cashNotes || '',
         owner_cash_injection: ownerContrib,
@@ -1179,8 +1181,6 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         manager_approved_by: managerApproved ? (user?.email || '') : '',
 
         approved_purchases_total: approvedPurchasesTotal,
-        daily_operating_result: operatingResult,
-        owner_capital_contribution: purchasesOwnerContrib,
 
         restaurant_id: activeRestaurant?.id || null,
       };

@@ -177,7 +177,7 @@ function ManagerContent({ branchId, branchName }) {
   const { data: yesterdaySales = [] } = useQuery({
     queryKey: ['mgr-yesterday-sales', branchId, yesterday],
     queryFn: async () => {
-      const { data } = await supabase.from('daily_sales').select('total_amount').eq('date', yesterday).eq('branch_id', branchId);
+      const { data } = await supabase.from('daily_sales').select('total, custom_sources_total').eq('date', yesterday).eq('branch_id', branchId);
       return data || [];
     },
     enabled: !!branchId,
@@ -241,12 +241,12 @@ function ManagerContent({ branchId, branchName }) {
     queryKey: ['mgr-recent-activity', branchId],
     queryFn: async () => {
       const [s, p, e] = await Promise.all([
-        supabase.from('daily_sales').select('id, total_amount, created_at').eq('branch_id', branchId).order('created_at', { ascending: false }).limit(5),
+        supabase.from('daily_sales').select('id, total, custom_sources_total, created_date').eq('branch_id', branchId).order('created_date', { ascending: false }).limit(5),
         supabase.from('supplier_invoices').select('id, total_amount, created_at').eq('branch_id', branchId).order('created_at', { ascending: false }).limit(5),
         supabase.from('expenses').select('id, amount, description, created_at').eq('branch_id', branchId).order('created_at', { ascending: false }).limit(5),
       ]);
       const items = [
-        ...(s.data || []).map(r => ({ type: 'sale',     amount: r.total_amount, label: 'Daily Sales', time: r.created_at })),
+        ...(s.data || []).map(r => ({ type: 'sale',     amount: (Number(r.total) || 0) + (Number(r.custom_sources_total) || 0), label: 'Daily Sales', time: r.created_date })),
         ...(p.data || []).map(r => ({ type: 'purchase', amount: r.total_amount, label: 'Purchase',    time: r.created_at })),
         ...(e.data || []).map(r => ({ type: 'expense',  amount: r.amount,       label: r.description || 'Expense', time: r.created_at })),
       ];
@@ -259,30 +259,30 @@ function ManagerContent({ branchId, branchName }) {
     queryKey: ['mgr-sales-trend', branchId],
     queryFn: async () => {
       const days = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), 6 - i), 'yyyy-MM-dd'));
-      const { data } = await supabase.from('daily_sales').select('date, total_amount, cash_amount, pos_amount').eq('branch_id', branchId).in('date', days);
+      const { data } = await supabase.from('daily_sales').select('date, total, custom_sources_total, restaurant_cash, restaurant_network').eq('branch_id', branchId).in('date', days);
       const map = {};
       (data || []).forEach(r => { map[r.date] = r; });
       return days.map(d => ({
         date:  format(new Date(d + 'T12:00:00'), 'EEE'),
-        sales: map[d]?.total_amount || 0,
-        cash:  map[d]?.cash_amount  || 0,
-        pos:   map[d]?.pos_amount   || 0,
+        sales: (Number(map[d]?.total) || 0) + (Number(map[d]?.custom_sources_total) || 0),
+        cash:  map[d]?.restaurant_cash || 0,
+        pos:   map[d]?.restaurant_network || 0,
       }));
     },
     enabled: !!branchId,
   });
 
   const kpis = useMemo(() => {
-    const todayTotal   = todaySales.reduce((s, r) => s + (r.total_amount || 0), 0);
-    const cashTotal    = todaySales.reduce((s, r) => s + (r.cash_amount  || 0), 0);
-    const posTotal     = todaySales.reduce((s, r) => s + (r.pos_amount   || 0), 0);
-    const creditTotal  = todaySales.reduce((s, r) => s + (r.credit_amount || 0), 0);
+    const todayTotal   = todaySales.reduce((s, r) => s + (Number(r.total) || 0) + (Number(r.custom_sources_total) || 0), 0);
+    const cashTotal    = todaySales.reduce((s, r) => s + (Number(r.restaurant_cash) || 0), 0);
+    const posTotal     = todaySales.reduce((s, r) => s + (Number(r.restaurant_network) || 0), 0);
+    const creditTotal  = todaySales.reduce((s, r) => s + (Number(r.credit) || 0), 0);
     const purchTotal   = todayPurchases.reduce((s, r) => s + (r.total_amount || 0), 0);
     const expTotal     = todayExpenses.reduce((s, r) => s + (r.amount || 0), 0);
     const grossProfit  = todayTotal - purchTotal;
     const netProfit    = grossProfit - expTotal;
 
-    const yTotal       = yesterdaySales.reduce((s, r) => s + (r.total_amount || 0), 0);
+    const yTotal       = yesterdaySales.reduce((s, r) => s + (Number(r.total) || 0) + (Number(r.custom_sources_total) || 0), 0);
     const salesTrendPct = yTotal > 0 ? ((todayTotal - yTotal) / yTotal) * 100 : 0;
 
     const lowStock     = inventory.filter(i => i.reorder_point > 0 && i.quantity <= i.reorder_point);

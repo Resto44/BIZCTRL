@@ -37,6 +37,11 @@ import {
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const firstRecord = (value) => asRecordArray(value).at(0) || null;
+const dailySalesTotal = (sale) =>
+  Number(sale?.restaurant_cash ?? sale?.cash ?? 0) +
+  Number(sale?.restaurant_network ?? sale?.network ?? 0) +
+  Number(sale?.credit ?? 0) +
+  Number(sale?.custom_sources_total ?? 0);
 
 export default function Sales() {
   const { t, currency } = useLanguage();
@@ -135,8 +140,9 @@ export default function Sales() {
   const autoOwnerCapitalTx = async (saleData, saleId) => {
     // Case (a): owner cash injection to cover register shortage
     const cashContrib = Number(saleData.owner_cash_injection) || 0;
-    // Case (b): owner capital to cover purchases > sales operating loss
-    const purchasesContrib = Number(saleData.owner_capital_contribution) || 0;
+    // Case (b): owner capital to cover purchases > sales operating loss.
+    // It is derived from persisted values because no separate database column exists.
+    const purchasesContrib = Math.max(0, (Number(saleData.approved_purchases_total) || 0) - dailySalesTotal(saleData));
 
     if (cashContrib <= 0 && purchasesContrib <= 0) return;
 
@@ -185,7 +191,7 @@ export default function Sales() {
           reference_id: saleId,
           auto_generated: true,
           recorded_by: user?.email || '',
-          notes: `Operating loss covered by owner. Sales=${saleData.total_sales || 0}, Purchases=${saleData.approved_purchases_total || 0}. Not classified as sales revenue.`,
+          notes: `Operating loss covered by owner. Sales=${dailySalesTotal(saleData)}, Purchases=${saleData.approved_purchases_total || 0}. Not classified as sales revenue.`,
           restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
           branch_id: saleData.branch_id || null,
         }));
@@ -202,8 +208,10 @@ export default function Sales() {
   // These are AUDIT records only — they do NOT modify Sales Total, Network, or Credit.
   const autoShortageOveageTx = async (saleData, saleId) => {
     const cashStatus = saleData.cash_status;
-    const shortageAmt = Number(saleData.cash_shortage_amount) || 0;
-    const overageAmt  = Number(saleData.cash_overage_amount)  || 0;
+    // Shortage and overage are derived from the persisted reconciliation difference.
+    const cashDifference = Number(saleData.cash_difference) || 0;
+    const shortageAmt = Math.max(0, -cashDifference);
+    const overageAmt  = Math.max(0, cashDifference);
 
     const isApprovedShortage = cashStatus === 'Shortage' && saleData.manager_approval && shortageAmt > 0;
     const isOverage           = cashStatus === 'Overage'  && overageAmt > 0;
@@ -468,7 +476,7 @@ export default function Sales() {
       console.log('[Sales:createMut] 5. Finalizing invoice...');
       autoGenerateInvoice(data, saleId);
       
-      const total = (data.restaurant_cash || 0) + (data.restaurant_network || 0) + (data.credit || 0);
+      const total = dailySalesTotal(data);
       try {
         await notif.sale({ branch: data.branch, amount: total, action: 'create' });
         console.log('[Sales:createMut] SUCCESS: notification sent');
