@@ -11,7 +11,7 @@ const TenantContext = createContext({
   setActiveRestaurant: () => {}, branches: [], allBranches: [], createRestaurant: async () => {},
   updateRestaurant: async () => {}, updateRestaurantBranches: async () => {}, refetchRestaurants: () => {},
   orgId: '', orgFilter: {}, restaurantFilter: null,
-  managerBranch: null, isManager: false,
+  managerBranch: null, managerBranchObject: null, isManager: false,
 });
 
 export function TenantProvider({ children }) {
@@ -313,8 +313,17 @@ export function TenantProvider({ children }) {
   // Branch isolation for all staff roles
   const isStaffRole = [ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.DRIVER, ROLES.KITCHEN].includes(normalizedRole);
 
-  // For staff roles, use profile.branch (branch_key string) for legacy compat
-  const assignedBranch = isStaffRole ? (user?.branch || null) : null;
+  // Prefer the legacy branch key, but preserve the canonical branch UUID when
+  // the key is absent on an assigned Branch Manager profile.
+  const assignedBranch = isStaffRole ? (user?.branch || user?.branch_id || null) : null;
+  const managerBranchObject = React.useMemo(() => {
+    if (!isManager || !assignedBranch) return null;
+    return branches.find((branch) =>
+      branch.id === user?.branch_id ||
+      branch.key === user?.branch ||
+      branch.branch_key === user?.branch,
+    ) || null;
+  }, [assignedBranch, branches, isManager, user?.branch, user?.branch_id]);
 
   // TENANT ISOLATION
   const ownerFilter = React.useMemo(() => {
@@ -344,10 +353,15 @@ export function TenantProvider({ children }) {
   // For managers: restrict branches list to only their assigned branch
   const effectiveBranches = React.useMemo(() => {
     if (isManager && assignedBranch) {
-      return branches.filter(b => b.key === assignedBranch || b.branch_key === assignedBranch);
+      return branches.filter((branch) =>
+        branch.id === user?.branch_id ||
+        branch.key === user?.branch ||
+        branch.branch_key === user?.branch ||
+        branch.id === assignedBranch,
+      );
     }
     return branches;
-  }, [branches, isManager, assignedBranch]);
+  }, [assignedBranch, branches, isManager, user?.branch, user?.branch_id]);
 
   return (
     <TenantContext.Provider value={{
@@ -366,7 +380,8 @@ export function TenantProvider({ children }) {
       orgFilter,
       restaurantFilter,
       ownerFilter,
-      managerBranch: assignedBranch,
+      managerBranch: managerBranchObject?.key || managerBranchObject?.branch_key || assignedBranch,
+      managerBranchObject,
       isManager,
       isEmployee,
       isDriver,

@@ -214,7 +214,7 @@ function createEntity(tableName) {
       // Convert empty strings to null for UUID columns that are ALREADY in the payload.
       // Empty string is not a valid UUID — Postgres rejects it with code 22P02.
       // IMPORTANT: only touch keys that already exist in the payload; do NOT inject new keys.
-      const UUID_COLS = ['category_id', 'restaurant_id', 'supplier_id', 'customer_id', 'product_id', 'order_id', 'employee_id', 'driver_id', 'branch_id'];
+      const UUID_COLS = ['category_id', 'restaurant_id', 'supplier_id', 'customer_id', 'product_id', 'order_id', 'employee_id', 'driver_id', 'branch_id', 'cashier_id', 'pos_device_id'];
       UUID_COLS.forEach(col => {
         if (Object.prototype.hasOwnProperty.call(payload, col) && (payload[col] === '' || payload[col] === undefined)) {
           payload[col] = null;

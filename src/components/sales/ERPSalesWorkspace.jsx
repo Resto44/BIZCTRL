@@ -67,6 +67,16 @@ function getSourceIcon(iconName) {
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const firstRecord = (value) => asRecordArray(value).at(0) || null;
+const matchesBranch = (record, branchKey, branchId) => {
+  if (!branchKey && !branchId) return true;
+  const recordBranchId = record?.branch_id;
+  return (
+    record?.branch === branchKey ||
+    record?.branch_key === branchKey ||
+    (recordBranchId && branchId && String(recordBranchId) === String(branchId)) ||
+    (!record?.branch && !recordBranchId)
+  );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS — Material 3 / ERP
@@ -399,8 +409,16 @@ const StickySummary = memo(function StickySummary({ totalSales, operatingResult,
 export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   const { currency } = useLanguage();
   const { user } = useAuth();
-  const { ownerFilter, branches: tenantBranches, managerBranch, activeRestaurant } = useTenant();
+  const { ownerFilter, branches: tenantBranches, managerBranch, activeRestaurant, isManager } = useTenant();
   const branches = asRecordArray(tenantBranches);
+  const assignedManagerBranch = useMemo(() => {
+    if (!isManager) return null;
+    return branches.find((branch) =>
+      branch.id === user?.branch_id ||
+      branch.key === managerBranch ||
+      branch.branch_key === managerBranch,
+    ) || null;
+  }, [branches, isManager, managerBranch, user?.branch_id]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -411,14 +429,39 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   // ── Form meta state ───────────────────────────────────────────────────────
   const [form, setForm] = useState({
     date: initial?.date || format(new Date(), 'yyyy-MM-dd'),
-    branch: initial?.branch || managerBranch || branches.at(0)?.key || '',
+    branch: initial?.branch || assignedManagerBranch?.key || assignedManagerBranch?.branch_key || managerBranch || branches.at(0)?.key || '',
     shift: initial?.shift || 'Morning',
     cashier_name: initial?.cashier_name || '',
     cashier_employee_id: initial?.cashier_employee_id || '',
+    cashier_id: initial?.cashier_id || initial?.cashier_employee_id || '',
+    customer_id: initial?.customer_id || '',
+    pos_device_id: initial?.pos_device_id || initial?.restaurant_network_account_id || '',
     sales_notes: initial?.sales_notes || '',
     ...initial,
   });
   const set = useCallback((field, value) => setForm(prev => ({ ...prev, [field]: value })), []);
+
+  // Tenant branches load after the workspace mounts. Persist the Branch Manager's
+  // assigned branch key and UUID as soon as that record is available.
+  useEffect(() => {
+    if (initial?.id || !isManager || !assignedManagerBranch?.id) return;
+    const branchKey = assignedManagerBranch.key || assignedManagerBranch.branch_key;
+    if (!branchKey) return;
+    setForm((previous) => {
+      if (previous.branch && previous.branch !== branchKey) return previous;
+      if (previous.branch === branchKey && previous.branch_id === assignedManagerBranch.id) return previous;
+      return { ...previous, branch: branchKey, branch_id: assignedManagerBranch.id };
+    });
+  }, [assignedManagerBranch, initial?.id, isManager]);
+
+  const selectedBranchId = useMemo(() => {
+    const branch = branches.find((item) =>
+      item.id === form.branch_id ||
+      item.key === form.branch ||
+      item.branch_key === form.branch,
+    );
+    return branch?.id || form.branch_id || null;
+  }, [branches, form.branch, form.branch_id]);
 
   // ── Sales Revenue inputs ──────────────────────────────────────────────────
   const [cashSalesInput, setCashSalesInput] = useState(
@@ -460,7 +503,6 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   const addPos = () => setPosEntries(prev => [...prev, { id: Date.now(), device_id: '', device_name: '', amount: '', notes: '' }]);
   const removePos = (id) => setPosEntries(prev => prev.filter(e => e.id !== id));
   const updatePos = (id, field, value) => setPosEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
-  const addCredit = () => setCreditEntries(prev => [...prev, { id: Date.now(), customer: '', amount: '', notes: '' }]);
   const removeCredit = (id) => setCreditEntries(prev => prev.filter(e => e.id !== id));
   const updateCredit = (id, field, value) => setCreditEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
 
@@ -487,36 +529,53 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
 
   // ── Employees ─────────────────────────────────────────────────────────────
   const { data: employeesData, isLoading: empLoading } = useQuery({
-    queryKey: ['employees_cashiers', ownerFilter?.created_by, ownerFilter?.branch, form.branch],
+    queryKey: ['employees_cashiers', activeRestaurant?.id, ownerFilter?.created_by, ownerFilter?.branch, form.branch, selectedBranchId],
     queryFn: async () => {
-      if (!ownerFilter?.created_by && !ownerFilter?.branch) return [];
+      if (isManager && !activeRestaurant?.id) return [];
+      if (!isManager && !ownerFilter?.created_by && !ownerFilter?.branch) return [];
       const all = asRecordArray(await base44.entities.Employee.filter(
-        { ...ownerFilter, is_active: true }, 'full_name', 200
+        isManager
+          ? { restaurant_id: activeRestaurant.id, is_active: true }
+          : { ...ownerFilter, is_active: true },
+        'full_name',
+        200,
       ));
-      const branchFiltered = form.branch
-        ? all.filter(e => !e.branch || e.branch === form.branch || e.branch === 'all')
-        : all;
+      const branchFiltered = isManager
+        ? all.filter((employee) => matchesBranch(employee, form.branch, selectedBranchId))
+        : form.branch
+          ? all.filter((employee) => !employee.branch || employee.branch === form.branch || employee.branch === 'all')
+          : all;
       const CASHIER_ROLES_EN = ['cashier', 'manager', 'owner', 'supervisor', 'admin'];
       const CASHIER_ROLES_AR = ['كاشير', 'مدير', 'مشرف', 'أدمن', 'ادمن'];
-      return branchFiltered.filter(e => {
-        const pos = (e.position || '');
-        const posLower = pos.toLowerCase();
-        return CASHIER_ROLES_EN.some(r => posLower.includes(r)) || CASHIER_ROLES_AR.some(r => pos.includes(r));
+      return branchFiltered.filter((employee) => {
+        const position = employee.position || '';
+        const positionLower = position.toLowerCase();
+        return CASHIER_ROLES_EN.some((role) => positionLower.includes(role)) || CASHIER_ROLES_AR.some((role) => position.includes(role));
       });
     },
     staleTime: 60000,
-    enabled: !!ownerFilter?.created_by || !!ownerFilter?.branch,
+    enabled: isManager
+      ? !!activeRestaurant?.id && !!form.branch
+      : !!ownerFilter?.created_by || !!ownerFilter?.branch,
   });
   const employees = asRecordArray(employeesData);
+  const cashiers = useMemo(() => {
+    if (!isManager || !user?.id) return employees;
+    if (employees.some((employee) => employee.id === user.id)) return employees;
+    return [{ id: user.id, full_name: user.full_name || user.email || 'Branch Manager' }, ...employees];
+  }, [employees, isManager, user?.email, user?.full_name, user?.id]);
 
-  // Default to the sole employee, or to the authenticated user when this is the first sale.
+  // Branch Managers close their own shift unless an assigned cashier exists first.
   useEffect(() => {
-    const employee = firstRecord(employees);
-    const cashierName = employee?.full_name || user?.full_name || user?.email || '';
-    if (!form.cashier_name && cashierName) {
-      setForm(prev => ({ ...prev, cashier_name: cashierName, cashier_employee_id: employee?.id || '' }));
-    }
-  }, [employees, form.cashier_name, user?.full_name, user?.email]);
+    const cashier = firstRecord(cashiers);
+    if (!cashier?.id || form.cashier_employee_id || form.cashier_id) return;
+    setForm((previous) => ({
+      ...previous,
+      cashier_name: cashier.full_name || user?.full_name || user?.email || '',
+      cashier_employee_id: cashier.id,
+      cashier_id: cashier.id,
+    }));
+  }, [cashiers, form.cashier_employee_id, form.cashier_id, user?.email, user?.full_name]);
 
   // Rule 9: Auto-populate Opening Cash from previous shift's Closing Cash
   useEffect(() => {
@@ -539,37 +598,58 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
 
   // ── POS devices ───────────────────────────────────────────────────────────
   const { data: posDevicesData, isLoading: posLoading } = useQuery({
-    queryKey: ['pos_devices_form', activeRestaurant?.id, ownerFilter?.created_by, form.branch],
+    queryKey: ['pos_devices_form', activeRestaurant?.id, ownerFilter?.created_by, form.branch, selectedBranchId],
     queryFn: async () => {
-      const createdBy = ownerFilter?.created_by;
-      if (!createdBy) return [];
-      const all = asRecordArray(await base44.entities.NetworkAccount.filter({ created_by: createdBy }, '-created_date', 200));
-      if (!form.branch) return all.filter(a => a.status === 'active' || a.is_active);
-      return all.filter(a =>
-        (a.status === 'active' || a.is_active) &&
-        (!a.branch || a.branch === form.branch || a.branch_id === form.branch)
+      if (isManager && !activeRestaurant?.id) return [];
+      if (!isManager && !ownerFilter?.created_by) return [];
+      const all = asRecordArray(await base44.entities.NetworkAccount.filter(
+        isManager ? { restaurant_id: activeRestaurant.id } : { created_by: ownerFilter.created_by },
+        '-created_date',
+        200,
+      ));
+      return all.filter((account) =>
+        (account.status === 'active' || account.is_active) &&
+        (isManager
+          ? matchesBranch(account, form.branch, selectedBranchId)
+          : (!form.branch || account.branch === form.branch || account.branch_id === form.branch))
       );
     },
     staleTime: 30000,
-    enabled: !!ownerFilter?.created_by,
+    enabled: isManager ? !!activeRestaurant?.id && !!form.branch : !!ownerFilter?.created_by,
   });
   const posDevices = asRecordArray(posDevicesData);
 
+  useEffect(() => {
+    if (initial?.id || !isManager || form.pos_device_id || !posDevices.length) return;
+    const device = firstRecord(posDevices);
+    if (!device?.id) return;
+    setForm((previous) => ({ ...previous, pos_device_id: device.id }));
+    setPosEntries((previous) => previous.map((entry, index) =>
+      index === 0 && !entry.device_id
+        ? {
+            ...entry,
+            device_id: device.id,
+            device_name: device.account_name || device.device_name || '',
+            provider: device.provider || device.account_type || '',
+          }
+        : entry,
+    ));
+  }, [form.pos_device_id, initial?.id, isManager, posDevices]);
+
   // ── Customers ─────────────────────────────────────────────────────────────
   const { data: allCustomersData, isLoading: custLoading } = useQuery({
-    queryKey: ['customers_form', ownerFilter?.created_by, activeRestaurant?.id],
+    queryKey: ['customers_form', activeRestaurant?.id, ownerFilter?.created_by, form.branch, selectedBranchId],
     queryFn: async () => {
-      if (!ownerFilter?.created_by) return [];
+      if (isManager && !activeRestaurant?.id) return [];
+      if (!isManager && !ownerFilter?.created_by) return [];
       let query = supabase
         .from('customers')
         .select('id, name, customer_name:name, phone, branch, branch_id, credit_limit, outstanding_balance, is_active, restaurant_id')
-        .eq('created_by', ownerFilter.created_by)
         .eq('is_active', true);
-      
-      if (activeRestaurant?.id) {
-        query = query.eq('restaurant_id', activeRestaurant.id);
-      }
-
+      query = isManager
+        ? query.eq('restaurant_id', activeRestaurant.id)
+        : query.eq('created_by', ownerFilter.created_by);
+      if (!isManager && activeRestaurant?.id) query = query.eq('restaurant_id', activeRestaurant.id);
       const { data, error } = await query.order('name');
       if (error) {
         console.error('[ERPSalesWorkspace] Customer fetch error:', error);
@@ -578,17 +658,49 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       return asRecordArray(data);
     },
     staleTime: 0, // Always fresh
-    enabled: !!ownerFilter?.created_by,
+    enabled: isManager ? !!activeRestaurant?.id && !!form.branch : !!ownerFilter?.created_by,
   });
   const allCustomers = asRecordArray(allCustomersData);
 
   // ── Filter customers by selected branch ──────────────────────────────────────
-  const customers = useMemo(() => {
-    if (!form.branch || form.branch === 'all') return allCustomers;
-    return allCustomers.filter(c =>
-      (c.branch === form.branch || c.branch_id === form.branch)
-    );
-  }, [allCustomers, form.branch]);
+  const customers = useMemo(() =>
+    isManager
+      ? allCustomers.filter((customer) => matchesBranch(customer, form.branch, selectedBranchId))
+      : (!form.branch || form.branch === 'all'
+          ? allCustomers
+          : allCustomers.filter((customer) => customer.branch === form.branch || customer.branch_id === form.branch)),
+    [allCustomers, form.branch, isManager, selectedBranchId]
+  );
+  const defaultCustomer = useMemo(() =>
+    customers.find((customer) => /walk[ -]?in|default/i.test(customer.customer_name || customer.name || '')) || firstRecord(customers),
+    [customers]
+  );
+
+  useEffect(() => {
+    if (initial?.id || !isManager || form.customer_id || !defaultCustomer?.id) return;
+    setForm((previous) => ({ ...previous, customer_id: defaultCustomer.id }));
+    setCreditEntries((previous) => previous.length > 0 ? previous : [{
+      id: Date.now(),
+      customer: defaultCustomer.customer_name,
+      customer_id: defaultCustomer.id,
+      customer_phone: defaultCustomer.phone || '',
+      current_debt: defaultCustomer.outstanding_balance || 0,
+      credit_limit: defaultCustomer.credit_limit || 0,
+      amount: '',
+      notes: '',
+    }]);
+  }, [defaultCustomer, form.customer_id, initial?.id, isManager]);
+
+  const addCredit = () => setCreditEntries((previous) => [...previous, {
+    id: Date.now(),
+    customer: isManager ? defaultCustomer?.customer_name || '' : '',
+    customer_id: isManager ? defaultCustomer?.id || '' : '',
+    customer_phone: isManager ? defaultCustomer?.phone || '' : '',
+    current_debt: isManager ? defaultCustomer?.outstanding_balance || 0 : 0,
+    credit_limit: isManager ? defaultCustomer?.credit_limit || 0 : 0,
+    amount: '',
+    notes: '',
+  }]);
 
   // ── Approved Purchases ────────────────────────────────────────────────────
   const { data: approvedPurchasesForDateData, isLoading: purchasesLoading } = useQuery({
@@ -975,12 +1087,20 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       branch.key === form.branch ||
       branch.branch_key === form.branch,
     );
-    const branchId = selectedBranch?.id || form.branch_id || null;
+    const branchId = selectedBranch?.id || selectedBranchId || null;
+    const cashierId = form.cashier_id || form.cashier_employee_id || user?.id || null;
+    const customerId = form.customer_id || creditEntries.find((entry) => entry.customer_id)?.customer_id || defaultCustomer?.id || null;
+    const posDeviceId = form.pos_device_id || posEntries.find((entry) => entry.device_id)?.device_id || null;
     const createdBy = user?.email || ownerFilter?.created_by || '';
     const tenantId = activeRestaurant?.id || user?.organization_id || user?.restaurant_id || '';
 
     if (!activeRestaurant?.id || !branchId || !createdBy) {
       toast.error('An active business, branch, and authenticated user are required to close sales.');
+      return;
+    }
+
+    if (isManager && (!cashierId || !customerId || !posDeviceId)) {
+      toast.error('Your assigned cashier, customer, and POS device must finish loading before closing sales.');
       return;
     }
 
@@ -998,7 +1118,10 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         cash: cashSales,
         restaurant_network: networkTotal,
         network: networkTotal,
-        restaurant_network_account_id: posEntries.at(0)?.device_id || '',
+        restaurant_network_account_id: posDeviceId || '',
+        cashier_id: cashierId,
+        customer_id: customerId,
+        pos_device_id: posDeviceId,
         credit: creditTotal,
         total_sales: totalSales,
         pos_entries_json: JSON.stringify(posEntries.map(({ id, ...rest }) => rest)),
@@ -1121,18 +1244,23 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                     <Skeleton className="h-10 w-full" />
                   ) : (
                     <Select
-                      value={form.cashier_employee_id || ''}
+                      value={form.cashier_employee_id || form.cashier_id || ''}
                       onValueChange={id => {
-                        const emp = employees.find(e => e.id === id);
-                        if (emp) setForm(prev => ({ ...prev, cashier_employee_id: id, cashier_name: emp.full_name }));
+                        const employee = cashiers.find((cashier) => cashier.id === id);
+                        if (employee) setForm((previous) => ({
+                          ...previous,
+                          cashier_employee_id: id,
+                          cashier_id: id,
+                          cashier_name: employee.full_name,
+                        }));
                       }}
                     >
                       <SelectTrigger className="h-10 text-sm">
                         <SelectValue placeholder="Select cashier..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {employees.map(emp => (
-                          <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+                        {cashiers.map((cashier) => (
+                          <SelectItem key={cashier.id} value={cashier.id}>{cashier.full_name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1273,11 +1401,13 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                                 updatePos(entry.id, 'device_id', '');
                                 updatePos(entry.id, 'device_name', 'Manual Entry');
                                 updatePos(entry.id, 'provider', '');
+                                set('pos_device_id', '');
                               } else {
                                 const d = posDevices.find(pd => pd.id === v);
                                 updatePos(entry.id, 'device_id', v);
                                 updatePos(entry.id, 'device_name', d?.account_name || d?.device_name || '');
                                 updatePos(entry.id, 'provider', d?.provider || d?.account_type || '');
+                                set('pos_device_id', v);
                               }
                             }}
                           >
