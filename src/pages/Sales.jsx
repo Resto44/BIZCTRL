@@ -67,7 +67,8 @@ export default function Sales() {
     queryKey: ['sales', ownerFilter],
     queryFn: async () => asRecordArray(await base44.entities.DailySales.filter(ownerFilter || {}, '-date', 2000)),
     staleTime: 120000,
-    enabled: !!ownerFilter?.created_by,
+    // Fix: Allow query to run if we have either created_by (Owner) or branch (Manager/Staff)
+    enabled: !!ownerFilter && (!!ownerFilter.created_by || !!ownerFilter.branch),
   });
   const sales = asRecordArray(salesData);
 
@@ -415,17 +416,22 @@ export default function Sales() {
 
   const createMut = useMutation({
     mutationFn: async ({ data, proofUrl, ocr }) => {
+      console.log('[Sales:createMut] mutationFn started');
       // ── TRANSACTION-LIKE WORKFLOW (Requirement 5) ──
       // 1. Insert parent Sale record first (Requirement 2)
+      console.log('[Sales:createMut] 1. Inserting daily_sales...');
       const sale = await base44.entities.DailySales.create(data);
-      if (!sale?.id) throw new Error('Failed to create sale record');
+      if (!sale?.id) {
+        console.error('[Sales:createMut] FAILED: No sale ID returned');
+        throw new Error('Failed to create sale record');
+      }
+      console.log('[Sales:createMut] SUCCESS: daily_sales created, ID:', sale.id);
 
       // 2. Wait for the returned Sale ID (Requirement 3)
       const saleId = sale.id;
 
       // 3. Create sales_invoices using exactly that Sale ID (Requirement 4)
-      // Note: A DB trigger fn_daily_sales_sync_invoice already exists, 
-      // but it might be failing or racing. We ensure the invoice exists here.
+      console.log('[Sales:createMut] 3. Creating sales_invoice...');
       try {
         const invoiceNum = data.invoice_number || await generateSalesInvoiceNumber(data.restaurant_id, data.date);
         await createSalesInvoice({
@@ -435,22 +441,42 @@ export default function Sales() {
           restaurantId: data.restaurant_id,
           createdBy: data.created_by || user?.email
         });
+        console.log('[Sales:createMut] SUCCESS: sales_invoice created');
       } catch (invErr) {
-        console.warn('[Sales] Manual invoice creation failed (might already exist via trigger):', invErr.message);
+        console.warn('[Sales:createMut] SKIPPED: Manual invoice creation failed:', invErr.message);
       }
 
       // 4. Run secondary side-effects
-      await autoWalletTx(data, saleId);
-      await autoShortageOveageTx(data, saleId);
-      await autoOwnerCapitalTx(data, saleId);
-      try { await autoSettle(data, saleId, proofUrl || null, ocr || null, null); } catch (e) { console.warn('autoSettle skipped:', e.message); }
-      await autoSaveCreditDebts(data, saleId);
+      console.log('[Sales:createMut] 4. Running side-effects...');
+      
+      console.log('[Sales:createMut] -> autoWalletTx...');
+      try { await autoWalletTx(data, saleId); console.log('[Sales:createMut] SUCCESS: autoWalletTx'); } catch (e) { console.error('[Sales:createMut] FAILED: autoWalletTx:', e.message); }
+      
+      console.log('[Sales:createMut] -> autoShortageOveageTx...');
+      try { await autoShortageOveageTx(data, saleId); console.log('[Sales:createMut] SUCCESS: autoShortageOveageTx'); } catch (e) { console.error('[Sales:createMut] FAILED: autoShortageOveageTx:', e.message); }
+      
+      console.log('[Sales:createMut] -> autoOwnerCapitalTx...');
+      try { await autoOwnerCapitalTx(data, saleId); console.log('[Sales:createMut] SUCCESS: autoOwnerCapitalTx'); } catch (e) { console.error('[Sales:createMut] FAILED: autoOwnerCapitalTx:', e.message); }
+      
+      console.log('[Sales:createMut] -> autoSettle...');
+      try { await autoSettle(data, saleId, proofUrl || null, ocr || null, null); console.log('[Sales:createMut] SUCCESS: autoSettle'); } catch (e) { console.warn('[Sales:createMut] SKIPPED: autoSettle:', e.message); }
+      
+      console.log('[Sales:createMut] -> autoSaveCreditDebts...');
+      try { await autoSaveCreditDebts(data, saleId); console.log('[Sales:createMut] SUCCESS: autoSaveCreditDebts'); } catch (e) { console.error('[Sales:createMut] FAILED: autoSaveCreditDebts:', e.message); }
       
       // 5. Finalize invoice (PDF generation etc) — SILENT BACKGROUND TASK
+      console.log('[Sales:createMut] 5. Finalizing invoice...');
       autoGenerateInvoice(data, saleId);
       
       const total = (data.restaurant_cash || 0) + (data.restaurant_network || 0) + (data.credit || 0);
-      await notif.sale({ branch: data.branch, amount: total, action: 'create' });
+      try {
+        await notif.sale({ branch: data.branch, amount: total, action: 'create' });
+        console.log('[Sales:createMut] SUCCESS: notification sent');
+      } catch (e) {
+        console.warn('[Sales:createMut] SKIPPED: notification failed:', e.message);
+      }
+      
+      console.log('[Sales:createMut] mutationFn COMPLETED');
       return sale;
     },
     onSuccess: () => {

@@ -1094,18 +1094,41 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     const createdBy = user?.email || ownerFilter?.created_by || '';
     const tenantId = activeRestaurant?.id || user?.organization_id || user?.restaurant_id || '';
 
+    console.log('[ERPSalesWorkspace] handleSubmit started');
+    console.log('[ERPSalesWorkspace] isManager:', isManager);
+    console.log('[ERPSalesWorkspace] cashierId:', cashierId);
+    console.log('[ERPSalesWorkspace] customerId:', customerId);
+    console.log('[ERPSalesWorkspace] posDeviceId:', posDeviceId);
+    console.log('[ERPSalesWorkspace] activeRestaurant:', activeRestaurant?.id);
+    console.log('[ERPSalesWorkspace] branchId:', branchId);
+    console.log('[ERPSalesWorkspace] createdBy:', createdBy);
+
     if (!activeRestaurant?.id || !branchId || !createdBy) {
+      console.log('[ERPSalesWorkspace] FAILED: Missing core IDs');
       toast.error('An active business, branch, and authenticated user are required to close sales.');
       return;
     }
 
-    if (isManager && (!cashierId || !customerId || !posDeviceId)) {
-      toast.error('Your assigned cashier, customer, and POS device must finish loading before closing sales.');
+    if (isManager && (custLoading || posLoading)) {
+      console.log('[ERPSalesWorkspace] FAILED: Data still loading');
+      toast.error('Required data is still loading, please wait...');
       return;
     }
 
+    // Cashier is always required for all roles
+    if (!cashierId) {
+      console.log('[ERPSalesWorkspace] FAILED: No cashier ID');
+      toast.error('A cashier must be assigned to close sales.');
+      return;
+    }
+
+    // Note: customerId and posDeviceId are allowed to be null if none exist in the branch.
+    // The DB should handle nulls or use its own defaults.
+    console.log('[ERPSalesWorkspace] Proceeding with save...');
+
     setIsSubmitting(true);
     try {
+      console.log('[ERPSalesWorkspace] Building payload...');
       const payload = {
         ...form,
         branch: selectedBranch?.key || selectedBranch?.branch_key || form.branch,
@@ -1162,7 +1185,9 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         restaurant_id: activeRestaurant?.id || null,
       };
 
+      console.log('[ERPSalesWorkspace] Calling onSubmit(payload)...');
       await onSubmit(payload);
+      console.log('[ERPSalesWorkspace] onSubmit(payload) SUCCESS');
       setSaveSuccess(true);
     } catch (err) {
       toast.error(`Save failed: ${err?.message || 'Unknown error'}`);
