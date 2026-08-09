@@ -26,7 +26,7 @@
  *   8. Product Price Intelligence
  *   9. Alerts
  */
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, { useState, useMemo, useCallback, memo, useEffect, useRef } from 'react';
 import { useBusinessMode } from '@/lib/BusinessModeContext';
 import ModeBadge from '@/components/shared/ModeBadge';
 import { ModeSpecificDashboardSection } from '@/components/dashboard/DashboardWidgetRegistry';
@@ -39,6 +39,7 @@ import { useTenant } from '@/lib/TenantContext';
 import { useRole } from '@/lib/RoleContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useNetworkSettlement } from '@/hooks/useNetworkSettlement';
+import { useOwnerDashboardRealtime } from '@/hooks/useOwnerDashboardRealtime';
 import { useNotify } from '@/lib/useNotify';
 import { calculateSalesRevenue, calculateERPAccounting, tagExpensesWithCategories, computeProductQuantityAnalytics } from '@/lib/helpers';
 import { computeAdditionalSources } from '@/services/salesAnalyticsEngine';
@@ -64,7 +65,7 @@ import {
   Scale, Target, Zap, ChevronRight, ArrowUpRight, ArrowDownRight,
   CheckCircle2, XCircle, AlertCircle,
   LayoutDashboard, Layers, Clock, MapPin, Globe, ChevronDown,
-  Building2,
+  Building2, Radio, RefreshCw,
 } from 'lucide-react';
 import {
   format, startOfMonth, startOfWeek, startOfYear,
@@ -294,6 +295,120 @@ const BranchSelector = memo(({ branches, selectedBranch, onSelect, t }) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// LIVE ACTIVITY FEED COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+const EVENT_ICON_MAP = {
+  daily_sales:            ShoppingBag,
+  sales_invoices:         Receipt,
+  purchases:              ShoppingCart,
+  supplier_invoices:      FileText,
+  purchase_orders:        FileText,
+  expenses:               Banknote,
+  products:               Package,
+  product_categories:     Package,
+  inventory:              PackagePlus,
+  inventory_transfers:    ArrowLeftRight,
+  inventory_transactions: PackagePlus,
+  inventory_waste:        Package,
+  suppliers:              Truck,
+  customers:              Users,
+  debt_records:           CreditCard,
+  debt_payments:          DollarSign,
+  wallet_transactions:    Wallet,
+  cash_movements:         Banknote,
+  cash_register_entries:  DollarSign,
+  daily_cash_settlements: DollarSign,
+  employees:              Users,
+  payroll_runs:           Banknote,
+  attendance:             Clock,
+  branches:               Building2,
+  notifications:          AlertCircle,
+  network_accounts:       Wifi,
+  network_transfers:      ArrowLeftRight,
+};
+
+const LiveActivityFeed = memo(({ events, realtimeStatus }) => {
+  const isConnected = realtimeStatus === 'SUBSCRIBED';
+  const isConnecting = realtimeStatus === 'CONNECTING' || realtimeStatus === 'SUBSCRIBING';
+
+  return (
+    <Card className="border border-border/60">
+      <CardContent className="p-4">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0">
+              <Radio className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground leading-tight">Live Activity Feed</h2>
+              <p className="text-[11px] text-muted-foreground leading-tight">Real-time branch events</p>
+            </div>
+          </div>
+          {/* Connection status badge */}
+          <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold ${
+            isConnected
+              ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400'
+              : isConnecting
+                ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              isConnected ? 'bg-emerald-500 animate-pulse' : isConnecting ? 'bg-amber-500 animate-pulse' : 'bg-red-500'
+            }`} />
+            {isConnected ? 'LIVE' : isConnecting ? 'Connecting…' : 'Offline'}
+          </div>
+        </div>
+
+        {/* Events list */}
+        {events.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <Radio className="w-8 h-8 text-muted-foreground/30 mb-2" />
+            <p className="text-xs text-muted-foreground">
+              {isConnected ? 'Listening for branch activity…' : 'Waiting for connection…'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+            {events.map((ev) => {
+              const Icon = EVENT_ICON_MAP[ev.table] || Activity;
+              const verbColor = ev.eventType === 'INSERT'
+                ? 'text-emerald-600'
+                : ev.eventType === 'DELETE'
+                  ? 'text-red-500'
+                  : 'text-blue-600';
+              return (
+                <div
+                  key={ev.id}
+                  className="flex items-start gap-2.5 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="w-6 h-6 rounded-md bg-background border border-border/60 flex items-center justify-center shrink-0 mt-0.5">
+                    <Icon className="w-3 h-3 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] leading-tight">
+                      <span className="font-semibold text-foreground">{ev.branchPrefix}</span>
+                      {' '}
+                      <span className={`font-medium ${verbColor}`}>{ev.verb}</span>
+                      {' '}
+                      <span className="text-muted-foreground">{ev.label}</span>
+                      {ev.detail ? <span className="text-muted-foreground"> {ev.detail}</span> : null}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                      {format(ev.timestamp, 'HH:mm:ss')}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ERROR BOUNDARY
 // ─────────────────────────────────────────────────────────────────────────────
 class WidgetErrorBoundary extends React.Component {
@@ -326,6 +441,15 @@ export default function OwnerDashboard() {
   const notif = useNotify();
   const qc = useQueryClient();
   const { autoSettle } = useNetworkSettlement({ orgId, user, currency });
+
+  // ── ENTERPRISE REAL-TIME SYNCHRONIZATION ─────────────────────────────────
+  // Subscribe to all ERP tables for this restaurant via Supabase Realtime.
+  // Any INSERT/UPDATE/DELETE by any Branch Manager instantly invalidates the
+  // affected React Query cache keys — no polling, no page refresh.
+  const { liveEvents, realtimeStatus } = useOwnerDashboardRealtime(
+    activeRestaurant?.id,
+    branches,
+  );
 
   // ── BRANCH SELECTION STATE ────────────────────────────────────────────────
   // 'all' means aggregate all active branches; any other value is a branch key/id.
@@ -1119,6 +1243,20 @@ export default function OwnerDashboard() {
               {totalAlerts} {totalAlerts === 1 ? t('active_alert') : t('active_alerts')}
             </button>
           )}
+          {/* Real-time connection indicator */}
+          <div
+            title={`Realtime: ${realtimeStatus}`}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+              realtimeStatus === 'SUBSCRIBED'
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              realtimeStatus === 'SUBSCRIBED' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400 animate-pulse'
+            }`} />
+            {realtimeStatus === 'SUBSCRIBED' ? 'LIVE' : 'Sync…'}
+          </div>
           <ModeBadge />
           <Badge variant="outline" className="text-xs capitalize">{role}</Badge>
         </div>
@@ -1912,6 +2050,13 @@ export default function OwnerDashboard() {
             {/* ── Price Changes Widget (existing component preserved) ── */}
       <WidgetErrorBoundary>
         <PriceChangesWidget />
+      </WidgetErrorBoundary>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECTION 11 — LIVE ACTIVITY FEED (Enterprise Real-Time)
+      ══════════════════════════════════════════════════════════════════════ */}
+      <WidgetErrorBoundary>
+        <LiveActivityFeed events={liveEvents} realtimeStatus={realtimeStatus} />
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
