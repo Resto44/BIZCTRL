@@ -50,6 +50,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Skeleton } from '@/components/ui/skeleton';
 // SalesForm removed to enforce single ERP workspace entry point
 import PriceChangesWidget from '@/components/dashboard/PriceChangesWidget';
+import DriverPerformance from '@/components/dashboard/DriverPerformance';
 import { toast } from 'sonner';
 import {
   generateSalesInvoiceNumber,
@@ -321,6 +322,13 @@ const EVENT_ICON_MAP = {
   employees:              Users,
   payroll_runs:           Banknote,
   attendance:             Clock,
+  drivers:                Truck,
+  delivery_orders:        Truck,
+  driver_shifts:          Clock,
+  driver_settlements:     Wallet,
+  driver_debts:           CreditCard,
+  driver_sales_entries:   Receipt,
+  driver_locations:       MapPin,
   branches:               Building2,
   notifications:          AlertCircle,
   network_accounts:       Wifi,
@@ -1286,6 +1294,18 @@ export default function OwnerDashboard() {
           </span>
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          DRIVER PERFORMANCE — restaurant-wide, branch-filter aware
+      ══════════════════════════════════════════════════════════════════════ */}
+      <WidgetErrorBoundary>
+        <DriverPerformance
+          restaurantId={activeRestaurant?.id}
+          branches={branches}
+          selectedBranch={selectedBranch}
+          currency={currency}
+        />
+      </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           ENTERPRISE FINANCIAL CENTER — Quick Access Cards

@@ -73,6 +73,15 @@ const TABLE_QUERY_MAP = {
   network_accounts:       ['network_accounts_dash'],
   network_transfers:      ['network_accounts_dash'],
 
+  // Driver operations — all driver actions feed the Owner Dashboard in real time.
+  drivers:                ['driver-performance'],
+  delivery_orders:        ['driver-performance', 'driver-orders'],
+  driver_shifts:          ['driver-performance'],
+  driver_settlements:     ['driver-performance'],
+  driver_debts:           ['driver-performance'],
+  driver_sales_entries:   ['driver-performance'],
+  driver_locations:       ['driver-performance'],
+
   // HR
   employees:              ['employees'],
   payroll_runs:           ['payroll_runs'],
@@ -114,6 +123,13 @@ const TABLE_LABELS = {
   owner_cash_injections:  'Cash Injection',
   network_accounts:       'POS Device',
   network_transfers:      'Transfer',
+  drivers:                'Driver',
+  delivery_orders:        'Delivery Order',
+  driver_shifts:          'Driver Shift',
+  driver_settlements:     'Driver Settlement',
+  driver_debts:           'Driver Debt',
+  driver_sales_entries:   'Driver Sales Entry',
+  driver_locations:       'Driver Location',
   employees:              'Employee',
   payroll_runs:           'Payroll',
   attendance:             'Attendance',
