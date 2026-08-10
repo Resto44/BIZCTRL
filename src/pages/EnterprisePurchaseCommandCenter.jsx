@@ -124,7 +124,12 @@ function buildStatusPie(invoices) {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function EnterprisePurchaseCommandCenter() {
   const { t, currency, dir } = useLanguage();
-  const { ownerFilter } = useTenant();
+  const { ownerFilter, activeRestaurant } = useTenant();
+  const procurementScope = useMemo(() => {
+    if (ownerFilter?.branch) return { branch: ownerFilter.branch };
+    if (activeRestaurant?.id) return { restaurant_id: activeRestaurant.id };
+    return ownerFilter || {};
+  }, [ownerFilter, activeRestaurant?.id]);
   const { role } = useRole();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -143,37 +148,41 @@ export default function EnterprisePurchaseCommandCenter() {
 
   // ── Data fetching ───────────────────────────────────────────────────────────
   const { data: invoices = [], isLoading: loadingInvoices, refetch } = useQuery({
-    queryKey: ['supplier_invoices', ownerFilter],
+    queryKey: ['supplier_invoices', procurementScope],
     queryFn: async () => {
       let q = supabase
         .from('supplier_invoices')
         .select('*')
         .order('date', { ascending: false })
         .limit(5000);
-      if (ownerFilter?.created_by) q = q.eq('created_by', ownerFilter.created_by);
+      if (procurementScope.branch) q = q.eq('branch', procurementScope.branch);
+      else if (procurementScope.restaurant_id) q = q.eq('restaurant_id', procurementScope.restaurant_id);
+      else if (procurementScope.created_by) q = q.eq('created_by', procurementScope.created_by);
       const { data, error } = await q;
       if (error) { console.warn('[EPCC] invoices fetch error:', error.message); return []; }
       return data || [];
     },
     staleTime: 120_000,
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    enabled: !!(procurementScope.created_by || procurementScope.branch || procurementScope.restaurant_id),
   });
 
   const { data: payments = [] } = useQuery({
-    queryKey: ['supplier_payments', ownerFilter],
+    queryKey: ['supplier_payments', procurementScope],
     queryFn: async () => {
       let q = supabase
         .from('supplier_payments')
         .select('*')
         .order('date', { ascending: false })
         .limit(5000);
-      if (ownerFilter?.created_by) q = q.eq('created_by', ownerFilter.created_by);
+      if (procurementScope.branch) q = q.eq('branch', procurementScope.branch);
+      else if (procurementScope.restaurant_id) q = q.eq('restaurant_id', procurementScope.restaurant_id);
+      else if (procurementScope.created_by) q = q.eq('created_by', procurementScope.created_by);
       const { data, error } = await q;
       if (error) { console.warn('[EPCC] payments fetch error:', error.message); return []; }
       return data || [];
     },
     staleTime: 120_000,
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    enabled: !!(procurementScope.created_by || procurementScope.branch || procurementScope.restaurant_id),
   });
 
   // ── Delete mutation ─────────────────────────────────────────────────────────

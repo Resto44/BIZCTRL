@@ -38,32 +38,41 @@ function KpiCard({ icon: Icon, label, value, sub, color = 'text-foreground', bgC
 
 export default function ProcurementDashboard() {
   const { currency } = useLanguage();
-  const { ownerFilter } = useTenant();
+  const { ownerFilter, activeRestaurant } = useTenant();
+  const procurementScope = useMemo(() => {
+    if (ownerFilter?.branch) return { branch: ownerFilter.branch };
+    if (activeRestaurant?.id) return { restaurant_id: activeRestaurant.id };
+    return ownerFilter || {};
+  }, [ownerFilter, activeRestaurant?.id]);
   const [filterBranch, setFilterBranch] = useState('all');
 
   // ── Fetch invoices ─────────────────────────────────────────────────────
   const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['supplier_invoices', ownerFilter],
+    queryKey: ['supplier_invoices', procurementScope],
     queryFn: async () => {
       let q = supabase.from('supplier_invoices').select('*').order('date', { ascending: false }).limit(5000);
-      if (ownerFilter?.created_by) q = q.eq('created_by', ownerFilter.created_by);
+      if (procurementScope.branch) q = q.eq('branch', procurementScope.branch);
+      else if (procurementScope.restaurant_id) q = q.eq('restaurant_id', procurementScope.restaurant_id);
+      else if (procurementScope.created_by) q = q.eq('created_by', procurementScope.created_by);
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    enabled: !!(procurementScope.created_by || procurementScope.branch || procurementScope.restaurant_id),
   });
 
   const { data: payments = [] } = useQuery({
-    queryKey: ['supplier_payments', ownerFilter],
+    queryKey: ['supplier_payments', procurementScope],
     queryFn: async () => {
       let q = supabase.from('supplier_payments').select('*').order('date', { ascending: false }).limit(5000);
-      if (ownerFilter?.created_by) q = q.eq('created_by', ownerFilter.created_by);
+      if (procurementScope.branch) q = q.eq('branch', procurementScope.branch);
+      else if (procurementScope.restaurant_id) q = q.eq('restaurant_id', procurementScope.restaurant_id);
+      else if (procurementScope.created_by) q = q.eq('created_by', procurementScope.created_by);
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    enabled: !!(procurementScope.created_by || procurementScope.branch || procurementScope.restaurant_id),
   });
 
   // ── Filter by branch ───────────────────────────────────────────────────

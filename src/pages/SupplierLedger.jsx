@@ -41,7 +41,12 @@ const STATUS_CONFIG = {
 
 export default function SupplierLedger() {
   const { currency } = useLanguage();
-  const { ownerFilter } = useTenant();
+  const { ownerFilter, activeRestaurant } = useTenant();
+  const procurementScope = useMemo(() => {
+    if (ownerFilter?.branch) return { branch: ownerFilter.branch };
+    if (activeRestaurant?.id) return { restaurant_id: activeRestaurant.id };
+    return ownerFilter || {};
+  }, [ownerFilter, activeRestaurant?.id]);
   const navigate = useNavigate();
 
   const [filterBranch, setFilterBranch] = useState('all');
@@ -50,33 +55,37 @@ export default function SupplierLedger() {
 
   // ── Fetch data ─────────────────────────────────────────────────────────
   const { data: suppliers = [] } = useQuery({
-    queryKey: ['suppliers', ownerFilter],
-    queryFn: () => base44.entities.Supplier.filter(ownerFilter || {}, 'name', 500),
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    queryKey: ['suppliers', procurementScope],
+    queryFn: () => base44.entities.Supplier.filter(procurementScope, 'name', 500),
+    enabled: !!(procurementScope.created_by || procurementScope.branch || procurementScope.restaurant_id),
   });
 
   const { data: invoices = [], isLoading: loadingInvoices } = useQuery({
-    queryKey: ['supplier_invoices', ownerFilter],
+    queryKey: ['supplier_invoices', procurementScope],
     queryFn: async () => {
       let q = supabase.from('supplier_invoices').select('*').order('date', { ascending: false }).limit(2000);
-      if (ownerFilter?.created_by) q = q.eq('created_by', ownerFilter.created_by);
+      if (procurementScope.branch) q = q.eq('branch', procurementScope.branch);
+      else if (procurementScope.restaurant_id) q = q.eq('restaurant_id', procurementScope.restaurant_id);
+      else if (procurementScope.created_by) q = q.eq('created_by', procurementScope.created_by);
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    enabled: !!(procurementScope.created_by || procurementScope.branch || procurementScope.restaurant_id),
   });
 
   const { data: payments = [] } = useQuery({
-    queryKey: ['supplier_payments', ownerFilter],
+    queryKey: ['supplier_payments', procurementScope],
     queryFn: async () => {
       let q = supabase.from('supplier_payments').select('*').order('date', { ascending: false }).limit(2000);
-      if (ownerFilter?.created_by) q = q.eq('created_by', ownerFilter.created_by);
+      if (procurementScope.branch) q = q.eq('branch', procurementScope.branch);
+      else if (procurementScope.restaurant_id) q = q.eq('restaurant_id', procurementScope.restaurant_id);
+      else if (procurementScope.created_by) q = q.eq('created_by', procurementScope.created_by);
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    enabled: !!(procurementScope.created_by || procurementScope.branch || procurementScope.restaurant_id),
   });
 
   // ── Filtered data ──────────────────────────────────────────────────────
