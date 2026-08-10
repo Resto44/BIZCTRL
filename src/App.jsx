@@ -30,8 +30,7 @@ const KitchenDisplaySystem   = lazy(() => import('./pages/KitchenDisplaySystem')
 const OnlineOrdering         = lazy(() => import('./pages/OnlineOrdering'));
 // ── Online Ordering V2 ──────────────────────────────────────────────────────
 const OnlineOrderingV2       = lazy(() => import('./pages/OnlineOrderingV2'));
-const KitchenDashboardV2     = lazy(() => import('./pages/KitchenDashboardV2'));
-const DriverDashboardV2      = lazy(() => import('./pages/DriverDashboardV2'));
+// KitchenDashboardV2 and DriverDashboardV2 removed — canonical ERP pages used instead
 const OrderManagementV2      = lazy(() => import('./pages/OrderManagementV2'));
 const PromotionsV2           = lazy(() => import('./pages/PromotionsV2'));
 const OrderAnalyticsV2       = lazy(() => import('./pages/OrderAnalyticsV2'));
@@ -367,8 +366,7 @@ const SubscribedRoutes = () => {
         <Route path="/order" element={<OnlineOrderingV2 />} />
         <Route path="/order/:branchSlug" element={<OnlineOrderingV2 />} />
         <Route path="/order/track/:orderId" element={<OnlineOrderingV2 />} />
-        <Route path="/kitchen-v2" element={<KitchenDashboardV2 />} />
-        <Route path="/driver-v2" element={<DriverDashboardV2 />} />
+        {/* kitchen-v2 and driver-v2 redirected above — duplicate route removed */}
         <Route path="/order-management" element={<RoleGuard permission="viewSales"><OrderManagementV2 /></RoleGuard>} />
         <Route path="/promotions" element={<RoleGuard permission="viewSales"><PromotionsV2 /></RoleGuard>} />
         <Route path="/order-analytics" element={<RoleGuard permission="viewReports"><OrderAnalyticsV2 /></RoleGuard>} />
