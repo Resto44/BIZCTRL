@@ -29,18 +29,22 @@ import { supabase } from '@/api/supabaseClient';
 // queryClient.invalidateQueries({ queryKey: [prefix], exact: false }).
 const TABLE_QUERY_MAP = {
   // Sales
-  daily_sales:            ['sales_today', 'sales_yesterday', 'sales_week', 'sales_month', 'sales_year', 'sales_prev_week', 'sales_prev_month'],
+  // BUG FIX: also invalidate 'sales' (history list) and 'sales_today_live' so that
+  // manager-created records immediately appear in Owner History and Live Summary.
+  daily_sales:            ['sales_today', 'sales_yesterday', 'sales_week', 'sales_month', 'sales_year', 'sales_prev_week', 'sales_prev_month', 'sales', 'sales_today_live', 'sales_yesterday_live', 'sales_month_live', 'mgr-today-sales', 'mgr-yesterday-sales'],
   sales_invoices:         ['sales_invoices_today'],
   sales_sources:          ['sales_sources'],
   sales_categories:       ['sales_categories'],
 
   // Purchases
+  // BUG FIX: also invalidate 'supplier_invoices' history list key
   purchases:              ['purchases_week', 'purchases_month'],
-  supplier_invoices:      ['supplier_invoices'],
-  purchase_orders:        ['purchase_orders'],
+  supplier_invoices:      ['supplier_invoices', 'mgr-today-purchases', 'mgr-pending-invoices'],
+  purchase_orders:        ['purchase_orders', 'mgr-pending-pos'],
 
   // Expenses
-  expenses:               ['expenses_today', 'expenses_yesterday', 'expenses_week', 'expenses_month', 'expenses_year', 'expenses_prev_month'],
+  // BUG FIX: also invalidate 'expenses' history list key and manager expense key
+  expenses:               ['expenses_today', 'expenses_yesterday', 'expenses_week', 'expenses_month', 'expenses_year', 'expenses_prev_month', 'expenses', 'mgr-today-expenses'],
   expense_categories:     ['expense_categories_dash'],
 
   // Products & Inventory

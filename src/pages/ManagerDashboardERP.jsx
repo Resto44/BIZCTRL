@@ -159,7 +159,7 @@ function LowStockItem({ item }) {
 }
 
 // ─── Main dashboard content ───────────────────────────────────────────────────
-function ManagerContent({ branchId, branchName }) {
+function ManagerContent({ branchId, branchName, branchKey }) {
   const navigate = useNavigate();
   const today     = format(new Date(), 'yyyy-MM-dd');
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
@@ -192,13 +192,39 @@ function ManagerContent({ branchId, branchName }) {
     enabled: !!branchId,
   });
 
+  // BUG FIX: expenses table stores branch identity as branch_key (TEXT), not branch_id.
+  // The previous query used branch_id which is always NULL for manager-created expenses,
+  // causing the Expenses Today KPI to always show 0.
+  // Fix: use branchKey (from sessionStorage) for the primary filter, with branch_id as fallback.
+  // Also resolve branch_key from DB if not available in sessionStorage.
   const { data: todayExpenses = [], isLoading: loadingExpenses } = useQuery({
-    queryKey: ['mgr-today-expenses', branchId, today],
+    queryKey: ['mgr-today-expenses', branchId, branchKey, today],
     queryFn: async () => {
-      const { data } = await supabase.from('expenses').select('id, amount, description, category').eq('branch_id', branchId).eq('date', today);
+      let resolvedKey = branchKey;
+      // If branch_key was not in sessionStorage, resolve it from the branches table
+      if (!resolvedKey) {
+        const { data: branchRow } = await supabase
+          .from('branches')
+          .select('branch_key')
+          .eq('id', branchId)
+          .single();
+        resolvedKey = branchRow?.branch_key || null;
+      }
+      // Query expenses by branch_key (primary) OR branch_id (fallback)
+      let q = supabase
+        .from('expenses')
+        .select('id, amount, description, category_id')
+        .eq('date', today);
+      if (resolvedKey) {
+        q = q.or(`branch_key.eq.${resolvedKey},branch_id.eq.${branchId}`);
+      } else {
+        q = q.eq('branch_id', branchId);
+      }
+      const { data } = await q;
       return data || [];
     },
     enabled: !!branchId,
+    refetchInterval: 60000,
   });
 
   const { data: inventory = [], isLoading: loadingInventory } = useQuery({
@@ -629,8 +655,9 @@ export default function ManagerDashboardERP() {
   React.useEffect(() => {
     const id   = sessionStorage.getItem('erp_active_branch_id');
     const name = sessionStorage.getItem('erp_active_branch_name');
+    const key  = sessionStorage.getItem('erp_active_branch_key') || '';
     if (id && name) {
-      setActiveBranch({ id, name });
+      setActiveBranch({ id, name, key });
       setBranchSelected(true);
     }
   }, []);
@@ -638,7 +665,8 @@ export default function ManagerDashboardERP() {
   const handleBranchSelect = (branch) => {
     sessionStorage.setItem('erp_active_branch_id',   branch.id);
     sessionStorage.setItem('erp_active_branch_name', branch.name);
-    setActiveBranch(branch);
+    sessionStorage.setItem('erp_active_branch_key',  branch.branch_key || branch.key || '');
+    setActiveBranch({ id: branch.id, name: branch.name, key: branch.branch_key || branch.key || '' });
     setBranchSelected(true);
   };
 
@@ -646,5 +674,5 @@ export default function ManagerDashboardERP() {
     return <BranchSelector onSelect={handleBranchSelect} />;
   }
 
-  return <ManagerContent branchId={activeBranch.id} branchName={activeBranch.name} />;
+  return <ManagerContent branchId={activeBranch.id} branchName={activeBranch.name} branchKey={activeBranch.key} />;
 }

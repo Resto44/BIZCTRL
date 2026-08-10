@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44, supabase } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -120,14 +120,21 @@ export default function Expenses() {
   const [showScanner, setShowScanner] = useState(false);
   const [scannedData, setScannedData] = useState(null);
 
-  const expenseFilter = ownerFilter?.branch
-    ? { branch_key: ownerFilter.branch }
-    : ownerFilter;
+  // BUG FIX: Owner history must query by restaurant_id so that expenses created
+  // by Branch Managers (different created_by) are visible to the owner.
+  // Managers still see only their branch via branch_key.
+  const { activeRestaurant } = useTenant();
+  const expenseFilter = useMemo(() => {
+    if (ownerFilter?.branch) return { branch_key: ownerFilter.branch }; // manager: branch-scoped
+    if (activeRestaurant?.id) return { restaurant_id: activeRestaurant.id }; // owner: restaurant-scoped
+    return ownerFilter || {};
+  }, [ownerFilter, activeRestaurant?.id]);
 
   const { data: expenses = [], isLoading } = useQuery({
     queryKey: ['expenses', expenseFilter],
-    queryFn: () => base44.entities.Expense.filter(expenseFilter || {}, '-date', 2000), staleTime: 120000,
-    enabled: !!(expenseFilter?.created_by || expenseFilter?.branch_key),
+    queryFn: () => base44.entities.Expense.filter(expenseFilter, '-date', 2000),
+    staleTime: 120000,
+    enabled: !!(expenseFilter?.created_by || expenseFilter?.branch_key || expenseFilter?.restaurant_id),
   });
 
   const { data: categories = [] } = useExpenseCategories();
@@ -142,7 +149,7 @@ export default function Expenses() {
   // Resolve restaurant_id: prefer the actively selected one, fall back to the first
   // restaurant in the list. This handles the case where localStorage has no saved
   // selection yet (first login / cleared storage) and activeRestaurantId is null.
-  const resolvedRestaurantId = activeRestaurantId || tenantRestaurants?.[0]?.id || null;
+  const resolvedRestaurantId = activeRestaurant?.id || activeRestaurantId || tenantRestaurants?.[0]?.id || null;
   const createMut = useMutation({
     mutationFn: async (d) => {
       console.log('[Expenses] createMut called with form data:', JSON.stringify(d));

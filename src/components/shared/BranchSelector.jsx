@@ -93,6 +93,8 @@ export default function BranchSelector({ onSelect }) {
     sessionStorage.setItem('erp_active_branch_id', branch.id);
     sessionStorage.setItem('erp_active_branch_name', branch.name || '');
     sessionStorage.setItem('erp_active_restaurant_id', branch.restaurant_id || '');
+    // BUG FIX: also persist branch_key so manager dashboard can query expenses by branch_key
+    sessionStorage.setItem('erp_active_branch_key', branch.branch_key || branch.key || '');
     onSelect?.(branch);
   };
 

@@ -581,23 +581,29 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   }, [cashiers, form.cashier_employee_id, form.cashier_id, user?.email, user?.full_name]);
 
   // Rule 9: Auto-populate Opening Cash from previous shift's Closing Cash
+  // BUG FIX: also support manager context (uses restaurant_id + branch, not created_by)
   useEffect(() => {
-    if (!initial?.id && openingCash === '' && ownerFilter?.created_by && form.branch) {
-      supabase
+    if (!initial?.id && openingCash === '' && form.branch) {
+      const canFetch = isManager ? !!activeRestaurant?.id : !!ownerFilter?.created_by;
+      if (!canFetch) return;
+      let q = supabase
         .from('daily_sales')
         .select('closing_cash, date, shift')
-        .eq('created_by', ownerFilter.created_by)
         .eq('branch', form.branch)
         .order('date', { ascending: false })
         .order('created_date', { ascending: false })
-        .limit(1)
-        .then((result = {}) => {
-          const previousSale = firstRecord(result.data);
-          setOpeningCash(previousSale?.closing_cash ?? 0);
-        })
-        .catch(() => setOpeningCash(0));
+        .limit(1);
+      if (isManager) {
+        q = q.eq('restaurant_id', activeRestaurant.id);
+      } else {
+        q = q.eq('created_by', ownerFilter.created_by);
+      }
+      q.then((result = {}) => {
+        const previousSale = firstRecord(result.data);
+        setOpeningCash(previousSale?.closing_cash ?? 0);
+      }).catch(() => setOpeningCash(0));
     }
-  }, [ownerFilter?.created_by, form.branch, initial?.id]);
+  }, [ownerFilter?.created_by, form.branch, initial?.id, isManager, activeRestaurant?.id]);
 
   // ── POS devices ───────────────────────────────────────────────────────────
   const { data: posDevicesData, isLoading: posLoading } = useQuery({
@@ -706,42 +712,62 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   }]);
 
   // ── Approved Purchases ────────────────────────────────────────────────────
+  // BUG FIX: Approved purchases query must work for both Owner (created_by) and
+  // Manager (restaurant_id + branch). When isManager, scope by restaurant_id and branch.
+  const purchasesEnabled = isManager
+    ? !!activeRestaurant?.id && !!form.date
+    : !!ownerFilter?.created_by && !!form.date;
+
   const { data: approvedPurchasesForDateData, isLoading: purchasesLoading } = useQuery({
-    queryKey: ['approved_purchases_for_date', ownerFilter?.created_by, form.date],
+    queryKey: ['approved_purchases_for_date', ownerFilter?.created_by, form.date, activeRestaurant?.id, form.branch],
     queryFn: async () => {
-      if (!ownerFilter?.created_by || !form.date) return [];
-      const { data, error } = await supabase
+      if (!form.date) return [];
+      let q = supabase
         .from('supplier_invoices')
         .select('id, total_amount, approval_status, date, supplier_name, branch')
-        .eq('created_by', ownerFilter.created_by)
         .eq('date', form.date)
         .in('approval_status', ['approved', 'auto_approved'])
         .limit(100);
+      if (isManager) {
+        q = q.eq('restaurant_id', activeRestaurant.id);
+        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
+      } else {
+        if (!ownerFilter?.created_by) return [];
+        q = q.eq('created_by', ownerFilter.created_by);
+      }
+      const { data, error } = await q;
       if (error) return [];
       return asRecordArray(data);
     },
     staleTime: 15000,
-    enabled: !!ownerFilter?.created_by && !!form.date,
+    enabled: purchasesEnabled,
   });
   const approvedPurchasesForDate = asRecordArray(approvedPurchasesForDateData);
 
   // Pending purchases (not approved)
   const { data: pendingPurchasesData, isLoading: pendingLoading } = useQuery({
-    queryKey: ['pending_purchases_for_date', ownerFilter?.created_by, form.date],
+    queryKey: ['pending_purchases_for_date', ownerFilter?.created_by, form.date, activeRestaurant?.id, form.branch],
     queryFn: async () => {
-      if (!ownerFilter?.created_by || !form.date) return [];
-      const { data, error } = await supabase
+      if (!form.date) return [];
+      let q = supabase
         .from('supplier_invoices')
         .select('id, total_amount, approval_status, date, supplier_name')
-        .eq('created_by', ownerFilter.created_by)
         .eq('date', form.date)
         .in('approval_status', ['pending'])
         .limit(50);
+      if (isManager) {
+        q = q.eq('restaurant_id', activeRestaurant.id);
+        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
+      } else {
+        if (!ownerFilter?.created_by) return [];
+        q = q.eq('created_by', ownerFilter.created_by);
+      }
+      const { data, error } = await q;
       if (error) return [];
       return asRecordArray(data);
     },
     staleTime: 15000,
-    enabled: !!ownerFilter?.created_by && !!form.date,
+    enabled: purchasesEnabled,
   });
   const pendingPurchases = asRecordArray(pendingPurchasesData);
 
@@ -750,88 +776,114 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
   const monthStartStr = format(startOfMonth(new Date()), 'yyyy-MM-dd');
 
+  // BUG FIX: Live Sales Summary queries must work for both Owner (created_by) and
+  // Manager (branch-scoped). When isManager, use branch filter; otherwise use created_by.
+  const liveSalesEnabled = isManager ? !!activeRestaurant?.id && !!form.branch : !!ownerFilter?.created_by;
+
   // Today's real sales from daily_sales (all branches or selected branch)
   const { data: realTodaySalesData, isLoading: realTodayLoading } = useQuery({
-    queryKey: ['sales_today_live', ownerFilter?.created_by, todayStr, form.branch],
+    queryKey: ['sales_today_live', ownerFilter?.created_by, todayStr, form.branch, activeRestaurant?.id],
     queryFn: async () => {
-      if (!ownerFilter?.created_by) return [];
       let q = supabase
         .from('daily_sales')
         .select('restaurant_cash, restaurant_network, credit, cash, network, branch, sales_sources_json, custom_sources_total')
-        .eq('created_by', ownerFilter.created_by)
         .eq('date', todayStr)
         .limit(50);
-      if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
+      if (isManager) {
+        q = q.eq('restaurant_id', activeRestaurant.id);
+        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
+      } else {
+        if (!ownerFilter?.created_by) return [];
+        q = q.eq('created_by', ownerFilter.created_by);
+        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
+      }
       const { data, error } = await q;
       if (error) return [];
       return asRecordArray(data);
     },
     staleTime: 10000,
-    enabled: !!ownerFilter?.created_by,
+    enabled: liveSalesEnabled,
   });
   const realTodaySales = asRecordArray(realTodaySalesData);
 
   // Yesterday's real sales from daily_sales
   const { data: realYesterdaySalesData } = useQuery({
-    queryKey: ['sales_yesterday_live', ownerFilter?.created_by, yesterdayStr, form.branch],
+    queryKey: ['sales_yesterday_live', ownerFilter?.created_by, yesterdayStr, form.branch, activeRestaurant?.id],
     queryFn: async () => {
-      if (!ownerFilter?.created_by) return [];
       let q = supabase
         .from('daily_sales')
         .select('restaurant_cash, restaurant_network, credit, cash, network, branch, sales_sources_json, custom_sources_total')
-        .eq('created_by', ownerFilter.created_by)
         .eq('date', yesterdayStr)
         .limit(50);
-      if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
+      if (isManager) {
+        q = q.eq('restaurant_id', activeRestaurant.id);
+        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
+      } else {
+        if (!ownerFilter?.created_by) return [];
+        q = q.eq('created_by', ownerFilter.created_by);
+        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
+      }
       const { data, error } = await q;
       if (error) return [];
       return asRecordArray(data);
     },
     staleTime: 60000,
-    enabled: !!ownerFilter?.created_by,
+    enabled: liveSalesEnabled,
   });
   const realYesterdaySales = asRecordArray(realYesterdaySalesData);
 
   // Month-to-date real sales from daily_sales
   const { data: realMonthSalesData } = useQuery({
-    queryKey: ['sales_month_live', ownerFilter?.created_by, monthStartStr, form.branch],
+    queryKey: ['sales_month_live', ownerFilter?.created_by, monthStartStr, form.branch, activeRestaurant?.id],
     queryFn: async () => {
-      if (!ownerFilter?.created_by) return [];
       let q = supabase
         .from('daily_sales')
         .select('restaurant_cash, restaurant_network, credit, cash, network, branch, sales_sources_json, custom_sources_total')
-        .eq('created_by', ownerFilter.created_by)
         .gte('date', monthStartStr)
         .limit(500);
-      if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
+      if (isManager) {
+        q = q.eq('restaurant_id', activeRestaurant.id);
+        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
+      } else {
+        if (!ownerFilter?.created_by) return [];
+        q = q.eq('created_by', ownerFilter.created_by);
+        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
+      }
       const { data, error } = await q;
       if (error) return [];
       return asRecordArray(data);
     },
     staleTime: 30000,
-    enabled: !!ownerFilter?.created_by,
+    enabled: liveSalesEnabled,
   });
   const realMonthSales = asRecordArray(realMonthSalesData);
 
   // Yesterday's sales for growth comparison (legacy — kept for growthVsYesterday calc)
   const { data: yesterdaySalesData } = useQuery({
-    queryKey: ['yesterday_sales', ownerFilter?.created_by, form.date, form.branch],
+    queryKey: ['yesterday_sales', ownerFilter?.created_by, form.date, form.branch, activeRestaurant?.id],
     queryFn: async () => {
-      if (!ownerFilter?.created_by || !form.date) return [];
+      if (!form.date) return [];
       const yesterday = new Date(form.date);
       yesterday.setDate(yesterday.getDate() - 1);
       const yStr = format(yesterday, 'yyyy-MM-dd');
-      const { data, error } = await supabase
+      let q = supabase
         .from('daily_sales')
         .select('restaurant_cash, restaurant_network, credit, cash, network, branch')
-        .eq('created_by', ownerFilter.created_by)
         .eq('date', yStr)
         .limit(20);
+      if (isManager) {
+        q = q.eq('restaurant_id', activeRestaurant.id);
+        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
+      } else {
+        if (!ownerFilter?.created_by) return [];
+        q = q.eq('created_by', ownerFilter.created_by);
+      }
+      const { data, error } = await q;
       if (error) return [];
       return asRecordArray(data);
     },
     staleTime: 60000,
-    enabled: !!ownerFilter?.created_by && !!form.date,
+    enabled: isManager ? !!activeRestaurant?.id && !!form.date : !!ownerFilter?.created_by && !!form.date,
   });
   const yesterdaySales = asRecordArray(yesterdaySalesData);
 

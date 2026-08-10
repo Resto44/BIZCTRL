@@ -68,12 +68,20 @@ export default function Sales() {
   const [savedInvoice, setSavedInvoice] = useState(null);
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
 
+  // BUG FIX: Owner history must query by restaurant_id so that records created
+  // by Branch Managers (who write with their own email as created_by) are visible.
+  // Manager history still queries by branch key (ownerFilter.branch).
+  const salesQueryFilter = useMemo(() => {
+    if (ownerFilter?.branch) return ownerFilter; // manager: branch-scoped
+    if (activeRestaurant?.id) return { restaurant_id: activeRestaurant.id }; // owner: restaurant-scoped
+    return ownerFilter || {};
+  }, [ownerFilter, activeRestaurant?.id]);
+
   const { data: salesData, isLoading, isError } = useQuery({
-    queryKey: ['sales', ownerFilter],
-    queryFn: async () => asRecordArray(await base44.entities.DailySales.filter(ownerFilter || {}, '-date', 2000)),
+    queryKey: ['sales', salesQueryFilter],
+    queryFn: async () => asRecordArray(await base44.entities.DailySales.filter(salesQueryFilter, '-date', 2000)),
     staleTime: 120000,
-    // Fix: Allow query to run if we have either created_by (Owner) or branch (Manager/Staff)
-    enabled: !!ownerFilter && (!!ownerFilter.created_by || !!ownerFilter.branch),
+    enabled: !!ownerFilter && (!!ownerFilter.created_by || !!ownerFilter.branch || !!activeRestaurant?.id),
   });
   const sales = asRecordArray(salesData);
 

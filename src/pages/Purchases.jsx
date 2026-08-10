@@ -49,17 +49,30 @@ export default function Purchases() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // ── Fetch invoices ─────────────────────────────────────────────────────
+  // BUG FIX: Owner history must query by restaurant_id so that invoices created
+  // by Branch Managers (different created_by) are visible to the owner.
+  // Managers still see only their branch.
+  const { activeRestaurant } = useTenant();
   const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['supplier_invoices', ownerFilter],
+    queryKey: ['supplier_invoices', ownerFilter, activeRestaurant?.id],
     queryFn: async () => {
       let q = supabase.from('supplier_invoices').select('*').order('date', { ascending: false }).limit(5000);
-      if (ownerFilter?.created_by) q = q.eq('created_by', ownerFilter.created_by);
+      if (ownerFilter?.branch) {
+        // Manager: scope to assigned branch only
+        q = q.eq('branch', ownerFilter.branch);
+      } else if (activeRestaurant?.id) {
+        // Owner: scope to entire restaurant (all branches, all managers)
+        q = q.eq('restaurant_id', activeRestaurant.id);
+      } else if (ownerFilter?.created_by) {
+        // Fallback: legacy created_by filter
+        q = q.eq('created_by', ownerFilter.created_by);
+      }
       const { data, error } = await q;
       if (error) { console.warn('supplier_invoices fetch error:', error.message); return []; }
       return data || [];
     },
     staleTime: 120000,
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch || activeRestaurant?.id),
   });
 
   const invalidatePurchaseQueries = () => {
