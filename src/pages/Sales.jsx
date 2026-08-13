@@ -810,7 +810,7 @@ export default function Sales() {
                     setEditing(sale);
                     setShowForm(false);
                   }}
-                  onDelete={canDelete && (!isDriverSale(sale) || isBranchManager) ? (sale) => setDeleting(sale) : null}
+                  onDelete={canDelete && (!isDriverSale(s) || isBranchManager) ? (sale) => setDeleting(sale) : null}
                   selected={selectedIds.has(s.id)}
                   onToggleSelect={canDelete ? toggleSelect : null}
                 />

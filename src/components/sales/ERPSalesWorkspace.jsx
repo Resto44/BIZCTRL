@@ -1391,6 +1391,10 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                     </Label>
                     {driversLoading ? (
                       <Skeleton className="h-10 w-full" />
+                    ) : drivers.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                        No active drivers are assigned to this branch. You can still save a normal sale without driver attribution.
+                      </div>
                     ) : (
                       <Select
                         value={form.driver_id || 'unassigned'}
@@ -1407,7 +1411,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                         <SelectContent>
                           <SelectItem value="unassigned">No driver selected</SelectItem>
                           {drivers.map((driver) => (
-                            <SelectItem key={driver.id} value={driver.id}>{driver.full_name}</SelectItem>
+                            <SelectItem key={driver.id} value={String(driver.id)}>{driver.full_name || 'Unnamed driver'}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
