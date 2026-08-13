@@ -29,6 +29,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -88,6 +89,7 @@ const createDriverSalesRow = (values = {}) => ({
   cash: values.cash !== undefined && Number(values.cash) !== 0 ? String(values.cash) : '',
   network: values.network !== undefined && Number(values.network) !== 0 ? String(values.network) : '',
   credit: values.credit !== undefined && Number(values.credit) !== 0 ? String(values.credit) : '',
+  notes: typeof values.notes === 'string' ? values.notes : '',
 });
 
 const parseDriverSalesRows = (record) => {
@@ -1370,6 +1372,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
             network,
             credit,
             total: cash + network + credit,
+            notes: typeof row.notes === 'string' ? row.notes.trim() : '',
           };
         })),
         credit: creditTotal,
@@ -1708,10 +1711,20 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                               <NumInput label="Network / POS Sales" value={row.network} onChange={(value) => updateDriverSalesRow(row.id, 'network', value)} prefix={currency} />
                               <NumInput label="Credit Sales" value={row.credit} onChange={(value) => updateDriverSalesRow(row.id, 'credit', value)} prefix={currency} />
                               <div className="rounded-lg border border-sky-200 bg-white px-3 py-2.5 sm:self-end">
-                                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Total</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Total Sales</p>
                                 <p className="mt-0.5 text-lg font-black text-sky-700">{currency}{rowTotal.toLocaleString()}</p>
                                 <p className="text-[10px] text-muted-foreground">Cash + POS + Credit</p>
                               </div>
+                            </div>
+                            <div>
+                              <Label className="mb-1 block text-[10px] font-bold uppercase text-muted-foreground">Notes</Label>
+                              <Textarea
+                                value={row.notes || ''}
+                                onChange={(event) => updateDriverSalesRow(row.id, 'notes', event.target.value)}
+                                placeholder="Add driver-specific notes, references, or follow-up details..."
+                                rows={2}
+                                className="min-h-16 resize-y text-sm"
+                              />
                             </div>
                           </div>
                         </div>

@@ -42,7 +42,10 @@ assert(workspace.includes('Add Driver'), 'Driver Sales does not provide an Add D
 assert(workspace.includes('driverSalesRows.map'), 'Driver Sales does not render individual driver rows');
 assert(workspace.includes('Select branch driver'), 'Driver Sales row has no branch-driver selector');
 assert(workspace.includes('Network / POS Sales'), 'Driver Sales row has no Network/POS field');
-assert(workspace.includes('Total</p>'), 'Driver Sales row has no total field');
+assert(workspace.includes('Total Sales</p>'), 'Driver Sales row has no total field');
+assert(workspace.includes("Label className=\"mb-1 block text-[10px] font-bold uppercase text-muted-foreground\">Notes"), 'Driver Sales row has no Notes field');
+assert(workspace.includes("updateDriverSalesRow(row.id, 'notes', event.target.value)"), 'Driver Sales Notes field does not update its row state');
+assert(workspace.includes("notes: typeof row.notes === 'string' ? row.notes.trim() : ''"), 'Driver Sales Notes are not retained in the canonical daily-sales snapshot');
 assert(workspace.includes('grid grid-cols-1 gap-3 sm:grid-cols-2'), 'Driver Sales rows are not responsive for mobile');
 assert(!workspace.includes('overflow-x-auto rounded-xl border border-sky-100'), 'retired Driver Sales horizontal scrolling remains');
 assert(!workspace.includes('min-w-[620px]'), 'retired fixed-width Driver Sales table remains');
@@ -60,11 +63,12 @@ assert(workspace.includes('new Set(selectedDriverIds).size !== selectedDriverIds
 assert(!workspace.includes('base44.entities.DailySales.create('), 'workspace must not create a duplicate Daily Sales record');
 
 // Required row calculation: Ahmad, Cash 300 + Network 200 + Credit 100 = 600.
-const ahmad = { cash: 300, network: 200, credit: 100 };
+const ahmad = { cash: 300, network: 200, credit: 100, notes: 'Cash collected after delivery reconciliation.' };
 const sara = { cash: 120, network: 80, credit: 0 };
 const ahmadTotal = ahmad.cash + ahmad.network + ahmad.credit;
 const driverListTotal = ahmadTotal + sara.cash + sara.network + sara.credit;
 assert(ahmadTotal === 600, 'Ahmad Driver Sales must equal 600 SAR for 300 + 200 + 100');
+assert(ahmad.notes.length > 0, 'Driver Sales Notes must be retained independently of monetary totals');
 assert(driverListTotal === 800, 'multiple driver rows must aggregate all individual totals once');
 
 // Driver dashboards and history must consume every saved split entry rather than
@@ -75,4 +79,4 @@ assert(driverManagement.includes('getDriverSaleEntries(sale)'), 'Driver Manageme
 assert(driverManagement.includes('driver_cash, driver_network, drivers_json'), 'Driver Management query omits saved Driver Sales fields');
 assert(driverPerformance.includes('driver_cash, driver_network, drivers_json'), 'Owner Driver Performance query omits saved Driver Sales fields');
 
-console.log('Add Sales accordion and multi-driver regression checks passed: all cards are exclusive mounted accordions, mobile-responsive, and retain the canonical sales and driver analytics behavior.');
+console.log('Add Sales accordion and multi-driver regression checks passed: notes, totals, single-record aggregation, analytics, and mobile-responsive accordion behavior are retained.');
