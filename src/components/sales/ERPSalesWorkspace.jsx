@@ -436,6 +436,8 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     cashier_id: initial?.cashier_id || initial?.cashier_employee_id || '',
     customer_id: initial?.customer_id || '',
     pos_device_id: initial?.pos_device_id || initial?.restaurant_network_account_id || '',
+    driver_id: initial?.driver_id || '',
+    driver_name: initial?.driver_name || '',
     sales_notes: initial?.sales_notes || '',
     ...initial,
   });
@@ -567,6 +569,24 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     if (employees.some((employee) => employee.id === user.id)) return employees;
     return [{ id: user.id, full_name: user.full_name || user.email || 'Branch Manager' }, ...employees];
   }, [employees, isManager, user?.email, user?.full_name, user?.id]);
+
+  // Drivers are managed only through public.drivers. The query is branch-scoped
+  // and RLS independently enforces the same owner/manager boundary.
+  const { data: driversData, isLoading: driversLoading } = useQuery({
+    queryKey: ['sales-form-drivers', activeRestaurant?.id, form.branch, selectedBranchId],
+    queryFn: async () => {
+      if (!activeRestaurant?.id || !selectedBranchId) return [];
+      const records = asRecordArray(await base44.entities.Driver.filter(
+        { restaurant_id: activeRestaurant.id, branch_id: selectedBranchId },
+        'full_name',
+        500,
+      ));
+      return records.filter((driver) => driver.is_active !== false && driver.status !== 'inactive');
+    },
+    staleTime: 0,
+    enabled: !!activeRestaurant?.id && !!selectedBranchId,
+  });
+  const drivers = asRecordArray(driversData);
 
   // Branch Managers close their own shift unless an assigned cashier exists first.
   useEffect(() => {
@@ -1146,6 +1166,8 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     const cashierId = form.cashier_id || form.cashier_employee_id || user?.id || null;
     const customerId = form.customer_id || creditEntries.find((entry) => entry.customer_id)?.customer_id || defaultCustomer?.id || null;
     const posDeviceId = form.pos_device_id || posEntries.find((entry) => entry.device_id)?.device_id || null;
+    const selectedDriver = form.driver_id ? drivers.find((driver) => String(driver.id) === String(form.driver_id)) : null;
+    const driverId = selectedDriver?.id || null;
     const createdBy = user?.email || ownerFilter?.created_by || '';
     const tenantId = activeRestaurant?.id || user?.organization_id || user?.restaurant_id || '';
 
@@ -1164,9 +1186,14 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       return;
     }
 
-    if (isManager && (custLoading || posLoading)) {
+    if (isManager && (custLoading || posLoading || driversLoading)) {
       console.log('[ERPSalesWorkspace] FAILED: Data still loading');
       toast.error('Required data is still loading, please wait...');
+      return;
+    }
+
+    if (form.driver_id && !selectedDriver) {
+      toast.error('Select an active driver from the current branch.');
       return;
     }
 
@@ -1204,6 +1231,9 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         cashier_id: cashierId,
         customer_id: customerId,
         pos_device_id: posDeviceId,
+        // Informational only: driver linkage never changes established sales totals.
+        driver_id: driverId,
+        driver_name: selectedDriver?.full_name || '',
         credit: creditTotal,
         pos_entries_json: JSON.stringify(posEntries.map(({ id, ...rest }) => rest)),
         credit_entries_json: JSON.stringify(creditEntries.map(({ id, ...rest }) => rest)),
@@ -1296,6 +1326,9 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                   <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">Branch</Label>
                   <BranchSelect value={form.branch} onChange={v => {
                     set('branch', v);
+                    set('branch_id', '');
+                    set('driver_id', '');
+                    set('driver_name', '');
                     // Clear credit entries when branch changes (to avoid showing customers from previous branch)
                     setCreditEntries([]);
                   }} />
@@ -1342,6 +1375,38 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                       </SelectContent>
                     </Select>
                   )}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">
+                    Driver
+                    {driversLoading && <Loader2 className="w-3 h-3 inline ml-1 animate-spin" />}
+                  </Label>
+                  {driversLoading ? (
+                    <Skeleton className="h-10 w-full" />
+                  ) : (
+                    <Select
+                      value={form.driver_id || 'unassigned'}
+                      onValueChange={(id) => {
+                        const driver = drivers.find((item) => String(item.id) === String(id));
+                        setForm((previous) => ({
+                          ...previous,
+                          driver_id: driver?.id || '',
+                          driver_name: driver?.full_name || '',
+                        }));
+                      }}
+                    >
+                      <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="No driver selected" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">No driver selected</SelectItem>
+                        {drivers.map((driver) => (
+                          <SelectItem key={driver.id} value={driver.id}>{driver.full_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <p className="mt-1 text-[10px] text-muted-foreground">Driver assignment is optional and does not change sales totals.</p>
                 </div>
               </div>
               {/* Shift status indicators */}

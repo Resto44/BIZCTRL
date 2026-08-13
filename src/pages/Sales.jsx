@@ -519,6 +519,8 @@ export default function Sales() {
       qc.invalidateQueries({ queryKey: ['sales_sources'] });
       qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
       qc.invalidateQueries({ queryKey: ['reports'] });
+      qc.invalidateQueries({ queryKey: ['driver-sales'] });
+      qc.invalidateQueries({ queryKey: ['driver-performance'] });
       setShowForm(false);
       setEditing(null); // Clear editing state just in case
     },
@@ -562,6 +564,8 @@ export default function Sales() {
       qc.invalidateQueries({ queryKey: ['sales_sources'] });
       qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
       qc.invalidateQueries({ queryKey: ['reports'] });
+      qc.invalidateQueries({ queryKey: ['driver-sales'] });
+      qc.invalidateQueries({ queryKey: ['driver-performance'] });
       setEditing(null);
       setShowForm(false); // Ensure form closes on update too
     },
@@ -581,6 +585,8 @@ export default function Sales() {
     qc.invalidateQueries({ queryKey: ['reports'] });
     qc.invalidateQueries({ queryKey: ['wallet_transactions'] });
     qc.invalidateQueries({ queryKey: ['supplier_invoices_dash'] });
+    qc.invalidateQueries({ queryKey: ['driver-sales'] });
+    qc.invalidateQueries({ queryKey: ['driver-performance'] });
   }, [qc]);
 
   const deleteMut = useMutation({

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Building2, Users, UserCheck, User, ChefHat, Truck, Package,
+  Building2, Users, UserCheck, User, ChefHat, Package,
   Eye, EyeOff, Loader2, ArrowLeft, ShieldCheck, LogIn
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -63,16 +63,6 @@ const ROLE_CONFIG = [
     textColor: 'text-red-300',
   },
   {
-    role: ROLES.DRIVER,
-    label: 'Driver',
-    description: 'Delivery orders and earnings',
-    icon: Truck,
-    color: 'from-sky-600 to-blue-700',
-    border: 'border-sky-500/40',
-    bg: 'bg-sky-500/10',
-    textColor: 'text-sky-300',
-  },
-  {
     role: ROLES.SUPPLIER,
     label: 'Supplier',
     description: 'Purchase orders and invoices',
@@ -113,6 +103,10 @@ export default function ERPLogin() {
             .select('role, approval_status, branch_id, restaurant_id, organization_id')
             .eq('id', session.user.id)
             .single();
+          if (profile?.role === ROLES.DRIVER) {
+            await supabase.auth.signOut();
+            return;
+          }
           if (profile?.role && profile.approval_status === 'approved') {
             // Pre-populate sessionStorage so dashboard opens on the correct branch
             if (profile.branch_id && profile.role !== ROLES.OWNER) {
@@ -131,7 +125,7 @@ export default function ERPLogin() {
         } catch (_) {}
       }
     });
-  }, []);
+  }, [navigate]);
 
   const handleRoleSelect = (roleConfig) => {
     setSelectedRole(roleConfig);

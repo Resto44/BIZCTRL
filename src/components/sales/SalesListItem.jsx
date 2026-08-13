@@ -1,9 +1,8 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, ShieldCheck, Clock, CheckCircle2, Store, Square, CheckSquare } from 'lucide-react';
+import { Pencil, Trash2, ShieldCheck, Clock, CheckCircle2, Store, Square, CheckSquare, Truck } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
-import RiskBadge from '@/components/shared/RiskBadge';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useTenant } from '@/lib/TenantContext';
@@ -105,7 +104,12 @@ export default function SalesListItem({ sale, onEdit, onDelete, selected = false
       </div>
 
       <div className="mt-2 flex items-center justify-between">
-        <div>
+        <div className="flex items-center gap-2">
+          {sale.driver_id && sale.driver_name && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700">
+              <Truck className="w-3 h-3" />{sale.driver_name}
+            </span>
+          )}
           {badge && (
             <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${badge.cls}`}>
               {badge.icon && <badge.icon className="w-3 h-3" />}

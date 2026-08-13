@@ -136,17 +136,13 @@ function classifyRevenueChannel(entry = {}, source = {}) {
 }
 
 function saleCash(record = {}) {
-  const total = number(record.cash);
-  const split = number(record.restaurant_cash) + number(record.driver_cash);
-  if (total !== 0 || split === 0) return total;
-  return split;
+  const restaurantCash = number(record.restaurant_cash);
+  return restaurantCash !== 0 ? restaurantCash : number(record.cash);
 }
 
 function saleNetwork(record = {}) {
-  const total = number(record.network);
-  const split = number(record.restaurant_network) + number(record.driver_network);
-  if (total !== 0 || split === 0) return total;
-  return split;
+  const restaurantNetwork = number(record.restaurant_network);
+  return restaurantNetwork !== 0 ? restaurantNetwork : number(record.network);
 }
 
 function salesRecordKey(record = {}) {

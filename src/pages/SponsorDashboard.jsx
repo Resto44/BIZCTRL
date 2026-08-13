@@ -57,11 +57,11 @@ function DriverRow({ driver }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-white truncate">{driver.full_name}</p>
-        <p className="text-xs text-slate-400">{driver.branch}</p>
+        <p className="text-xs text-slate-400">{driver.branch_name || 'Assigned branch'}</p>
       </div>
       <div className="text-right shrink-0">
-        <Badge className={`text-xs ${driver.driver_status === 'active' ? 'bg-emerald-900/60 text-emerald-300 border-emerald-700' : 'bg-amber-900/60 text-amber-300 border-amber-700'}`}>
-          {driver.driver_status || 'active'}
+        <Badge className={`text-xs ${driver.status === 'active' && driver.is_active !== false ? 'bg-emerald-900/60 text-emerald-300 border-emerald-700' : 'bg-amber-900/60 text-amber-300 border-amber-700'}`}>
+          {driver.is_active === false ? 'inactive' : driver.status || 'active'}
         </Badge>
         {driver.phone && (
           <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 justify-end">
@@ -86,6 +86,11 @@ export default function SponsorDashboard() {
     queryFn: () => base44.entities.Employee.list('-created_date', 200),
   });
 
+  const { data: drivers = [], isLoading: loadingDrivers } = useQuery({
+    queryKey: ['sponsor-drivers'],
+    queryFn: () => base44.entities.Driver.list('full_name', 500),
+  });
+
   const { data: sales = [], refetch: refetchSales } = useQuery({
     queryKey: ['sponsor-sales'],
     queryFn: () => base44.entities.DailySales.list('-date', 90),
@@ -97,7 +102,6 @@ export default function SponsorDashboard() {
   });
 
   const activeEmployees = employees.filter(e => e.is_active);
-  const drivers = employees.filter(e => e.is_driver);
   const recentSales = sales.filter(s => s.date >= thirtyDaysAgo);
   const totalRevenue30d = recentSales.reduce((sum, s) => sum + (s.cash || 0) + (s.network || 0) + (s.credit || 0), 0);
   const pendingSettlements = settlements.filter(s => s.status === 'pending');
@@ -248,10 +252,10 @@ export default function SponsorDashboard() {
               <Eye className="w-4 h-4 text-slate-500" />
             </div>
             {loadingEmps && <p className="text-sm text-slate-500 text-center py-8">Loading…</p>}
-            {employees.filter(e => !e.is_driver).map(emp => (
+            {employees.map(emp => (
               <EmployeeRow key={emp.id} emp={emp} />
             ))}
-            {!loadingEmps && employees.filter(e => !e.is_driver).length === 0 && (
+            {!loadingEmps && employees.length === 0 && (
               <p className="text-xs text-slate-500 text-center py-8">No employee records found</p>
             )}
           </TabsContent>
@@ -262,10 +266,11 @@ export default function SponsorDashboard() {
               <p className="text-xs text-slate-400">{drivers.length} drivers · read-only view</p>
               <Eye className="w-4 h-4 text-slate-500" />
             </div>
+            {loadingDrivers && <p className="text-sm text-slate-500 text-center py-8">Loading…</p>}
             {drivers.map(d => (
               <DriverRow key={d.id} driver={d} />
             ))}
-            {drivers.length === 0 && (
+            {!loadingDrivers && drivers.length === 0 && (
               <p className="text-xs text-slate-500 text-center py-8">No driver records found</p>
             )}
           </TabsContent>
@@ -277,7 +282,8 @@ export default function SponsorDashboard() {
             )}
             {branchList.map(br => {
               const branchEmps = employees.filter(e => e.branch === br.key);
-              const branchDrivers = branchEmps.filter(e => e.is_driver);
+              const branchRecord = branches.find(b => b.key === br.key || b.branch_key === br.key);
+              const branchDrivers = drivers.filter(d => String(d.branch_id || '') === String(branchRecord?.id || ''));
               return (
                 <Card key={br.key} className="bg-slate-900 border-slate-700">
                   <CardContent className="p-4">
@@ -292,7 +298,7 @@ export default function SponsorDashboard() {
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="bg-slate-800 rounded-lg p-2 text-center">
-                        <p className="font-bold text-violet-300">{branchEmps.filter(e => !e.is_driver && e.is_active).length}</p>
+                        <p className="font-bold text-violet-300">{branchEmps.filter(e => e.is_active).length}</p>
                         <p className="text-slate-500">Staff</p>
                       </div>
                       <div className="bg-slate-800 rounded-lg p-2 text-center">

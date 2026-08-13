@@ -139,7 +139,6 @@ const GMDashboard           = lazy(() => import('@/pages/GMDashboard'));
 const ManagerDashboardERP   = lazy(() => import('@/pages/ManagerDashboardERP'));
 const EmployeeDashboardERP  = lazy(() => import('@/pages/EmployeeDashboardERP'));
 const KitchenDashboardERP   = lazy(() => import('@/pages/KitchenDashboardERP'));
-const DriverDashboardERP    = lazy(() => import('@/pages/DriverDashboardERP'));
 const SupplierPortalERP     = lazy(() => import('@/pages/SupplierPortalERP'));
 
 // ── Shared page loading fallback ─────────────────────────────────────────────
@@ -344,15 +343,12 @@ const SubscribedRoutes = () => {
         <Route path="/gm-dashboard" element={<ERPRoleGuard allowedRoles={['general_manager']}><GMDashboard /></ERPRoleGuard>} />
         <Route path="/manager-dashboard" element={<ERPRoleGuard allowedRoles={['manager']}><ManagerDashboardERP /></ERPRoleGuard>} />
         <Route path="/employee-dashboard" element={<ERPRoleGuard allowedRoles={['employee']}><EmployeeDashboardERP /></ERPRoleGuard>} />
-        <Route path="/driver-dashboard" element={<ERPRoleGuard allowedRoles={['driver']}><DriverDashboardERP /></ERPRoleGuard>} />
         <Route path="/kitchen-dashboard" element={<ERPRoleGuard allowedRoles={['kitchen']}><KitchenDashboardERP /></ERPRoleGuard>} />
         <Route path="/supplier-portal" element={<ERPRoleGuard allowedRoles={['supplier']}><SupplierPortalERP /></ERPRoleGuard>} />
         <Route path="/erp-approval-center" element={<RoleGuard permission="manageSettings"><OwnerApprovalCenter /></RoleGuard>} />
         {/* ── Legacy role portals — redirect to new ERP dashboards ── */}
         <Route path="/employee-portal" element={<Navigate to="/employee-dashboard" replace />} />
-        <Route path="/driver-portal" element={<Navigate to="/driver-dashboard" replace />} />
         <Route path="/kitchen-display" element={<Navigate to="/kitchen-dashboard" replace />} />
-        <Route path="/driver-v2" element={<Navigate to="/driver-dashboard" replace />} />
         <Route path="/kitchen-v2" element={<Navigate to="/kitchen-dashboard" replace />} />
         <Route path="/sponsor-dashboard" element={<Navigate to="/erp-login" replace />} />
         <Route path="/customer-dashboard" element={<Navigate to="/erp-login" replace />} />
@@ -366,7 +362,7 @@ const SubscribedRoutes = () => {
         <Route path="/order" element={<OnlineOrderingV2 />} />
         <Route path="/order/:branchSlug" element={<OnlineOrderingV2 />} />
         <Route path="/order/track/:orderId" element={<OnlineOrderingV2 />} />
-        {/* kitchen-v2 and driver-v2 redirected above — duplicate route removed */}
+        {/* Legacy kitchen route redirects above. */}
         <Route path="/order-management" element={<RoleGuard permission="viewSales"><OrderManagementV2 /></RoleGuard>} />
         <Route path="/promotions" element={<RoleGuard permission="viewSales"><PromotionsV2 /></RoleGuard>} />
         <Route path="/order-analytics" element={<RoleGuard permission="viewReports"><OrderAnalyticsV2 /></RoleGuard>} />
@@ -386,7 +382,6 @@ const SubscribedRoutes = () => {
 
         {/* ── Short aliases — redirect to new ERP dashboards ── */}
         <Route path="/employee" element={<Navigate to="/employee-dashboard" replace />} />
-        <Route path="/driver" element={<Navigate to="/driver-dashboard" replace />} />
         <Route path="/kitchen" element={<Navigate to="/kitchen-dashboard" replace />} />
         <Route path="/customer" element={<Navigate to="/erp-login" replace />} />
 
@@ -498,8 +493,6 @@ function App() {
               <Route path="/auth/invite" element={<LegacyInvitationRedirect />} />
               <Route path="/auth/manager-login" element={<Navigate to="/erp-login?role=manager" replace />} />
               <Route path="/auth/activate" element={<LegacyInvitationRedirect />} />
-              <Route path="/driver-invite" element={<LegacyInvitationRedirect />} />
-              <Route path="/auth/driver-login" element={<Navigate to="/erp-login?role=driver" replace />} />
               <Route path="/employee-invite" element={<LegacyInvitationRedirect />} />
               <Route path="/auth/employee-login" element={<Navigate to="/erp-login?role=employee" replace />} />
               <Route path="/kitchen-invite" element={<LegacyInvitationRedirect />} />

@@ -68,10 +68,6 @@ const PRIMARY_NAV_EMPLOYEE = [
   { path: '/employee-attendance',  icon: UserCheck,       labelKey: 'attendance' },
   { path: '/tasks',                icon: ClipboardList,   labelKey: 'tasks' },
 ];
-const PRIMARY_NAV_DRIVER = [
-  { path: '/driver-dashboard',     icon: LayoutDashboard, labelKey: 'dashboard' },
-  { path: '/delivery',             icon: Truck,           labelKey: 'delivery' },
-];
 const PRIMARY_NAV_SPONSOR = [
   { path: '/erp-login',            icon: LayoutDashboard, labelKey: 'dashboard' },
 ];
@@ -332,7 +328,7 @@ const BottomNav = memo(function BottomNav() {
 
   const { visibleNav, moreSections } = useMemo(() => {
     if (role === ROLES.EMPLOYEE) return { visibleNav: PRIMARY_NAV_EMPLOYEE, moreSections: [] };
-    if (role === ROLES.DRIVER) return { visibleNav: PRIMARY_NAV_DRIVER, moreSections: [] };
+    if (role === ROLES.DRIVER) return { visibleNav: [], moreSections: [] };
     if (role === ROLES.SPONSOR) return { visibleNav: PRIMARY_NAV_SPONSOR, moreSections: [] };
     if (role === ROLES.KITCHEN) return { visibleNav: PRIMARY_NAV_KITCHEN, moreSections: [] };
     if (role === ROLES.CUSTOMER) return { visibleNav: PRIMARY_NAV_CUSTOMER, moreSections: [] };

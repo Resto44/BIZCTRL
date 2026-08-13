@@ -1,513 +1,417 @@
-import React, { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
+import { buildDriverSalesAnalytics, getDriverSaleAmounts } from '@/lib/driverAnalytics';
+import BranchSelect from '@/components/shared/BranchSelect';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-import { Progress } from '@/components/ui/progress';
-import {
-  Truck, Search, Plus, Star, Clock, Wallet, DollarSign, TrendingUp,
-  AlertTriangle, CheckCircle2, ChevronRight, Phone, MapPin, Calendar,
-  BarChart3, ArrowUpRight, ArrowDownRight, Users, Shield, Fuel
-} from 'lucide-react';
-import { format } from 'date-fns';
+import { Switch } from '@/components/ui/switch';
+import { Search, Plus, Truck, Users, Activity, ReceiptText, Pencil, Phone, BarChart3, WalletCards } from 'lucide-react';
 import { toast } from 'sonner';
 
-function DriverCard({ driver, onClick }) {
-  const { currency } = useLanguage();
-  const isActive = driver.is_active !== false;
-  return (
-    <Card className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98]" onClick={onClick}>
-      <CardContent className="p-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-primary font-bold text-sm">
-              {driver.name?.charAt(0)?.toUpperCase() || 'D'}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold truncate">{driver.name}</p>
-              <Badge variant={isActive ? 'default' : 'secondary'} className="text-[10px] h-4 px-1">
-                {isActive ? 'Active' : 'Inactive'}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">{driver.phone || '—'}</p>
-            <p className="text-xs text-muted-foreground">{driver.branch}</p>
-          </div>
-          <div className="text-right shrink-0">
-            <div className="flex items-center gap-0.5 justify-end">
-              <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-              <span className="text-xs font-semibold">{driver.rating || '4.8'}</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground mt-1 ml-auto" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+const emptyForm = {
+  full_name: '',
+  phone: '',
+  email: '',
+  driver_id: '',
+  vehicle_type: '',
+  vehicle_plate: '',
+  notes: '',
+  branch_id: '',
+};
+
+const asArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
+
+function money(value, currency) {
+  return `${currency}${(Number(value) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
-function DriverProfileModal({ driver, onClose }) {
-  const { t, currency } = useLanguage();
-  const [tab, setTab] = useState('overview');
-  const [showDebtDialog, setShowDebtDialog] = useState(false);
-  const [debtAmount, setDebtAmount] = useState('');
-  const [debtReason, setDebtReason] = useState('');
-  const qc = useQueryClient();
+function branchKeyFor(branch) {
+  return branch?.key || branch?.branch_key || '';
+}
 
-  const { data: shifts = [] } = useQuery({
-    queryKey: ['driver-shifts', driver?.id],
-    queryFn: () => base44.entities.DriverShift.filter({ driver_id: driver.id }, '-shift_date', 50),
-    enabled: !!driver?.id && tab === 'shifts',
-  });
-
-  const { data: debts = [] } = useQuery({
-    queryKey: ['driver-debts', driver?.id],
-    queryFn: () => base44.entities.DriverDebt.filter({ driver_id: driver.id }, '-date', 50),
-    enabled: !!driver?.id && tab === 'debts',
-  });
-
-  const shiftMutation = useMutation({
-    mutationFn: (data) => data.id ? base44.entities.DriverShift.update(data.id, data) : base44.entities.DriverShift.create(data),
-    onSuccess: () => {
-      toast.success('Shift updated');
-      qc.invalidateQueries({ queryKey: ['driver-shifts', driver.id] });
-    },
-  });
-
-  const debtMutation = useMutation({
-    mutationFn: (data) => base44.entities.DriverDebt.create(data),
-    onSuccess: () => {
-      toast.success('Debt record added');
-      qc.invalidateQueries({ queryKey: ['driver-debts', driver.id] });
-      setShowDebtDialog(false);
-      setDebtAmount('');
-      setDebtReason('');
-    },
-  });
-
-  const handleClockIn = () => {
-    shiftMutation.mutate({
-      driver_id: driver.id,
-      driver_name: driver.name || driver.full_name,
-      branch: driver.branch,
-      shift_date: new Date().toISOString().split('T')[0],
-      start_time: new Date().toLocaleTimeString('en-GB', { hour12: false }),
-      status: 'open'
-    });
-  };
-
-  const handleClockOut = () => {
-    const openShift = shifts.find(s => s.status === 'open');
-    if (!openShift) {
-      toast.error('No open shift found');
-      return;
-    }
-    shiftMutation.mutate({
-      id: openShift.id,
-      end_time: new Date().toLocaleTimeString('en-GB', { hour12: false }),
-      status: 'closed'
-    });
-  };
-
-  const handleAddDebt = () => {
-    if (!debtAmount) return;
-    debtMutation.mutate({
-      driver_id: driver.id,
-      driver_name: driver.name || driver.full_name,
-      branch: driver.branch,
-      amount: Number(debtAmount),
-      reason: debtReason,
-      date: new Date().toISOString().split('T')[0],
-      status: 'pending'
-    });
-  };
-
+function DriverDetailsDialog({ driver, analytics, sales, currency, onOpenChange }) {
   if (!driver) return null;
 
-  const tabs = [
-    { key: 'overview',     label: t('overview') },
-    { key: 'orders',       label: t('driver_orders') },
-    { key: 'earnings',     label: t('driver_earnings') },
-    { key: 'wallet',       label: t('driver_wallet') },
-    { key: 'settlements',  label: t('driver_settlements') },
-    { key: 'performance',  label: t('driver_performance') },
-    { key: 'shifts',       label: t('driver_shifts') },
-    { key: 'debts',        label: t('driver_debts') },
-  ];
+  const row = analytics.driverRows.find((item) => String(item.driverId) === String(driver.id));
+  const history = sales
+    .filter((sale) => String(sale.driver_id || '') === String(driver.id))
+    .sort((left, right) => String(right.date || '').localeCompare(String(left.date || '')))
+    .slice(0, 25);
 
   return (
-    <Dialog open={!!driver} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+    <Dialog open={!!driver} onOpenChange={(open) => !open && onOpenChange(null)}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-primary font-bold text-sm">
-                {driver.name?.charAt(0)?.toUpperCase() || 'D'}
-              </span>
-            </div>
-            {driver.name}
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">
+              {(driver.full_name || 'D').charAt(0).toUpperCase()}
+            </span>
+            <span>{driver.full_name}</span>
+            <Badge variant={driver.is_active !== false && driver.status !== 'inactive' ? 'default' : 'secondary'}>
+              {driver.is_active !== false && driver.status !== 'inactive' ? 'Active' : 'Inactive'}
+            </Badge>
           </DialogTitle>
         </DialogHeader>
 
-        {/* Tab navigation - scrollable */}
-        <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
-          {tabs.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                tab === t.key ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <MetricCard label="Sales / Orders" value={`${row?.orders || 0}`} icon={ReceiptText} />
+          <MetricCard label="Cash Sales" value={money(row?.cash, currency)} icon={WalletCards} />
+          <MetricCard label="Network / POS" value={money(row?.network, currency)} icon={Activity} />
+          <MetricCard label="Total Revenue" value={money(row?.revenue, currency)} icon={BarChart3} />
         </div>
 
-        {/* Tab content */}
-        <div className="mt-2">
-          {tab === 'overview' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Total Orders', value: driver.total_orders || '0', icon: Truck, color: 'text-blue-600' },
-                  { label: 'Rating', value: `${driver.rating || '4.8'} ⭐`, icon: Star, color: 'text-amber-600' },
-                  { label: 'This Month', value: `${currency}${(driver.earnings_month || 0).toLocaleString()}`, icon: DollarSign, color: 'text-green-600' },
-                  { label: 'Wallet Balance', value: `${currency}${(driver.wallet_balance || 0).toLocaleString()}`, icon: Wallet, color: 'text-purple-600' },
-                ].map(kpi => (
-                  <Card key={kpi.label}>
-                    <CardContent className="p-3">
-                      <p className={`text-lg font-bold ${kpi.color}`}>{kpi.value}</p>
-                      <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                    </CardContent>
-                  </Card>
-                ))}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Driver Profile</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+            <ProfileLine label="Branch" value={driver.branch_name || 'Assigned branch'} />
+            <ProfileLine label="Phone" value={driver.phone || '—'} />
+            <ProfileLine label="Driver ID" value={driver.driver_id || '—'} />
+            <ProfileLine label="Vehicle" value={[driver.vehicle_type, driver.vehicle_plate].filter(Boolean).join(' · ') || '—'} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Sales History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {history.length === 0 ? (
+              <p className="py-5 text-center text-sm text-muted-foreground">No sales have been linked to this driver yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {history.map((sale) => {
+                  const amounts = getDriverSaleAmounts(sale);
+                  return (
+                    <div key={sale.id} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg border border-border/70 p-3 text-sm">
+                      <div>
+                        <p className="font-semibold">{sale.date || 'Undated sale'}</p>
+                        <p className="text-xs text-muted-foreground">{sale.branch || 'Branch'} · Cash {money(amounts.cash, currency)} · POS {money(amounts.network, currency)}</p>
+                      </div>
+                      <p className="font-bold text-primary">{money(amounts.revenue, currency)}</p>
+                    </div>
+                  );
+                })}
               </div>
-              <Card>
-                <CardContent className="p-3 space-y-2">
-                  {[
-                    { label: 'Branch', value: driver.branch || '—' },
-                    { label: 'Phone', value: driver.phone || '—' },
-                    { label: 'Join Date', value: driver.joining_date || '—' },
-                    { label: 'Status', value: driver.is_active !== false ? 'Active' : 'Inactive' },
-                  ].map(row => (
-                    <div key={row.label} className="flex justify-between py-1 border-b border-border last:border-0">
-                      <span className="text-xs text-muted-foreground">{row.label}</span>
-                      <span className="text-xs font-medium">{row.value}</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {tab === 'shifts' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <Button 
-                  className="h-10 bg-emerald-500 hover:bg-emerald-600 text-white text-xs gap-1"
-                  onClick={handleClockIn}
-                  disabled={shiftMutation.isPending || shifts.some(s => s.status === 'open')}
-                >
-                  <CheckCircle2 className="w-4 h-4" />{t('clock_in')}
-                </Button>
-                <Button 
-                  className="h-10 bg-red-500 hover:bg-red-600 text-white text-xs gap-1"
-                  onClick={handleClockOut}
-                  disabled={shiftMutation.isPending || !shifts.some(s => s.status === 'open')}
-                >
-                  <Clock className="w-4 h-4" />{t('clock_out')}
-                </Button>
-              </div>
-              <Card>
-                <CardHeader className="pb-1 pt-3 px-3">
-                  <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">{t('shift_history')}</CardTitle>
-                </CardHeader>
-                <CardContent className="px-3 pb-3">
-                  {shifts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">{t('no_data')}</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {shifts.map(s => (
-                        <div key={s.id} className="flex justify-between text-xs py-1 border-b last:border-0">
-                          <span>{s.shift_date}</span>
-                          <span className="font-medium">{s.start_time} - {s.end_time || '...'}</span>
-                          <Badge variant={s.status === 'open' ? 'default' : 'secondary'} className="text-[10px] h-4">
-                            {s.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {tab === 'debts' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: t('fuel_advances'),      color: 'bg-amber-50 text-amber-700', value: debts.filter(d => d.reason?.toLowerCase().includes('fuel')).reduce((sum, d) => sum + Number(d.amount || 0), 0) },
-                  { label: t('cash_shortages'),     color: 'bg-red-50 text-red-700',    value: debts.filter(d => d.reason?.toLowerCase().includes('cash')).reduce((sum, d) => sum + Number(d.amount || 0), 0) },
-                  { label: t('equipment_liability'), color: 'bg-blue-50 text-blue-700', value: debts.filter(d => d.reason?.toLowerCase().includes('equipment')).reduce((sum, d) => sum + Number(d.amount || 0), 0) },
-                  { label: t('installments'),       color: 'bg-purple-50 text-purple-700', value: debts.filter(d => d.reason?.toLowerCase().includes('installment')).reduce((sum, d) => sum + Number(d.amount || 0), 0) },
-                ].map(d => (
-                  <Card key={d.label} className={d.color}>
-                    <CardContent className="p-3">
-                      <p className="text-lg font-bold">{currency}{d.value.toLocaleString()}</p>
-                      <p className="text-[11px] font-medium">{d.label}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              <Button className="w-full h-9 text-xs" variant="outline" onClick={() => setShowDebtDialog(true)}>
-                <Plus className="w-3 h-3 mr-1" /> Add Debt Record
-              </Button>
-
-              <Dialog open={showDebtDialog} onOpenChange={setShowDebtDialog}>
-                <DialogContent className="max-w-sm">
-                  <DialogHeader><DialogTitle>Add Debt Record</DialogTitle></DialogHeader>
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-xs">Amount</Label>
-                      <Input type="number" value={debtAmount} onChange={e => setDebtAmount(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Reason</Label>
-                      <Select value={debtReason} onValueChange={setDebtReason}>
-                        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select reason" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Fuel Advance">Fuel Advance</SelectItem>
-                          <SelectItem value="Cash Shortage">Cash Shortage</SelectItem>
-                          <SelectItem value="Equipment Liability">Equipment Liability</SelectItem>
-                          <SelectItem value="Installment">Installment</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <DialogFooter className="mt-4">
-                    <Button variant="outline" onClick={() => setShowDebtDialog(false)}>Cancel</Button>
-                    <Button onClick={handleAddDebt} disabled={debtMutation.isPending || !debtAmount}>
-                      {debtMutation.isPending ? 'Saving...' : 'Save Record'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          )}
-
-          {tab === 'earnings' && (
-            <div className="space-y-3">
-              <Card>
-                <CardContent className="p-3 space-y-2">
-                  {[
-                    { label: 'This Month', value: `${currency}${(driver.earnings_month || 0).toLocaleString()}`, color: 'text-green-600' },
-                    { label: 'Last Month', value: `${currency}0`, color: 'text-muted-foreground' },
-                    { label: 'Total Earned', value: `${currency}${(driver.total_earnings || 0).toLocaleString()}`, color: 'text-blue-600' },
-                  ].map(row => (
-                    <div key={row.label} className="flex justify-between py-1.5 border-b border-border last:border-0">
-                      <span className="text-sm text-muted-foreground">{row.label}</span>
-                      <span className={`text-sm font-bold ${row.color}`}>{row.value}</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {tab === 'performance' && (
-            <div className="space-y-3">
-              {[
-                { label: 'On-Time Delivery', value: 92, color: 'bg-emerald-500' },
-                { label: 'Customer Rating', value: 96, color: 'bg-blue-500' },
-                { label: 'Order Acceptance', value: 88, color: 'bg-amber-500' },
-                { label: 'Completion Rate', value: 97, color: 'bg-purple-500' },
-              ].map(m => (
-                <div key={m.label}>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-muted-foreground">{m.label}</span>
-                    <span className="font-semibold">{m.value}%</span>
-                  </div>
-                  <Progress value={m.value} className="h-2" />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {(tab === 'orders' || tab === 'wallet' || tab === 'settlements') && (
-            <div className="text-center py-8 text-muted-foreground">
-              <p className="text-sm">{t('no_data')}</p>
-            </div>
-          )}
-        </div>
+            )}
+          </CardContent>
+        </Card>
       </DialogContent>
     </Dialog>
   );
 }
 
-const emptyDriverForm = { full_name: '', phone: '', branch: '', position: 'Driver', is_active: true };
+function MetricCard({ label, value, icon: Icon }) {
+  return (
+    <Card>
+      <CardContent className="p-3">
+        <Icon className="mb-2 h-4 w-4 text-primary" />
+        <p className="text-base font-bold truncate">{value}</p>
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProfileLine({ label, value }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-border/60 py-1.5 last:border-0">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-xs font-medium text-right">{value}</span>
+    </div>
+  );
+}
 
 export default function DriverManagement() {
-  const { t } = useLanguage();
-  const { ownerFilter, branches } = useTenant();
+  const { currency } = useLanguage();
+  const { user } = useAuth();
+  const { activeRestaurant, branches: tenantBranches, isManager, managerBranch } = useTenant();
+  const queryClient = useQueryClient();
+  const branches = asArray(tenantBranches);
+  const managerBranchRecord = useMemo(() => branches.find((branch) =>
+    branchKeyFor(branch) === managerBranch || String(branch.id || '') === String(user?.branch_id || ''),
+  ) || null, [branches, managerBranch, user?.branch_id]);
+
+  const [selectedBranch, setSelectedBranch] = useState(() =>
+    isManager ? branchKeyFor(managerBranchRecord) || managerBranch || '' : 'all',
+  );
   const [search, setSearch] = useState('');
   const [selectedDriver, setSelectedDriver] = useState(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [driverForm, setDriverForm] = useState(emptyDriverForm);
-  const qc = useQueryClient();
+  const [showEditor, setShowEditor] = useState(false);
+  const [editingDriver, setEditingDriver] = useState(null);
+  const [form, setForm] = useState(emptyForm);
 
-  const addMutation = useMutation({
-    mutationFn: (data) => base44.entities.Employee.create(data),
-    onSuccess: () => {
-      toast.success('Driver added successfully');
-      qc.invalidateQueries({ queryKey: ['drivers'] });
-      setShowAddDialog(false);
-      setDriverForm(emptyDriverForm);
-    },
-    onError: (err) => {
-      toast.error(err?.message || 'Failed to add driver');
-    },
+  useEffect(() => {
+    if (!isManager) return;
+    const branch = branchKeyFor(managerBranchRecord) || managerBranch;
+    if (branch) setSelectedBranch(branch);
+  }, [isManager, managerBranch, managerBranchRecord]);
+
+  const selectedBranchRecord = useMemo(() => branches.find((branch) =>
+    branchKeyFor(branch) === selectedBranch || String(branch.id || '') === String(selectedBranch || ''),
+  ) || null, [branches, selectedBranch]);
+  const effectiveBranch = isManager ? managerBranchRecord || selectedBranchRecord : selectedBranchRecord;
+  const effectiveBranchId = effectiveBranch?.id || null;
+  const effectiveBranchKey = branchKeyFor(effectiveBranch) || (selectedBranch === 'all' ? '' : selectedBranch);
+  const canLoad = !!activeRestaurant?.id && (!isManager || !!effectiveBranchId);
+
+  const { data: driversData = [], isLoading: driversLoading } = useQuery({
+    queryKey: ['drivers', activeRestaurant?.id, effectiveBranchId, isManager],
+    queryFn: () => base44.entities.Driver.filter(
+      isManager
+        ? { restaurant_id: activeRestaurant.id, branch_id: effectiveBranchId }
+        : effectiveBranchId
+          ? { restaurant_id: activeRestaurant.id, branch_id: effectiveBranchId }
+          : { restaurant_id: activeRestaurant.id },
+      'full_name',
+      500,
+    ),
+    enabled: canLoad,
+    staleTime: 0,
   });
+  const drivers = asArray(driversData);
 
-  const handleAddDriver = () => {
-    if (!driverForm.full_name || !driverForm.branch) {
-      toast.error('Full name and branch are required');
-      return;
-    }
-    addMutation.mutate({ ...driverForm, is_driver: true });
+  const { data: salesData = [] } = useQuery({
+    queryKey: ['driver-sales', activeRestaurant?.id, effectiveBranchId, isManager],
+    queryFn: async () => {
+      let query = supabase
+        .from('daily_sales')
+        .select('id, date, branch, branch_id, driver_id, driver_name, restaurant_cash, restaurant_network, cash, network, credit, sales_sources_json, custom_sources_total')
+        .eq('restaurant_id', activeRestaurant.id)
+        .not('driver_id', 'is', null)
+        .order('date', { ascending: false })
+        .limit(5000);
+      if (effectiveBranchId) query = query.eq('branch_id', effectiveBranchId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: canLoad,
+    staleTime: 0,
+  });
+  const sales = asArray(salesData);
+
+  const analytics = useMemo(() => buildDriverSalesAnalytics({
+    drivers,
+    sales,
+    branchKey: effectiveBranchKey,
+    branchId: effectiveBranchId,
+  }), [drivers, sales, effectiveBranchId, effectiveBranchKey]);
+
+  const visibleDrivers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return drivers;
+    return drivers.filter((driver) => [driver.full_name, driver.phone, driver.driver_id]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(query)));
+  }, [drivers, search]);
+
+  const openCreate = () => {
+    setEditingDriver(null);
+    setForm({
+      ...emptyForm,
+      branch_id: effectiveBranchId || '',
+    });
+    setShowEditor(true);
   };
 
-  const { data: employees = [], isLoading } = useQuery({
-    queryKey: ['drivers', ownerFilter],
-    queryFn: () => base44.entities.Employee.filter(ownerFilter || {}),
-    staleTime: 120000,
-    enabled: !!ownerFilter?.created_by,
+  const openEdit = (driver) => {
+    setEditingDriver(driver);
+    setForm({
+      full_name: driver.full_name || '',
+      phone: driver.phone || '',
+      email: driver.email || '',
+      driver_id: driver.driver_id || '',
+      vehicle_type: driver.vehicle_type || '',
+      vehicle_plate: driver.vehicle_plate || '',
+      notes: driver.notes || '',
+      branch_id: driver.branch_id || effectiveBranchId || '',
+    });
+    setShowEditor(true);
+  };
+
+  const invalidateDriverData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['drivers'] });
+    queryClient.invalidateQueries({ queryKey: ['driver-sales'] });
+    queryClient.invalidateQueries({ queryKey: ['driver-performance'] });
+  }, [queryClient]);
+
+  useEffect(() => {
+    if (!activeRestaurant?.id) return undefined;
+    const refresh = () => invalidateDriverData();
+    const channel = supabase
+      .channel(`driver-management-${activeRestaurant.id}-${effectiveBranchId || 'all'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers', filter: `restaurant_id=eq.${activeRestaurant.id}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_sales', filter: `restaurant_id=eq.${activeRestaurant.id}` }, refresh)
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [activeRestaurant?.id, effectiveBranchId, invalidateDriverData]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!form.full_name.trim() || !form.branch_id) throw new Error('Full name and branch are required.');
+      const branch = branches.find((item) => String(item.id) === String(form.branch_id));
+      if (!branch) throw new Error('Select a valid branch.');
+      const payload = {
+        full_name: form.full_name.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        driver_id: form.driver_id.trim(),
+        vehicle_type: form.vehicle_type.trim(),
+        vehicle_plate: form.vehicle_plate.trim(),
+        notes: form.notes.trim(),
+        branch_id: branch.id,
+        restaurant_id: activeRestaurant.id,
+        tenant_id: activeRestaurant.id,
+        status: editingDriver?.is_active === false ? 'inactive' : 'active',
+        is_active: editingDriver?.is_active !== false,
+      };
+      return editingDriver
+        ? base44.entities.Driver.update(editingDriver.id, payload)
+        : base44.entities.Driver.create(payload);
+    },
+    onSuccess: () => {
+      toast.success(editingDriver ? 'Driver updated' : 'Driver created');
+      invalidateDriverData();
+      setShowEditor(false);
+      setEditingDriver(null);
+      setForm(emptyForm);
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to save driver'),
   });
 
-  const drivers = useMemo(() =>
-    employees.filter(e =>
-      e.position?.toLowerCase().includes('driver') &&
-      (search === '' || e.name?.toLowerCase().includes(search.toLowerCase()))
-    ),
-    [employees, search]
-  );
+  const toggleMutation = useMutation({
+    mutationFn: (driver) => {
+      const nextActive = driver.is_active === false;
+      return base44.entities.Driver.update(driver.id, {
+        is_active: nextActive,
+        status: nextActive ? 'active' : 'inactive',
+      });
+    },
+    onSuccess: () => {
+      toast.success('Driver status updated');
+      invalidateDriverData();
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to update driver status'),
+  });
 
-  const activeCount = drivers.filter(d => d.is_active !== false).length;
+  const selectedAnalytics = useMemo(() => buildDriverSalesAnalytics({
+    drivers,
+    sales,
+    branchKey: effectiveBranchKey,
+    branchId: effectiveBranchId,
+  }), [drivers, sales, effectiveBranchId, effectiveBranchKey]);
 
   return (
-    <div className="space-y-4 pb-24">
-      {/* Header */}
-      <div className="flex items-center justify-between pt-1">
+    <div className="mx-auto max-w-6xl space-y-5 pb-24">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold">{t('driver_management')}</h1>
-          <p className="text-xs text-muted-foreground">{activeCount} active drivers</p>
+          <h1 className="text-2xl font-bold tracking-tight">Driver Management</h1>
+          <p className="text-sm text-muted-foreground">Canonical branch-scoped driver directory, sales history, and performance.</p>
         </div>
-        <Button size="sm" className="h-8 gap-1 text-xs" onClick={() => setShowAddDialog(true)}>
-          <Plus className="w-3 h-3" /> Add Driver
-        </Button>
+        <Button onClick={openCreate} disabled={!canLoad} className="gap-2"><Plus className="h-4 w-4" />Add Driver</Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: 'Total', value: drivers.length, color: 'bg-blue-50 text-blue-700' },
-          { label: 'Active', value: activeCount, color: 'bg-emerald-50 text-emerald-700' },
-          { label: 'Inactive', value: drivers.length - activeCount, color: 'bg-red-50 text-red-700' },
-        ].map(s => (
-          <div key={s.label} className={`rounded-xl p-2.5 text-center ${s.color}`}>
-            <p className="text-xl font-bold">{s.value}</p>
-            <p className="text-[11px] font-medium">{s.label}</p>
+      <Card>
+        <CardContent className="p-4">
+          <Label className="mb-2 block text-xs font-semibold uppercase text-muted-foreground">Branch Scope</Label>
+          <BranchSelect value={selectedBranch} onChange={setSelectedBranch} includeAll />
+          {isManager && <p className="mt-2 text-xs text-muted-foreground">Your access is restricted to your assigned branch.</p>}
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <MetricCard label="Total Drivers" value={analytics.totals.drivers} icon={Users} />
+        <MetricCard label="Active Drivers" value={analytics.totals.activeDrivers} icon={Truck} />
+        <MetricCard label="Driver Sales" value={money(analytics.totals.revenue, currency)} icon={BarChart3} />
+        <MetricCard label="Sales / Orders" value={analytics.totals.orders} icon={ReceiptText} />
+      </div>
+
+      <Card>
+        <CardContent className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search drivers by name, ID, or phone" />
           </div>
-        ))}
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder={`${t('search')} drivers...`}
-          className="pl-9 h-9 text-sm"
-        />
-      </div>
-
-      {/* Driver list */}
-      {isLoading ? (
-        <div className="flex justify-center py-8">
-          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : drivers.length === 0 ? (
-        <div className="text-center py-10 text-muted-foreground">
-          <Truck className="w-10 h-10 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">{t('no_data')}</p>
-          <p className="text-xs mt-1">No drivers found. Add drivers with "Driver" in their position.</p>
-        </div>
+      {driversLoading ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">Loading drivers…</p>
+      ) : visibleDrivers.length === 0 ? (
+        <Card><CardContent className="py-12 text-center"><Truck className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" /><p className="text-sm text-muted-foreground">No drivers are assigned to this branch.</p></CardContent></Card>
       ) : (
-        <div className="space-y-2">
-          {drivers.map(driver => (
-            <DriverCard key={driver.id} driver={driver} onClick={() => setSelectedDriver(driver)} />
-          ))}
+        <div className="grid gap-3 md:grid-cols-2">
+          {visibleDrivers.map((driver) => {
+            const row = analytics.driverRows.find((item) => String(item.driverId) === String(driver.id));
+            const active = driver.is_active !== false && driver.status !== 'inactive';
+            return (
+              <Card key={driver.id} className="transition-shadow hover:shadow-md">
+                <CardContent className="space-y-4 p-4">
+                  <div className="flex items-start gap-3">
+                    <button type="button" onClick={() => setSelectedDriver(driver)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">{(driver.full_name || 'D').charAt(0).toUpperCase()}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold">{driver.full_name}</span>
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground"><Phone className="h-3 w-3" />{driver.phone || 'No phone'}</span>
+                      </span>
+                    </button>
+                    <Badge variant={active ? 'default' : 'secondary'}>{active ? 'Active' : 'Inactive'}</Badge>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/45 p-3 text-center">
+                    <div><p className="text-sm font-bold">{row?.orders || 0}</p><p className="text-[10px] text-muted-foreground">Orders</p></div>
+                    <div><p className="text-sm font-bold">{money(row?.cash, currency)}</p><p className="text-[10px] text-muted-foreground">Cash</p></div>
+                    <div><p className="text-sm font-bold">{money(row?.revenue, currency)}</p><p className="text-[10px] text-muted-foreground">Revenue</p></div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground"><Switch checked={active} onCheckedChange={() => toggleMutation.mutate(driver)} disabled={toggleMutation.isPending} />{active ? 'Active' : 'Inactive'}</div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setSelectedDriver(driver)}>History</Button>
+                      <Button size="sm" variant="outline" className="gap-1" onClick={() => openEdit(driver)}><Pencil className="h-3 w-3" />Edit</Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {/* Driver Profile Modal */}
-      <DriverProfileModal driver={selectedDriver} onClose={() => setSelectedDriver(null)} />
+      <DriverDetailsDialog driver={selectedDriver} analytics={selectedAnalytics} sales={sales} currency={currency} onOpenChange={setSelectedDriver} />
 
-      {/* Add Driver Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Add Driver</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs">Full Name *</Label>
-              <Input
-                value={driverForm.full_name}
-                onChange={e => setDriverForm(f => ({ ...f, full_name: e.target.value }))}
-                placeholder="Driver full name"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Phone</Label>
-              <Input
-                value={driverForm.phone}
-                onChange={e => setDriverForm(f => ({ ...f, phone: e.target.value }))}
-                placeholder="Phone number"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Branch *</Label>
-              <Select value={driverForm.branch} onValueChange={v => setDriverForm(f => ({ ...f, branch: v }))}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(branches || []).map(b => (
-                    <SelectItem key={b.key} value={b.key}>{b.label}</SelectItem>
-                  ))}
-                </SelectContent>
+      <Dialog open={showEditor} onOpenChange={(open) => !open && setShowEditor(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{editingDriver ? 'Edit Driver' : 'Add Driver'}</DialogTitle></DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2"><Label>Full Name *</Label><Input value={form.full_name} onChange={(event) => setForm((current) => ({ ...current, full_name: event.target.value }))} /></div>
+            <div><Label>Phone</Label><Input value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} /></div>
+            <div><Label>Driver ID</Label><Input value={form.driver_id} onChange={(event) => setForm((current) => ({ ...current, driver_id: event.target.value }))} /></div>
+            <div className="sm:col-span-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></div>
+            <div><Label>Vehicle Type</Label><Input value={form.vehicle_type} onChange={(event) => setForm((current) => ({ ...current, vehicle_type: event.target.value }))} /></div>
+            <div><Label>Vehicle Plate</Label><Input value={form.vehicle_plate} onChange={(event) => setForm((current) => ({ ...current, vehicle_plate: event.target.value }))} /></div>
+            <div className="sm:col-span-2">
+              <Label>Branch *</Label>
+              <Select value={form.branch_id} onValueChange={(value) => setForm((current) => ({ ...current, branch_id: value }))} disabled={isManager}>
+                <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
+                <SelectContent>{branches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.label || branch.name || branchKeyFor(branch)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            <div className="sm:col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} /></div>
           </div>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-            <Button onClick={handleAddDriver} disabled={addMutation.isPending}>
-              {addMutation.isPending ? 'Saving...' : 'Add Driver'}
-            </Button>
-          </DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setShowEditor(false)}>Cancel</Button><Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>{saveMutation.isPending ? 'Saving…' : editingDriver ? 'Save Changes' : 'Create Driver'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

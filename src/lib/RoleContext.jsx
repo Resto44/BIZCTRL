@@ -11,8 +11,9 @@ import { audit } from '@/lib/auditLogger';
  * 3. Manager          — single branch, reports to Owner/GM
  * 4. Employee         — single branch, limited ops
  * 5. Kitchen          — single branch, kitchen queue only
- * 6. Driver           — single branch, delivery only
- * 7. Supplier         — no branch, purchase orders only
+ * 6. Supplier         — no branch, purchase orders only
+ *
+ * Drivers are managed records, not authenticated ERP portal users.
  */
 
 export const ROLES = {
@@ -20,6 +21,7 @@ export const ROLES = {
   GENERAL_MANAGER: 'general_manager',
   MANAGER:         'manager',
   EMPLOYEE:        'employee',
+  // Retained only to safely quarantine legacy profile values; no driver portal exists.
   DRIVER:          'driver',
   KITCHEN:         'kitchen',
   SUPPLIER:        'supplier',
@@ -34,7 +36,7 @@ export const ROLE_HOME = {
   [ROLES.GENERAL_MANAGER]: '/gm-dashboard',
   [ROLES.MANAGER]:         '/manager-dashboard',
   [ROLES.EMPLOYEE]:        '/employee-dashboard',
-  [ROLES.DRIVER]:          '/driver-dashboard',
+  [ROLES.DRIVER]:          '/erp-login',
   [ROLES.KITCHEN]:         '/kitchen-dashboard',
   [ROLES.SUPPLIER]:        '/supplier-portal',
   // Legacy
@@ -78,7 +80,7 @@ function buildCan(role) {
 
   return {
     // Dashboard
-    viewDashboard:      is(ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.DRIVER, ROLES.KITCHEN, ROLES.SUPPLIER, ROLES.SPONSOR, ROLES.CUSTOMER),
+    viewDashboard:      is(ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.KITCHEN, ROLES.SUPPLIER, ROLES.SPONSOR, ROLES.CUSTOMER),
     // Sales
     viewSales:          is(ROLES.MANAGER),
     // Purchases
@@ -86,7 +88,7 @@ function buildCan(role) {
     // Inventory
     viewInventory:      is(ROLES.MANAGER),
     // Orders
-    viewOrders:         is(ROLES.MANAGER, ROLES.DRIVER, ROLES.KITCHEN),
+    viewOrders:         is(ROLES.MANAGER, ROLES.KITCHEN),
     // Staff
     viewStaff:          is(ROLES.MANAGER),
     viewEmployees:      is(ROLES.MANAGER),
@@ -103,7 +105,7 @@ function buildCan(role) {
     // Suppliers
     viewSuppliers:      is(ROLES.MANAGER, ROLES.SUPPLIER),
     // Delivery
-    viewDelivery:       is(ROLES.MANAGER, ROLES.DRIVER),
+    viewDelivery:       is(ROLES.MANAGER),
     // Brand / Settings
     viewBrandSettings:  false,
     viewBilling:        false,
@@ -122,11 +124,11 @@ function buildCan(role) {
     viewTasks:          is(ROLES.MANAGER, ROLES.EMPLOYEE),
     viewSalary:         is(ROLES.EMPLOYEE),
     manageLoans:        is(ROLES.EMPLOYEE),
-    viewProfile:        is(ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.DRIVER, ROLES.CUSTOMER),
+    viewProfile:        is(ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.CUSTOMER),
     // Driver Specific
-    viewDeliveries:     is(ROLES.MANAGER, ROLES.DRIVER),
-    updateDelivery:     is(ROLES.MANAGER, ROLES.DRIVER),
-    viewEarnings:       is(ROLES.DRIVER),
+    viewDeliveries:     is(ROLES.MANAGER),
+    updateDelivery:     is(ROLES.MANAGER),
+    viewEarnings:       false,
     // Sponsor Specific
     viewWallet:         is(ROLES.SPONSOR),
     manageTransactions: is(ROLES.SPONSOR),

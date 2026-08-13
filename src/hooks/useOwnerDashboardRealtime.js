@@ -31,7 +31,7 @@ const TABLE_QUERY_MAP = {
   // Sales
   // BUG FIX: also invalidate 'sales' (history list) and 'sales_today_live' so that
   // manager-created records immediately appear in Owner History and Live Summary.
-  daily_sales:            ['sales_today', 'sales_yesterday', 'sales_week', 'sales_month', 'sales_year', 'sales_prev_week', 'sales_prev_month', 'sales', 'sales_today_live', 'sales_yesterday_live', 'sales_month_live', 'mgr-today-sales', 'mgr-yesterday-sales'],
+  daily_sales:            ['sales_today', 'sales_yesterday', 'sales_week', 'sales_month', 'sales_year', 'sales_prev_week', 'sales_prev_month', 'sales', 'sales_today_live', 'sales_yesterday_live', 'sales_month_live', 'mgr-today-sales', 'mgr-yesterday-sales', 'driver-performance', 'driver-sales'],
   sales_invoices:         ['sales_invoices_today'],
   sales_sources:          ['sales_sources'],
   sales_categories:       ['sales_categories'],
@@ -74,7 +74,7 @@ const TABLE_QUERY_MAP = {
   network_transfers:      ['network_accounts_dash'],
 
   // Driver operations — all driver actions feed the Owner Dashboard in real time.
-  drivers:                ['driver-performance'],
+  drivers:                ['drivers', 'driver-performance', 'driver-sales'],
   delivery_orders:        ['driver-performance', 'driver-orders', 'kitchen-orders', 'manager-delivery-orders'],
   driver_shifts:          ['driver-performance'],
   driver_settlements:     ['driver-performance'],

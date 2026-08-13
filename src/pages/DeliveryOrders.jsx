@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
-import { useRole, ROLES } from '@/lib/RoleContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, RefreshCw, ShoppingBag, Truck, ChefHat, BarChart2, Users, Map } from 'lucide-react';
-import DriverManagementPanel from '@/components/driver/DriverManagementPanel';
+import { Plus, RefreshCw, ShoppingBag, Truck, ChefHat, BarChart2, Map } from 'lucide-react';
 import { ManagerLiveMap } from '@/components/driver/DriverLocationMap';
 import BranchSelect from '@/components/shared/BranchSelect';
 import OrderBoard from '@/components/delivery/OrderBoard';
@@ -18,28 +15,22 @@ import DriverWallets from '@/components/delivery/DriverWallets';
 import DeliveryAnalytics from '@/components/delivery/DeliveryAnalytics';
 
 export default function DeliveryOrders() {
-  const { user } = useAuth();
-  const { branches, managerBranch, isManager } = useTenant();
-  const { role } = useRole();
+  const { branches, managerBranch, isManager, activeRestaurant } = useTenant();
   const qc = useQueryClient();
-  const isOwner = role === ROLES.OWNER;
 
   const defaultBranch = isManager ? (managerBranch || '') : (branches[0]?.key || '');
   const [selectedBranch, setSelectedBranch] = useState(defaultBranch);
   const [tab, setTab] = useState('orders');
   const [showNewOrder, setShowNewOrder] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     if (!selectedBranch && defaultBranch) setSelectedBranch(defaultBranch);
   }, [defaultBranch]);
 
-  useEffect(() => {
-    const t = setInterval(() => setCurrentTime(new Date()), 10000);
-    return () => clearInterval(t);
-  }, []);
-
   const today = new Date().toISOString().split('T')[0];
+  const selectedBranchRecord = useMemo(() => branches.find((branch) =>
+    branch.key === selectedBranch || branch.branch_key === selectedBranch || String(branch.id) === String(selectedBranch),
+  ) || null, [branches, selectedBranch]);
 
   const { data: orders = [], refetch } = useQuery({
     queryKey: ['delivery-orders', selectedBranch, today],
@@ -51,11 +42,11 @@ export default function DeliveryOrders() {
   });
 
   const { data: drivers = [] } = useQuery({
-    queryKey: ['drivers', selectedBranch],
-    queryFn: () => selectedBranch
-      ? base44.entities.Employee.filter({ branch: selectedBranch, position: 'driver' })
+    queryKey: ['drivers', activeRestaurant?.id, selectedBranchRecord?.id],
+    queryFn: () => activeRestaurant?.id && selectedBranchRecord?.id
+      ? base44.entities.Driver.filter({ restaurant_id: activeRestaurant.id, branch_id: selectedBranchRecord.id }, 'full_name', 500)
       : [],
-    enabled: !!selectedBranch,
+    enabled: !!activeRestaurant?.id && !!selectedBranchRecord?.id,
   });
 
   const { data: menuCategories = [] } = useQuery({
@@ -133,7 +124,7 @@ export default function DeliveryOrders() {
 
       <div className="px-4 pt-4 max-w-5xl mx-auto">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-6 w-full mb-4">
+          <TabsList className="grid grid-cols-5 w-full mb-4">
             <TabsTrigger value="orders" className="text-xs flex items-center gap-1">
               <ShoppingBag className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Orders</span>
@@ -156,9 +147,6 @@ export default function DeliveryOrders() {
             </TabsTrigger>
             <TabsTrigger value="analytics" className="text-xs flex items-center gap-1">
               <BarChart2 className="w-3.5 h-3.5" /><span className="hidden sm:inline">Analytics</span>
-            </TabsTrigger>
-            <TabsTrigger value="drivermgmt" className="text-xs flex items-center gap-1">
-              <Users className="w-3.5 h-3.5" /><span className="hidden sm:inline">Manage</span>
             </TabsTrigger>
           </TabsList>
 
@@ -223,12 +211,6 @@ export default function DeliveryOrders() {
             <DeliveryAnalytics orders={orders} drivers={drivers} today={today} />
           </TabsContent>
 
-          <TabsContent value="drivermgmt">
-            <DriverManagementPanel
-              branch={selectedBranch}
-              today={today}
-            />
-          </TabsContent>
         </Tabs>
       </div>
 
