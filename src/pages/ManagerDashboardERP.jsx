@@ -28,10 +28,8 @@
  */
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/lib/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
-import { useTenant } from '@/lib/TenantContext';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,9 +42,9 @@ import {
   Users, Clock, RefreshCw, BarChart3,
   AlertTriangle, CheckCircle2, Activity, Wallet, Receipt,
   CreditCard, Banknote, ArrowUpRight, ArrowDownRight,
-  FileText, Zap, Building2, Truck, ChefHat,
+  FileText, Zap, Building2,
 } from 'lucide-react';
-import { format, subDays, startOfMonth } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
@@ -629,9 +627,6 @@ function ManagerContent({ branchId, branchName, branchKey }) {
         </div>
       </div>
 
-      {/* ── Delivery Orders Overview ── */}
-      <ManagerDeliverySection branchId={branchId} navigate={navigate} />
-
       {/* Quick Actions */}
       <div>
         <SectionHeader title="Quick Actions" icon={Zap} />
@@ -645,75 +640,6 @@ function ManagerContent({ branchId, branchName, branchKey }) {
           <QuickAction label="Reports"      icon={BarChart3}     path="/reports"     color="bg-blue-500/10 text-blue-600" />
           <QuickAction label="Employees"    icon={Users}         path="/employees"   color="bg-indigo-500/10 text-indigo-600" />
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Delivery Orders Overview for Manager ───────────────────────────────────
-function ManagerDeliverySection({ branchId, navigate }) {
-  const { data: deliveryOrders = [], isLoading } = useQuery({
-    queryKey: ['manager-delivery-orders', branchId],
-    queryFn: async () => {
-      if (!branchId) return [];
-      const { data, error } = await supabase
-        .from('delivery_orders')
-        .select('id, order_number, status, driver_name, customer_name, total_amount, created_date, updated_date')
-        .eq('branch_id', branchId)
-        .not('status', 'in', '(delivered,completed,cancelled)')
-        .order('created_date', { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!branchId,
-    refetchInterval: 30000,
-  });
-
-  const stats = React.useMemo(() => ({
-    active: deliveryOrders.filter(o => !['delivered', 'completed', 'cancelled'].includes(o.status)).length,
-    awaitingAssignment: deliveryOrders.filter(o => ['pending', 'assigned'].includes(o.status)).length,
-    enRoute: deliveryOrders.filter(o => ['picked_up', 'out_for_delivery'].includes(o.status)).length,
-  }), [deliveryOrders]);
-
-  if (isLoading) return null;
-  if (deliveryOrders.length === 0) return null;
-
-  return (
-    <div>
-      <SectionHeader title="Active Deliveries" icon={Truck}
-        action={<Button variant="ghost" size="sm" className="text-xs" onClick={() => navigate('/delivery')}>View All</Button>} />
-      <div className="grid grid-cols-3 gap-3 mb-3">
-        <Card className="border-border/60">
-          <CardContent className="p-3 text-center">
-            <p className="text-xl font-bold text-amber-600">{stats.active}</p>
-            <p className="text-xs text-muted-foreground">Active Orders</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/60">
-          <CardContent className="p-3 text-center">
-            <p className="text-xl font-bold text-blue-600">{stats.awaitingAssignment}</p>
-            <p className="text-xs text-muted-foreground">Awaiting Assignment</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/60">
-          <CardContent className="p-3 text-center">
-            <p className="text-xl font-bold text-violet-600">{stats.enRoute}</p>
-            <p className="text-xs text-muted-foreground">En Route</p>
-          </CardContent>
-        </Card>
-      </div>
-      <div className="space-y-2">
-        {deliveryOrders.slice(0, 5).map(order => (
-          <div key={order.id} className="flex items-center justify-between p-2 rounded-lg border border-border/50 bg-card text-sm">
-            <div className="flex items-center gap-2">
-              <Truck className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-medium text-foreground">{order.order_number || `#${order.id?.slice(0,8)}`}</span>
-              {order.driver_name && <span className="text-muted-foreground text-xs">• {order.driver_name}</span>}
-            </div>
-            <Badge variant="outline" className="text-[10px]">{order.status?.replace(/_/g,' ')}</Badge>
-          </div>
-        ))}
       </div>
     </div>
   );

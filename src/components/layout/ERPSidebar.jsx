@@ -11,13 +11,11 @@
  *   - Dark/light mode aware
  *   - Responsive: hidden on mobile (BottomNav handles mobile)
  */
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useRole } from '@/lib/RoleContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
-import { useLanguage } from '@/lib/LanguageContext';
-import { useBusinessMode } from '@/lib/BusinessModeContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -26,11 +24,11 @@ import { Separator } from '@/components/ui/separator';
 import {
   LayoutDashboard, TrendingUp, ShoppingCart, Package, Users,
   DollarSign, Wallet, BarChart3, Settings, Bell, Building2,
-  ChefHat, Truck, Shield, Star, Clock, ChevronLeft, ChevronRight,
+  ChefHat, Shield, Star, Clock, ChevronLeft, ChevronRight,
   Receipt, FileText, AlertTriangle, Zap, Activity, CreditCard,
   Banknote, Network, UserCheck, GitBranch, Store, Globe,
   PieChart, Target, Layers, ClipboardList, Handshake,
-  ArrowLeftRight, BookOpen, Megaphone, ShieldCheck
+  ArrowLeftRight, ShieldCheck
 } from 'lucide-react';
 import { useERPNavigation } from '@/hooks/useERPNavigation';
 
@@ -64,7 +62,6 @@ export const ERP_NAV_GROUPS = [
       { path: '/inventory-transfers', label: 'Transfers',       icon: ArrowLeftRight, permission: 'viewInventory' },
       { path: '/inventory-waste',     label: 'Waste',           icon: AlertTriangle,  permission: 'viewInventory' },
       { path: '/products',            label: 'Products',        icon: Store,          permission: 'viewInventory' },
-      { path: '/recipes',             label: 'Recipes',         icon: BookOpen,       permission: 'viewInventory' },
     ],
   },
   {
@@ -105,15 +102,6 @@ export const ERP_NAV_GROUPS = [
       { path: '/oracle-analytics',label: 'Oracle Analytics',icon: Zap,       permission: 'viewReports' },
       { path: '/branch-analytics',label: 'Branch Analytics',icon: GitBranch, permission: 'viewReports' },
       { path: '/alerts',          label: 'Smart Alerts',    icon: Bell,      permission: 'viewAlerts' },
-    ],
-  },
-  {
-    key: 'delivery',
-    label: 'Delivery',
-    items: [
-      { path: '/delivery',         label: 'Delivery Orders',  icon: Truck,    permission: 'viewDelivery' },
-      { path: '/menu-products',    label: 'Menu Products',    icon: ChefHat,  permission: 'viewDelivery' },
-      { path: '/driver-settlements',label: 'Driver Settlements',icon: Banknote,permission: 'viewDelivery' },
     ],
   },
   {

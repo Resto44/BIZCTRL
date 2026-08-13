@@ -26,23 +26,16 @@ const Dashboard           = lazy(() => import('./pages/Dashboard'));
 const ExecutiveCommandCenter = lazy(() => import('./pages/ExecutiveCommandCenter'));
 const OwnerDashboard         = lazy(() => import('./pages/OwnerDashboard'));
 const CashRegisterCenter     = lazy(() => import('./pages/CashRegisterCenter'));
-const OnlineOrdering         = lazy(() => import('./pages/OnlineOrdering'));
-// ── Online Ordering V2 ──────────────────────────────────────────────────────
-const OnlineOrderingV2       = lazy(() => import('./pages/OnlineOrderingV2'));
 // Legacy dashboard variants removed — canonical ERP pages used instead
-const OrderManagementV2      = lazy(() => import('./pages/OrderManagementV2'));
 const PromotionsV2           = lazy(() => import('./pages/PromotionsV2'));
-const OrderAnalyticsV2       = lazy(() => import('./pages/OrderAnalyticsV2'));
 const LoyaltyProgramV2       = lazy(() => import('./pages/LoyaltyProgramV2'));
 const DriverManagement       = lazy(() => import('./pages/DriverManagement'));
 const CustomerManagement     = lazy(() => import('./pages/CustomerManagement'));
 const BranchCommandCenter    = lazy(() => import('./pages/BranchCommandCenter'));
 const InventoryCommandCenter = lazy(() => import('./pages/InventoryCommandCenter'));
-const RecipeFoodCosting      = lazy(() => import('./pages/RecipeFoodCosting'));
 const SmartAlertCenter       = lazy(() => import('./pages/SmartAlertCenter'));
 const AIBusinessCopilot      = lazy(() => import('./pages/AIBusinessCopilot'));
 const BICenter               = lazy(() => import('./pages/BICenter'));
-const ReservationTableManagement = lazy(() => import('./pages/ReservationTableManagement'));
 
 const Sales               = lazy(() => import('./pages/Sales'));
 const SalesInvoices       = lazy(() => import('./pages/SalesInvoices'));
@@ -54,7 +47,6 @@ const Inventory           = lazy(() => import('@/pages/Inventory'));
 const InventoryTransfer   = lazy(() => import('@/pages/InventoryTransfer'));
 const InventoryWaste      = lazy(() => import('@/pages/InventoryWaste'));
 const InventoryForecast   = lazy(() => import('@/pages/InventoryForecast'));
-const Recipes             = lazy(() => import('@/pages/Recipes'));
 
 const Suppliers           = lazy(() => import('@/pages/Suppliers'));
 const PurchaseOrders      = lazy(() => import('@/pages/PurchaseOrders'));
@@ -84,12 +76,8 @@ const SponsorTreasury     = lazy(() => import('@/pages/SponsorTreasury'));
 const DebtManagement      = lazy(() => import('@/pages/DebtManagement'));
 const NetworkManagement   = lazy(() => import('@/pages/NetworkManagement'));
 
-const DeliveryOrders      = lazy(() => import('@/pages/DeliveryOrders'));
-const MenuProducts        = lazy(() => import('@/pages/MenuProducts'));
-const DriverSettlements   = lazy(() => import('@/pages/DriverSettlements'));
 const CustomerPortal      = lazy(() => import('@/pages/CustomerPortal'));
 const LoyaltyProgram      = lazy(() => import('@/pages/LoyaltyProgram'));
-const AIRecommendations   = lazy(() => import('@/pages/AIRecommendations'));
 
 const SettingsPage        = lazy(() => import('@/pages/SettingsPage'));
 const BrandSettings       = lazy(() => import('@/pages/BrandSettings'));
@@ -121,9 +109,6 @@ const ProductVariants     = lazy(() => import('@/pages/retail/ProductVariants'))
 const BatchTracking       = lazy(() => import('@/pages/retail/BatchTracking'));
 const ExpiryTracking      = lazy(() => import('@/pages/retail/ExpiryTracking'));
 const SerialNumbers       = lazy(() => import('@/pages/retail/SerialNumbers'));
-
-// ── Restaurant Mode Exclusive Modules ────────────────────────────────────────
-const Production          = lazy(() => import('@/pages/Production'));
 
 // ── Public pages (eager — shown before auth) ─────────────────────────────────
 import LandingPage            from '@/pages/LandingPage';
@@ -281,7 +266,6 @@ const SubscribedRoutes = () => {
         <Route path="/inventory-transfers" element={<RoleGuard permission="viewInventory"><InventoryTransfer /></RoleGuard>} />
         <Route path="/inventory-waste" element={<RoleGuard permission="viewInventory"><InventoryWaste /></RoleGuard>} />
         <Route path="/inventory-forecast" element={<InventoryForecast />} />
-        <Route path="/recipes" element={<RoleGuard permission="viewInventory"><Recipes /></RoleGuard>} />
 
         {/* ── Analytics & Reports ── */}
         <Route path="/reports" element={<RoleGuard permission="viewReports"><Reports /></RoleGuard>} />
@@ -314,11 +298,6 @@ const SubscribedRoutes = () => {
         <Route path="/network-analytics" element={<RoleGuard permission="viewNetworkAccounts"><NetworkManagement /></RoleGuard>} />
         <Route path="/network-hub" element={<RoleGuard permission="viewDashboard"><NetworkManagement /></RoleGuard>} />
 
-        {/* ── Delivery ── */}
-        <Route path="/delivery" element={<RoleGuard permission="viewDelivery"><DeliveryOrders /></RoleGuard>} />
-        <Route path="/menu-products" element={<RoleGuard permission="viewDelivery"><MenuProducts /></RoleGuard>} />
-        <Route path="/driver-settlements" element={<RoleGuard permission="viewDelivery"><DriverSettlements /></RoleGuard>} />
-
         {/* ── Configuration ── */}
         <Route path="/settings" element={<RoleGuard permission="manageSettings"><SettingsPage /></RoleGuard>} />
         <Route path="/brand" element={<RoleGuard permission="viewBrandSettings"><BrandSettings /></RoleGuard>} />
@@ -350,29 +329,17 @@ const SubscribedRoutes = () => {
 
         {/* ── Enterprise Modules ── */}
         <Route path="/cash-register" element={<RoleGuard permission="viewSales"><CashRegisterCenter /></RoleGuard>} />
-        <Route path="/online-ordering" element={<RoleGuard permission="viewSales"><OnlineOrdering /></RoleGuard>} />
-
-        {/* ── Online Ordering V2 ── */}
-        <Route path="/order" element={<OnlineOrderingV2 />} />
-        <Route path="/order/:branchSlug" element={<OnlineOrderingV2 />} />
-        <Route path="/order/track/:orderId" element={<OnlineOrderingV2 />} />
-
-        <Route path="/order-management" element={<RoleGuard permission="viewSales"><OrderManagementV2 /></RoleGuard>} />
         <Route path="/promotions" element={<RoleGuard permission="viewSales"><PromotionsV2 /></RoleGuard>} />
-        <Route path="/order-analytics" element={<RoleGuard permission="viewReports"><OrderAnalyticsV2 /></RoleGuard>} />
         <Route path="/loyalty-v2" element={<RoleGuard permission="viewDebts"><LoyaltyProgramV2 /></RoleGuard>} />
         <Route path="/driver-management" element={<RoleGuard permission="viewEmployees"><DriverManagement /></RoleGuard>} />
         <Route path="/customer-management" element={<RoleGuard permission="viewDebts"><CustomerManagement /></RoleGuard>} />
         <Route path="/branch-command-center" element={<RoleGuard permission="viewDashboard"><BranchCommandCenter /></RoleGuard>} />
         <Route path="/inventory-command-center" element={<RoleGuard permission="viewInventory"><InventoryCommandCenter /></RoleGuard>} />
-        <Route path="/recipe-food-costing" element={<RoleGuard permission="viewInventory"><RecipeFoodCosting /></RoleGuard>} />
         <Route path="/smart-alerts" element={<RoleGuard permission="viewAlerts"><SmartAlertCenter /></RoleGuard>} />
         <Route path="/ai-copilot" element={<RoleGuard permission="viewDashboard"><AIBusinessCopilot /></RoleGuard>} />
         <Route path="/bi-center" element={<RoleGuard permission="viewReports"><BICenter /></RoleGuard>} />
-        <Route path="/reservations" element={<RoleGuard permission="viewSales"><ReservationTableManagement /></RoleGuard>} />
         <Route path="/customer-portal" element={<CustomerPortal />} />
         <Route path="/loyalty-program" element={<RoleGuard permission="viewDebts"><LoyaltyProgram /></RoleGuard>} />
-        <Route path="/ai-recommendations" element={<AIRecommendations />} />
 
         {/* ── Short aliases — redirect to new ERP dashboards ── */}
         <Route path="/employee" element={<Navigate to="/employee-dashboard" replace />} />
@@ -390,11 +357,6 @@ const SubscribedRoutes = () => {
         <Route path="/retail/expiry"   element={<RoleGuard permission="viewInventory"><ExpiryTracking /></RoleGuard>} />
         <Route path="/retail/serials"  element={<RoleGuard permission="viewInventory"><SerialNumbers /></RoleGuard>} />
 
-        {/* ══════════════════════════════════════════════════════════════════════
-            RESTAURANT MODE EXCLUSIVE ROUTES
-            Pages enforce Restaurant Mode via useBusinessMode() guard.
-        ══════════════════════════════════════════════════════════════════════ */}
-        <Route path="/production"      element={<RoleGuard permission="viewInventory"><Production /></RoleGuard>} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

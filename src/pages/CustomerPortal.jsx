@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44, supabase } from '@/api/supabaseClient';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useAuth } from '@/lib/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,12 +12,11 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  User, MapPin, Heart, Clock, Star, Phone, Mail, Edit2, Plus, Trash2,
-  Home, Briefcase, Award, Gift, ChevronRight, LogOut, Check, X,
-  Crown, Shield, Zap, Package
+  User, MapPin, Star, Phone, Mail, Edit2, Plus, Trash2,
+  Home, Briefcase, Award, Gift, Check,
+  Crown, Shield, Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
 
 const TIER_CONFIG = {
   Bronze:   { icon: Award,  color: 'text-amber-700',   bg: 'bg-amber-100',   border: 'border-amber-300',   points: 0    },
@@ -154,13 +153,6 @@ export default function CustomerPortal() {
     enabled: !!customer?.id,
   });
 
-  // Load customer orders
-  const { data: orders = [] } = useQuery({
-    queryKey: ['customer_orders', customer?.id],
-    queryFn: () => base44.entities.Order.filter({ customer_id: customer.id }, '-created_date', 50),
-    enabled: !!customer?.id,
-  });
-
   useEffect(() => {
     if (customer) {
       setProfileForm({ name: customer.name || '', phone: customer.phone || '', email: customer.email || '' });
@@ -280,10 +272,9 @@ export default function CustomerPortal() {
       </Card>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full grid grid-cols-4 h-9">
+        <TabsList className="w-full grid grid-cols-3 h-9">
           <TabsTrigger value="profile" className="text-xs"><User className="w-3 h-3" /></TabsTrigger>
           <TabsTrigger value="addresses" className="text-xs"><MapPin className="w-3 h-3" /></TabsTrigger>
-          <TabsTrigger value="orders" className="text-xs"><Package className="w-3 h-3" /></TabsTrigger>
           <TabsTrigger value="loyalty" className="text-xs"><Gift className="w-3 h-3" /></TabsTrigger>
         </TabsList>
 
@@ -371,37 +362,6 @@ export default function CustomerPortal() {
             <Button className="w-full h-10" variant="outline" onClick={() => setAddressDialog({ open: true, address: null })}>
               <Plus className="w-4 h-4 mr-1.5" />{t('add')} {t('address')}
             </Button>
-          )}
-        </TabsContent>
-
-        {/* Orders Tab */}
-        <TabsContent value="orders" className="mt-3 space-y-3">
-          {orders.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">{t('no_data')}</p>
-            </div>
-          ) : (
-            orders.map(order => (
-              <Card key={order.id} className="overflow-hidden">
-                <CardContent className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-bold">#{order.id?.slice(-6)?.toUpperCase()}</p>
-                      <p className="text-xs text-muted-foreground">{order.created_date ? format(new Date(order.created_date), 'dd MMM yyyy, HH:mm') : '—'}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-primary">{order.total_amount?.toFixed(2)}</p>
-                      <Badge variant="outline" className={`text-[10px] ${
-                        order.status === 'delivered' ? 'text-emerald-600 border-emerald-300' :
-                        order.status === 'cancelled' ? 'text-red-500 border-red-300' :
-                        'text-amber-600 border-amber-300'
-                      }`}>{order.status}</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
           )}
         </TabsContent>
 

@@ -11,11 +11,11 @@
 import React, { memo, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Receipt, BarChart3, MoreHorizontal, Wallet, Users, Truck,
-  ChefHat, ShoppingBag, ClipboardList, UserCheck, Bell, Bot, Building2,
+  LayoutDashboard, Receipt, BarChart3, Wallet, Users, Truck,
+  ClipboardList, UserCheck, Bot, Building2,
   Package, CreditCard, ShoppingCart, Star, Grid3x3, X,
-  TrendingUp, Calendar, Utensils, Zap, Barcode, Boxes, Tags,
-  UtensilsCrossed, BookOpen, Factory, ScanLine, Hash, Layers, ShieldCheck,
+  TrendingUp, Calendar, Zap, Barcode, Boxes, Tags,
+  ScanLine, Hash, Layers, ShieldCheck,
 } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
@@ -71,10 +71,7 @@ const PRIMARY_NAV_EMPLOYEE = [
 const PRIMARY_NAV_SPONSOR = [
   { path: '/erp-login',            icon: LayoutDashboard, labelKey: 'dashboard' },
 ];
-const PRIMARY_NAV_CUSTOMER = [
-  { path: '/order',                icon: ShoppingBag,     labelKey: 'order_now' },
-  { path: '/online-ordering',      icon: ShoppingBag,     labelKey: 'menu_page' },
-];
+const PRIMARY_NAV_CUSTOMER = [];
 
 // ── More Menu Sections ────────────────────────────────────────────────────────
 
@@ -83,19 +80,6 @@ const MORE_SECTIONS_OWNER_RESTAURANT = [
     title: 'Approvals',
     items: [
       { path: '/erp-approval-center',       icon: ShieldCheck, labelKey: 'approval_center' },
-    ],
-  },
-  {
-    title: 'Restaurant',
-    items: [
-      { path: '/menu-products',             icon: BookOpen,    labelKey: 'menu' },
-      { path: '/recipes',                   icon: ChefHat,     labelKey: 'recipes' },
-      { path: '/recipe-food-costing',       icon: TrendingUp,  labelKey: 'food_cost' },
-      { path: '/reservation-table-management', icon: Utensils, labelKey: 'tables' },
-      { path: '/order-management',          icon: ClipboardList, labelKey: 'orders' },
-      { path: '/delivery',                  icon: Truck,       labelKey: 'delivery' },
-      { path: '/online-ordering',           icon: ShoppingCart, labelKey: 'online_ordering' },
-      { path: '/production',                icon: Factory,     labelKey: 'production' },
     ],
   },
   {
@@ -202,14 +186,6 @@ const MORE_SECTIONS_OWNER_RETAIL = [
 ];
 
 const MORE_SECTIONS_MANAGER_RESTAURANT = [
-  {
-    title: 'Restaurant',
-    items: [
-      { path: '/menu-products',     icon: BookOpen,    labelKey: 'menu' },
-      { path: '/reservations',      icon: Calendar,    labelKey: 'reservations' },
-      { path: '/delivery',          icon: Truck,       labelKey: 'delivery' },
-    ],
-  },
   {
     title: 'Operations',
     items: [

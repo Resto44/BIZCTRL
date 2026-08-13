@@ -15,14 +15,10 @@ import React, { useMemo } from 'react';
 import { useBusinessMode } from '@/lib/BusinessModeContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import {
-  TrendingUp, TrendingDown, Package, AlertTriangle, ChefHat,
-  Truck, Users, Wallet, Receipt, ShoppingBag, Barcode, Tags,
-  Calendar, ScanLine, Clock, CheckCircle2, XCircle, Boxes,
-  UtensilsCrossed, Factory, BookOpen, Star, ArrowRight,
+  TrendingUp, TrendingDown, AlertTriangle, Receipt,
+  Calendar, Boxes, ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -137,7 +133,6 @@ export function useModeDashboardConfig() {
       { id: 'expiring_soon',  title: 'Expiring Soon',  icon: Calendar,  color: 'red',    dataKey: 'expiringSoon' },
     ] : [
       { id: 'daily_sales',    title: 'Today Sales',    icon: Receipt,    color: 'blue',   dataKey: 'dailySales' },
-      { id: 'orders_today',   title: 'Orders Today',   icon: ClipboardList, color: 'orange', dataKey: 'ordersToday' },
       { id: 'low_ingredients', title: 'Low Ingredients', icon: AlertTriangle, color: 'red', dataKey: 'lowIngredients' },
     ],
 
@@ -147,14 +142,13 @@ export function useModeDashboardConfig() {
       { id: 'expiry',       title: 'Expiry Alerts',     icon: Calendar,      color: 'red',   linkTo: '/retail/expiry' },
     ] : [
       { id: 'low_stock',    title: 'Low Ingredients',   icon: AlertTriangle, color: 'amber', linkTo: '/inventory' },
-      { id: 'pending_orders', title: 'Pending Orders',  icon: Clock,         color: 'blue',  linkTo: '/order-management' },
     ],
   }), [isRetail, isRestaurant]);
 }
 
 // ── Mode-Aware Dashboard Section ──────────────────────────────────────────────
 
-export function ModeSpecificDashboardSection({ lowStockItems = [], expiryAlerts = [], pendingOrders = [] }) {
+export function ModeSpecificDashboardSection({ lowStockItems = [], expiryAlerts = [] }) {
   const { isRetail } = useBusinessMode();
   const { t } = useLanguage();
 
@@ -209,22 +203,6 @@ export function ModeSpecificDashboardSection({ lowStockItems = [], expiryAlerts 
         emptyMsg={t('all_ingredients_stocked')}
       />
 
-      {/* Restaurant: Pending Orders */}
-      <AlertWidget
-        title={t('pending_label')}
-        icon={Clock}
-        color="blue"
-        linkTo="/order-management"
-        items={pendingOrders.map(order => ({
-          label: `${t('order_label')}${order.id?.slice(-6) || '—'}`,
-          value: order.total_amount ? `${order.total_amount}` : t('pending_label'),
-          valueColor: 'text-blue-600',
-        }))}
-        emptyMsg={t('no_pending_orders')}
-      />
     </div>
   );
 }
-
-// Fix missing import
-import { ClipboardList } from 'lucide-react';

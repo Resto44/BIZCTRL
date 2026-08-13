@@ -13,11 +13,11 @@
  *   - Navigation reads this context to show/hide mode-specific routes.
  *
  * Business Modes:
- *   'restaurant' — Menu, Recipe/BOM, Ingredient Inventory, Tables, Delivery
- *   'cafe'       — Like restaurant but without full production
+ *   'restaurant' — ERP sales, inventory, purchasing, finance, and people operations
+ *   'cafe'       — ERP sales, inventory, purchasing, finance, and people operations
  *   'retail'     — Barcode, SKU, Variants, Batch/Lot, Expiry, Serial Numbers
  *   'warehouse'  — Inventory, transfers, batch tracking, no POS
- *   'factory'    — Production/BOM, raw materials, finished goods
+ *   'factory'    — Raw-material and finished-goods inventory operations
  *   'pharmacy'   — Expiry tracking, serial numbers, prescriptions
  *   'clinic'     — Appointments, services, medical inventory
  *   'wholesale'  — Bulk orders, price tiers, large POs
@@ -90,18 +90,6 @@ export const MODULE_REGISTRY = {
   multi_language:        { modes: 'all', label: 'Multi-Language' },
   approval_center:       { modes: 'all', label: 'Approval Center' },
   supplier_portal:       { modes: 'all', label: 'Supplier Portal' },
-
-  // ── Restaurant / Café Mode Modules ─────────────────────────────────────────
-  menu_management:       { modes: ['restaurant', 'cafe'], label: 'Menu Management' },
-  recipe_bom:            { modes: ['restaurant', 'cafe'], label: 'Recipe / BOM' },
-  ingredient_inventory:  { modes: ['restaurant', 'cafe'], label: 'Ingredient Inventory' },
-  table_service:         { modes: 'restaurant', label: 'Table Service' },
-  dine_in:               { modes: 'restaurant', label: 'Dine-In' },
-  takeaway:              { modes: ['restaurant', 'cafe'], label: 'Takeaway' },
-  delivery:              { modes: ['restaurant', 'cafe'], label: 'Delivery' },
-  waste_management:      { modes: ['restaurant', 'cafe'], label: 'Waste Management' },
-  production:            { modes: ['restaurant', 'factory'], label: 'Production' },
-  food_cost:             { modes: ['restaurant', 'cafe'], label: 'Food Cost' },
 
   // ── Retail / Warehouse / Wholesale Mode Modules ─────────────────────────────
   barcode:               { modes: ['retail', 'warehouse', 'wholesale', 'pharmacy'], label: 'Barcode' },

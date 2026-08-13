@@ -26,12 +26,11 @@
  *   8. Product Price Intelligence
  *   9. Alerts
  */
-import React, { useState, useMemo, useCallback, memo, useEffect, useRef } from 'react';
-import { useBusinessMode } from '@/lib/BusinessModeContext';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import ModeBadge from '@/components/shared/ModeBadge';
 import { ModeSpecificDashboardSection } from '@/components/dashboard/DashboardWidgetRegistry';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -46,27 +45,20 @@ import { computeAdditionalSources } from '@/services/salesAnalyticsEngine';
 import { useSalesSources } from '@/hooks/useSalesSources';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 // SalesForm removed to enforce single ERP workspace entry point
 import PriceChangesWidget from '@/components/dashboard/PriceChangesWidget';
 import DriverPerformance from '@/components/dashboard/DriverPerformance';
-import { toast } from 'sonner';
-import {
-  generateSalesInvoiceNumber,
-  createSalesInvoice,
-  generateAndUploadPDF,
-} from '@/lib/salesInvoiceService';
-import { computeProcurementKPIs, getOverdueInfo } from '@/lib/procurementEngine';
+import { computeProcurementKPIs } from '@/lib/procurementEngine';
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package,
-  Users, Truck, AlertTriangle, Wifi, Plus, CreditCard, Wallet,
-  Receipt, Banknote, ArrowDownLeft, BarChart3,
+  Users, Truck, AlertTriangle, Wifi, CreditCard, Wallet,
+  Receipt, Banknote, BarChart3,
   PackagePlus, ArrowLeftRight, FileText, ShoppingBag, Activity,
-  Scale, Target, Zap, ChevronRight, ArrowUpRight, ArrowDownRight,
+  Scale, Target, ChevronRight, ArrowUpRight, ArrowDownRight,
   CheckCircle2, XCircle, AlertCircle,
   LayoutDashboard, Layers, Clock, MapPin, Globe, ChevronDown,
-  Building2, Radio, RefreshCw,
+  Building2, Radio,
 } from 'lucide-react';
 import {
   format, startOfMonth, startOfWeek, startOfYear,
@@ -74,7 +66,7 @@ import {
 } from 'date-fns';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
+  Tooltip as RechartsTooltip, ResponsiveContainer,
 } from 'recharts';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -323,12 +315,6 @@ const EVENT_ICON_MAP = {
   payroll_runs:           Banknote,
   attendance:             Clock,
   drivers:                Truck,
-  delivery_orders:        Truck,
-  driver_shifts:          Clock,
-  driver_settlements:     Wallet,
-  driver_debts:           CreditCard,
-  driver_sales_entries:   Receipt,
-  driver_locations:       MapPin,
   branches:               Building2,
   notifications:          AlertCircle,
   network_accounts:       Wifi,

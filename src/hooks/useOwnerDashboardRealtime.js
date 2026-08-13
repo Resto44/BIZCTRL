@@ -73,17 +73,8 @@ const TABLE_QUERY_MAP = {
   network_accounts:       ['network_accounts_dash'],
   network_transfers:      ['network_accounts_dash'],
 
-  // Driver operations — all driver actions feed the Owner Dashboard in real time.
+  // Driver records remain managed through canonical Daily Sales attribution.
   drivers:                ['drivers', 'driver-performance', 'driver-sales'],
-  delivery_orders:        ['driver-performance', 'driver-orders', 'manager-delivery-orders'],
-  driver_shifts:          ['driver-performance'],
-  driver_settlements:     ['driver-performance'],
-  driver_debts:           ['driver-performance'],
-  driver_sales_entries:   ['driver-performance'],
-  driver_locations:       ['driver-performance'],
-
-  // Order workflow
-  order_status_history:   ['driver-orders', 'driver-performance'],
 
   // HR
   employees:              ['employees'],
@@ -127,13 +118,6 @@ const TABLE_LABELS = {
   network_accounts:       'POS Device',
   network_transfers:      'Transfer',
   drivers:                'Driver',
-  delivery_orders:        'Delivery Order',
-  driver_shifts:          'Driver Shift',
-  driver_settlements:     'Driver Settlement',
-  driver_debts:           'Driver Debt',
-  driver_sales_entries:   'Driver Sales Entry',
-  driver_locations:       'Driver Location',
-  order_status_history:   'Order Status',
   employees:              'Employee',
   payroll_runs:           'Payroll',
   attendance:             'Attendance',
