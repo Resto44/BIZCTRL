@@ -383,7 +383,6 @@ export function TenantProvider({ children }) {
       managerBranchObject,
       isManager,
       isEmployee,
-      isDriver,
       isKitchen,
       isCustomer,
       isSponsor,
