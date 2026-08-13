@@ -23,6 +23,19 @@ assert(salesPage.includes('isDriverSale(s) || isBranchManager'), 'delete permiss
 assert(branchSelect.includes('const branches = asRecordArray(tenantBranches);'), 'BranchSelect does not normalize loading/null branch data');
 assert(branchSelect.includes("const canChange = typeof onChange === 'function';"), 'BranchSelect does not guard a missing branch callback');
 
+// Exclusive, data-preserving Add Sales accordion.
+const accordionSections = ['shift', 'summary', 'drivers', 'pos', 'credit', 'custom', 'purchases', 'reconciliation', 'operating', 'validation', 'save'];
+assert(workspace.includes('const [activeSection, setActiveSection] = useState(null);'), 'Add Sales cards do not default to a compact collapsed state');
+assert(workspace.includes('current === key ? null : key'), 'accordion headers do not toggle open and closed');
+assert(workspace.includes('const AccordionBody = memo'), 'collapsed section bodies are not safely retained');
+assert(workspace.includes('grid-rows-[0fr] opacity-0 pointer-events-none'), 'collapsed sections do not hide safely without unmounting their fields');
+accordionSections.forEach((section) => {
+  assert(workspace.includes(`isSectionOpen('${section}')`), `accordion behavior is missing for the ${section} section`);
+});
+assert(!workspace.includes('collapsed.purchases'), 'legacy purchase-only collapse state remains');
+assert(!workspace.includes('collapsed.validation'), 'legacy validation-only collapse state remains');
+assert(workspace.includes('sm:grid-cols-2'), 'Add Sales card grids are not responsive on mobile');
+
 // Responsive unlimited Driver Sales rows.
 assert(workspace.includes('SECTION 3 — DRIVER SALES'), 'dedicated Driver Sales section is missing');
 assert(workspace.includes('Add Driver'), 'Driver Sales does not provide an Add Driver action');
@@ -62,4 +75,4 @@ assert(driverManagement.includes('getDriverSaleEntries(sale)'), 'Driver Manageme
 assert(driverManagement.includes('driver_cash, driver_network, drivers_json'), 'Driver Management query omits saved Driver Sales fields');
 assert(driverPerformance.includes('driver_cash, driver_network, drivers_json'), 'Owner Driver Performance query omits saved Driver Sales fields');
 
-console.log('Multi-driver UI regression checks passed: vertical responsive rows, Add Driver, no horizontal scroll, individual totals, single-record aggregation, and multi-driver analytics/history.');
+console.log('Add Sales accordion and multi-driver regression checks passed: all cards are exclusive mounted accordions, mobile-responsive, and retain the canonical sales and driver analytics behavior.');

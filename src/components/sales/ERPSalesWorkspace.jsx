@@ -119,6 +119,8 @@ const driverRowAmount = (row, field) => Math.max(0, Number(row?.[field]) || 0);
 const SECTION_COLORS = {
   shift:        { border: 'border-slate-200',   bg: 'bg-slate-50/50',   icon: 'text-slate-600',   header: 'bg-slate-100/80'   },
   kpi:          { border: 'border-indigo-200',  bg: 'bg-indigo-50/30',  icon: 'text-indigo-600',  header: 'bg-indigo-100/60'  },
+  driver:       { border: 'border-sky-200',     bg: 'bg-sky-50/30',     icon: 'text-sky-700',     header: 'bg-sky-100/60'     },
+  custom:       { border: 'border-teal-200',    bg: 'bg-teal-50/30',    icon: 'text-teal-600',    header: 'bg-teal-100/60'    },
   pos:          { border: 'border-violet-200',  bg: 'bg-violet-50/30',  icon: 'text-violet-600',  header: 'bg-violet-100/60'  },
   credit:       { border: 'border-blue-200',    bg: 'bg-blue-50/30',    icon: 'text-blue-600',    header: 'bg-blue-100/60'    },
   purchases:    { border: 'border-orange-200',  bg: 'bg-orange-50/30',  icon: 'text-orange-600',  header: 'bg-orange-100/60'  },
@@ -150,26 +152,46 @@ const SectionHeader = memo(function SectionHeader({
   icon: Icon, title, badge, color = 'shift', sectionNum, collapsible = false, collapsed, onToggle,
 }) {
   const c = SECTION_COLORS[color] || SECTION_COLORS.shift;
-  return (
-    <div
-      className={`flex items-center justify-between px-4 py-3 ${c.header} border-b border-border/60 ${collapsible ? 'cursor-pointer select-none' : ''}`}
-      onClick={collapsible ? onToggle : undefined}
-    >
-      <div className="flex items-center gap-2.5">
+  const contents = (
+    <>
+      <span className="flex min-w-0 items-center gap-2.5">
         {sectionNum && (
-          <span className={`flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold bg-white/70 border border-border/50 ${c.icon}`}>
+          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold bg-white/70 border border-border/50 ${c.icon}`}>
             {sectionNum}
           </span>
         )}
-        <Icon className={`w-4 h-4 ${c.icon}`} />
-        <span className="text-xs font-bold uppercase tracking-wider text-foreground/80">{title}</span>
-      </div>
-      <div className="flex items-center gap-2">
+        <Icon className={`h-4 w-4 shrink-0 ${c.icon}`} />
+        <span className="truncate text-left text-xs font-bold uppercase tracking-wider text-foreground/80">{title}</span>
+      </span>
+      <span className="flex shrink-0 items-center gap-2">
         {badge}
         {collapsible && (
-          collapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronUp className="w-4 h-4 text-muted-foreground" />
+          collapsed ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 text-muted-foreground" />
         )}
-      </div>
+      </span>
+    </>
+  );
+
+  if (collapsible) {
+    return (
+      <button
+        type="button"
+        className={`flex w-full items-center justify-between px-4 py-3 ${c.header} border-b border-border/60 text-left transition-colors hover:bg-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50`}
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+      >
+        {contents}
+      </button>
+    );
+  }
+
+  return <div className={`flex items-center justify-between px-4 py-3 ${c.header} border-b border-border/60`}>{contents}</div>;
+});
+
+const AccordionBody = memo(function AccordionBody({ open, children }) {
+  return (
+    <div className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+      <div className="min-h-0 overflow-hidden">{children}</div>
     </div>
   );
 });
@@ -361,7 +383,7 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
 
       {/* Credit Intelligence Panel */}
       {entry.customer && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <div className="bg-background rounded-lg p-2 border border-border">
             <p className="text-[9px] text-muted-foreground uppercase font-bold">Current Debt</p>
             <p className="text-sm font-bold text-red-600">{currency}{currentDebt.toLocaleString()}</p>
@@ -407,12 +429,12 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
 const StickySummary = memo(function StickySummary({ totalSales, operatingResult, cashStatus, currency, isSubmitting }) {
   return (
     <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border shadow-sm">
-      <div className="flex items-center justify-between px-4 py-2 gap-3 overflow-x-auto">
-        <div className="flex items-center gap-1 flex-shrink-0">
+      <div className="flex flex-col gap-2 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-1">
           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Live</span>
         </div>
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
           <div className="flex items-center gap-1.5">
             <DollarSign className="w-3.5 h-3.5 text-blue-600" />
             <span className="text-muted-foreground">Revenue</span>
@@ -457,9 +479,14 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // ── Section collapse state ────────────────────────────────────────────────
-  const [collapsed, setCollapsed] = useState({ purchases: false, validation: false });
-  const toggleSection = (key) => setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
+  // ── Exclusive accordion state ──────────────────────────────────────────────
+  // All cards begin compact. Keeping their bodies mounted prevents input state,
+  // queries, and calculations from being lost when a Manager changes sections.
+  const [activeSection, setActiveSection] = useState(null);
+  const isSectionOpen = useCallback((key) => activeSection === key, [activeSection]);
+  const toggleSection = useCallback((key) => {
+    setActiveSection((current) => current === key ? null : key);
+  }, []);
 
   // ── Form meta state ───────────────────────────────────────────────────────
   const [form, setForm] = useState({
@@ -1416,14 +1443,18 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               title="Shift Information"
               color="shift"
               sectionNum="1"
+              collapsible
+              collapsed={!isSectionOpen('shift')}
+              onToggle={() => toggleSection('shift')}
               badge={
                 <Badge variant="outline" className="text-[10px] font-bold">
                   {form.date} · {form.shift}
                 </Badge>
               }
             />
-            <div className="p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+            <AccordionBody open={isSectionOpen('shift')}>
+              <div className="p-4 space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">Date</Label>
                   <Input
@@ -1448,7 +1479,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                   }} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">Shift</Label>
                   <Select value={form.shift} onValueChange={v => set('shift', v)}>
@@ -1492,7 +1523,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 </div>
               </div>
               {/* Shift status indicators */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200">
                   <div className="w-2 h-2 rounded-full bg-emerald-500" />
                   <span className="text-[10px] font-bold text-emerald-700 uppercase">Shift Open</span>
@@ -1504,7 +1535,8 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                   </span>
                 </div>
               </div>
-            </div>
+              </div>
+            </AccordionBody>
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════
@@ -1516,12 +1548,16 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               title="Live Sales Summary"
               color="kpi"
               sectionNum="2"
+              collapsible
+              collapsed={!isSectionOpen('summary')}
+              onToggle={() => toggleSection('summary')}
               badge={
                 <Badge className="bg-indigo-600 text-white text-[10px] font-bold">
                   {currency}{realSummary.todayTotal.toLocaleString()}
                 </Badge>
               }
             />
+            <AccordionBody open={isSectionOpen('summary')}>
             {realTodayLoading ? (
               <div className="p-4 grid grid-cols-2 gap-3">
                 {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
@@ -1535,7 +1571,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                     <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Today</span>
                     <span className="text-[10px] text-muted-foreground">{todayStr}</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <KPICard label="Cash Sales"       value={`${currency}${realSummary.todayCash.toLocaleString()}`}    icon={Banknote}    colorClass="text-emerald-600" bgClass="bg-emerald-100" sublabel="Counter cash" />
                     <KPICard label="POS / Network"    value={`${currency}${realSummary.todayNetwork.toLocaleString()}`} icon={CreditCard}  colorClass="text-violet-600" bgClass="bg-violet-100" sublabel="POS & digital" />
                     <KPICard label="Customer Credit"  value={`${currency}${realSummary.todayCredit.toLocaleString()}`}  icon={User}        colorClass="text-blue-600"   bgClass="bg-blue-100"   sublabel="Credit sales" />
@@ -1575,6 +1611,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 </div>
               </div>
             )}
+            </AccordionBody>
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════
@@ -1582,16 +1619,17 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
           ═══════════════════════════════════════════════════════════════ */}
           {isManager && (
             <div className="rounded-2xl border-2 border-sky-200 overflow-hidden bg-background shadow-sm">
-              <div className="flex items-center justify-between px-4 py-3 bg-sky-100/60 border-b border-border/60">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold bg-white/70 border border-border/50 text-sky-700">3</span>
-                  <Truck className="w-4 h-4 text-sky-700" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-foreground/80">Driver Sales</span>
-                </div>
-                <Badge variant="outline" className="text-sky-700 border-sky-300 text-[10px] font-bold">
-                  {currency}{driverSalesTotal.toLocaleString()}
-                </Badge>
-              </div>
+              <SectionHeader
+                icon={Truck}
+                title="Driver Sales"
+                color="driver"
+                sectionNum="3"
+                collapsible
+                collapsed={!isSectionOpen('drivers')}
+                onToggle={() => toggleSection('drivers')}
+                badge={<Badge variant="outline" className="text-sky-700 border-sky-300 text-[10px] font-bold">{currency}{driverSalesTotal.toLocaleString()}</Badge>}
+              />
+              <AccordionBody open={isSectionOpen('drivers')}>
               <div className="p-4 space-y-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <p className="text-xs text-muted-foreground sm:max-w-[70%]">
@@ -1682,6 +1720,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                   </div>
                 )}
               </div>
+              </AccordionBody>
             </div>
           )}
 
@@ -1694,12 +1733,16 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               title="POS Sales"
               color="pos"
               sectionNum="4"
+              collapsible
+              collapsed={!isSectionOpen('pos')}
+              onToggle={() => toggleSection('pos')}
               badge={
                 <Badge variant="outline" className="text-violet-700 border-violet-300 text-[10px] font-bold">
                   {currency}{networkTotal.toLocaleString()}
                 </Badge>
               }
             />
+            <AccordionBody open={isSectionOpen('pos')}>
             <div className="p-4 space-y-3">
               {posLoading ? (
                 <div className="space-y-2">
@@ -1723,7 +1766,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <div>
                           <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">POS Device</Label>
                           <Select
@@ -1766,7 +1809,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                           />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <NumInput
                           label="Amount"
                           value={entry.amount}
@@ -1806,6 +1849,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 </>
               )}
             </div>
+            </AccordionBody>
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════
@@ -1817,12 +1861,16 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               title="Customer Credit"
               color="credit"
               sectionNum="4"
+              collapsible
+              collapsed={!isSectionOpen('credit')}
+              onToggle={() => toggleSection('credit')}
               badge={
                 <Badge variant="outline" className="text-blue-700 border-blue-300 text-[10px] font-bold">
                   {currency}{creditTotal.toLocaleString()}
                 </Badge>
               }
             />
+            <AccordionBody open={isSectionOpen('credit')}>
             <div className="p-4 space-y-3">
               {custLoading ? (
                 <Skeleton className="h-20 w-full" />
@@ -1851,6 +1899,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 </>
               )}
             </div>
+            </AccordionBody>
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════
@@ -1858,16 +1907,17 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
           ═══════════════════════════════════════════════════════════════ */}
           {!sourcesLoading && customSources.length > 0 && (
             <div className="rounded-2xl border-2 border-teal-200 overflow-hidden bg-background shadow-sm">
-              <div className="flex items-center justify-between px-4 py-3 bg-teal-100/60 border-b border-border/60">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold bg-white/70 border border-border/50 text-teal-600">4½</span>
-                  <ZapIcon className="w-4 h-4 text-teal-600" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-foreground/80">Additional Sales Sources</span>
-                </div>
-                <Badge variant="outline" className="text-teal-700 border-teal-300 text-[10px] font-bold">
-                  {currency}{customTotal.toLocaleString()}
-                </Badge>
-              </div>
+              <SectionHeader
+                icon={ZapIcon}
+                title="Additional Sales Sources"
+                color="custom"
+                sectionNum="4½"
+                collapsible
+                collapsed={!isSectionOpen('custom')}
+                onToggle={() => toggleSection('custom')}
+                badge={<Badge variant="outline" className="text-teal-700 border-teal-300 text-[10px] font-bold">{currency}{customTotal.toLocaleString()}</Badge>}
+              />
+              <AccordionBody open={isSectionOpen('custom')}>
               <div className="p-4 space-y-3">
                 {customSources.map(src => {
                   const SrcIcon = getSourceIcon(src.icon);
@@ -1896,6 +1946,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                   );
                 })}
               </div>
+              </AccordionBody>
             </div>
           )}
 
@@ -1909,7 +1960,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               color="purchases"
               sectionNum="5"
               collapsible
-              collapsed={collapsed.purchases}
+              collapsed={!isSectionOpen('purchases')}
               onToggle={() => toggleSection('purchases')}
               badge={
                 purchasesLoading
@@ -1919,15 +1970,15 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                     </Badge>
               }
             />
-            {!collapsed.purchases && (
+            <AccordionBody open={isSectionOpen('purchases')}>
               <div className="p-4 space-y-3">
                 {purchasesLoading || pendingLoading ? (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <KPICard
                         label="Approved Purchases"
                         value={`${currency}${approvedPurchasesTotal.toLocaleString()}`}
@@ -2009,7 +2060,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                   </>
                 )}
               </div>
-            )}
+            </AccordionBody>
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════
@@ -2021,8 +2072,12 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               title="Cash Reconciliation"
               color="reconcile"
               sectionNum="6"
+              collapsible
+              collapsed={!isSectionOpen('reconciliation')}
+              onToggle={() => toggleSection('reconciliation')}
               badge={cashReconcStatus ? <StatusBadge status={cashReconcStatus} /> : undefined}
             />
+            <AccordionBody open={isSectionOpen('reconciliation')}>
             <div className="p-4 space-y-3">
               {/* Cash Sales Input */}
               <NumInput
@@ -2032,7 +2087,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 prefix={currency}
                 helpText="Actual cash revenue collected at counter"
               />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <NumInput
                   label="Opening Cash"
                   value={openingCash}
@@ -2116,7 +2171,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               )}
 
               {/* Summary row */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div className="bg-muted/30 rounded-lg p-2.5 border border-border">
                   <p className="text-[9px] font-bold uppercase text-muted-foreground">Closing Cash</p>
                   <p className="text-sm font-black text-foreground">{currency}{closingCash.toLocaleString()}</p>
@@ -2133,6 +2188,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 </div>
               </div>
             </div>
+            </AccordionBody>
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════
@@ -2144,12 +2200,16 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               title="Operating Result"
               color="operating"
               sectionNum="7"
+              collapsible
+              collapsed={!isSectionOpen('operating')}
+              onToggle={() => toggleSection('operating')}
               badge={
                 <Badge className={`text-[10px] font-bold ${operatingResult >= 0 ? 'bg-emerald-600' : 'bg-red-600'} text-white`}>
                   {operatingResult >= 0 ? '+' : ''}{currency}{operatingResult.toLocaleString()}
                 </Badge>
               }
             />
+            <AccordionBody open={isSectionOpen('operating')}>
             <div className="p-4 space-y-2">
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-blue-50 border border-blue-200">
@@ -2169,7 +2229,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                     {operatingResult >= 0 ? '+' : ''}{currency}{operatingResult.toLocaleString()}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-muted/30 border border-border">
                     <span className="text-[10px] font-semibold text-muted-foreground">Operating Margin</span>
                     <span className={`text-xs font-black ${operatingMarginPct >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
@@ -2210,6 +2270,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 </p>
               </div>
             </div>
+            </AccordionBody>
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════
@@ -2222,7 +2283,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               color="validation"
               sectionNum="8"
               collapsible
-              collapsed={collapsed.validation}
+              collapsed={!isSectionOpen('validation')}
               onToggle={() => toggleSection('validation')}
               badge={
                 <Badge className={`text-[10px] font-bold ${allValid ? 'bg-emerald-600' : 'bg-red-500'} text-white`}>
@@ -2230,7 +2291,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 </Badge>
               }
             />
-            {!collapsed.validation && (
+            <AccordionBody open={isSectionOpen('validation')}>
               <div className="p-4 space-y-2">
                 {validations.map(v => (
                   <ValidationRow key={v.key} label={v.label} passed={v.passed} message={v.message} />
@@ -2242,7 +2303,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                   </div>
                 )}
               </div>
-            )}
+            </AccordionBody>
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════
@@ -2254,7 +2315,11 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               title="Save Panel"
               color="save"
               sectionNum="9"
+              collapsible
+              collapsed={!isSectionOpen('save')}
+              onToggle={() => toggleSection('save')}
             />
+            <AccordionBody open={isSectionOpen('save')}>
             <div className="p-4 space-y-3">
               <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-wide">Records that will be created:</p>
               <div className="space-y-1.5">
@@ -2308,6 +2373,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 </Button>
               </div>
             </div>
+            </AccordionBody>
           </div>
 
         </div>
