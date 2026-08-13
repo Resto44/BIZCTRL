@@ -85,7 +85,17 @@ const SkeletonCard = memo(() => (
   </Card>
 ));
 
-const SectionHeader = memo(({ icon: Icon, title, subtitle, action, color = 'blue' }) => {
+const SectionHeader = memo(({
+  icon: Icon,
+  title,
+  subtitle,
+  action,
+  color = 'blue',
+  summary,
+  isExpanded,
+  onToggle,
+  controls,
+}) => {
   const colorMap = {
     blue:   'bg-blue-100 dark:bg-blue-900/40 text-blue-600',
     green:  'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600',
@@ -97,23 +107,77 @@ const SectionHeader = memo(({ icon: Icon, title, subtitle, action, color = 'blue
     indigo: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600',
     slate:  'bg-slate-100 dark:bg-slate-800 text-slate-600',
   };
-  return (
-    <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center gap-2.5">
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${colorMap[color] || colorMap.blue}`}>
-          {Icon && <Icon className="w-4 h-4" />}
-        </div>
-        <div>
-          <h2 className="text-sm font-bold text-foreground leading-tight">{title}</h2>
-          {subtitle && <p className="text-[11px] text-muted-foreground leading-tight">{subtitle}</p>}
-        </div>
+  const header = (
+    <>
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${colorMap[color] || colorMap.blue}`}>
+        {Icon && <Icon className="w-4 h-4" />}
       </div>
+      <div className="min-w-0 flex-1 text-left">
+        <h2 className="truncate text-sm font-bold text-foreground leading-tight">{title}</h2>
+        {subtitle && <p className="truncate text-[11px] text-muted-foreground leading-tight">{subtitle}</p>}
+      </div>
+      {summary !== undefined && summary !== null && (
+        <span className="max-w-[8.5rem] truncate rounded-full bg-muted px-2 py-1 text-[10px] font-bold text-foreground sm:max-w-[12rem]">{summary}</span>
+      )}
+      {onToggle && <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none ${isExpanded ? 'rotate-180' : ''}`} />}
+    </>
+  );
+
+  return (
+    <div className="owner-dashboard-section-header mb-2 flex items-center gap-2">
+      {onToggle ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 py-1 text-left transition-colors duration-200 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary active:scale-[0.99]"
+          aria-expanded={isExpanded}
+        >
+          {header}
+        </button>
+      ) : <div className="flex min-w-0 flex-1 items-center gap-2.5 px-1.5 py-1">{header}</div>}
+      {controls}
       {action && (
-        <button onClick={action.onClick} className="flex items-center gap-1 text-xs text-primary hover:underline">
-          {action.label} <ChevronRight className="w-3 h-3" />
+        <button onClick={action.onClick} className="shrink-0 rounded-md px-1 py-1 text-xs text-primary hover:bg-primary/10 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          {action.label} <ChevronRight className="inline h-3 w-3" />
         </button>
       )}
     </div>
+  );
+});
+
+const DashboardAccordionSection = memo(({
+  id,
+  expandedId,
+  onToggle,
+  icon,
+  title,
+  subtitle,
+  summary,
+  action,
+  color,
+  controls,
+  children,
+}) => {
+  const expanded = expandedId === id;
+  return (
+    <section className="rounded-2xl border border-border/60 bg-card/30 p-2.5 shadow-sm sm:p-3">
+      <SectionHeader
+        icon={icon}
+        title={title}
+        subtitle={subtitle}
+        summary={summary}
+        action={action}
+        color={color}
+        controls={controls}
+        isExpanded={expanded}
+        onToggle={() => onToggle(id)}
+      />
+      <div className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none ${expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+        <div className="min-h-0 overflow-hidden" aria-hidden={!expanded} inert={expanded ? undefined : ''}>
+          <div className="pt-1">{children}</div>
+        </div>
+      </div>
+    </section>
   );
 });
 
@@ -432,6 +496,10 @@ export default function OwnerDashboard() {
   // ── BRANCH SELECTION STATE ────────────────────────────────────────────────
   // 'all' means aggregate all active branches; any other value is a branch key/id.
   const [selectedBranch, setSelectedBranch] = useState('all');
+  const [expandedSection, setExpandedSection] = useState(null);
+  const toggleSection = useCallback((sectionId) => {
+    setExpandedSection((current) => current === sectionId ? null : sectionId);
+  }, []);
 
   const activeBranchKeys = useMemo(
     () => (branches || [])
@@ -1283,12 +1351,23 @@ export default function OwnerDashboard() {
           DRIVER PERFORMANCE — restaurant-wide, branch-filter aware
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <DriverPerformance
-          restaurantId={activeRestaurant?.id}
-          branches={branches}
-          selectedBranch={selectedBranch}
-          currency={currency}
-        />
+        <DashboardAccordionSection
+          id="driver-analytics"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={Truck}
+          title="Driver Analytics"
+          subtitle="Branch and driver sales performance"
+          summary="Live data"
+          color="cyan"
+        >
+          <DriverPerformance
+            restaurantId={activeRestaurant?.id}
+            branches={branches}
+            selectedBranch={selectedBranch}
+            currency={currency}
+          />
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
@@ -1297,13 +1376,16 @@ export default function OwnerDashboard() {
           Balance Sheet, Branch Analytics, CEO Dashboard.
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader
-            icon={LayoutDashboard}
-            title="Enterprise Financial Center"
-            subtitle="Quick access to enterprise reports"
-            color="purple"
-          />
+        <DashboardAccordionSection
+          id="financial-center"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={LayoutDashboard}
+          title="Enterprise Financial Center"
+          subtitle="Quick access to enterprise reports"
+          summary="6 reports"
+          color="purple"
+        >
           <div className="grid grid-cols-2 gap-3">
             {/* 1. Profit & Loss */}
             <button
@@ -1395,7 +1477,7 @@ export default function OwnerDashboard() {
               <ChevronRight className="w-3.5 h-3.5 text-purple-500 self-end ml-auto" />
             </button>
           </div>
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
@@ -1406,14 +1488,17 @@ export default function OwnerDashboard() {
           Auto-updates when any query key changes (transactions, branch).
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader
-            icon={BarChart3}
-            title="6-Month Trend Analytics"
-            subtitle={`${selectedBranchLabel} — Last 6 calendar months`}
-            color="indigo"
-            action={{ label: 'Reports', onClick: () => navigate('/reports') }}
-          />
+        <DashboardAccordionSection
+          id="six-month-trend"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={BarChart3}
+          title="6-Month Trend Analytics"
+          subtitle={`${selectedBranchLabel} — Last 6 calendar months`}
+          summary={fmt(sixMonthTrend.at(-1)?.NetProfit || 0)}
+          color="indigo"
+          action={{ label: 'Reports', onClick: () => navigate('/reports') }}
+        >
           <Card className="border-indigo-100 dark:border-indigo-900/60">
             <CardContent className="p-3">
               {/* Legend summary row */}
@@ -1448,15 +1533,23 @@ export default function OwnerDashboard() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 1 — EXECUTIVE SUMMARY
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader icon={LayoutDashboard} title={t('executive_summary')} subtitle={t('todays_kpi')} color="blue" />
+        <DashboardAccordionSection
+          id="executive-summary"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={LayoutDashboard}
+          title={t('executive_summary')}
+          subtitle={t('todays_kpi')}
+          summary={fmt(execSummary.salesToday)}
+          color="blue"
+        >
           {loadingSales ? (
             <div className="grid grid-cols-2 gap-3">
               {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
@@ -1501,15 +1594,23 @@ export default function OwnerDashboard() {
               <MetricCard title={t('cash_overage_today')}  value={fmt(execSummary.cashOverageToday)}  subtitle={t('excess_cash_on_hand')}     icon={CheckCircle2}  color={execSummary.cashOverageToday > 0 ? 'green' : 'slate'} />
             </div>
           )}
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 2 — OPERATING RESULT  (NEVER REMOVE THIS WIDGET)
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader icon={Scale} title={t('operating_result')} subtitle={t('sales_revenue_minus_purchases')} color="green" />
+        <DashboardAccordionSection
+          id="operating-result"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={Scale}
+          title={t('operating_result')}
+          subtitle={t('sales_revenue_minus_purchases')}
+          summary={fmt(operatingResult.result)}
+          color="green"
+        >
           <Card className={`border-2 ${operatingResult.result >= 0 ? 'border-emerald-200 dark:border-emerald-800' : 'border-red-200 dark:border-red-800'}`}>
             <CardContent className="p-4 space-y-1">
               <LedgerRow label={t('sales_revenue')}      value={fmt(operatingResult.salesRevenue)}      color="green" bold />
@@ -1517,15 +1618,24 @@ export default function OwnerDashboard() {
               <LedgerRow label={t('operating_result')}   value={fmt(operatingResult.result)}            color={operatingResult.result >= 0 ? 'green' : 'red'} bold separator />
             </CardContent>
           </Card>
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 3 — CASH RECONCILIATION
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader icon={Wallet} title={t('cash_reconciliation')} subtitle={t('todays_cash_position')} color="amber" action={{ label: t('treasury') || 'Treasury', onClick: () => navigate('/treasury') }} />
+        <DashboardAccordionSection
+          id="cash-reconciliation"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={Wallet}
+          title={t('cash_reconciliation')}
+          subtitle={t('todays_cash_position')}
+          summary={fmt(cashRecon.closingCash)}
+          color="amber"
+          action={{ label: t('treasury') || 'Treasury', onClick: () => navigate('/treasury') }}
+        >
           <Card>
             <CardContent className="p-4 space-y-1">
               <LedgerRow label={t('opening_cash')}        value={fmt(cashRecon.openingCash)}   color="blue" />
@@ -1537,15 +1647,24 @@ export default function OwnerDashboard() {
               <LedgerRow label={t('closing_cash')}        value={fmt(cashRecon.closingCash)}   color="green" bold separator />
             </CardContent>
           </Card>
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 4 — SALES ANALYTICS
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader icon={BarChart3} title={t('sales_analytics')} subtitle={t('multi_period_sales')} color="green" action={{ label: t('reports') || 'Reports', onClick: () => navigate('/reports') }} />
+        <DashboardAccordionSection
+          id="sales-analytics"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={BarChart3}
+          title={t('sales_analytics')}
+          subtitle={t('multi_period_sales')}
+          summary={fmt(salesAnalytics.monthAmt)}
+          color="green"
+          action={{ label: t('reports') || 'Reports', onClick: () => navigate('/reports') }}
+        >
           <div className="grid grid-cols-2 gap-3">
             <MetricCard title={t('today_label')}            value={fmt(salesAnalytics.todayAmt)}     icon={DollarSign}    color="green" />
             <MetricCard title={t('yesterday_label')}        value={fmt(salesAnalytics.yesterdayAmt)} icon={Clock}         color="slate" />
@@ -1557,7 +1676,7 @@ export default function OwnerDashboard() {
             <MetricCard title={t('highest_sales_day')} value={fmt(salesAnalytics.highestDay)}  icon={ArrowUpRight}  color="green" />
             <MetricCard title={t('lowest_sales_day')}  value={fmt(salesAnalytics.lowestDay)}   icon={ArrowDownRight} color="amber" />
           </div>
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
@@ -1567,14 +1686,17 @@ export default function OwnerDashboard() {
       ══════════════════════════════════════════════════════════════════════ */}
       {additionalSources.length > 0 && (
         <WidgetErrorBoundary>
-          <section>
-            <SectionHeader
-              icon={Building2}
-              title={t('additional_sales_sources')}
-              subtitle={t('delivery_catering_subtitle')}
-              color="purple"
-              action={{ label: t('reports') || 'Reports', onClick: () => navigate('/reports') }}
-            />
+          <DashboardAccordionSection
+            id="additional-sales-sources"
+            expandedId={expandedSection}
+            onToggle={toggleSection}
+            icon={Building2}
+            title={t('additional_sales_sources')}
+            subtitle={t('delivery_catering_subtitle')}
+            summary={fmt(additionalSources.reduce((total, source) => total + (Number(source.today) || 0), 0))}
+            color="purple"
+            action={{ label: t('reports') || 'Reports', onClick: () => navigate('/reports') }}
+          >
             <div className="grid grid-cols-2 gap-3">
               {additionalSources.map((src, i) => {
                 const colors = ['purple', 'cyan', 'orange', 'indigo', 'green', 'amber', 'blue', 'red'];
@@ -1593,7 +1715,7 @@ export default function OwnerDashboard() {
                 );
               })}
             </div>
-          </section>
+          </DashboardAccordionSection>
         </WidgetErrorBoundary>
       )}
 
@@ -1601,8 +1723,17 @@ export default function OwnerDashboard() {
           SECTION 5 — PURCHASE ANALYTICS
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader icon={ShoppingCart} title={t('purchase_analytics')} subtitle={t('approved_invoices_branch')} color="amber" action={{ label: t('purchases') || 'Purchases', onClick: () => navigate('/enterprise-purchases') }} />
+        <DashboardAccordionSection
+          id="purchase-analytics"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={ShoppingCart}
+          title={t('purchase_analytics')}
+          subtitle={t('approved_invoices_branch')}
+          summary={fmt(purchaseAnalytics.monthAmt)}
+          color="amber"
+          action={{ label: t('purchases') || 'Purchases', onClick: () => navigate('/enterprise-purchases') }}
+        >
           <div className="grid grid-cols-2 gap-3">
             {/* A) Today's Purchases Card — approved invoices only */}
             <MetricCard
@@ -1665,21 +1796,24 @@ export default function OwnerDashboard() {
               </CardContent>
             </Card>
           )}
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 5b — PRODUCT CONSUMPTION ANALYTICS (ERP)
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader
-            icon={BarChart3}
-            title={t('product_consumption_analytics')}
-            subtitle={`${t('purchase_items_branch')} · ${selectedBranch === 'all' ? t('all_branches') : selectedBranchLabel}`}
-            color="purple"
-            action={{ label: t('purchases') || 'Purchases', onClick: () => navigate('/enterprise-purchases') }}
-          />
+        <DashboardAccordionSection
+          id="product-consumption"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={BarChart3}
+          title={t('product_consumption_analytics')}
+          subtitle={`${t('purchase_items_branch')} · ${selectedBranch === 'all' ? t('all_branches') : selectedBranchLabel}`}
+          summary={`${productQuantityAnalytics.combinedProducts.length} products`}
+          color="purple"
+          action={{ label: t('purchases') || 'Purchases', onClick: () => navigate('/enterprise-purchases') }}
+        >
 
           {/* ── ERP KPI Summary Cards ───────────────────────────────────────── */}
           <div className="grid grid-cols-2 gap-2 mb-3">
@@ -1851,15 +1985,24 @@ export default function OwnerDashboard() {
               </CardContent>
             </Card>
           )}
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 6 — INVENTORY ANALYTICS
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader icon={Package} title={t('inventory_analytics')} subtitle={t('stock_health_overview')} color="indigo" action={{ label: t('inventory') || 'Inventory', onClick: () => navigate('/inventory') }} />
+        <DashboardAccordionSection
+          id="inventory-analytics"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={Package}
+          title={t('inventory_analytics')}
+          subtitle={t('stock_health_overview')}
+          summary={fmt(inventoryAnalytics.inventoryValue)}
+          color="indigo"
+          action={{ label: t('inventory') || 'Inventory', onClick: () => navigate('/inventory') }}
+        >
           <div className="grid grid-cols-2 gap-3 mb-3">
             <MetricCard title={t('inventory_value')}  value={fmt(inventoryAnalytics.inventoryValue)} icon={Package}       color="indigo" large />
             <MetricCard title={t('low_stock_items_label')}  value={inventoryAnalytics.lowStock.length}      icon={AlertTriangle} color={inventoryAnalytics.lowStock.length > 0 ? 'amber' : 'green'} large onClick={() => navigate('/inventory')} />
@@ -1896,7 +2039,7 @@ export default function OwnerDashboard() {
               </CardContent>
             </Card>
           )}
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
@@ -1905,14 +2048,17 @@ export default function OwnerDashboard() {
           Fixed Expenses are excluded.
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader
-            icon={Receipt}
-            title="Variable Expenses"
-            subtitle="Variable costs only — fixed expenses excluded"
-            color="amber"
-            action={{ label: t('expenses_label') || 'Expenses', onClick: () => navigate('/expenses') }}
-          />
+        <DashboardAccordionSection
+          id="variable-expenses"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={Receipt}
+          title="Variable Expenses"
+          subtitle="Variable costs only — fixed expenses excluded"
+          summary={fmt(expenseSummary.monthlyVariable)}
+          color="amber"
+          action={{ label: t('expenses_label') || 'Expenses', onClick: () => navigate('/expenses') }}
+        >
           <div className="grid grid-cols-2 gap-3">
             <MetricCard
               title="Today Variable"
@@ -1958,15 +2104,24 @@ export default function OwnerDashboard() {
               />
             </div>
           </div>
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 7 — CASH FLOW
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader icon={Activity} title={t('cash_flow')} subtitle={t('todays_money_movement')} color="cyan" action={{ label: t('treasury') || 'Treasury', onClick: () => navigate('/treasury') }} />
+        <DashboardAccordionSection
+          id="cash-flow"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={Activity}
+          title={t('cash_flow')}
+          subtitle={t('todays_money_movement')}
+          summary={fmt(cashFlow.netCashFlow)}
+          color="cyan"
+          action={{ label: t('treasury') || 'Treasury', onClick: () => navigate('/treasury') }}
+        >
           <Card>
             <CardContent className="p-4 space-y-1">
               <LedgerRow label={t('money_in')}      value={fmt(cashFlow.moneyIn)}                  color="green" />
@@ -1976,15 +2131,24 @@ export default function OwnerDashboard() {
               <LedgerRow label={t('net_cash_flow')} value={fmt(cashFlow.netCashFlow)}              color={cashFlow.netCashFlow >= 0 ? 'green' : 'red'} bold separator />
             </CardContent>
           </Card>
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 8 — PRODUCT PRICE INTELLIGENCE
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader icon={TrendingUp} title={t('price_intelligence')} subtitle={t('price_changes_subtitle')} color="purple" action={{ label: t('products') || 'Products', onClick: () => navigate('/product-management') }} />
+        <DashboardAccordionSection
+          id="price-intelligence"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={TrendingUp}
+          title={t('price_intelligence')}
+          subtitle={t('price_changes_subtitle')}
+          summary={`${priceIntelligence.length} changes`}
+          color="purple"
+          action={{ label: t('products') || 'Products', onClick: () => navigate('/product-management') }}
+        >
           {priceIntelligence.length === 0 ? (
             <Card>
               <CardContent className="p-4 text-center text-xs text-muted-foreground">
@@ -2029,21 +2193,24 @@ export default function OwnerDashboard() {
               ))}
             </div>
           )}
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 9 — ALERTS
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader
-            icon={AlertTriangle}
-            title={t('alerts_label')}
-            subtitle={`${activeAlertCount} ${activeAlertCount === 1 ? t('active_alert') : t('active_alerts')}`}
-            color="red"
-            action={{ label: 'View all', onClick: () => navigate('/alerts') }}
-          />
+        <DashboardAccordionSection
+          id="active-alerts"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={AlertTriangle}
+          title={t('alerts_label')}
+          subtitle={`${activeAlertCount} ${activeAlertCount === 1 ? t('active_alert') : t('active_alerts')}`}
+          summary={loadingActiveAlerts ? 'Loading…' : `${activeAlertCount} active`}
+          color="red"
+          action={{ label: 'View all', onClick: () => navigate('/alerts') }}
+        >
           {loadingActiveAlerts ? (
             <Skeleton className="h-24 w-full" />
           ) : dashboardActiveAlerts.length === 0 ? (
@@ -2092,40 +2259,65 @@ export default function OwnerDashboard() {
               })}
             </div>
           )}
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
 
 
             {/* ── Price Changes Widget (existing component preserved) ── */}
       <WidgetErrorBoundary>
-        <PriceChangesWidget />
+        <DashboardAccordionSection
+          id="price-changes"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={TrendingUp}
+          title="Price Changes"
+          subtitle="Recent supplier and product price activity"
+          summary="Recent activity"
+          color="purple"
+        >
+          <PriceChangesWidget />
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 11 — LIVE ACTIVITY FEED (Enterprise Real-Time)
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <LiveActivityFeed events={liveEvents} realtimeStatus={realtimeStatus} />
+        <DashboardAccordionSection
+          id="live-activity"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={Radio}
+          title="Live Activity Feed"
+          subtitle="Real-time branch events"
+          summary={realtimeStatus === 'SUBSCRIBED' ? 'LIVE' : 'Syncing'}
+          color="green"
+        >
+          <LiveActivityFeed events={liveEvents} realtimeStatus={realtimeStatus} />
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 10 — MODE-SPECIFIC WIDGETS (Auto-switches by Business Type)
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
-        <section>
-          <SectionHeader
-            icon={Layers}
-            title={t('mode_specific_insights')}
-            subtitle={t('mode_specific_subtitle')}
-            color="indigo"
-          />
+        <DashboardAccordionSection
+          id="mode-insights"
+          expandedId={expandedSection}
+          onToggle={toggleSection}
+          icon={Layers}
+          title={t('mode_specific_insights')}
+          subtitle={t('mode_specific_subtitle')}
+          summary="Operational"
+          color="indigo"
+        >
           <ModeSpecificDashboardSection
             lowStockItems={[]}
             expiryAlerts={[]}
             pendingOrders={[]}
           />
-        </section>
+        </DashboardAccordionSection>
       </WidgetErrorBoundary>
     </div>
   );
