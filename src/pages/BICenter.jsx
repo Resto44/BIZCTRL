@@ -1,49 +1,90 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  BarChart3, TrendingUp, TrendingDown, DollarSign, Target,
-  Calendar, Download, RefreshCw, PieChart, Activity
+  BarChart3, Download, PieChart
 } from 'lucide-react';
 import {
-  AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart as RechartsPie,
-  Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  Area, BarChart, Bar, Line, PieChart as RechartsPie,
+  Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ComposedChart
 } from 'recharts';
 import { format, subDays, subMonths, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
 
+const asNumber = (value) => Number(value) || 0;
+const getSaleTotal = (sale) => {
+  if (sale?.total !== null && sale?.total !== undefined && sale?.total !== '') {
+    return asNumber(sale.total);
+  }
+  return asNumber(sale?.cash) + asNumber(sale?.network) + asNumber(sale?.credit);
+};
+const getPurchaseTotal = (purchase) => {
+  if (purchase?.total_amount !== null && purchase?.total_amount !== undefined && purchase?.total_amount !== '') {
+    return asNumber(purchase.total_amount);
+  }
+  return asNumber(purchase?.used_price ?? purchase?.current_price) * asNumber(purchase?.qty || 1);
+};
+
 export default function BICenter() {
   const { t, currency } = useLanguage();
-  const { ownerFilter } = useTenant();
+  const { ownerFilter, activeRestaurant, isManager, managerBranch } = useTenant();
   const [tab, setTab] = useState('revenue');
   const [period, setPeriod] = useState('30');
 
+  const analyticsScope = useMemo(() => {
+    const branch = managerBranch || ownerFilter?.branch || null;
+    if (isManager) return branch ? { branch } : null;
+    if (activeRestaurant?.id) return { restaurantId: activeRestaurant.id };
+    return ownerFilter?.created_by ? { createdBy: ownerFilter.created_by } : null;
+  }, [activeRestaurant?.id, isManager, managerBranch, ownerFilter?.branch, ownerFilter?.created_by]);
+  const salesFilter = analyticsScope?.branch
+    ? { branch: analyticsScope.branch }
+    : analyticsScope?.restaurantId
+      ? { restaurant_id: analyticsScope.restaurantId }
+      : analyticsScope?.createdBy
+        ? { created_by: analyticsScope.createdBy }
+        : null;
+  const expenseFilter = analyticsScope?.branch ? { branch_key: analyticsScope.branch } : salesFilter;
+
   const { data: allSales = [] } = useQuery({
-    queryKey: ['bi_sales', ownerFilter],
-    queryFn: () => base44.entities.DailySales.filter(ownerFilter || {}, '-date', 1000),
+    queryKey: ['bi_sales', salesFilter],
+    queryFn: () => base44.entities.DailySales.filter(salesFilter || {}, '-date', 1000),
     staleTime: 120000,
-    enabled: !!ownerFilter?.created_by,
+    enabled: !!analyticsScope,
   });
   const { data: allPurchases = [] } = useQuery({
-    queryKey: ['bi_purchases', ownerFilter],
-    queryFn: () => base44.entities.Purchase.filter(ownerFilter || {}, '-date', 500),
+    queryKey: ['bi_purchases', analyticsScope],
+    queryFn: async () => {
+      if (!analyticsScope) return [];
+      let query = supabase
+        .from('supplier_invoices')
+        .select('id, date, branch, total_amount, status')
+        .in('status', ['approved', 'partial', 'paid'])
+        .order('date', { ascending: false })
+        .limit(500);
+      if (analyticsScope.branch) query = query.eq('branch', analyticsScope.branch);
+      else if (analyticsScope.restaurantId) query = query.eq('restaurant_id', analyticsScope.restaurantId);
+      else if (analyticsScope.createdBy) query = query.eq('created_by', analyticsScope.createdBy);
+      const { data, error } = await query;
+      return error ? [] : (data || []);
+    },
     staleTime: 120000,
-    enabled: !!ownerFilter?.created_by,
+    enabled: !!analyticsScope,
   });
   const { data: allExpenses = [] } = useQuery({
-    queryKey: ['bi_expenses', ownerFilter],
-    queryFn: () => base44.entities.Expense.filter(ownerFilter || {}, '-date', 500),
+    queryKey: ['bi_expenses', expenseFilter],
+    queryFn: () => base44.entities.Expense.filter(expenseFilter || {}, '-date', 500),
     staleTime: 120000,
-    enabled: !!ownerFilter?.created_by,
+    enabled: !!analyticsScope,
   });
 
   const days = parseInt(period);
@@ -51,15 +92,15 @@ export default function BICenter() {
 
   // Daily revenue chart
   const dailyData = useMemo(() => {
-    const interval = eachDayOfInterval({ start: subDays(new Date(), Math.min(days - 1, 29)), end: new Date() });
+    const interval = eachDayOfInterval({ start: subDays(new Date(), days - 1), end: new Date() });
     return interval.map(date => {
       const d = format(date, 'yyyy-MM-dd');
       const label = format(date, days <= 30 ? 'MM/dd' : 'MMM dd');
       const daySales = allSales.filter(s => s.date === d);
       const dayPurchases = allPurchases.filter(p => p.date === d);
       const dayExpenses = allExpenses.filter(e => e.date === d);
-      const revenue = daySales.reduce((s, r) => s + (r.total_sales || 0), 0);
-      const cost = dayPurchases.reduce((s, r) => s + (r.total_amount || 0), 0);
+      const revenue = daySales.reduce((sum, sale) => sum + getSaleTotal(sale), 0);
+      const cost = dayPurchases.reduce((sum, purchase) => sum + getPurchaseTotal(purchase), 0);
       const expenses = dayExpenses.reduce((s, r) => s + (r.amount || 0), 0);
       return { date: label, revenue, cost, expenses, profit: revenue - cost - expenses };
     });
@@ -75,8 +116,8 @@ export default function BICenter() {
       const mSales = allSales.filter(s => s.date >= mStart && s.date <= mEnd);
       const mPurchases = allPurchases.filter(p => p.date >= mStart && p.date <= mEnd);
       const mExpenses = allExpenses.filter(e => e.date >= mStart && e.date <= mEnd);
-      const revenue = mSales.reduce((s, r) => s + (r.total_sales || 0), 0);
-      const cost = mPurchases.reduce((s, r) => s + (r.total_amount || 0), 0);
+      const revenue = mSales.reduce((sum, sale) => sum + getSaleTotal(sale), 0);
+      const cost = mPurchases.reduce((sum, purchase) => sum + getPurchaseTotal(purchase), 0);
       const expenses = mExpenses.reduce((s, r) => s + (r.amount || 0), 0);
       return { month: label, revenue, cost, expenses, profit: revenue - cost - expenses };
     });
@@ -87,12 +128,12 @@ export default function BICenter() {
     const periodSales = allSales.filter(s => s.date >= startDate);
     const cash = periodSales.reduce((s, r) => s + (r.cash || 0), 0);
     const credit = periodSales.reduce((s, r) => s + (r.credit || 0), 0);
-    const card = periodSales.reduce((s, r) => s + (r.card || 0), 0);
+    const card = periodSales.reduce((sum, sale) => sum + asNumber(sale.network ?? sale.card), 0);
     const online = periodSales.reduce((s, r) => s + (r.online || 0), 0);
     return [
       { name: 'Cash', value: cash },
       { name: 'Credit', value: credit },
-      { name: 'Card', value: card },
+      { name: 'Network/POS', value: card },
       { name: 'Online', value: online },
     ].filter(p => p.value > 0);
   }, [allSales, startDate]);
@@ -103,7 +144,7 @@ export default function BICenter() {
     const map = {};
     periodSales.forEach(s => {
       if (!map[s.branch]) map[s.branch] = 0;
-      map[s.branch] += s.total_sales || 0;
+      map[s.branch] += getSaleTotal(s);
     });
     return Object.entries(map).map(([name, revenue]) => ({ name, revenue })).sort((a, b) => b.revenue - a.revenue);
   }, [allSales, startDate]);
@@ -113,8 +154,8 @@ export default function BICenter() {
     const periodSales = allSales.filter(s => s.date >= startDate);
     const periodPurchases = allPurchases.filter(p => p.date >= startDate);
     const periodExpenses = allExpenses.filter(e => e.date >= startDate);
-    const revenue = periodSales.reduce((s, r) => s + (r.total_sales || 0), 0);
-    const cost = periodPurchases.reduce((s, r) => s + (r.total_amount || 0), 0);
+    const revenue = periodSales.reduce((sum, sale) => sum + getSaleTotal(sale), 0);
+    const cost = periodPurchases.reduce((sum, purchase) => sum + getPurchaseTotal(purchase), 0);
     const expenses = periodExpenses.reduce((s, r) => s + (r.amount || 0), 0);
     const profit = revenue - cost - expenses;
     const margin = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : 0;
@@ -123,16 +164,29 @@ export default function BICenter() {
   }, [allSales, allPurchases, allExpenses, startDate, days]);
 
   const fmt = (n) => `${currency}${(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const exportTrendCsv = useCallback(() => {
+    const rows = [
+      ['Date', 'Revenue', 'Procurement Cost', 'Expenses', 'Profit'],
+      ...dailyData.map(({ date, revenue, cost, expenses, profit }) => [date, revenue, cost, expenses, profit]),
+    ];
+    const csv = rows.map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `business-intelligence-${period}-days.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [dailyData, period]);
 
   return (
     <div className="space-y-4 pb-24">
       {/* Header */}
-      <div className="flex items-center justify-between pt-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         <div>
           <h1 className="text-xl font-bold">{t('bi_center')}</h1>
           <p className="text-xs text-muted-foreground">Business Intelligence</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex shrink-0 gap-2 items-center">
           <Select value={period} onValueChange={setPeriod}>
             <SelectTrigger className="h-8 w-24 text-xs">
               <SelectValue />
@@ -143,7 +197,7 @@ export default function BICenter() {
               <SelectItem value="90">90 days</SelectItem>
             </SelectContent>
           </Select>
-          <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+          <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={exportTrendCsv} aria-label="Export business intelligence trend as CSV" title="Export CSV">
             <Download className="w-3.5 h-3.5" />
           </Button>
         </div>

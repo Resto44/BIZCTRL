@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -13,43 +14,67 @@ import { currentMonth, monthRange, summariseAttendance } from '@/lib/payrollEngi
 
 export default function Alerts() {
   const { t, currency } = useLanguage();
-  const { ownerFilter, branches = [] } = useTenant();
-  
-  // MULTI-TENANT SECURITY: always use ownerFilter (created_by or branch) to scope all queries
-  const tenantFilter = ownerFilter || {};
-  const tenantEnabled = !!(ownerFilter?.created_by || ownerFilter?.branch);
+  const { ownerFilter, branches = [], activeRestaurant, isManager, managerBranch } = useTenant();
+
+  const alertScope = useMemo(() => {
+    const branch = managerBranch || ownerFilter?.branch || null;
+    if (isManager) return branch ? { branch } : null;
+    if (activeRestaurant?.id) return { restaurantId: activeRestaurant.id };
+    return ownerFilter?.created_by ? { createdBy: ownerFilter.created_by } : null;
+  }, [activeRestaurant?.id, isManager, managerBranch, ownerFilter?.branch, ownerFilter?.created_by]);
+  const tenantFilter = alertScope?.branch
+    ? { branch: alertScope.branch }
+    : alertScope?.restaurantId
+      ? { restaurant_id: alertScope.restaurantId }
+      : alertScope?.createdBy
+        ? { created_by: alertScope.createdBy }
+        : null;
+  const tenantEnabled = !!alertScope;
 
   const { data: sales = [], isLoading: loadingSales, isError: errorSales } = useQuery({
-    queryKey: ['sales', ownerFilter],
-    queryFn: () => base44.entities.DailySales.filter(tenantFilter, '-date', 1000),
+    queryKey: ['sales', 'alerts', tenantFilter],
+    queryFn: () => base44.entities.DailySales.filter(tenantFilter || {}, '-date', 1000),
     enabled: tenantEnabled,
     staleTime: 120000
   });
 
   const { data: purchases = [], isLoading: loadingPurchases, isError: errorPurchases } = useQuery({
-    queryKey: ['purchases', ownerFilter],
-    queryFn: () => base44.entities.Purchase.filter(tenantFilter, '-date', 1000),
+    queryKey: ['purchases', 'alerts', alertScope],
+    queryFn: async () => {
+      if (!alertScope) return [];
+      let query = supabase
+        .from('supplier_invoices')
+        .select('id, date, branch, total_amount, status')
+        .in('status', ['approved', 'partial', 'paid'])
+        .order('date', { ascending: false })
+        .limit(1000);
+      if (alertScope.branch) query = query.eq('branch', alertScope.branch);
+      else if (alertScope.restaurantId) query = query.eq('restaurant_id', alertScope.restaurantId);
+      else if (alertScope.createdBy) query = query.eq('created_by', alertScope.createdBy);
+      const { data, error } = await query;
+      return error ? [] : (data || []);
+    },
     enabled: tenantEnabled,
     staleTime: 120000
   });
 
   const { data: attendanceAll = [], isLoading: loadingAttendance, isError: errorAttendance } = useQuery({
-    queryKey: ['attendance', ownerFilter],
-    queryFn: () => base44.entities.Attendance.filter(tenantFilter, '-date', 1000),
+    queryKey: ['attendance', 'alerts', tenantFilter],
+    queryFn: () => base44.entities.Attendance.filter(tenantFilter || {}, '-date', 1000),
     enabled: tenantEnabled,
     staleTime: 300000
   });
 
   const { data: bonusesAll = [], isLoading: loadingBonuses, isError: errorBonuses } = useQuery({
-    queryKey: ['employee_bonuses', ownerFilter],
-    queryFn: () => base44.entities.EmployeeBonus.filter(tenantFilter, '-date', 500),
+    queryKey: ['employee_bonuses', 'alerts', tenantFilter],
+    queryFn: () => base44.entities.EmployeeBonus.filter(tenantFilter || {}, '-date', 500),
     enabled: tenantEnabled,
     staleTime: 300000
   });
 
   const { data: employees = [], isLoading: loadingEmployees, isError: errorEmployees } = useQuery({
-    queryKey: ['employees', ownerFilter],
-    queryFn: () => base44.entities.Employee.filter(tenantFilter, 'name', 500),
+    queryKey: ['employees', 'alerts', tenantFilter],
+    queryFn: () => base44.entities.Employee.filter(tenantFilter || {}, 'name', 500),
     enabled: tenantEnabled,
     staleTime: 600000
   });
@@ -80,10 +105,16 @@ export default function Alerts() {
     const thisPurch = safePurchases.filter(p => p && p.date >= thisMonthStart && p.date <= thisMonthEnd);
     const lastPurch = safePurchases.filter(p => p && p.date >= lastMonthStart && p.date <= lastMonthEnd);
 
-    const thisTotal = thisSales.reduce((s, r) => s + (Number(r.cash) || 0) + (Number(r.network) || 0) + (Number(r.credit) || 0), 0);
-    const lastTotal = lastSales.reduce((s, r) => s + (Number(r.cash) || 0) + (Number(r.network) || 0) + (Number(r.credit) || 0), 0);
-    const thisCost = thisPurch.reduce((s, p) => s + (Number(p.qty) || 0) * (Number(p.used_price || p.current_price) || 0), 0);
-    const lastCost = lastPurch.reduce((s, p) => s + (Number(p.qty) || 0) * (Number(p.used_price || p.current_price) || 0), 0);
+    const saleTotal = (sale) => {
+      const explicitTotal = Number(sale?.total);
+      return Number.isFinite(explicitTotal)
+        ? explicitTotal
+        : (Number(sale?.cash) || 0) + (Number(sale?.network) || 0) + (Number(sale?.credit) || 0);
+    };
+    const thisTotal = thisSales.reduce((sum, sale) => sum + saleTotal(sale), 0);
+    const lastTotal = lastSales.reduce((sum, sale) => sum + saleTotal(sale), 0);
+    const thisCost = thisPurch.reduce((sum, purchase) => sum + (Number(purchase.total_amount) || 0), 0);
+    const lastCost = lastPurch.reduce((sum, purchase) => sum + (Number(purchase.total_amount) || 0), 0);
 
     const thisProfit = thisTotal - thisCost;
     const lastProfit = lastTotal - lastCost;

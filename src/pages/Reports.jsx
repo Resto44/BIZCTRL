@@ -15,7 +15,6 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useSalesSources } from '@/hooks/useSalesSources';
 import PageHeader from '@/components/shared/PageHeader';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -36,9 +35,7 @@ import {
   computeBranchPerformance,
   computeCostControl,
   computeProfitAnalysis,
-  buildInventorySummary,
   generateRecommendations,
-  buildPDFPayload,
 } from '@/services/salesAnalyticsEngine';
 import { generateUltimatePDF } from '@/lib/pdfGenerator';
 import { formatCurrency, formatPct, formatDate, getDateRange, computeProductQuantityAnalytics } from '@/lib/helpers';
@@ -121,56 +118,70 @@ function KPICard({ label, value, sub, trend, icon: Icon, color = 'blue' }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function Reports() {
   const { t, currency, lang, dir } = useLanguage();
-  const { ownerFilter, branches, isManager, managerBranch } = useTenant();
+  const { ownerFilter, branches, isManager, managerBranch, activeRestaurant } = useTenant();
   const { revenueSources, isLoading: loadingSources } = useSalesSources();
 
-  const hasFilter = !!(ownerFilter?.created_by || ownerFilter?.branch);
+  // Owner reporting is restaurant-scoped so records entered by Branch Managers
+  // are included. Managers remain constrained to their assigned branch.
+  const reportScope = useMemo(() => {
+    const branch = managerBranch || ownerFilter?.branch || null;
+    if (isManager) return branch ? { branch } : null;
+    if (activeRestaurant?.id) return { restaurantId: activeRestaurant.id };
+    return ownerFilter?.created_by ? { createdBy: ownerFilter.created_by } : null;
+  }, [activeRestaurant?.id, isManager, managerBranch, ownerFilter?.branch, ownerFilter?.created_by]);
+
+  const hasScope = !!reportScope;
+  const salesFilter = reportScope?.branch
+    ? { branch: reportScope.branch }
+    : reportScope?.restaurantId
+      ? { restaurant_id: reportScope.restaurantId }
+      : reportScope?.createdBy
+        ? { created_by: reportScope.createdBy }
+        : null;
+  const expenseFilter = reportScope?.branch ? { branch_key: reportScope.branch } : salesFilter;
+  const walletFilter = reportScope?.branch ? { branch: reportScope.branch } : salesFilter;
 
   // ── Data fetching ──────────────────────────────────────────────────────────
   const { data: sales = [], isLoading: loadingSales } = useQuery({
-    queryKey: ['sales', ownerFilter],
-    queryFn: () => base44.entities.DailySales.filter(ownerFilter || {}, '-date', 2000),
+    queryKey: ['sales', 'reports', salesFilter],
+    queryFn: () => base44.entities.DailySales.filter(salesFilter || {}, '-date', 2000),
     staleTime: 120000,
-    enabled: hasFilter,
+    enabled: hasScope,
   });
 
   const { data: purchases = [], isLoading: loadingPurchases } = useQuery({
-    queryKey: ['purchases_erp', ownerFilter],
+    queryKey: ['purchases_erp', reportScope],
     queryFn: async () => {
-      if (!ownerFilter?.created_by) return [];
-      const { data, error } = await supabase
+      if (!reportScope) return [];
+      let query = supabase
         .from('supplier_invoices')
         .select('*')
-        .eq('created_by', ownerFilter.created_by)
-        .in('approval_status', ['approved', 'auto_approved'])
+        .in('status', ['approved', 'partial', 'paid'])
         .order('date', { ascending: false })
         .limit(2000);
+      if (reportScope.branch) query = query.eq('branch', reportScope.branch);
+      else if (reportScope.restaurantId) query = query.eq('restaurant_id', reportScope.restaurantId);
+      else if (reportScope.createdBy) query = query.eq('created_by', reportScope.createdBy);
+      const { data, error } = await query;
       if (error) return [];
       return data || [];
     },
     staleTime: 120000,
-    enabled: hasFilter,
+    enabled: hasScope,
   });
 
   const { data: expenses = [], isLoading: loadingExpenses } = useQuery({
-    queryKey: ['expenses', ownerFilter],
-    queryFn: () => base44.entities.Expense.filter(ownerFilter || {}, '-date', 2000),
+    queryKey: ['expenses', 'reports', expenseFilter],
+    queryFn: () => base44.entities.Expense.filter(expenseFilter || {}, '-date', 2000),
     staleTime: 120000,
-    enabled: hasFilter,
+    enabled: hasScope,
   });
 
   const { data: walletTransactions = [] } = useQuery({
-    queryKey: ['wallet_transactions', ownerFilter],
-    queryFn: () => base44.entities.WalletTransaction.filter(ownerFilter || {}, '-date', 500),
+    queryKey: ['wallet_transactions', 'reports', walletFilter],
+    queryFn: () => base44.entities.WalletTransaction.filter(walletFilter || {}, '-date', 500),
     staleTime: 60000,
-    enabled: hasFilter,
-  });
-
-  const { data: inventory = [] } = useQuery({
-    queryKey: ['inventory', ownerFilter],
-    queryFn: () => base44.entities.Inventory.list('-date', 2000),
-    staleTime: 300000,
-    enabled: hasFilter,
+    enabled: hasScope,
   });
 
   const { data: brandSettingsList = [] } = useQuery({
@@ -185,7 +196,7 @@ export default function Reports() {
       ? base44.entities.ExpenseCategory.list('sort_order', 500)
       : Promise.resolve([]),
     staleTime: 300000,
-    enabled: hasFilter,
+    enabled: hasScope,
   });
 
   const isLoading = loadingSales || loadingPurchases || loadingExpenses || loadingSources;
@@ -226,8 +237,6 @@ export default function Reports() {
     [sales, purchases, expenses, revenueSources, expenseCategories]
   );
 
-  const inventorySummary = useMemo(() => buildInventorySummary(inventory), [inventory]);
-
   const recommendations = useMemo(
     () => generateRecommendations(executive, cost, branchPerf),
     [executive, cost, branchPerf]
@@ -249,6 +258,7 @@ export default function Reports() {
     setPdfError(null);
     try {
       const dr = getDateRange('month');
+      const inventory = await base44.entities.Inventory.filter(salesFilter || {}, '-date', 2000);
       await generateUltimatePDF({
         sales, purchases, expenses,
         rangeType: 'month',
@@ -271,7 +281,7 @@ export default function Reports() {
       setPdfError(e.message || 'Generation failed');
       setPdfStatus('error');
     }
-  }, [sales, purchases, expenses, branches, inventory, walletTransactions, revenueSources, expenseCategories, brandSettingsList, t, lang, currency, dir]);
+  }, [sales, purchases, expenses, branches, salesFilter, walletTransactions, revenueSources, expenseCategories, brandSettingsList, t, lang, currency, dir]);
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (isLoading) {

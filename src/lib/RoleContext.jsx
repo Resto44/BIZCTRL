@@ -168,13 +168,13 @@ export function RoleProvider({ children }) {
 
   const role = useMemo(() => {
     // Do not resolve role until auth has finished loading
-    if (isLoadingAuth || !user) return ROLES.OWNER;
+    if (isLoadingAuth || !user) return ROLES.EMPLOYEE;
     // Normalize role strings to match our ROLES constant
     const r = (user?.role || '').toLowerCase();
     if (Object.values(ROLES).includes(r)) return r;
     if (r === 'admin' || r === 'restaurant_admin') return ROLES.OWNER;
     if (r === 'staff') return ROLES.EMPLOYEE;
-    return ROLES.OWNER; // Safe default
+    return ROLES.EMPLOYEE; // Deny by default until a recognized role is available
   }, [user, isLoadingAuth]);
 
   const can = useMemo(() => {
@@ -198,7 +198,7 @@ export function RoleProvider({ children }) {
 }
 export function useRole() {
   const ctx = useContext(RoleContext);
-  if (!ctx) return { role: ROLES.OWNER, can: buildCan(ROLES.OWNER), user: null };
+  if (!ctx) return { role: ROLES.EMPLOYEE, can: buildCan(ROLES.EMPLOYEE), user: null };
   return ctx;
 }
 export function useRouteGuard() {

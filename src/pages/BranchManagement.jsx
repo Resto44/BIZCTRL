@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
 import { useRole } from '@/lib/RoleContext';
 import { useLanguage } from '@/lib/LanguageContext';
-import { useAuth } from '@/lib/AuthContext';
 import { formatCurrency } from '@/lib/helpers';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -24,7 +23,7 @@ import {
   BarChart3, AlertTriangle, CheckCircle2, Building2, Mail,
   Shield, ShieldCheck, ShieldOff, Key, RefreshCw, Copy,
   ArrowRightLeft, UserMinus, ChevronDown, ChevronUp, Search,
-  History, Eye, EyeOff, Settings2, Lock, Unlock, Globe, Filter
+  History, Settings2, Globe
 } from 'lucide-react';
 import { subDays, format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -399,7 +398,7 @@ function StatusBadge({ status }) {
 }
 
 // ─── User Row (expandable) ────────────────────────────────────────────────────
-function UserRow({ mem, branches, allMembers, onRoleChange, onPermChange, onScopeChange, onQuickAction, u, saving }) {
+function UserRow({ mem, branches, onRoleChange, onPermChange, onScopeChange, onQuickAction, u }) {
   const [expanded, setExpanded] = useState(false);
   const [localPerms, setLocalPerms] = useState(mem.permissions || {});
   const [permSaving, setPermSaving] = useState(false);
@@ -703,9 +702,7 @@ export default function BranchManagement() {
   const { lang, currency } = useLanguage();
   const u = UI[lang] || UI.en;
   const { role } = useRole();
-  const { user } = useAuth();
   const { allBranches, updateRestaurantBranches, ownerFilter, activeRestaurantId } = useTenant();
-  const queryClient = useQueryClient();
 
   // Branch form state
   const [showForm, setShowForm] = useState(false);
@@ -727,29 +724,45 @@ export default function BranchManagement() {
   const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd');
 
   // ── Data fetching ──────────────────────────────────────────────────────────
+  // Branch Management is Owner-only. Scope analytics by restaurant instead of the
+  // Owner's email so branch-created records participate in the comparison.
+  const analyticsFilter = activeRestaurantId
+    ? { restaurant_id: activeRestaurantId }
+    : (ownerFilter || {});
+  const analyticsEnabled = !!(activeRestaurantId || ownerFilter?.created_by || ownerFilter?.branch);
   const { data: sales = [] } = useQuery({
-    queryKey: ['bm_sales', ownerFilter],
-    queryFn: () => base44.entities.DailySales.filter(ownerFilter || {}, '-date', 1000),
+    queryKey: ['bm_sales', analyticsFilter],
+    queryFn: () => base44.entities.DailySales.filter(analyticsFilter, '-date', 1000),
     staleTime: 120000,
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    enabled: analyticsEnabled,
   });
   const { data: expenses = [] } = useQuery({
-    queryKey: ['bm_expenses', ownerFilter],
-    queryFn: () => base44.entities.Expense.filter(ownerFilter || {}, '-date', 500),
+    queryKey: ['bm_expenses', analyticsFilter],
+    queryFn: () => base44.entities.Expense.filter(analyticsFilter, '-date', 500),
     staleTime: 120000,
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    enabled: analyticsEnabled,
   });
   const { data: purchases = [] } = useQuery({
-    queryKey: ['bm_purchases', ownerFilter],
-    queryFn: () => base44.entities.Purchase.filter(ownerFilter || {}, '-date', 500),
+    queryKey: ['bm_purchases', activeRestaurantId],
+    queryFn: async () => {
+      if (!activeRestaurantId) return [];
+      const { data, error } = await supabase
+        .from('supplier_invoices')
+        .select('id, branch, date, total_amount, status')
+        .eq('restaurant_id', activeRestaurantId)
+        .in('status', ['approved', 'partial', 'paid'])
+        .order('date', { ascending: false })
+        .limit(500);
+      return error ? [] : (data || []);
+    },
     staleTime: 120000,
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    enabled: !!activeRestaurantId,
   });
   const { data: employees = [] } = useQuery({
-    queryKey: ['bm_employees', ownerFilter],
-    queryFn: () => base44.entities.Employee.filter(ownerFilter || {}, 'full_name', 200),
+    queryKey: ['bm_employees', analyticsFilter],
+    queryFn: () => base44.entities.Employee.filter(analyticsFilter, 'full_name', 200),
     staleTime: 120000,
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    enabled: analyticsEnabled,
   });
 
   // Fetch all users (erp_memberships) for this restaurant
@@ -797,9 +810,14 @@ export default function BranchManagement() {
       const bExpenses = recentExpenses.filter(e => e.branch === b.key || e.branch === 'all');
       const bPurchases = recentPurchases.filter(p => p.branch === b.key);
       const bEmployees = employees.filter(e => e.branch === b.key);
-      const totalSales = bSales.reduce((s, r) => s + (r.cash || 0) + (r.network || 0) + (r.credit || 0), 0);
+      const totalSales = bSales.reduce((sum, sale) => {
+        const explicitTotal = Number(sale.total);
+        return sum + (Number.isFinite(explicitTotal)
+          ? explicitTotal
+          : (Number(sale.cash) || 0) + (Number(sale.network) || 0) + (Number(sale.credit) || 0));
+      }, 0);
       const totalExpenses = bExpenses.reduce((s, e) => s + (e.amount || 0), 0);
-      const totalPurchases = bPurchases.reduce((s, p) => s + ((p.used_price || p.current_price || 0) * (p.qty || 1)), 0);
+      const totalPurchases = bPurchases.reduce((sum, purchase) => sum + (Number(purchase.total_amount) || 0), 0);
       return { ...b, totalSales, totalExpenses, totalPurchases, employeeCount: bEmployees.length };
     });
   }, [allBranches, recentSales, recentExpenses, recentPurchases, employees]);
@@ -870,7 +888,7 @@ export default function BranchManagement() {
   // ── Role change ────────────────────────────────────────────────────────────
   const handleRoleChange = useCallback(async (membershipId, newRole, oldRole) => {
     try {
-      const { data, error } = await supabase.rpc('update_user_role_and_permissions', {
+      const { error } = await supabase.rpc('update_user_role_and_permissions', {
         p_membership_id: membershipId,
         p_new_role: newRole,
         p_action: 'role_change',
@@ -1270,13 +1288,11 @@ export default function BranchManagement() {
                     key={mem.id}
                     mem={mem}
                     branches={dbBranches}
-                    allMembers={memberships}
                     onRoleChange={handleRoleChange}
                     onPermChange={handlePermChange}
                     onScopeChange={handleScopeChange}
                     onQuickAction={handleQuickAction}
                     u={u}
-                    saving={saving}
                   />
                 ))}
               </div>

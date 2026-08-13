@@ -30,7 +30,7 @@ export function TenantProvider({ children }) {
     if (Object.values(ROLES).includes(r)) return r;
     if (r === 'admin' || r === 'restaurant_admin') return ROLES.OWNER;
     if (r === 'staff') return ROLES.EMPLOYEE;
-    return ROLES.OWNER; // safe default
+    return ROLES.EMPLOYEE; // deny data access until a recognized role is available
   })();
   const isOwner = normalizedRole === ROLES.OWNER;
   const isManager = normalizedRole === ROLES.MANAGER;
