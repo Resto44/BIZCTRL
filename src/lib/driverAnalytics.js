@@ -191,3 +191,83 @@ export function buildBranchDriverAnalytics({ drivers = [], sales = [], branches 
     };
   }).sort((left, right) => right.revenue - left.revenue || left.branchName.localeCompare(right.branchName));
 }
+
+
+// Builds the chart-ready trend data used by both the Owner dashboard and the
+// branch-scoped Driver Management workspace. Every metric is attributed via the
+// same canonical getDriverSaleEntries() path as Driver Sales history and totals.
+export function buildDriverTrendAnalytics({
+  drivers = [],
+  sales = [],
+  branches = [],
+  branchKey,
+  branchId,
+  dateFrom,
+  dateTo,
+} = {}) {
+  const analytics = buildDriverSalesAnalytics({
+    drivers,
+    sales,
+    branchKey,
+    branchId,
+    dateFrom,
+    dateTo,
+  });
+
+  const scopedBranches = branches.filter((branch) => {
+    if (!branchKey && !branchId) return true;
+    return branchMatches({
+      branch_id: branch.id,
+      branch: branch.key || branch.branch_key,
+    }, branchKey, branchId);
+  });
+  const branchRows = buildBranchDriverAnalytics({
+    drivers,
+    sales,
+    branches: scopedBranches,
+    dateFrom,
+    dateTo,
+  });
+  const branchNames = new Map(branchRows.flatMap((row) => [
+    [String(row.branchId || ''), row.branchName],
+    [String(row.branchKey || ''), row.branchName],
+  ]));
+
+  const driverRows = analytics.driverRows.map((row) => ({
+    ...row,
+    branchName: branchNames.get(String(row.branchId || ''))
+      || branchNames.get(String(row.branch || ''))
+      || row.branch
+      || 'Unassigned branch',
+  }));
+
+  const dates = Array.from(new Set(
+    sales
+      .filter((sale) => branchMatches(sale, branchKey, branchId) && saleDateMatches(sale, dateFrom, dateTo))
+      .map((sale) => String(sale.date || '').slice(0, 10))
+      .filter(Boolean),
+  )).sort((left, right) => left.localeCompare(right));
+
+  const trendRows = dates.map((date) => {
+    const daily = buildDriverSalesAnalytics({
+      drivers,
+      sales,
+      branchKey,
+      branchId,
+      dateFrom: date,
+      dateTo: date,
+    }).totals;
+    return {
+      date,
+      label: date.slice(5),
+      ...daily,
+    };
+  });
+
+  return {
+    ...analytics,
+    branchRows,
+    driverRows,
+    trendRows,
+  };
+}

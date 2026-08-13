@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { buildDriverSalesAnalytics, DRIVER_ANALYTICS_PERIODS, getDriverAnalyticsDateRange, getDriverSaleEntries } from '@/lib/driverAnalytics';
 import BranchSelect from '@/components/shared/BranchSelect';
+import DriverTrendAnalytics from '@/components/dashboard/DriverTrendAnalytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -369,6 +370,18 @@ export default function DriverManagement() {
         <MetricCard label="Credit Sales" value={money(analytics.totals.credit, currency)} icon={CreditCard} />
         <MetricCard label="Total Revenue" value={money(analytics.totals.revenue, currency)} icon={BarChart3} />
       </div>
+
+      <DriverTrendAnalytics
+        drivers={drivers}
+        sales={sales}
+        branches={branches}
+        branchKey={effectiveBranchKey}
+        branchId={effectiveBranchId}
+        dateFrom={dateRange.startDate}
+        dateTo={dateRange.endDate}
+        periodLabel={periodLabel}
+        currency={currency}
+      />
 
       <Card>
         <CardContent className="p-4">

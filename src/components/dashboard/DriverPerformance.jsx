@@ -4,6 +4,7 @@ import { Award, BarChart3, CreditCard, DollarSign, Package, Truck, Users } from 
 import { supabase } from '@/api/supabaseClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import DriverTrendAnalytics from '@/components/dashboard/DriverTrendAnalytics';
 import {
   buildBranchDriverAnalytics,
   buildDriverSalesAnalytics,
@@ -53,7 +54,7 @@ const DriverPerformance = memo(function DriverPerformance({ restaurantId, branch
         .from('daily_sales')
         .select('id, date, restaurant_id, branch, branch_id, driver_id, driver_name, driver_cash, driver_network, drivers_json, restaurant_cash, restaurant_network, cash, network, credit, sales_sources_json, custom_sources_total')
         .eq('restaurant_id', restaurantId)
-        .not('driver_id', 'is', null)
+        .or('driver_id.not.is.null,drivers_json.not.is.null')
         .gte('date', range.startDate)
         .lte('date', range.endDate)
         .order('date', { ascending: false })
@@ -85,7 +86,7 @@ const DriverPerformance = memo(function DriverPerformance({ restaurantId, branch
   const error = driversError || salesError;
 
   return (
-    <section>
+    <section className="space-y-4">
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-100 text-cyan-600 dark:bg-cyan-900/40">
@@ -164,6 +165,20 @@ const DriverPerformance = memo(function DriverPerformance({ restaurantId, branch
           )}
         </CardContent>
       </Card>
+
+      {!loading && !error && (
+        <DriverTrendAnalytics
+          drivers={drivers}
+          sales={sales}
+          branches={branchList}
+          branchKey={selectedBranchKey}
+          branchId={branchId}
+          dateFrom={range.startDate}
+          dateTo={range.endDate}
+          periodLabel={DRIVER_ANALYTICS_PERIODS.find((item) => item.id === period)?.label || 'Selected period'}
+          currency={currency}
+        />
+      )}
     </section>
   );
 });
