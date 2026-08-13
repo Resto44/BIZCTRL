@@ -46,29 +46,38 @@ export function getCustomSourcesTotal(sale = {}) {
   }
 }
 
-export function getDriverSaleAmounts(sale = {}) {
-  // New Driver Sales entries carry a dedicated snapshot inside the same
-  // daily_sales record. Read that split for driver analytics so a selected
-  // driver never receives credit for unrelated counter/POS/credit sales.
-  if (sale.driver_id && sale.drivers_json) {
+const amountsFromDriverEntry = (entry = {}) => {
+  const cash = number(entry.cash);
+  const network = number(entry.network);
+  const credit = number(entry.credit);
+  return { cash, network, credit, other: 0, revenue: cash + network + credit };
+};
+
+export function getDriverSaleEntries(sale = {}) {
+  // New multi-driver entries carry one snapshot element per branch driver in
+  // the same daily_sales row. This is deliberately separate from normal POS.
+  if (sale.drivers_json) {
     try {
       const snapshot = JSON.parse(sale.drivers_json);
-      const entry = Array.isArray(snapshot) ? snapshot.at(0) : null;
-      if (entry) {
-        const cash = number(entry.cash);
-        const network = number(entry.network);
-        const credit = number(entry.credit);
-        return { cash, network, credit, other: 0, revenue: cash + network + credit };
+      if (Array.isArray(snapshot) && snapshot.length) {
+        return snapshot
+          .filter((entry) => entry?.driver_id || entry?.driver_name)
+          .map((entry) => ({
+            driver_id: entry.driver_id || '',
+            driver_name: entry.driver_name || '',
+            ...amountsFromDriverEntry(entry),
+          }));
       }
     } catch { /* Fall through to legacy compatibility. */ }
   }
 
-  // Some legacy driver entries stored only cash/network split columns. They do
-  // not include driver credit, so retain those explicit values when present.
-  if (sale.driver_id && (number(sale.driver_cash) > 0 || number(sale.driver_network) > 0)) {
+  if (!sale.driver_id && !sale.driver_name) return [];
+
+  // Some legacy driver entries stored only cash/network split columns.
+  if (number(sale.driver_cash) > 0 || number(sale.driver_network) > 0) {
     const cash = number(sale.driver_cash);
     const network = number(sale.driver_network);
-    return { cash, network, credit: 0, other: 0, revenue: cash + network };
+    return [{ driver_id: sale.driver_id || '', driver_name: sale.driver_name || '', cash, network, credit: 0, other: 0, revenue: cash + network }];
   }
 
   // Legacy attributed records predate the dedicated snapshot. Preserve their
@@ -77,14 +86,15 @@ export function getDriverSaleAmounts(sale = {}) {
   const network = number(sale.restaurant_network ?? sale.network);
   const credit = number(sale.credit);
   const other = getCustomSourcesTotal(sale);
+  return [{ driver_id: sale.driver_id || '', driver_name: sale.driver_name || '', cash, network, credit, other, revenue: cash + network + credit + other }];
+}
 
-  return {
-    cash,
-    network,
-    credit,
-    other,
-    revenue: cash + network + credit + other,
-  };
+export function getDriverSaleAmounts(sale = {}, driverId = null) {
+  const entries = getDriverSaleEntries(sale);
+  const entry = driverId
+    ? entries.find((item) => String(item.driver_id) === String(driverId))
+    : entries.at(0);
+  return entry || { cash: 0, network: 0, credit: 0, other: 0, revenue: 0 };
 }
 
 export function branchMatches(record = {}, branchKey, branchId) {
@@ -122,19 +132,20 @@ export function buildDriverSalesAnalytics({ drivers = [], sales = [], branchKey,
 
   sales.forEach((sale) => {
     if (!branchMatches(sale, branchKey, branchId)) return;
-    const linkedDriver = sale.driver_id
-      ? driverById.get(String(sale.driver_id))
-      : driverByName.get(String(sale.driver_name || '').trim().toLowerCase());
-    if (!linkedDriver) return;
+    getDriverSaleEntries(sale).forEach((entry) => {
+      const linkedDriver = entry.driver_id
+        ? driverById.get(String(entry.driver_id))
+        : driverByName.get(String(entry.driver_name || '').trim().toLowerCase());
+      if (!linkedDriver) return;
 
-    const row = rows.get(String(linkedDriver.id));
-    const amounts = getDriverSaleAmounts(sale);
-    row.orders += 1;
-    row.cash += amounts.cash;
-    row.network += amounts.network;
-    row.credit += amounts.credit;
-    row.other += amounts.other;
-    row.revenue += amounts.revenue;
+      const row = rows.get(String(linkedDriver.id));
+      row.orders += 1;
+      row.cash += entry.cash;
+      row.network += entry.network;
+      row.credit += entry.credit;
+      row.other += entry.other;
+      row.revenue += entry.revenue;
+    });
   });
 
   const driverRows = Array.from(rows.values())

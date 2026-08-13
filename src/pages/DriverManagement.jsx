@@ -5,7 +5,7 @@ import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
-import { buildDriverSalesAnalytics, getDriverSaleAmounts } from '@/lib/driverAnalytics';
+import { buildDriverSalesAnalytics, getDriverSaleEntries } from '@/lib/driverAnalytics';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,7 +44,9 @@ function DriverDetailsDialog({ driver, analytics, sales, currency, onOpenChange 
 
   const row = analytics.driverRows.find((item) => String(item.driverId) === String(driver.id));
   const history = sales
-    .filter((sale) => String(sale.driver_id || '') === String(driver.id))
+    .flatMap((sale) => getDriverSaleEntries(sale)
+      .filter((entry) => String(entry.driver_id || '') === String(driver.id))
+      .map((entry, index) => ({ ...sale, driverAmounts: entry, historyKey: `${sale.id}-${entry.driver_id || index}` })))
     .sort((left, right) => String(right.date || '').localeCompare(String(left.date || '')))
     .slice(0, 25);
 
@@ -92,9 +94,9 @@ function DriverDetailsDialog({ driver, analytics, sales, currency, onOpenChange 
             ) : (
               <div className="space-y-2">
                 {history.map((sale) => {
-                  const amounts = getDriverSaleAmounts(sale);
+                  const amounts = sale.driverAmounts;
                   return (
-                    <div key={sale.id} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg border border-border/70 p-3 text-sm">
+                    <div key={sale.historyKey} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg border border-border/70 p-3 text-sm">
                       <div>
                         <p className="font-semibold">{sale.date || 'Undated sale'}</p>
                         <p className="text-xs text-muted-foreground">{sale.branch || 'Branch'} · Cash {money(amounts.cash, currency)} · POS {money(amounts.network, currency)}</p>

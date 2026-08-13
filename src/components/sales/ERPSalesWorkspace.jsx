@@ -78,23 +78,40 @@ const matchesBranch = (record, branchKey, branchId) => {
   );
 };
 
-// Driver Sales remains part of one canonical daily_sales row. This parser restores
-// the driver-specific split for edits while the standard sales totals remain the
-// authoritative amounts used by dashboards, history, and reconciliation.
-const parseDriverSalesSnapshot = (record) => {
-  if (!record?.driver_id) return { cash: 0, network: 0, credit: 0 };
-  let snapshot = null;
-  if (record.drivers_json) {
+// Driver Sales remains part of one canonical daily_sales row. Each entry is a
+// responsive UI row, while daily_sales remains the sole source of truth for the
+// combined cash, network, credit, dashboard, history, and reconciliation totals.
+const createDriverSalesRow = (values = {}) => ({
+  id: values.id || `driver-sale-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  driver_id: values.driver_id || '',
+  driver_name: values.driver_name || '',
+  cash: values.cash !== undefined && Number(values.cash) !== 0 ? String(values.cash) : '',
+  network: values.network !== undefined && Number(values.network) !== 0 ? String(values.network) : '',
+  credit: values.credit !== undefined && Number(values.credit) !== 0 ? String(values.credit) : '',
+});
+
+const parseDriverSalesRows = (record) => {
+  if (record?.drivers_json) {
     try {
-      snapshot = firstRecord(JSON.parse(record.drivers_json));
+      const entries = asRecordArray(JSON.parse(record.drivers_json));
+      if (entries.length) return entries.map((entry) => createDriverSalesRow(entry));
     } catch { /* Legacy records may contain malformed/empty JSON. */ }
   }
-  return {
-    cash: Number(snapshot?.cash ?? record.driver_cash) || 0,
-    network: Number(snapshot?.network ?? record.driver_network) || 0,
-    credit: Number(snapshot?.credit) || 0,
-  };
+
+  // Preserve the existing single-driver format when editing a legacy record.
+  if (record?.driver_id) {
+    return [createDriverSalesRow({
+      driver_id: record.driver_id,
+      driver_name: record.driver_name,
+      cash: record.driver_cash,
+      network: record.driver_network,
+      credit: 0,
+    })];
+  }
+  return [];
 };
+
+const driverRowAmount = (row, field) => Math.max(0, Number(row?.[field]) || 0);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS — Material 3 / ERP
@@ -484,24 +501,24 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   }, [branches, form.branch, form.branch_id]);
 
   // ── Sales Revenue inputs ──────────────────────────────────────────────────
+  const [driverSalesRows, setDriverSalesRows] = useState(() => parseDriverSalesRows(initial));
   const [cashSalesInput, setCashSalesInput] = useState(() => {
-    const persistedDriverSales = parseDriverSalesSnapshot(initial);
+    const persistedDriverCash = parseDriverSalesRows(initial)
+      .reduce((total, row) => total + driverRowAmount(row, 'cash'), 0);
     const storedCash = initial?.restaurant_cash !== undefined
       ? Number(initial.restaurant_cash)
       : Number(initial?.cash);
-    const counterCash = Math.max(0, (Number.isFinite(storedCash) ? storedCash : 0) - persistedDriverSales.cash);
+    const counterCash = Math.max(0, (Number.isFinite(storedCash) ? storedCash : 0) - persistedDriverCash);
     return counterCash ? String(counterCash) : '';
   });
-  const [driverSalesInputs, setDriverSalesInputs] = useState(() => {
-    const persistedDriverSales = parseDriverSalesSnapshot(initial);
-    return {
-      cash: persistedDriverSales.cash ? String(persistedDriverSales.cash) : '',
-      network: persistedDriverSales.network ? String(persistedDriverSales.network) : '',
-      credit: persistedDriverSales.credit ? String(persistedDriverSales.credit) : '',
-    };
-  });
-  const setDriverSalesInput = useCallback((field, value) => {
-    setDriverSalesInputs((previous) => ({ ...previous, [field]: value }));
+  const addDriverSalesRow = useCallback(() => {
+    setDriverSalesRows((previous) => [...previous, createDriverSalesRow()]);
+  }, []);
+  const removeDriverSalesRow = useCallback((rowId) => {
+    setDriverSalesRows((previous) => previous.filter((row) => row.id !== rowId));
+  }, []);
+  const updateDriverSalesRow = useCallback((rowId, field, value) => {
+    setDriverSalesRows((previous) => previous.map((row) => row.id === rowId ? { ...row, [field]: value } : row));
   }, []);
 
   // ── Cash Reconciliation inputs ────────────────────────────────────────────
@@ -945,14 +962,13 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   // second sale. Each driver amount therefore feeds the canonical cash, network,
   // credit, total-revenue, reconciliation, dashboard, and history calculations.
   const counterCashSales = useMemo(() => Math.max(0, Number(cashSalesInput) || 0), [cashSalesInput]);
-  const hasSelectedDriver = !!form.driver_id;
-  const enteredDriverCashSales = useMemo(() => Math.max(0, Number(driverSalesInputs.cash) || 0), [driverSalesInputs.cash]);
-  const enteredDriverNetworkSales = useMemo(() => Math.max(0, Number(driverSalesInputs.network) || 0), [driverSalesInputs.network]);
-  const enteredDriverCreditSales = useMemo(() => Math.max(0, Number(driverSalesInputs.credit) || 0), [driverSalesInputs.credit]);
-  const driverSalesEntered = useMemo(() => enteredDriverCashSales + enteredDriverNetworkSales + enteredDriverCreditSales, [enteredDriverCashSales, enteredDriverNetworkSales, enteredDriverCreditSales]);
-  const driverCashSales = useMemo(() => hasSelectedDriver ? enteredDriverCashSales : 0, [enteredDriverCashSales, hasSelectedDriver]);
-  const driverNetworkSales = useMemo(() => hasSelectedDriver ? enteredDriverNetworkSales : 0, [enteredDriverNetworkSales, hasSelectedDriver]);
-  const driverCreditSales = useMemo(() => hasSelectedDriver ? enteredDriverCreditSales : 0, [enteredDriverCreditSales, hasSelectedDriver]);
+  const driverSalesEntered = useMemo(() => driverSalesRows.reduce((total, row) => (
+    total + driverRowAmount(row, 'cash') + driverRowAmount(row, 'network') + driverRowAmount(row, 'credit')
+  ), 0), [driverSalesRows]);
+  const attributedDriverSalesRows = useMemo(() => driverSalesRows.filter((row) => row.driver_id), [driverSalesRows]);
+  const driverCashSales = useMemo(() => attributedDriverSalesRows.reduce((total, row) => total + driverRowAmount(row, 'cash'), 0), [attributedDriverSalesRows]);
+  const driverNetworkSales = useMemo(() => attributedDriverSalesRows.reduce((total, row) => total + driverRowAmount(row, 'network'), 0), [attributedDriverSalesRows]);
+  const driverCreditSales = useMemo(() => attributedDriverSalesRows.reduce((total, row) => total + driverRowAmount(row, 'credit'), 0), [attributedDriverSalesRows]);
   const driverSalesTotal = useMemo(() => driverCashSales + driverNetworkSales + driverCreditSales, [driverCashSales, driverNetworkSales, driverCreditSales]);
   const cashSales = useMemo(() => counterCashSales + driverCashSales, [counterCashSales, driverCashSales]);
   const counterNetworkTotal = useMemo(() => asRecordArray(posEntries).reduce((s, e) => s + (Number(e.amount) || 0), 0), [posEntries]);
@@ -1214,8 +1230,12 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     const cashierId = form.cashier_id || form.cashier_employee_id || user?.id || null;
     const customerId = form.customer_id || creditEntries.find((entry) => entry.customer_id)?.customer_id || defaultCustomer?.id || null;
     const posDeviceId = form.pos_device_id || posEntries.find((entry) => entry.device_id)?.device_id || null;
-    const selectedDriver = form.driver_id ? drivers.find((driver) => String(driver.id) === String(form.driver_id)) : null;
-    const driverId = selectedDriver?.id || null;
+    const selectedDriverRows = attributedDriverSalesRows.map((row) => ({
+      ...row,
+      driver: drivers.find((driver) => String(driver.id) === String(row.driver_id)) || null,
+    }));
+    const primaryDriver = firstRecord(selectedDriverRows);
+    const driverId = primaryDriver?.driver_id || null;
     const createdBy = user?.email || ownerFilter?.created_by || '';
     const tenantId = activeRestaurant?.id || user?.organization_id || user?.restaurant_id || '';
 
@@ -1240,13 +1260,28 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       return;
     }
 
-    if (form.driver_id && !isManager) {
-      toast.error('Only the assigned Branch Manager can record a Driver Sale.');
+    if (attributedDriverSalesRows.length > 0 && !isManager) {
+      toast.error('Only the assigned Branch Manager can record Driver Sales.');
       return;
     }
 
-    if (form.driver_id && !selectedDriver) {
-      toast.error('Select an active driver from the current branch.');
+    const amountWithoutDriver = driverSalesRows.find((row) => (
+      (driverRowAmount(row, 'cash') + driverRowAmount(row, 'network') + driverRowAmount(row, 'credit')) > 0 && !row.driver_id
+    ));
+    if (amountWithoutDriver) {
+      toast.error('Select a branch driver before entering that row’s Driver Sales amounts.');
+      return;
+    }
+
+    const invalidDriverRow = selectedDriverRows.find((row) => !row.driver);
+    if (invalidDriverRow) {
+      toast.error('Each Driver Sales row must use an active driver from the current branch.');
+      return;
+    }
+
+    const selectedDriverIds = selectedDriverRows.map((row) => String(row.driver_id));
+    if (new Set(selectedDriverIds).size !== selectedDriverIds.length) {
+      toast.error('Each driver can be entered only once in the Driver Sales list.');
       return;
     }
 
@@ -1291,18 +1326,25 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         pos_device_id: posDeviceId,
         // Driver Sales is a split within this same daily_sales record. The standard
         // totals above remain the source used by Dashboards, History, and Today.
+        // `driver_id` remains the first linked driver for legacy compatibility;
+        // `drivers_json` stores every responsive Driver Sales row in this same record.
         driver_id: driverId,
-        driver_name: selectedDriver?.full_name || '',
+        driver_name: primaryDriver?.driver?.full_name || primaryDriver?.driver_name || '',
         driver_cash: driverCashSales,
         driver_network: driverNetworkSales,
-        drivers_json: JSON.stringify(driverId ? [{
-          driver_id: driverId,
-          driver_name: selectedDriver?.full_name || '',
-          cash: driverCashSales,
-          network: driverNetworkSales,
-          credit: driverCreditSales,
-          total: driverSalesTotal,
-        }] : []),
+        drivers_json: JSON.stringify(selectedDriverRows.map((row) => {
+          const cash = driverRowAmount(row, 'cash');
+          const network = driverRowAmount(row, 'network');
+          const credit = driverRowAmount(row, 'credit');
+          return {
+            driver_id: row.driver_id,
+            driver_name: row.driver?.full_name || row.driver_name || '',
+            cash,
+            network,
+            credit,
+            total: cash + network + credit,
+          };
+        })),
         credit: creditTotal,
         pos_entries_json: JSON.stringify(posEntries.map(({ id, ...rest }) => rest)),
         credit_entries_json: JSON.stringify(creditEntries.map(({ id, ...rest }) => rest)),
@@ -1398,6 +1440,9 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                     set('branch_id', '');
                     set('driver_id', '');
                     set('driver_name', '');
+                    // Driver Sales is strictly branch-scoped; reset rows before
+                    // loading the newly selected branch’s drivers.
+                    setDriverSalesRows([]);
                     // Clear credit entries when branch changes (to avoid showing customers from previous branch)
                     setCreditEntries([]);
                   }} />
@@ -1548,66 +1593,92 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 </Badge>
               </div>
               <div className="p-4 space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  Enter one branch driver’s sales here. These amounts are included once in the same Daily Sales record and its standard Cash, Network/POS, Credit, Today, History, and dashboard totals.
-                </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <p className="text-xs text-muted-foreground sm:max-w-[70%]">
+                    Add one row per branch driver. Every row is included once in this same Daily Sales record; normal POS Sales remains a separate section below.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="w-full bg-sky-700 text-white hover:bg-sky-800 sm:w-auto"
+                    onClick={addDriverSalesRow}
+                    disabled={driversLoading || drivers.length === 0}
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Driver
+                  </Button>
+                </div>
                 {driversLoading ? (
-                  <Skeleton className="h-10 w-full" />
+                  <div className="space-y-2"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>
                 ) : drivers.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                     No active drivers are assigned to this branch. You can still save normal sales without driver attribution.
                   </div>
+                ) : driverSalesRows.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-sky-200 bg-sky-50/50 px-4 py-5 text-center">
+                    <Truck className="mx-auto mb-2 h-5 w-5 text-sky-600" />
+                    <p className="text-sm font-semibold text-sky-900">No drivers added yet</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Use Add Driver to record sales for any driver assigned to this branch.</p>
+                  </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-xl border border-sky-100">
-                    <table className="w-full min-w-[620px] text-left">
-                      <thead className="bg-sky-50 text-[10px] font-bold uppercase tracking-wide text-sky-900">
-                        <tr>
-                          <th className="px-3 py-2.5">Select Branch Driver</th>
-                          <th className="px-3 py-2.5">Cash Sales</th>
-                          <th className="px-3 py-2.5">Network / POS Sales</th>
-                          <th className="px-3 py-2.5">Credit Sales</th>
-                          <th className="px-3 py-2.5 text-right">Total Driver Sales</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="bg-background align-top">
-                          <td className="p-3 min-w-[190px]">
-                            <Select
-                              value={form.driver_id || 'unassigned'}
-                              onValueChange={(id) => {
-                                const driver = drivers.find((item) => String(item.id) === String(id));
-                                setForm((previous) => ({
-                                  ...previous,
-                                  driver_id: driver?.id || '',
-                                  driver_name: driver?.full_name || '',
-                                }));
-                              }}
+                  <div className="space-y-3">
+                    {driverSalesRows.map((row, index) => {
+                      const rowCash = driverRowAmount(row, 'cash');
+                      const rowNetwork = driverRowAmount(row, 'network');
+                      const rowCredit = driverRowAmount(row, 'credit');
+                      const rowTotal = rowCash + rowNetwork + rowCredit;
+                      return (
+                        <div key={row.id} className="rounded-xl border border-sky-200 bg-sky-50/30 p-3 shadow-sm">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-sky-800">Driver #{index + 1}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-destructive hover:bg-destructive/10"
+                              onClick={() => removeDriverSalesRow(row.id)}
                             >
-                              <SelectTrigger className="h-10 text-xs"><SelectValue placeholder="Select driver" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="unassigned">No driver selected</SelectItem>
-                                {drivers.map((driver) => (
-                                  <SelectItem key={driver.id} value={String(driver.id)}>{driver.full_name || 'Unnamed driver'}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          <td className="p-3 min-w-[125px]">
-                            <NumInput label="Cash" value={driverSalesInputs.cash} onChange={(value) => setDriverSalesInput('cash', value)} prefix={currency} />
-                          </td>
-                          <td className="p-3 min-w-[145px]">
-                            <NumInput label="Network / POS" value={driverSalesInputs.network} onChange={(value) => setDriverSalesInput('network', value)} prefix={currency} />
-                          </td>
-                          <td className="p-3 min-w-[125px]">
-                            <NumInput label="Credit" value={driverSalesInputs.credit} onChange={(value) => setDriverSalesInput('credit', value)} prefix={currency} />
-                          </td>
-                          <td className="p-3 text-right align-middle min-w-[130px]">
-                            <span className="text-base font-black text-sky-700">{currency}{driverSalesTotal.toLocaleString()}</span>
-                            <p className="mt-1 text-[10px] text-muted-foreground">Cash + POS + Credit</p>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                              <Trash2 className="mr-1 h-3.5 w-3.5" /> Remove
+                            </Button>
+                          </div>
+                          <div className="space-y-3">
+                            <div>
+                              <Label className="mb-1 block text-[10px] font-bold uppercase text-muted-foreground">Driver name</Label>
+                              <Select
+                                value={row.driver_id || '__unselected__'}
+                                onValueChange={(id) => {
+                                  const driver = drivers.find((item) => String(item.id) === String(id));
+                                  updateDriverSalesRow(row.id, 'driver_id', driver?.id || '');
+                                  updateDriverSalesRow(row.id, 'driver_name', driver?.full_name || '');
+                                }}
+                              >
+                                <SelectTrigger className="h-10 w-full text-sm"><SelectValue placeholder="Select branch driver" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__unselected__">Select branch driver</SelectItem>
+                                  {drivers.map((driver) => {
+                                    const selectedInAnotherRow = driverSalesRows.some((other) => other.id !== row.id && String(other.driver_id) === String(driver.id));
+                                    return (
+                                      <SelectItem key={driver.id} value={String(driver.id)} disabled={selectedInAnotherRow}>
+                                        {driver.full_name || 'Unnamed driver'}{selectedInAnotherRow ? ' — already added' : ''}
+                                      </SelectItem>
+                                    );
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <NumInput label="Cash Sales" value={row.cash} onChange={(value) => updateDriverSalesRow(row.id, 'cash', value)} prefix={currency} />
+                              <NumInput label="Network / POS Sales" value={row.network} onChange={(value) => updateDriverSalesRow(row.id, 'network', value)} prefix={currency} />
+                              <NumInput label="Credit Sales" value={row.credit} onChange={(value) => updateDriverSalesRow(row.id, 'credit', value)} prefix={currency} />
+                              <div className="rounded-lg border border-sky-200 bg-white px-3 py-2.5 sm:self-end">
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Total</p>
+                                <p className="mt-0.5 text-lg font-black text-sky-700">{currency}{rowTotal.toLocaleString()}</p>
+                                <p className="text-[10px] text-muted-foreground">Cash + POS + Credit</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
