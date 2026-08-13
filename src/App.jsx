@@ -95,7 +95,6 @@ const Support             = lazy(() => import('@/pages/Support'));
 const SuperAdmin          = lazy(() => import('@/pages/SuperAdmin'));
 
 const Tasks               = lazy(() => import('@/pages/Tasks'));
-const Alerts              = lazy(() => import('@/pages/Alerts'));
 const NotificationCenter  = lazy(() => import('@/pages/NotificationCenter'));
 const StaffUpload         = lazy(() => import('@/pages/StaffUpload'));
 const StaffInvitations    = lazy(() => import('@/pages/StaffInvitations'));
@@ -311,7 +310,7 @@ const SubscribedRoutes = () => {
         <Route path="/telegram-settings" element={<RoleGuard permission="viewBrandSettings"><TelegramSettings /></RoleGuard>} />
         <Route path="/billing" element={<RoleGuard permission="viewBilling"><Billing /></RoleGuard>} />
         <Route path="/notifications" element={<RoleGuard permission="viewAlerts"><NotificationCenter /></RoleGuard>} />
-        <Route path="/alerts" element={<RoleGuard permission="viewAlerts"><Alerts /></RoleGuard>} />
+        <Route path="/alerts" element={<RoleGuard permission="viewAlerts"><SmartAlertCenter /></RoleGuard>} />
         <Route path="/tasks" element={<RoleGuard permission="viewTasks"><Tasks /></RoleGuard>} />
         <Route path="/support" element={<Support />} />
         <Route path="/super-admin" element={<SuperAdmin />} />
@@ -335,7 +334,7 @@ const SubscribedRoutes = () => {
         <Route path="/customer-management" element={<RoleGuard permission="viewDebts"><CustomerManagement /></RoleGuard>} />
         <Route path="/branch-command-center" element={<RoleGuard permission="viewDashboard"><BranchCommandCenter /></RoleGuard>} />
         <Route path="/inventory-command-center" element={<RoleGuard permission="viewInventory"><InventoryCommandCenter /></RoleGuard>} />
-        <Route path="/smart-alerts" element={<RoleGuard permission="viewAlerts"><SmartAlertCenter /></RoleGuard>} />
+        <Route path="/smart-alerts" element={<Navigate to="/alerts" replace />} />
         <Route path="/ai-copilot" element={<RoleGuard permission="viewDashboard"><AIBusinessCopilot /></RoleGuard>} />
         <Route path="/bi-center" element={<RoleGuard permission="viewReports"><BICenter /></RoleGuard>} />
         <Route path="/customer-portal" element={<CustomerPortal />} />
@@ -384,9 +383,15 @@ const AuthenticatedApp = () => {
     return () => clearTimeout(t);
   }, []);
 
-  // Wait for auth to finish before deciding whether to redirect
+  // Wait for auth to finish before deciding whether to redirect. Navigation must
+  // run in an effect, never during render, to avoid React state-update warnings.
   const noUser = !isLoadingAuth && !user && !authError;
-  if (noUser) { navigateToLogin(); return null; }
+  const requiresLogin = noUser || authError?.type === 'auth_required';
+  React.useEffect(() => {
+    if (requiresLogin) navigateToLogin();
+  }, [navigateToLogin, requiresLogin]);
+
+  if (requiresLogin) return null;
 
   if (isLoadingAuth && timedOut) {
     return (
@@ -411,7 +416,6 @@ const AuthenticatedApp = () => {
 
   if (authError) {
     if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
-    if (authError.type === 'auth_required') { navigateToLogin(); return null; }
   }
 
   return (

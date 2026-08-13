@@ -26,7 +26,7 @@
  *   8. Product Price Intelligence
  *   9. Alerts
  */
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import ModeBadge from '@/components/shared/ModeBadge';
 import { ModeSpecificDashboardSection } from '@/components/dashboard/DashboardWidgetRegistry';
 import { useNavigate } from 'react-router-dom';
@@ -39,9 +39,11 @@ import { useRole } from '@/lib/RoleContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useNetworkSettlement } from '@/hooks/useNetworkSettlement';
 import { useOwnerDashboardRealtime } from '@/hooks/useOwnerDashboardRealtime';
+import { useActiveAlerts } from '@/hooks/useActiveAlerts';
 import { useNotify } from '@/lib/useNotify';
 import { calculateSalesRevenue, calculateERPAccounting, tagExpensesWithCategories, computeProductQuantityAnalytics } from '@/lib/helpers';
 import { computeAdditionalSources } from '@/services/salesAnalyticsEngine';
+import { buildActiveAlertCandidates, reconcileActiveAlerts } from '@/lib/activeAlertsEngine';
 import { useSalesSources } from '@/hooks/useSalesSources';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -177,29 +179,6 @@ const LedgerRow = memo(({ label, value, color = 'default', bold = false, separat
     </>
   );
 });
-
-const AlertRow = memo(({ icon: Icon, title, count, severity = 'amber', onClick }) => {
-  const severityMap = {
-    critical: { bg: 'bg-red-50 dark:bg-red-950/40',    border: 'border-red-200 dark:border-red-800',    icon: 'text-red-600',    badge: 'bg-red-500' },
-    high:     { bg: 'bg-orange-50 dark:bg-orange-950/40', border: 'border-orange-200 dark:border-orange-800', icon: 'text-orange-600', badge: 'bg-orange-500' },
-    amber:    { bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800', icon: 'text-amber-600',  badge: 'bg-amber-500' },
-    blue:     { bg: 'bg-blue-50 dark:bg-blue-950/40',   border: 'border-blue-200 dark:border-blue-800',  icon: 'text-blue-600',   badge: 'bg-blue-500' },
-    green:    { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-800', icon: 'text-emerald-600', badge: 'bg-emerald-500' },
-  };
-  const s = severityMap[severity] || severityMap.amber;
-  return (
-    <div
-      className={`flex items-center gap-3 p-3 rounded-xl border ${s.border} ${s.bg} ${onClick ? 'cursor-pointer active:scale-[0.98]' : ''} transition-all`}
-      onClick={onClick}
-    >
-      <Icon className={`w-4 h-4 shrink-0 ${s.icon}`} />
-      <span className="flex-1 text-xs font-medium text-foreground leading-tight">{title}</span>
-      <span className={`text-white text-xs font-bold rounded-full px-2.5 py-0.5 ${s.badge} shrink-0 min-w-[24px] text-center`}>{count}</span>
-    </div>
-  );
-});
-
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BRANCH SELECTOR COMPONENT
@@ -444,6 +423,11 @@ export default function OwnerDashboard() {
     activeRestaurant?.id,
     branches,
   );
+  const {
+    alerts: persistedActiveAlerts,
+    alertCount: activeAlertCount,
+    isLoading: loadingActiveAlerts,
+  } = useActiveAlerts();
 
   // ── BRANCH SELECTION STATE ────────────────────────────────────────────────
   // 'all' means aggregate all active branches; any other value is a branch key/id.
@@ -575,22 +559,6 @@ export default function OwnerDashboard() {
     select: (data) => data.filter(sale => sale.date >= prevMonthStart && sale.date < monthStart && isRecordInActiveBranchScope(sale, 'branch')),
   });
 
-  const { data: weekPurchases = [] } = useQuery({
-    queryKey: ['purchases_week', branchFilter, weekStart, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.Purchase.filter(branchFilter || {}, '-date', 500),
-    staleTime: 60000,
-    enabled,
-    select: (data) => data.filter(purchase => purchase.date >= weekStart && isRecordInActiveBranchScope(purchase, 'branch')),
-  });
-
-  const { data: monthPurchases = [] } = useQuery({
-    queryKey: ['purchases_month', branchFilter, monthStart, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.Purchase.filter(branchFilter || {}, '-date', 1000),
-    staleTime: 60000,
-    enabled,
-    select: (data) => data.filter(purchase => purchase.date >= monthStart && isRecordInActiveBranchScope(purchase, 'branch')),
-  });
-
   const { data: todayExpenses = [] } = useQuery({
     queryKey: ['expenses_today', expenseBranchFilter, today, selectedBranch, activeBranchSignature],
     queryFn: () => base44.entities.Expense.filter({ ...(expenseBranchFilter || {}), date: today }, '-date', 200),
@@ -655,7 +623,7 @@ export default function OwnerDashboard() {
     enabled,
   });
 
-  const { data: supplierInvoices = [] } = useQuery({
+  const { data: supplierInvoices = [], isLoading: loadingSupplierInvoices } = useQuery({
     queryKey: ['supplier_invoices', activeRestaurant?.id, selectedBranch, activeBranchSignature],
     queryFn: async () => {
       if (!activeRestaurant?.id) return [];
@@ -672,7 +640,7 @@ export default function OwnerDashboard() {
     enabled,
   });
 
-  const { data: customerDebts = [] } = useQuery({
+  const { data: customerDebts = [], isLoading: loadingCustomerDebts } = useQuery({
     queryKey: ['debts_customer_dash', branchFilter, selectedBranch],
     queryFn: () => base44.entities.DebtRecord.filter(
       { ...(branchFilter || {}), type: 'receivable', party_type: 'customer' },
@@ -682,7 +650,7 @@ export default function OwnerDashboard() {
     enabled,
   });
 
-  const { data: inventory = [] } = useQuery({
+  const { data: inventory = [], isLoading: loadingInventory } = useQuery({
     queryKey: ['inventory_dash', branchFilter, selectedBranch],
     queryFn: () => base44.entities.Inventory.filter(branchFilter || {}, 'product_name', 500),
     staleTime: 60000,
@@ -972,6 +940,47 @@ export default function OwnerDashboard() {
     };
   }, [todaySales, yesterdaySales, todayExpenses, customerDebts, inventory, monthSales, supplierInvoices, revenueSources, expenseSummary, periodProfit]);
 
+  // Reconcile only the enterprise view. Branch-filtered dashboards must never clear
+  // alerts belonging to another branch.
+  const activeAlertCandidates = useMemo(() => buildActiveAlertCandidates({
+    inventory,
+    todaySales,
+    customerDebts,
+    supplierInvoices,
+    netProfit: execSummary.netProfit,
+    branches,
+    today,
+    currency,
+  }), [branches, currency, customerDebts, execSummary.netProfit, inventory, supplierInvoices, today, todaySales]);
+  const activeAlertCandidateSignature = useMemo(
+    () => JSON.stringify(activeAlertCandidates.map((alert) => ({
+      source_key: alert.source_key,
+      type: alert.type,
+      severity: alert.severity,
+      branch_id: alert.branch_id,
+      message: alert.message,
+    })).sort((a, b) => a.source_key.localeCompare(b.source_key))),
+    [activeAlertCandidates],
+  );
+  const canReconcileActiveAlerts = enabled
+    && selectedBranch === 'all'
+    && !loadingSales
+    && !loadingInventory
+    && !loadingCustomerDebts
+    && !loadingSupplierInvoices;
+
+  useEffect(() => {
+    if (!canReconcileActiveAlerts) return undefined;
+    let cancelled = false;
+    reconcileActiveAlerts({
+      restaurantId: activeRestaurant.id,
+      candidates: activeAlertCandidates,
+    }).catch((error) => {
+      if (!cancelled) console.warn('[OwnerDashboard] active alert reconciliation failed:', error.message);
+    });
+    return () => { cancelled = true; };
+  }, [activeAlertCandidateSignature, activeAlertCandidates, activeRestaurant?.id, canReconcileActiveAlerts]);
+
   // ── Section 2: Operating Result (NEVER REMOVE) ───────────────────────────────
   const operatingResult = useMemo(() => {
     const salesRevenue      = execSummary.salesToday;
@@ -1195,22 +1204,13 @@ export default function OwnerDashboard() {
     });
   }, [priceHistory]);
 
-  // ── Section 9: Alerts ─────────────────────────────────────────────────────────
-  const alerts = useMemo(() => {
-    const salesDays    = new Set( (monthSales || []).map(s => s.date));
-    const purchaseDays = new Set( (monthPurchases || []).map(p => p.date));
-    const missingPurchaseDays = [...salesDays].filter(d => !purchaseDays.has(d)).length;
-    const cashShortage        = todaySales.filter(r => (Number(r.cash_difference) || 0) < 0).length;
-    const negativeProfit      = execSummary.netProfit < 0 ? 1 : 0;
-    const inventoryAlerts     = inventoryAnalytics.lowStock.length + inventoryAnalytics.outOfStock.length;
-    const customerCreditAlerts = customerDebts.filter(d => d.status !== 'paid' && d.status !== 'written_off').length;
-    const supplierDueAlerts   = supplierInvoices.filter(inv => inv.status !== 'paid' && inv.due_date && inv.due_date <= today).length;
-    return { missingPurchaseDays, cashShortage, negativeProfit, inventoryAlerts, customerCreditAlerts, supplierDueAlerts };
-  }, [monthSales, monthPurchases, todaySales, execSummary, inventoryAnalytics, customerDebts, supplierInvoices, today]);
-
-  const totalAlerts = useMemo(() => Object.values(alerts).reduce((s, v) => s + v, 0), [alerts]);
-
-
+  // ── Section 9: Active Alerts ───────────────────────────────────────────────
+  // The displayed count and rows are intentionally derived only from persisted,
+  // unresolved active_alerts records. Financial heuristics are reconciled above.
+  const dashboardActiveAlerts = useMemo(
+    () => persistedActiveAlerts.slice(0, 5),
+    [persistedActiveAlerts],
+  );
 
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -1228,15 +1228,13 @@ export default function OwnerDashboard() {
           <p className="text-xs text-muted-foreground mt-0.5 ml-7">{format(new Date(), 'EEEE, MMMM d yyyy')}</p>
         </div>
         <div className="flex items-center gap-2">
-          {totalAlerts > 0 && (
-            <button
-              onClick={() => navigate('/alerts')}
-              className="bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5 transition-colors cursor-pointer active:scale-95"
-              aria-label={`${totalAlerts} alerts`}
-            >
-              {totalAlerts} {totalAlerts === 1 ? t('active_alert') : t('active_alerts')}
-            </button>
-          )}
+          <button
+            onClick={() => navigate('/alerts')}
+            className="bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5 transition-colors cursor-pointer active:scale-95"
+            aria-label={`${activeAlertCount} ${activeAlertCount === 1 ? 'active alert' : 'active alerts'}`}
+          >
+            {loadingActiveAlerts ? '…' : activeAlertCount} {activeAlertCount === 1 ? t('active_alert') : t('active_alerts')}
+          </button>
           {/* Real-time connection indicator */}
           <div
             title={`Realtime: ${realtimeStatus}`}
@@ -2039,15 +2037,61 @@ export default function OwnerDashboard() {
       ══════════════════════════════════════════════════════════════════════ */}
       <WidgetErrorBoundary>
         <section>
-          <SectionHeader icon={AlertTriangle} title={t('alerts_label')} subtitle={`${totalAlerts} ${totalAlerts === 1 ? t('active_alert') : t('active_alerts')}`} color="red" />
-          <div className="space-y-2">
-            <AlertRow icon={ShoppingBag}  title={t('missing_purchases')}       count={alerts.missingPurchaseDays}    severity={alerts.missingPurchaseDays > 0 ? 'amber' : 'green'}    onClick={() => navigate('/enterprise-purchases')} />
-            <AlertRow icon={AlertTriangle} title={t('cash_shortage_alert')}  count={alerts.cashShortage}           severity={alerts.cashShortage > 0 ? 'critical' : 'green'}        onClick={() => navigate('/sales')} />
-            <AlertRow icon={TrendingDown}  title={t('negative_profit')}        count={alerts.negativeProfit}         severity={alerts.negativeProfit > 0 ? 'critical' : 'green'}      onClick={() => navigate('/profit-loss')} />
-            <AlertRow icon={Package}       title={t('inventory_alerts')}       count={alerts.inventoryAlerts}        severity={alerts.inventoryAlerts > 0 ? 'amber' : 'green'}        onClick={() => navigate('/inventory')} />
-            <AlertRow icon={Users}         title={t('customer_credit_alerts')} count={alerts.customerCreditAlerts}   severity={alerts.customerCreditAlerts > 0 ? 'blue' : 'green'}    onClick={() => navigate('/debt-management')} />
-            <AlertRow icon={Truck}         title={t('supplier_due_alerts')}    count={alerts.supplierDueAlerts}      severity={alerts.supplierDueAlerts > 0 ? 'high' : 'green'}       onClick={() => navigate('/suppliers')} />
-          </div>
+          <SectionHeader
+            icon={AlertTriangle}
+            title={t('alerts_label')}
+            subtitle={`${activeAlertCount} ${activeAlertCount === 1 ? t('active_alert') : t('active_alerts')}`}
+            color="red"
+            action={{ label: 'View all', onClick: () => navigate('/alerts') }}
+          />
+          {loadingActiveAlerts ? (
+            <Skeleton className="h-24 w-full" />
+          ) : dashboardActiveAlerts.length === 0 ? (
+            <Card className="border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20">
+              <CardContent className="p-4 flex items-center gap-3 text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
+                <div>
+                  <p className="text-sm font-bold">0 Active Alerts</p>
+                  <p className="text-xs opacity-80">No unresolved alert records require attention.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {dashboardActiveAlerts.map((alert) => {
+                const branch = branches.find((item) => item.id === alert.branch_id || item.key === alert.branch || item.branch_key === alert.branch);
+                const severityClass = {
+                  critical: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
+                  high: 'bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300',
+                  warning: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
+                  info: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+                }[alert.severity] || 'bg-muted text-muted-foreground';
+                return (
+                  <button
+                    key={alert.id}
+                    type="button"
+                    onClick={() => navigate('/alerts')}
+                    className="w-full text-left rounded-xl border border-border bg-card p-3 hover:border-primary/50 hover:shadow-sm active:scale-[0.99] transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-red-500" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-foreground truncate">{alert.title}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{alert.message}</p>
+                        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-muted-foreground sm:grid-cols-5">
+                          <span><strong>Type:</strong> {alert.type.replaceAll('_', ' ')}</span>
+                          <span><strong>Branch:</strong> {branch?.name || branch?.label || alert.branch || 'All branches'}</span>
+                          <span><strong>Date:</strong> {format(new Date(alert.detected_at), 'MMM d, HH:mm')}</span>
+                          <span><strong>Severity:</strong> <b className={`rounded px-1.5 py-0.5 capitalize ${severityClass}`}>{alert.severity}</b></span>
+                          <span><strong>Status:</strong> <b className="text-red-600">Active</b></span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </section>
       </WidgetErrorBoundary>
 
@@ -2077,7 +2121,7 @@ export default function OwnerDashboard() {
             color="indigo"
           />
           <ModeSpecificDashboardSection
-            lowStockItems={alerts.inventoryAlerts > 0 ? [] : []}
+            lowStockItems={[]}
             expiryAlerts={[]}
             pendingOrders={[]}
           />

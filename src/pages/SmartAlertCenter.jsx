@@ -1,50 +1,76 @@
-import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
-import { useLanguage } from '@/lib/LanguageContext';
-import { useTenant } from '@/lib/TenantContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useMemo, useState } from 'react';
+import { format } from 'date-fns';
+import { Bell, CheckCircle2, RefreshCw, X } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import {
-  Bell, AlertTriangle, CheckCircle2, Info, TrendingDown, Package,
-  DollarSign, Users, Truck, Clock, X, ChevronRight, Zap,
-  Shield, RefreshCw
-} from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useActiveAlerts } from '@/hooks/useActiveAlerts';
+import { useTenant } from '@/lib/TenantContext';
+import { useLanguage } from '@/lib/LanguageContext';
 
-const ALERT_TYPES = {
-  critical: { color: 'bg-red-500',    text: 'text-red-700',   bg: 'bg-red-50',   border: 'border-red-200',   icon: AlertTriangle },
-  warning:  { color: 'bg-amber-500',  text: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', icon: AlertTriangle },
-  info:     { color: 'bg-blue-500',   text: 'text-blue-700',  bg: 'bg-blue-50',  border: 'border-blue-200',  icon: Info },
-  success:  { color: 'bg-emerald-500',text: 'text-emerald-700',bg:'bg-emerald-50',border:'border-emerald-200',icon: CheckCircle2 },
+const severityStyle = {
+  critical: { badge: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-300', dot: 'bg-red-500' },
+  high: { badge: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-950/50 dark:text-orange-300', dot: 'bg-orange-500' },
+  warning: { badge: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300', dot: 'bg-amber-500' },
+  info: { badge: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300', dot: 'bg-blue-500' },
 };
 
-function AlertCard({ alert, onDismiss }) {
-  const cfg = ALERT_TYPES[alert.type] || ALERT_TYPES.info;
-  const Icon = cfg.icon;
+function formatType(value) {
+  return String(value || 'alert').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function AlertRecordCard({ alert, branchName, onResolve, disabled }) {
+  const style = severityStyle[alert.severity] || severityStyle.info;
   return (
-    <Card className={`border ${cfg.border} ${cfg.bg}`}>
-      <CardContent className="p-3">
-        <div className="flex items-start gap-2">
-          <div className={`w-7 h-7 rounded-lg ${cfg.color} flex items-center justify-center shrink-0 mt-0.5`}>
-            <Icon className="w-3.5 h-3.5 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className={`text-sm font-semibold ${cfg.text}`}>{alert.title}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{alert.message}</p>
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-[10px] text-muted-foreground">{alert.time}</span>
-              {alert.branch && <Badge variant="outline" className="text-[10px] h-4 px-1">{alert.branch}</Badge>}
-              {alert.action && (
-                <button className={`text-[10px] font-semibold ${cfg.text} underline`}>{alert.action}</button>
-              )}
+    <Card className="border-border/80 overflow-hidden">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-start gap-3">
+          <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${style.dot}`} aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground break-words">{alert.title}</p>
+                {alert.message && <p className="mt-1 text-xs leading-relaxed text-muted-foreground break-words">{alert.message}</p>}
+              </div>
+              <Badge variant="outline" className={`w-fit shrink-0 capitalize ${style.badge}`}>{alert.severity}</Badge>
+            </div>
+
+            <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] sm:grid-cols-5">
+              <div>
+                <dt className="font-semibold uppercase tracking-wide text-muted-foreground">Type</dt>
+                <dd className="mt-0.5 text-foreground break-words">{formatType(alert.type)}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold uppercase tracking-wide text-muted-foreground">Branch</dt>
+                <dd className="mt-0.5 text-foreground break-words">{branchName || 'All branches'}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold uppercase tracking-wide text-muted-foreground">Date / time</dt>
+                <dd className="mt-0.5 text-foreground">{alert.detected_at ? format(new Date(alert.detected_at), 'MMM d, yyyy HH:mm') : '—'}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold uppercase tracking-wide text-muted-foreground">Severity</dt>
+                <dd className="mt-0.5 capitalize text-foreground">{alert.severity}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold uppercase tracking-wide text-muted-foreground">Status</dt>
+                <dd className="mt-0.5 font-semibold text-red-600 dark:text-red-400">Active</dd>
+              </div>
+            </dl>
+
+            <div className="mt-3 flex justify-end">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={disabled}
+                onClick={() => onResolve(alert.id)}
+                className="h-8 gap-1.5 text-xs"
+              >
+                <X className="h-3.5 w-3.5" /> Resolve alert
+              </Button>
             </div>
           </div>
-          <button onClick={() => onDismiss(alert.id)} className="shrink-0 p-1 text-muted-foreground hover:text-foreground">
-            <X className="w-3.5 h-3.5" />
-          </button>
         </div>
       </CardContent>
     </Card>
@@ -52,248 +78,86 @@ function AlertCard({ alert, onDismiss }) {
 }
 
 export default function SmartAlertCenter() {
-  const { t, currency } = useLanguage();
-  const { ownerFilter, branches } = useTenant();
-  const [tab, setTab] = useState('active');
-  const [dismissed, setDismissed] = useState(new Set());
+  const { t } = useLanguage();
+  const { branches } = useTenant();
+  const {
+    alerts,
+    alertCount,
+    isLoading,
+    isError,
+    error,
+    resolveAlert,
+    resolveAll,
+    isResolving,
+    refetch,
+  } = useActiveAlerts();
+  const [tab, setTab] = useState('all');
 
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const monthStart = format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd');
-
-  const { data: inventory = [] } = useQuery({
-    queryKey: ['alerts_inventory', ownerFilter],
-    queryFn: () => base44.entities.Inventory.filter(ownerFilter || {}),
-    staleTime: 120000,
-    enabled: !!ownerFilter?.created_by,
-  });
-
-  const { data: allSales = [] } = useQuery({
-    queryKey: ['alerts_sales', ownerFilter],
-    queryFn: () => base44.entities.DailySales.filter(ownerFilter || {}, '-date', 200),
-    staleTime: 120000,
-    enabled: !!ownerFilter?.created_by,
-  });
-
-  const { data: debts = [] } = useQuery({
-    queryKey: ['alerts_debts', ownerFilter],
-    queryFn: () => base44.entities.Debt?.filter(ownerFilter || {}) || [],
-    staleTime: 120000,
-    enabled: !!ownerFilter?.created_by,
-  });
-
-  // Generate smart alerts from data
-  const generatedAlerts = useMemo(() => {
-    const alerts = [];
-
-    // Low stock alerts
-    const lowStockItems = inventory.filter(i => i.quantity <= (i.low_stock_threshold || 0) && i.quantity > 0);
-    const outOfStockItems = inventory.filter(i => i.quantity <= 0);
-
-    outOfStockItems.forEach(item => {
-      alerts.push({
-        id: `out-${item.id}`,
-        type: 'critical',
-        title: `Out of Stock: ${item.product_name}`,
-        message: `${item.product_name} is out of stock at ${item.branch}. Reorder immediately.`,
-        time: 'Now',
-        branch: item.branch,
-        action: 'Order Now',
-        category: 'inventory',
-      });
-    });
-
-    lowStockItems.slice(0, 3).forEach(item => {
-      alerts.push({
-        id: `low-${item.id}`,
-        type: 'warning',
-        title: `Low Stock: ${item.product_name}`,
-        message: `Only ${item.quantity} ${item.unit || 'units'} remaining (threshold: ${item.low_stock_threshold}).`,
-        time: 'Today',
-        branch: item.branch,
-        action: 'Restock',
-        category: 'inventory',
-      });
-    });
-
-    // High outstanding debts
-    const highDebts = debts.filter(d => (d.balance || 0) > 1000);
-    highDebts.slice(0, 2).forEach(debt => {
-      alerts.push({
-        id: `debt-${debt.id}`,
-        type: 'warning',
-        title: `High Outstanding: ${debt.party_name}`,
-        message: `${debt.party_name} has ${currency}${(debt.balance || 0).toLocaleString()} outstanding.`,
-        time: 'Today',
-        action: 'Collect',
-        category: 'financial',
-      });
-    });
-
-    // No sales today alert
-    const todaySales = allSales.filter(s => s.date === today);
-    if (todaySales.length === 0 && new Date().getHours() >= 10) {
-      alerts.push({
-        id: 'no-sales-today',
-        type: 'warning',
-        title: 'No Sales Recorded Today',
-        message: 'No sales have been recorded yet today. Please check if the POS is operational.',
-        time: 'Today',
-        category: 'sales',
-      });
-    }
-
-    // Revenue drop alert (compare today vs yesterday)
-    const yesterdaySales = allSales.filter(s => s.date === format(subDays(new Date(), 1), 'yyyy-MM-dd'));
-    const todayRevenue = todaySales.reduce((s, r) => s + (r.total_sales || 0), 0);
-    const yesterdayRevenue = yesterdaySales.reduce((s, r) => s + (r.total_sales || 0), 0);
-    if (yesterdayRevenue > 0 && todayRevenue < yesterdayRevenue * 0.5 && new Date().getHours() >= 14) {
-      alerts.push({
-        id: 'revenue-drop',
-        type: 'critical',
-        title: 'Revenue Drop Alert',
-        message: `Today's revenue (${currency}${todayRevenue.toLocaleString()}) is 50%+ below yesterday (${currency}${yesterdayRevenue.toLocaleString()}).`,
-        time: 'Today',
-        category: 'sales',
-      });
-    }
-
-    // System info alerts
-    alerts.push({
-      id: 'system-backup',
-      type: 'info',
-      title: 'Daily Backup Complete',
-      message: 'All data has been backed up successfully.',
-      time: format(new Date(), 'HH:mm'),
-      category: 'system',
-    });
-
+  const filteredAlerts = useMemo(() => {
+    if (tab === 'inventory') return alerts.filter((alert) => ['low_stock', 'out_of_stock'].includes(alert.type));
+    if (tab === 'financial') return alerts.filter((alert) => !['low_stock', 'out_of_stock'].includes(alert.type));
     return alerts;
-  }, [inventory, allSales, debts, today, currency]);
+  }, [alerts, tab]);
 
-  const activeAlerts = generatedAlerts.filter(a => !dismissed.has(a.id));
-  const criticalAlerts = activeAlerts.filter(a => a.type === 'critical');
-  const warningAlerts = activeAlerts.filter(a => a.type === 'warning');
-  const infoAlerts = activeAlerts.filter(a => a.type === 'info' || a.type === 'success');
-
-  const handleDismiss = (id) => setDismissed(prev => new Set([...prev, id]));
-  const handleDismissAll = () => setDismissed(new Set(activeAlerts.map(a => a.id)));
+  const resolveOne = async (alertId) => {
+    try { await resolveAlert(alertId); } catch (resolveError) { console.warn('[ActiveAlerts] resolve failed:', resolveError.message); }
+  };
+  const resolveVisible = async () => {
+    try { await resolveAll(filteredAlerts); } catch (resolveError) { console.warn('[ActiveAlerts] resolve all failed:', resolveError.message); }
+  };
 
   return (
-    <div className="space-y-4 pb-24">
-      {/* Header */}
-      <div className="flex items-center justify-between pt-1">
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Bell className="w-6 h-6 text-primary" />
-            {activeAlerts.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                {activeAlerts.length}
-              </span>
-            )}
+    <div className="space-y-4 pb-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="relative rounded-xl bg-red-50 p-2.5 dark:bg-red-950/30">
+            <Bell className="h-5 w-5 text-red-600" />
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">{alertCount}</span>
           </div>
           <div>
-            <h1 className="text-xl font-bold">{t('smart_alert_center')}</h1>
-            <p className="text-xs text-muted-foreground">{activeAlerts.length} active alerts</p>
+            <h1 className="text-xl font-bold text-foreground">{t('alerts_label')}</h1>
+            <p className="text-xs text-muted-foreground">{alertCount} {alertCount === 1 ? 'Active Alert' : 'Active Alerts'} · persisted unresolved records only</p>
           </div>
         </div>
-        {activeAlerts.length > 0 && (
-          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleDismissAll}>
-            Dismiss All
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => refetch()} disabled={isLoading}>
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
           </Button>
-        )}
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-center">
-          <p className="text-xl font-bold text-red-600">{criticalAlerts.length}</p>
-          <p className="text-[11px] text-red-600/70 font-medium">Critical</p>
-        </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-center">
-          <p className="text-xl font-bold text-amber-600">{warningAlerts.length}</p>
-          <p className="text-[11px] text-amber-600/70 font-medium">Warnings</p>
-        </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-2.5 text-center">
-          <p className="text-xl font-bold text-blue-600">{infoAlerts.length}</p>
-          <p className="text-[11px] text-blue-600/70 font-medium">Info</p>
+          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={resolveVisible} disabled={isResolving || filteredAlerts.length === 0}>
+            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Resolve visible
+          </Button>
         </div>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full grid grid-cols-4 h-9">
-          <TabsTrigger value="active" className="text-xs">
-            Active {activeAlerts.length > 0 && <Badge className="ml-1 h-4 w-4 p-0 text-[9px] bg-red-500">{activeAlerts.length}</Badge>}
-          </TabsTrigger>
+        <TabsList className="grid h-9 w-full grid-cols-3">
+          <TabsTrigger value="all" className="text-xs">All <Badge className="ml-1 h-4 min-w-4 px-1 text-[9px]">{alertCount}</Badge></TabsTrigger>
           <TabsTrigger value="inventory" className="text-xs">Inventory</TabsTrigger>
           <TabsTrigger value="financial" className="text-xs">Financial</TabsTrigger>
-          <TabsTrigger value="settings" className="text-xs">Settings</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="active" className="mt-3 space-y-2">
-          {activeAlerts.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-500 opacity-50" />
-              <p className="text-sm font-medium">All clear! No active alerts.</p>
-              <p className="text-xs mt-1">Your restaurant is running smoothly.</p>
-            </div>
-          ) : (
-            <>
-              {criticalAlerts.map(a => <AlertCard key={a.id} alert={a} onDismiss={handleDismiss} />)}
-              {warningAlerts.map(a => <AlertCard key={a.id} alert={a} onDismiss={handleDismiss} />)}
-              {infoAlerts.map(a => <AlertCard key={a.id} alert={a} onDismiss={handleDismiss} />)}
-            </>
-          )}
-        </TabsContent>
-
-        <TabsContent value="inventory" className="mt-3 space-y-2">
-          {activeAlerts.filter(a => a.category === 'inventory').length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No inventory alerts</p>
-            </div>
-          ) : (
-            activeAlerts.filter(a => a.category === 'inventory').map(a => (
-              <AlertCard key={a.id} alert={a} onDismiss={handleDismiss} />
-            ))
-          )}
-        </TabsContent>
-
-        <TabsContent value="financial" className="mt-3 space-y-2">
-          {activeAlerts.filter(a => a.category === 'financial' || a.category === 'sales').length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <DollarSign className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No financial alerts</p>
-            </div>
-          ) : (
-            activeAlerts.filter(a => a.category === 'financial' || a.category === 'sales').map(a => (
-              <AlertCard key={a.id} alert={a} onDismiss={handleDismiss} />
-            ))
-          )}
-        </TabsContent>
-
-        <TabsContent value="settings" className="mt-3 space-y-3">
-          <Card>
-            <CardHeader className="pb-2 pt-3 px-4">
-              <CardTitle className="text-sm font-semibold">Alert Preferences</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-4 space-y-3">
-              {[
-                { label: 'Low Stock Alerts', enabled: true },
-                { label: 'Revenue Drop Alerts', enabled: true },
-                { label: 'Outstanding Debt Alerts', enabled: true },
-                { label: 'System Notifications', enabled: true },
-                { label: 'Daily Summary', enabled: false },
-              ].map(pref => (
-                <div key={pref.label} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
-                  <span className="text-sm">{pref.label}</span>
-                  <div className={`w-10 h-5 rounded-full transition-colors ${pref.enabled ? 'bg-primary' : 'bg-muted'} relative cursor-pointer`}>
-                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${pref.enabled ? 'right-0.5' : 'left-0.5'}`} />
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {['all', 'inventory', 'financial'].map((tabName) => (
+          <TabsContent key={tabName} value={tabName} className="mt-3 space-y-2">
+            {isLoading ? (
+              <Card><CardContent className="p-6 text-sm text-muted-foreground">Loading active alerts…</CardContent></Card>
+            ) : isError ? (
+              <Card className="border-red-200"><CardContent className="p-6 text-sm text-red-700">Unable to load active alerts: {error?.message || 'Unknown error'}</CardContent></Card>
+            ) : filteredAlerts.length === 0 ? (
+              <Card className="border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20">
+                <CardContent className="flex flex-col items-center p-8 text-center text-emerald-700 dark:text-emerald-300">
+                  <CheckCircle2 className="mb-2 h-9 w-9" />
+                  <p className="text-sm font-bold">0 Active Alerts</p>
+                  <p className="mt-1 text-xs opacity-80">There are no unresolved persisted alerts in this scope.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              filteredAlerts.map((alert) => {
+                const branch = (branches || []).find((item) => item.id === alert.branch_id || item.key === alert.branch || item.branch_key === alert.branch);
+                return <AlertRecordCard key={alert.id} alert={alert} branchName={branch?.name || branch?.label || alert.branch} onResolve={resolveOne} disabled={isResolving} />;
+              })
+            )}
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
   );

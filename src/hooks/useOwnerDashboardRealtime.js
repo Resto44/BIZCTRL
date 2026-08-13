@@ -86,8 +86,9 @@ const TABLE_QUERY_MAP = {
   branches:               ['branches'],
   restaurants:            ['restaurants'],
 
-  // Notifications
-  notifications:          ['notifications'],
+  // Notifications and canonical persisted Active Alerts
+  notifications:          ['notifications', 'active-alerts'],
+  active_alerts:          ['active-alerts'],
 };
 
 // ─── Human-readable event labels ─────────────────────────────────────────────
@@ -125,6 +126,7 @@ const TABLE_LABELS = {
   branches:               'Branch',
   restaurants:            'Restaurant',
   notifications:          'Notification',
+  active_alerts:          'Active Alert',
 };
 
 const EVENT_VERB = { INSERT: 'created', UPDATE: 'updated', DELETE: 'deleted' };
@@ -230,9 +232,9 @@ export function useOwnerDashboardRealtime(restaurantId, branches = []) {
     channel.subscribe((status) => {
       setRealtimeStatus(status);
       if (status === 'SUBSCRIBED') {
-        console.info(`[useOwnerDashboardRealtime] ✅ Subscribed to ${Object.keys(TABLE_QUERY_MAP).length} tables for restaurant ${restaurantId}`);
+        globalThis.console?.info(`[useOwnerDashboardRealtime] Subscribed to ${Object.keys(TABLE_QUERY_MAP).length} tables for restaurant ${restaurantId}`);
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        console.warn(`[useOwnerDashboardRealtime] ⚠️ Channel status: ${status}`);
+        globalThis.console?.warn(`[useOwnerDashboardRealtime] Channel status: ${status}`);
       }
     });
 
