@@ -13,11 +13,17 @@ const branchSelect = read('src/components/shared/BranchSelect.jsx');
 const driverAnalytics = read('src/lib/driverAnalytics.js');
 const driverManagement = read('src/pages/DriverManagement.jsx');
 const driverPerformance = read('src/components/dashboard/DriverPerformance.jsx');
+const driverPermissionMigration = read('supabase/migrations/20260813_driver_sales_owner_or_manager.sql');
 
 // Regression: the sales list maps each entry as `s`. Referencing `sale` in the
 // delete-permission expression previously raised a ReferenceError at render time.
 assert(!salesPage.includes('isDriverSale(sale) || isBranchManager'), 'legacy undefined sales-row variable remains in delete permission');
-assert(salesPage.includes('isDriverSale(s) || isBranchManager'), 'delete permission does not evaluate the current mapped sales row');
+assert(salesPage.includes('isDriverSale(s) || canManageDriverSales'), 'delete permission does not evaluate the current mapped sales row with Owner access');
+assert(salesPage.includes('const canManageDriverSales = role === ROLES.OWNER || isBranchManager;'), 'Sales mutation layer does not share Driver Sales access with Owners');
+assert(salesPage.includes('Only the restaurant Owner or assigned Branch Manager can create a Driver Sale.'), 'Owner create permission is missing');
+assert(salesPage.includes('Only the restaurant Owner or assigned Branch Manager can edit a Driver Sale.'), 'Owner edit permission is missing');
+assert(salesPage.includes("qc.invalidateQueries({ queryKey: ['driver-performance'] });"), 'saved Driver Sales do not refresh Owner Driver Analytics');
+assert(salesPage.includes("qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });"), 'saved Driver Sales do not refresh dashboard metrics');
 
 // Branch Manager Add Sales mount guards.
 assert(branchSelect.includes('const branches = asRecordArray(tenantBranches);'), 'BranchSelect does not normalize loading/null branch data');
@@ -52,6 +58,12 @@ assert(!workspace.includes('min-w-[620px]'), 'retired fixed-width Driver Sales t
 assert(workspace.includes('selectedInAnotherRow'), 'duplicate drivers are not prevented across Driver Sales rows');
 assert(workspace.includes('setDriverSalesRows([]);'), 'Driver Sales rows are not reset when the branch changes');
 assert(workspace.includes('drivers.length === 0'), 'Driver empty-state guard is missing');
+assert(workspace.includes('const canManageDriverSales = isManager || !!ownerFilter?.created_by;'), 'Owner and Branch Manager shared Driver Sales capability is missing');
+assert(workspace.includes('enabled: canManageDriverSales && !!activeRestaurant?.id && !!selectedBranchId'), 'Owner Driver Sales driver query is not enabled');
+assert(workspace.includes('{canManageDriverSales && ('), 'Owner cannot see the shared Driver Sales table');
+assert(workspace.includes('Only the Owner or assigned Branch Manager can record Driver Sales.'), 'Owner and Manager Driver Sales validation is not shared');
+assert(driverPermissionMigration.includes("membership.role = 'owner'"), 'production Driver Sales permission migration does not allow Owners');
+assert(driverPermissionMigration.includes("membership.role = 'manager'"), 'production Driver Sales permission migration does not retain Branch Manager access');
 
 // Driver rows are added exactly once to the canonical Daily Sales components.
 assert(workspace.includes('const cashSales = useMemo(() => counterCashSales + driverCashSales'), 'Driver cash is not added to standard cash totals');
@@ -78,5 +90,12 @@ assert(driverAnalytics.includes('getDriverSaleEntries(sale).forEach'), 'driver a
 assert(driverManagement.includes('getDriverSaleEntries(sale)'), 'Driver Management history omits additional drivers in a shared Daily Sales record');
 assert(driverManagement.includes('driver_cash, driver_network, drivers_json'), 'Driver Management query omits saved Driver Sales fields');
 assert(driverPerformance.includes('driver_cash, driver_network, drivers_json'), 'Owner Driver Performance query omits saved Driver Sales fields');
+assert(driverPerformance.includes('SummaryMetric label="Total Drivers"'), 'Driver Analytics omits Total Drivers');
+assert(driverPerformance.includes('SummaryMetric label="Active Drivers"'), 'Driver Analytics omits Active Drivers');
+assert(driverPerformance.includes('SummaryMetric label="Cash Sales"'), 'Driver Analytics omits Cash Sales');
+assert(driverPerformance.includes('SummaryMetric label="Network / POS Sales"'), 'Driver Analytics omits Network / POS Sales');
+assert(driverPerformance.includes('SummaryMetric label="Credit Sales"'), 'Driver Analytics omits Credit Sales');
+assert(driverPerformance.includes('SummaryMetric label="Total Revenue"'), 'Driver Analytics omits Total Revenue');
+assert(driverPerformance.includes('Metric label="Credit sales"'), 'per-driver analytics omit Credit Sales');
 
-console.log('Add Sales accordion and multi-driver regression checks passed: notes, totals, single-record aggregation, analytics, and mobile-responsive accordion behavior are retained.');
+console.log('Shared Owner/Manager Driver Sales regression checks passed: canonical totals, notes, dashboards, history, and complete analytics payment splits are retained.');

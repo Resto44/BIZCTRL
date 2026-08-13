@@ -54,6 +54,7 @@ export default function Sales() {
   const { role } = useRole();
   const canDelete = role === ROLES.OWNER || role === ROLES.MANAGER || role === ROLES.GENERAL_MANAGER;
   const isBranchManager = role === ROLES.MANAGER;
+  const canManageDriverSales = role === ROLES.OWNER || isBranchManager;
   const isDriverSale = (sale) => Boolean(sale?.driver_id);
   const { autoSettle } = useNetworkSettlement({ orgId, user, currency });
   const [showForm, setShowForm] = useState(false);
@@ -436,8 +437,8 @@ export default function Sales() {
   const createMut = useMutation({
     mutationFn: async ({ data, proofUrl, ocr }) => {
       console.log('[Sales:createMut] mutationFn started');
-      if (data.driver_id && !isBranchManager) {
-        throw new Error('Only the assigned Branch Manager can create a Driver Sale.');
+      if (data.driver_id && !canManageDriverSales) {
+        throw new Error('Only the restaurant Owner or assigned Branch Manager can create a Driver Sale.');
       }
       // ── TRANSACTION-LIKE WORKFLOW (Requirement 5) ──
       // 1. Insert parent Sale record first (Requirement 2)
@@ -534,8 +535,8 @@ export default function Sales() {
 
   const updateMut = useMutation({
     mutationFn: async ({ id, data, prev, proofUrl, ocr }) => {
-      if ((prev?.driver_id || data.driver_id) && !isBranchManager) {
-        throw new Error('Only the assigned Branch Manager can edit a Driver Sale.');
+      if ((prev?.driver_id || data.driver_id) && !canManageDriverSales) {
+        throw new Error('Only the restaurant Owner or assigned Branch Manager can edit a Driver Sale.');
       }
       const sale = await base44.entities.DailySales.update(id, data);
       await autoWalletTx(data, id, prev);
@@ -600,8 +601,8 @@ export default function Sales() {
 
   const deleteMut = useMutation({
     mutationFn: async (sale) => {
-      if (isDriverSale(sale) && !isBranchManager) {
-        throw new Error('Only the assigned Branch Manager can delete a Driver Sale.');
+      if (isDriverSale(sale) && !canManageDriverSales) {
+        throw new Error('Only the restaurant Owner or assigned Branch Manager can delete a Driver Sale.');
       }
       await base44.entities.DailySales.delete(sale.id);
       await notif.sale({ branch: sale.branch, action: 'delete' });
@@ -615,8 +616,8 @@ export default function Sales() {
   const bulkDeleteMut = useMutation({
     mutationFn: async (ids) => {
       const selectedSales = sales.filter((sale) => ids.includes(sale.id));
-      if (selectedSales.some(isDriverSale) && !isBranchManager) {
-        throw new Error('Only the assigned Branch Manager can delete Driver Sales.');
+      if (selectedSales.some(isDriverSale) && !canManageDriverSales) {
+        throw new Error('Only the restaurant Owner or assigned Branch Manager can delete Driver Sales.');
       }
       await Promise.all(ids.map(id => base44.entities.DailySales.delete(id)));
     },
@@ -803,14 +804,14 @@ export default function Sales() {
                   key={s.id}
                   sale={s}
                   onEdit={(sale) => {
-                    if (isDriverSale(sale) && !isBranchManager) {
-                      toast.error('Driver Sales are view-only for owners and non-manager roles.');
+                    if (isDriverSale(sale) && !canManageDriverSales) {
+                      toast.error('Driver Sales can only be edited by the restaurant Owner or assigned Branch Manager.');
                       return;
                     }
                     setEditing(sale);
                     setShowForm(false);
                   }}
-                  onDelete={canDelete && (!isDriverSale(s) || isBranchManager) ? (sale) => setDeleting(sale) : null}
+                  onDelete={canDelete && (!isDriverSale(s) || canManageDriverSales) ? (sale) => setDeleting(sale) : null}
                   selected={selectedIds.has(s.id)}
                   onToggleSelect={canDelete ? toggleSelect : null}
                 />

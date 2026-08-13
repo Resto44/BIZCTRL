@@ -117,19 +117,20 @@ const DriverPerformance = memo(function DriverPerformance({ restaurantId, branch
             <p className="text-xs text-red-600">Driver analytics could not be loaded.</p>
           ) : (
             <>
-              <div className="mb-4 grid grid-cols-2 gap-2 border-b border-border/60 pb-3 lg:grid-cols-5">
+              <div className="mb-4 grid grid-cols-2 gap-2 border-b border-border/60 pb-3 sm:grid-cols-3 xl:grid-cols-6">
                 <SummaryMetric label="Total Drivers" value={analytics.totals.drivers} icon={Users} color="text-cyan-600" />
                 <SummaryMetric label="Active Drivers" value={analytics.totals.activeDrivers} icon={Truck} color="text-emerald-600" />
-                <SummaryMetric label="Sales / Orders" value={analytics.totals.orders} icon={Package} color="text-violet-600" />
                 <SummaryMetric label="Cash Sales" value={money(analytics.totals.cash, currency)} icon={DollarSign} color="text-amber-600" />
-                <SummaryMetric label="Total Revenue" value={money(analytics.totals.revenue, currency)} icon={BarChart3} color="text-blue-600" />
+                <SummaryMetric label="Network / POS Sales" value={money(analytics.totals.network, currency)} icon={CreditCard} color="text-violet-600" />
+                <SummaryMetric label="Credit Sales" value={money(analytics.totals.credit, currency)} icon={CreditCard} color="text-blue-600" />
+                <SummaryMetric label="Total Revenue" value={money(analytics.totals.revenue, currency)} icon={BarChart3} color="text-emerald-600" />
               </div>
 
               {selectedBranch === 'all' && (
                 <div className="mb-4 overflow-x-auto rounded-xl border border-border/70">
                   <table className="w-full min-w-[580px] text-left text-xs">
-                    <thead className="bg-muted/50 text-muted-foreground"><tr><th className="px-3 py-2 font-semibold">Branch</th><th className="px-3 py-2 font-semibold">Drivers</th><th className="px-3 py-2 font-semibold">Active</th><th className="px-3 py-2 font-semibold">Sales</th><th className="px-3 py-2 font-semibold">Orders</th></tr></thead>
-                    <tbody>{branchRows.map((row) => <tr key={row.branchId || row.branchKey} className="border-t border-border/60"><td className="px-3 py-2 font-semibold">{row.branchName}</td><td className="px-3 py-2">{row.drivers}</td><td className="px-3 py-2">{row.activeDrivers}</td><td className="px-3 py-2 font-semibold">{money(row.revenue, currency)}</td><td className="px-3 py-2">{row.orders}</td></tr>)}</tbody>
+                    <thead className="bg-muted/50 text-muted-foreground"><tr><th className="px-3 py-2 font-semibold">Branch</th><th className="px-3 py-2 font-semibold">Drivers</th><th className="px-3 py-2 font-semibold">Active</th><th className="px-3 py-2 font-semibold">Cash</th><th className="px-3 py-2 font-semibold">Network / POS</th><th className="px-3 py-2 font-semibold">Credit</th><th className="px-3 py-2 font-semibold">Total Revenue</th></tr></thead>
+                    <tbody>{branchRows.map((row) => <tr key={row.branchId || row.branchKey} className="border-t border-border/60"><td className="px-3 py-2 font-semibold">{row.branchName}</td><td className="px-3 py-2">{row.drivers}</td><td className="px-3 py-2">{row.activeDrivers}</td><td className="px-3 py-2">{money(row.cash, currency)}</td><td className="px-3 py-2">{money(row.network, currency)}</td><td className="px-3 py-2">{money(row.credit, currency)}</td><td className="px-3 py-2 font-semibold">{money(row.revenue, currency)}</td></tr>)}</tbody>
                   </table>
                 </div>
               )}
@@ -145,10 +146,11 @@ const DriverPerformance = memo(function DriverPerformance({ restaurantId, branch
                         <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${index === 0 ? 'bg-amber-100 text-amber-700' : index === 1 ? 'bg-slate-200 text-slate-700' : index === 2 ? 'bg-orange-100 text-orange-700' : 'bg-muted text-muted-foreground'}`}>{index + 1}</div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2"><p className="truncate text-xs font-bold text-foreground">{driver.name}</p><span className="whitespace-nowrap text-[10px] font-bold text-cyan-700">{money(driver.revenue, currency)}</span></div>
-                          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[10px] sm:grid-cols-5">
+                          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[10px] sm:grid-cols-6">
                             <Metric label="Sales / orders" value={driver.orders} icon={Package} />
                             <Metric label="Cash sales" value={money(driver.cash, currency)} icon={DollarSign} />
                             <Metric label="Network / POS" value={money(driver.network, currency)} icon={CreditCard} />
+                            <Metric label="Credit sales" value={money(driver.credit, currency)} icon={CreditCard} />
                             <Metric label="Total revenue" value={money(driver.revenue, currency)} icon={BarChart3} />
                             <Metric label="Avg. sale" value={money(driver.averageSale, currency)} />
                           </div>

@@ -649,12 +649,16 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     return [{ id: user.id, full_name: user.full_name || user.email || 'Branch Manager' }, ...employees];
   }, [employees, isManager, user?.email, user?.full_name, user?.id]);
 
+  // Driver Sales is intentionally shared by Owners and assigned Branch Managers.
+  // Employees and customers do not receive the driver-entry controls.
+  const canManageDriverSales = isManager || !!ownerFilter?.created_by;
+
   // Drivers are managed only through public.drivers. The query is branch-scoped
   // and RLS independently enforces the same owner/manager boundary.
   const { data: driversData, isLoading: driversLoading } = useQuery({
-    queryKey: ['sales-form-drivers', activeRestaurant?.id, form.branch, selectedBranchId],
+    queryKey: ['sales-form-drivers', activeRestaurant?.id, form.branch, selectedBranchId, canManageDriverSales],
     queryFn: async () => {
-      if (!activeRestaurant?.id || !selectedBranchId) return [];
+      if (!activeRestaurant?.id || !selectedBranchId || !canManageDriverSales) return [];
       const records = asRecordArray(await base44.entities.Driver.filter(
         { restaurant_id: activeRestaurant.id, branch_id: selectedBranchId },
         'full_name',
@@ -663,7 +667,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       return records.filter((driver) => driver.is_active !== false && driver.status !== 'inactive');
     },
     staleTime: 0,
-    enabled: isManager && !!activeRestaurant?.id && !!selectedBranchId,
+    enabled: canManageDriverSales && !!activeRestaurant?.id && !!selectedBranchId,
   });
   const drivers = asRecordArray(driversData);
 
@@ -1289,8 +1293,8 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       return;
     }
 
-    if (attributedDriverSalesRows.length > 0 && !isManager) {
-      toast.error('Only the assigned Branch Manager can record Driver Sales.');
+    if (attributedDriverSalesRows.length > 0 && !canManageDriverSales) {
+      toast.error('Only the Owner or assigned Branch Manager can record Driver Sales.');
       return;
     }
 
@@ -1620,7 +1624,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
           {/* ═══════════════════════════════════════════════════════════════
               SECTION 3 — DRIVER SALES (one attributed Daily Sales record)
           ═══════════════════════════════════════════════════════════════ */}
-          {isManager && (
+          {canManageDriverSales && (
             <div className="rounded-2xl border-2 border-sky-200 overflow-hidden bg-background shadow-sm">
               <SectionHeader
                 icon={Truck}
