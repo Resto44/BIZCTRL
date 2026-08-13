@@ -78,6 +78,24 @@ const matchesBranch = (record, branchKey, branchId) => {
   );
 };
 
+// Driver Sales remains part of one canonical daily_sales row. This parser restores
+// the driver-specific split for edits while the standard sales totals remain the
+// authoritative amounts used by dashboards, history, and reconciliation.
+const parseDriverSalesSnapshot = (record) => {
+  if (!record?.driver_id) return { cash: 0, network: 0, credit: 0 };
+  let snapshot = null;
+  if (record.drivers_json) {
+    try {
+      snapshot = firstRecord(JSON.parse(record.drivers_json));
+    } catch { /* Legacy records may contain malformed/empty JSON. */ }
+  }
+  return {
+    cash: Number(snapshot?.cash ?? record.driver_cash) || 0,
+    network: Number(snapshot?.network ?? record.driver_network) || 0,
+    credit: Number(snapshot?.credit) || 0,
+  };
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS — Material 3 / ERP
 // ─────────────────────────────────────────────────────────────────────────────
@@ -466,10 +484,25 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   }, [branches, form.branch, form.branch_id]);
 
   // ── Sales Revenue inputs ──────────────────────────────────────────────────
-  const [cashSalesInput, setCashSalesInput] = useState(
-    initial?.restaurant_cash !== undefined ? String(initial.restaurant_cash)
-      : initial?.cash !== undefined ? String(initial.cash) : ''
-  );
+  const [cashSalesInput, setCashSalesInput] = useState(() => {
+    const persistedDriverSales = parseDriverSalesSnapshot(initial);
+    const storedCash = initial?.restaurant_cash !== undefined
+      ? Number(initial.restaurant_cash)
+      : Number(initial?.cash);
+    const counterCash = Math.max(0, (Number.isFinite(storedCash) ? storedCash : 0) - persistedDriverSales.cash);
+    return counterCash ? String(counterCash) : '';
+  });
+  const [driverSalesInputs, setDriverSalesInputs] = useState(() => {
+    const persistedDriverSales = parseDriverSalesSnapshot(initial);
+    return {
+      cash: persistedDriverSales.cash ? String(persistedDriverSales.cash) : '',
+      network: persistedDriverSales.network ? String(persistedDriverSales.network) : '',
+      credit: persistedDriverSales.credit ? String(persistedDriverSales.credit) : '',
+    };
+  });
+  const setDriverSalesInput = useCallback((field, value) => {
+    setDriverSalesInputs((previous) => ({ ...previous, [field]: value }));
+  }, []);
 
   // ── Cash Reconciliation inputs ────────────────────────────────────────────
   const [openingCash, setOpeningCash] = useState(initial?.opening_cash ?? '');
@@ -908,11 +941,26 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   const yesterdaySales = asRecordArray(yesterdaySalesData);
 
   // ── Calculations (RULE-COMPLIANT — DO NOT MODIFY) ─────────────────────────
-  const cashSales    = useMemo(() => Math.max(0, Number(cashSalesInput) || 0), [cashSalesInput]);
-  const networkTotal = useMemo(() => asRecordArray(posEntries).reduce((s, e) => s + (Number(e.amount) || 0), 0), [posEntries]);
-  const creditTotal  = useMemo(() => asRecordArray(creditEntries).reduce((s, e) => s + (Number(e.amount) || 0), 0), [creditEntries]);
-  // totalSales now includes dynamic custom sources (Rule 1 extended)
-  const totalSales   = useMemo(() => cashSales + networkTotal + creditTotal + customTotal, [cashSales, networkTotal, creditTotal, customTotal]);
+  // Driver Sales is an attributed portion of this same daily-sales record—not a
+  // second sale. Each driver amount therefore feeds the canonical cash, network,
+  // credit, total-revenue, reconciliation, dashboard, and history calculations.
+  const counterCashSales = useMemo(() => Math.max(0, Number(cashSalesInput) || 0), [cashSalesInput]);
+  const hasSelectedDriver = !!form.driver_id;
+  const enteredDriverCashSales = useMemo(() => Math.max(0, Number(driverSalesInputs.cash) || 0), [driverSalesInputs.cash]);
+  const enteredDriverNetworkSales = useMemo(() => Math.max(0, Number(driverSalesInputs.network) || 0), [driverSalesInputs.network]);
+  const enteredDriverCreditSales = useMemo(() => Math.max(0, Number(driverSalesInputs.credit) || 0), [driverSalesInputs.credit]);
+  const driverSalesEntered = useMemo(() => enteredDriverCashSales + enteredDriverNetworkSales + enteredDriverCreditSales, [enteredDriverCashSales, enteredDriverNetworkSales, enteredDriverCreditSales]);
+  const driverCashSales = useMemo(() => hasSelectedDriver ? enteredDriverCashSales : 0, [enteredDriverCashSales, hasSelectedDriver]);
+  const driverNetworkSales = useMemo(() => hasSelectedDriver ? enteredDriverNetworkSales : 0, [enteredDriverNetworkSales, hasSelectedDriver]);
+  const driverCreditSales = useMemo(() => hasSelectedDriver ? enteredDriverCreditSales : 0, [enteredDriverCreditSales, hasSelectedDriver]);
+  const driverSalesTotal = useMemo(() => driverCashSales + driverNetworkSales + driverCreditSales, [driverCashSales, driverNetworkSales, driverCreditSales]);
+  const cashSales = useMemo(() => counterCashSales + driverCashSales, [counterCashSales, driverCashSales]);
+  const counterNetworkTotal = useMemo(() => asRecordArray(posEntries).reduce((s, e) => s + (Number(e.amount) || 0), 0), [posEntries]);
+  const networkTotal = useMemo(() => counterNetworkTotal + driverNetworkSales, [counterNetworkTotal, driverNetworkSales]);
+  const customerCreditTotal = useMemo(() => asRecordArray(creditEntries).reduce((s, e) => s + (Number(e.amount) || 0), 0), [creditEntries]);
+  const creditTotal = useMemo(() => customerCreditTotal + driverCreditSales, [customerCreditTotal, driverCreditSales]);
+  // totalSales now includes Driver Sales and dynamic custom sources (Rule 1 extended)
+  const totalSales = useMemo(() => cashSales + networkTotal + creditTotal + customTotal, [cashSales, networkTotal, creditTotal, customTotal]);
 
   const opening      = useMemo(() => Number(openingCash) || 0, [openingCash]);
   const actualCount  = useMemo(() => actualCashCount !== '' ? Number(actualCashCount) : null, [actualCashCount]);
@@ -1202,6 +1250,11 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       return;
     }
 
+    if (driverSalesEntered > 0 && !driverId) {
+      toast.error('Select a branch driver before entering Driver Sales amounts.');
+      return;
+    }
+
     // Cashier is always required for all roles
     if (!cashierId) {
       console.log('[ERPSalesWorkspace] FAILED: No cashier ID');
@@ -1236,9 +1289,20 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         cashier_id: cashierId,
         customer_id: customerId,
         pos_device_id: posDeviceId,
-        // Informational only: driver linkage never changes established sales totals.
+        // Driver Sales is a split within this same daily_sales record. The standard
+        // totals above remain the source used by Dashboards, History, and Today.
         driver_id: driverId,
         driver_name: selectedDriver?.full_name || '',
+        driver_cash: driverCashSales,
+        driver_network: driverNetworkSales,
+        drivers_json: JSON.stringify(driverId ? [{
+          driver_id: driverId,
+          driver_name: selectedDriver?.full_name || '',
+          cash: driverCashSales,
+          network: driverNetworkSales,
+          credit: driverCreditSales,
+          total: driverSalesTotal,
+        }] : []),
         credit: creditTotal,
         pos_entries_json: JSON.stringify(posEntries.map(({ id, ...rest }) => rest)),
         credit_entries_json: JSON.stringify(creditEntries.map(({ id, ...rest }) => rest)),
@@ -1382,44 +1446,6 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                   )}
                 </div>
               </div>
-              {isManager && (
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">
-                      Driver
-                      {driversLoading && <Loader2 className="w-3 h-3 inline ml-1 animate-spin" />}
-                    </Label>
-                    {driversLoading ? (
-                      <Skeleton className="h-10 w-full" />
-                    ) : drivers.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                        No active drivers are assigned to this branch. You can still save a normal sale without driver attribution.
-                      </div>
-                    ) : (
-                      <Select
-                        value={form.driver_id || 'unassigned'}
-                        onValueChange={(id) => {
-                          const driver = drivers.find((item) => String(item.id) === String(id));
-                          setForm((previous) => ({
-                            ...previous,
-                            driver_id: driver?.id || '',
-                            driver_name: driver?.full_name || '',
-                          }));
-                        }}
-                      >
-                        <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="No driver selected" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unassigned">No driver selected</SelectItem>
-                          {drivers.map((driver) => (
-                            <SelectItem key={driver.id} value={String(driver.id)}>{driver.full_name || 'Unnamed driver'}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    <p className="mt-1 text-[10px] text-muted-foreground">Select a branch driver to attribute this sale. Attribution never changes sales totals.</p>
-                  </div>
-                </div>
-              )}
               {/* Shift status indicators */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200">
@@ -1507,14 +1533,96 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════
-              SECTION 3 — POS SALES
+              SECTION 3 — DRIVER SALES (one attributed Daily Sales record)
+          ═══════════════════════════════════════════════════════════════ */}
+          {isManager && (
+            <div className="rounded-2xl border-2 border-sky-200 overflow-hidden bg-background shadow-sm">
+              <div className="flex items-center justify-between px-4 py-3 bg-sky-100/60 border-b border-border/60">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold bg-white/70 border border-border/50 text-sky-700">3</span>
+                  <Truck className="w-4 h-4 text-sky-700" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-foreground/80">Driver Sales</span>
+                </div>
+                <Badge variant="outline" className="text-sky-700 border-sky-300 text-[10px] font-bold">
+                  {currency}{driverSalesTotal.toLocaleString()}
+                </Badge>
+              </div>
+              <div className="p-4 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Enter one branch driver’s sales here. These amounts are included once in the same Daily Sales record and its standard Cash, Network/POS, Credit, Today, History, and dashboard totals.
+                </p>
+                {driversLoading ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : drivers.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    No active drivers are assigned to this branch. You can still save normal sales without driver attribution.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-sky-100">
+                    <table className="w-full min-w-[620px] text-left">
+                      <thead className="bg-sky-50 text-[10px] font-bold uppercase tracking-wide text-sky-900">
+                        <tr>
+                          <th className="px-3 py-2.5">Select Branch Driver</th>
+                          <th className="px-3 py-2.5">Cash Sales</th>
+                          <th className="px-3 py-2.5">Network / POS Sales</th>
+                          <th className="px-3 py-2.5">Credit Sales</th>
+                          <th className="px-3 py-2.5 text-right">Total Driver Sales</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="bg-background align-top">
+                          <td className="p-3 min-w-[190px]">
+                            <Select
+                              value={form.driver_id || 'unassigned'}
+                              onValueChange={(id) => {
+                                const driver = drivers.find((item) => String(item.id) === String(id));
+                                setForm((previous) => ({
+                                  ...previous,
+                                  driver_id: driver?.id || '',
+                                  driver_name: driver?.full_name || '',
+                                }));
+                              }}
+                            >
+                              <SelectTrigger className="h-10 text-xs"><SelectValue placeholder="Select driver" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unassigned">No driver selected</SelectItem>
+                                {drivers.map((driver) => (
+                                  <SelectItem key={driver.id} value={String(driver.id)}>{driver.full_name || 'Unnamed driver'}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="p-3 min-w-[125px]">
+                            <NumInput label="Cash" value={driverSalesInputs.cash} onChange={(value) => setDriverSalesInput('cash', value)} prefix={currency} />
+                          </td>
+                          <td className="p-3 min-w-[145px]">
+                            <NumInput label="Network / POS" value={driverSalesInputs.network} onChange={(value) => setDriverSalesInput('network', value)} prefix={currency} />
+                          </td>
+                          <td className="p-3 min-w-[125px]">
+                            <NumInput label="Credit" value={driverSalesInputs.credit} onChange={(value) => setDriverSalesInput('credit', value)} prefix={currency} />
+                          </td>
+                          <td className="p-3 text-right align-middle min-w-[130px]">
+                            <span className="text-base font-black text-sky-700">{currency}{driverSalesTotal.toLocaleString()}</span>
+                            <p className="mt-1 text-[10px] text-muted-foreground">Cash + POS + Credit</p>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════
+              SECTION 4 — POS SALES
           ═══════════════════════════════════════════════════════════════ */}
           <div className={`rounded-2xl border-2 ${SECTION_COLORS.pos.border} overflow-hidden bg-background shadow-sm`}>
             <SectionHeader
               icon={CreditCard}
               title="POS Sales"
               color="pos"
-              sectionNum="3"
+              sectionNum="4"
               badge={
                 <Badge variant="outline" className="text-violet-700 border-violet-300 text-[10px] font-bold">
                   {currency}{networkTotal.toLocaleString()}

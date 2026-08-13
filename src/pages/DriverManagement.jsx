@@ -187,7 +187,7 @@ export default function DriverManagement() {
     queryFn: async () => {
       let query = supabase
         .from('daily_sales')
-        .select('id, date, branch, branch_id, driver_id, driver_name, restaurant_cash, restaurant_network, cash, network, credit, sales_sources_json, custom_sources_total')
+        .select('id, date, branch, branch_id, driver_id, driver_name, driver_cash, driver_network, drivers_json, restaurant_cash, restaurant_network, cash, network, credit, sales_sources_json, custom_sources_total')
         .eq('restaurant_id', activeRestaurant.id)
         .not('driver_id', 'is', null)
         .order('date', { ascending: false })

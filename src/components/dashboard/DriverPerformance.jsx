@@ -51,7 +51,7 @@ const DriverPerformance = memo(function DriverPerformance({ restaurantId, branch
     queryFn: async () => {
       let query = supabase
         .from('daily_sales')
-        .select('id, date, restaurant_id, branch, branch_id, driver_id, driver_name, restaurant_cash, restaurant_network, cash, network, credit, sales_sources_json, custom_sources_total')
+        .select('id, date, restaurant_id, branch, branch_id, driver_id, driver_name, driver_cash, driver_network, drivers_json, restaurant_cash, restaurant_network, cash, network, credit, sales_sources_json, custom_sources_total')
         .eq('restaurant_id', restaurantId)
         .not('driver_id', 'is', null)
         .gte('date', range.startDate)

@@ -47,6 +47,32 @@ export function getCustomSourcesTotal(sale = {}) {
 }
 
 export function getDriverSaleAmounts(sale = {}) {
+  // New Driver Sales entries carry a dedicated snapshot inside the same
+  // daily_sales record. Read that split for driver analytics so a selected
+  // driver never receives credit for unrelated counter/POS/credit sales.
+  if (sale.driver_id && sale.drivers_json) {
+    try {
+      const snapshot = JSON.parse(sale.drivers_json);
+      const entry = Array.isArray(snapshot) ? snapshot.at(0) : null;
+      if (entry) {
+        const cash = number(entry.cash);
+        const network = number(entry.network);
+        const credit = number(entry.credit);
+        return { cash, network, credit, other: 0, revenue: cash + network + credit };
+      }
+    } catch { /* Fall through to legacy compatibility. */ }
+  }
+
+  // Some legacy driver entries stored only cash/network split columns. They do
+  // not include driver credit, so retain those explicit values when present.
+  if (sale.driver_id && (number(sale.driver_cash) > 0 || number(sale.driver_network) > 0)) {
+    const cash = number(sale.driver_cash);
+    const network = number(sale.driver_network);
+    return { cash, network, credit: 0, other: 0, revenue: cash + network };
+  }
+
+  // Legacy attributed records predate the dedicated snapshot. Preserve their
+  // historical reporting behavior rather than rewriting existing results.
   const cash = number(sale.restaurant_cash ?? sale.cash);
   const network = number(sale.restaurant_network ?? sale.network);
   const credit = number(sale.credit);
