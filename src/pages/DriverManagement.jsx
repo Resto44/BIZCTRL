@@ -5,7 +5,7 @@ import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
-import { buildDriverSalesAnalytics, getDriverSaleEntries } from '@/lib/driverAnalytics';
+import { buildDriverSalesAnalytics, DRIVER_ANALYTICS_PERIODS, getDriverAnalyticsDateRange, getDriverSaleEntries } from '@/lib/driverAnalytics';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Search, Plus, Truck, Users, Activity, ReceiptText, Pencil, Phone, BarChart3, WalletCards } from 'lucide-react';
+import { Search, Plus, Truck, Users, Activity, ReceiptText, Pencil, Phone, BarChart3, WalletCards, Award, CreditCard, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 
 const emptyForm = {
@@ -65,10 +65,11 @@ function DriverDetailsDialog({ driver, analytics, sales, currency, onOpenChange 
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <MetricCard label="Sales / Orders" value={`${row?.orders || 0}`} icon={ReceiptText} />
           <MetricCard label="Cash Sales" value={money(row?.cash, currency)} icon={WalletCards} />
           <MetricCard label="Network / POS" value={money(row?.network, currency)} icon={Activity} />
+          <MetricCard label="Credit Sales" value={money(row?.credit, currency)} icon={CreditCard} />
           <MetricCard label="Total Revenue" value={money(row?.revenue, currency)} icon={BarChart3} />
         </div>
 
@@ -99,7 +100,8 @@ function DriverDetailsDialog({ driver, analytics, sales, currency, onOpenChange 
                     <div key={sale.historyKey} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg border border-border/70 p-3 text-sm">
                       <div>
                         <p className="font-semibold">{sale.date || 'Undated sale'}</p>
-                        <p className="text-xs text-muted-foreground">{sale.branch || 'Branch'} · Cash {money(amounts.cash, currency)} · POS {money(amounts.network, currency)}</p>
+                        <p className="text-xs text-muted-foreground">{sale.branch || 'Branch'} · Cash {money(amounts.cash, currency)} · POS {money(amounts.network, currency)} · Credit {money(amounts.credit, currency)}</p>
+                        {amounts.notes && <p className="mt-1 text-xs text-muted-foreground">Notes: {amounts.notes}</p>}
                       </div>
                       <p className="font-bold text-primary">{money(amounts.revenue, currency)}</p>
                     </div>
@@ -148,6 +150,7 @@ export default function DriverManagement() {
   const [selectedBranch, setSelectedBranch] = useState(() =>
     isManager ? branchKeyFor(managerBranchRecord) || managerBranch || '' : 'all',
   );
+  const [period, setPeriod] = useState('month');
   const [search, setSearch] = useState('');
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
@@ -167,6 +170,8 @@ export default function DriverManagement() {
   const effectiveBranchId = effectiveBranch?.id || null;
   const effectiveBranchKey = branchKeyFor(effectiveBranch) || (selectedBranch === 'all' ? '' : selectedBranch);
   const canLoad = !!activeRestaurant?.id && (!isManager || !!effectiveBranchId);
+  const dateRange = useMemo(() => getDriverAnalyticsDateRange(period), [period]);
+  const periodLabel = useMemo(() => DRIVER_ANALYTICS_PERIODS.find((item) => item.id === period)?.label || 'Selected period', [period]);
 
   const { data: driversData = [], isLoading: driversLoading } = useQuery({
     queryKey: ['drivers', activeRestaurant?.id, effectiveBranchId, isManager],
@@ -185,13 +190,15 @@ export default function DriverManagement() {
   const drivers = asArray(driversData);
 
   const { data: salesData = [] } = useQuery({
-    queryKey: ['driver-sales', activeRestaurant?.id, effectiveBranchId, isManager],
+    queryKey: ['driver-sales', activeRestaurant?.id, effectiveBranchId, isManager, dateRange.startDate, dateRange.endDate],
     queryFn: async () => {
       let query = supabase
         .from('daily_sales')
         .select('id, date, branch, branch_id, driver_id, driver_name, driver_cash, driver_network, drivers_json, restaurant_cash, restaurant_network, cash, network, credit, sales_sources_json, custom_sources_total')
         .eq('restaurant_id', activeRestaurant.id)
-        .not('driver_id', 'is', null)
+        .or('driver_id.not.is.null,drivers_json.not.is.null')
+        .gte('date', dateRange.startDate)
+        .lte('date', dateRange.endDate)
         .order('date', { ascending: false })
         .limit(5000);
       if (effectiveBranchId) query = query.eq('branch_id', effectiveBranchId);
@@ -209,7 +216,9 @@ export default function DriverManagement() {
     sales,
     branchKey: effectiveBranchKey,
     branchId: effectiveBranchId,
-  }), [drivers, sales, effectiveBranchId, effectiveBranchKey]);
+    dateFrom: dateRange.startDate,
+    dateTo: dateRange.endDate,
+  }), [drivers, sales, effectiveBranchId, effectiveBranchKey, dateRange.startDate, dateRange.endDate]);
 
   const visibleDrivers = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -313,7 +322,9 @@ export default function DriverManagement() {
     sales,
     branchKey: effectiveBranchKey,
     branchId: effectiveBranchId,
-  }), [drivers, sales, effectiveBranchId, effectiveBranchKey]);
+    dateFrom: dateRange.startDate,
+    dateTo: dateRange.endDate,
+  }), [drivers, sales, effectiveBranchId, effectiveBranchKey, dateRange.startDate, dateRange.endDate]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 pb-24">
@@ -333,11 +344,30 @@ export default function DriverManagement() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <Card>
+        <CardContent className="p-4">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <Label className="text-xs font-semibold uppercase text-muted-foreground">Analytics Period</Label>
+            <span className="text-xs text-muted-foreground">{periodLabel}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {DRIVER_ANALYTICS_PERIODS.map((item) => (
+              <Button key={item.id} type="button" variant={period === item.id ? 'default' : 'outline'} size="sm" onClick={() => setPeriod(item.id)}>
+                {item.label}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-7">
         <MetricCard label="Total Drivers" value={analytics.totals.drivers} icon={Users} />
         <MetricCard label="Active Drivers" value={analytics.totals.activeDrivers} icon={Truck} />
-        <MetricCard label="Driver Sales" value={money(analytics.totals.revenue, currency)} icon={BarChart3} />
         <MetricCard label="Sales / Orders" value={analytics.totals.orders} icon={ReceiptText} />
+        <MetricCard label="Cash Sales" value={money(analytics.totals.cash, currency)} icon={DollarSign} />
+        <MetricCard label="Network / POS" value={money(analytics.totals.network, currency)} icon={Activity} />
+        <MetricCard label="Credit Sales" value={money(analytics.totals.credit, currency)} icon={CreditCard} />
+        <MetricCard label="Total Revenue" value={money(analytics.totals.revenue, currency)} icon={BarChart3} />
       </div>
 
       <Card>
@@ -372,10 +402,11 @@ export default function DriverManagement() {
                     <Badge variant={active ? 'default' : 'secondary'}>{active ? 'Active' : 'Inactive'}</Badge>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/45 p-3 text-center">
-                    <div><p className="text-sm font-bold">{row?.orders || 0}</p><p className="text-[10px] text-muted-foreground">Orders</p></div>
+                  <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/45 p-3 text-center sm:grid-cols-4">
                     <div><p className="text-sm font-bold">{money(row?.cash, currency)}</p><p className="text-[10px] text-muted-foreground">Cash</p></div>
-                    <div><p className="text-sm font-bold">{money(row?.revenue, currency)}</p><p className="text-[10px] text-muted-foreground">Revenue</p></div>
+                    <div><p className="text-sm font-bold">{money(row?.network, currency)}</p><p className="text-[10px] text-muted-foreground">Network / POS</p></div>
+                    <div><p className="text-sm font-bold">{money(row?.credit, currency)}</p><p className="text-[10px] text-muted-foreground">Credit</p></div>
+                    <div><p className="text-sm font-bold">{money(row?.revenue, currency)}</p><p className="text-[10px] text-muted-foreground">Total Revenue</p></div>
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
@@ -391,6 +422,22 @@ export default function DriverManagement() {
           })}
         </div>
       )}
+
+      <Card>
+        <CardContent className="p-4">
+          <div className="mb-3 flex items-center gap-2"><Award className="h-4 w-4 text-amber-600" /><div><h2 className="text-sm font-bold">Top 10 Drivers</h2><p className="text-xs text-muted-foreground">Ranked by total revenue for {periodLabel.toLowerCase()}.</p></div></div>
+          {analytics.rankedDrivers.length === 0 ? (
+            <p className="py-5 text-center text-sm text-muted-foreground">No driver-linked sales have been recorded for this period.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-border/70">
+              <table className="w-full min-w-[760px] text-left text-xs">
+                <thead className="bg-muted/50 text-muted-foreground"><tr><th className="px-3 py-2 font-semibold">#</th><th className="px-3 py-2 font-semibold">Driver</th><th className="px-3 py-2 font-semibold">Sales / Orders</th><th className="px-3 py-2 font-semibold">Cash</th><th className="px-3 py-2 font-semibold">Network / POS</th><th className="px-3 py-2 font-semibold">Credit</th><th className="px-3 py-2 font-semibold">Total Revenue</th></tr></thead>
+                <tbody>{analytics.rankedDrivers.map((driver, index) => <tr key={driver.driverId} className="border-t border-border/60"><td className="px-3 py-2 font-bold text-muted-foreground">{index + 1}</td><td className="px-3 py-2 font-semibold">{driver.name}</td><td className="px-3 py-2">{driver.orders}</td><td className="px-3 py-2">{money(driver.cash, currency)}</td><td className="px-3 py-2">{money(driver.network, currency)}</td><td className="px-3 py-2">{money(driver.credit, currency)}</td><td className="px-3 py-2 font-bold text-primary">{money(driver.revenue, currency)}</td></tr>)}</tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <DriverDetailsDialog driver={selectedDriver} analytics={selectedAnalytics} sales={sales} currency={currency} onOpenChange={setSelectedDriver} />
 

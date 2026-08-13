@@ -55,7 +55,7 @@ export default function Sales() {
   const canDelete = role === ROLES.OWNER || role === ROLES.MANAGER || role === ROLES.GENERAL_MANAGER;
   const isBranchManager = role === ROLES.MANAGER;
   const canManageDriverSales = role === ROLES.OWNER || isBranchManager;
-  const isDriverSale = (sale) => Boolean(sale?.driver_id);
+  const isDriverSale = (sale) => Boolean(sale?.driver_id || sale?.drivers_json);
   const { autoSettle } = useNetworkSettlement({ orgId, user, currency });
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -437,7 +437,7 @@ export default function Sales() {
   const createMut = useMutation({
     mutationFn: async ({ data, proofUrl, ocr }) => {
       console.log('[Sales:createMut] mutationFn started');
-      if (data.driver_id && !canManageDriverSales) {
+      if (isDriverSale(data) && !canManageDriverSales) {
         throw new Error('Only the restaurant Owner or assigned Branch Manager can create a Driver Sale.');
       }
       // ── TRANSACTION-LIKE WORKFLOW (Requirement 5) ──
@@ -535,7 +535,7 @@ export default function Sales() {
 
   const updateMut = useMutation({
     mutationFn: async ({ id, data, prev, proofUrl, ocr }) => {
-      if ((prev?.driver_id || data.driver_id) && !canManageDriverSales) {
+      if ((isDriverSale(prev) || isDriverSale(data)) && !canManageDriverSales) {
         throw new Error('Only the restaurant Owner or assigned Branch Manager can edit a Driver Sale.');
       }
       const sale = await base44.entities.DailySales.update(id, data);

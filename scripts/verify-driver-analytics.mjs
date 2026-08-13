@@ -11,6 +11,7 @@ const drivers = [
 
 const sale = {
   id: 'daily-sale-1',
+  date: '2026-08-13',
   branch_id: 'branch-a',
   // Standard Daily Sales totals include counter activity too.
   restaurant_cash: 920,
@@ -34,4 +35,10 @@ assert(ahmad?.cash === 300 && ahmad?.network === 200 && ahmad?.credit === 100 &&
 assert(sara?.cash === 120 && sara?.network === 80 && sara?.credit === 0 && sara?.revenue === 200, 'Sara did not receive only her 200 Driver Sales split');
 assert(analytics.totals.revenue === 800, `Expected aggregated Driver Sales 800, received ${analytics.totals.revenue}`);
 
-console.log('Multi-driver analytics executable test passed: Ahmad 300+200+100=600, Sara 120+80+0=200, and both are attributed from one Daily Sales record.');
+const includedRange = buildDriverSalesAnalytics({ drivers, sales: [sale], branchId: 'branch-a', dateFrom: '2026-08-13', dateTo: '2026-08-13' });
+assert(includedRange.totals.revenue === 800, `Expected the inclusive date range to retain 800, received ${includedRange.totals.revenue}`);
+
+const excludedRange = buildDriverSalesAnalytics({ drivers, sales: [sale], branchId: 'branch-a', dateFrom: '2026-08-14', dateTo: '2026-08-14' });
+assert(excludedRange.totals.revenue === 0, `Expected the out-of-range sale to be excluded, received ${excludedRange.totals.revenue}`);
+
+console.log('Multi-driver analytics executable test passed: Ahmad 300+200+100=600, Sara 120+80+0=200, and inclusive date-range filtering preserves canonical attribution.');

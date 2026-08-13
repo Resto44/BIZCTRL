@@ -345,9 +345,7 @@ const auth = {
 // ── Entity registry ────────────────────────────────────────────────────────
 const entities = {
   Employee: createEntity('employees'), Driver: createEntity('drivers'),
-  DeliveryOrder: createEntity('delivery_orders'), DriverSettlement: createEntity('driver_settlements'),
-  DriverShift: createEntity('driver_shifts'), DriverDebt: createEntity('driver_debts'),
-  DriverSalesEntry: createEntity('driver_sales_entries'), Attendance: createEntity('attendance'),
+  Attendance: createEntity('attendance'),
   Inventory: createEntity('inventory'), Product: createEntity('products'),
   MenuProduct: createEntity('products'), // fix: menu_products table does not exist in DB; remapped to products
   PayrollRun: createEntity('payroll_runs'),
@@ -397,7 +395,6 @@ const entities = {
   ProductSize: createEntity('product_sizes'),
   CartItem: createEntity('cart_items'),
   OrderTracking: createEntity('order_tracking'),
-  DriverLocation: createEntity('driver_locations'),
   // ── Product Management System ──
   ProductUnit: createEntity('product_units'),
   ProductVariant: createEntity('product_variants'),

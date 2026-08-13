@@ -65,6 +65,7 @@ export function getDriverSaleEntries(sale = {}) {
           .map((entry) => ({
             driver_id: entry.driver_id || '',
             driver_name: entry.driver_name || '',
+            notes: typeof entry.notes === 'string' ? entry.notes : '',
             ...amountsFromDriverEntry(entry),
           }));
       }
@@ -77,7 +78,7 @@ export function getDriverSaleEntries(sale = {}) {
   if (number(sale.driver_cash) > 0 || number(sale.driver_network) > 0) {
     const cash = number(sale.driver_cash);
     const network = number(sale.driver_network);
-    return [{ driver_id: sale.driver_id || '', driver_name: sale.driver_name || '', cash, network, credit: 0, other: 0, revenue: cash + network }];
+    return [{ driver_id: sale.driver_id || '', driver_name: sale.driver_name || '', notes: '', cash, network, credit: 0, other: 0, revenue: cash + network }];
   }
 
   // Legacy attributed records predate the dedicated snapshot. Preserve their
@@ -86,7 +87,7 @@ export function getDriverSaleEntries(sale = {}) {
   const network = number(sale.restaurant_network ?? sale.network);
   const credit = number(sale.credit);
   const other = getCustomSourcesTotal(sale);
-  return [{ driver_id: sale.driver_id || '', driver_name: sale.driver_name || '', cash, network, credit, other, revenue: cash + network + credit + other }];
+  return [{ driver_id: sale.driver_id || '', driver_name: sale.driver_name || '', notes: '', cash, network, credit, other, revenue: cash + network + credit + other }];
 }
 
 export function getDriverSaleAmounts(sale = {}, driverId = null) {
@@ -111,7 +112,14 @@ function driverBranchMatches(driver, branchKey, branchId) {
   return matchesId || matchesKey;
 }
 
-export function buildDriverSalesAnalytics({ drivers = [], sales = [], branchKey, branchId } = {}) {
+function saleDateMatches(sale, dateFrom, dateTo) {
+  if (!dateFrom && !dateTo) return true;
+  const date = String(sale?.date || '').slice(0, 10);
+  if (!date) return false;
+  return (!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo);
+}
+
+export function buildDriverSalesAnalytics({ drivers = [], sales = [], branchKey, branchId, dateFrom, dateTo } = {}) {
   const scopedDrivers = drivers.filter((driver) => driverBranchMatches(driver, branchKey, branchId));
   const driverById = new Map(scopedDrivers.map((driver) => [String(driver.id), driver]));
   const driverByName = new Map(scopedDrivers.map((driver) => [String(driver.full_name || '').trim().toLowerCase(), driver]));
@@ -131,7 +139,7 @@ export function buildDriverSalesAnalytics({ drivers = [], sales = [], branchKey,
   }]));
 
   sales.forEach((sale) => {
-    if (!branchMatches(sale, branchKey, branchId)) return;
+    if (!branchMatches(sale, branchKey, branchId) || !saleDateMatches(sale, dateFrom, dateTo)) return;
     getDriverSaleEntries(sale).forEach((entry) => {
       const linkedDriver = entry.driver_id
         ? driverById.get(String(entry.driver_id))
@@ -170,11 +178,11 @@ export function buildDriverSalesAnalytics({ drivers = [], sales = [], branchKey,
   };
 }
 
-export function buildBranchDriverAnalytics({ drivers = [], sales = [], branches = [] } = {}) {
+export function buildBranchDriverAnalytics({ drivers = [], sales = [], branches = [], dateFrom, dateTo } = {}) {
   return branches.map((branch) => {
     const branchKey = branch.key || branch.branch_key || '';
     const branchId = branch.id || null;
-    const analytics = buildDriverSalesAnalytics({ drivers, sales, branchKey, branchId });
+    const analytics = buildDriverSalesAnalytics({ drivers, sales, branchKey, branchId, dateFrom, dateTo });
     return {
       branchId,
       branchKey,
