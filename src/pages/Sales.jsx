@@ -16,6 +16,7 @@ import ExportDialog from '@/components/shared/ExportDialog';
 import SalesFilterSidebar from '@/components/sales/SalesFilterSidebar';
 import { useNotify } from '@/lib/useNotify';
 import { useNetworkSettlement } from '@/hooks/useNetworkSettlement';
+import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
@@ -52,6 +53,8 @@ export default function Sales() {
   const { user } = useAuth();
   const { role } = useRole();
   const canDelete = role === ROLES.OWNER || role === ROLES.MANAGER || role === ROLES.GENERAL_MANAGER;
+  const isBranchManager = role === ROLES.MANAGER;
+  const isDriverSale = (sale) => Boolean(sale?.driver_id);
   const { autoSettle } = useNetworkSettlement({ orgId, user, currency });
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -433,6 +436,9 @@ export default function Sales() {
   const createMut = useMutation({
     mutationFn: async ({ data, proofUrl, ocr }) => {
       console.log('[Sales:createMut] mutationFn started');
+      if (data.driver_id && !isBranchManager) {
+        throw new Error('Only the assigned Branch Manager can create a Driver Sale.');
+      }
       // ── TRANSACTION-LIKE WORKFLOW (Requirement 5) ──
       // 1. Insert parent Sale record first (Requirement 2)
       console.log('[Sales:createMut] 1. Inserting daily_sales...');
@@ -528,6 +534,9 @@ export default function Sales() {
 
   const updateMut = useMutation({
     mutationFn: async ({ id, data, prev, proofUrl, ocr }) => {
+      if ((prev?.driver_id || data.driver_id) && !isBranchManager) {
+        throw new Error('Only the assigned Branch Manager can edit a Driver Sale.');
+      }
       const sale = await base44.entities.DailySales.update(id, data);
       await autoWalletTx(data, id, prev);
       // FIX 5: Update treasury transaction for approved shortage/overage
@@ -591,6 +600,9 @@ export default function Sales() {
 
   const deleteMut = useMutation({
     mutationFn: async (sale) => {
+      if (isDriverSale(sale) && !isBranchManager) {
+        throw new Error('Only the assigned Branch Manager can delete a Driver Sale.');
+      }
       await base44.entities.DailySales.delete(sale.id);
       await notif.sale({ branch: sale.branch, action: 'delete' });
     },
@@ -602,6 +614,10 @@ export default function Sales() {
 
   const bulkDeleteMut = useMutation({
     mutationFn: async (ids) => {
+      const selectedSales = sales.filter((sale) => ids.includes(sale.id));
+      if (selectedSales.some(isDriverSale) && !isBranchManager) {
+        throw new Error('Only the assigned Branch Manager can delete Driver Sales.');
+      }
       await Promise.all(ids.map(id => base44.entities.DailySales.delete(id)));
     },
     onSuccess: () => {
@@ -786,8 +802,15 @@ export default function Sales() {
                 <SalesListItem
                   key={s.id}
                   sale={s}
-                  onEdit={(sale) => { setEditing(sale); setShowForm(false); }}
-                  onDelete={canDelete ? (sale) => setDeleting(sale) : null}
+                  onEdit={(sale) => {
+                    if (isDriverSale(sale) && !isBranchManager) {
+                      toast.error('Driver Sales are view-only for owners and non-manager roles.');
+                      return;
+                    }
+                    setEditing(sale);
+                    setShowForm(false);
+                  }}
+                  onDelete={canDelete && (!isDriverSale(sale) || isBranchManager) ? (sale) => setDeleting(sale) : null}
                   selected={selectedIds.has(s.id)}
                   onToggleSelect={canDelete ? toggleSelect : null}
                 />

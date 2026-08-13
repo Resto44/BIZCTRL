@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Building2, Users, UserCheck, User, ChefHat, Truck, Package,
+  Building2, Users, UserCheck, User, Truck, Package,
   CheckCircle2, XCircle, Clock, ShieldCheck, ShieldOff,
   RefreshCw, Search, Eye, Phone, Mail, Calendar, GitBranch,
   AlertCircle, Loader2, ArrowLeft, Link2
@@ -19,7 +19,6 @@ const ROLE_META = {
   general_manager: { label: 'General Manager', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30',     icon: Users },
   manager:         { label: 'Branch Manager',  color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', icon: UserCheck },
   employee:        { label: 'Employee',        color: 'bg-amber-500/20 text-amber-300 border-amber-500/30',   icon: User },
-  kitchen:         { label: 'Kitchen',         color: 'bg-red-500/20 text-red-300 border-red-500/30',         icon: ChefHat },
   driver:          { label: 'Driver',          color: 'bg-sky-500/20 text-sky-300 border-sky-500/30',         icon: Truck },
   supplier:        { label: 'Supplier',        color: 'bg-slate-500/20 text-slate-300 border-slate-500/30',   icon: Package },
 };
@@ -62,7 +61,7 @@ function ActionModal({ membership, action, branches, onConfirm, onClose, loading
   };
   const meta = actionMeta[action] || actionMeta.approved;
   const Icon = meta.icon;
-  const needsBranch = action === 'approved' && ['manager','employee','kitchen','driver'].includes(membership?.role);
+  const needsBranch = action === 'approved' && ['manager', 'employee', 'driver'].includes(membership?.role);
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -366,7 +365,6 @@ function ApprovalCenterTab() {
             <option value="general_manager">General Manager</option>
             <option value="manager">Branch Manager</option>
             <option value="employee">Employee</option>
-            <option value="kitchen">Kitchen</option>
             <option value="driver">Driver</option>
             <option value="supplier">Supplier</option>
           </select>

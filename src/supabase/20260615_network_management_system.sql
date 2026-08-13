@@ -1,7 +1,7 @@
 -- ============================================================
 -- Network Management System — Database Schema
 -- Modules: Multi-Branch Control, Central Inventory, Inter-Branch Transfers,
---          Central Purchasing, Shared Customers, Driver Network, Kitchen Network
+--          Central Purchasing, Shared Customers, and Driver Network
 -- ============================================================
 
 -- ── 1. TRANSFER REQUESTS (Inter-Branch Transfers with Approval Workflow) ──
@@ -147,44 +147,7 @@ CREATE TABLE IF NOT EXISTS driver_performance (
 ALTER TABLE driver_performance ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_driver_performance_month ON driver_performance(month);
 
--- ── 8. KITCHEN DEMAND FORECAST (Central Kitchen Network Planning) ──
-CREATE TABLE IF NOT EXISTS kitchen_demand_forecast (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  restaurant_id     UUID REFERENCES restaurants(id) ON DELETE CASCADE,
-  product_id        TEXT NOT NULL,
-  product_name      TEXT,
-  forecast_date     DATE NOT NULL,
-  branch_demand     JSONB, -- {branch_key: quantity, ...}
-  total_demand      NUMERIC DEFAULT 0,
-  production_plan   TEXT, -- Notes on production schedule
-  created_by        TEXT,
-  created_date      TIMESTAMPTZ DEFAULT NOW(),
-  updated_date      TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(restaurant_id, product_id, forecast_date)
-);
-ALTER TABLE kitchen_demand_forecast ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS idx_kitchen_demand_date ON kitchen_demand_forecast(forecast_date);
-
--- ── 9. KITCHEN WORKLOAD BALANCING ──
-CREATE TABLE IF NOT EXISTS kitchen_workload (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  restaurant_id     UUID REFERENCES restaurants(id) ON DELETE CASCADE,
-  branch            TEXT NOT NULL,
-  date              DATE NOT NULL,
-  shift             TEXT DEFAULT 'morning', -- morning, afternoon, evening
-  total_orders      INTEGER DEFAULT 0,
-  average_prep_time NUMERIC DEFAULT 0, -- in minutes
-  peak_hour         TEXT,
-  capacity_utilization NUMERIC DEFAULT 0, -- 0-100%
-  notes             TEXT,
-  created_date      TIMESTAMPTZ DEFAULT NOW(),
-  updated_date      TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(restaurant_id, branch, date, shift)
-);
-ALTER TABLE kitchen_workload ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS idx_kitchen_workload_date ON kitchen_workload(date);
-
--- ── 10. BRANCH HEALTH SCORE (Real-Time Operational Status) ──
+-- ── 8. BRANCH HEALTH SCORE (Real-Time Operational Status) ──
 CREATE TABLE IF NOT EXISTS branch_health_scores (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id     UUID REFERENCES restaurants(id) ON DELETE CASCADE,
@@ -206,7 +169,7 @@ ALTER TABLE branch_health_scores ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_branch_health_date ON branch_health_scores(date);
 CREATE INDEX IF NOT EXISTS idx_branch_health_status ON branch_health_scores(status);
 
--- ── 11. NETWORK ANALYTICS SNAPSHOT (Pre-Calculated Metrics) ──
+-- ── 9. NETWORK ANALYTICS SNAPSHOT (Pre-Calculated Metrics) ──
 CREATE TABLE IF NOT EXISTS network_analytics_snapshot (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id     UUID REFERENCES restaurants(id) ON DELETE CASCADE,
@@ -231,8 +194,6 @@ CREATE OR REPLACE TRIGGER trg_network_suppliers BEFORE UPDATE ON network_supplie
 CREATE OR REPLACE TRIGGER trg_network_contracts BEFORE UPDATE ON network_contracts FOR EACH ROW EXECUTE FUNCTION update_updated_date();
 CREATE OR REPLACE TRIGGER trg_driver_allocations BEFORE UPDATE ON driver_allocations FOR EACH ROW EXECUTE FUNCTION update_updated_date();
 CREATE OR REPLACE TRIGGER trg_driver_performance BEFORE UPDATE ON driver_performance FOR EACH ROW EXECUTE FUNCTION update_updated_date();
-CREATE OR REPLACE TRIGGER trg_kitchen_demand_forecast BEFORE UPDATE ON kitchen_demand_forecast FOR EACH ROW EXECUTE FUNCTION update_updated_date();
-CREATE OR REPLACE TRIGGER trg_kitchen_workload BEFORE UPDATE ON kitchen_workload FOR EACH ROW EXECUTE FUNCTION update_updated_date();
 CREATE OR REPLACE TRIGGER trg_branch_health_scores BEFORE UPDATE ON branch_health_scores FOR EACH ROW EXECUTE FUNCTION update_updated_date();
 
 -- ── RLS POLICIES ──────────────────────────────────────────────────────────
@@ -244,8 +205,6 @@ CREATE POLICY "Network Suppliers: owner manage all" ON network_suppliers FOR ALL
 CREATE POLICY "Network Contracts: owner manage all" ON network_contracts FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email'))) WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email')));
 CREATE POLICY "Driver Allocations: owner manage all" ON driver_allocations FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email'))) WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email')));
 CREATE POLICY "Driver Performance: owner manage all" ON driver_performance FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email'))) WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email')));
-CREATE POLICY "Kitchen Demand: owner manage all" ON kitchen_demand_forecast FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email'))) WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email')));
-CREATE POLICY "Kitchen Workload: owner manage all" ON kitchen_workload FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email'))) WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email')));
 CREATE POLICY "Branch Health: owner manage all" ON branch_health_scores FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email'))) WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email')));
 CREATE POLICY "Network Analytics: owner manage all" ON network_analytics_snapshot FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email'))) WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE org_id = (auth.jwt() ->> 'email')));
 
@@ -253,5 +212,4 @@ CREATE POLICY "Network Analytics: owner manage all" ON network_analytics_snapsho
 CREATE POLICY "Transfer Requests: staff view branch" ON transfer_requests FOR SELECT USING (from_branch = (SELECT branch FROM profiles WHERE id = auth.uid()) OR to_branch = (SELECT branch FROM profiles WHERE id = auth.uid()));
 CREATE POLICY "Network Customers: staff view all" ON network_customers FOR SELECT USING (restaurant_id IN (SELECT restaurant_id FROM profiles WHERE id = auth.uid()));
 CREATE POLICY "Driver Allocations: staff view branch" ON driver_allocations FOR SELECT USING (assigned_branch = (SELECT branch FROM profiles WHERE id = auth.uid()));
-CREATE POLICY "Kitchen Workload: staff view branch" ON kitchen_workload FOR SELECT USING (branch = (SELECT branch FROM profiles WHERE id = auth.uid()));
 CREATE POLICY "Branch Health: staff view branch" ON branch_health_scores FOR SELECT USING (branch = (SELECT branch FROM profiles WHERE id = auth.uid()));

@@ -4,14 +4,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { audit } from '@/lib/auditLogger';
 
 /**
- * ROLE SYSTEM — 7 ERP Roles
+ * ROLE SYSTEM — 6 ERP Roles
  * ─────────────────────────
  * 1. Owner            — full access, manages all branches
  * 2. General Manager  — cross-branch access, reports to Owner
  * 3. Manager          — single branch, reports to Owner/GM
  * 4. Employee         — single branch, limited ops
- * 5. Kitchen          — single branch, kitchen queue only
- * 6. Supplier         — no branch, purchase orders only
+ * 5. Supplier         — no branch, purchase orders only
  *
  * Drivers are managed records, not authenticated ERP portal users.
  */
@@ -21,9 +20,6 @@ export const ROLES = {
   GENERAL_MANAGER: 'general_manager',
   MANAGER:         'manager',
   EMPLOYEE:        'employee',
-  // Retained only to safely quarantine legacy profile values; no driver portal exists.
-  DRIVER:          'driver',
-  KITCHEN:         'kitchen',
   SUPPLIER:        'supplier',
   // Legacy aliases kept for backward-compat
   SPONSOR:         'sponsor',
@@ -36,8 +32,6 @@ export const ROLE_HOME = {
   [ROLES.GENERAL_MANAGER]: '/gm-dashboard',
   [ROLES.MANAGER]:         '/manager-dashboard',
   [ROLES.EMPLOYEE]:        '/employee-dashboard',
-  [ROLES.DRIVER]:          '/erp-login',
-  [ROLES.KITCHEN]:         '/kitchen-dashboard',
   [ROLES.SUPPLIER]:        '/supplier-portal',
   // Legacy
   [ROLES.SPONSOR]:         '/sponsor-dashboard',
@@ -49,8 +43,6 @@ export const NON_OWNER_ROLES = new Set([
   ROLES.GENERAL_MANAGER,
   ROLES.MANAGER,
   ROLES.EMPLOYEE,
-  ROLES.DRIVER,
-  ROLES.KITCHEN,
   ROLES.SUPPLIER,
   ROLES.SPONSOR,
   ROLES.CUSTOMER,
@@ -80,7 +72,7 @@ function buildCan(role) {
 
   return {
     // Dashboard
-    viewDashboard:      is(ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.KITCHEN, ROLES.SUPPLIER, ROLES.SPONSOR, ROLES.CUSTOMER),
+    viewDashboard:      is(ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.SUPPLIER, ROLES.SPONSOR, ROLES.CUSTOMER),
     // Sales
     viewSales:          is(ROLES.MANAGER),
     // Purchases
@@ -88,7 +80,7 @@ function buildCan(role) {
     // Inventory
     viewInventory:      is(ROLES.MANAGER),
     // Orders
-    viewOrders:         is(ROLES.MANAGER, ROLES.KITCHEN),
+    viewOrders:         is(ROLES.MANAGER),
     // Staff
     viewStaff:          is(ROLES.MANAGER),
     viewEmployees:      is(ROLES.MANAGER),
@@ -125,17 +117,13 @@ function buildCan(role) {
     viewSalary:         is(ROLES.EMPLOYEE),
     manageLoans:        is(ROLES.EMPLOYEE),
     viewProfile:        is(ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.CUSTOMER),
-    // Driver Specific
+    // Delivery management is available to branch managers.
     viewDeliveries:     is(ROLES.MANAGER),
     updateDelivery:     is(ROLES.MANAGER),
-    viewEarnings:       false,
     // Sponsor Specific
     viewWallet:         is(ROLES.SPONSOR),
     manageTransactions: is(ROLES.SPONSOR),
     viewSponsored:      is(ROLES.SPONSOR),
-    // Kitchen Specific
-    viewKitchenQueue:   is(ROLES.MANAGER, ROLES.KITCHEN),
-    updatePrepStatus:   is(ROLES.MANAGER, ROLES.KITCHEN),
     // Customer Specific
     placeOrders:        is(ROLES.CUSTOMER),
     trackOrders:        is(ROLES.CUSTOMER),
@@ -146,7 +134,6 @@ function buildCan(role) {
     manageRoles:        false,
     manageCustomers:    false,
     manageDrivers:      false,
-    manageKitchen:      false,
     manageSponsors:     false,
     // Legacy / Misc
     uploadSales:        is(ROLES.MANAGER),
@@ -159,11 +146,11 @@ const PERMISSIONS_LIST = {
   viewOrders: false, viewStaff: false, viewAttendance: false, viewReports: false,
   viewFinancials: false, viewProfitLoss: false, recordAttendance: false,
   viewSchedule: false, viewTasks: false, viewSalary: false, manageLoans: false,
-  viewProfile: false, viewDeliveries: false, updateDelivery: false, viewEarnings: false,
+  viewProfile: false, viewDeliveries: false, updateDelivery: false,
   viewWallet: false, manageTransactions: false, viewSponsored: false,
-  viewKitchenQueue: false, updatePrepStatus: false, placeOrders: false,
+  placeOrders: false,
   trackOrders: false, manageSettings: false, manageBranches: false, manageUsers: false,
-  manageRoles: false, manageCustomers: false, manageDrivers: false, manageKitchen: false,
+  manageRoles: false, manageCustomers: false, manageDrivers: false,
   manageSponsors: false, uploadSales: false, viewAlerts: false, viewSupport: true,
   // Additional permissions used in route guards — must be listed here so Owner reduce() grants them
   viewEmployees: false, viewPayroll: false, viewTreasury: false, viewExpenses: false,

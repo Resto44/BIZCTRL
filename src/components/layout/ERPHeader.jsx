@@ -268,7 +268,6 @@ function UserMenu() {
     accountant: 'bg-indigo-500',
     procurement: 'bg-orange-500',
     warehouse: 'bg-amber-500',
-    kitchen: 'bg-red-500',
     delivery: 'bg-sky-500',
   };
 

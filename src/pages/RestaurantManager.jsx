@@ -2,7 +2,7 @@
  * RestaurantManager — Tenant & Branch Management with Business Type Selection
  *
  * At tenant (restaurant) creation, the owner MUST select a Business Type:
- *   - Restaurant Mode: Menu, Kitchen, Recipes, Delivery, Table Service
+ *   - Restaurant Mode: Menu, Recipes, Delivery, Table Service
  *   - Retail Mode: Barcode, SKU, Variants, Batch/Lot, Expiry, Serials
  *
  * The selected Business Type is stored in the `business_mode` field and

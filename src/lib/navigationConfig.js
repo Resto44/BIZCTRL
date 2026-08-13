@@ -176,22 +176,6 @@ export const ALL_NAV_ITEMS = [
     permission: 'viewReports',
   },
   {
-    path: '/kitchen-dashboard',
-    label: 'Kitchen',
-    icon: UtensilsCrossed,
-    mode: 'restaurant',
-    group: NAV_GROUPS.RESTAURANT,
-    permission: 'viewSales',
-  },
-  {
-    path: '/kds',
-    label: 'KDS',
-    icon: ChefHat,
-    mode: 'restaurant',
-    group: NAV_GROUPS.RESTAURANT,
-    permission: 'viewSales',
-  },
-  {
     path: '/reservation-table-management',
     label: 'Tables',
     icon: UtensilsCrossed,

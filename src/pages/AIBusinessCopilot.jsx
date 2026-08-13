@@ -373,7 +373,7 @@ export default function AIBusinessCopilot() {
               color: 'amber',
               items: [
                 'Set up automated low-stock alerts',
-                'Use KDS to reduce order preparation time',
+                'Review order turnaround time with branch managers',
                 'Implement daily cash reconciliation',
               ]
             },

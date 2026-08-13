@@ -17,9 +17,7 @@ const ROLE_BADGE = {
   [ROLES.OWNER]:    { label: { en: 'Owner', ar: 'المالك', fa: 'مالک' }, color: 'bg-violet-100 text-violet-700 border-violet-200' },
   [ROLES.MANAGER]:  { label: { en: 'Manager', ar: 'مدير فرع', fa: 'مدیر' }, color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   [ROLES.EMPLOYEE]: { label: { en: 'Employee', ar: 'موظف', fa: 'کارمند' }, color: 'bg-slate-100 text-slate-600 border-slate-200' },
-  [ROLES.DRIVER]:   { label: { en: 'Driver', ar: 'سائق', fa: 'راننده' }, color: 'bg-orange-100 text-orange-700 border-orange-200' },
   [ROLES.SPONSOR]:  { label: { en: 'Sponsor', ar: 'كفيل', fa: 'کفیل' }, color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  [ROLES.KITCHEN]:  { label: { en: 'Kitchen', ar: 'مطبخ', fa: 'آشپزخانه' }, color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   [ROLES.CUSTOMER]: { label: { en: 'Customer', ar: 'عميل', fa: 'مشتری' }, color: 'bg-pink-100 text-pink-700 border-pink-200' },
 };
 

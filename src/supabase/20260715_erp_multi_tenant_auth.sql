@@ -2,11 +2,11 @@
 -- ERP Multi-Tenant Architecture Migration
 -- Date: 2026-07-15
 -- Description: Adds branch architecture, unified role support,
---              and tenant isolation for 7 roles.
+--              and tenant isolation for supported portal roles.
 -- ============================================================
 
--- 1. Ensure all 7 roles are supported in profiles and app
--- Roles: owner, general_manager, manager, employee, driver, kitchen, supplier
+-- 1. Ensure supported portal roles are available in profiles and app
+-- Roles: owner, general_manager, manager, employee, supplier
 ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
 
 -- 2. Create branch_assignments table to handle multi-branch managers and staff

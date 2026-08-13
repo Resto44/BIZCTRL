@@ -35,7 +35,6 @@ export function TenantProvider({ children }) {
   const isOwner = normalizedRole === ROLES.OWNER;
   const isManager = normalizedRole === ROLES.MANAGER;
   const isEmployee = normalizedRole === ROLES.EMPLOYEE;
-  const isKitchen = normalizedRole === ROLES.KITCHEN;
   const isCustomer = normalizedRole === ROLES.CUSTOMER;
   const isSponsor = normalizedRole === ROLES.SPONSOR;
 
@@ -310,7 +309,7 @@ export function TenantProvider({ children }) {
     : null;
 
   // Branch isolation for all staff roles
-  const isStaffRole = [ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.KITCHEN].includes(normalizedRole);
+  const isStaffRole = [ROLES.MANAGER, ROLES.EMPLOYEE].includes(normalizedRole);
 
   // Prefer the legacy branch key, but preserve the canonical branch UUID when
   // the key is absent on an assigned Branch Manager profile.
@@ -383,7 +382,6 @@ export function TenantProvider({ children }) {
       managerBranchObject,
       isManager,
       isEmployee,
-      isKitchen,
       isCustomer,
       isSponsor,
     }}>

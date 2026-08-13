@@ -75,15 +75,14 @@ const TABLE_QUERY_MAP = {
 
   // Driver operations — all driver actions feed the Owner Dashboard in real time.
   drivers:                ['drivers', 'driver-performance', 'driver-sales'],
-  delivery_orders:        ['driver-performance', 'driver-orders', 'kitchen-orders', 'manager-delivery-orders'],
+  delivery_orders:        ['driver-performance', 'driver-orders', 'manager-delivery-orders'],
   driver_shifts:          ['driver-performance'],
   driver_settlements:     ['driver-performance'],
   driver_debts:           ['driver-performance'],
   driver_sales_entries:   ['driver-performance'],
   driver_locations:       ['driver-performance'],
 
-  // Kitchen & Order workflow
-  kitchen_queues:         ['kitchen-orders', 'driver-orders', 'driver-performance'],
+  // Order workflow
   order_status_history:   ['driver-orders', 'driver-performance'],
 
   // HR
@@ -134,7 +133,6 @@ const TABLE_LABELS = {
   driver_debts:           'Driver Debt',
   driver_sales_entries:   'Driver Sales Entry',
   driver_locations:       'Driver Location',
-  kitchen_queues:         'Kitchen Queue',
   order_status_history:   'Order Status',
   employees:              'Employee',
   payroll_runs:           'Payroll',

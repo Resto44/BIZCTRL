@@ -1,5 +1,5 @@
--- Supports the Owner Dashboard Driver Performance query and the Driver Portal's
--- self-scoped delivery query without changing any application records.
+-- Supports Owner Dashboard driver-performance analytics and manager delivery queries
+-- without changing any application records.
 CREATE INDEX IF NOT EXISTS idx_delivery_orders_restaurant_created_date
   ON public.delivery_orders (restaurant_id, created_date DESC);
 

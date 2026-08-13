@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS erp_registrations (
   email           TEXT NOT NULL,
   full_name       TEXT NOT NULL,
   phone           TEXT,
-  role            TEXT NOT NULL CHECK (role IN ('owner','general_manager','manager','employee','kitchen','driver','supplier')),
+  role            TEXT NOT NULL CHECK (role IN ('owner','general_manager','manager','employee','supplier')),
   organization_id UUID REFERENCES restaurants(id) ON DELETE CASCADE,
   branch_id       UUID REFERENCES branches(id) ON DELETE SET NULL,
   status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected','suspended')),

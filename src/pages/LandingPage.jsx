@@ -34,7 +34,7 @@ const FEATURES = [
   {
     icon: Users,
     title: 'Role-Based Access Control',
-    desc: 'Owner, Manager, Employee, Supplier, Driver — each with tailored dashboards and granular permissions.',
+    desc: 'Owner, Manager, Employee, and Supplier access is protected by tailored dashboards and granular permissions.',
     color: 'text-purple-400',
     bg: 'bg-purple-500/10',
   },
@@ -315,8 +315,6 @@ export default function LandingPage() {
                 { role: 'Manager', desc: 'Branch operations, staff, inventory, and sales', color: 'border-purple-500/30 bg-purple-500/5' },
                 { role: 'Employee', desc: 'Attendance, tasks, payslips, and shift schedule', color: 'border-emerald-500/30 bg-emerald-500/5' },
                 { role: 'Supplier', desc: 'Purchase orders, invoices, payments, and balance', color: 'border-amber-500/30 bg-amber-500/5' },
-                { role: 'Driver', desc: 'Delivery assignments, routes, and earnings', color: 'border-rose-500/30 bg-rose-500/5' },
-                { role: 'Kitchen', desc: 'Order queue, KDS display, and production status', color: 'border-orange-500/30 bg-orange-500/5' },
               ].map(({ role, desc, color }) => (
                 <div key={role} className={`p-3 rounded-xl border ${color}`}>
                   <p className="text-white font-bold text-sm">{role}</p>

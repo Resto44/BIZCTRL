@@ -584,7 +584,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       return records.filter((driver) => driver.is_active !== false && driver.status !== 'inactive');
     },
     staleTime: 0,
-    enabled: !!activeRestaurant?.id && !!selectedBranchId,
+    enabled: isManager && !!activeRestaurant?.id && !!selectedBranchId,
   });
   const drivers = asRecordArray(driversData);
 
@@ -1192,6 +1192,11 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       return;
     }
 
+    if (form.driver_id && !isManager) {
+      toast.error('Only the assigned Branch Manager can record a Driver Sale.');
+      return;
+    }
+
     if (form.driver_id && !selectedDriver) {
       toast.error('Select an active driver from the current branch.');
       return;
@@ -1377,38 +1382,40 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">
-                    Driver
-                    {driversLoading && <Loader2 className="w-3 h-3 inline ml-1 animate-spin" />}
-                  </Label>
-                  {driversLoading ? (
-                    <Skeleton className="h-10 w-full" />
-                  ) : (
-                    <Select
-                      value={form.driver_id || 'unassigned'}
-                      onValueChange={(id) => {
-                        const driver = drivers.find((item) => String(item.id) === String(id));
-                        setForm((previous) => ({
-                          ...previous,
-                          driver_id: driver?.id || '',
-                          driver_name: driver?.full_name || '',
-                        }));
-                      }}
-                    >
-                      <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="No driver selected" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">No driver selected</SelectItem>
-                        {drivers.map((driver) => (
-                          <SelectItem key={driver.id} value={driver.id}>{driver.full_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  <p className="mt-1 text-[10px] text-muted-foreground">Driver assignment is optional and does not change sales totals.</p>
+              {isManager && (
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">
+                      Driver
+                      {driversLoading && <Loader2 className="w-3 h-3 inline ml-1 animate-spin" />}
+                    </Label>
+                    {driversLoading ? (
+                      <Skeleton className="h-10 w-full" />
+                    ) : (
+                      <Select
+                        value={form.driver_id || 'unassigned'}
+                        onValueChange={(id) => {
+                          const driver = drivers.find((item) => String(item.id) === String(id));
+                          setForm((previous) => ({
+                            ...previous,
+                            driver_id: driver?.id || '',
+                            driver_name: driver?.full_name || '',
+                          }));
+                        }}
+                      >
+                        <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="No driver selected" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">No driver selected</SelectItem>
+                          {drivers.map((driver) => (
+                            <SelectItem key={driver.id} value={driver.id}>{driver.full_name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <p className="mt-1 text-[10px] text-muted-foreground">Select a branch driver to attribute this sale. Attribution never changes sales totals.</p>
+                  </div>
                 </div>
-              </div>
+              )}
               {/* Shift status indicators */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200">

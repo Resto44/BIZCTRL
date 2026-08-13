@@ -138,7 +138,6 @@ export function useModeDashboardConfig() {
     ] : [
       { id: 'daily_sales',    title: 'Today Sales',    icon: Receipt,    color: 'blue',   dataKey: 'dailySales' },
       { id: 'orders_today',   title: 'Orders Today',   icon: ClipboardList, color: 'orange', dataKey: 'ordersToday' },
-      { id: 'kitchen_pending', title: 'Kitchen Queue', icon: ChefHat,   color: 'amber',  dataKey: 'kitchenPending' },
       { id: 'low_ingredients', title: 'Low Ingredients', icon: AlertTriangle, color: 'red', dataKey: 'lowIngredients' },
     ],
 

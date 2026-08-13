@@ -26,7 +26,7 @@ export const ENTERPRISE_ICONS = [
   { name: 'GlassWater', category: 'restaurant', labels: { en: ['Water'], ar: ['ماء'], fa: ['آب'] } },
   { name: 'Egg', category: 'restaurant', labels: { en: ['Breakfast'], ar: ['إفطار'], fa: ['صبحانه'] } },
   { name: 'Leaf', category: 'restaurant', labels: { en: ['Sauce', 'Spices', 'Herbs'], ar: ['صلصة', 'توابل', 'أعشاب'], fa: ['سس', 'ادویه', 'گیاهان'] } },
-  { name: 'CookingPot', category: 'restaurant', labels: { en: ['Kitchen', 'Cooking'], ar: ['مطبخ', 'طبخ'], fa: ['آشپزخانه', 'پخت و پز'] } },
+  { name: 'CookingPot', category: 'restaurant', labels: { en: ['Cooking'], ar: ['طبخ'], fa: ['پخت و پز'] } },
   { name: 'ChefHat', category: 'restaurant', labels: { en: ['Chef'], ar: ['شيف', 'طباخ'], fa: ['سرآشپز'] } },
   { name: 'BookOpen', category: 'restaurant', labels: { en: ['Recipe', 'Menu'], ar: ['وصفة', 'منيو', 'قائمة طعام'], fa: ['دستور پخت', 'منو'] } },
   { name: 'DollarSign', category: 'restaurant', labels: { en: ['Food Cost'], ar: ['تكلفة الطعام'], fa: ['هزینه غذا'] } },

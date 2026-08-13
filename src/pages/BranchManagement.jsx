@@ -39,14 +39,12 @@ const ALL_ROLES = [
   { value: 'accountant',      label: 'Accountant',      color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' },
   { value: 'procurement',     label: 'Procurement',     color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' },
   { value: 'warehouse',       label: 'Warehouse',       color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
-  { value: 'kitchen',         label: 'Kitchen',         color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
   { value: 'delivery',        label: 'Delivery',        color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' },
   { value: 'waiter',          label: 'Waiter',          color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' },
   { value: 'auditor',         label: 'Auditor',         color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
   { value: 'read_only',       label: 'Read Only',       color: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' },
   // Legacy ERP roles
   { value: 'employee',        label: 'Employee',        color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
-  { value: 'driver',          label: 'Driver',          color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' },
   { value: 'supplier',        label: 'Supplier',        color: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' },
 ];
 

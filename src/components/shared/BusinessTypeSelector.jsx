@@ -15,12 +15,11 @@ const BUSINESS_TYPES = [
   {
     value: 'restaurant',
     label: 'Restaurant',
-    description: 'Full-service dining, takeaway, delivery, kitchen management, recipe costing, and ingredient inventory.',
+    description: 'Full-service dining, takeaway, delivery, recipe costing, and ingredient inventory.',
     icon: UtensilsCrossed,
     color: 'orange',
     features: [
       'Menu & Recipe Management',
-      'Kitchen Display System',
       'Table Service & Dine-In',
       'Takeaway & Delivery',
       'Ingredient Inventory (BOM)',

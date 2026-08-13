@@ -13,8 +13,8 @@
  *   - Navigation reads this context to show/hide mode-specific routes.
  *
  * Business Modes:
- *   'restaurant' — Menu, Recipe/BOM, Ingredient Inventory, Kitchen, Tables, Delivery
- *   'cafe'       — Like restaurant but without full kitchen/production
+ *   'restaurant' — Menu, Recipe/BOM, Ingredient Inventory, Tables, Delivery
+ *   'cafe'       — Like restaurant but without full production
  *   'retail'     — Barcode, SKU, Variants, Batch/Lot, Expiry, Serial Numbers
  *   'warehouse'  — Inventory, transfers, batch tracking, no POS
  *   'factory'    — Production/BOM, raw materials, finished goods
@@ -42,7 +42,7 @@ export const BUSINESS_MODES = {
   OTHER:      'other',
 };
 
-// Business types that use restaurant-style inventory (menu/recipe/kitchen)
+// Business types that use restaurant-style inventory (menu and recipe workflows)
 export const RESTAURANT_LIKE_MODES = ['restaurant', 'cafe'];
 
 // Business types that use retail-style inventory (non-restaurant)
@@ -95,7 +95,6 @@ export const MODULE_REGISTRY = {
   menu_management:       { modes: ['restaurant', 'cafe'], label: 'Menu Management' },
   recipe_bom:            { modes: ['restaurant', 'cafe'], label: 'Recipe / BOM' },
   ingredient_inventory:  { modes: ['restaurant', 'cafe'], label: 'Ingredient Inventory' },
-  kitchen:               { modes: ['restaurant', 'cafe'], label: 'Kitchen' },
   table_service:         { modes: 'restaurant', label: 'Table Service' },
   dine_in:               { modes: 'restaurant', label: 'Dine-In' },
   takeaway:              { modes: ['restaurant', 'cafe'], label: 'Takeaway' },
@@ -226,7 +225,7 @@ export function withModeGuard(Component, requiredMode, FallbackComponent = null)
  *
  * Usage:
  *   <ModeGuard mode="restaurant">
- *     <KitchenDashboard />
+ *     <DeliveryOrders />
  *   </ModeGuard>
  *
  *   <ModeGuard mode={['retail', 'warehouse']}>

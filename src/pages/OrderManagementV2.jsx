@@ -268,11 +268,18 @@ export default function OrderManagementV2() {
     refetchInterval: 10000,
   });
 
-  // Load drivers
+  // Load active canonical drivers for the current branch. Drivers are managed
+  // records; they are not authenticated portal users.
   const { data: drivers = [] } = useQuery({
-    queryKey: ['drivers', restaurant?.id],
-    queryFn: () => base44.entities.User.filter({ role: 'driver', restaurant_id: restaurant?.id }),
-    enabled: !!restaurant?.id,
+    queryKey: ['drivers', restaurant?.id, branchId],
+    queryFn: async () => {
+      const records = await base44.entities.Driver.filter({
+        restaurant_id: restaurant?.id,
+        branch_id: branchId,
+      }, 'full_name', 500);
+      return (records || []).filter((driver) => driver.is_active !== false && driver.status !== 'inactive');
+    },
+    enabled: !!restaurant?.id && !!branchId,
   });
 
   const updateMutation = useMutation({

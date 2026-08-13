@@ -13,8 +13,6 @@ const STAFF_ROLES = [
   { value: 'general_manager', label: 'General Manager' },
   { value: 'manager', label: 'Branch Manager' },
   { value: 'employee', label: 'Employee' },
-  { value: 'kitchen', label: 'Kitchen Staff' },
-  { value: 'driver', label: 'Driver' },
   { value: 'supplier', label: 'Supplier' },
 ];
 

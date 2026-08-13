@@ -10,10 +10,6 @@ import { createNotification } from '@/lib/notificationEngine';
 // ── Order Status Pipeline ──────────────────────────────────────────────────
 export const ORDER_STATUS = {
   PENDING:       'pending',
-  ACCEPTED:      'accepted',
-  PREPARING:     'preparing',
-  COOKING:       'cooking',
-  READY:         'ready',
   ASSIGNED:      'assigned',
   PICKED_UP:     'picked_up',
   ON_THE_WAY:    'on_the_way',
@@ -21,16 +17,6 @@ export const ORDER_STATUS = {
   DELIVERED:     'delivered',
   CANCELLED:     'cancelled',
   REFUNDED:      'refunded',
-};
-
-export const KITCHEN_STATUS = {
-  PENDING:    'pending',
-  ACCEPTED:   'accepted',
-  PREPARING:  'preparing',
-  COOKING:    'cooking',
-  READY:      'ready',
-  DELAYED:    'delayed',
-  REJECTED:   'rejected',
 };
 
 export const DELIVERY_STATUS = {
@@ -113,7 +99,6 @@ export async function placeOrder({
     order_number: generateOrderNumber(),
     order_type: orderType,
     status: ORDER_STATUS.PENDING,
-    kitchen_status: KITCHEN_STATUS.PENDING,
     delivery_status: DELIVERY_STATUS.UNASSIGNED,
     payment_method: paymentMethod,
     payment_status: 'pending',
@@ -156,14 +141,14 @@ export async function placeOrder({
     await deductCustomerWallet(customerId, walletUsed, order.id, 'Order payment');
   }
 
-  // 7. Notify kitchen, manager, admin
+  // 7. Notify the branch manager
   await createNotification({
     orgId,
     restaurantId,
     type: 'new_order',
     title: `New Order ${order.order_number}`,
     message: `New ${orderType} order received. Total: ${totalAmount.toFixed(2)} SAR`,
-    targetRole: 'kitchen',
+    targetRole: 'manager',
     severity: 'info',
     metadata: { order_id: order.id, order_number: order.order_number },
   });
@@ -189,10 +174,6 @@ export async function updateOrderStatus(orderId, newStatus, actorId, actorRole, 
   await trackOrderEvent(orderId, newStatus, `Status updated to ${newStatus}`, actorId, actorRole);
 
   const statusMessages = {
-    [ORDER_STATUS.ACCEPTED]:   { title: 'Order Accepted', message: 'Your order has been accepted by the kitchen.' },
-    [ORDER_STATUS.PREPARING]:  { title: 'Preparing', message: 'The kitchen is preparing your order.' },
-    [ORDER_STATUS.COOKING]:    { title: 'Cooking', message: 'Your order is being cooked.' },
-    [ORDER_STATUS.READY]:      { title: 'Ready', message: 'Your order is ready for pickup.' },
     [ORDER_STATUS.ASSIGNED]:   { title: 'Driver Assigned', message: 'A driver has been assigned to your order.' },
     [ORDER_STATUS.PICKED_UP]:  { title: 'Picked Up', message: 'Your order has been picked up by the driver.' },
     [ORDER_STATUS.ON_THE_WAY]: { title: 'On the Way', message: 'Your driver is on the way.' },
@@ -213,26 +194,6 @@ export async function updateOrderStatus(orderId, newStatus, actorId, actorRole, 
       severity: 'info',
       metadata: { order_id: orderId, status: newStatus },
     });
-  }
-}
-
-// ── Update Kitchen Status ──────────────────────────────────────────────────
-export async function updateKitchenStatus(orderId, kitchenStatus, actorId, orgId, restaurantId) {
-  await base44.entities.Order.update(orderId, {
-    kitchen_status: kitchenStatus,
-    updated_date: new Date().toISOString(),
-  });
-  await trackOrderEvent(orderId, `kitchen_${kitchenStatus}`, `Kitchen: ${kitchenStatus}`, actorId, 'kitchen');
-
-  // Map kitchen status to order status
-  const statusMap = {
-    [KITCHEN_STATUS.ACCEPTED]:  ORDER_STATUS.ACCEPTED,
-    [KITCHEN_STATUS.PREPARING]: ORDER_STATUS.PREPARING,
-    [KITCHEN_STATUS.COOKING]:   ORDER_STATUS.COOKING,
-    [KITCHEN_STATUS.READY]:     ORDER_STATUS.READY,
-  };
-  if (statusMap[kitchenStatus]) {
-    await updateOrderStatus(orderId, statusMap[kitchenStatus], actorId, 'kitchen', orgId, restaurantId);
   }
 }
 

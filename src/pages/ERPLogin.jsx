@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Building2, Users, UserCheck, User, ChefHat, Package,
+  Building2, Users, UserCheck, User, Package,
   Eye, EyeOff, Loader2, ArrowLeft, ShieldCheck, LogIn
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -53,16 +53,6 @@ const ROLE_CONFIG = [
     textColor: 'text-amber-300',
   },
   {
-    role: ROLES.KITCHEN,
-    label: 'Kitchen',
-    description: 'Kitchen queue and order prep',
-    icon: ChefHat,
-    color: 'from-red-600 to-rose-700',
-    border: 'border-red-500/40',
-    bg: 'bg-red-500/10',
-    textColor: 'text-red-300',
-  },
-  {
     role: ROLES.SUPPLIER,
     label: 'Supplier',
     description: 'Purchase orders and invoices',
@@ -103,10 +93,6 @@ export default function ERPLogin() {
             .select('role, approval_status, branch_id, restaurant_id, organization_id')
             .eq('id', session.user.id)
             .single();
-          if (profile?.role === ROLES.DRIVER) {
-            await supabase.auth.signOut();
-            return;
-          }
           if (profile?.role && profile.approval_status === 'approved') {
             // Pre-populate sessionStorage so dashboard opens on the correct branch
             if (profile.branch_id && profile.role !== ROLES.OWNER) {

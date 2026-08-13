@@ -1,7 +1,7 @@
 /**
  * Online Ordering Redesign Module
- * Integrated dashboards for Customer, Kitchen, Driver, and Admin
- * Real-time order flow: Customer → Kitchen → Driver
+ * Integrated dashboards for Customer, Driver, and Admin
+ * Real-time order flow: Customer → Manager Dispatch → Driver
  */
 
 import { base44 } from '@/api/base44Client';
@@ -43,68 +43,6 @@ export const CustomerDashboardFeatures = {
 };
 
 /**
- * Kitchen Dashboard Features:
- * - View incoming orders
- * - Assign orders to stations
- * - Mark items as ready
- * - Manage preparation queue
- * - Real-time notifications
- */
-export const KitchenDashboardFeatures = {
-  orderQueue: {
-    description: 'View pending orders',
-    features: ['Order list', 'Urgency indicator', 'Prep time estimate', 'Special instructions', 'Customer info'],
-  },
-  stationAssignment: {
-    description: 'Assign orders to prep stations',
-    features: ['Station selection', 'Batch assignment', 'Drag & drop', 'Auto-assignment', 'Load balancing'],
-  },
-  preparation: {
-    description: 'Manage order preparation',
-    features: ['Mark item ready', 'Pause order', 'Add notes', 'Request help', 'Reprint ticket'],
-  },
-  notifications: {
-    description: 'Real-time notifications',
-    features: ['New order alert', 'Sound alert', 'Visual indicator', 'Priority highlighting', 'Delivery time warning'],
-  },
-  analytics: {
-    description: 'Kitchen performance',
-    features: ['Avg prep time', 'Orders per hour', 'Station efficiency', 'Peak hours', 'Item popularity'],
-  },
-};
-
-/**
- * Driver Dashboard Features:
- * - Accept/reject orders
- * - View delivery route
- * - Update delivery status
- * - Real-time notifications
- * - Earnings tracking
- */
-export const DriverDashboardFeatures = {
-  orderAcceptance: {
-    description: 'Accept or reject orders',
-    features: ['Order list', 'Distance', 'Estimated payout', 'Restaurant info', 'Delivery address'],
-  },
-  routing: {
-    description: 'Delivery route management',
-    features: ['Live map', 'Turn-by-turn', 'Traffic info', 'Multiple stops', 'Optimized route'],
-  },
-  statusUpdate: {
-    description: 'Update delivery status',
-    features: ['Picked up', 'On the way', 'Arrived', 'Delivered', 'Photo proof'],
-  },
-  communication: {
-    description: 'Customer communication',
-    features: ['Call customer', 'Send message', 'Share location', 'Estimated time', 'Arrival notification'],
-  },
-  earnings: {
-    description: 'Earnings and settlements',
-    features: ['Daily earnings', 'Trip history', 'Payout schedule', 'Performance bonus', 'Ratings'],
-  },
-};
-
-/**
  * Admin Dispatch Center Features:
  * - Live dispatch map
  * - Driver management
@@ -137,13 +75,10 @@ export const AdminDispatchFeatures = {
 
 /**
  * Real-time Order Flow
- * 10-step status pipeline
+ * delivery status pipeline
  */
 export const OrderStatusPipeline = [
   { status: 'pending', label: 'Order Received', icon: 'Clock', color: 'slate' },
-  { status: 'accepted', label: 'Accepted by Restaurant', icon: 'CheckCircle', color: 'blue' },
-  { status: 'preparing', label: 'Being Prepared', icon: 'ChefHat', color: 'amber' },
-  { status: 'ready', label: 'Ready for Pickup', icon: 'Package', color: 'green' },
   { status: 'assigned', label: 'Driver Assigned', icon: 'Bike', color: 'purple' },
   { status: 'picked_up', label: 'Picked Up', icon: 'MapPin', color: 'indigo' },
   { status: 'on_the_way', label: 'On the Way', icon: 'Navigation', color: 'cyan' },
@@ -157,10 +92,6 @@ export const OrderStatusPipeline = [
  */
 export const RealtimeEvents = {
   ORDER_CREATED: 'order:created',
-  ORDER_ACCEPTED: 'order:accepted',
-  ORDER_REJECTED: 'order:rejected',
-  ORDER_PREPARING: 'order:preparing',
-  ORDER_READY: 'order:ready',
   DRIVER_ASSIGNED: 'driver:assigned',
   DRIVER_PICKED_UP: 'driver:picked_up',
   DRIVER_ON_WAY: 'driver:on_the_way',
@@ -287,8 +218,6 @@ export async function sendNotification(orderId, event, recipients) {
 
 export default {
   CustomerDashboardFeatures,
-  KitchenDashboardFeatures,
-  DriverDashboardFeatures,
   AdminDispatchFeatures,
   OrderStatusPipeline,
   RealtimeEvents,

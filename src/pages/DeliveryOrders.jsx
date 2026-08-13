@@ -5,12 +5,11 @@ import { useTenant } from '@/lib/TenantContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, RefreshCw, ShoppingBag, Truck, ChefHat, BarChart2, Map } from 'lucide-react';
+import { Plus, RefreshCw, ShoppingBag, Truck, BarChart2, Map } from 'lucide-react';
 import { ManagerLiveMap } from '@/components/driver/DriverLocationMap';
 import BranchSelect from '@/components/shared/BranchSelect';
 import OrderBoard from '@/components/delivery/OrderBoard';
 import NewOrderForm from '@/components/delivery/NewOrderForm';
-import KitchenDisplay from '@/components/delivery/KitchenDisplay';
 import DriverWallets from '@/components/delivery/DriverWallets';
 import DeliveryAnalytics from '@/components/delivery/DeliveryAnalytics';
 
@@ -124,16 +123,13 @@ export default function DeliveryOrders() {
 
       <div className="px-4 pt-4 max-w-5xl mx-auto">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-5 w-full mb-4">
+          <TabsList className="grid grid-cols-4 w-full mb-4">
             <TabsTrigger value="orders" className="text-xs flex items-center gap-1">
               <ShoppingBag className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Orders</span>
               {activeOrders.length > 0 && (
                 <Badge className="ml-1 h-4 px-1 text-[10px] bg-primary">{activeOrders.length}</Badge>
               )}
-            </TabsTrigger>
-            <TabsTrigger value="kitchen" className="text-xs flex items-center gap-1">
-              <ChefHat className="w-3.5 h-3.5" /><span className="hidden sm:inline">Kitchen</span>
             </TabsTrigger>
             <TabsTrigger value="drivers" className="text-xs flex items-center gap-1">
               <Truck className="w-3.5 h-3.5" /><span className="hidden sm:inline">Wallets</span>
@@ -159,9 +155,6 @@ export default function DeliveryOrders() {
             />
           </TabsContent>
 
-          <TabsContent value="kitchen">
-            <KitchenDisplay orders={orders} onUpdateOrder={(id, data) => updateOrderMutation.mutate({ id, data })} />
-          </TabsContent>
 
           <TabsContent value="drivers">
             <DriverWallets

@@ -26,11 +26,10 @@ const Dashboard           = lazy(() => import('./pages/Dashboard'));
 const ExecutiveCommandCenter = lazy(() => import('./pages/ExecutiveCommandCenter'));
 const OwnerDashboard         = lazy(() => import('./pages/OwnerDashboard'));
 const CashRegisterCenter     = lazy(() => import('./pages/CashRegisterCenter'));
-const KitchenDisplaySystem   = lazy(() => import('./pages/KitchenDisplaySystem'));
 const OnlineOrdering         = lazy(() => import('./pages/OnlineOrdering'));
 // ── Online Ordering V2 ──────────────────────────────────────────────────────
 const OnlineOrderingV2       = lazy(() => import('./pages/OnlineOrderingV2'));
-// KitchenDashboardV2 and DriverDashboardV2 removed — canonical ERP pages used instead
+// Legacy dashboard variants removed — canonical ERP pages used instead
 const OrderManagementV2      = lazy(() => import('./pages/OrderManagementV2'));
 const PromotionsV2           = lazy(() => import('./pages/PromotionsV2'));
 const OrderAnalyticsV2       = lazy(() => import('./pages/OrderAnalyticsV2'));
@@ -138,7 +137,6 @@ import ERPRegister            from '@/pages/ERPRegister';
 const GMDashboard           = lazy(() => import('@/pages/GMDashboard'));
 const ManagerDashboardERP   = lazy(() => import('@/pages/ManagerDashboardERP'));
 const EmployeeDashboardERP  = lazy(() => import('@/pages/EmployeeDashboardERP'));
-const KitchenDashboardERP   = lazy(() => import('@/pages/KitchenDashboardERP'));
 const SupplierPortalERP     = lazy(() => import('@/pages/SupplierPortalERP'));
 
 // ── Shared page loading fallback ─────────────────────────────────────────────
@@ -343,26 +341,22 @@ const SubscribedRoutes = () => {
         <Route path="/gm-dashboard" element={<ERPRoleGuard allowedRoles={['general_manager']}><GMDashboard /></ERPRoleGuard>} />
         <Route path="/manager-dashboard" element={<ERPRoleGuard allowedRoles={['manager']}><ManagerDashboardERP /></ERPRoleGuard>} />
         <Route path="/employee-dashboard" element={<ERPRoleGuard allowedRoles={['employee']}><EmployeeDashboardERP /></ERPRoleGuard>} />
-        <Route path="/kitchen-dashboard" element={<ERPRoleGuard allowedRoles={['kitchen']}><KitchenDashboardERP /></ERPRoleGuard>} />
         <Route path="/supplier-portal" element={<ERPRoleGuard allowedRoles={['supplier']}><SupplierPortalERP /></ERPRoleGuard>} />
         <Route path="/erp-approval-center" element={<RoleGuard permission="manageSettings"><OwnerApprovalCenter /></RoleGuard>} />
         {/* ── Legacy role portals — redirect to new ERP dashboards ── */}
         <Route path="/employee-portal" element={<Navigate to="/employee-dashboard" replace />} />
-        <Route path="/kitchen-display" element={<Navigate to="/kitchen-dashboard" replace />} />
-        <Route path="/kitchen-v2" element={<Navigate to="/kitchen-dashboard" replace />} />
         <Route path="/sponsor-dashboard" element={<Navigate to="/erp-login" replace />} />
         <Route path="/customer-dashboard" element={<Navigate to="/erp-login" replace />} />
 
         {/* ── Enterprise Modules ── */}
         <Route path="/cash-register" element={<RoleGuard permission="viewSales"><CashRegisterCenter /></RoleGuard>} />
-        <Route path="/kds" element={<RoleGuard permission="viewSales"><KitchenDisplaySystem /></RoleGuard>} />
         <Route path="/online-ordering" element={<RoleGuard permission="viewSales"><OnlineOrdering /></RoleGuard>} />
 
         {/* ── Online Ordering V2 ── */}
         <Route path="/order" element={<OnlineOrderingV2 />} />
         <Route path="/order/:branchSlug" element={<OnlineOrderingV2 />} />
         <Route path="/order/track/:orderId" element={<OnlineOrderingV2 />} />
-        {/* Legacy kitchen route redirects above. */}
+
         <Route path="/order-management" element={<RoleGuard permission="viewSales"><OrderManagementV2 /></RoleGuard>} />
         <Route path="/promotions" element={<RoleGuard permission="viewSales"><PromotionsV2 /></RoleGuard>} />
         <Route path="/order-analytics" element={<RoleGuard permission="viewReports"><OrderAnalyticsV2 /></RoleGuard>} />
@@ -382,7 +376,6 @@ const SubscribedRoutes = () => {
 
         {/* ── Short aliases — redirect to new ERP dashboards ── */}
         <Route path="/employee" element={<Navigate to="/employee-dashboard" replace />} />
-        <Route path="/kitchen" element={<Navigate to="/kitchen-dashboard" replace />} />
         <Route path="/customer" element={<Navigate to="/erp-login" replace />} />
 
         {/* ══════════════════════════════════════════════════════════════════════
@@ -495,7 +488,6 @@ function App() {
               <Route path="/auth/activate" element={<LegacyInvitationRedirect />} />
               <Route path="/employee-invite" element={<LegacyInvitationRedirect />} />
               <Route path="/auth/employee-login" element={<Navigate to="/erp-login?role=employee" replace />} />
-              <Route path="/kitchen-invite" element={<LegacyInvitationRedirect />} />
               <Route path="/supplier-registration" element={<LegacyInvitationRedirect />} />
               {/* ── Landing page ── */}
               <Route path="/" element={<LandingPage />} />

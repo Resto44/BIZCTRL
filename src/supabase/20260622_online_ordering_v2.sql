@@ -54,7 +54,6 @@ ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS order_type           TEXT DEFAULT 'delivery' CHECK (order_type IN ('delivery', 'pickup', 'dine_in')),
   ADD COLUMN IF NOT EXISTS payment_method       TEXT DEFAULT 'cash',
   ADD COLUMN IF NOT EXISTS payment_status       TEXT DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'failed', 'refunded')),
-  ADD COLUMN IF NOT EXISTS kitchen_status       TEXT DEFAULT 'pending' CHECK (kitchen_status IN ('pending', 'accepted', 'preparing', 'cooking', 'ready', 'delayed', 'rejected')),
   ADD COLUMN IF NOT EXISTS delivery_status      TEXT DEFAULT 'unassigned' CHECK (delivery_status IN ('unassigned', 'assigned', 'picked_up', 'on_the_way', 'arrived', 'delivered')),
   ADD COLUMN IF NOT EXISTS priority             TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
   ADD COLUMN IF NOT EXISTS delivery_address_id  UUID REFERENCES customer_addresses(id),
@@ -77,7 +76,7 @@ CREATE TABLE IF NOT EXISTS order_tracking (
   order_id      UUID REFERENCES orders(id) ON DELETE CASCADE,
   status        TEXT NOT NULL,
   description   TEXT,
-  actor_id      UUID REFERENCES profiles(id), -- user/driver/kitchen who triggered
+  actor_id      UUID REFERENCES profiles(id), -- user or manager who triggered
   actor_role    TEXT,
   location_lat  NUMERIC,
   location_lng  NUMERIC,

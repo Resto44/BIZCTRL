@@ -101,7 +101,7 @@ CREATE INDEX IF NOT EXISTS idx_serials_status ON product_serials(status);
 
 -- ── 7. RESTAURANT-SPECIFIC TABLES (ensure they exist) ────────────────────────
 
--- Kitchen Tables / Table Service
+-- Table Service
 CREATE TABLE IF NOT EXISTS dining_tables (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id   UUID REFERENCES restaurants(id) ON DELETE CASCADE,

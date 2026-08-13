@@ -658,7 +658,7 @@ function ManagerDeliverySection({ branchId, navigate }) {
       if (!branchId) return [];
       const { data, error } = await supabase
         .from('delivery_orders')
-        .select('id, order_number, status, kitchen_status, driver_name, customer_name, total_amount, created_date, updated_date')
+        .select('id, order_number, status, driver_name, customer_name, total_amount, created_date, updated_date')
         .eq('branch_id', branchId)
         .not('status', 'in', '(delivered,completed,cancelled)')
         .order('created_date', { ascending: false })
@@ -671,10 +671,9 @@ function ManagerDeliverySection({ branchId, navigate }) {
   });
 
   const stats = React.useMemo(() => ({
-    active:    deliveryOrders.filter(o => !['delivered','completed','cancelled'].includes(o.status)).length,
-    kitchen:   deliveryOrders.filter(o => ['pending','sent_to_kitchen'].includes(o.status)).length,
-    preparing: deliveryOrders.filter(o => ['kitchen_approved','preparing','ready_for_pickup'].includes(o.status)).length,
-    enRoute:   deliveryOrders.filter(o => ['picked_up','out_for_delivery'].includes(o.status)).length,
+    active: deliveryOrders.filter(o => !['delivered', 'completed', 'cancelled'].includes(o.status)).length,
+    awaitingAssignment: deliveryOrders.filter(o => ['pending', 'assigned'].includes(o.status)).length,
+    enRoute: deliveryOrders.filter(o => ['picked_up', 'out_for_delivery'].includes(o.status)).length,
   }), [deliveryOrders]);
 
   if (isLoading) return null;
@@ -687,14 +686,14 @@ function ManagerDeliverySection({ branchId, navigate }) {
       <div className="grid grid-cols-3 gap-3 mb-3">
         <Card className="border-border/60">
           <CardContent className="p-3 text-center">
-            <p className="text-xl font-bold text-amber-600">{stats.kitchen}</p>
-            <p className="text-xs text-muted-foreground">Awaiting Kitchen</p>
+            <p className="text-xl font-bold text-amber-600">{stats.active}</p>
+            <p className="text-xs text-muted-foreground">Active Orders</p>
           </CardContent>
         </Card>
         <Card className="border-border/60">
           <CardContent className="p-3 text-center">
-            <p className="text-xl font-bold text-blue-600">{stats.preparing}</p>
-            <p className="text-xs text-muted-foreground">Preparing / Ready</p>
+            <p className="text-xl font-bold text-blue-600">{stats.awaitingAssignment}</p>
+            <p className="text-xs text-muted-foreground">Awaiting Assignment</p>
           </CardContent>
         </Card>
         <Card className="border-border/60">

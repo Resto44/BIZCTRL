@@ -14,8 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea';
 import {
   ShoppingCart, Search, Star, Heart, Plus, Minus, X, ChevronRight,
-  MapPin, Clock, CheckCircle2, Bike, ChefHat, Package, ArrowLeft,
-  Truck, CreditCard, Wallet, Phone, Home, Zap, Tag, Gift, Flame,
+  MapPin, Clock, CheckCircle2, Bike, ArrowLeft,
+  Truck, CreditCard, Wallet, Phone, Home, Zap, Tag, Gift,
   Award, Sparkles, Filter, ChevronDown, Info, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -24,9 +24,6 @@ import { format } from 'date-fns';
 // ── Order status pipeline ──────────────────────────────────────────────────────
 const ORDER_STEPS = [
   { key: 'pending',       label_en: 'Order Received',   label_ar: 'تم استلام الطلب',   label_fa: 'سفارش دریافت شد',   icon: CheckCircle2 },
-  { key: 'preparing',     label_en: 'Preparing',         label_ar: 'جاري التحضير',       label_fa: 'در حال آماده‌سازی', icon: ChefHat },
-  { key: 'cooking',       label_en: 'Cooking',           label_ar: 'جاري الطهي',         label_fa: 'در حال پخت',        icon: Flame },
-  { key: 'ready',         label_en: 'Ready',             label_ar: 'جاهز',               label_fa: 'آماده',             icon: Package },
   { key: 'assigned',      label_en: 'Driver Assigned',   label_ar: 'تم تعيين السائق',    label_fa: 'راننده تعیین شد',   icon: Bike },
   { key: 'picked_up',     label_en: 'Picked Up',         label_ar: 'تم الاستلام',        label_fa: 'تحویل گرفته شد',   icon: Truck },
   { key: 'on_the_way',    label_en: 'On The Way',        label_ar: 'في الطريق',          label_fa: 'در راه است',        icon: Bike },
@@ -461,7 +458,6 @@ export default function OnlineOrdering() {
         promo_code: appliedPromo?.code || null,
         total_amount: cartTotal,
         status: 'pending',
-        kitchen_status: 'pending',
         delivery_status: 'unassigned',
         payment_status: 'pending',
         order_type: 'delivery',
@@ -520,7 +516,7 @@ export default function OnlineOrdering() {
   };
 
   const currentStepIndex = activeOrder
-    ? ORDER_STEPS.findIndex(s => s.key === (activeOrder.delivery_status || activeOrder.kitchen_status || activeOrder.status))
+    ? ORDER_STEPS.findIndex(s => s.key === (activeOrder.delivery_status || activeOrder.status))
     : -1;
 
   return (

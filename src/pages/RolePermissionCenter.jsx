@@ -51,7 +51,6 @@ export const ALL_ROLES = [
   { value: 'accountant',      label: 'Accountant',      color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300', description: 'Finance and reports' },
   { value: 'procurement',     label: 'Procurement',     color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300', description: 'Purchases and suppliers' },
   { value: 'warehouse',       label: 'Warehouse',       color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',     description: 'Inventory management' },
-  { value: 'kitchen',         label: 'Kitchen',         color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',             description: 'Kitchen display only' },
   { value: 'delivery',        label: 'Delivery',        color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',             description: 'Delivery orders only' },
   { value: 'waiter',          label: 'Waiter',          color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',         description: 'Table service' },
   { value: 'auditor',         label: 'Auditor',         color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300', description: 'Read-only audit access' },

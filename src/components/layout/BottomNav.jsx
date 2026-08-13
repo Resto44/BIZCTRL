@@ -71,10 +71,6 @@ const PRIMARY_NAV_EMPLOYEE = [
 const PRIMARY_NAV_SPONSOR = [
   { path: '/erp-login',            icon: LayoutDashboard, labelKey: 'dashboard' },
 ];
-const PRIMARY_NAV_KITCHEN = [
-  { path: '/kitchen-dashboard',    icon: LayoutDashboard, labelKey: 'dashboard' },
-  { path: '/kds',                  icon: ChefHat,         labelKey: 'kds' },
-];
 const PRIMARY_NAV_CUSTOMER = [
   { path: '/order',                icon: ShoppingBag,     labelKey: 'order_now' },
   { path: '/online-ordering',      icon: ShoppingBag,     labelKey: 'menu_page' },
@@ -97,8 +93,6 @@ const MORE_SECTIONS_OWNER_RESTAURANT = [
       { path: '/recipe-food-costing',       icon: TrendingUp,  labelKey: 'food_cost' },
       { path: '/reservation-table-management', icon: Utensils, labelKey: 'tables' },
       { path: '/order-management',          icon: ClipboardList, labelKey: 'orders' },
-      { path: '/kitchen-dashboard',         icon: ChefHat,     labelKey: 'kitchen' },
-      { path: '/kds',                       icon: ChefHat,     labelKey: 'kds' },
       { path: '/delivery',                  icon: Truck,       labelKey: 'delivery' },
       { path: '/online-ordering',           icon: ShoppingCart, labelKey: 'online_ordering' },
       { path: '/production',                icon: Factory,     labelKey: 'production' },
@@ -212,8 +206,6 @@ const MORE_SECTIONS_MANAGER_RESTAURANT = [
     title: 'Restaurant',
     items: [
       { path: '/menu-products',     icon: BookOpen,    labelKey: 'menu' },
-      { path: '/kitchen-dashboard', icon: ChefHat,     labelKey: 'kitchen' },
-      { path: '/kds',               icon: ChefHat,     labelKey: 'kds' },
       { path: '/reservations',      icon: Calendar,    labelKey: 'reservations' },
       { path: '/delivery',          icon: Truck,       labelKey: 'delivery' },
     ],
@@ -328,9 +320,7 @@ const BottomNav = memo(function BottomNav() {
 
   const { visibleNav, moreSections } = useMemo(() => {
     if (role === ROLES.EMPLOYEE) return { visibleNav: PRIMARY_NAV_EMPLOYEE, moreSections: [] };
-    if (role === ROLES.DRIVER) return { visibleNav: [], moreSections: [] };
     if (role === ROLES.SPONSOR) return { visibleNav: PRIMARY_NAV_SPONSOR, moreSections: [] };
-    if (role === ROLES.KITCHEN) return { visibleNav: PRIMARY_NAV_KITCHEN, moreSections: [] };
     if (role === ROLES.CUSTOMER) return { visibleNav: PRIMARY_NAV_CUSTOMER, moreSections: [] };
     if (role === ROLES.SUPPLIER) return { visibleNav: [
       { path: '/supplier-portal', icon: Package, labelKey: 'dashboard' },

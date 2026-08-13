@@ -8,18 +8,13 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import {
   placeOrder,
-  updateOrderStatus,
-  updateKitchenStatus,
   assignDriver,
-  updateDriverLocation,
   validatePromoCode,
   awardLoyaltyPoints,
   subscribeToOrder,
   subscribeToOrderTracking,
   subscribeToDriverLocation,
   subscribeToBranchOrders,
-  ORDER_STATUS,
-  KITCHEN_STATUS,
 } from '@/lib/onlineOrderingService';
 
 // ── useOrderRealtime — subscribe to a single order ─────────────────────────
@@ -100,50 +95,6 @@ export function useBranchOrders(branchId, statusFilter = null) {
   });
 }
 
-// ── useKitchenOrders — real-time kitchen queue ─────────────────────────────
-export function useKitchenOrders(branchId) {
-  const qc = useQueryClient();
-
-  useEffect(() => {
-    if (!branchId) return;
-    const sub = subscribeToBranchOrders(branchId, () => {
-      qc.invalidateQueries({ queryKey: ['kitchen_orders', branchId] });
-    });
-    return () => sub?.unsubscribe?.();
-  }, [branchId, qc]);
-
-  return useQuery({
-    queryKey: ['kitchen_orders', branchId],
-    queryFn: async () => {
-      const orders = await base44.entities.Order.filter({ branch_id: branchId });
-      return orders.filter(o =>
-        [ORDER_STATUS.PENDING, ORDER_STATUS.ACCEPTED, ORDER_STATUS.PREPARING, ORDER_STATUS.COOKING, ORDER_STATUS.READY]
-          .includes(o.status)
-      );
-    },
-    enabled: !!branchId,
-    refetchInterval: 5000,
-  });
-}
-
-// ── useDriverOrders — real-time driver order queue ─────────────────────────
-export function useDriverOrders(driverId) {
-  const qc = useQueryClient();
-
-  return useQuery({
-    queryKey: ['driver_orders', driverId],
-    queryFn: async () => {
-      const orders = await base44.entities.Order.filter({ driver_id: driverId });
-      return orders.filter(o =>
-        [ORDER_STATUS.ASSIGNED, ORDER_STATUS.PICKED_UP, ORDER_STATUS.ON_THE_WAY, ORDER_STATUS.ARRIVED]
-          .includes(o.status)
-      );
-    },
-    enabled: !!driverId,
-    refetchInterval: 5000,
-  });
-}
-
 // ── useCustomerOrders — customer order history ─────────────────────────────
 export function useCustomerOrders(customerId) {
   return useQuery({
@@ -161,73 +112,8 @@ export function usePlaceOrder() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['customer_orders'] });
       qc.invalidateQueries({ queryKey: ['branch_orders'] });
-      qc.invalidateQueries({ queryKey: ['kitchen_orders'] });
     },
   });
-}
-
-// ── useKitchenActions mutation ─────────────────────────────────────────────
-export function useKitchenActions(orgId, restaurantId) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ orderId, kitchenStatus, actorId }) =>
-      updateKitchenStatus(orderId, kitchenStatus, actorId, orgId, restaurantId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['kitchen_orders'] });
-      qc.invalidateQueries({ queryKey: ['branch_orders'] });
-    },
-  });
-}
-
-// ── useDriverActions mutation ──────────────────────────────────────────────
-export function useDriverActions(orgId, restaurantId) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ orderId, status, actorId }) =>
-      updateOrderStatus(orderId, status, actorId, 'driver', orgId, restaurantId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['driver_orders'] });
-    },
-  });
-}
-
-// ── useDriverLocationUpdate — GPS tracking ────────────────────────────────
-export function useDriverLocationUpdate(driverId, activeOrderId) {
-  const [isTracking, setIsTracking] = useState(false);
-  const watchRef = useRef(null);
-
-  const startTracking = useCallback(() => {
-    if (!navigator.geolocation || !activeOrderId) return;
-    setIsTracking(true);
-    watchRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        updateDriverLocation(
-          driverId,
-          activeOrderId,
-          pos.coords.latitude,
-          pos.coords.longitude,
-          pos.coords.heading,
-          pos.coords.speed
-        );
-      },
-      (err) => console.warn('[GPS]', err),
-      { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
-    );
-  }, [driverId, activeOrderId]);
-
-  const stopTracking = useCallback(() => {
-    if (watchRef.current) {
-      navigator.geolocation.clearWatch(watchRef.current);
-      watchRef.current = null;
-    }
-    setIsTracking(false);
-  }, []);
-
-  useEffect(() => {
-    return () => stopTracking();
-  }, [stopTracking]);
-
-  return { isTracking, startTracking, stopTracking };
 }
 
 // ── usePromoCode validation ────────────────────────────────────────────────
