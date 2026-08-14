@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { formatCurrency } from '@/lib/helpers';
+import { calculateTreasuryLedgerBalance } from '@/lib/treasuryAccounts';
 import { Card } from '@/components/ui/card';
 import { format, addDays, subDays, getDaysInMonth, getDate } from 'date-fns';
 import {
@@ -14,9 +15,8 @@ import { AlertTriangle, Info } from 'lucide-react';
 
 const DAYS = 30;
 
-export default function CashflowProjection() {
+export default function CashflowProjection({ accounts = [], transactions = [] }) {
   const { currency } = useLanguage();
-  const { branches } = useTenant();
   const [showDetails, setShowDetails] = useState(false);
 
   const today = new Date();
@@ -28,7 +28,6 @@ export default function CashflowProjection() {
   const { data: expenses = [] } = useQuery({ queryKey: ['expenses', ownerFilter], queryFn: () => base44.entities.Expense.filter(ownerFilter, '-date', 500), staleTime: 120000, enabled: !!ownerFilter.created_by });
   const { data: employees = [] } = useQuery({ queryKey: ['employees', ownerFilter], queryFn: () => base44.entities.Employee.filter(ownerFilter, 'full_name', 500), staleTime: 300000, enabled: !!ownerFilter.created_by });
   const { data: purchases = [] } = useQuery({ queryKey: ['purchases', ownerFilter], queryFn: () => base44.entities.Purchase.filter(ownerFilter, '-date', 500), staleTime: 120000, enabled: !!ownerFilter.created_by });
-  const { data: walletTx = [] } = useQuery({ queryKey: ['wallet_transactions', ownerFilter], queryFn: () => base44.entities.WalletTransaction.filter(ownerFilter, '-transaction_date', 200), staleTime: 120000, enabled: !!ownerFilter.created_by });
   const { data: invoices = [] } = useQuery({ queryKey: ['supplier_invoices', ownerFilter], queryFn: () => base44.entities.SupplierInvoice.filter(ownerFilter, '-date', 200), staleTime: 120000, enabled: !!ownerFilter.created_by });
 
   const projection = useMemo(() => {
@@ -69,9 +68,7 @@ export default function CashflowProjection() {
       }));
 
     // ── Opening balance (current wallet balance) ─────────────────────────
-    const openingBalance = walletTx.reduce((s, tx) =>
-      s + (tx.direction === 'in' ? (tx.amount || 0) : -(tx.amount || 0)), 0
-    );
+    const openingBalance = calculateTreasuryLedgerBalance(accounts, transactions);
 
     // ── Weekday adjustment factor (Saturday+Friday slower) ───────────────
     const DOW_FACTOR = [1.0, 1.05, 1.0, 0.95, 0.9, 1.15, 1.1]; // Sun–Sat
@@ -133,11 +130,9 @@ export default function CashflowProjection() {
       closingBalance: days.length > 0 ? days[days.length - 1].balance : openingBalance,
       negativeDays: days.filter(d => d.balance < 0).length,
     };
-  }, [sales, expenses, employees, purchases, walletTx, invoices, ninetyDaysAgo, todayStr]);
+  }, [sales, expenses, employees, purchases, accounts, transactions, invoices, ninetyDaysAgo, todayStr]);
 
   const fmt = v => formatCurrency(v, currency);
-
-  const chartData = projection.days.filter((_, i) => i % 2 === 0 || i === 0 || i === projection.days.length - 1);
 
   return (
     <div className="space-y-4">

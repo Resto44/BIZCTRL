@@ -254,7 +254,7 @@ export async function createOwnerCashInjection({
   // 2. Create WalletTransaction for treasury tracking
   const walletTx = await base44.entities.WalletTransaction.create({
     transaction_date: d,
-    type: 'owner_capital_contribution',
+    transaction_type: 'owner_capital_contribution',
     wallet: 'branch_cash',
     direction: 'in',
     branch,

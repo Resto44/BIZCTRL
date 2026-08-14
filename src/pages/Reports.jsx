@@ -179,7 +179,7 @@ export default function Reports() {
 
   const { data: walletTransactions = [] } = useQuery({
     queryKey: ['wallet_transactions', 'reports', walletFilter],
-    queryFn: () => base44.entities.WalletTransaction.filter(walletFilter || {}, '-date', 500),
+    queryFn: () => base44.entities.WalletTransaction.filter(walletFilter || {}, '-transaction_date', 500),
     staleTime: 60000,
     enabled: hasScope,
   });

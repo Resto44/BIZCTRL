@@ -255,7 +255,7 @@ function ManagerContent({ branchId, branchName, branchKey }) {
   const { data: treasury = [], isLoading: loadingTreasury } = useQuery({
     queryKey: ['mgr-treasury', branchId],
     queryFn: async () => {
-      const { data } = await supabase.from('wallet_transactions').select('id, amount, type, description, created_at').eq('branch_id', branchId).order('created_at', { ascending: false }).limit(20);
+      const { data } = await supabase.from('wallet_transactions').select('id, amount, transaction_type, transaction_date, description, account_id, direction').eq('branch_id', branchId).order('transaction_date', { ascending: false }).limit(20);
       return data || [];
     },
     enabled: !!branchId,

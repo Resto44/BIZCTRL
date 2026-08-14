@@ -427,8 +427,12 @@ export function computeNetworkAnalytics(sales, walletTransactions = []) {
 
   // Settlements from treasury (wallet transactions of type sent_to_owner)
   const monthSettlements = (walletTransactions || [])
-    .filter(t => t && t.date >= mStart && t.date <= mEnd && t.type === 'sent_to_owner')
-    .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    .filter((transaction) => {
+      const date = transaction?.transaction_date || transaction?.date || '';
+      const type = transaction?.transaction_type || transaction?.type || '';
+      return date >= mStart && date <= mEnd && ['sent_to_owner', 'branch_to_owner_network'].includes(type);
+    })
+    .reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0);
 
   const pending    = Math.max(0, monthNetwork - monthSettlements);
   const difference = monthNetwork - monthSettlements;

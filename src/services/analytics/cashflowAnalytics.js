@@ -10,13 +10,13 @@ import { formatDate } from '@/lib/helpers';
 // ── calculateCashBalances ─────────────────────────────────────────────────────
 export function calculateCashBalances(walletTransactions = [], branches = []) {
   const ownerCash = walletTransactions
-    .filter(t => t.wallet_type === 'owner_cash')
+    .filter(t => t.wallet === 'owner_cash')
     .reduce((s, t) => s + (t.direction === 'in' ? (t.amount || 0) : -(t.amount || 0)), 0);
   const ownerNetwork = walletTransactions
-    .filter(t => t.wallet_type === 'owner_network')
+    .filter(t => t.wallet === 'owner_network')
     .reduce((s, t) => s + (t.direction === 'in' ? (t.amount || 0) : -(t.amount || 0)), 0);
   const branchCash = walletTransactions
-    .filter(t => t.wallet_type === 'branch_cash')
+    .filter(t => t.wallet === 'branch_cash')
     .reduce((s, t) => s + (t.direction === 'in' ? (t.amount || 0) : -(t.amount || 0)), 0);
   return { ownerCash, ownerNetwork, branchCash, total: ownerCash + ownerNetwork + branchCash };
 }

@@ -26,11 +26,14 @@ const OWNER_EXPENSE_FOR_BRANCH_TYPES = [
   'branch_purchase_payment',
 ];
 
+const transactionDate = (transaction) => transaction?.transaction_date || transaction?.date || '';
+const transactionType = (transaction) => transaction?.transaction_type || transaction?.type || '';
+
 /**
  * Computes per-branch settlement ledger from all wallet transactions.
  * Returns { [branchKey]: { sentToOwner, returnedToBranch, ownerExpenseForBranch, remaining, lastSentDate, lastExpenseDate } }
  */
-export function computeBranchSettlements(transactions, branches) {
+export function computeBranchSettlements(transactions, _branches) {
   const ledger = {};
 
   const ensureBranch = (key) => {
@@ -51,16 +54,16 @@ export function computeBranchSettlements(transactions, branches) {
     ensureBranch(tx.branch);
     const entry = ledger[tx.branch];
 
-    if (SENT_TO_OWNER_TYPES.includes(tx.type)) {
+    if (SENT_TO_OWNER_TYPES.includes(transactionType(tx))) {
       entry.sentToOwner += tx.amount || 0;
-      if (!entry.lastSentDate || tx.date > entry.lastSentDate) entry.lastSentDate = tx.date;
+      if (!entry.lastSentDate || transactionDate(tx) > entry.lastSentDate) entry.lastSentDate = transactionDate(tx);
       entry.history.push({ ...tx, ledgerRole: 'sent' });
-    } else if (RETURNED_TO_BRANCH_TYPES.includes(tx.type)) {
+    } else if (RETURNED_TO_BRANCH_TYPES.includes(transactionType(tx))) {
       entry.returnedToBranch += tx.amount || 0;
       entry.history.push({ ...tx, ledgerRole: 'returned' });
-    } else if (OWNER_EXPENSE_FOR_BRANCH_TYPES.includes(tx.type)) {
+    } else if (OWNER_EXPENSE_FOR_BRANCH_TYPES.includes(transactionType(tx))) {
       entry.ownerExpenseForBranch += tx.amount || 0;
-      if (!entry.lastExpenseDate || tx.date > entry.lastExpenseDate) entry.lastExpenseDate = tx.date;
+      if (!entry.lastExpenseDate || transactionDate(tx) > entry.lastExpenseDate) entry.lastExpenseDate = transactionDate(tx);
       entry.history.push({ ...tx, ledgerRole: 'expense' });
     }
   });
@@ -70,7 +73,7 @@ export function computeBranchSettlements(transactions, branches) {
     const e = ledger[key];
     e.remaining = e.sentToOwner - e.returnedToBranch - e.ownerExpenseForBranch;
     // sort history descending
-    e.history.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    e.history.sort((a, b) => transactionDate(b).localeCompare(transactionDate(a)));
   });
 
   return ledger;
@@ -111,8 +114,8 @@ export default function BranchSettlementLedger({ transactions = [], branches = [
   // Monthly statement for selected month
   const monthlyStatement = useMemo(() => {
     return branches.map(b => {
-      const prevTx = transactions.filter(tx => tx.branch === b.key && tx.date < `${statementMonth}-01`);
-      const monthTx = transactions.filter(tx => tx.branch === b.key && tx.date?.startsWith(statementMonth));
+      const prevTx = transactions.filter(tx => tx.branch === b.key && transactionDate(tx) < `${statementMonth}-01`);
+      const monthTx = transactions.filter(tx => tx.branch === b.key && transactionDate(tx).startsWith(statementMonth));
 
       const calcSettlement = (txList) => computeBranchSettlements(txList, [b]);
       const prevLedger = calcSettlement(prevTx)[b.key] || { sentToOwner: 0, returnedToBranch: 0, ownerExpenseForBranch: 0, remaining: 0 };
@@ -231,7 +234,7 @@ export default function BranchSettlementLedger({ transactions = [], branches = [
                       <div key={i} className="flex items-center justify-between text-xs py-0.5 border-b border-border/50 last:border-0">
                         <div className="flex items-center gap-1.5">
                           <Badge variant="outline" className={`text-xs py-0 px-1 ${roleColor}`}>{roleLabel}</Badge>
-                          <span className="text-muted-foreground">{tx.date}</span>
+                          <span className="text-muted-foreground">{transactionDate(tx)}</span>
                           {tx.description && <span className="text-muted-foreground truncate max-w-24">{tx.description}</span>}
                         </div>
                         <span className={`font-semibold ${tx.ledgerRole === 'sent' ? 'text-blue-600' : 'text-red-500'}`}>

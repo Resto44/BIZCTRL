@@ -361,7 +361,7 @@ const entities = {
   NetworkPosDevice: createEntity('network_pos_devices'),
   NetworkTransfer: createEntity('network_transfers'),
   NetworkReconciliation: createEntity('network_reconciliations'),
-  Subscription: createEntity('subscriptions'), WalletTransaction: createEntity('wallet_transactions'),
+  Subscription: createEntity('subscriptions'), WalletTransaction: createEntity('wallet_transactions'), TreasuryAccount: createEntity('treasury_accounts'),
   Supplier: createEntity('suppliers'), SupplierInvoice: createEntity('supplier_invoices'),
   SupplierPayment: createEntity('supplier_payments'), OcrLog: createEntity('ocr_logs'),
   SupportTicket: createEntity('support_tickets'), AuditLog: createEntity('audit_logs'),
