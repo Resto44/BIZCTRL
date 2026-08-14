@@ -17,6 +17,7 @@ import { initAuditLogger } from '@/lib/auditLogger';
 import { useRouteGuard } from '@/lib/RoleContext';
 import PWAInstallBanner from '@/components/pwa/PWAInstallBanner';
 import QuickActionsDock from '@/components/dashboard/QuickActionsDock';
+import SubscriptionStatusBanner from '@/components/subscription/SubscriptionStatusBanner';
 
 function RouteEnforcer() {
   useRouteGuard();
@@ -34,6 +35,7 @@ export default function AppLayout() {
     <ERPLayout>
       <RouteEnforcer />
       <div className="max-w-[1600px] mx-auto px-4 py-4 lg:px-6">
+        <SubscriptionStatusBanner />
         <Outlet />
       </div>
       <QuickActionsDock />

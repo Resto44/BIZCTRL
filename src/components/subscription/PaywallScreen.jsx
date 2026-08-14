@@ -37,11 +37,11 @@ const messages = {
 
 export default function PaywallScreen() {
   const { lang } = useLanguage();
-  const { effectiveStatus } = useSubscription();
+  const { status } = useSubscription();
   const m = messages[lang] || messages.en;
 
-  const statusMsg = effectiveStatus === 'past_due' ? m.past_due
-    : effectiveStatus === 'canceled' ? m.canceled
+  const statusMsg = status === 'PAST_DUE' ? m.past_due
+    : status === 'CANCELED' ? m.canceled
     : m.trial_expired;
 
   return (

@@ -19,6 +19,7 @@ import { Toaster } from 'sonner';
 // ── Core layout (always loaded eagerly) ──────────────────────────────────────
 import AppLayout from '@/components/layout/AppLayout';
 import PaywallScreen from '@/components/subscription/PaywallScreen';
+import FeatureRouteGuard from '@/components/subscription/FeatureRouteGuard';
 
 // ── Lazy-loaded pages (code splitting) ───────────────────────────────────────
 const Dashboard           = lazy(() => import('./pages/Dashboard'));
@@ -114,6 +115,7 @@ import LandingPage            from '@/pages/LandingPage';
 // AuthPage removed — replaced by ERPLogin
 import ERPLogin               from '@/pages/ERPLogin';
 import ERPRegister            from '@/pages/ERPRegister';
+const BillingVisualHarness = import.meta.env.DEV ? lazy(() => import('@/pages/dev/BillingVisualHarness')) : null;
 // Legacy invite pages removed — all redirected to ERP portals
 
 // ── Legacy pages removed — replaced by ERP portals ─────────────────────────
@@ -270,14 +272,14 @@ const SubscribedRoutes = () => {
         <Route path="/reports" element={<RoleGuard permission="viewReports"><Reports /></RoleGuard>} />
         <Route path="/sales-dashboard" element={<RoleGuard permission="viewReports"><SalesDashboard /></RoleGuard>} />
         <Route path="/profit-loss" element={<RoleGuard permission="viewReports"><ProfitLoss /></RoleGuard>} />
-        <Route path="/cashflow" element={<RoleGuard permission="viewReports"><CashFlow /></RoleGuard>} />
-        <Route path="/oracle-analytics" element={<RoleGuard permission="viewReports"><OracleAnalytics /></RoleGuard>} />
+        <Route path="/cashflow" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="cashflow_forecast"><CashFlow /></FeatureRouteGuard></RoleGuard>} />
+        <Route path="/oracle-analytics" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="advanced_analytics"><OracleAnalytics /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/balance-sheet" element={<RoleGuard permission="viewReports"><BalanceSheet /></RoleGuard>} />
-        <Route path="/branch-analytics" element={<RoleGuard permission="viewReports"><BranchAnalytics /></RoleGuard>} />
-        <Route path="/ceo-dashboard" element={<RoleGuard permission="viewDashboard"><CEODashboard /></RoleGuard>} />
-        <Route path="/price-optimization" element={<RoleGuard permission="viewReports"><PriceOptimization /></RoleGuard>} />
+        <Route path="/branch-analytics" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="advanced_analytics"><BranchAnalytics /></FeatureRouteGuard></RoleGuard>} />
+        <Route path="/ceo-dashboard" element={<RoleGuard permission="viewDashboard"><FeatureRouteGuard feature="advanced_analytics"><CEODashboard /></FeatureRouteGuard></RoleGuard>} />
+        <Route path="/price-optimization" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="advanced_analytics"><PriceOptimization /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/activity-logs" element={<RoleGuard permission="viewActivityLogs"><ActivityLogs /></RoleGuard>} />
-        <Route path="/scheduled-reports" element={<RoleGuard permission="exportPDF"><ScheduledReports /></RoleGuard>} />
+        <Route path="/scheduled-reports" element={<RoleGuard permission="exportPDF"><FeatureRouteGuard feature="scheduled_reports"><ScheduledReports /></FeatureRouteGuard></RoleGuard>} />
 
         {/* ── People ── */}
         <Route path="/employees" element={<RoleGuard permission="viewEmployees"><Employees /></RoleGuard>} />
@@ -291,11 +293,11 @@ const SubscribedRoutes = () => {
         <Route path="/sponsor-treasury" element={<RoleGuard permission="viewSponsorTreasury"><SponsorTreasury /></RoleGuard>} />
         <Route path="/debts" element={<RoleGuard permission="viewDebts"><DebtManagement /></RoleGuard>} />
         <Route path="/debt-management" element={<RoleGuard permission="viewDebts"><DebtManagement /></RoleGuard>} />
-        <Route path="/network-management" element={<RoleGuard permission="viewNetworkAccounts"><NetworkManagement /></RoleGuard>} />
+        <Route path="/network-management" element={<RoleGuard permission="viewNetworkAccounts"><FeatureRouteGuard feature="network_management"><NetworkManagement /></FeatureRouteGuard></RoleGuard>} />
         {/* Legacy redirects */}
-        <Route path="/network-accounts" element={<RoleGuard permission="viewNetworkAccounts"><NetworkManagement /></RoleGuard>} />
-        <Route path="/network-analytics" element={<RoleGuard permission="viewNetworkAccounts"><NetworkManagement /></RoleGuard>} />
-        <Route path="/network-hub" element={<RoleGuard permission="viewDashboard"><NetworkManagement /></RoleGuard>} />
+        <Route path="/network-accounts" element={<RoleGuard permission="viewNetworkAccounts"><FeatureRouteGuard feature="network_management"><NetworkManagement /></FeatureRouteGuard></RoleGuard>} />
+        <Route path="/network-analytics" element={<RoleGuard permission="viewNetworkAccounts"><FeatureRouteGuard feature="network_management"><NetworkManagement /></FeatureRouteGuard></RoleGuard>} />
+        <Route path="/network-hub" element={<RoleGuard permission="viewDashboard"><FeatureRouteGuard feature="network_management"><NetworkManagement /></FeatureRouteGuard></RoleGuard>} />
 
         {/* ── Configuration ── */}
         <Route path="/settings" element={<RoleGuard permission="manageSettings"><SettingsPage /></RoleGuard>} />
@@ -330,13 +332,13 @@ const SubscribedRoutes = () => {
         <Route path="/cash-register" element={<RoleGuard permission="viewSales"><CashRegisterCenter /></RoleGuard>} />
         <Route path="/promotions" element={<RoleGuard permission="viewSales"><PromotionsV2 /></RoleGuard>} />
         <Route path="/loyalty-v2" element={<RoleGuard permission="viewDebts"><LoyaltyProgramV2 /></RoleGuard>} />
-        <Route path="/driver-management" element={<RoleGuard permission="viewEmployees"><DriverManagement /></RoleGuard>} />
+        <Route path="/driver-management" element={<RoleGuard permission="viewEmployees"><FeatureRouteGuard feature="driver_analytics"><DriverManagement /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/customer-management" element={<RoleGuard permission="viewDebts"><CustomerManagement /></RoleGuard>} />
         <Route path="/branch-command-center" element={<RoleGuard permission="viewDashboard"><BranchCommandCenter /></RoleGuard>} />
         <Route path="/inventory-command-center" element={<RoleGuard permission="viewInventory"><InventoryCommandCenter /></RoleGuard>} />
         <Route path="/smart-alerts" element={<Navigate to="/alerts" replace />} />
-        <Route path="/ai-copilot" element={<RoleGuard permission="viewDashboard"><AIBusinessCopilot /></RoleGuard>} />
-        <Route path="/bi-center" element={<RoleGuard permission="viewReports"><BICenter /></RoleGuard>} />
+        <Route path="/ai-copilot" element={<RoleGuard permission="viewDashboard"><FeatureRouteGuard feature="ai_copilot"><AIBusinessCopilot /></FeatureRouteGuard></RoleGuard>} />
+        <Route path="/bi-center" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="advanced_analytics"><BICenter /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/customer-portal" element={<CustomerPortal />} />
         <Route path="/loyalty-program" element={<RoleGuard permission="viewDebts"><LoyaltyProgram /></RoleGuard>} />
 
@@ -445,6 +447,7 @@ function App() {
               {/* ── NEW ERP Unified Auth (primary entry points) ── */}
               <Route path="/erp-login" element={<ERPLogin />} />
               <Route path="/erp-register" element={<ERPRegister />} />
+              {import.meta.env.DEV && BillingVisualHarness && <Route path="/__test/billing" element={<Suspense fallback={<PageLoader />}><BillingVisualHarness /></Suspense>} />}
               {/* ── Legacy auth routes — all redirect to unified ERP login ── */}
               <Route path="/auth" element={<Navigate to="/erp-login" replace />} />
               <Route path="/invite" element={<LegacyInvitationRedirect />} />

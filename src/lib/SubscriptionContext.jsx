@@ -1,156 +1,158 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { base44 } from '@/api/base44Client';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 
-const SubscriptionContext = createContext();
+const SubscriptionContext = createContext(null);
 
-export const PLAN_LIMITS = {
-  starter:    { branches: 3,  restaurants: 1, employees: 20,  ocr: 100,  pdf: 50,  price: 49  },
-  pro:        { branches: 15, restaurants: 5, employees: 100, ocr: 500,  pdf: 200, price: 99  },
-  enterprise: { branches: 999, restaurants: 999, employees: 999, ocr: 9999, pdf: 9999, price: 299 },
+const EMPTY_SUMMARY = {
+  found: false,
+  status: 'EXPIRED',
+  has_erp_access: false,
+  plan_id: 'free',
+  plan_name: 'Free',
+  trial_days_remaining: 0,
+  limits: {},
+  usage: {},
+  feature_flags: [],
+  pricing: {},
+  pending_payment_id: null,
+  test_mode_enabled: false,
+  can_manage_billing: false,
 };
 
+function normalizeError(error) {
+  const message = error?.message || 'Unable to load your subscription.';
+  const detail = error?.details || error?.hint || '';
+  const code = message.match(/(SUBSCRIPTION_[A-Z_]+|BILLING_[A-Z_]+|PAID_PLAN_REQUIRED|ACTIVE_SUBSCRIPTION_REQUIRED|RENEWAL_NOT_AVAILABLE|TEST_[A-Z_]+)/)?.[1] || 'BILLING_REQUEST_FAILED';
+  return { code, message, detail, billingRoute: '/billing' };
+}
+
 export function SubscriptionProvider({ children }) {
-  const { user } = useAuth();
-  const [subscription, setSubscription] = useState(null);
+  const { user, isLoadingAuth } = useAuth();
+  const [summary, setSummary] = useState(EMPTY_SUMMARY);
+  const [plans, setPlans] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Use authenticated user's email as org key — ensures true tenant isolation
-  const orgKey = user?.email || null;
-
-  const fetchingRef = useRef(false);
-  const fetchSubscription = useCallback(async () => {
-    if (fetchingRef.current) return; // prevent concurrent fetches
-    fetchingRef.current = true;
-    setLoading(true);
-    // Hard 8s timeout — never hang forever
-    const timeout = setTimeout(() => {
-      if (fetchingRef.current) {
-        console.warn('[SubscriptionContext] fetch timed out');
-        setLoading(false);
-        fetchingRef.current = false;
-      }
-    }, 8000);
-    try {
-      if (!orgKey) { setLoading(false); fetchingRef.current = false; return; }
-      const records = await base44.entities.Subscription.filter({ org_key: orgKey });
-      if (records.length > 0) {
-        setSubscription(records[0]);
-      } else {
-        // Auto-create a 14-day trial
-        const trialEnd = new Date();
-        trialEnd.setDate(trialEnd.getDate() + 14);
-        const trialEndStr = trialEnd.toISOString().split('T')[0];
-        const defaults = PLAN_LIMITS.pro;
-        const newSub = await base44.entities.Subscription.create({
-          org_key: orgKey,
-          plan: 'pro',
-          subscription_status: 'trial',
-          trial_end: trialEndStr,
-          current_period_end: trialEndStr,
-          payment_provider: 'none',
-          monthly_price: defaults.price,
-          max_restaurants: defaults.restaurants,
-          max_branches: defaults.branches,
-          max_employees: defaults.employees,
-          max_ocr_scans: defaults.ocr,
-          max_pdf_exports: defaults.pdf,
-          used_ocr_scans: 0,
-          used_pdf_exports: 0,
-        });
-        setSubscription(newSub);
-      }
-    } catch (e) {
-      console.warn('[SubscriptionContext] fetch failed:', e);
-    } finally {
-      clearTimeout(timeout);
+  const refresh = useCallback(async () => {
+    if (!user?.id) {
+      setSummary(EMPTY_SUMMARY);
+      setPlans([]);
+      setPayments([]);
+      setEvents([]);
       setLoading(false);
-      fetchingRef.current = false;
+      return EMPTY_SUMMARY;
     }
-  }, [orgKey]);
 
-  const { isLoadingAuth } = useAuth();
+    setLoading(true);
+    setError(null);
+    try {
+      const [snapshotResult, planResult] = await Promise.all([
+        supabase.rpc('erp_subscription_snapshot'),
+        supabase
+          .from('subscription_plans')
+          .select('id, display_name, monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label, max_restaurants, max_branches, max_employees, max_users, max_storage_mb, max_pdf_exports, max_ocr_scans, advanced_analytics, feature_flags, sort_order')
+          .eq('is_active', true)
+          .eq('is_public', true)
+          .order('sort_order'),
+      ]);
+
+      if (snapshotResult.error) throw snapshotResult.error;
+      if (planResult.error) throw planResult.error;
+
+      const nextSummary = { ...EMPTY_SUMMARY, ...(snapshotResult.data || {}) };
+      setSummary(nextSummary);
+      setPlans(planResult.data || []);
+
+      const [paymentResult, eventResult] = await Promise.all([
+        supabase
+          .from('subscription_payments')
+          .select('id, plan_id, provider, status, amount_cents, currency, is_test, display_label, paid_at, failed_at, period_start, period_end, created_at')
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('subscription_events')
+          .select('id, event_type, previous_status, next_status, source, details, created_at')
+          .order('created_at', { ascending: false })
+          .limit(20),
+      ]);
+      setPayments(paymentResult.error ? [] : paymentResult.data || []);
+      setEvents(eventResult.error ? [] : eventResult.data || []);
+      return nextSummary;
+    } catch (nextError) {
+      const structured = normalizeError(nextError);
+      setError(structured);
+      setSummary(EMPTY_SUMMARY);
+      return EMPTY_SUMMARY;
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
-    if (user?.email) {
-      fetchSubscription();
-    } else if (!user && !isLoadingAuth) {
-      // If auth check finished and no user, we're not loading subscription
-      setLoading(false);
-    }
-  }, [fetchSubscription, user?.email, user, isLoadingAuth]);
+    if (isLoadingAuth) return;
+    refresh();
+  }, [isLoadingAuth, refresh]);
 
-  const effectiveStatus = (() => {
-    if (!subscription) return 'trial';
-    const { subscription_status, trial_end, current_period_end } = subscription;
-    const today = new Date().toISOString().split('T')[0];
-    if (subscription_status === 'trial' && trial_end && today > trial_end) return 'canceled';
-    if (subscription_status === 'active' && current_period_end && today > current_period_end) return 'past_due';
-    return subscription_status;
-  })();
+  const invoke = useCallback(async (name, args = {}) => {
+    const { data, error: mutationError } = await supabase.rpc(name, args);
+    if (mutationError) throw normalizeError(mutationError);
+    await refresh();
+    return data;
+  }, [refresh]);
 
-  const isActive = effectiveStatus === 'active' || effectiveStatus === 'trial';
-  const plan = subscription?.plan || 'pro';
-  const planDefaults = PLAN_LIMITS[plan] || PLAN_LIMITS.pro;
+  const value = useMemo(() => {
+    const status = summary.status || 'EXPIRED';
+    const limits = summary.limits || {};
+    const usage = summary.usage || {};
+    const featureFlags = summary.feature_flags || [];
 
-  // Merge plan defaults with any per-tenant overrides stored on subscription
-  const limits = {
-    branches:    subscription?.max_branches    ?? planDefaults.branches,
-    restaurants: subscription?.max_restaurants ?? planDefaults.restaurants,
-    employees:   subscription?.max_employees   ?? planDefaults.employees,
-    ocr:         subscription?.max_ocr_scans   ?? planDefaults.ocr,
-    pdf:         subscription?.max_pdf_exports ?? planDefaults.pdf,
-  };
-
-  const usedOcr = subscription?.used_ocr_scans || 0;
-  const usedPdf = subscription?.used_pdf_exports || 0;
-
-  const updateSubscription = async (data) => {
-    if (!subscription) return;
-    const updated = await base44.entities.Subscription.update(subscription.id, data);
-    setSubscription(updated);
-  };
-
-  // Track usage increment
-  const trackUsage = async (type) => {
-    if (!subscription) return;
-    const field = type === 'ocr' ? 'used_ocr_scans' : 'used_pdf_exports';
-    const current = subscription[field] || 0;
-    await updateSubscription({ [field]: current + 1 });
-  };
-
-  // Check if feature is within limits
-  const withinLimit = (feature) => {
-    if (!isActive) return false;
-    if (feature === 'ocr') return usedOcr < limits.ocr;
-    if (feature === 'pdf') return usedPdf < limits.pdf;
-    return true;
-  };
-
-  return (
-    <SubscriptionContext.Provider value={{
-      subscription,
-      effectiveStatus,
-      isActive,
-      plan,
-      limits,
-      PLAN_LIMITS,
+    return {
+      summary,
+      plans,
+      payments,
+      events,
       loading,
-      usedOcr,
-      usedPdf,
-      orgKey,
-      updateSubscription,
-      trackUsage,
-      withinLimit,
-      refetch: fetchSubscription,
-    }}>
-      {children}
-    </SubscriptionContext.Provider>
-  );
+      error,
+      status,
+      plan: summary.plan_id || 'free',
+      planName: summary.plan_name || 'Free',
+      limits,
+      usage,
+      trialDaysRemaining: Number(summary.trial_days_remaining || 0),
+      isTrial: status === 'TRIAL',
+      isActive: Boolean(summary.has_erp_access),
+      isPendingPayment: status === 'PENDING_PAYMENT',
+      pendingPaymentId: summary.pending_payment_id || null,
+      isTestModeEnabled: Boolean(summary.test_mode_enabled),
+      canManageBilling: Boolean(summary.can_manage_billing),
+      hasFeature: (feature) => featureFlags.includes('all') || featureFlags.includes(String(feature || '').toLowerCase()),
+      withinLimit: (metric) => {
+        const used = Number(usage[metric] || 0);
+        const limit = Number(limits[metric] || 0);
+        return Boolean(summary.has_erp_access) && used < limit;
+      },
+      refresh,
+      selectFreePlan: () => invoke('select_free_subscription_plan'),
+      createPaymentIntent: (planId) => invoke('create_subscription_payment_intent', { p_plan_id: planId }),
+      createCheckoutIntent: (planId) => invoke('create_subscription_payment_intent', { p_plan_id: planId }),
+      cancelAtPeriodEnd: () => invoke('cancel_subscription_at_period_end'),
+      renewSubscription: () => invoke('renew_subscription'),
+      consumeUsage: (metric, amount = 1) => invoke('erp_consume_subscription_usage', { p_metric: metric, p_amount: amount }),
+      applyTestPayment: (paymentId, outcome) => invoke('erp_apply_mock_test_payment', { p_payment_id: paymentId, p_outcome: outcome }),
+      simulateSubscriptionLifecycle: (action) => invoke('erp_simulate_subscription_lifecycle', { p_action: action }),
+    };
+  }, [error, events, invoke, loading, payments, plans, refresh, summary]);
+
+  return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;
 }
 
 export function useSubscription() {
-  const ctx = useContext(SubscriptionContext);
-  if (!ctx) return { isActive: true, loading: false, plan: 'pro', limits: {}, subscription: null, PLAN_LIMITS, usedOcr: 0, usedPdf: 0, withinLimit: () => true, trackUsage: async () => {}, updateSubscription: async () => {}, refetch: async () => {} };
-  return ctx;
+  const context = useContext(SubscriptionContext);
+  if (!context) {
+    throw new Error('useSubscription must be used within SubscriptionProvider');
+  }
+  return context;
 }

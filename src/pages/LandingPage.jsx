@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '@/lib/LanguageContext';
+import { supabase } from '@/api/supabaseClient';
 import { Button } from '@/components/ui/button';
 import {
   Building2, ChefHat, ShoppingBag, Warehouse, Factory,
   Pill, Stethoscope, Package, Wrench, BarChart3,
   Users, DollarSign, ShieldCheck, Globe,
   ArrowRight, CheckCircle2, Zap,
-  LayoutDashboard, Truck, Receipt, Star,
-  ChevronRight, Menu, X
+  LayoutDashboard, Truck, Receipt,
+  ChevronRight, Menu, X, CreditCard, Clock, Sparkles
 } from 'lucide-react';
 
 const BUSINESS_TYPES = [
@@ -82,33 +84,61 @@ const FEATURES = [
   },
 ];
 
-const TESTIMONIALS = [
-  {
-    name: 'Ahmed Al-Rashidi',
-    role: 'Owner, Al-Nakheel Restaurant Group',
-    text: 'BizCTRL transformed how we manage 6 branches. The owner dashboard gives me everything I need in seconds.',
-    stars: 5,
+const PRICING_COPY = {
+  en: {
+    trial: '30-Day Full ERP Trial', title: 'Plans that scale with your operation',
+    intro: 'Create your organization to start a 30-day full-access trial. After the trial, choose the permanent Free plan or a paid plan. Paid selections remain payment-pending until a payment provider confirms them.',
+    start: 'Start Free Trial', choose: 'Choose Plan', recommended: 'Recommended', original: 'Original', final: 'Final',
+    tiers: [
+      { name: 'Free', amount: 0, price: '$0', detail: 'Permanent limited access', limits: ['1 restaurant · 1 branch', '5 employees · 5 users', '512 MB storage', '10 PDF reports · 10 OCR/month', 'Core sales, purchasing & inventory'] },
+      { name: 'Starter', amount: 20, price: '$20', detail: 'per month', limits: ['1 restaurant · 3 branches', '20 employees · 20 users', '5 GB storage', '100 PDF reports · 100 OCR/month', 'Treasury, suppliers & reports'] },
+      { name: 'Growth', amount: 40, price: '$40', detail: 'per month', limits: ['3 restaurants · 10 branches', '75 employees · 75 users', '25 GB storage', '500 PDF reports · 500 OCR/month', 'Advanced & scheduled analytics'] },
+      { name: 'Enterprise', amount: 100, price: '$100', detail: 'per month', limits: ['10 restaurants · 50 branches', '250 employees · 250 users', '100 GB storage', '2,000 PDF reports · 2,000 OCR/month', 'All ERP modules'] },
+    ],
   },
-  {
-    name: 'Sara Khalil',
-    role: 'Manager, Bloom Pharmacy Chain',
-    text: 'The inventory expiry tracking and supplier approval system saved us countless hours every week.',
-    stars: 5,
+  ar: {
+    trial: 'تجربة ERP كاملة لمدة 30 يوماً', title: 'خطط تنمو مع عملياتك',
+    intro: 'أنشئ مؤسستك لبدء تجربة وصول كامل لمدة 30 يوماً. بعد التجربة، اختر الخطة المجانية الدائمة أو خطة مدفوعة. تبقى الخطط المدفوعة بانتظار تأكيد الدفع ولا تُفعّل قبل ذلك.',
+    start: 'ابدأ التجربة المجانية', choose: 'اختر الخطة', recommended: 'موصى بها', original: 'الأصلي', final: 'النهائي',
+    tiers: [
+      { name: 'مجاني', amount: 0, price: '$0', detail: 'وصول محدود دائم', limits: ['مطعم واحد · فرع واحد', '5 موظفين · 5 مستخدمين', '512 ميجابايت تخزين', '10 تقارير PDF · 10 OCR/شهر', 'المبيعات والمشتريات والمخزون الأساسية'] },
+      { name: 'Starter', amount: 20, price: '$20', detail: 'شهرياً', limits: ['مطعم واحد · 3 فروع', '20 موظفاً · 20 مستخدماً', '5 جيجابايت تخزين', '100 تقرير PDF · 100 OCR/شهر', 'الخزينة والموردون والتقارير'] },
+      { name: 'Growth', amount: 40, price: '$40', detail: 'شهرياً', limits: ['3 مطاعم · 10 فروع', '75 موظفاً · 75 مستخدماً', '25 جيجابايت تخزين', '500 تقرير PDF · 500 OCR/شهر', 'تحليلات متقدمة ومجدولة'] },
+      { name: 'Enterprise', amount: 100, price: '$100', detail: 'شهرياً', limits: ['10 مطاعم · 50 فرعاً', '250 موظفاً · 250 مستخدماً', '100 جيجابايت تخزين', '2,000 تقرير PDF · 2,000 OCR/شهر', 'جميع وحدات ERP'] },
+    ],
   },
-  {
-    name: 'Omar Farouk',
-    role: 'Director, FastTrack Wholesale',
-    text: 'Finally an ERP that works for wholesale. The purchase order and supplier portal features are outstanding.',
-    stars: 5,
+  fa: {
+    trial: 'آزمایش کامل ERP برای ۳۰ روز', title: 'طرح‌هایی متناسب با رشد کسب‌وکار شما',
+    intro: 'سازمان خود را ایجاد کنید تا آزمایش دسترسی کامل ۳۰ روزه را شروع کنید. پس از آزمایش، طرح رایگان دائمی یا طرح پولی را انتخاب کنید. طرح پولی تا تأیید پرداخت در حالت انتظار باقی می‌ماند و فعال نمی‌شود.',
+    start: 'شروع آزمایش رایگان', choose: 'انتخاب طرح', recommended: 'پیشنهادی', original: 'قیمت اصلی', final: 'قیمت نهایی',
+    tiers: [
+      { name: 'رایگان', amount: 0, price: '$0', detail: 'دسترسی محدود دائمی', limits: ['۱ رستوران · ۱ شعبه', '۵ کارمند · ۵ کاربر', '۵۱۲ مگابایت فضا', '۱۰ گزارش PDF · ۱۰ OCR/ماه', 'فروش، خرید و انبار پایه'] },
+      { name: 'Starter', amount: 20, price: '$20', detail: 'ماهانه', limits: ['۱ رستوران · ۳ شعبه', '۲۰ کارمند · ۲۰ کاربر', '۵ گیگابایت فضا', '۱۰۰ گزارش PDF · ۱۰۰ OCR/ماه', 'خزانه، تأمین‌کنندگان و گزارش‌ها'] },
+      { name: 'Growth', amount: 40, price: '$40', detail: 'ماهانه', limits: ['۳ رستوران · ۱۰ شعبه', '۷۵ کارمند · ۷۵ کاربر', '۲۵ گیگابایت فضا', '۵۰۰ گزارش PDF · ۵۰۰ OCR/ماه', 'تحلیل‌های پیشرفته و زمان‌بندی‌شده'] },
+      { name: 'Enterprise', amount: 100, price: '$100', detail: 'ماهانه', limits: ['۱۰ رستوران · ۵۰ شعبه', '۲۵۰ کارمند · ۲۵۰ کاربر', '۱۰۰ گیگابایت فضا', '۲٬۰۰۰ گزارش PDF · ۲٬۰۰۰ OCR/ماه', 'همه ماژول‌های ERP'] },
+    ],
   },
-];
+};
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { lang, isRTL } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [catalogPlans, setCatalogPlans] = useState([]);
+  const pricing = PRICING_COPY[lang] || PRICING_COPY.en;
+
+  useEffect(() => {
+    let active = true;
+    supabase.from('subscription_plans')
+      .select('monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label')
+      .eq('is_active', true)
+      .eq('is_public', true)
+      .then(({ data }) => { if (active && data) setCatalogPlans(data); });
+    return () => { active = false; };
+  }, []);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden">
+    <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
       {/* ── Navbar ── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/90 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -129,7 +159,7 @@ export default function LandingPage() {
           <div className="hidden md:flex items-center gap-6 text-sm text-slate-400">
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#business-types" className="hover:text-white transition-colors">Industries</a>
-            <a href="#testimonials" className="hover:text-white transition-colors">Testimonials</a>
+            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
           </div>
 
           {/* Secure ERP entry points */}
@@ -163,7 +193,7 @@ export default function LandingPage() {
           <div className="md:hidden px-4 pb-4 space-y-3 border-t border-white/5 pt-4">
             <a href="#features" className="block text-slate-300 hover:text-white text-sm py-1">Features</a>
             <a href="#business-types" className="block text-slate-300 hover:text-white text-sm py-1">Industries</a>
-            <a href="#testimonials" className="block text-slate-300 hover:text-white text-sm py-1">Testimonials</a>
+            <a href="#pricing" className="block text-slate-300 hover:text-white text-sm py-1">Pricing</a>
             <div className="flex gap-2 pt-2">
               <Button variant="outline" onClick={() => navigate('/erp-login')} className="flex-1 border-white/20 text-slate-300 text-sm">Sign In</Button>
               <Button onClick={() => navigate('/erp-register?owner=1')} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm">Create Organization</Button>
@@ -217,7 +247,7 @@ export default function LandingPage() {
 
           {/* Trust indicators */}
           <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-slate-500">
-            {['No credit card required', 'Free 14-day trial', 'Cancel anytime', 'GDPR compliant'].map(item => (
+            {['No credit card required', '30-day free trial', 'Cancel anytime', 'Secure by design'].map(item => (
               <span key={item} className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                 {item}
@@ -326,29 +356,34 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Testimonials ── */}
-      <section id="testimonials" className="py-20 px-4 sm:px-6 max-w-7xl mx-auto">
+      {/* ── Pricing ── */}
+      <section id="pricing" className="py-20 px-4 sm:px-6 max-w-7xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
-            Trusted by Business Owners
-          </h2>
-          <p className="text-slate-400">Join thousands of businesses already running on BizCTRL.</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-bold uppercase tracking-widest mb-4">
+            <Clock className="w-3 h-3" /> {pricing.trial}
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">{pricing.title}</h2>
+          <p className="text-slate-400 max-w-2xl mx-auto">{pricing.intro}</p>
+          <Button onClick={() => navigate('/erp-register?owner=1')} className="mt-6 bg-cyan-600 hover:bg-cyan-500 text-white font-bold"><Sparkles className="w-4 h-4 me-2" />{pricing.start}</Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {TESTIMONIALS.map(({ name, role, text, stars }) => (
-            <div key={name} className="p-6 rounded-2xl bg-white/5 border border-white/10">
-              <div className="flex gap-1 mb-4">
-                {Array.from({ length: stars }).map((_, i) => (
-                  <Star key={i} className="w-4 h-4 text-amber-400 fill-amber-400" />
-                ))}
-              </div>
-              <p className="text-slate-300 text-sm leading-relaxed mb-4">"{text}"</p>
-              <div>
-                <p className="text-white font-bold text-sm">{name}</p>
-                <p className="text-slate-500 text-xs">{role}</p>
-              </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {pricing.tiers.map((tier, index) => {
+            const accents = ['border-white/10', 'border-cyan-500/30', 'border-violet-500/50', 'border-amber-400/40'];
+            const featured = index === 2;
+            const catalog = catalogPlans.find((item) => Number(item.monthly_price_cents) === tier.amount * 100);
+            const finalPrice = catalog ? `$${Number(catalog.monthly_price_cents) / 100}` : tier.price;
+            const hasDiscount = Boolean(catalog?.discount_active) && Number(catalog?.original_price_cents) > Number(catalog?.monthly_price_cents);
+            return (
+            <div key={tier.name} className={`relative p-6 rounded-2xl bg-white/5 border ${accents[index]} flex flex-col ${featured ? 'shadow-xl shadow-violet-950/30' : ''}`}>
+              {hasDiscount ? <span className="absolute top-3 end-3 text-[10px] px-2 py-1 rounded-full bg-rose-600 text-white font-bold uppercase tracking-wide">{catalog.discount_label || `-${catalog.discount_percent}%`}</span> : featured && <span className="absolute top-3 end-3 text-[10px] px-2 py-1 rounded-full bg-violet-500 text-white font-bold uppercase tracking-wide">{pricing.recommended}</span>}
+              <h3 className="text-xl font-black text-white">{tier.name}</h3>
+              <div className="mt-3"><span className="text-4xl font-black text-white">{finalPrice}</span><span className="text-slate-400 text-sm ms-1">{tier.detail}</span></div>
+              {hasDiscount && <p className="mt-1 text-xs text-slate-400"><span className="line-through">{pricing.original}: ${Number(catalog.original_price_cents) / 100}</span> · <span className="font-semibold text-emerald-300">{pricing.final}: {finalPrice}</span></p>}
+              <ul className="mt-6 space-y-3 flex-1">{tier.limits.map((limit) => <li key={limit} className="flex gap-2 text-sm text-slate-300"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />{limit}</li>)}</ul>
+              <Button onClick={() => navigate('/erp-register?owner=1')} variant={featured ? 'default' : 'outline'} className={featured ? 'mt-6 bg-violet-600 hover:bg-violet-500 font-bold' : 'mt-6 border-white/20 text-slate-200 hover:bg-white/10 font-bold'}><CreditCard className="w-4 h-4 me-2" />{pricing.choose}</Button>
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -362,7 +397,7 @@ export default function LandingPage() {
             Ready to Transform Your Business?
           </h2>
           <p className="text-slate-400 mb-8 max-w-xl mx-auto">
-            Start your free 14-day trial today. No credit card required. Set up in minutes.
+            Start your 30-day full-access trial today. No credit card required. Set up in minutes.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
