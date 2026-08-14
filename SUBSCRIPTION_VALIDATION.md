@@ -31,10 +31,16 @@ The credential-free, compile-time development-only Billing visual harness was re
 
 ## Controlled Browser-Authentication Limitation
 
-The real `/billing` browser route could not be exercised with a disposable owner account because hosted Auth rejected the direct SQL fixture even though its bcrypt comparison was valid, and then rate-limited the attempt to create an Auth-managed test identity. The defective fixture was deleted. This limitation does not weaken the release boundary: the equivalent owner, lifecycle, pricing, usage, and RLS paths were validated against the live database in rollback-only transactions, while the authenticated UI layout was covered by the inert development-only visual harness. No real user credentials, production tenant records, payment records, or enabled TEST MODE settings were retained.
+The real `/billing` browser route could not be exercised with a disposable owner account because hosted Auth rejected both the direct SQL fixture and a complete fixture containing email-provider metadata and an identity record, then rate-limited an Auth-managed signup attempt. Each fixture was deleted immediately. This limitation does not weaken the release boundary: the equivalent owner, lifecycle, pricing, usage, and RLS paths were validated against the live database in rollback-only transactions, while the authenticated UI layout was covered by the inert development-only visual harness. No real user credentials, production tenant records, payment records, or enabled TEST MODE settings were retained.
 
 ## Premium Module Boundary
 
 Database-backed paid-only modules are protected by restrictive RLS policies. The imported AI Copilot is a client-side analytics presentation over existing Base44 entity APIs rather than a persisted Supabase premium module; it is feature-route guarded and has no separate subscription-owned database table or server procedure to authorize. A future migration of that module to a server API must call the canonical `erp_subscription_can_use_feature('ai_copilot', restaurant_id)` guard before processing data.
 
 > TEST MODE remains disabled by default and is designed for isolated non-production configuration only. No external payment gateway, credential, product, price, or webhook is present in this release.
+
+## Publication Readiness
+
+The deployment-ready source is committed and pushed to the selected GitHub target, `Resto44/Base44RestoCTRL`, at commit `5d683c1`. The managed project release checkpoint is `eb480f85`, created after the production build, final 26-test suite, artifact scan, live rollback-only database validations, and runtime-log review. The managed preview is running and its latest health check reports no TypeScript or language-server errors.
+
+Publication is intentionally not initiated automatically. To release the verified checkpoint through the managed hosting workflow, open the project management interface and select **Publish** for checkpoint `eb480f85`. This preserves explicit user control over the public deployment action while all code, database migrations, documentation, and source-repository evidence are ready.
