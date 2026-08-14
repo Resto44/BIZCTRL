@@ -9,7 +9,6 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import PageHeader from '@/components/shared/PageHeader';
@@ -96,7 +95,8 @@ function InvoiceCard({ invoice, currency, onView, onDownload, onPrint, onWhatsAp
 }
 
 export default function SalesInvoices() {
-  const { currency } = useLanguage();
+  const { currency, lang, dir, translateLiteral } = useLanguage();
+  const invoiceOptions = useMemo(() => ({ lang, dir, translateLiteral }), [lang, dir, translateLiteral]);
   const { branches, activeRestaurant, ownerFilter } = useTenant();
   const [search, setSearch] = useState('');
   const [filterBranch, setFilterBranch] = useState('all');
@@ -209,10 +209,10 @@ export default function SalesInvoices() {
               invoice={inv}
               currency={currency}
               onView={(i) => setViewInvoice(i)}
-              onDownload={(i) => downloadInvoicePDF(i, 'RestoCTRL', currency)}
-              onPrint={(i) => printInvoice(i, 'RestoCTRL', currency)}
-              onWhatsApp={(i) => shareInvoiceWhatsApp(i, currency)}
-              onShare={(i) => shareInvoiceNative(i, 'RestoCTRL', currency)}
+              onDownload={(i) => downloadInvoicePDF(i, 'RestoCTRL', currency, invoiceOptions)}
+              onPrint={(i) => printInvoice(i, 'RestoCTRL', currency, invoiceOptions)}
+              onWhatsApp={(i) => shareInvoiceWhatsApp(i, currency, invoiceOptions)}
+              onShare={(i) => shareInvoiceNative(i, 'RestoCTRL', currency, invoiceOptions)}
             />
           ))}
         </div>
@@ -309,19 +309,19 @@ export default function SalesInvoices() {
 
               {/* Action buttons */}
               <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="h-10" onClick={() => downloadInvoicePDF(viewInvoice, 'RestoCTRL', currency)}>
+                <Button variant="outline" className="h-10" onClick={() => downloadInvoicePDF(viewInvoice, 'RestoCTRL', currency, invoiceOptions)}>
                   <Download className="w-4 h-4 mr-1" />Download
                 </Button>
-                <Button variant="outline" className="h-10" onClick={() => openInvoicePrint(viewInvoice, 'RestoCTRL', currency)}>
+                <Button variant="outline" className="h-10" onClick={() => openInvoicePrint(viewInvoice, 'RestoCTRL', currency, invoiceOptions)}>
                   <FileText className="w-4 h-4 mr-1" />View PDF
                 </Button>
-                <Button variant="outline" className="h-10" onClick={() => shareInvoiceNative(viewInvoice, 'RestoCTRL', currency)}>
+                <Button variant="outline" className="h-10" onClick={() => shareInvoiceNative(viewInvoice, 'RestoCTRL', currency, invoiceOptions)}>
                   <Share2 className="w-4 h-4 mr-1" />Share PDF
                 </Button>
-                <Button variant="outline" className="h-10" onClick={() => printInvoice(viewInvoice, 'RestoCTRL', currency)}>
+                <Button variant="outline" className="h-10" onClick={() => printInvoice(viewInvoice, 'RestoCTRL', currency, invoiceOptions)}>
                   <Printer className="w-4 h-4 mr-1" />Print
                 </Button>
-                <Button className="h-10 col-span-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => shareInvoiceWhatsApp(viewInvoice, currency)}>
+                <Button className="h-10 col-span-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => shareInvoiceWhatsApp(viewInvoice, currency, invoiceOptions)}>
                   <MessageCircle className="w-4 h-4 mr-1" />WhatsApp Share
                 </Button>
               </div>

@@ -8,7 +8,7 @@ import ERPSalesWorkspace from '@/components/sales/ERPSalesWorkspace';
 import SalesListItem from '@/components/sales/SalesListItem';
 import EmptyState from '@/components/shared/EmptyState';
 import { Button } from '@/components/ui/button';
-import { Plus, Download, SlidersHorizontal, BarChart3, FileText, Share2, Printer, MessageCircle, Trash2, CheckSquare, Square } from 'lucide-react';
+import { Plus, Download, SlidersHorizontal, BarChart3, Trash2, CheckSquare, Square } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { downloadCSV, downloadPDF, buildSalesCSV, buildSalesPDF } from '@/lib/exportUtils';
@@ -29,11 +29,6 @@ import {
   generateSalesInvoiceNumber,
   createSalesInvoice,
   generateAndUploadPDF,
-  shareInvoiceNative,
-  openInvoicePrint,
-  downloadInvoicePDF,
-  printInvoice,
-  shareInvoiceWhatsApp,
 } from '@/lib/salesInvoiceService';
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
@@ -45,7 +40,7 @@ const dailySalesTotal = (sale) =>
   Number(sale?.custom_sources_total ?? 0);
 
 export default function Sales() {
-  const { t, currency } = useLanguage();
+  const { t, currency, lang, dir, translateLiteral } = useLanguage();
   const { branches: tenantBranches, orgId, ownerFilter, activeRestaurant } = useTenant();
   const branches = asRecordArray(tenantBranches);
   const qc = useQueryClient();
@@ -424,7 +419,7 @@ export default function Sales() {
 
       // Generate and store permanent PDF in background
       try {
-        await generateAndUploadPDF(invoice, 'RestoCTRL', currency);
+        await generateAndUploadPDF(invoice, 'RestoCTRL', currency, { lang, dir, translateLiteral });
         qc.invalidateQueries({ queryKey: ['sales_invoices'] });
       } catch (pdfErr) {
         console.warn('[Sales] Silent PDF generation failed:', pdfErr);
@@ -696,7 +691,7 @@ export default function Sales() {
       downloadCSV(`${filename}.csv`, headers, rows);
     } else {
       const { headers, rows, totalsRow } = buildSalesPDF(data, t, currency, branches, subtitle);
-      downloadPDF({ filename: `${filename}.pdf`, title: t('daily_sales'), subtitle, headers, rows, totalsRow, currency });
+      downloadPDF({ filename: `${filename}.pdf`, title: t('daily_sales'), subtitle, headers, rows, totalsRow, lang, dir });
     }
     setShowExport(false);
   };

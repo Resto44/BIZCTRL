@@ -6,6 +6,7 @@
 import jsPDF from 'jspdf';
 import { computeDashboardMetrics, buildDailyProfitTrend, formatCurrency, formatPct, tagExpensesWithCategories } from './helpers';
 import { computeBranchSettlements } from '../components/treasury/BranchSettlementLedger';
+import { drawLocalizedPdfText, prepareLocalizedPdf, safePdfFilename } from './pdfLocalization';
 
 // ─── Color palette ────────────────────────────────────────────────────────────
 let C = {
@@ -113,32 +114,15 @@ async function textToPng(text, opts = {}) {
 // ─── txt helper ───────────────────────────────────────────────────────────────
 // For RTL: renders canvas PNG. For LTR: uses jsPDF text.
 async function txt(doc, text, x, y, opts = {}, dir = 'ltr') {
-  const { size = 9, bold = false, color = C.dark, align = 'left', maxWidth } = opts;
-  const str = String(text ?? '');
-
-  if (dir === 'rtl') {
-    const img = await textToPng(str, {
-      fontSize: size * 1.15,
-      color: `rgb(${color[0]},${color[1]},${color[2]})`,
-      bold,
-      maxWidthPx: maxWidth || 500,
-    });
-    // anchor: for 'right' align, x is the right edge; 'left', x is left edge; 'center', x is center
-    let imgX;
-    if (align === 'right') imgX = x - img.wMm;
-    else if (align === 'center') imgX = x - img.wMm / 2;
-    else imgX = x;
-    const imgY = y - img.hMm * 0.72;
-    doc.addImage(img.dataUrl, 'PNG', imgX, imgY, img.wMm, img.hMm, undefined, 'FAST');
-  } else {
-    doc.setFontSize(size);
-    doc.setFont('helvetica', bold ? 'bold' : 'normal');
-    doc.setTextColor(color[0], color[1], color[2]);
-    const textOpts = {};
-    if (align !== 'left') textOpts.align = align;
-    if (maxWidth) textOpts.maxWidth = maxWidth;
-    doc.text(str, x, y, textOpts);
-  }
+  const { size = 9, bold = false, color = C.dark, align, maxWidth } = opts;
+  drawLocalizedPdfText(doc, text, x, y, {
+    rtl: dir === 'rtl',
+    size,
+    bold,
+    color,
+    align,
+    maxWidth,
+  });
 }
 
 // ─── Drawing primitives ───────────────────────────────────────────────────────
@@ -188,6 +172,7 @@ async function kpiRow(doc, items, y, ML, TW, dir) {
 
 // ─── Chart: Bar ───────────────────────────────────────────────────────────────
 function chartBar(doc, data, x, y, w, h, label = '') {
+  const rtl = Boolean(doc.__erpPdfRTL);
   if (!data || data.length === 0) return y + h + 4;
   const max = Math.max(...data.map(d => Math.abs(safeNum(d.value))), 1);
   const barW = Math.max(3, Math.floor((w - 14) / data.length) - 2);
@@ -211,17 +196,11 @@ function chartBar(doc, data, x, y, w, h, label = '') {
     const by = base - bh;
     const rgb = d.value < 0 ? C.danger : (d.color || C.primary);
     fillRect(doc, bx, by, barW, bh, rgb);
-    doc.setFontSize(5.5);
-    doc.setTextColor(C.muted[0], C.muted[1], C.muted[2]);
     const lbl = String(d.name || '').slice(0, 7);
-    doc.text(lbl, bx + barW / 2, base + 5, { align: 'center' });
+    drawLocalizedPdfText(doc, lbl, bx + barW / 2, base + 5, { rtl, size: 5.5, color: C.muted, align: 'center' });
   });
 
-  if (label) {
-    doc.setFontSize(6.5);
-    doc.setTextColor(C.muted[0], C.muted[1], C.muted[2]);
-    doc.text(label, x + 2, y + 6);
-  }
+  if (label) drawLocalizedPdfText(doc, label, rtl ? x + w - 2 : x + 2, y + 6, { rtl, size: 6.5, color: C.muted });
   return y + h + 4;
 }
 
@@ -281,11 +260,13 @@ async function chartHorizBar(doc, data, x, y, w, dir) {
     // value
     const vx = dir === 'rtl' ? x : x + w;
     const valign = dir === 'rtl' ? 'left' : 'right';
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(col[0], col[1], col[2]);
-    doc.text(String(data[i].label || ''), vx, ry + rowH * 0.65, { align: valign });
-    doc.setTextColor(C.dark[0], C.dark[1], C.dark[2]);
+    drawLocalizedPdfText(doc, String(data[i].label || ''), vx, ry + rowH * 0.65, {
+      rtl: false,
+      bold: true,
+      size: 7,
+      color: col,
+      align: valign,
+    });
   }
   return y + data.length * rowH + 4;
 }
@@ -332,9 +313,7 @@ async function drawTable(doc, headers, rows, x, y, colWidths, dir, hdrFn) {
   } else {
     let cx = x;
     for (let i = 0; i < headers.length; i++) {
-      doc.setFontSize(6.5); doc.setFont('helvetica', 'bold');
-      doc.setTextColor(255, 255, 255);
-      doc.text(String(headers[i] ?? ''), cx + 2, y + 5);
+      await txt(doc, String(headers[i] ?? ''), cx + 2, y + 5, { size: 6.5, bold: true, color: C.white }, dir);
       cx += colWidths[i];
     }
   }
@@ -355,9 +334,7 @@ async function drawTable(doc, headers, rows, x, y, colWidths, dir, hdrFn) {
     } else {
       let cx = x;
       for (let ci = 0; ci < row.length; ci++) {
-        doc.setFontSize(6.5); doc.setFont('helvetica', 'normal');
-        doc.setTextColor(C.dark[0], C.dark[1], C.dark[2]);
-        doc.text(String(row[ci] ?? ''), cx + 2, y + 5, { maxWidth: colWidths[ci] - 3 });
+        await txt(doc, String(row[ci] ?? ''), cx + 2, y + 5, { size: 6.5, color: C.dark, maxWidth: colWidths[ci] - 3 }, dir);
         cx += colWidths[ci];
       }
     }
@@ -379,29 +356,27 @@ async function guidanceBox(doc, lines, x, y, w, dir) {
     if (dir === 'rtl') {
       await txt(doc, `• ${lines[i]}`, x + w - pad, ly, { size: 7, color: [92, 60, 0], align: 'right' }, dir);
     } else {
-      doc.setFontSize(7); doc.setTextColor(92, 60, 0);
-      doc.text(`• ${lines[i]}`, x + pad, ly, { maxWidth: w - pad * 2 });
+      await txt(doc, `• ${lines[i]}`, x + pad, ly, { size: 7, color: [92, 60, 0], maxWidth: w - pad * 2 }, dir);
     }
   }
   return y + boxH + 4;
 }
 
 // ─── Footer/page number ───────────────────────────────────────────────────────
-async function addFooter(doc, brandName, pageN, totalN, fromStr, toStr, dir, W = 210) {
+async function addFooter(doc, brandName, pageN, totalN, fromStr, toStr, dir, lang = 'en', W = 210) {
   const ph = doc.internal.pageSize.getHeight();
   fillRect(doc, 0, ph - 9, W, 9, [245, 247, 250]);
   doc.setDrawColor(200, 210, 230); doc.setLineWidth(0.3);
   doc.line(0, ph - 9, W, ph - 9);
-  doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-  doc.setTextColor(C.muted[0], C.muted[1], C.muted[2]);
-
+  // Report numbers and dates intentionally remain LTR values; only display
+  // labels are translated, which keeps mixed-direction footers readable.
   const dateStr = new Date().toLocaleDateString('en-GB');
   if (dir === 'rtl') {
-    doc.text(`${pageN} / ${totalN}`, W - 14, ph - 4, { align: 'right' });
-    doc.text(`${dateStr} · ${brandName}`, 14, ph - 4, { align: 'left' });
+    await txt(doc, `${pageN} / ${totalN}`, W - 14, ph - 4, { size: 7, color: C.muted, align: 'right' }, dir);
+    await txt(doc, `${dateStr} · ${brandName}`, 14, ph - 4, { size: 7, color: C.muted, align: 'left' }, dir);
   } else {
-    doc.text(`${brandName} · ${dateStr}`, 14, ph - 4);
-    doc.text(`${pageN} / ${totalN}`, W - 14, ph - 4, { align: 'right' });
+    await txt(doc, `${brandName} · ${dateStr}`, 14, ph - 4, { size: 7, color: C.muted }, dir);
+    await txt(doc, `${pageN} / ${totalN}`, W - 14, ph - 4, { size: 7, color: C.muted, align: 'right' }, dir);
   }
 }
 
@@ -599,10 +574,8 @@ export async function generateUltimatePDF({
   const isRTL = dir === 'rtl';
   const l = L(lang);
 
-  // Preload Vazirmatn font so canvas renders correctly
-  if (isRTL) await preloadVazirmatn();
-
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
+  prepareLocalizedPdf(doc, { lang, dir });
   const W = 210;
   const ML = 14;
   const TW = W - ML * 2;
@@ -652,9 +625,12 @@ export async function generateUltimatePDF({
     const titleX = isRTL ? W - ML - (logoUrl ? 22 : 0) : ML + (logoUrl ? 20 : 0);
     await txt(doc, pageTitle, titleX, 12, { size: 12, bold: true, color: C.white, align: isRTL ? 'right' : 'left' }, dir);
     // Range
-    doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
-    doc.setTextColor(200, 220, 255);
-    doc.text(`${fromStr}  →  ${toStr}`, isRTL ? ML : W - ML, 17, { align: isRTL ? 'left' : 'right' });
+    drawLocalizedPdfText(doc, `${fromStr}  →  ${toStr}`, isRTL ? ML : W - ML, 17, {
+      rtl: false,
+      size: 7.5,
+      color: [200, 220, 255],
+      align: isRTL ? 'left' : 'right',
+    });
     return 24;
   };
 
@@ -707,7 +683,7 @@ export async function generateUltimatePDF({
   ].filter(d => d.value > 0);
   y = await chartPie(doc, payMix, ML, y, TW, 10, dir);
 
-  await addFooter(doc, brandName, 1, TOTAL_PAGES, fromStr, toStr, dir, W);
+  await addFooter(doc, brandName, 1, TOTAL_PAGES, fromStr, toStr, dir, lang, W);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PAGE 2: Branch Performance
@@ -749,7 +725,7 @@ export async function generateUltimatePDF({
   ]);
   y = await drawTable(doc, bHeaders, bRows, ML, y, [38, 28, 28, 28, 28, 22], dir, null);
 
-  await addFooter(doc, brandName, 2, TOTAL_PAGES, fromStr, toStr, dir, W);
+  await addFooter(doc, brandName, 2, TOTAL_PAGES, fromStr, toStr, dir, lang, W);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PAGE 3: Sales Analysis
@@ -799,7 +775,7 @@ export async function generateUltimatePDF({
   });
   y = await drawTable(doc, sHeaders, sRows, ML, y, [24, 30, 22, 22, 22, 26], dir, null);
 
-  await addFooter(doc, brandName, 3, TOTAL_PAGES, fromStr, toStr, dir, W);
+  await addFooter(doc, brandName, 3, TOTAL_PAGES, fromStr, toStr, dir, lang, W);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PAGE 4: Purchase Analysis
@@ -843,7 +819,7 @@ export async function generateUltimatePDF({
   });
   y = await drawTable(doc, pHeaders, pRows, ML, y, [25, 30, 46, 16, 29], dir, null);
 
-  await addFooter(doc, brandName, 4, TOTAL_PAGES, fromStr, toStr, dir, W);
+  await addFooter(doc, brandName, 4, TOTAL_PAGES, fromStr, toStr, dir, lang, W);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PAGE 5: Inventory Analysis
@@ -896,7 +872,7 @@ export async function generateUltimatePDF({
     y = await drawTable(doc, invHeaders, invRows, ML, y, [55, 40, 30, 30], dir, null);
   }
 
-  await addFooter(doc, brandName, 5, TOTAL_PAGES, fromStr, toStr, dir, W);
+  await addFooter(doc, brandName, 5, TOTAL_PAGES, fromStr, toStr, dir, lang, W);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PAGE 6: Credit & Receivables Analysis
@@ -952,7 +928,7 @@ export async function generateUltimatePDF({
   }));
   y = await chartHorizBar(doc, creditByBranch, ML, y, TW, dir);
 
-  await addFooter(doc, brandName, 6, TOTAL_PAGES, fromStr, toStr, dir, W);
+  await addFooter(doc, brandName, 6, TOTAL_PAGES, fromStr, toStr, dir, lang, W);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PAGE 7: Expense Analysis
@@ -1010,7 +986,7 @@ export async function generateUltimatePDF({
   ]);
   y = await drawTable(doc, eHeaders, eRows, ML, y, [28, 40, 45, 33], dir, null);
 
-  await addFooter(doc, brandName, 7, TOTAL_PAGES, fromStr, toStr, dir, W);
+  await addFooter(doc, brandName, 7, TOTAL_PAGES, fromStr, toStr, dir, lang, W);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PAGE 8: Price & Profitability Analysis
@@ -1051,7 +1027,7 @@ export async function generateUltimatePDF({
   ];
   y = await guidanceBox(doc, netGuidance, ML, y, TW, dir);
 
-  await addFooter(doc, brandName, 8, TOTAL_PAGES, fromStr, toStr, dir, W);
+  await addFooter(doc, brandName, 8, TOTAL_PAGES, fromStr, toStr, dir, lang, W);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PAGE 9: Branch–Owner Settlement
@@ -1129,7 +1105,7 @@ export async function generateUltimatePDF({
     }
   }
 
-  await addFooter(doc, brandName, 9, TOTAL_PAGES, fromStr, toStr, dir, W);
+  await addFooter(doc, brandName, 9, TOTAL_PAGES, fromStr, toStr, dir, lang, W);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PAGE 10: Smart Insights
@@ -1200,7 +1176,7 @@ export async function generateUltimatePDF({
     y += 30;
   }
 
-  await addFooter(doc, brandName, 10, TOTAL_PAGES, fromStr, toStr, dir, W);
+  await addFooter(doc, brandName, 10, TOTAL_PAGES, fromStr, toStr, dir, lang, W);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PAGE 11: Management Guidance
@@ -1312,7 +1288,7 @@ export async function generateUltimatePDF({
   y = await sectionHeader(doc, l.creditActions, y, dir, W, ML);
   y = await guidanceBox(doc, shortActions.credit, ML, y, TW, dir);
 
-  await addFooter(doc, brandName, 11, TOTAL_PAGES, fromStr, toStr, dir, W);
+  await addFooter(doc, brandName, 11, TOTAL_PAGES, fromStr, toStr, dir, lang, W);
 
   // ─── Save ─────────────────────────────────────────────────────────────────
   // ─────────────────────────────────────────────────────────────────────────
@@ -1407,7 +1383,8 @@ export async function generateUltimatePDF({
     }
   }
 
-  await addFooter(doc, brandName, 12, TOTAL_PAGES, fromStr, toStr, dir, W);
+  await addFooter(doc, brandName, 12, TOTAL_PAGES, fromStr, toStr, dir, lang, W);
 
-    doc.save(`executive-report-${fromStr}-${toStr}.pdf`);
+  doc.save(safePdfFilename(`executive-report-${fromStr}-${toStr}`, lang));
+  return doc;
 }

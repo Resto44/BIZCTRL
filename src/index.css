@@ -191,6 +191,39 @@
 [dir="rtl"] .text-2xl { font-size: 1.75rem !important; }
 [dir="rtl"] .text-3xl { font-size: 2rem !important; }
 
+/* Directional ERP behavior. These rules use the document direction rather than
+   translating or mutating any database value, number, identifier, or currency. */
+html[dir="rtl"] .erp-layout { direction: rtl; }
+html[dir="rtl"] .erp-layout > aside { border-right-width: 0; border-left-width: 1px; }
+html[dir="rtl"] .erp-section-title { letter-spacing: normal; text-transform: none; }
+html[dir="rtl"] .text-left { text-align: right !important; }
+html[dir="rtl"] .text-right { text-align: left !important; }
+html[dir="rtl"] .ml-auto { margin-left: 0; margin-right: auto; }
+html[dir="rtl"] .mr-auto { margin-right: 0; margin-left: auto; }
+html[dir="rtl"] .border-r { border-right-width: 0; border-left-width: 1px; }
+html[dir="rtl"] .border-l { border-left-width: 0; border-right-width: 1px; }
+html[dir="rtl"] table { direction: rtl; }
+html[dir="rtl"] table :is(th, td) { text-align: start; }
+html[dir="rtl"] input:not([type="number"]):not([type="tel"]):not([type="email"]),
+html[dir="rtl"] textarea,
+html[dir="rtl"] [contenteditable="true"] { text-align: right; }
+html[dir="rtl"] input[type="number"],
+html[dir="rtl"] input[type="tel"],
+html[dir="rtl"] input[type="email"],
+html[dir="rtl"] input[data-keep-ltr="true"],
+html[dir="rtl"] .font-mono { direction: ltr; text-align: left; unicode-bidi: plaintext; }
+html[dir="rtl"] .recharts-wrapper { direction: ltr; }
+html[dir="rtl"] .recharts-wrapper text { font-family: 'Vazirmatn', 'Noto Sans Arabic', sans-serif; }
+html[dir="rtl"] [role="dialog"],
+html[dir="rtl"] [data-radix-popper-content-wrapper] { text-align: right; }
+html[dir="rtl"] .animate-slide-in-left { animation-name: slide-in-right; }
+html[dir="rtl"] .animate-slide-in-right { animation-name: slide-in-left; }
+
+@media (max-width: 640px) {
+  html[dir="rtl"] [role="dialog"] { max-width: calc(100vw - 1rem); }
+  html[dir="rtl"] table { min-width: max-content; }
+}
+
 /* ─── Scrollbar utilities ─────────────────────────────────────────────────── */
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

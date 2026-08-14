@@ -194,7 +194,7 @@ function CustomerCard({ customer, onSelect, onEdit, onDelete, currency, t }) {
 
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function CustomerManagement() {
-  const { t, currency } = useLanguage();
+  const { t, currency, lang, dir, translateLiteral, translateLabel } = useLanguage();
   const { ownerFilter, activeRestaurantId, branches, isManager, managerBranch } = useTenant();
   const { role } = useRole();
   const qc = useQueryClient();
@@ -605,13 +605,19 @@ export default function CustomerManagement() {
   const handlePrintStatement = useCallback(() => {
     if (!selectedCustomer) return;
     const name = selectedCustomer.customer_name || selectedCustomer.name;
-    const win = window.open('', '_blank');
+    const rtl = dir === 'rtl';
+    const locale = lang === 'fa' ? 'fa-IR' : lang === 'ar' ? 'ar-SA' : 'en-US';
+    const escapeHTML = (value) => String(value ?? '—').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    const label = (value) => translateLiteral(value);
+    const win = window.open('', '_blank', 'noopener');
     if (!win) return;
-    const rows = selectedDebts.map(d => `<tr><td>${fmtDate(d.date)}</td><td>${d.invoice_number || '—'}</td><td>${fmt(d.total_amount, currency)}</td><td>${fmt(d.paid_amount, currency)}</td><td>${fmt(d.remaining_amount, currency)}</td><td>${d.status}</td></tr>`).join('');
-    const collRows = selectedCollections.map(c => `<tr><td>${fmtDate(c.date)}</td><td>${fmt(c.amount, currency)}</td><td>${c.payment_method || '—'}</td><td>${c.notes || '—'}</td></tr>`).join('');
-    win.document.write(`<html><head><title>Statement — ${name}</title><style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th,td{border:1px solid #ccc;padding:6px 10px;font-size:12px}th{background:#f5f5f5}h2{margin-bottom:4px}p{margin:2px 0;font-size:12px}</style></head><body><h2>Customer Statement — ${name}</h2><p>Phone: ${selectedCustomer.phone || selectedCustomer.customer_phone || '—'}</p><p>Generated: ${format(new Date(), 'dd MMM yyyy HH:mm')}</p><hr/><h3>Credit Sales</h3><table><thead><tr><th>Date</th><th>Invoice</th><th>Amount</th><th>Paid</th><th>Remaining</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><h3>Collections</h3><table><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Notes</th></tr></thead><tbody>${collRows}</tbody></table><p><strong>Total Outstanding: ${fmt(selectedCustomer.outstanding_balance, currency)}</strong></p></body></html>`);
-    win.document.close(); win.print();
-  }, [selectedCustomer, selectedDebts, selectedCollections, currency]);
+    const rows = selectedDebts.map((debt) => `<tr><td>${escapeHTML(fmtDate(debt.date))}</td><td>${escapeHTML(debt.invoice_number || '—')}</td><td dir="ltr">${escapeHTML(fmt(debt.total_amount, currency))}</td><td dir="ltr">${escapeHTML(fmt(debt.paid_amount, currency))}</td><td dir="ltr">${escapeHTML(fmt(debt.remaining_amount, currency))}</td><td>${escapeHTML(translateLabel(debt.status, debt.status || '—'))}</td></tr>`).join('');
+    const collectionRows = selectedCollections.map((collection) => `<tr><td>${escapeHTML(fmtDate(collection.date))}</td><td dir="ltr">${escapeHTML(fmt(collection.amount, currency))}</td><td>${escapeHTML(translateLabel(collection.payment_method, collection.payment_method || '—'))}</td><td>${escapeHTML(collection.notes || '—')}</td></tr>`).join('');
+    const title = `${label('Customer Statement')} — ${name}`;
+    win.document.write(`<!doctype html><html dir="${rtl ? 'rtl' : 'ltr'}" lang="${lang}"><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;700&family=Vazirmatn:wght@400;600;700&display=swap" rel="stylesheet"><title>${escapeHTML(title)}</title><style>body{font-family:${rtl ? "'Vazirmatn','Noto Naskh Arabic',Tahoma,sans-serif" : 'Arial,sans-serif'};padding:20px;direction:${rtl ? 'rtl' : 'ltr'};color:#111827}table{width:100%;border-collapse:collapse;margin-bottom:20px}th,td{border:1px solid #ccc;padding:6px 10px;font-size:12px;text-align:${rtl ? 'right' : 'left'}}th{background:#f5f5f5}h2{margin-bottom:4px}p{margin:2px 0;font-size:12px}</style></head><body><h2>${escapeHTML(title)}</h2><p>${escapeHTML(label('Phone'))}: ${escapeHTML(selectedCustomer.phone || selectedCustomer.customer_phone || '—')}</p><p>${escapeHTML(label('Generated'))}: ${escapeHTML(new Date().toLocaleString(locale))}</p><hr/><h3>${escapeHTML(label('Credit Sales'))}</h3><table><thead><tr><th>${escapeHTML(label('Date'))}</th><th>${escapeHTML(label('Invoice'))}</th><th>${escapeHTML(label('Amount'))}</th><th>${escapeHTML(label('Paid'))}</th><th>${escapeHTML(label('Remaining'))}</th><th>${escapeHTML(label('Status'))}</th></tr></thead><tbody>${rows}</tbody></table><h3>${escapeHTML(label('Collections'))}</h3><table><thead><tr><th>${escapeHTML(label('Date'))}</th><th>${escapeHTML(label('Amount'))}</th><th>${escapeHTML(label('Method'))}</th><th>${escapeHTML(label('Notes'))}</th></tr></thead><tbody>${collectionRows}</tbody></table><p><strong>${escapeHTML(label('Total Outstanding'))}: <span dir="ltr">${escapeHTML(fmt(selectedCustomer.outstanding_balance, currency))}</span></strong></p></body></html>`);
+    win.document.close();
+    win.print();
+  }, [selectedCustomer, selectedDebts, selectedCollections, currency, dir, lang, translateLabel, translateLiteral]);
 
   const loading = loadingSummary || loadingCustomers;
 

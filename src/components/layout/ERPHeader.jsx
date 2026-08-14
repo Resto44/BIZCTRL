@@ -14,42 +14,39 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useRole } from '@/lib/RoleContext';
-import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Search, Bell, Star, StarOff, Sun, Moon, LogOut, User,
-  ChevronRight, Settings, Building2, Menu, X, Command,
+  Search, Star, Sun, Moon, ChevronRight, Settings, Menu, X,
 } from 'lucide-react';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import { useERPNavigation } from '@/hooks/useERPNavigation';
 import { ERP_NAV_GROUPS } from './ERPSidebar';
 import ModeBadge from '@/components/shared/ModeBadge';
 import LogoutButton from './LogoutButton';
+import LanguageSwitcher from '@/components/shared/LanguageSwitcher';
 
 // ─── Breadcrumb ───────────────────────────────────────────────────────────────
 function ERPBreadcrumb() {
   const location = useLocation();
+  const { translateLiteral } = useLanguage();
   const allItems = useMemo(() => ERP_NAV_GROUPS.flatMap(g => g.items), []);
 
   const crumbs = useMemo(() => {
     const parts = location.pathname.split('/').filter(Boolean);
-    const result = [{ label: 'Home', path: '/' }];
+    const result = [{ label: translateLiteral('Home'), path: '/' }];
     let accumulated = '';
     for (const part of parts) {
       accumulated += '/' + part;
       const match = allItems.find(i => i.path === accumulated || i.path.startsWith(accumulated));
       if (match) {
-        result.push({ label: match.label, path: accumulated });
+        result.push({ label: translateLiteral(match.label), path: accumulated });
       } else {
         result.push({
           label: part.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
@@ -58,7 +55,7 @@ function ERPBreadcrumb() {
       }
     }
     return result;
-  }, [location.pathname, allItems]);
+  }, [location.pathname, allItems, translateLiteral]);
 
   if (crumbs.length <= 1) return null;
 
@@ -86,6 +83,7 @@ function ERPBreadcrumb() {
 // ─── Global Search ────────────────────────────────────────────────────────────
 function GlobalSearch() {
   const [open, setOpen] = useState(false);
+  const { translateLiteral } = useLanguage();
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
   const inputRef = useRef(null);
@@ -134,7 +132,7 @@ function GlobalSearch() {
         className="hidden md:flex items-center gap-2 text-muted-foreground w-48 justify-start text-xs h-8"
       >
         <Search className="w-3.5 h-3.5" />
-        <span>Search...</span>
+        <span>{translateLiteral('Search...')}</span>
         <kbd className="ml-auto text-[10px] bg-muted px-1.5 py-0.5 rounded border border-border font-mono">
           ⌘K
         </kbd>
@@ -159,7 +157,7 @@ function GlobalSearch() {
                 ref={inputRef}
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Search pages, modules, actions..."
+                placeholder={translateLiteral('Search pages, modules, actions...')}
                 className="flex-1 bg-transparent text-sm outline-none text-foreground placeholder:text-muted-foreground"
               />
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setOpen(false)}>
@@ -168,7 +166,7 @@ function GlobalSearch() {
             </div>
             <div className="max-h-80 overflow-y-auto py-2">
               {results.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">No results found</p>
+                <p className="text-sm text-muted-foreground text-center py-6">{translateLiteral('No results found')}</p>
               ) : (
                 results.map(item => {
                   const Icon = item.icon;
@@ -181,7 +179,7 @@ function GlobalSearch() {
                       <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
                         <Icon className="w-3.5 h-3.5 text-primary" />
                       </div>
-                      <span className="text-foreground">{item.label}</span>
+                      <span className="text-foreground">{translateLiteral(item.label)}</span>
                       <span className="ml-auto text-xs text-muted-foreground font-mono">{item.path}</span>
                     </button>
                   );
@@ -189,9 +187,9 @@ function GlobalSearch() {
               )}
             </div>
             <div className="px-4 py-2 border-t border-border flex items-center gap-3 text-[10px] text-muted-foreground">
-              <span><kbd className="bg-muted px-1 rounded">↑↓</kbd> navigate</span>
-              <span><kbd className="bg-muted px-1 rounded">↵</kbd> open</span>
-              <span><kbd className="bg-muted px-1 rounded">esc</kbd> close</span>
+              <span><kbd className="bg-muted px-1 rounded">↑↓</kbd> {translateLiteral('navigate')}</span>
+              <span><kbd className="bg-muted px-1 rounded">↵</kbd> {translateLiteral('open')}</span>
+              <span><kbd className="bg-muted px-1 rounded">esc</kbd> {translateLiteral('close')}</span>
             </div>
           </div>
         </div>
@@ -203,6 +201,7 @@ function GlobalSearch() {
 // ─── Favorite toggle ──────────────────────────────────────────────────────────
 function FavoriteToggle() {
   const location = useLocation();
+  const { translateLiteral } = useLanguage();
   const { favorites, toggleFavorite } = useERPNavigation();
   const allItems = useMemo(() => ERP_NAV_GROUPS.flatMap(g => g.items), []);
 
@@ -221,7 +220,7 @@ function FavoriteToggle() {
       size="icon"
       className="h-8 w-8 text-muted-foreground hover:text-warning"
       onClick={() => toggleFavorite(currentItem)}
-      title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+      title={translateLiteral(isFav ? 'Remove from favorites' : 'Add to favorites')}
     >
       {isFav
         ? <Star className="w-4 h-4 fill-warning text-warning" />
@@ -252,6 +251,7 @@ function ThemeToggle() {
 // ─── User menu ────────────────────────────────────────────────────────────────
 function UserMenu() {
   const { user } = useAuth();
+  const { t, translateLabel } = useLanguage();
   const { role } = useRole();
   const navigate = useNavigate();
 
@@ -287,7 +287,7 @@ function UserMenu() {
             <span className="text-xs font-medium text-foreground leading-tight truncate max-w-[100px]">
               {user?.full_name || user?.email?.split('@')[0] || 'User'}
             </span>
-            <span className="text-[10px] text-muted-foreground capitalize">{role}</span>
+            <span className="text-[10px] text-muted-foreground capitalize">{translateLabel(role, role)}</span>
           </div>
         </button>
       </DropdownMenuTrigger>
@@ -297,7 +297,7 @@ function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => navigate('/settings')}>
-          <Settings className="w-3.5 h-3.5 mr-2" /> Settings
+          <Settings className="w-3.5 h-3.5 mr-2" /> {t('settings')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
@@ -336,6 +336,7 @@ export default function ERPHeader({ onMobileMenuToggle }) {
       <div className="flex items-center gap-1">
         <GlobalSearch />
         <FavoriteToggle />
+        <LanguageSwitcher />
         <ThemeToggle />
         <ModeBadge size="xs" />
         {isSuperAdmin && (

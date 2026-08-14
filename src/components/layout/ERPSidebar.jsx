@@ -16,6 +16,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useRole } from '@/lib/RoleContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
+import { useLanguage } from '@/lib/LanguageContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -121,6 +122,8 @@ export const ERP_NAV_GROUPS = [
 // ─── Single nav item ──────────────────────────────────────────────────────────
 function NavItem({ item, collapsed, isActive }) {
   const Icon = item.icon;
+  const { translateLiteral } = useLanguage();
+  const label = translateLiteral(item.label);
   const base = cn(
     'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer',
     'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60',
@@ -137,7 +140,7 @@ function NavItem({ item, collapsed, isActive }) {
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right" className="text-xs font-medium">
-            {item.label}
+            {label}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -147,7 +150,7 @@ function NavItem({ item, collapsed, isActive }) {
   return (
     <Link to={item.path} className={base}>
       <Icon className="w-4 h-4 shrink-0" />
-      <span className="truncate">{item.label}</span>
+      <span className="truncate">{label}</span>
       {item.badge && (
         <Badge variant="secondary" className="ml-auto text-[10px] h-4 px-1.5">
           {item.badge}
@@ -160,6 +163,7 @@ function NavItem({ item, collapsed, isActive }) {
 // ─── Nav group ────────────────────────────────────────────────────────────────
 function NavGroup({ group, collapsed, location, can }) {
   const [open, setOpen] = useState(true);
+  const { translateLiteral } = useLanguage();
   const visibleItems = useMemo(
     () => group.items.filter(item => !item.permission || can[item.permission]),
     [group.items, can]
@@ -173,7 +177,7 @@ function NavGroup({ group, collapsed, location, can }) {
           onClick={() => setOpen(o => !o)}
           className="w-full flex items-center justify-between px-3 py-1 group"
         >
-          <span className="erp-section-title">{group.label}</span>
+          <span className="erp-section-title">{translateLiteral(group.label)}</span>
           <ChevronRight
             className={cn(
               'w-3 h-3 text-muted-foreground/50 transition-transform',
@@ -209,6 +213,7 @@ export default function ERPSidebar({ collapsed, onToggle }) {
   const { user } = useAuth();
   const { activeRestaurant } = useTenant();
   const { favorites, recentPages } = useERPNavigation();
+  const { translateLiteral } = useLanguage();
 
   const isOwner = role === 'owner' || role === 'general_manager';
 
@@ -249,7 +254,7 @@ export default function ERPSidebar({ collapsed, onToggle }) {
         {!collapsed && favorites.length > 0 && (
           <div className="mb-1">
             <span className="erp-section-title flex items-center gap-1">
-              <Star className="w-3 h-3" /> Favorites
+              <Star className="w-3 h-3" /> {translateLiteral('Favorites')}
             </span>
             <div className="px-2 space-y-0.5">
               {favorites.map(fav => (
@@ -269,7 +274,7 @@ export default function ERPSidebar({ collapsed, onToggle }) {
         {!collapsed && recentPages.length > 0 && (
           <div className="mb-1">
             <span className="erp-section-title flex items-center gap-1">
-              <Clock className="w-3 h-3" /> Recent
+              <Clock className="w-3 h-3" /> {translateLiteral('Recent')}
             </span>
             <div className="px-2 space-y-0.5">
               {recentPages.slice(0, 5).map(page => (
@@ -310,7 +315,7 @@ export default function ERPSidebar({ collapsed, onToggle }) {
         >
           {collapsed
             ? <ChevronRight className="w-4 h-4" />
-            : <><ChevronLeft className="w-4 h-4" /><span className="text-xs">Collapse</span></>
+            : <><ChevronLeft className="w-4 h-4" /><span className="text-xs">{translateLiteral('Collapse')}</span></>
           }
         </Button>
       </div>

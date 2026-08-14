@@ -20,6 +20,7 @@ import {
 
 import { base44, supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
+import { drawLocalizedPdfText, prepareLocalizedPdf, safePdfFilename } from '@/lib/pdfLocalization';
 import { useTenant } from '@/lib/TenantContext';
 import { formatCurrency } from '@/lib/helpers';
 import { useSalesSources } from '@/hooks/useSalesSources';
@@ -259,7 +260,7 @@ function BranchSelector({
 }
 
 export default function ProfitLoss() {
-  const { currency } = useLanguage();
+  const { currency, lang, dir, t, translateLiteral } = useLanguage();
   const {
     activeRestaurant,
     branches = [],
@@ -408,32 +409,37 @@ export default function ProfitLoss() {
   const downloadCSV = () => downloadBlob(csvFromRows(exportData), `financial-analysis_${range.from}_${range.to}.csv`, 'text/csv;charset=utf-8');
   const downloadExcel = () => downloadBlob(xlsFromRows(exportData), `financial-analysis_${range.from}_${range.to}.xls`, 'application/vnd.ms-excel');
   const downloadPDF = () => {
-    const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
-    const lines = [
-      'ERP Financial Analysis',
-      `Period: ${range.from} to ${range.to}`,
-      '',
-      ...exportData.map((row) => row.filter((value) => value !== undefined && value !== null && value !== '').join('   |   ')),
-    ];
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4', putOnlyUsedFonts: true });
+    const { rtl } = prepareLocalizedPdf(pdf, { lang, dir });
+    const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
+    const left = 42;
+    const right = pageWidth - left;
+    const heading = translateLiteral('ERP Financial Analysis');
+    const period = `${translateLiteral('Period')}: ${range.from} ${translateLiteral('to')} ${range.to}`;
+    const lines = [heading, period, '', ...exportData.map((row) => row
+      .filter((value) => value !== undefined && value !== null && value !== '')
+      .map((value) => typeof value === 'string' ? translateLiteral(value) : value)
+      .join('   |   '))];
     let y = 42;
-    lines.forEach((line) => {
-      const wrapped = pdf.splitTextToSize(line, 510);
+    lines.forEach((line, index) => {
+      pdf.setFont(rtl ? 'NotoNaskhArabic' : 'helvetica', index === 0 ? 'bold' : 'normal');
+      pdf.setFontSize(index === 0 ? 17 : 10);
+      const wrapped = pdf.splitTextToSize(String(line), 510);
       wrapped.forEach((part) => {
-        if (y > pageHeight - 42) {
-          pdf.addPage();
-          y = 42;
-        }
-        pdf.text(part, 42, y);
-        y += 14;
+        if (y > pageHeight - 42) { pdf.addPage(); y = 42; }
+        drawLocalizedPdfText(pdf, part, rtl ? right : left, y, { rtl, bold: index === 0, size: index === 0 ? 17 : 10, color: [15, 23, 42], align: rtl ? 'right' : 'left', maxWidth: 510 });
+        y += index === 0 ? 20 : 14;
       });
     });
-    pdf.save(`financial-analysis_${range.from}_${range.to}.pdf`);
+    pdf.save(safePdfFilename(`financial-analysis_${range.from}_${range.to}`, lang));
   };
   const printReport = () => {
     const printWindow = window.open('', '_blank', 'noopener,noreferrer');
     if (!printWindow) return;
-    printWindow.document.write(`<!doctype html><html><head><title>ERP Financial Analysis</title><style>body{font-family:Arial,sans-serif;color:#111827;padding:28px}h1{font-size:20px;margin:0 0 6px}p{color:#4b5563;font-size:12px;margin:0 0 18px}table{border-collapse:collapse;width:100%;font-size:11px;margin-bottom:20px}th,td{border:1px solid #d1d5db;padding:6px;text-align:left}th{background:#f3f4f6}</style></head><body><h1>ERP Financial Analysis</h1><p>${range.from} to ${range.to}</p>${printableTable(exportData)}</body></html>`);
+    const rtl = dir === 'rtl';
+    const localizedRows = exportData.map((row) => row.map((value) => typeof value === 'string' ? translateLiteral(value) : value));
+    printWindow.document.write(`<!doctype html><html dir="${rtl ? 'rtl' : 'ltr'}" lang="${lang}"><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;700&family=Vazirmatn:wght@400;600;700&display=swap" rel="stylesheet"><title>${translateLiteral('ERP Financial Analysis')}</title><style>body{font-family:${rtl ? "'Vazirmatn','Noto Naskh Arabic',Tahoma,sans-serif" : 'Arial,sans-serif'};color:#111827;padding:28px;direction:${rtl ? 'rtl' : 'ltr'}}h1{font-size:20px;margin:0 0 6px}p{color:#4b5563;font-size:12px;margin:0 0 18px}table{border-collapse:collapse;width:100%;font-size:11px;margin-bottom:20px}th,td{border:1px solid #d1d5db;padding:6px;text-align:${rtl ? 'right' : 'left'}}th{background:#f3f4f6}</style></head><body><h1>${translateLiteral('ERP Financial Analysis')}</h1><p>${range.from} ${translateLiteral('to')} ${range.to}</p>${printableTable(localizedRows)}</body></html>`);
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();

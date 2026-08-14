@@ -1,0 +1,2859 @@
+{
+  "generatedAt": "2026-08-13T23:50:30.045Z",
+  "localeParity": {
+    "ar": {
+      "keyCount": 1007,
+      "missing": [],
+      "untranslated": [
+        "tier_vip"
+      ]
+    },
+    "fa": {
+      "keyCount": 1007,
+      "missing": [],
+      "untranslated": [
+        "tier_vip"
+      ]
+    }
+  },
+  "sourceFilesScanned": 311,
+  "candidateFileCount": 214,
+  "candidatePhraseCount": 1765,
+  "candidates": [
+    {
+      "file": "src/App.jsx",
+      "phrases": [
+        "App is taking too long to load",
+        "Reset &amp; Reload",
+        "This may be a network or session issue.",
+        "This page failed to load.",
+        "Try Again"
+      ]
+    },
+    {
+      "file": "src/api/supabaseClient.js",
+      "phrases": [
+        "Supabase not configured"
+      ]
+    },
+    {
+      "file": "src/components/UserNotRegisteredError.jsx",
+      "phrases": [
+        "Access Restricted",
+        "Contact the app administrator for access",
+        "If you believe this is an error, you can:",
+        "Try logging out and back in again",
+        "Verify you are logged in with the correct account"
+      ]
+    },
+    {
+      "file": "src/components/attendance/AttendanceAnalyticsPanel.jsx",
+      "phrases": [
+        "Attendance Rate",
+        "Avg Hours/Day",
+        "Daily Attendance Trend",
+        "Hours by Employee (period)",
+        "Late Arrivals"
+      ]
+    },
+    {
+      "file": "src/components/attendance/KioskPINPad.jsx",
+      "phrases": [
+        "Checking…"
+      ]
+    },
+    {
+      "file": "src/components/attendance/LaborReport.jsx",
+      "phrases": [
+        "= fromDate && r.date",
+        "Estimated Labor Cost",
+        "No data for selected period",
+        "Staff Breakdown",
+        "Staff Members",
+        "e.g. 25"
+      ]
+    },
+    {
+      "file": "src/components/attendance/QRScanner.jsx",
+      "phrases": [
+        "Employee QR code",
+        "— or enter code manually —"
+      ]
+    },
+    {
+      "file": "src/components/cashregister/CashRegisterDashboard.jsx",
+      "phrases": [
+        "7-Day Cash Overview",
+        "No settlements yet today",
+        "Settlement History",
+        "Today's Settlements"
+      ]
+    },
+    {
+      "file": "src/components/cashregister/CashRegisterReports.jsx",
+      "phrases": [
+        "= dateFrom && r.date",
+        "Cash Movement Report",
+        "Daily Settlement Report",
+        "Monthly Settlement Report",
+        "Owner Injection Report",
+        "Pending / Resolved",
+        "Shortage Report",
+        "Total Cash In",
+        "Total Cash Out",
+        "Total Cash Sales",
+        "Total Injected",
+        "Total Settlements",
+        "Total Shortages"
+      ]
+    },
+    {
+      "file": "src/components/cashregister/CashShortageManager.jsx",
+      "phrases": [
+        "All cash settlements are balanced.",
+        "Owner notes / explanation...",
+        "Reported by:"
+      ]
+    },
+    {
+      "file": "src/components/cashregister/DailyCashSettlementForm.jsx",
+      "phrases": [
+        "Awaiting Owner Approval",
+        "Cash Flow Summary",
+        "Manager notes...",
+        "Notes (optional)",
+        "Settlement Approved",
+        "Submit Settlement",
+        "Submitted by:",
+        "Tap to count"
+      ]
+    },
+    {
+      "file": "src/components/cashregister/OwnerCashInjectionForm.jsx",
+      "phrases": [
+        "Additional notes...",
+        "Inject Cash",
+        "Inject cash into branch register",
+        "Notes (optional)",
+        "Owner Cash Injection",
+        "Select branch",
+        "Select reason"
+      ]
+    },
+    {
+      "file": "src/components/categories/CategoryManager.jsx",
+      "phrases": [
+        "Add child category",
+        "Arabic (اسم)",
+        "Category name",
+        "Delete Category?",
+        "Enterprise Category Manager",
+        "Expense Categories",
+        "Farsi (نام)",
+        "Image URL (optional)",
+        "Loading categories...",
+        "Name (English) *",
+        "Online Order Categories",
+        "Parent Category (leave blank for Level 1)",
+        "Pick color",
+        "Product Categories",
+        "Sales Categories",
+        "Search categories...",
+        "Select Color",
+        "Sort Order",
+        "Used by Expenses module only",
+        "Used by Online Ordering module only",
+        "Used by Product Management & Inventory only",
+        "Used by Sales module only",
+        "— Top Level (Main Category) —"
+      ]
+    },
+    {
+      "file": "src/components/categories/NewIconPicker.jsx",
+      "phrases": [
+        "Search icons (English, Arabic, Persian)...",
+        "Select Icon"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/AccountsPayableWidget.jsx",
+      "phrases": [
+        "= 0 && diff",
+        "= 1 && d",
+        "i.due_date && i.due_date"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/AdvancedKPICards.jsx",
+      "phrases": [
+        "= fromStr && s.date"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/BranchHealthDashboard.jsx",
+      "phrases": [
+        "(i.opening_stock || 0)",
+        "Based on the last 30 days across all modules."
+      ]
+    },
+    {
+      "file": "src/components/dashboard/DashboardChartsTab.jsx",
+      "phrases": [
+        "Monthly Revenue vs Cost",
+        "No data",
+        "Sales by Branch"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/DashboardWidgetRegistry.jsx",
+      "phrases": [
+        "Expiring Soon",
+        "Today Sales"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/DriverPerformance.jsx",
+      "phrases": [
+        "Branch and driver sales performance, refreshed from canonical driver and sales records.",
+        "Driver analytics could not be loaded.",
+        "Network / POS",
+        "No driver-linked sales for this period.",
+        "Top 10 Drivers"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/DriverTrendAnalytics.jsx",
+      "phrases": [
+        "Branch Breakdown",
+        "Branch Revenue Comparison",
+        "Driver Breakdown",
+        "Driver Revenue Trend",
+        "LIVE CANONICAL DATA",
+        "Network / POS",
+        "Top Driver Comparison",
+        "Total revenue",
+        "Trend Analytics"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/FinancialKPIs.jsx",
+      "phrases": [
+        "${lowInventory.length} ${lbl.low_inventory}",
+        "${overdueCustomers.length} ${lbl.overdue_customers}",
+        "${overdueSuppliers.length} ${lbl.overdue_suppliers}",
+        "0 && qty",
+        "Purchases (Approved)",
+        "Sales Summary"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/LowStockWidget.jsx",
+      "phrases": [
+        "Top recommendations (14-day target):"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/PaymentMixCharts.jsx",
+      "phrases": [
+        "Tap a bar to drill into that branch"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/PriceChangesWidget.jsx",
+      "phrases": [
+        "(r.difference || 0)",
+        "0 ? 'text-red-600' : diff",
+        "0) return"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/QuickPurchaseModal.jsx",
+      "phrases": [
+        "Daily Purchase"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/RealDailyProfit.jsx",
+      "phrases": [
+        "(Real Daily Profit)",
+        "Costs (today)",
+        "Revenue (today)",
+        "سود واقعی روز / Real Daily Profit"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/SalesTrendsChart.jsx",
+      "phrases": [
+        "Daily (30d)",
+        "No data in last 30 days",
+        "No monthly data yet",
+        "Sales & Profit Trends"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/SmartInsights.jsx",
+      "phrases": [
+        "${b.label}: ${issue.label}",
+        "${currency}${spike.previous.toFixed(0)} → ${currency}${spike.current.toFixed(0)}",
+        "${spike.category} expenses up ${spike.pct}%",
+        "Low stock: ${pred.product_name}",
+        "~${pred.daysLeft} day(s) left at current usage (${pred.branch})"
+      ]
+    },
+    {
+      "file": "src/components/dashboard/WelcomeDashboard.jsx",
+      "phrases": [
+        "Add First Employee",
+        "Manage Restaurants",
+        "Record First Purchase",
+        "Record First Sale",
+        "Setup Treasury"
+      ]
+    },
+    {
+      "file": "src/components/debts/DebtForm.jsx",
+      "phrases": [
+        "(WhatsApp)",
+        "Auto Invoice Number"
+      ]
+    },
+    {
+      "file": "src/components/debts/LiquidityForecast.jsx",
+      "phrases": [
+        "= today && dt",
+        "= today && dueDate",
+        "= today && parseISO(d.due_date)",
+        "W${w + 1}"
+      ]
+    },
+    {
+      "file": "src/components/debts/PaymentForm.jsx",
+      "phrases": [
+        "Receipt will be auto-created"
+      ]
+    },
+    {
+      "file": "src/components/debts/ReminderSettings.jsx",
+      "phrases": [
+        ": saving ?"
+      ]
+    },
+    {
+      "file": "src/components/expenses/ExpenseAnalytics.jsx",
+      "phrases": [
+        "0 ? 'text-red-500' : c.change",
+        "10 ? 'bg-red-50 border-red-200' : yoyChange",
+        "By Branch (All Time)",
+        "Category Share",
+        "No expense data to analyze yet."
+      ]
+    },
+    {
+      "file": "src/components/expenses/ExpenseCategoryManager.jsx",
+      "phrases": [
+        "Add Expense Category",
+        "Category Name *",
+        "Create your first category to start tracking expenses",
+        "Daily Operating",
+        "Delete Category?",
+        "Expense Categories",
+        "Expense Type *",
+        "Fixed Monthly",
+        "No expense categories yet",
+        "This will not delete existing expenses using this category.",
+        "e.g. Rent"
+      ]
+    },
+    {
+      "file": "src/components/expenses/ReceiptScanner.jsx",
+      "phrases": [
+        "Drag & drop or click to browse",
+        "Extracting amount, date, and vendor",
+        "One word describing the type of expense (rent, utilities, salaries, marketing, maintenance, or other)",
+        "Receipt scanned successfully",
+        "Scanning receipt with AI...",
+        "Upload or take a photo of your receipt"
+      ]
+    },
+    {
+      "file": "src/components/inventory/AIRestockAlerts.jsx",
+      "phrases": [
+        "10 ? 'text-red-500' : f.trend",
+        "3 && f.daysLeft",
+        "= week4Ago && p.date",
+        "= week8Ago && p.date",
+        "= weekStart && p.date",
+        "All items have sufficient stock (&gt;14 days)",
+        "Analyzing inventory patterns...",
+        "Click \"Run Analysis\" to get AI-powered restock prioritization based on current stock levels, consumption velocity, and lead times.",
+        "Critical (≤3d)",
+        "Days Left",
+        "Lead Time",
+        "Order By",
+        "Trend ↑",
+        "Warning (≤7d)",
+        "f.daysLeft !== null && f.daysLeft"
+      ]
+    },
+    {
+      "file": "src/components/inventory/ForecastReorderPanel.jsx",
+      "phrases": [
+        "Order by:"
+      ]
+    },
+    {
+      "file": "src/components/layout/BottomNav.jsx",
+      "phrases": [
+        "People & Finance"
+      ]
+    },
+    {
+      "file": "src/components/layout/ERPHeader.jsx",
+      "phrases": [
+        "No results found",
+        "Search pages, modules, actions..."
+      ]
+    },
+    {
+      "file": "src/components/layout/ERPSidebar.jsx",
+      "phrases": [
+        "Analytics & Reports",
+        "Balance Sheet",
+        "CEO Dashboard",
+        "Debt Management",
+        "Network Settlement",
+        "Oracle Analytics",
+        "Role & Permissions",
+        "Staff Control",
+        "Supplier Portal"
+      ]
+    },
+    {
+      "file": "src/components/layout/LogoutButton.jsx",
+      "phrases": [
+        "Log out of your account?"
+      ]
+    },
+    {
+      "file": "src/components/network/NetworkAccountSelect.jsx",
+      "phrases": [
+        "No active accounts for this branch",
+        "Select a branch first"
+      ]
+    },
+    {
+      "file": "src/components/notifications/LiveOperationsCenter.jsx",
+      "phrases": [
+        "Last 24h",
+        "Live Feed",
+        "No activity in the last 24 hours",
+        "🔴 Critical",
+        "🔵 Info",
+        "🟡 Warning"
+      ]
+    },
+    {
+      "file": "src/components/notifications/NotificationList.jsx",
+      "phrases": [
+        "No notifications found"
+      ]
+    },
+    {
+      "file": "src/components/notifications/NotificationPopups.jsx",
+      "phrases": [
+        "tap to open →"
+      ]
+    },
+    {
+      "file": "src/components/notifications/SoundSettings.jsx",
+      "phrases": [
+        "Alert Sounds",
+        "Test sounds"
+      ]
+    },
+    {
+      "file": "src/components/owner/OwnerStaffProvisioning.jsx",
+      "phrases": [
+        "Create a secure staff invitation",
+        "Email address",
+        "Full name",
+        "General Manager",
+        "Loading owner-scoped invitations…",
+        "No secure invitations have been issued for this organization.",
+        "Only invitations for the selected organization are visible here.",
+        "Phone number",
+        "Recent invitations",
+        "Select an active branch",
+        "Select an owned organization",
+        "Staff member name",
+        "or email above",
+        "or phone below"
+      ]
+    },
+    {
+      "file": "src/components/payroll/AttendanceAnalytics.jsx",
+      "phrases": [
+        "90 days",
+        "= from && date",
+        "Attendance by Day of Week"
+      ]
+    },
+    {
+      "file": "src/components/payroll/BonusDeductionTab.jsx",
+      "phrases": [
+        "Add Bonus / Reward",
+        "Add Salary Advance",
+        "No advances recorded",
+        "No bonuses recorded",
+        "Payroll Month",
+        "Performance, overtime...",
+        "Select employee",
+        "Total Advances",
+        "Total Bonuses"
+      ]
+    },
+    {
+      "file": "src/components/payroll/DeductionRulesSettings.jsx",
+      "phrases": [
+        ": deducts a flat amount per each occurrence (e.g. SAR 50 per absence)",
+        ": deducts a fraction of the daily salary (base ÷ 26 working days) per occurrence",
+        "Add Deduction Rule",
+        "Add Rule",
+        "Add rules to auto-calculate deductions in payroll",
+        "Applies To",
+        "Configure how absences, late arrivals, and half-days affect salary",
+        "Daily fraction",
+        "Deduction Rules",
+        "Deduction Type",
+        "Fixed amount",
+        "How deductions work:",
+        "Late Threshold (minutes)",
+        "No deduction rules configured",
+        "Rule Name",
+        "Save Rule",
+        "e.g. Absence Deduction",
+        "• Late rules only apply when the employee's attendance status is \"Late\""
+      ]
+    },
+    {
+      "file": "src/components/payroll/PayrollDashboard.jsx",
+      "phrases": [
+        "= from && date"
+      ]
+    },
+    {
+      "file": "src/components/payroll/PayrollReport.jsx",
+      "phrases": [
+        "+ Bonuses",
+        "= Final Payable",
+        "= from && b.date",
+        "= from && r.date",
+        "Finalize Payroll?",
+        "High Deduction Warning",
+        "No employees found",
+        "Total Payroll",
+        "− Advances",
+        "− Deductions"
+      ]
+    },
+    {
+      "file": "src/components/products/BarcodeGenerator.jsx",
+      "phrases": [
+        "Barcode Value",
+        "Enter QR content",
+        "Enter barcode number",
+        "QR Code Value"
+      ]
+    },
+    {
+      "file": "src/components/products/InventoryTransactionForm.jsx",
+      "phrases": [
+        "New Stock After",
+        "Recipe Consumption",
+        "Transfer In",
+        "Transfer Out"
+      ]
+    },
+    {
+      "file": "src/components/products/PriceAnalyticsTab.jsx",
+      "phrases": [
+        "(r.difference || 0)",
+        "0 ? 'text-red-600' : diff",
+        "0) return",
+        "= from && d",
+        "Average % Change",
+        "Avg Price Change",
+        "Est. Cost Increase",
+        "Est. Cost Saving",
+        "Increases vs Decreases",
+        "Loading price history...",
+        "No price changes recorded for this period.",
+        "Price Increases / Decreases",
+        "Price changes are recorded automatically when purchase invoices are approved.",
+        "Products Changed",
+        "Search product, supplier, branch...",
+        "Total Records",
+        "▲ Increase",
+        "▼ Decrease",
+        "➜ No Change"
+      ]
+    },
+    {
+      "file": "src/components/products/ProductForm.jsx",
+      "phrases": [
+        "Child Category (Level 3)",
+        "Select child category...",
+        "Select main category...",
+        "Select sub-category...",
+        "Sub-category (Level 2)",
+        "— None —"
+      ]
+    },
+    {
+      "file": "src/components/products/ProductMasterForm.jsx",
+      "phrases": [
+        "Child Category (Level 3)",
+        "Main display name",
+        "Product name",
+        "Select child category...",
+        "Select main category...",
+        "Select sub-category...",
+        "Sub-category (Level 2)",
+        "— None —"
+      ]
+    },
+    {
+      "file": "src/components/products/ProductVariantsManager.jsx",
+      "phrases": [
+        "Edit Variant",
+        "SKU Suffix"
+      ]
+    },
+    {
+      "file": "src/components/purchase-orders/GenerateFromLowStock.jsx",
+      "phrases": [
+        "Assign to Supplier",
+        "Select supplier"
+      ]
+    },
+    {
+      "file": "src/components/purchase-orders/PurchaseOrderDetail.jsx",
+      "phrases": [
+        "No email on file",
+        "No phone on file"
+      ]
+    },
+    {
+      "file": "src/components/purchase-orders/PurchaseOrderForm.jsx",
+      "phrases": [
+        "Order Date",
+        "Order Items",
+        "Save as Draft",
+        "Select supplier",
+        "Supplier & Branch",
+        "Unit Price"
+      ]
+    },
+    {
+      "file": "src/components/purchase-orders/ReceiveOrderDialog.jsx",
+      "phrases": [
+        "Enter the quantity actually received for each item. Items received will be added to inventory as purchases.",
+        "Receipt Date",
+        "parseFloat(receivedQtys[it.product_id] || 0)"
+      ]
+    },
+    {
+      "file": "src/components/purchases/EnterpriseUIComponents.jsx",
+      "phrases": [
+        "text-amber-700 dark:text-amber-300",
+        "text-amber-800 dark:text-amber-200",
+        "text-blue-700 dark:text-blue-300",
+        "text-blue-800 dark:text-blue-200",
+        "text-emerald-700 dark:text-emerald-300",
+        "text-emerald-800 dark:text-emerald-200",
+        "text-red-700 dark:text-red-300",
+        "text-red-800 dark:text-red-200"
+      ]
+    },
+    {
+      "file": "src/components/purchases/FinancialPurchaseForm.jsx",
+      "phrases": [
+        "New Purchase",
+        "Or type supplier name...",
+        "Purchase Amounts",
+        "e.g. INV-1001"
+      ]
+    },
+    {
+      "file": "src/components/purchases/MobileOptimizedPurchaseView.jsx",
+      "phrases": [
+        "No invoices found",
+        "Try adjusting your filters"
+      ]
+    },
+    {
+      "file": "src/components/purchases/OcrScanDialog.jsx",
+      "phrases": [
+        "Apply to Form",
+        "Review the extracted data above. Click Apply to pre-fill the form.",
+        "Upload Invoice (PDF or Image)"
+      ]
+    },
+    {
+      "file": "src/components/purchases/PurchaseInvoiceForm.jsx",
+      "phrases": [
+        "Additional Costs",
+        "Additional notes...",
+        "Auto Approved",
+        "Branch *",
+        "Grand Total",
+        "Invoice Header",
+        "Invoice Number",
+        "Line Items",
+        "Line Total",
+        "No matching products found.",
+        "Or type product name",
+        "Or type supplier name...",
+        "Pending Approval",
+        "Product *",
+        "Product Category *",
+        "Purchase Date *",
+        "Remaining Balance",
+        "Select supplier...",
+        "Supplier *",
+        "Tax %",
+        "Unit Cost"
+      ]
+    },
+    {
+      "file": "src/components/purchases/PurchaseInvoiceList.jsx",
+      "phrases": [
+        "Approve Invoice",
+        "Delete Invoice",
+        "No invoices found"
+      ]
+    },
+    {
+      "file": "src/components/pwa/PWAInstallBanner.jsx",
+      "phrases": [
+        "Install the App"
+      ]
+    },
+    {
+      "file": "src/components/pwa/PWAInstallModal.jsx",
+      "phrases": [
+        "(s",
+        "Add to your home screen for a native app experience",
+        "Install the App",
+        "Scroll and tap",
+        "Tap the Share button",
+        "Tap the menu (⋮)"
+      ]
+    },
+    {
+      "file": "src/components/rbac/ERPRoleGuard.jsx",
+      "phrases": [
+        "Pending Approval"
+      ]
+    },
+    {
+      "file": "src/components/rbac/RoleGuard.jsx",
+      "phrases": [
+        "Access Restricted"
+      ]
+    },
+    {
+      "file": "src/components/sales/CashRegister.jsx",
+      "phrases": [
+        "0 ? 'text-amber-600' : cashDiff"
+      ]
+    },
+    {
+      "file": "src/components/sales/CustomerCollections.jsx",
+      "phrases": [
+        "Customer Collections"
+      ]
+    },
+    {
+      "file": "src/components/sales/DailySummary.jsx",
+      "phrases": [
+        "Daily Summary"
+      ]
+    },
+    {
+      "file": "src/components/sales/ERPSalesWorkspace.jsx",
+      "phrases": [
+        "${currency}${cashSales.toLocaleString()}",
+        "${currency}${creditTotal.toLocaleString()}",
+        "${currency}${networkTotal.toLocaleString()}",
+        "Add driver-specific notes, references, or follow-up details...",
+        "All validations passed — ready to close shift",
+        "All within limits",
+        "Approved Invoices",
+        "Available Credit",
+        "Branch Selected",
+        "Cannot save — fix validation errors first",
+        "Cash + POS + Credit",
+        "Cash Reconciled",
+        "Cash Totals Valid",
+        "Cashier Selected",
+        "Credit Limits Not Exceeded",
+        "Credit Score",
+        "Credit Totals Valid",
+        "Current Debt",
+        "Customer Credit Entries",
+        "Daily Sales Record",
+        "Driver Sales",
+        "Driver name",
+        "For next shift opening",
+        "Gross Operating Result",
+        "Live Sales Summary",
+        "Manual Entry",
+        "Month Running Total",
+        "Net Cash",
+        "Network / POS Sales",
+        "No drivers added yet",
+        "Operating Cost Ratio",
+        "Operating Margin",
+        "Owner Contribution (Cash)",
+        "Owner Contribution (Purchases Gap)",
+        "POS Device",
+        "POS Sales",
+        "POS Totals Valid",
+        "Purchase Summary",
+        "Purchases Recorded",
+        "Records that will be created:",
+        "Ref Required",
+        "Ref number",
+        "Reference #",
+        "Remaining Credit After Sale",
+        "Required Fields Complete",
+        "Risk Indicator",
+        "Save Panel",
+        "Search by name or phone...",
+        "Select branch driver",
+        "Select cashier...",
+        "Select device...",
+        "Shift Information",
+        "Shift Open",
+        "Treasury Transactions",
+        "Use Add Driver to record sales for any driver assigned to this branch.",
+        "Validation Center",
+        "Wallet Transactions",
+        "e.g. Visa, Mastercard"
+      ]
+    },
+    {
+      "file": "src/components/sales/POSReconciliation.jsx",
+      "phrases": [
+        "POS Reconciliation",
+        "تطبیق POS"
+      ]
+    },
+    {
+      "file": "src/components/sales/SalesFilterSidebar.jsx",
+      "phrases": [
+        "All branches",
+        "Custom From",
+        "Custom To",
+        "Last 7 days",
+        "Max Total Sales",
+        "Min Total Sales",
+        "Quick Date Range",
+        "This month"
+      ]
+    },
+    {
+      "file": "src/components/settings/SalesSourcesManager.jsx",
+      "phrases": [
+        "Activity / Misc",
+        "Amber (Credit)",
+        "Analytics / Report",
+        "Cash / Banknote",
+        "Cash Reg",
+        "Catering / Event",
+        "Create your first sales source to get started.",
+        "Credit Card / POS",
+        "Customer / Credit",
+        "Default Payment Method",
+        "Delivery / Truck",
+        "Dollar / Income",
+        "Emerald (Cash)",
+        "Gift Card",
+        "Group / Membership",
+        "In KPI",
+        "Inclusion Flags",
+        "Loading sales sources...",
+        "Mobile / App",
+        "Network / POS",
+        "No sales sources yet",
+        "Online / Globe",
+        "Optional description of this sale source...",
+        "Other / Plus",
+        "Package / Wholesale",
+        "Protected / Secure",
+        "Quick / Flash",
+        "Scope & Payment",
+        "Select branch...",
+        "Shopping Bag",
+        "Slate (Other)",
+        "Sort Order",
+        "Star / Featured",
+        "Suggested Custom Sources",
+        "System Sources are protected",
+        "Total Sources",
+        "Violet (POS)",
+        "e.g. Delivery Revenue"
+      ]
+    },
+    {
+      "file": "src/components/settlement/BranchBalanceTracker.jsx",
+      "phrases": [
+        "Across all branches",
+        "Branch Settlement Overview",
+        "No settlement data yet",
+        "Not yet sent to owner",
+        "Owner → Branch",
+        "Owner → Branches",
+        "Received by Sponsor",
+        "Remaining w/ Sponsor",
+        "Sent to Owner",
+        "Sponsor → Owner",
+        "Total Sent to Sponsor",
+        "Total funded back",
+        "Total settled to owner"
+      ]
+    },
+    {
+      "file": "src/components/settlement/ManagerSubmitPanel.jsx",
+      "phrases": [
+        "${form.branch}${accName ?",
+        "(Required)",
+        "Bank Reference (optional)",
+        "Branch *",
+        "Date *",
+        "My Submissions",
+        "Network Account / Device",
+        "Network Amount *",
+        "No submissions yet",
+        "OCR auto-filled:",
+        "Optional notes...",
+        "Pending Review",
+        "Select which device settled...",
+        "Transfer Proof Image *",
+        "e.g. TXN-123456",
+        "— verify before submitting",
+        "⚠️ Proof image is required before submitting",
+        "🏦 Network Settlement — ${form.branch}"
+      ]
+    },
+    {
+      "file": "src/components/settlement/ReviewPanel.jsx",
+      "phrases": [
+        "${currency} ${Number(s.amount).toLocaleString()} network settlement approved by ${user?.full_name || user?.email}",
+        "${currency} ${Number(s.amount).toLocaleString()} settlement verified by accountant ${user?.full_name || user?.email}. Ready for owner approval.",
+        "All Settlement Records",
+        "Amount *",
+        "Bank ref...",
+        "Branch → Sponsor",
+        "Date *",
+        "Owner → Branch",
+        "Proof Image (optional)",
+        "Reason: ${rejectReason}",
+        "Reject Settlement",
+        "Rejection Reason *",
+        "Sponsor → Owner",
+        "e.g. Wrong amount, unclear proof...",
+        "✅ Settlement Approved — ${s.branch}",
+        "❌ Settlement REJECTED — ${rejectDialog.branch}",
+        "🔍 Settlement Verified — ${s.branch}"
+      ]
+    },
+    {
+      "file": "src/components/settlement/SettlementAuditLog.jsx",
+      "phrases": [
+        "Anti-Fraud Protection Active",
+        "Approved records are locked and cannot be altered. All uploads include submitter identity and timestamps.",
+        "No records found",
+        "Search by branch, user, reference...",
+        "View proof"
+      ]
+    },
+    {
+      "file": "src/components/settlement/SponsorLedger.jsx",
+      "phrases": [
+        "All branches, approved",
+        "Branch Sponsor Ledger",
+        "Branch-by-Branch Sponsor Ledger",
+        "Fully Settled",
+        "Large balance held by sponsor — follow up required",
+        "Loading sponsor ledger...",
+        "No Activity",
+        "No settlement data yet",
+        "Owner → Branch Funded",
+        "Partial Transfer",
+        "Pending Transfer",
+        "Received by Sponsor − Sent to Owner = Remaining with Sponsor",
+        "Sponsor Balance Ledger",
+        "Sponsor → Owner Sent",
+        "Total Received by Sponsor",
+        "Total Sponsor Holdings Split",
+        "Total transferred to owner",
+        "الكفيل لا يزال يحتفظ بـ ${currency} ${Number(b.sponsorRemaining).toLocaleString()} من ${b.branch}. إجمالي استلام: ${fmt(b.receivedBySponsor)} | محوّل للمالك: ${fmt(b.sentToOwner)}",
+        "⚠️ Sponsor Balance Outstanding — ${b.branch}"
+      ]
+    },
+    {
+      "file": "src/components/shared/BranchSelector.jsx",
+      "phrases": [
+        "No Branch Assigned",
+        "Select Branch",
+        "You have access to multiple branches. Choose one to continue."
+      ]
+    },
+    {
+      "file": "src/components/shared/BusinessTypeSelector.jsx",
+      "phrases": [
+        "Business Type",
+        "Full-service dining, takeaway, delivery, recipe costing, and ingredient inventory.",
+        "Retail store management with barcode scanning, SKU tracking, product variants, batch/lot, expiry, and serial numbers."
+      ]
+    },
+    {
+      "file": "src/components/shared/SmartUploadZone.jsx",
+      "phrases": [
+        "OCR…"
+      ]
+    },
+    {
+      "file": "src/components/staff/RosterCard.jsx",
+      "phrases": [
+        "Send email reminder",
+        "WhatsApp reminder"
+      ]
+    },
+    {
+      "file": "src/components/staff/RosterForm.jsx",
+      "phrases": [
+        "Full name",
+        "Save Roster",
+        "Shift note (optional)",
+        "Staff Name *",
+        "Week Starting"
+      ]
+    },
+    {
+      "file": "src/components/staff/ShiftAudit.jsx",
+      "phrases": [
+        "Attach Receipt Photo",
+        "Branch *",
+        "Cashier name",
+        "Cashier on Duty",
+        "Date *",
+        "Expected Network",
+        "Explain what happened...",
+        "Flag Cashier for Review",
+        "No shift data found for this filter",
+        "Recorded Cash",
+        "Recorded Network",
+        "Resolution Notes",
+        "Resolution Tag *",
+        "Resolve Discrepancy",
+        "Select reason...",
+        "Set Expected Shift Totals",
+        "Staff on shift:"
+      ]
+    },
+    {
+      "file": "src/components/staff/StaffPerformanceDashboard.jsx",
+      "phrases": [
+        "Avg Sales per Shift by Staff",
+        "No attendance data for selected period.",
+        "Staff Active",
+        "Staff Performance Breakdown",
+        "Total Hours Worked"
+      ]
+    },
+    {
+      "file": "src/components/staff/WeeklyRosterView.jsx",
+      "phrases": [
+        "Loading rosters...",
+        "No roster for this week"
+      ]
+    },
+    {
+      "file": "src/components/subscription/PaywallScreen.jsx",
+      "phrases": [
+        "Subscription Required"
+      ]
+    },
+    {
+      "file": "src/components/suppliers/SupplierContractTab.jsx",
+      "phrases": [
+        "Contract Notes / Terms",
+        "Credit Limit:",
+        "Delivery terms, quality standards, penalties...",
+        "Edit Contract Terms",
+        "Expiring Soon",
+        "No contract terms set. Click Edit to add."
+      ]
+    },
+    {
+      "file": "src/components/suppliers/SupplierDetail.jsx",
+      "phrases": [
+        "No purchase orders yet",
+        "Purchase Order Created",
+        "Send Email",
+        "Total Orders"
+      ]
+    },
+    {
+      "file": "src/components/suppliers/SupplierInvoices.jsx",
+      "phrases": [
+        "· Overdue"
+      ]
+    },
+    {
+      "file": "src/components/suppliers/SupplierPaymentForm.jsx",
+      "phrases": [
+        "Or type supplier name..."
+      ]
+    },
+    {
+      "file": "src/components/suppliers/SupplierPaymentManager.jsx",
+      "phrases": [
+        "All Statuses",
+        "Amount *",
+        "Create Supplier Invoice",
+        "Date *",
+        "No supplier invoices yet",
+        "Payment Amount",
+        "Pending AP",
+        "Recent Inventory Purchases (Unlinked)",
+        "Record Payment",
+        "Remaining (Partial)",
+        "Select supplier...",
+        "Settled (Total)",
+        "Supplier *"
+      ]
+    },
+    {
+      "file": "src/components/suppliers/SupplierPriceComparison.jsx",
+      "phrases": [
+        "Not enough data yet. Price comparison requires at least 2 purchase orders with priced items.",
+        "Price Change Summary",
+        "Price Trend"
+      ]
+    },
+    {
+      "file": "src/components/suppliers/SupplierPriceTracker.jsx",
+      "phrases": [
+        "(!best || s.latest",
+        "Loading price history...",
+        "No purchase price history found. Add purchases with prices to see comparisons.",
+        "Search ingredient..."
+      ]
+    },
+    {
+      "file": "src/components/suppliers/SupplierStatement.jsx",
+      "phrases": [
+        "i.status !== 'paid' && i.due_date && new Date(i.due_date)"
+      ]
+    },
+    {
+      "file": "src/components/support/SupportTicketForm.jsx",
+      "phrases": [
+        "Contact Support",
+        "Critical 🔴",
+        "Describe your issue...",
+        "🐛 Bug Report",
+        "💡 Feature Request",
+        "💬 General",
+        "💳 Billing Issue",
+        "🚨 Urgent"
+      ]
+    },
+    {
+      "file": "src/components/treasury/BranchSettlementLedger.jsx",
+      "phrases": [
+        "+ Sent to Owner",
+        "Across all branches",
+        "Active Branches",
+        "Branch Settlement Comparison",
+        "Branch Settlement Overview",
+        "Monthly Settlement Statements",
+        "No settlement activity for this month",
+        "Owner Spent",
+        "Remaining w/ Owner",
+        "Sent to Owner",
+        "Settlement History",
+        "Total Held by Owner",
+        "With settlement history",
+        "tx.branch === b.key && tx.date",
+        "– Owner Spending"
+      ]
+    },
+    {
+      "file": "src/components/treasury/CashflowProjection.jsx",
+      "phrases": [
+        "30-Day Liquidity Forecast",
+        "= ninetyDaysAgo && e.date",
+        "= ninetyDaysAgo && p.date",
+        "= ninetyDaysAgo && s.date",
+        "Avg Daily Purchase Cost",
+        "Avg Daily Sales (historical)",
+        "Daily Fixed Cost Total",
+        "Daily Inflow vs Outflow",
+        "Days in Negative",
+        "Lowest Point",
+        "Monthly Rent (from expenses)",
+        "Monthly Salaries (from employees)",
+        "Pending AP Outflows (due dates)",
+        "Projected Balance (Day 30)",
+        "Projection Assumptions"
+      ]
+    },
+    {
+      "file": "src/components/treasury/OwnerPersonalFinance.jsx",
+      "phrases": [
+        "Amount *",
+        "Attachment / Proof (optional)",
+        "Date *",
+        "Delete this record?",
+        "Expense by Category",
+        "External Business",
+        "From Wallet",
+        "Housing / Rent",
+        "Monthly Personal Finance Trend",
+        "Network / Card",
+        "No personal finance records yet",
+        "No records this month",
+        "Optional description...",
+        "Owner Private — Strictly Separated from Restaurant Operations",
+        "Owner withdrew ${currency} ${amount.toLocaleString()} from treasury for personal use",
+        "Personal Balance",
+        "Personal Expense",
+        "Personal Expenses",
+        "Personal Income",
+        "Personal Shopping",
+        "Personal finances never affect restaurant P&L, branch balances, or operational analytics.",
+        "Recent Records",
+        "Transfers / Remittance",
+        "Withdrawals from Treasury",
+        "e.g. External business, investment return...",
+        "⚠️ Large Personal Withdrawal"
+      ]
+    },
+    {
+      "file": "src/components/treasury/ReconciliationDashboard.jsx",
+      "phrases": [
+        "= cutoff && s.date",
+        "= cutoff && tx.date",
+        "Adjustment Amount *",
+        "Each day's network sales are compared against",
+        "Fee / Adjustment Reason *",
+        "How it works:",
+        "Last 60 days",
+        "Last 7 days",
+        "No network sales in this period",
+        "No transactions to reconcile in this period",
+        "Not in Sponsor",
+        "Notes (optional)",
+        "Wallet vs Sales",
+        "e.g. Sponsor fee, rounding, bank charge...",
+        "entries. Discrepancies can be fixed by creating a"
+      ]
+    },
+    {
+      "file": "src/components/waste/AIWasteAnalysis.jsx",
+      "phrases": [
+        "AI Analysis Summary",
+        "AI Prep Quantity Optimizer",
+        "Analyzes waste + sales patterns to suggest daily prep levels",
+        "Day adjustments:",
+        "General Tips",
+        "Generate Prep Recommendations",
+        "High waste weeks with low sales = overprep problem",
+        "No waste data to analyze yet",
+        "Red = high waste rate relative to sales",
+        "Root cause:",
+        "Top Wasted Items (by cost)",
+        "Total Loss (90d)",
+        "Waste Events",
+        "Waste Rate by Day of Week",
+        "Waste vs Sales Correlation (Weekly)",
+        "Waste/Sales Ratio",
+        "parseFloat(d.wasteRate)"
+      ]
+    },
+    {
+      "file": "src/components/waste/WasteCostReport.jsx",
+      "phrases": [
+        "Loss by Branch",
+        "Loss by Reason",
+        "No waste records in this period",
+        "Top Reason",
+        "Total Loss",
+        "Waste Cost by Item",
+        "Waste Events"
+      ]
+    },
+    {
+      "file": "src/hooks/usePurchaseCategories.js",
+      "phrases": [
+        "${cat.icon ||"
+      ]
+    },
+    {
+      "file": "src/lib/AuthContext.jsx",
+      "phrases": [
+        "Authentication required"
+      ]
+    },
+    {
+      "file": "src/lib/BusinessModeContext.jsx",
+      "phrases": [
+        "AI Analytics",
+        "Approval Center",
+        "Batch / Lot Tracking",
+        "Café",
+        "Direct Inventory",
+        "Expiry Tracking",
+        "Network Settlement",
+        "Owner Dashboard",
+        "Product Management",
+        "SKU Management",
+        "Serial Numbers",
+        "Supplier Management",
+        "Supplier Portal"
+      ]
+    },
+    {
+      "file": "src/lib/PageNotFound.jsx",
+      "phrases": [
+        "Admin Note"
+      ]
+    },
+    {
+      "file": "src/lib/activeAlertsEngine.js",
+      "phrases": [
+        "${currency}${remaining.toLocaleString()} is overdue since ${debt.due_date}.",
+        "${currency}${remaining.toLocaleString()} is overdue since ${invoice.due_date}.",
+        "${item.product_name || item.name ||",
+        "0 && quantity",
+        "Cash reconciliation is short by ${currency}${Math.abs(shortage).toLocaleString()}.",
+        "Cash shortage requires review",
+        "Current operating result is ${currency}${Math.abs(numeric(netProfit)).toLocaleString()} below zero.",
+        "Low stock: ${item.product_name || item.name ||",
+        "Negative operating result requires review",
+        "Out of stock: ${item.product_name || item.name ||",
+        "Overdue customer balance: ${debt.party_name || debt.customer_name ||",
+        "Supplier invoice overdue: ${invoice.supplier_name || invoice.invoice_number ||"
+      ]
+    },
+    {
+      "file": "src/lib/auditLogger.js",
+      "phrases": [
+        "Created ${entity}: ${record?.date || record?.name || record?.id}",
+        "Deleted ${entity} record: ${record?.date || record?.name || record?.id}",
+        "PDF report exported for range: ${rangeType}",
+        "Price changed for",
+        "Unauthorized access attempt by [${role}] to: ${path}",
+        "Updated ${entity} #${id?.slice(-6)?.toUpperCase()}",
+        "User logged in: ${email}"
+      ]
+    },
+    {
+      "file": "src/lib/cashflowEngine.js",
+      "phrases": [
+        "= fromStr && r.date"
+      ]
+    },
+    {
+      "file": "src/lib/debtI18n.js",
+      "phrases": [
+        "Amount Paid",
+        "Debt Aging (Receivables)",
+        "Debts & Receivables",
+        "Manage accounts receivable and payable",
+        "Name *",
+        "Outcome / Notes",
+        "النوع / Type",
+        "جهة / Party",
+        "💬 Message"
+      ]
+    },
+    {
+      "file": "src/lib/debtInvoiceService.js",
+      "phrases": [
+        "Amount Paid / المبلغ المدفوع",
+        "Branch / الفرع",
+        "Customer / العميل",
+        "DEBT INVOICE / فاتورة دين",
+        "Invoice Date / تاريخ الفاتورة",
+        "Invoice Reference",
+        "PAYMENT RECEIPT / إيصال دفع",
+        "Paid Amount / المدفوع",
+        "Payment Date / تاريخ الدفع",
+        "Payment Method / طريقة الدفع",
+        "Payment confirmed / تم تأكيد الدفع",
+        "Remaining Balance / المتبقي",
+        "Status / الحالة",
+        "Thank you for your business / شكراً لتعاملكم معنا",
+        "Total Amount / المبلغ الإجمالي"
+      ]
+    },
+    {
+      "file": "src/lib/driverAnalytics.js",
+      "phrases": [
+        "= dateFrom) && (!dateTo || date"
+      ]
+    },
+    {
+      "file": "src/lib/helpers.js",
+      "phrases": [
+        "0 ? '↑' : diff",
+        "= monthStartStr && inv.date",
+        "= prevMonthStartStr && inv.date"
+      ]
+    },
+    {
+      "file": "src/lib/invoiceGenerator.js",
+      "phrases": [
+        "Invoice #:",
+        "Payment Method:",
+        "Thank you for your business!",
+        "Unit Price"
+      ]
+    },
+    {
+      "file": "src/lib/navigationConfig.js",
+      "phrases": [
+        "AI Analytics",
+        "Approval Center",
+        "Batch / Lot Tracking",
+        "Brand Settings",
+        "Debt Management",
+        "Expiry Tracking",
+        "Network Settlement",
+        "SKU Management",
+        "Serial Numbers",
+        "Supplier Portal"
+      ]
+    },
+    {
+      "file": "src/lib/notificationEngine.js",
+      "phrases": [
+        "${actorName || actorEmail ||",
+        "${currency} ${oldPrice} → ${currency} ${newPrice} (${branch ||",
+        "${productName}: ${qty} ${unit ||",
+        "المصاريف أعلى بـ ${pct}% من المعدل الطبيعي",
+        "انخفاض ${dropPct}% مقارنة بالفترة السابقة",
+        "تم تصدير التقرير بنجاح بواسطة ${actorName || actorEmail ||",
+        "مبلغ: ${currency} ${Number(amount || 0).toLocaleString()}",
+        "موجودی: ${currentQty} ${unit ||",
+        "↔️ تحويل فرع → مالک — ${branch ||",
+        "↔️ نقل مخزون — ${fromBranch ||",
+        "⚠️ ارتفاع المصاريف — ${branch ||",
+        "🏷️ تغيير سعر — ${productName ||",
+        "💳 تمويل فرع — ${branch ||",
+        "💵 صرف راتب — ${employeeName ||",
+        "📄 تصدير PDF اكتمل",
+        "📉 تنزل الربح — ${branch ||",
+        "📦 موجودی کم — ${productName ||",
+        "🚨 نشاط مشبوه — ${branch ||"
+      ]
+    },
+    {
+      "file": "src/lib/pdfGenerator.js",
+      "phrases": [
+        "${b.name}: ${lang ===",
+        "(settlements9[b.key]?.remaining || 0)",
+        "= fromStr && e.date",
+        "= fromStr && p.date",
+        "= fromStr && s.date",
+        "safeNum(i.opening_stock)"
+      ]
+    },
+    {
+      "file": "src/lib/procurementEngine.js",
+      "phrases": [
+        "Purchase Invoice ${invoice.invoice_number || invoice.id}",
+        "Supplier Payment — ${invoice.supplier_name ||"
+      ]
+    },
+    {
+      "file": "src/lib/salesInvoiceService.js",
+      "phrases": [
+        "Cash Sales (Revenue)",
+        "Invoice ${invoice.invoice_number}",
+        "Network Sales",
+        "SALES INVOICE",
+        "Sales Summary",
+        "Sales Total"
+      ]
+    },
+    {
+      "file": "src/lib/smartAnalytics.js",
+      "phrases": [
+        "High credit risk",
+        "High expenses",
+        "High waste",
+        "Low sales",
+        "Profit dropped"
+      ]
+    },
+    {
+      "file": "src/lib/whatsappService.js",
+      "phrases": [
+        "No phone number"
+      ]
+    },
+    {
+      "file": "src/main.jsx",
+      "phrases": [
+        "Something went wrong"
+      ]
+    },
+    {
+      "file": "src/pages/AIBusinessCopilot.jsx",
+      "phrases": [
+        "Ask about your business...",
+        "Cash collection rate: ${collectionRate}%${collectionRate < 70 ?",
+        "Collection rate is low — follow up on outstanding debts",
+        "Consider bulk purchasing for high-turnover items",
+        "Expenses: ${fmt(expTotal)} — Audit recurring expenses for savings",
+        "Food waste tracking can reduce costs by 5-15%",
+        "Gross Profit: ${fmt(profit)}",
+        "How can I reduce costs?",
+        "How is my business doing this month?",
+        "Monthly Revenue",
+        "Net Profit: ${fmt(profit)} (${margin}% margin)${parseFloat(margin) < 30 ?",
+        "Powered by AI · Always learning",
+        "Profit Margin: ${margin}%${parseFloat(margin) < 30 ?",
+        "Profit margin is below 30% — review menu pricing",
+        "Purchase costs: ${fmt(cost)} — Review supplier prices quarterly",
+        "Restock ${insights.lowStock} low-inventory items to avoid stockouts",
+        "Revenue: ${fmt(revenue)} — ${revenue > 0 ?",
+        "Review branch performance weekly for optimization opportunities",
+        "Track food waste daily to reduce costs by up to 15%",
+        "What are my top selling items?",
+        "What should I restock?",
+        "Which branch is most profitable?",
+        "Who owes me the most?"
+      ]
+    },
+    {
+      "file": "src/pages/ActivityLogs.jsx",
+      "phrases": [
+        "Activity logs are restricted to organization owners for security.",
+        "All actions",
+        "Branch Change",
+        "Loading logs...",
+        "Logs appear as users perform actions in the system.",
+        "No activity logs yet.",
+        "Owner Access Only",
+        "Price Change",
+        "Search actions, users, entities..."
+      ]
+    },
+    {
+      "file": "src/pages/Alerts.jsx",
+      "phrases": [
+        "${b.label || b.name || b.key} — ${t(",
+        "0 && thisProfit",
+        "= lastMonthStart && p.date",
+        "= lastMonthStart && s.date",
+        "= mFrom && b.date",
+        "= mFrom && r.date",
+        "= thisMonthStart && p.date",
+        "= thisMonthStart && s.date",
+        "Failed to load alerts",
+        "Frequent Late Arrivals — ${emp.name ||",
+        "High Bonus — ${emp.name ||",
+        "Payroll Due",
+        "Please check your connection and try again.",
+        "Repeated Absences — ${emp.name ||"
+      ]
+    },
+    {
+      "file": "src/pages/ApprovalPolicy.jsx",
+      "phrases": [
+        "0 = disabled",
+        "Accountant Verification:",
+        "Accountant must verify before owner approves",
+        "Add Policy",
+        "All Settlements",
+        "All Types (Global)",
+        "All submissions require manual review by default",
+        "Amounts above this need both Sponsor + Owner sign-off",
+        "Amounts above this threshold require both Sponsor + Owner sign-off.",
+        "Approval Policies",
+        "Auto-Approve Limit:",
+        "Branch (optional)",
+        "Branch → Sponsor Settlement",
+        "Delete this policy?",
+        "Dual Signature:",
+        "Expense Type *",
+        "How Approval Policies Work",
+        "Leave blank = disabled",
+        "No approval policies defined yet",
+        "Notes (optional)",
+        "Owner access only.",
+        "Owner → Branch Funding",
+        "Personal Expense",
+        "Policy Active",
+        "Require Accountant Verification",
+        "Requires an accountant to mark \"Verified\" before owner approval.",
+        "Specific Manager Email (leave blank = all)",
+        "Sponsor → Owner Transfer",
+        "Submissions at or below this amount skip manual review.",
+        "Submissions ≤ this amount are automatically approved",
+        "🔍 Accountant verification required"
+      ]
+    },
+    {
+      "file": "src/pages/BICenter.jsx",
+      "phrases": [
+        "30 days",
+        "6-Month Comparison",
+        "7 days",
+        "90 days",
+        "= mStart && e.date",
+        "= mStart && p.date",
+        "= mStart && s.date",
+        "Avg Daily Rev",
+        "Branch Revenue",
+        "Cost Breakdown",
+        "Export business intelligence trend as CSV",
+        "Monthly Summary Table",
+        "Payment Method Breakdown",
+        "Revenue & Profit Trend"
+      ]
+    },
+    {
+      "file": "src/pages/BalanceSheet.jsx",
+      "phrases": [
+        "Balance Sheet",
+        "Balance Sheet Summary",
+        "Total Assets",
+        "Total Liabilities"
+      ]
+    },
+    {
+      "file": "src/pages/Billing.jsx",
+      "phrases": [
+        "0 && max",
+        "Activate Enterprise",
+        "Activate Pro",
+        "Activate Starter",
+        "Reset Trial"
+      ]
+    },
+    {
+      "file": "src/pages/BranchAnalytics.jsx",
+      "phrases": [
+        "= from && e.date",
+        "= from && p.date",
+        "= from && s.date",
+        "= prevFrom && s.date",
+        "Branch Ranking",
+        "Enterprise Branch Dashboard",
+        "Loading…",
+        "Needs Attention",
+        "No branch data available for this period.",
+        "Top Branch"
+      ]
+    },
+    {
+      "file": "src/pages/BranchCommandCenter.jsx",
+      "phrases": [
+        "Detailed Comparison",
+        "No branches configured",
+        "Revenue Comparison"
+      ]
+    },
+    {
+      "file": "src/pages/BranchManagement.jsx",
+      "phrases": [
+        "9:00 AM - 11:00 PM",
+        "All Roles",
+        "Assigned Branch Only",
+        "Branch Management & Role Control Center",
+        "Branch Ranking by Sales",
+        "General Manager",
+        "Manage branches, users, roles, and permissions from one place",
+        "Oracle Analytics",
+        "Owner (Owner Only)",
+        "Read Only",
+        "Select accessible branches:",
+        "Selected Branches",
+        "Total Users"
+      ]
+    },
+    {
+      "file": "src/pages/BrandSettings.jsx",
+      "phrases": [
+        "✓ Uploaded"
+      ]
+    },
+    {
+      "file": "src/pages/CEODashboard.jsx",
+      "phrases": [
+        "= monthStart && e.date",
+        "= monthStart && s.date",
+        "= yearStart && e.date",
+        "= yearStart && s.date",
+        "All sales today",
+        "CEO Dashboard",
+        "Cost × quantity",
+        "Exp / Sales",
+        "Financial Position",
+        "Gross − Expenses",
+        "Monthly Profit",
+        "Monthly Revenue",
+        "Net / Sales",
+        "Net this month",
+        "Open customer debts",
+        "Outstanding to suppliers",
+        "Purch / Sales",
+        "Ratios (Monthly)",
+        "Revenue − Purchases",
+        "This month",
+        "Wallet balance",
+        "YTD net profit",
+        "Year Profit",
+        "Year Revenue",
+        "Year to Date"
+      ]
+    },
+    {
+      "file": "src/pages/CashRegisterCenter.jsx",
+      "phrases": [
+        "Auto-Sync Active.",
+        "No cash injections yet.",
+        "Total Owner Injections"
+      ]
+    },
+    {
+      "file": "src/pages/CustomerManagement.jsx",
+      "phrases": [
+        "Edit a customer to assign a VIP tier",
+        "Enter note...",
+        "Select open debt (optional)"
+      ]
+    },
+    {
+      "file": "src/pages/CustomerPortal.jsx",
+      "phrases": [
+        "Apartment, Floor...",
+        "Street, Building..."
+      ]
+    },
+    {
+      "file": "src/pages/Dashboard.jsx",
+      "phrases": [
+        "= fromStr && e.date",
+        "= fromStr && p.date",
+        "= fromStr && s.date",
+        "= fromStr && w.date",
+        "= monthStart && e.date",
+        "= prevFrom && e.date",
+        "= prevFrom && p.date",
+        "= prevFrom && s.date"
+      ]
+    },
+    {
+      "file": "src/pages/DebtManagement.jsx",
+      "phrases": [
+        "No WhatsApp messages queued",
+        "No invoices yet",
+        "No receipts yet",
+        "No transactions found",
+        "Pending Delivery",
+        "Pending WA",
+        "Search customer...",
+        "Total Customers",
+        "Total Outstanding",
+        "WA Queue",
+        "WA Sent"
+      ]
+    },
+    {
+      "file": "src/pages/DriverManagement.jsx",
+      "phrases": [
+        "Add Driver",
+        "Analytics Period",
+        "Branch *",
+        "Branch Scope",
+        "Canonical branch-scoped driver directory, sales history, and performance.",
+        "Driver ID",
+        "Full Name *",
+        "Loading drivers…",
+        "Network / POS",
+        "No driver-linked sales have been recorded for this period.",
+        "No drivers are assigned to this branch.",
+        "No sales have been linked to this driver yet.",
+        "Sales / Orders",
+        "Sales History",
+        "Search drivers by name, ID, or phone",
+        "Select branch",
+        "Top 10 Drivers",
+        "Vehicle Plate",
+        "Vehicle Type",
+        "Your access is restricted to your assigned branch."
+      ]
+    },
+    {
+      "file": "src/pages/ERPLogin.jsx",
+      "phrases": [
+        "Attendance, tasks and schedule",
+        "Create a new owner organization account",
+        "Cross-branch management and analytics",
+        "Email Address",
+        "Full access to all branches and settings",
+        "General Manager",
+        "Manage your assigned branch",
+        "Purchase orders and invoices",
+        "Secure ERP Portal",
+        "Sign In",
+        "Signing in…",
+        "Staff accounts are invitation-only. Ask your organization owner for a secure activation link."
+      ]
+    },
+    {
+      "file": "src/pages/ERPRegister.jsx",
+      "phrases": [
+        ": awaitingSms ?",
+        "Activate your invited account",
+        "Already have an account",
+        "Ask your organization owner to create a secure invitation. Public organization and branch selection are not available.",
+        "At least 10 characters",
+        "At least 10 characters with letters and numbers.",
+        "Checking secure access…",
+        "Confirm password",
+        "Create a new owner organization account",
+        "Create password",
+        "Create your organization",
+        "Email address",
+        "Enter the code sent to the invited phone number.",
+        "Go to sign in",
+        "Initial branch name",
+        "Invited email address or phone number",
+        "Need help? Contact the owner who sent the invitation.",
+        "Only owners create organizations, branches, and secure staff invitations.",
+        "Open the verification link sent to your invited email address. You will return here and your account will activate automatically.",
+        "Organization and branch lists are intentionally unavailable. The owner’s invitation is the sole source of your organization, branch, role, and permissions.",
+        "Organization name",
+        "Owner organization setup",
+        "Return to sign in",
+        "SMS verification code",
+        "Secure staff activation",
+        "Staff accounts are invitation-only",
+        "Try again",
+        "Use another identity",
+        "Verify the invited identity, create a password, and access only the workspace assigned by the owner.",
+        "Verify your email",
+        "Verify your phone",
+        "Your name",
+        "you@company.com or +1 555 0100"
+      ]
+    },
+    {
+      "file": "src/pages/EmployeeAttendance.jsx",
+      "phrases": [
+        "${emp.full_name} already completed shift",
+        "${emp.full_name} checked in at ${checkIn}${lateMinutes > 0 ?",
+        "${emp.full_name} checked out at ${checkOut} (${hours.toFixed(1)}h worked)",
+        "Already Done",
+        "Checked Out",
+        "Employee Attendance",
+        "Employee Checked Out",
+        "Invalid PIN",
+        "Loading…",
+        "Point camera at employee QR badge",
+        "QR Error",
+        "Scan QR Code",
+        "Tap digits to check in / check out"
+      ]
+    },
+    {
+      "file": "src/pages/EmployeeDashboardERP.jsx",
+      "phrases": [
+        "Checked In",
+        "Checked Out",
+        "My Tasks",
+        "No announcements.",
+        "No tasks assigned.",
+        "You haven't checked in yet today."
+      ]
+    },
+    {
+      "file": "src/pages/EmployeePortal.jsx",
+      "phrases": [
+        "Attendance History",
+        "My Compensation",
+        "My Schedule",
+        "Not checked in",
+        "Profile Not Found",
+        "Salary Advances",
+        "Sign Out",
+        "per month"
+      ]
+    },
+    {
+      "file": "src/pages/Employees.jsx",
+      "phrases": [
+        "Access restricted.",
+        "Add First Employee",
+        "Announcement details…",
+        "Base Salary (SAR)",
+        "Branch *",
+        "Cashier, Chef...",
+        "Delete this employee?",
+        "Employee ID",
+        "Full Name *",
+        "Message *",
+        "No employees yet",
+        "Open Owner Dashboard",
+        "Post Announcement",
+        "Staff access is provisioned by the Owner",
+        "Title *",
+        "e.g. Shift change tomorrow"
+      ]
+    },
+    {
+      "file": "src/pages/EnterprisePurchaseCommandCenter.jsx",
+      "phrases": [
+        "${inv.supplier_name ||"
+      ]
+    },
+    {
+      "file": "src/pages/ExecutiveCommandCenter.jsx",
+      "phrases": [
+        "= fromStr && e.date",
+        "= fromStr && p.date",
+        "= fromStr && s.date",
+        "= fromStr && w.date",
+        "= prevFrom && e.date",
+        "= prevFrom && p.date",
+        "= prevFrom && s.date"
+      ]
+    },
+    {
+      "file": "src/pages/Expenses.jsx",
+      "phrases": [
+        "(Fixed)",
+        "Daily Operating",
+        "Fixed Monthly",
+        "No categories yet. Create them in the Categories tab.",
+        "Scan Receipt",
+        "Select category..."
+      ]
+    },
+    {
+      "file": "src/pages/GMDashboard.jsx",
+      "phrases": [
+        "Active Branches",
+        "GM Command Center",
+        "General Manager",
+        "No active branches found.",
+        "No pending approvals.",
+        "Sales Reports"
+      ]
+    },
+    {
+      "file": "src/pages/Inventory.jsx",
+      "phrases": [
+        "Manager WhatsApp Number",
+        "Send Low-Stock Alerts"
+      ]
+    },
+    {
+      "file": "src/pages/InventoryCommandCenter.jsx",
+      "phrases": [
+        "All items are well-stocked!",
+        "Inventory by Category"
+      ]
+    },
+    {
+      "file": "src/pages/InventoryForecast.jsx",
+      "phrases": [
+        "3 && r.daysLeft",
+        "= cutoffDate && p.date",
+        "= cutoffDate && w.date",
+        "AI Alerts",
+        "r.daysLeft !== null && r.daysLeft"
+      ]
+    },
+    {
+      "file": "src/pages/InventoryTransfer.jsx",
+      "phrases": [
+        "Inventory Transfers",
+        "New Inventory Transfer",
+        "Save Transfer"
+      ]
+    },
+    {
+      "file": "src/pages/InventoryWaste.jsx",
+      "phrases": [
+        "Inventory Waste",
+        "Log Inventory Waste",
+        "Log Waste",
+        "No waste records",
+        "Notes (optional)",
+        "Select product",
+        "Total Loss",
+        "Unit Cost"
+      ]
+    },
+    {
+      "file": "src/pages/LandingPage.jsx",
+      "phrases": [
+        "BI & Analytics",
+        "BizCTRL transformed how we manage 6 branches. The owner dashboard gives me everything I need in seconds.",
+        "Café",
+        "Create Organization",
+        "ERP Sign In",
+        "Enterprise ERP",
+        "Enterprise Features",
+        "Finally an ERP that works for wholesale. The purchase order and supplier portal features are outstanding.",
+        "Finance & Treasury",
+        "Join thousands of businesses already running on BizCTRL.",
+        "Multi-Tenant & Secure",
+        "Role-Based Access",
+        "Role-Based Access Control",
+        "Sales & POS",
+        "Sign In",
+        "Smart Inventory",
+        "Supplier Management",
+        "The All-in-One Business ERP Platform",
+        "The inventory expiry tracking and supplier approval system saved us countless hours every week.",
+        "Unified Owner Dashboard",
+        "© 2026 BizCTRL. All rights reserved."
+      ]
+    },
+    {
+      "file": "src/pages/LoyaltyProgram.jsx",
+      "phrases": [
+        "Avg Points",
+        "Code *",
+        "Max Discount",
+        "Min Order",
+        "No promo codes yet",
+        "Search customers...",
+        "Summer sale...",
+        "Tier Distribution",
+        "Tier Rules",
+        "Total Members",
+        "Value *"
+      ]
+    },
+    {
+      "file": "src/pages/LoyaltyProgramV2.jsx",
+      "phrases": [
+        "Manage points, cashback, VIP tiers, and referrals",
+        "Manual adjustment by ${user?.email}",
+        "Points amount",
+        "Search customers...",
+        "Total Members",
+        "Total Points",
+        "VIP Tier Distribution",
+        "VIP+ Members",
+        "Wallet (SAR)"
+      ]
+    },
+    {
+      "file": "src/pages/ManagerDashboardERP.jsx",
+      "phrases": [
+        "0 && i.quantity",
+        "All clear",
+        "All items well-stocked",
+        "No activity yet",
+        "Sales Records"
+      ]
+    },
+    {
+      "file": "src/pages/NetworkManagement.jsx",
+      "phrases": [
+        "Account #",
+        "Account Name",
+        "Account Number",
+        "Account is available for transactions",
+        "Actual Amount",
+        "Add your first network account to get started",
+        "All accounts",
+        "All branches",
+        "Assign POS devices to network accounts",
+        "Assign to Network Account",
+        "Branch selection is required.",
+        "Daily Settlement",
+        "Delete Network Account?",
+        "Delete POS Device?",
+        "Device Name",
+        "Edit Network Account",
+        "Expected Amount",
+        "From Account",
+        "Loading devices...",
+        "Loading reconciliations...",
+        "Loading transfers...",
+        "Network Account",
+        "New Network Account",
+        "New Transfer",
+        "No POS devices found",
+        "No POS entry data available",
+        "No accounts yet",
+        "No network accounts found",
+        "No reconciliations yet",
+        "No sales data available",
+        "No transfers yet",
+        "Optional notes...",
+        "Record daily settlements and detect variances",
+        "Ref #",
+        "Search accounts...",
+        "Select destination account...",
+        "Select provider...",
+        "Select source account...",
+        "Serial Number",
+        "Settlement Date",
+        "To Account",
+        "Total Network Revenue (all time)",
+        "Transfer funds between network accounts",
+        "e.g. Mada Terminal 1",
+        "e.g. Main POS Network",
+        "e.g. POS Terminal 1"
+      ]
+    },
+    {
+      "file": "src/pages/OracleAnalytics.jsx",
+      "phrases": [
+        "6-Month Trend",
+        "= fromStr && r[dateField]",
+        "= mStart && e.date",
+        "= mStart && p.date",
+        "= mStart && s.date",
+        "= prevFromStr && r[dateField]",
+        "Fixed Expense",
+        "Gross − Expenses",
+        "Loading chart…",
+        "Monthly Summary",
+        "Net / Sales",
+        "Oracle Analytics Dashboard",
+        "Variable Expense",
+        "vs previous period"
+      ]
+    },
+    {
+      "file": "src/pages/OwnerApprovalCenter.jsx",
+      "phrases": [
+        "Additional Info",
+        "All Roles",
+        "All Status",
+        "Approval Center",
+        "Approved At",
+        "Assign Branch *",
+        "General Manager",
+        "Manage approvals and staff invitations",
+        "No registrations found",
+        "Provide a reason...",
+        "Reason (optional)",
+        "Registration Details",
+        "Rejection Reason",
+        "Request Center",
+        "Requested Branch",
+        "Review and manage staff registration requests",
+        "Search by name, email, phone, role...",
+        "Tap to view pending requests",
+        "— Select Branch —"
+      ]
+    },
+    {
+      "file": "src/pages/OwnerDashboard.jsx",
+      "phrases": [
+        "(Number(r.cash_difference) || 0)",
+        "(item.quantity || 0)",
+        "0 && qty",
+        "0 ? 'text-red-600' : item.diff",
+        "0 Active Alerts",
+        "6 Month Trend",
+        "6-Month Trend Analytics",
+        ": item.diff",
+        "= format(startOfMonth(new Date()), 'yyyy-MM-dd') && inv.date",
+        "= mStart && e.date",
+        "= mStart && inv.date",
+        "= mStart && s.date",
+        "= prevMonthStart && expense.date",
+        "= prevMonthStart && sale.date",
+        "= prevWeekStart && sale.date",
+        "= startDate && invoice.date",
+        "= startOfW && inv.date",
+        "= weekStart && expense.date",
+        "Assets / Liabilities",
+        "Balance Sheet",
+        "Branch and driver sales performance",
+        "CEO View",
+        "Cash In / Out",
+        "Compare Branches",
+        "Enterprise Financial Center",
+        "Financial Report",
+        "Fixed Exp",
+        "Live Activity Feed",
+        "Month Variable",
+        "No unresolved alert records require attention.",
+        "Oracle Analytics",
+        "Profit &amp; Loss",
+        "Quick access to enterprise reports",
+        "Real-time branch events",
+        "Recent supplier and product price activity",
+        "Today Variable",
+        "Var Exp",
+        "Variable Expenses",
+        "Variable costs only — fixed expenses excluded",
+        "Variable expenses this month",
+        "Variable expenses this week",
+        "Variable expenses today",
+        "Variable expenses year-to-date",
+        "Variable expenses yesterday",
+        "Week Variable",
+        "Widget failed to load. Please refresh.",
+        "Year Variable",
+        "Yesterday Variable"
+      ]
+    },
+    {
+      "file": "src/pages/Payroll.jsx",
+      "phrases": [
+        "Access restricted."
+      ]
+    },
+    {
+      "file": "src/pages/PriceOptimization.jsx",
+      "phrases": [
+        "0.5 ? 'text-amber-600' : priceDiff",
+        ": priceDiff",
+        "AI Pricing Analysis",
+        "At Risk",
+        "Below Target",
+        "Cost shift:",
+        "Current margin:",
+        "Current price:",
+        "Loading product data...",
+        "No cost data",
+        "On Target",
+        "Search products...",
+        "Target Profit Margin"
+      ]
+    },
+    {
+      "file": "src/pages/ProcurementDashboard.jsx",
+      "phrases": [
+        "Enterprise purchasing analytics",
+        "No invoices yet",
+        "Procurement Dashboard",
+        "View Invoices"
+      ]
+    },
+    {
+      "file": "src/pages/ProductManagement.jsx",
+      "phrases": [
+        "#6366f1",
+        "(p.current_stock || 0)",
+        "0 && (p.current_stock || 0)",
+        "0 && s",
+        "Barcode / QR Code",
+        "CSV Format Guide",
+        "Category Name *",
+        "Color (hex)",
+        "Critical Stock (Out)",
+        "Download the template above for the correct format.",
+        "In Stock",
+        "Inventory Insights",
+        "Inventory Transaction",
+        "No inventory transactions yet",
+        "Optional: name_ar, name_en, sku, barcode, category, unit, brand, purchase_cost, selling_price, tax_rate, min_stock, max_stock, status",
+        "Press Enter or click Search to look up",
+        "Products by Category",
+        "Quick Generate — All Products",
+        "Required columns:",
+        "Scan or type barcode / SKU...",
+        "Search name, SKU, barcode...",
+        "Search transactions...",
+        "Status values: active, inactive, discontinued",
+        "Stock Levels vs Minimum",
+        "Supported: .csv",
+        "Total Product Value",
+        "Unit Name *",
+        "e.g. Dozen",
+        "— Top Level —"
+      ]
+    },
+    {
+      "file": "src/pages/ProfitLoss.jsx",
+      "phrases": [
+        "Custom range end",
+        "Custom range start",
+        "Date range",
+        "ERP Financial Analysis",
+        "Expense Cadence",
+        "Financial KPIs",
+        "Financial reporting scope",
+        "Fixed Expenses",
+        "Multi Branch",
+        "No branch data is available for this scope and period.",
+        "No fixed expenses recorded for this period.",
+        "No live records for this period.",
+        "No variable expenses recorded for this period.",
+        "Organization Total",
+        "Purchase Analysis",
+        "Purchase Trend",
+        "Select an organization to view its financial analysis.",
+        "Select branch",
+        "Single Branch",
+        "Top 10 Products",
+        "Top Categories",
+        "Top Expense Categories",
+        "Top Lists",
+        "Top Performing Branches",
+        "Top Suppliers",
+        "Trend Analytics",
+        "Variable Expenses",
+        "Worst Performing Branches"
+      ]
+    },
+    {
+      "file": "src/pages/PromotionsV2.jsx",
+      "phrases": [
+        "Cashback Promos",
+        "End Date",
+        "Fixed Amount",
+        "Free Delivery",
+        "Limit Reached",
+        "Manage discount codes, cashback, and special offers",
+        "Max Discount (SAR)",
+        "Min Order (SAR)",
+        "No limit",
+        "No promotions yet. Create your first one!",
+        "Percentage Discount",
+        "Promo Code *",
+        "Save Promotion",
+        "Start Date",
+        "Total Promos",
+        "Total Uses",
+        "Usage Limit"
+      ]
+    },
+    {
+      "file": "src/pages/PurchaseOrders.jsx",
+      "phrases": [
+        "No purchase orders yet"
+      ]
+    },
+    {
+      "file": "src/pages/Purchases.jsx",
+      "phrases": [
+        "All Status",
+        "Delete Invoice?",
+        "Enterprise procurement & accounts payable",
+        "Search supplier or invoice #...",
+        "Total Outstanding Payables"
+      ]
+    },
+    {
+      "file": "src/pages/Reports.jsx",
+      "phrases": [
+        "Configure sources in Settings → Sales Sources",
+        "Highest Cost (Month)",
+        "Monthly Product Consumption",
+        "No product consumption data. Add purchase invoices with line items.",
+        "Today's Product Usage",
+        "Top Consumed (Month)"
+      ]
+    },
+    {
+      "file": "src/pages/RestaurantManager.jsx",
+      "phrases": [
+        "Add your first Restaurant or Retail business to get started.",
+        "Branch Name *",
+        "Branch inherits",
+        "Business Details",
+        "Business Name *",
+        "Business address",
+        "Businesses & Branches",
+        "Manage your tenants and branches. Each business has a fixed Business Type.",
+        "Manager Email (optional)",
+        "New Business",
+        "No branches yet",
+        "No businesses yet.",
+        "Owner access required.",
+        "Please select a Business Type above to continue.",
+        "e.g. Main Branch, Downtown",
+        "from parent business."
+      ]
+    },
+    {
+      "file": "src/pages/RolePermissionCenter.jsx",
+      "phrases": [
+        "Access Restricted",
+        "All Roles",
+        "All Status",
+        "All roles",
+        "All status",
+        "Assigned Branch Only",
+        "Audit Log",
+        "Base Role",
+        "Brand Settings",
+        "Clone template",
+        "Close Shift",
+        "Create Role Template",
+        "Data Scope",
+        "Debt Management",
+        "Delete template",
+        "Delivery orders only",
+        "Export / Print",
+        "Finance and reports",
+        "Full access to all features",
+        "General Manager",
+        "Inventory management",
+        "Module Permissions",
+        "Multi-branch oversight",
+        "Network Settlement",
+        "No audit events yet.",
+        "No users found",
+        "Only the Owner can manage roles and permissions.",
+        "Open Shift",
+        "Owner-controlled access management. All permissions come from the database.",
+        "POS and sales only",
+        "Purchases and suppliers",
+        "Read Only",
+        "Read-only audit access",
+        "Remove User",
+        "Remove user",
+        "Role & Permission Center",
+        "Role Templates",
+        "Search by name or email...",
+        "Select branch",
+        "Selected Branches",
+        "Single branch management",
+        "Staff Control",
+        "Table service",
+        "Template Name",
+        "Total Users",
+        "Transfer Branch",
+        "Transfer branch",
+        "User Management",
+        "View only, no edits",
+        "e.g. Senior Cashier"
+      ]
+    },
+    {
+      "file": "src/pages/Sales.jsx",
+      "phrases": [
+        "= from) && (!to || s.date",
+        "Cash Overage (Reconciliation) — ${saleData.branch} — ${saleData.date} — Cashier: ${saleData.cashier_name ||",
+        "Cash Shortage (Reconciliation) — ${saleData.branch} — ${saleData.date} — Cashier: ${saleData.cashier_name ||",
+        "Counter cash — ${saleData.branch} — ${saleData.date}",
+        "Counter network — ${saleData.branch} — ${saleData.date}",
+        "Credit sale — ${saleData.date}",
+        "Owner Capital Contribution — Cash Register Shortage — ${saleData.branch} — ${saleData.date}",
+        "Owner Capital Contribution — Purchases Exceed Sales — ${saleData.branch} — ${saleData.date}"
+      ]
+    },
+    {
+      "file": "src/pages/SalesDashboard.jsx",
+      "phrases": [
+        "= fromPrev && s.date",
+        "Branch Performance Comparison",
+        "Daily Revenue Trend",
+        "Monthly Trend",
+        "No data",
+        "Payment Breakdown",
+        "Payment Method Mix",
+        "Peak Day",
+        "Weekly Revenue"
+      ]
+    },
+    {
+      "file": "src/pages/SalesInvoices.jsx",
+      "phrases": [
+        "Cash Sales (Closing − Opening)",
+        "Cash Status",
+        "Invoice archive — search, view, download, reprint, reshare",
+        "Loading invoices...",
+        "Network Sales",
+        "Sales Breakdown",
+        "Sales Total",
+        "Search invoice number, branch, cashier..."
+      ]
+    },
+    {
+      "file": "src/pages/SalesSources.jsx",
+      "phrases": [
+        "Owner Access Only"
+      ]
+    },
+    {
+      "file": "src/pages/ScheduledReports.jsx",
+      "phrases": [
+        ": pdfDone ? '✓' :",
+        "Weekly Sales Report"
+      ]
+    },
+    {
+      "file": "src/pages/SettingsPage.jsx",
+      "phrases": [
+        "Approval Policy",
+        "Sales Sources",
+        "System Configuration",
+        "Users & Access"
+      ]
+    },
+    {
+      "file": "src/pages/SmartAlertCenter.jsx",
+      "phrases": [
+        "0 Active Alerts",
+        "Date / time",
+        "Loading active alerts…",
+        "There are no unresolved persisted alerts in this scope."
+      ]
+    },
+    {
+      "file": "src/pages/SponsorDashboard.jsx",
+      "phrases": [
+        "Awaiting your review in the Settlement tab",
+        "Loading…",
+        "No branches configured",
+        "No driver records found",
+        "No employee records found",
+        "No settlements yet",
+        "Sponsor View · Read-Only",
+        "كفيل Dashboard"
+      ]
+    },
+    {
+      "file": "src/pages/SponsorTreasury.jsx",
+      "phrases": [
+        "3-Party Settlement: Branch Manager → Sponsor (كفيل) → Owner",
+        "Access restricted.",
+        "Manager submits nightly network sales with proof → Sponsor reviews & approves → Owner receives settlement → Owner funds branches.",
+        "Sponsor ↔ Owner Settlement"
+      ]
+    },
+    {
+      "file": "src/pages/StaffInvitations.jsx",
+      "phrases": [
+        "Create and manage secure invitations for organization staff.",
+        "Staff Invitations"
+      ]
+    },
+    {
+      "file": "src/pages/SuperAdmin.jsx",
+      "phrases": [
+        "Access Denied",
+        "All Plans",
+        "All Status",
+        "Confirm Suspend",
+        "No active tenants yet",
+        "No tenants found",
+        "No tenants yet",
+        "PDF Exports",
+        "Plan Distribution",
+        "Platform Control Center",
+        "Reason for suspension",
+        "Search by email or business name...",
+        "Super Admin",
+        "Super Admin access required.",
+        "Suspension Reason",
+        "Total OCR Scans",
+        "View Details",
+        "e.g. Payment failed, abuse, etc.",
+        "will block their access immediately.",
+        "⚡ Usage",
+        "🏢 Tenants",
+        "📊 Overview"
+      ]
+    },
+    {
+      "file": "src/pages/SupplierLedger.jsx",
+      "phrases": [
+        "Account statements, invoices & payments",
+        "All Suppliers",
+        "Invoice ${inv.invoice_number || inv.id.slice(0, 8)} — ${inv.supplier_name}",
+        "No payments found",
+        "No transactions found",
+        "Payment — ${p.supplier_name} (${p.payment_method})",
+        "Search supplier or invoice #...",
+        "Total Invoiced",
+        "Total Paid"
+      ]
+    },
+    {
+      "file": "src/pages/SupplierPortal.jsx",
+      "phrases": [
+        "No activity yet",
+        "No invoices yet",
+        "No payments recorded yet",
+        "No purchase orders yet",
+        "Payment History",
+        "Purchase orders and invoices will appear here once created.",
+        "Recent Activity",
+        "Total Invoiced",
+        "Total Paid"
+      ]
+    },
+    {
+      "file": "src/pages/SupplierPortalERP.jsx",
+      "phrases": [
+        "All clear!",
+        "Awaiting Ship",
+        "No invoices yet.",
+        "No pending shipments or invoices.",
+        "No purchase orders found.",
+        "Search invoices…",
+        "Search orders…"
+      ]
+    },
+    {
+      "file": "src/pages/SupplierRegistration.jsx",
+      "phrases": [
+        "(select all that apply)",
+        "+966 5x xxx xxxx",
+        "Additional Notes",
+        "Company / Business Name *",
+        "Company Information",
+        "Contact Details",
+        "Contact Person Name *",
+        "Email Address *",
+        "Full name",
+        "Phone Number",
+        "Product Categories",
+        "Register as a Supplier",
+        "Registration Submitted!",
+        "Supplier Portal",
+        "Supplier Registration",
+        "Tell us about your company, products, minimum order quantities, delivery areas, etc.",
+        "e.g. Al-Nakheel Trading Co."
+      ]
+    },
+    {
+      "file": "src/pages/Support.jsx",
+      "phrases": [
+        "Support Center"
+      ]
+    },
+    {
+      "file": "src/pages/TelegramSettings.jsx",
+      "phrases": [
+        "Bot Token",
+        "Chat ID",
+        "Configure your bot to receive real-time alerts for restaurant events.",
+        "Enable Telegram Notifications",
+        "Enter your message template...",
+        "Integration status",
+        "Saved!",
+        "Saving…",
+        "Send Test Message",
+        "Sending…",
+        "Telegram Notifications",
+        "Template Content",
+        "Test failed.",
+        "Test message sent successfully.",
+        "e.g. 123456789 or -100123456789"
+      ]
+    },
+    {
+      "file": "src/pages/Treasury.jsx",
+      "phrases": [
+        "Amount *",
+        "Branch Expense",
+        "Branch Purchase Payment",
+        "Branch → Owner (Cash Transfer)",
+        "Branch → Owner (Network Sales)",
+        "Cash Overage (Reconciliation)",
+        "Cash Sales (Auto)",
+        "Cash Shortage (Reconciliation)",
+        "Credit Collection (Cash)",
+        "Credit Collection (Network)",
+        "Date *",
+        "Delete this transaction?",
+        "Description / Notes",
+        "External Debt (Owner)",
+        "Network Sales (Auto)",
+        "Owner Capital Contribution",
+        "Owner Expense (for Branch)",
+        "Owner Investment In",
+        "Owner Pays Salary (for Branch)",
+        "Owner Supplier Payment",
+        "Owner → Branch (Funding)",
+        "Personal Withdrawal",
+        "Salary Advance (Branch)",
+        "Select type...",
+        "Sponsor Holdings (كفيل)",
+        "— Branch Cash —",
+        "— Branch ↔ Owner Settlement —",
+        "— Credit Collections —",
+        "— Owner Only —"
+      ]
+    },
+    {
+      "file": "src/pages/retail/BarcodeScanner.jsx",
+      "phrases": [
+        "Barcode Scanner",
+        "Cost Price",
+        "Quick Stock Adjustment",
+        "Retail Mode Required",
+        "Scan barcodes to look up products, check stock, and adjust inventory",
+        "Scan or Enter Code",
+        "Sell Price"
+      ]
+    },
+    {
+      "file": "src/pages/retail/BatchTracking.jsx",
+      "phrases": [
+        "All Products",
+        "All products",
+        "Batch / Lot Tracking",
+        "Batch Number *",
+        "Expiring Soon",
+        "Expiry Date",
+        "Lot Number",
+        "Manufacture Date",
+        "New Batch / Lot",
+        "No batches found",
+        "Product *",
+        "Quantity *",
+        "Retail Mode Required",
+        "Search batch, lot, product...",
+        "Select product...",
+        "Storage Location",
+        "Total Batches",
+        "Track product batches, lot numbers, and expiry dates",
+        "Unit Cost",
+        "e.g. Shelf A3"
+      ]
+    },
+    {
+      "file": "src/pages/retail/ExpiryTracking.jsx",
+      "phrases": [
+        "7 && days",
+        "Critical (≤7d)",
+        "Expired — Requires Immediate Action",
+        "Expiry Tracking",
+        "Monitor product expiry dates and manage expired stock",
+        "No Expiry",
+        "Retail Mode Required",
+        "Warning (≤30d)"
+      ]
+    },
+    {
+      "file": "src/pages/retail/ProductVariants.jsx",
+      "phrases": [
+        "No variant-enabled products",
+        "Retail Mode Required",
+        "Search products...",
+        "Value *",
+        "e.g. Large, Red"
+      ]
+    },
+    {
+      "file": "src/pages/retail/SKUManagement.jsx",
+      "phrases": [
+        "Edit SKU",
+        "Retail Mode Required",
+        "SKU Code",
+        "SKU Management",
+        "Search by name, SKU, category...",
+        "With SKU",
+        "Without SKU",
+        "e.g. CAT-PROD-0001"
+      ]
+    },
+    {
+      "file": "src/pages/retail/SerialNumbers.jsx",
+      "phrases": [
+        "All Products",
+        "All products",
+        "In Stock",
+        "No serial numbers found",
+        "Product *",
+        "Purchase Date",
+        "Register Serial Number",
+        "Retail Mode Required",
+        "Scan or enter serial number",
+        "Search serial number, product...",
+        "Select product...",
+        "Serial Number *",
+        "Serial Numbers",
+        "Warranty Expiry"
+      ]
+    },
+    {
+      "file": "src/services/analytics/alertAnalytics.js",
+      "phrases": [
+        "${lowStockItems.length} items below reorder level",
+        "(i.current_stock || 0)",
+        "= fromStr && e.date",
+        "= fromStr && s.date",
+        "Credit sales are ${((creditSales / revenue) * 100).toFixed(1)}% of revenue",
+        "High Credit Sales",
+        "High Food Cost",
+        "Net profit is negative this month",
+        "Purchase cost is ${((purchaseCost / revenue) * 100).toFixed(1)}% of revenue"
+      ]
+    },
+    {
+      "file": "src/services/analytics/branchAnalytics.js",
+      "phrases": [
+        "= fromStr && e.date",
+        "= fromStr && s.date"
+      ]
+    },
+    {
+      "file": "src/services/analytics/cashflowAnalytics.js",
+      "phrases": [
+        "= fromStr && e.date",
+        "= fromStr && s.date"
+      ]
+    },
+    {
+      "file": "src/services/analytics/financialAnalysis.js",
+      "phrases": [
+        "= from && key"
+      ]
+    },
+    {
+      "file": "src/services/analytics/forecastAnalytics.js",
+      "phrases": [
+        "= formatDate(dr.from) && s.date"
+      ]
+    },
+    {
+      "file": "src/services/analytics/profitAnalytics.js",
+      "phrases": [
+        "= fromStr && e.date",
+        "= fromStr && s.date",
+        "= monthStart && e.date"
+      ]
+    },
+    {
+      "file": "src/services/cashRegisterService.js",
+      "phrases": [
+        "Owner Cash Injection: ${reason ||"
+      ]
+    },
+    {
+      "file": "src/services/salesAnalyticsEngine.js",
+      "phrases": [
+        "(!worst || d.total",
+        "(i.opening_stock || 0)",
+        "= from && r.date",
+        "= mStart && t.date",
+        "All key metrics are within healthy ranges. Focus on growth and expansion.",
+        "Expense ratio at ${cost.expenseRatio.toFixed(1)}% — review fixed and variable overhead.",
+        "Food cost at ${cost.foodCostPct.toFixed(1)}% — target below 30%. Renegotiate supplier prices.",
+        "Net margin is below 10%. Review pricing and cost structure.",
+        "Net profit is negative. Reduce purchase costs and variable expenses immediately.",
+        "Sales declined ${Math.abs(executive.salesGrowth).toFixed(1)}% vs last month. Investigate root cause."
+      ]
+    }
+  ]
+}

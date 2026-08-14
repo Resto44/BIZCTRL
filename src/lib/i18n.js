@@ -2,6 +2,7 @@ const translations = {
   en: {
     dir: 'ltr',
     lang: 'English',
+    selected: 'Selected',
     // Navigation
     dashboard: 'Dashboard',
     sales: 'Sales',
@@ -1130,6 +1131,7 @@ const translations = {
   ar: {
     dir: 'rtl',
     lang: 'العربية',
+    selected: 'محدد',
     // Navigation
     dashboard: 'لوحة التحكم',
     sales: 'المبيعات',
@@ -2229,6 +2231,7 @@ const translations = {
   fa: {
     dir: 'rtl',
     lang: 'فارسی',
+    selected: 'انتخاب‌شده',
     // Navigation
     dashboard: 'داشبورد',
     sales: 'فروش',

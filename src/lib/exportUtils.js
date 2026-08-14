@@ -1,4 +1,11 @@
 import jsPDF from 'jspdf';
+import {
+  drawLocalizedPdfText,
+  localizePdfColumns,
+  pdfColumnX,
+  prepareLocalizedPdf,
+  safePdfFilename,
+} from './pdfLocalization';
 
 // ─── CSV ──────────────────────────────────────────────────────────────────────
 
@@ -16,77 +23,101 @@ export function downloadCSV(filename, headers, rows) {
     headers.map(escapeCSV).join(','),
     ...rows.map(row => row.map(escapeCSV).join(',')),
   ];
-  const bom = '\uFEFF'; // UTF-8 BOM for Excel RTL compatibility
+  const bom = '\uFEFF'; // UTF-8 BOM keeps Persian and Arabic readable in Excel.
   const blob = new Blob([bom + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
   triggerDownload(blob, filename);
 }
 
 // ─── PDF ──────────────────────────────────────────────────────────────────────
 
-export function downloadPDF({ filename, title, subtitle, headers, rows, currency = '$', totalsRow }) {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+/**
+ * Shared export table. Callers supply already-localized headings and values; the
+ * direction and embedded Unicode font follow the selected application language.
+ */
+export function downloadPDF({
+  filename,
+  title,
+  subtitle,
+  headers,
+  rows,
+  totalsRow,
+  lang = 'en',
+  dir = 'ltr',
+}) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
+  const { rtl } = prepareLocalizedPdf(doc, { lang, dir });
   const pageW = 210;
   const marginL = 14;
   const marginR = 14;
   const tableW = pageW - marginL - marginR;
-  const colW = tableW / headers.length;
+  const colW = tableW / Math.max(headers.length, 1);
   const rowH = 8;
   let y = 14;
 
-  // Title
-  doc.setFontSize(15);
-  doc.setFont('helvetica', 'bold');
-  doc.text(title, marginL, y);
+  const drawRow = (values, rowY, { header = false, totals = false } = {}) => {
+    const columns = localizePdfColumns(values, rtl);
+    columns.forEach((cell, index) => {
+      drawLocalizedPdfText(doc, cell, pdfColumnX({ index, columnWidth: colW, marginLeft: marginL, rtl }), rowY + 5.4, {
+        rtl,
+        bold: header || totals,
+        size: rtl ? 8.4 : 8,
+        color: header ? [255, 255, 255] : [15, 23, 42],
+        align: rtl ? 'right' : 'left',
+        maxWidth: colW - 4,
+      });
+    });
+  };
+
+  drawLocalizedPdfText(doc, title, rtl ? pageW - marginR : marginL, y, {
+    rtl,
+    bold: true,
+    size: rtl ? 16 : 15,
+    color: [15, 23, 42],
+  });
   y += 7;
 
-  // Subtitle
   if (subtitle) {
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 100, 100);
-    doc.text(subtitle, marginL, y);
-    doc.setTextColor(0, 0, 0);
+    drawLocalizedPdfText(doc, subtitle, rtl ? pageW - marginR : marginL, y, {
+      rtl,
+      size: rtl ? 10 : 9,
+      color: [100, 100, 100],
+    });
     y += 7;
   }
 
-  // Header row
   doc.setFillColor(37, 99, 235);
   doc.rect(marginL, y, tableW, rowH, 'F');
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  headers.forEach((h, i) => {
-    doc.text(String(h), marginL + i * colW + 2, y + 5.5, { maxWidth: colW - 3 });
-  });
-  doc.setTextColor(0, 0, 0);
+  drawRow(headers, y, { header: true });
   y += rowH;
 
-  // Data rows
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  rows.forEach((row, ri) => {
-    if (y > 270) { doc.addPage(); y = 14; }
-    if (ri % 2 === 1) {
+  rows.forEach((row, rowIndex) => {
+    if (y > 270) {
+      doc.addPage();
+      y = 14;
+      doc.setFillColor(37, 99, 235);
+      doc.rect(marginL, y, tableW, rowH, 'F');
+      drawRow(headers, y, { header: true });
+      y += rowH;
+    }
+    if (rowIndex % 2 === 1) {
       doc.setFillColor(248, 250, 252);
       doc.rect(marginL, y, tableW, rowH, 'F');
     }
-    row.forEach((cell, i) => {
-      doc.text(String(cell ?? ''), marginL + i * colW + 2, y + 5.5, { maxWidth: colW - 3 });
-    });
+    drawRow(row, y);
     y += rowH;
   });
 
-  // Totals row
   if (totalsRow) {
+    if (y > 270) {
+      doc.addPage();
+      y = 14;
+    }
     doc.setFillColor(229, 231, 235);
     doc.rect(marginL, y, tableW, rowH, 'F');
-    doc.setFont('helvetica', 'bold');
-    totalsRow.forEach((cell, i) => {
-      doc.text(String(cell ?? ''), marginL + i * colW + 2, y + 5.5, { maxWidth: colW - 3 });
-    });
+    drawRow(totalsRow, y, { totals: true });
   }
 
-  doc.save(filename);
+  doc.save(safePdfFilename(filename, lang));
 }
 
 // ─── Trigger download ─────────────────────────────────────────────────────────
@@ -109,11 +140,10 @@ export function buildSalesCSV(data, t, currency, branches) {
   const headers = [t('date'), t('branch'), t('cash'), t('network'), t('credit'), t('total_sales')];
   const rows = data.map(s => {
     const sCash = Number(s.restaurant_cash ?? s.cash ?? 0);
-    const sNet  = Number(s.restaurant_network ?? s.network ?? 0);
+    const sNet = Number(s.restaurant_network ?? s.network ?? 0);
     const total = sCash + sNet + (Number(s.credit) || 0);
     return [s.date, getBranchLabel(s.branch), sCash, sNet, Number(s.credit) || 0, total];
   });
-  // Totals row
   const totals = rows.reduce((acc, r) => [
     '', '',
     acc[2] + Number(r[2]),
@@ -130,19 +160,19 @@ export function buildSalesPDF(data, t, currency, branches, subtitle) {
   const headers = [t('date'), t('branch'), t('cash'), t('network'), t('credit'), t('total_sales')];
   const rows = data.map(s => {
     const sCash = Number(s.restaurant_cash ?? s.cash ?? 0);
-    const sNet  = Number(s.restaurant_network ?? s.network ?? 0);
+    const sNet = Number(s.restaurant_network ?? s.network ?? 0);
     const total = sCash + sNet + (Number(s.credit) || 0);
     return [s.date, getBranchLabel(s.branch), `${currency}${sCash.toLocaleString()}`, `${currency}${sNet.toLocaleString()}`, `${currency}${(Number(s.credit) || 0).toLocaleString()}`, `${currency}${total.toLocaleString()}`];
   });
-  const totalCash   = data.reduce((s, r) => s + Number(r.restaurant_cash   ?? r.cash    ?? 0), 0);
-  const totalNet    = data.reduce((s, r) => s + Number(r.restaurant_network ?? r.network ?? 0), 0);
-  const totalCredit = data.reduce((s, r) => s + (Number(r.credit) || 0), 0);
+  const totalCash = data.reduce((sum, record) => sum + Number(record.restaurant_cash ?? record.cash ?? 0), 0);
+  const totalNet = data.reduce((sum, record) => sum + Number(record.restaurant_network ?? record.network ?? 0), 0);
+  const totalCredit = data.reduce((sum, record) => sum + (Number(record.credit) || 0), 0);
   const grandTotal = totalCash + totalNet + totalCredit;
   const totalsRow = [t('total_sales'), '', `${currency}${totalCash.toLocaleString()}`, `${currency}${totalNet.toLocaleString()}`, `${currency}${totalCredit.toLocaleString()}`, `${currency}${grandTotal.toLocaleString()}`];
   return { headers, rows, totalsRow, subtitle };
 }
 
-// ─── Purchases export builders ────────────────────────────────────────────────
+// ─── Purchases export builders ─────────────────────────────────────────────────
 
 export function buildPurchasesCSV(data, t, currency, branches) {
   const getBranchLabel = (key) => branches.find(b => b.key === key)?.label || key;
@@ -152,7 +182,7 @@ export function buildPurchasesCSV(data, t, currency, branches) {
     const total = (p.qty || 0) * price;
     return [p.date, getBranchLabel(p.branch), p.product_name || p.product_id, p.qty || 0, price, total];
   });
-  const grandTotal = rows.reduce((s, r) => s + Number(r[5]), 0);
+  const grandTotal = rows.reduce((sum, row) => sum + Number(row[5]), 0);
   rows.push(['', t('total_purchase_cost'), '', '', '', grandTotal]);
   return { headers, rows };
 }
@@ -165,9 +195,9 @@ export function buildPurchasesPDF(data, t, currency, branches, subtitle) {
     const total = (p.qty || 0) * price;
     return [p.date, getBranchLabel(p.branch), p.product_name || p.product_id, String(p.qty || 0), `${currency}${price.toLocaleString()}`, `${currency}${total.toLocaleString()}`];
   });
-  const grandTotal = data.reduce((s, p) => {
-    const price = p.used_price || p.current_price || 0;
-    return s + (p.qty || 0) * price;
+  const grandTotal = data.reduce((sum, purchase) => {
+    const price = purchase.used_price || purchase.current_price || 0;
+    return sum + (purchase.qty || 0) * price;
   }, 0);
   const totalsRow = [t('total_purchase_cost'), '', '', '', '', `${currency}${grandTotal.toLocaleString()}`];
   return { headers, rows, totalsRow, subtitle };
