@@ -31,6 +31,7 @@ import { ERP_NAV_GROUPS } from './ERPSidebar';
 import ModeBadge from '@/components/shared/ModeBadge';
 import LogoutButton from './LogoutButton';
 import LanguageSwitcher from '@/components/shared/LanguageSwitcher';
+import PortalIdentityHeader from './PortalIdentityHeader';
 
 // ─── Breadcrumb ───────────────────────────────────────────────────────────────
 function ERPBreadcrumb() {
@@ -328,6 +329,8 @@ export default function ERPHeader({ onMobileMenuToggle }) {
 
       {/* Breadcrumb */}
       <ERPBreadcrumb />
+
+      <PortalIdentityHeader />
 
       {/* Spacer */}
       <div className="flex-1" />

@@ -240,7 +240,7 @@ export default function ERPSidebar({ collapsed, onToggle }) {
         {!collapsed && (
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold text-sidebar-foreground truncate">
-              {activeRestaurant?.name || 'RestoCTRL'}
+              {activeRestaurant?.name || ''}
             </span>
             <span className="text-[10px] text-muted-foreground capitalize">{role}</span>
           </div>

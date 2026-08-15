@@ -12,6 +12,7 @@ const TenantContext = createContext({
   updateRestaurant: async () => {}, updateRestaurantBranches: async () => {}, refetchRestaurants: () => {},
   orgId: '', orgFilter: {}, restaurantFilter: null,
   managerBranch: null, managerBranchObject: null, isManager: false,
+  portalIdentity: null, loadingPortalIdentity: false,
 });
 
 export function TenantProvider({ children }) {
@@ -44,22 +45,23 @@ export function TenantProvider({ children }) {
       if (!user?.id) return [];
 
       if (isOwner) {
-        // Owner: find their restaurant via erp_memberships (most reliable)
-        // Fall back to org_id match if needed
-        const { data: membership } = await supabase
+        // Owner: resolve every approved tenant membership so the active restaurant
+        // can switch safely without falling back to an unverified client label.
+        const { data: memberships } = await supabase
           .from('erp_memberships')
           .select('restaurant_id')
           .eq('user_id', user.id)
           .eq('role', 'owner')
-          .eq('status', 'approved')
-          .single();
+          .eq('status', 'approved');
 
-        if (membership?.restaurant_id) {
+        const restaurantIds = asRecordArray(memberships)
+          .map((membership) => membership.restaurant_id)
+          .filter(Boolean);
+        if (restaurantIds.length > 0) {
           const { data } = await supabase
             .from('restaurants')
             .select('*')
-            .eq('id', membership.restaurant_id)
-            .limit(1);
+            .in('id', restaurantIds);
           return data || [];
         }
 
@@ -100,6 +102,21 @@ export function TenantProvider({ children }) {
   }, [restaurants, activeRestaurantId]);
 
   const activeRestaurant = restaurants.find(r => r.id === activeRestaurantId) || restaurants.at(0) || null;
+
+  const { data: portalIdentityData, isLoading: loadingPortalIdentity } = useQuery({
+    queryKey: ['portal-identity', user?.id, activeRestaurant?.id],
+    queryFn: async () => {
+      if (!activeRestaurant?.id) return null;
+      const { data, error } = await supabase.rpc('erp_get_authenticated_portal_identity', {
+        p_restaurant_id: activeRestaurant.id,
+      });
+      if (error) throw error;
+      return asRecordArray(data).at(0) || null;
+    },
+    enabled: !!user?.id && !!activeRestaurant?.id && !isLoadingAuth,
+    staleTime: 60000,
+  });
+  const portalIdentity = portalIdentityData || null;
 
   const setActiveRestaurant = useCallback((id) => {
     setActiveRestaurantIdRaw(id);
@@ -384,6 +401,8 @@ export function TenantProvider({ children }) {
       isEmployee,
       isCustomer,
       isSponsor,
+      portalIdentity,
+      loadingPortalIdentity,
     }}>
       {children}
     </TenantContext.Provider>
