@@ -93,7 +93,8 @@ const SalesSources        = lazy(() => import('@/pages/SalesSources'));
 const TelegramSettings    = lazy(() => import('@/pages/TelegramSettings'));
 const Billing             = lazy(() => import('@/pages/Billing'));
 const Support             = lazy(() => import('@/pages/Support'));
-const SuperAdmin          = lazy(() => import('@/pages/SuperAdmin'));
+const PlatformOwnerPortal = lazy(() => import('@/pages/PlatformOwnerPortal'));
+const PlatformOwnerLogin  = lazy(() => import('@/pages/PlatformOwnerLogin'));
 
 const Tasks               = lazy(() => import('@/pages/Tasks'));
 const NotificationCenter  = lazy(() => import('@/pages/NotificationCenter'));
@@ -315,7 +316,7 @@ const SubscribedRoutes = () => {
         <Route path="/alerts" element={<RoleGuard permission="viewAlerts"><SmartAlertCenter /></RoleGuard>} />
         <Route path="/tasks" element={<RoleGuard permission="viewTasks"><Tasks /></RoleGuard>} />
         <Route path="/support" element={<Support />} />
-        <Route path="/super-admin" element={<SuperAdmin />} />
+        <Route path="/super-admin" element={<Navigate to="/platform-owner/login" replace />} />
 
         {/* ── NEW ERP Role Portals — strict role-based access control ── */}
         <Route path="/gm-dashboard" element={<ERPRoleGuard allowedRoles={['general_manager']}><GMDashboard /></ERPRoleGuard>} />
@@ -447,6 +448,8 @@ function App() {
               {/* ── NEW ERP Unified Auth (primary entry points) ── */}
               <Route path="/erp-login" element={<ERPLogin />} />
               <Route path="/erp-register" element={<ERPRegister />} />
+              <Route path="/platform-owner/login" element={<Suspense fallback={<PageLoader />}><PlatformOwnerLogin /></Suspense>} />
+              <Route path="/platform-owner/*" element={<Suspense fallback={<PageLoader />}><PlatformOwnerPortal /></Suspense>} />
               {import.meta.env.DEV && BillingVisualHarness && <Route path="/__test/billing" element={<Suspense fallback={<PageLoader />}><BillingVisualHarness /></Suspense>} />}
               {/* ── Legacy auth routes — all redirect to unified ERP login ── */}
               <Route path="/auth" element={<Navigate to="/erp-login" replace />} />

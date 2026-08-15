@@ -8,12 +8,17 @@ const planChangePath = new URL('../src/supabase/20260814_plan_change_classificat
 const contextPath = new URL('../src/lib/SubscriptionContext.jsx', import.meta.url);
 
 describe('subscription UI and plan-change contract', () => {
-  it('hides Mock/Test simulation controls unless the server-derived viewer is an owner and test mode is enabled', async () => {
-    const billing = await readFile(billingPath, 'utf8');
-    expect(billing).toContain('canManageBilling && isTestModeEnabled');
+  it('uses the owner-only manual IBAN intent and payment-proof workflow rather than an obsolete permanent Free or mock-payment UI path', async () => {
+    const [billing, context] = await Promise.all([
+      readFile(billingPath, 'utf8'),
+      readFile(contextPath, 'utf8'),
+    ]);
     expect(billing).toContain('!canManageBilling ? <Button className="w-full" disabled>{copy.ownerOnly}</Button>');
-    expect(billing).toContain("provider.verifyPayment(pendingPaymentId, 'succeeded')");
-    expect(billing).toContain("provider.verifyPayment(pendingPaymentId, 'failed')");
+    expect(billing).toContain('beginManualPayment(item.id)');
+    expect(billing).toContain('submitManualPaymentProof(manualPayment?.payment_id || pendingPaymentId, paymentReference, paymentProof)');
+    expect(billing).not.toContain('selectFreePlan');
+    expect(context).toContain("create_manual_iban_payment_intent");
+    expect(context).toContain("submit_manual_iban_payment_proof");
   });
 
   it('renders landing discounts only from canonical public plan data with badge, original price, and final price', async () => {

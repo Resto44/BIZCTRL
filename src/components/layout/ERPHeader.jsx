@@ -312,8 +312,6 @@ function UserMenu() {
 // ─── Main ERPHeader ───────────────────────────────────────────────────────────
 export default function ERPHeader({ onMobileMenuToggle }) {
   const { role } = useRole();
-  const { user } = useAuth();
-  const isSuperAdmin = user?.email === import.meta.env.VITE_SUPER_ADMIN_EMAIL;
 
   return (
     <header className="sticky top-0 z-50 h-[60px] bg-card/95 backdrop-blur-md border-b border-border flex items-center px-4 gap-3 shrink-0">
@@ -342,14 +340,6 @@ export default function ERPHeader({ onMobileMenuToggle }) {
         <LanguageSwitcher />
         <ThemeToggle />
         <ModeBadge size="xs" />
-        {isSuperAdmin && (
-          <Link
-            to="/super-admin"
-            className="hidden md:flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-violet-100 text-violet-700 border border-violet-200 hover:bg-violet-200 transition-colors dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800"
-          >
-            SA
-          </Link>
-        )}
         <NotificationBell />
         <UserMenu />
       </div>

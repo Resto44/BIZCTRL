@@ -8,8 +8,8 @@ const EMPTY_SUMMARY = {
   found: false,
   status: 'EXPIRED',
   has_erp_access: false,
-  plan_id: 'free',
-  plan_name: 'Free',
+  plan_id: null,
+  plan_name: 'No active plan',
   trial_days_remaining: 0,
   limits: {},
   usage: {},
@@ -69,7 +69,7 @@ export function SubscriptionProvider({ children }) {
       const [paymentResult, eventResult] = await Promise.all([
         supabase
           .from('subscription_payments')
-          .select('id, plan_id, provider, status, amount_cents, currency, is_test, display_label, paid_at, failed_at, period_start, period_end, created_at')
+          .select('id, plan_id, provider, status, amount_cents, currency, is_test, display_label, payment_reference, payment_proof_key, payment_proof_filename, submitted_at, paid_at, failed_at, period_start, period_end, created_at')
           .order('created_at', { ascending: false })
           .limit(20),
         supabase
@@ -117,8 +117,8 @@ export function SubscriptionProvider({ children }) {
       loading,
       error,
       status,
-      plan: summary.plan_id || 'free',
-      planName: summary.plan_name || 'Free',
+      plan: summary.plan_id || null,
+      planName: summary.plan_name || 'No active plan',
       limits,
       usage,
       trialDaysRemaining: Number(summary.trial_days_remaining || 0),
@@ -135,9 +135,29 @@ export function SubscriptionProvider({ children }) {
         return Boolean(summary.has_erp_access) && used < limit;
       },
       refresh,
-      selectFreePlan: () => invoke('select_free_subscription_plan'),
-      createPaymentIntent: (planId) => invoke('create_subscription_payment_intent', { p_plan_id: planId }),
-      createCheckoutIntent: (planId) => invoke('create_subscription_payment_intent', { p_plan_id: planId }),
+      createManualPaymentIntent: (planId, couponCode = null) => invoke('create_manual_iban_payment_intent', { p_plan_id: planId, p_coupon_code: couponCode }),
+      getManualPaymentInstructions: () => invoke('platform_manual_payment_instructions'),
+      submitManualPaymentProof: async (paymentId, paymentReference, file) => {
+        if (!paymentId || !paymentReference || !file || !user?.id) throw normalizeError(new Error('MANUAL_PAYMENT_PROOF_INPUT_INVALID'));
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(file.type) || file.size > 10 * 1024 * 1024) throw normalizeError(new Error('MANUAL_PAYMENT_PROOF_FILE_INVALID'));
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const objectKey = `${user.id}/${paymentId}/${Date.now()}-${safeName}`;
+        const { error: uploadError } = await supabase.storage.from('payment-proofs').upload(objectKey, file, { contentType: file.type, upsert: false });
+        if (uploadError) throw normalizeError(uploadError);
+        try {
+          return await invoke('submit_manual_iban_payment_proof', {
+            p_payment_id: paymentId,
+            p_payment_reference: paymentReference,
+            p_proof_key: objectKey,
+            p_filename: file.name,
+            p_content_type: file.type,
+          });
+        } catch (proofError) {
+          await supabase.storage.from('payment-proofs').remove([objectKey]);
+          throw proofError;
+        }
+      },
       cancelAtPeriodEnd: () => invoke('cancel_subscription_at_period_end'),
       renewSubscription: () => invoke('renew_subscription'),
       consumeUsage: (metric, amount = 1) => invoke('erp_consume_subscription_usage', { p_metric: metric, p_amount: amount }),

@@ -1,8 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Shield, ChevronDown } from 'lucide-react';
+import { Building2, ChevronDown } from 'lucide-react';
 import { useTenant } from '@/lib/TenantContext';
-import { useAuth } from '@/lib/AuthContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useBusinessMode } from '@/lib/BusinessModeContext';
@@ -83,11 +82,9 @@ function RestaurantSelector() {
 }
 
 export default function AppHeader() {
-  const { user } = useAuth();
   const { role } = useRole();
   const { lang } = useLanguage();
   const badge = ROLE_BADGE[role];
-  const isSuperAdmin = user?.email === import.meta.env.VITE_SUPER_ADMIN_EMAIL;
 
   // Stripped header for sponsor
   const isLimited = role === ROLES.SPONSOR;
@@ -130,17 +127,6 @@ export default function AppHeader() {
             <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${badge.color} hidden xs:inline-flex`}>
               {badge.label[lang] || badge.label.en}
             </span>
-          )}
-
-          {/* Super admin link */}
-          {isSuperAdmin && (
-            <Link
-              to="/super-admin"
-              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-violet-100 text-violet-700 border border-violet-200 hover:bg-violet-200 transition-colors"
-            >
-              <Shield className="w-3 h-3" />
-              SA
-            </Link>
           )}
 
           <NotificationBell />

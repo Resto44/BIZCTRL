@@ -65,6 +65,36 @@ export class MockTestPaymentProvider extends PaymentProvider {
   }
 }
 
+export class ManualIbanPaymentProvider extends PaymentProvider {
+  constructor(subscriptionApi) {
+    super();
+    this.subscriptionApi = subscriptionApi;
+    this.id = 'manual_iban';
+    this.label = 'Manual IBAN Transfer';
+    this.isLiveGateway = false;
+  }
+
+  async createCheckout(planId, couponCode = null) {
+    return this.subscriptionApi.createManualPaymentIntent(planId, couponCode);
+  }
+
+  async verifyPayment() {
+    throw new Error('MANUAL_PAYMENT_REQUIRES_PLATFORM_OWNER_REVIEW');
+  }
+
+  async handleWebhook() {
+    throw new Error('MANUAL_IBAN_PROVIDER_HAS_NO_WEBHOOK');
+  }
+
+  async cancelSubscription() {
+    return this.subscriptionApi.cancelAtPeriodEnd();
+  }
+
+  async getSubscription() {
+    return this.subscriptionApi.refresh();
+  }
+}
+
 export function createPaymentProvider(subscriptionApi) {
-  return new MockTestPaymentProvider(subscriptionApi);
+  return new ManualIbanPaymentProvider(subscriptionApi);
 }

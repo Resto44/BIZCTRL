@@ -22,13 +22,15 @@ describe('production safety', () => {
     expect(harness).not.toContain('verifyPayment(');
   });
 
-  it('keeps the only active provider explicitly Mock/Test', async () => {
+  it('keeps Mock/Test available only as an explicit adapter while manual IBAN is the active production billing provider', async () => {
     const provider = await readFile(providerPath, 'utf8');
     expect(provider).toContain("this.id = 'mock_test'");
+    expect(provider).toContain("this.id = 'manual_iban'");
+    expect(provider).toContain('return new ManualIbanPaymentProvider(subscriptionApi)');
     expect(provider).not.toContain('stripe');
   });
 
-  it('keeps TEST MODE disabled by default and exposes its mutation controls only to the server-derived billing owner', async () => {
+  it('keeps TEST MODE disabled by default and removes simulation controls from the production Billing UI', async () => {
     const [billing, sql] = await Promise.all([
       readFile(billingPath, 'utf8'),
       readFile(mockPaymentMigrationPath, 'utf8'),
@@ -36,8 +38,8 @@ describe('production safety', () => {
     expect(sql).toContain('enabled boolean NOT NULL DEFAULT false');
     expect(sql.match(/PERFORM public\.erp_assert_billing_owner\(v_restaurant_id\);/g)).toHaveLength(3);
     expect(sql).toContain("MESSAGE = 'TEST_MODE_DISABLED'");
-    expect(billing).toContain('canManageBilling && isTestModeEnabled');
-    expect(billing).toContain("provider.verifyPayment(pendingPaymentId, 'succeeded')");
-    expect(billing).toContain("provider.simulateLifecycle('expiration')");
+    expect(billing).toContain('submitManualPaymentProof');
+    expect(billing).not.toContain('provider.verifyPayment(');
+    expect(billing).not.toContain('provider.simulateLifecycle(');
   });
 });

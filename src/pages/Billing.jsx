@@ -7,10 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
 import {
-  AlertTriangle, BadgeCheck, Building2, CalendarClock, Check, CircleDollarSign,
-  Clock3, CreditCard, FileText, FlaskConical, Loader2, ShieldCheck, Sparkles,
-  UserRound, Users, XCircle, RotateCcw, Camera, Database,
+  Building2, Check, CircleDollarSign, Clock3, CreditCard, FileText, Loader2,
+  Sparkles, UserRound, Users, RotateCcw, Camera, Database, Landmark,
 } from 'lucide-react';
 
 const COPY = {
@@ -20,13 +20,10 @@ const COPY = {
     renewal: 'Next renewal', planAccess: 'ERP access', granted: 'Available', restricted: 'Billing only',
     usage: 'Usage & limits', availablePlans: 'Available plans', paymentHistory: 'Payment history',
     subscriptionHistory: 'Subscription history', choose: 'Choose Plan', upgrade: 'Upgrade plan', downgrade: 'Downgrade plan', current: 'Current plan',
-    selectFree: 'Select Free', pending: 'Payment pending', cancel: 'Cancel at period end', renew: 'Keep subscription',
-    testMode: 'TEST MODE — Mock Payment Provider', testOnly: 'TEST ONLY', simulateSuccess: 'Simulate successful payment',
-    simulateFailure: 'Simulate failed payment', simulateRenewal: 'Simulate renewal', simulateCancellation: 'Simulate cancellation',
-    simulateExpiration: 'Simulate expiration', noGateway: 'No live payment gateway is connected. Simulations never create a real transaction.',
-    disabledTest: 'TEST MODE is disabled in this environment.', ownerOnly: 'Billing actions are available to the organization owner.',
+    pending: 'Payment pending', cancel: 'Cancel at period end', renew: 'Keep subscription',
+    ibanTitle: 'Manual IBAN payment', ibanInstructions: 'Transfer the exact amount using the information below, then upload a PDF or image proof for Platform Owner review.', paymentReference: 'Bank transfer reference', uploadProof: 'Upload payment proof', submitProof: 'Submit proof for review', proofAccepted: 'Your proof has been submitted. The subscription will activate only after Platform Owner approval.', ownerOnly: 'Billing actions are available to the organization owner.',
     priceMonth: '/ month', original: 'Original', final: 'Final', noRecords: 'No records yet.',
-    paymentSelected: 'A TEST ONLY payment request has been created. This plan remains unavailable until a simulated confirmation is run by an owner in enabled TEST MODE.',
+    paymentSelected: 'A manual IBAN payment request has been created. This plan remains unavailable until your payment proof is approved by the Platform Owner.',
     actionFailed: 'The requested billing action could not be completed.', limits: 'Limits', modules: 'Included modules',
     pendingDetails: 'This paid plan is awaiting payment confirmation. It has not been activated.',
   },
@@ -36,13 +33,10 @@ const COPY = {
     renewal: 'التجديد القادم', planAccess: 'دخول نظام ERP', granted: 'متاح', restricted: 'الفوترة فقط',
     usage: 'الاستخدام والحدود', availablePlans: 'الخطط المتاحة', paymentHistory: 'سجل المدفوعات',
     subscriptionHistory: 'سجل الاشتراك', choose: 'اختر الخطة', upgrade: 'ترقية الخطة', downgrade: 'تخفيض الخطة', current: 'الخطة الحالية',
-    selectFree: 'اختر الخطة المجانية', pending: 'الدفع قيد الانتظار', cancel: 'إلغاء عند نهاية الفترة', renew: 'الاحتفاظ بالاشتراك',
-    testMode: 'وضع الاختبار — مزود دفع وهمي', testOnly: 'للاختبار فقط', simulateSuccess: 'محاكاة دفع ناجح',
-    simulateFailure: 'محاكاة دفع فاشل', simulateRenewal: 'محاكاة التجديد', simulateCancellation: 'محاكاة الإلغاء',
-    simulateExpiration: 'محاكاة الانتهاء', noGateway: 'لا توجد بوابة دفع فعلية. عمليات المحاكاة لا تنشئ أي معاملة حقيقية.',
-    disabledTest: 'وضع الاختبار معطل في هذه البيئة.', ownerOnly: 'إجراءات الفوترة متاحة لمالك المؤسسة فقط.',
+    pending: 'الدفع قيد الانتظار', cancel: 'إلغاء عند نهاية الفترة', renew: 'الاحتفاظ بالاشتراك',
+    ibanTitle: 'دفع يدوي عبر IBAN', ibanInstructions: 'حوّل المبلغ الدقيق بالمعلومات أدناه، ثم ارفع إثبات PDF أو صورة لمراجعة مالك المنصة.', paymentReference: 'مرجع التحويل البنكي', uploadProof: 'رفع إثبات الدفع', submitProof: 'إرسال الإثبات للمراجعة', proofAccepted: 'تم إرسال الإثبات. لا يُفعّل الاشتراك إلا بعد موافقة مالك المنصة.', ownerOnly: 'إجراءات الفوترة متاحة لمالك المؤسسة فقط.',
     priceMonth: '/ شهرياً', original: 'الأصلي', final: 'النهائي', noRecords: 'لا توجد سجلات بعد.',
-    paymentSelected: 'تم إنشاء طلب دفع للاختبار فقط. تظل الخطة غير نشطة حتى يؤكدها المالك في وضع الاختبار المفعّل.',
+    paymentSelected: 'تم إنشاء طلب دفع يدوي عبر IBAN. تظل الخطة غير نشطة حتى يوافق مالك المنصة على إثبات الدفع.',
     actionFailed: 'تعذر إكمال إجراء الفوترة المطلوب.', limits: 'الحدود', modules: 'الوحدات المتاحة',
     pendingDetails: 'هذه الخطة المدفوعة بانتظار تأكيد الدفع ولم يتم تفعيلها.',
   },
@@ -52,13 +46,10 @@ const COPY = {
     renewal: 'تمدید بعدی', planAccess: 'دسترسی ERP', granted: 'در دسترس', restricted: 'فقط صورتحساب',
     usage: 'مصرف و محدودیت‌ها', availablePlans: 'طرح‌های موجود', paymentHistory: 'تاریخچه پرداخت',
     subscriptionHistory: 'تاریخچه اشتراک', choose: 'انتخاب طرح', upgrade: 'ارتقای طرح', downgrade: 'کاهش طرح', current: 'طرح فعلی',
-    selectFree: 'انتخاب رایگان', pending: 'پرداخت در انتظار', cancel: 'لغو در پایان دوره', renew: 'ادامه اشتراک',
-    testMode: 'حالت آزمایش — ارائه‌دهنده پرداخت ساختگی', testOnly: 'فقط آزمایشی', simulateSuccess: 'شبیه‌سازی پرداخت موفق',
-    simulateFailure: 'شبیه‌سازی پرداخت ناموفق', simulateRenewal: 'شبیه‌سازی تمدید', simulateCancellation: 'شبیه‌سازی لغو',
-    simulateExpiration: 'شبیه‌سازی انقضا', noGateway: 'هیچ درگاه پرداخت واقعی متصل نیست. شبیه‌سازی‌ها تراکنش واقعی ایجاد نمی‌کنند.',
-    disabledTest: 'حالت آزمایش در این محیط غیرفعال است.', ownerOnly: 'اقدامات صورتحساب فقط برای مالک سازمان در دسترس است.',
+    pending: 'پرداخت در انتظار', cancel: 'لغو در پایان دوره', renew: 'ادامه اشتراک',
+    ibanTitle: 'پرداخت دستی IBAN', ibanInstructions: 'مبلغ دقیق را با اطلاعات زیر انتقال دهید و سپس مدرک PDF یا تصویر را برای بررسی مالک پلتفرم بارگذاری کنید.', paymentReference: 'مرجع انتقال بانکی', uploadProof: 'بارگذاری مدرک پرداخت', submitProof: 'ارسال مدرک برای بررسی', proofAccepted: 'مدرک ارسال شد. اشتراک فقط پس از تأیید مالک پلتفرم فعال می‌شود.', ownerOnly: 'اقدامات صورتحساب فقط برای مالک سازمان در دسترس است.',
     priceMonth: '/ ماه', original: 'قیمت اصلی', final: 'قیمت نهایی', noRecords: 'هنوز رکوردی وجود ندارد.',
-    paymentSelected: 'درخواست پرداخت فقط آزمایشی ایجاد شد. این طرح تا تأیید شبیه‌سازی‌شده توسط مالک در حالت آزمایش فعال نمی‌شود.',
+    paymentSelected: 'درخواست پرداخت دستی IBAN ایجاد شد. این طرح تا تأیید مدرک پرداخت توسط مالک پلتفرم فعال نمی‌شود.',
     actionFailed: 'اقدام صورتحساب مورد نظر انجام نشد.', limits: 'محدودیت‌ها', modules: 'ماژول‌های شامل',
     pendingDetails: 'این طرح پولی در انتظار تأیید پرداخت است و فعال نشده است.',
   },
@@ -66,7 +57,6 @@ const COPY = {
 
 const STATUS_STYLE = {
   TRIAL: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200',
-  FREE: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100',
   PENDING_PAYMENT: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
   ACTIVE: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
   PAST_DUE: 'bg-orange-100 text-orange-900 dark:bg-orange-950 dark:text-orange-200',
@@ -108,12 +98,15 @@ export default function Billing() {
   const subscription = useSubscription();
   const {
     summary, plans, payments, events, loading, error, status, plan, planName, limits, usage,
-    trialDaysRemaining, isActive, isPendingPayment, pendingPaymentId, isTestModeEnabled,
-    canManageBilling, selectFreePlan, cancelAtPeriodEnd, renewSubscription,
+    trialDaysRemaining, isActive, pendingPaymentId, canManageBilling, cancelAtPeriodEnd, renewSubscription,
+    getManualPaymentInstructions, submitManualPaymentProof,
   } = subscription;
   const provider = useMemo(() => createPaymentProvider(subscription), [subscription]);
   const [acting, setActing] = useState('');
   const [notice, setNotice] = useState('');
+  const [manualPayment, setManualPayment] = useState(null);
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentProof, setPaymentProof] = useState(null);
   const copy = COPY[lang] || COPY.en;
 
   const runAction = async (action, work, successMessage = '') => {
@@ -138,6 +131,23 @@ export default function Billing() {
     { key: 'ocr_scans', label: 'OCR', icon: Camera },
   ];
 
+  const beginManualPayment = async (planId) => {
+    setActing(`plan-${planId}`);
+    setNotice('');
+    try {
+      const intent = await provider.createCheckout(planId);
+      const instructions = await getManualPaymentInstructions();
+      setManualPayment({ ...intent, instructions });
+      setNotice(copy.paymentSelected);
+    } catch (nextError) {
+      setNotice(nextError?.message || copy.actionFailed);
+    } finally {
+      setActing('');
+    }
+  };
+
+  const submitProof = () => runAction('submit-proof', () => submitManualPaymentProof(manualPayment?.payment_id || pendingPaymentId, paymentReference, paymentProof), copy.proofAccepted);
+
   return (
     <div className="space-y-6 pb-10" dir={isRTL ? 'rtl' : 'ltr'}>
       <PageHeader title={copy.title} />
@@ -161,7 +171,6 @@ export default function Billing() {
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-black tracking-tight">{planName}</h1>
                 <Badge className={`border-0 font-semibold ${STATUS_STYLE[status] || STATUS_STYLE.EXPIRED}`}>{displayStatus(status)}</Badge>
-                {summary.payment_provider === 'mock_test' && <Badge variant="outline" className="border-amber-500 text-amber-700">{copy.testOnly}</Badge>}
               </div>
               {status === 'PENDING_PAYMENT' && <p className="mt-2 max-w-2xl text-sm text-amber-800 dark:text-amber-200">{copy.pendingDetails}</p>}
             </div>
@@ -208,8 +217,7 @@ export default function Billing() {
         <div className="mb-3 flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /><h2 className="text-lg font-bold">{copy.availablePlans}</h2></div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {plans.map((item) => {
-            const isCurrent = item.id === plan && ['TRIAL', 'FREE', 'ACTIVE', 'PENDING_PAYMENT'].includes(status);
-            const isFree = Number(item.monthly_price_cents) === 0;
+            const isCurrent = item.id === plan && ['TRIAL', 'ACTIVE', 'PENDING_PAYMENT'].includes(status);
             const discount = Boolean(item.discount_active) && Number(item.original_price_cents) > Number(item.monthly_price_cents);
             const selectedPending = status === 'PENDING_PAYMENT' && item.id === plan;
             const allModules = lang === 'ar' ? 'جميع وحدات ERP' : lang === 'fa' ? 'همه ماژول‌های ERP' : 'All ERP modules';
@@ -219,19 +227,15 @@ export default function Billing() {
             return <Card key={item.id} className={`relative overflow-hidden ${isCurrent ? 'ring-2 ring-primary shadow-md' : ''}`}>
               {discount && <Badge className="absolute end-3 top-3 bg-rose-600 text-white">{item.discount_label || `-${item.discount_percent}%`}</Badge>}
               <CardHeader className="pb-2"><CardTitle className="text-lg">{item.display_name}</CardTitle><div className="flex items-end gap-2"><span className="text-3xl font-black">{money(item.monthly_price_cents)}</span><span className="pb-1 text-xs text-muted-foreground">{copy.priceMonth}</span></div>{discount && <p className="text-xs text-muted-foreground"><span className="line-through">{copy.original}: {money(item.original_price_cents)}</span> · <span className="font-semibold text-emerald-700">{copy.final}: {money(item.monthly_price_cents)}</span></p>}</CardHeader>
-              <CardContent className="space-y-4"><p className="text-xs text-muted-foreground">{capacitySummary(item, lang)}</p><ul className="space-y-1.5 text-sm text-muted-foreground">{features.slice(0, 5).map((feature) => <li key={feature} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{feature}</li>)}</ul>{isCurrent && !selectedPending ? <Badge variant="secondary" className="w-full justify-center py-2">{copy.current}</Badge> : !canManageBilling ? <Button className="w-full" disabled>{copy.ownerOnly}</Button> : isFree ? <Button className="w-full" variant="outline" disabled={Boolean(acting)} onClick={() => runAction('free', selectFreePlan)}>{copy.selectFree}</Button> : <Button className="w-full" disabled={Boolean(acting) || selectedPending} onClick={() => runAction(`plan-${item.id}`, () => provider.createCheckout(item.id), copy.paymentSelected)}><CreditCard className="me-2 h-4 w-4" />{selectedPending ? copy.pending : paidAction}</Button>}</CardContent>
+              <CardContent className="space-y-4"><p className="text-xs text-muted-foreground">{capacitySummary(item, lang)}</p><ul className="space-y-1.5 text-sm text-muted-foreground">{features.slice(0, 5).map((feature) => <li key={feature} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{feature}</li>)}</ul>{isCurrent && !selectedPending ? <Badge variant="secondary" className="w-full justify-center py-2">{copy.current}</Badge> : !canManageBilling ? <Button className="w-full" disabled>{copy.ownerOnly}</Button> : <Button className="w-full" disabled={Boolean(acting) || selectedPending} onClick={() => beginManualPayment(item.id)}><CreditCard className="me-2 h-4 w-4" />{selectedPending ? copy.pending : paidAction}</Button>}</CardContent>
             </Card>;
           })}
         </div>
       </section>
 
-      {canManageBilling && isTestModeEnabled && (
-        <Card className="border-amber-400 bg-amber-50/60 dark:bg-amber-950/15">
-          <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-200"><FlaskConical className="h-5 w-5" />{copy.testMode}</CardTitle></CardHeader>
-          <CardContent className="space-y-4"><p className="text-sm text-amber-900/80 dark:text-amber-100/80">{copy.noGateway}</p>{pendingPaymentId && <div className="flex flex-wrap gap-2"><Button size="sm" className="bg-emerald-700 hover:bg-emerald-800" disabled={Boolean(acting)} onClick={() => runAction('test-success', () => provider.verifyPayment(pendingPaymentId, 'succeeded'))}><BadgeCheck className="me-2 h-4 w-4" />{copy.simulateSuccess}</Button><Button size="sm" variant="destructive" disabled={Boolean(acting)} onClick={() => runAction('test-failure', () => provider.verifyPayment(pendingPaymentId, 'failed'))}><XCircle className="me-2 h-4 w-4" />{copy.simulateFailure}</Button></div>}<div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={Boolean(acting)} onClick={() => runAction('test-renewal', () => provider.simulateLifecycle('renewal'))}>{copy.simulateRenewal}</Button><Button size="sm" variant="outline" disabled={Boolean(acting)} onClick={() => runAction('test-cancel', () => provider.simulateLifecycle('cancellation'))}>{copy.simulateCancellation}</Button><Button size="sm" variant="outline" disabled={Boolean(acting)} onClick={() => runAction('test-expiration', () => provider.simulateLifecycle('expiration'))}>{copy.simulateExpiration}</Button></div></CardContent>
-        </Card>
+      {canManageBilling && (manualPayment || (status === 'PENDING_PAYMENT' && summary.payment_provider === 'manual_iban')) && (
+        <Card className="border-violet-300 bg-violet-50/60 dark:bg-violet-950/15"><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-violet-900 dark:text-violet-200"><Landmark className="h-5 w-5" />{copy.ibanTitle}</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-violet-900/80 dark:text-violet-100/80">{copy.ibanInstructions}</p>{manualPayment?.instructions && <div className="grid gap-3 rounded-xl border bg-background p-4 text-sm sm:grid-cols-2"><p><span className="text-muted-foreground">IBAN</span><br /><strong>{manualPayment.instructions.iban}</strong></p><p><span className="text-muted-foreground">Bank</span><br /><strong>{manualPayment.instructions.bank_name || '—'}</strong></p><p><span className="text-muted-foreground">Beneficiary</span><br /><strong>{manualPayment.instructions.beneficiary_name || '—'}</strong></p><p><span className="text-muted-foreground">Amount</span><br /><strong>{money(manualPayment.amount_cents)}</strong></p></div>}<div className="grid gap-3 sm:grid-cols-2"><div><label className="text-sm font-medium">{copy.paymentReference}</label><Input className="mt-1" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></div><div><label className="text-sm font-medium">{copy.uploadProof}</label><Input className="mt-1" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => setPaymentProof(event.target.files?.[0] || null)} /></div></div><Button disabled={Boolean(acting) || !paymentReference || !paymentProof} onClick={submitProof}>{acting === 'submit-proof' && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{copy.submitProof}</Button></CardContent></Card>
       )}
-      {canManageBilling && !isTestModeEnabled && <div className="rounded-xl border border-dashed border-muted-foreground/40 px-4 py-3 text-sm text-muted-foreground"><AlertTriangle className="me-2 inline h-4 w-4" />{copy.disabledTest}</div>}
 
       <section className="grid gap-5 xl:grid-cols-2">
         <Card><CardHeader><CardTitle className="text-base">{copy.paymentHistory}</CardTitle></CardHeader><CardContent className="space-y-3">{payments.length ? payments.map((payment) => <div key={payment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"><div><p className="font-semibold">{payment.display_label || `${payment.plan_id} · ${payment.status}`}</p><p className="text-xs text-muted-foreground">{formatDate(payment.created_at, lang)} · {money(payment.amount_cents)}</p></div><div className="flex items-center gap-2"><Badge variant="outline">{payment.status}</Badge>{payment.is_test && <Badge className="bg-amber-500 text-amber-950">{copy.testOnly}</Badge>}</div></div>) : <p className="text-sm text-muted-foreground">{copy.noRecords}</p>}</CardContent></Card>
