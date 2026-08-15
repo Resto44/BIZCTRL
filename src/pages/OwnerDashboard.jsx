@@ -455,9 +455,18 @@ class WidgetErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <Card className="border-red-200 bg-red-50 dark:bg-red-950/30">
-          <CardContent className="p-4 flex items-center gap-2 text-red-600">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span className="text-xs font-medium">Widget failed to load. Please refresh.</span>
+          <CardContent className="p-4 flex items-center justify-between gap-3 text-red-600">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span className="text-xs font-medium">Unable to load this section. Try again.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => this.setState({ hasError: false })}
+              className="shrink-0 rounded-md border border-red-300 px-2 py-1 text-xs font-semibold hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            >
+              Retry
+            </button>
           </CardContent>
         </Card>
       );
@@ -470,6 +479,55 @@ class WidgetErrorBoundary extends React.Component {
 // MAIN DASHBOARD
 // ─────────────────────────────────────────────────────────────────────────────
 export default function OwnerDashboard() {
+  const {
+    activeRestaurant,
+    loadingRestaurants,
+    loadingPortalIdentity,
+    portalIdentityError,
+    refetchRestaurants,
+    refetchPortalIdentity,
+  } = useTenant();
+  const { user, isLoadingAuth, authError, checkUserAuth } = useAuth();
+  const navigate = useNavigate();
+
+  if (isLoadingAuth || loadingRestaurants || (activeRestaurant && loadingPortalIdentity)) {
+    return <div className="space-y-4 p-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>;
+  }
+
+  if (!user || authError?.type === 'auth_required') {
+    return (
+      <Card className="mx-auto mt-10 max-w-md border-amber-200 bg-amber-50 dark:bg-amber-950/30">
+        <CardContent className="space-y-3 p-5 text-center">
+          <AlertCircle className="mx-auto h-6 w-6 text-amber-600" />
+          <p className="text-sm font-semibold">Your session has expired. Please sign in again.</p>
+          <button type="button" onClick={() => navigate('/erp-login')} className="rounded-md bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">Sign in again</button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!activeRestaurant || portalIdentityError) {
+    return (
+      <Card className="mx-auto mt-10 max-w-md border-red-200 bg-red-50 dark:bg-red-950/30">
+        <CardContent className="space-y-3 p-5 text-center">
+          <AlertCircle className="mx-auto h-6 w-6 text-red-600" />
+          <p className="text-sm font-semibold">Unable to load this section. Try again.</p>
+          <button
+            type="button"
+            onClick={async () => { await checkUserAuth(); await refetchRestaurants(); await refetchPortalIdentity(); }}
+            className="rounded-md bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"
+          >
+            Retry
+          </button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return <OwnerDashboardContent />;
+}
+
+function OwnerDashboardContent() {
   const { t, currency } = useLanguage();
   const { branches, ownerFilter, orgId, activeRestaurant } = useTenant();
   const { role } = useRole();

@@ -12,7 +12,7 @@ const TenantContext = createContext({
   updateRestaurant: async () => {}, updateRestaurantBranches: async () => {}, refetchRestaurants: () => {},
   orgId: '', orgFilter: {}, restaurantFilter: null,
   managerBranch: null, managerBranchObject: null, isManager: false,
-  portalIdentity: null, loadingPortalIdentity: false,
+  portalIdentity: null, loadingPortalIdentity: false, portalIdentityError: null, refetchPortalIdentity: () => {},
 });
 
 export function TenantProvider({ children }) {
@@ -103,7 +103,12 @@ export function TenantProvider({ children }) {
 
   const activeRestaurant = restaurants.find(r => r.id === activeRestaurantId) || restaurants.at(0) || null;
 
-  const { data: portalIdentityData, isLoading: loadingPortalIdentity } = useQuery({
+  const {
+    data: portalIdentityData,
+    isLoading: loadingPortalIdentity,
+    error: portalIdentityError,
+    refetch: refetchPortalIdentity,
+  } = useQuery({
     queryKey: ['portal-identity', user?.id, activeRestaurant?.id],
     queryFn: async () => {
       if (!activeRestaurant?.id) return null;
@@ -361,6 +366,7 @@ export function TenantProvider({ children }) {
       if (prevEmailRef.current) {
         localStorage.removeItem(`rc_restaurant_${prevEmailRef.current}`);
       }
+      setActiveRestaurantIdRaw(localStorage.getItem(`rc_restaurant_${email || 'default'}`) || null);
     }
     prevEmailRef.current = email;
   }, [user?.email, queryClient]);
@@ -403,6 +409,8 @@ export function TenantProvider({ children }) {
       isSponsor,
       portalIdentity,
       loadingPortalIdentity,
+      portalIdentityError,
+      refetchPortalIdentity,
     }}>
       {children}
     </TenantContext.Provider>

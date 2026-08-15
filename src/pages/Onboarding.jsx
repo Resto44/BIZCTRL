@@ -124,9 +124,13 @@ export default function Onboarding({ onComplete }) {
       if (!user?.email) throw new Error('Not authenticated — please refresh and try again.');
 
       const branchKey = branchLabel.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || 'main';
-      // Determine business_mode from business_type
-      const retailTypes = ['retail', 'wholesale', 'warehouse', 'pharmacy'];
-      const businessMode = retailTypes.includes(businessType) ? 'retail' : 'restaurant';
+      // Persist the canonical portal mode. Pharmacy has a dedicated server-backed
+      // mode and must never be collapsed into Retail during tenant creation.
+      const businessMode = businessType === 'pharmacy'
+        ? 'pharmacy'
+        : ['retail', 'wholesale', 'warehouse'].includes(businessType)
+          ? 'retail'
+          : 'restaurant';
 
       const rest = await base44.entities.Restaurant.create({
         org_id: user.email,
