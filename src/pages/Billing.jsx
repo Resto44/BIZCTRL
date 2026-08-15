@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useSubscription } from '@/lib/SubscriptionContext';
 import { createPaymentProvider } from '@/lib/payment/PaymentProvider';
@@ -26,6 +26,7 @@ const COPY = {
     paymentSelected: 'A manual IBAN payment request has been created. This plan remains unavailable until your payment proof is approved by the Platform Owner.',
     actionFailed: 'The requested billing action could not be completed.', limits: 'Limits', modules: 'Included modules',
     pendingDetails: 'This paid plan is awaiting payment confirmation. It has not been activated.',
+    testOnly: 'Test payment', iban: 'IBAN', bank: 'Bank', beneficiary: 'Beneficiary', amount: 'Amount', transferInstructions: 'Transfer instructions', selectedFile: 'Selected file', loadingSubscription: 'Loading subscription…',
   },
   ar: {
     title: 'الفوترة والاشتراك', currentPlan: 'الخطة الحالية', status: 'حالة الاشتراك',
@@ -39,6 +40,7 @@ const COPY = {
     paymentSelected: 'تم إنشاء طلب دفع يدوي عبر IBAN. تظل الخطة غير نشطة حتى يوافق مالك المنصة على إثبات الدفع.',
     actionFailed: 'تعذر إكمال إجراء الفوترة المطلوب.', limits: 'الحدود', modules: 'الوحدات المتاحة',
     pendingDetails: 'هذه الخطة المدفوعة بانتظار تأكيد الدفع ولم يتم تفعيلها.',
+    testOnly: 'دفعة اختبار', iban: 'IBAN', bank: 'البنك', beneficiary: 'المستفيد', amount: 'المبلغ', transferInstructions: 'تعليمات التحويل', selectedFile: 'الملف المحدد', loadingSubscription: 'جارٍ تحميل الاشتراك…',
   },
   fa: {
     title: 'صورتحساب و اشتراک', currentPlan: 'طرح فعلی', status: 'وضعیت اشتراک',
@@ -52,6 +54,7 @@ const COPY = {
     paymentSelected: 'درخواست پرداخت دستی IBAN ایجاد شد. این طرح تا تأیید مدرک پرداخت توسط مالک پلتفرم فعال نمی‌شود.',
     actionFailed: 'اقدام صورتحساب مورد نظر انجام نشد.', limits: 'محدودیت‌ها', modules: 'ماژول‌های شامل',
     pendingDetails: 'این طرح پولی در انتظار تأیید پرداخت است و فعال نشده است.',
+    testOnly: 'پرداخت آزمایشی', iban: 'IBAN', bank: 'بانک', beneficiary: 'ذی‌نفع', amount: 'مبلغ', transferInstructions: 'دستورالعمل انتقال', selectedFile: 'فایل انتخاب‌شده', loadingSubscription: 'در حال بارگذاری اشتراک…',
   },
 };
 
@@ -107,7 +110,17 @@ export default function Billing() {
   const [manualPayment, setManualPayment] = useState(null);
   const [paymentReference, setPaymentReference] = useState('');
   const [paymentProof, setPaymentProof] = useState(null);
+  const [pendingInstructions, setPendingInstructions] = useState(null);
   const copy = COPY[lang] || COPY.en;
+
+  useEffect(() => {
+    let mounted = true;
+    if (!canManageBilling || status !== 'PENDING_PAYMENT' || manualPayment?.instructions) return undefined;
+    getManualPaymentInstructions()
+      .then((instructions) => { if (mounted) setPendingInstructions(instructions); })
+      .catch(() => { if (mounted) setPendingInstructions(null); });
+    return () => { mounted = false; };
+  }, [canManageBilling, getManualPaymentInstructions, manualPayment?.instructions, status]);
 
   const runAction = async (action, work, successMessage = '') => {
     setActing(action);
@@ -138,6 +151,7 @@ export default function Billing() {
       const intent = await provider.createCheckout(planId);
       const instructions = await getManualPaymentInstructions();
       setManualPayment({ ...intent, instructions });
+      setPendingInstructions(instructions);
       setNotice(copy.paymentSelected);
     } catch (nextError) {
       setNotice(nextError?.message || copy.actionFailed);
@@ -147,6 +161,8 @@ export default function Billing() {
   };
 
   const submitProof = () => runAction('submit-proof', () => submitManualPaymentProof(manualPayment?.payment_id || pendingPaymentId, paymentReference, paymentProof), copy.proofAccepted);
+  const billingInstructions = manualPayment?.instructions || pendingInstructions;
+  const billingAmountCents = manualPayment?.amount_cents || summary.pricing?.monthly_price_cents;
 
   return (
     <div className="space-y-6 pb-10" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -234,7 +250,7 @@ export default function Billing() {
       </section>
 
       {canManageBilling && (manualPayment || (status === 'PENDING_PAYMENT' && summary.payment_provider === 'manual_iban')) && (
-        <Card className="border-violet-300 bg-violet-50/60 dark:bg-violet-950/15"><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-violet-900 dark:text-violet-200"><Landmark className="h-5 w-5" />{copy.ibanTitle}</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-violet-900/80 dark:text-violet-100/80">{copy.ibanInstructions}</p>{manualPayment?.instructions && <div className="grid gap-3 rounded-xl border bg-background p-4 text-sm sm:grid-cols-2"><p><span className="text-muted-foreground">IBAN</span><br /><strong>{manualPayment.instructions.iban}</strong></p><p><span className="text-muted-foreground">Bank</span><br /><strong>{manualPayment.instructions.bank_name || '—'}</strong></p><p><span className="text-muted-foreground">Beneficiary</span><br /><strong>{manualPayment.instructions.beneficiary_name || '—'}</strong></p><p><span className="text-muted-foreground">Amount</span><br /><strong>{money(manualPayment.amount_cents)}</strong></p></div>}<div className="grid gap-3 sm:grid-cols-2"><div><label className="text-sm font-medium">{copy.paymentReference}</label><Input className="mt-1" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></div><div><label className="text-sm font-medium">{copy.uploadProof}</label><Input className="mt-1" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => setPaymentProof(event.target.files?.[0] || null)} /></div></div><Button disabled={Boolean(acting) || !paymentReference || !paymentProof} onClick={submitProof}>{acting === 'submit-proof' && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{copy.submitProof}</Button></CardContent></Card>
+        <Card className="border-violet-300 bg-violet-50/60 dark:bg-violet-950/15"><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-violet-900 dark:text-violet-200"><Landmark className="h-5 w-5" />{copy.ibanTitle}</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-violet-900/80 dark:text-violet-100/80">{copy.ibanInstructions}</p>{billingInstructions && <><div className="grid gap-3 rounded-xl border bg-background p-4 text-sm sm:grid-cols-2"><p><span className="text-muted-foreground">{copy.iban}</span><br /><strong dir="ltr">{billingInstructions.iban}</strong></p><p><span className="text-muted-foreground">{copy.bank}</span><br /><strong>{billingInstructions.bank_name || '—'}</strong></p><p><span className="text-muted-foreground">{copy.beneficiary}</span><br /><strong>{billingInstructions.beneficiary_name || '—'}</strong></p><p><span className="text-muted-foreground">{copy.amount}</span><br /><strong>{money(billingAmountCents)}</strong></p></div>{billingInstructions.instructions && <p className="rounded-lg bg-background/70 p-3 text-sm"><span className="font-semibold">{copy.transferInstructions}: </span>{billingInstructions.instructions}</p>}</>}<div className="grid gap-3 sm:grid-cols-2"><div><label className="text-sm font-medium">{copy.paymentReference}</label><Input className="mt-1" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></div><div><label className="text-sm font-medium">{copy.uploadProof}</label><Input className="mt-1" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => setPaymentProof(event.target.files?.[0] || null)} />{paymentProof && <p className="mt-1 text-xs text-muted-foreground">{copy.selectedFile}: {paymentProof.name}</p>}</div></div><Button disabled={Boolean(acting) || !paymentReference || !paymentProof} onClick={submitProof}>{acting === 'submit-proof' && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{copy.submitProof}</Button></CardContent></Card>
       )}
 
       <section className="grid gap-5 xl:grid-cols-2">
@@ -242,7 +258,7 @@ export default function Billing() {
         <Card><CardHeader><CardTitle className="text-base">{copy.subscriptionHistory}</CardTitle></CardHeader><CardContent className="space-y-3">{events.length ? events.map((event) => <div key={event.id} className="flex items-start justify-between gap-3 rounded-lg border p-3 text-sm"><div><p className="font-semibold">{String(event.event_type || '').replaceAll('_', ' ')}</p><p className="text-xs text-muted-foreground">{formatDate(event.created_at, lang)}</p></div><Badge variant="outline">{event.next_status || '—'}</Badge></div>) : <p className="text-sm text-muted-foreground">{copy.noRecords}</p>}</CardContent></Card>
       </section>
 
-      {loading && <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading subscription</div>}
+      {loading && <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />{copy.loadingSubscription}</div>}
     </div>
   );
 }

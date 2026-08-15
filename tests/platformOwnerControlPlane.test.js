@@ -65,8 +65,8 @@ describe('Platform Owner control plane', () => {
 
   it('renders a multilingual responsive control-plane navigation and separate owner login', async () => {
     const [portal, login, api] = await Promise.all([readFile(portalPath, 'utf8'), readFile(loginPath, 'utf8'), readFile(apiPath, 'utf8')]);
-    expect(portal).toContain("fa: { dashboard: 'داشبورد'");
-    expect(portal).toContain("ar: { dashboard: 'لوحة التحكم'");
+    expect(portal).toMatch(/fa:\s*\{\s*dashboard: 'داشبورد'/);
+    expect(portal).toMatch(/ar:\s*\{\s*dashboard: 'لوحة التحكم'/);
     expect(portal).toContain('lg:hidden');
     expect(portal).toContain('md:hidden');
     expect(login).toContain('Platform Owner sign in');

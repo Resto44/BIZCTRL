@@ -16,10 +16,12 @@ export const platformOwnerApi = {
   plans: () => rpc('platform_owner_list_plans'),
   promotions: (limit, offset) => rpc('platform_owner_list_promotions', { p_limit: limit, p_offset: offset }),
   activity: (limit, offset) => rpc('platform_owner_list_activity_logs', { p_limit: limit, p_offset: offset }),
+  manualPaymentSettings: () => rpc('platform_owner_manual_payment_settings'),
   reviewPayment: (paymentId, approve, note) => rpc('platform_owner_review_manual_payment', { p_payment_id: paymentId, p_approve: approve, p_note: note || null }),
   setUserStatus: (userId, status, reason) => rpc('platform_owner_set_user_status', { p_user_id: userId, p_status: status, p_reason: reason || null }),
   setOrganizationStatus: (restaurantId, active, reason) => rpc('platform_owner_set_organization_status', { p_restaurant_id: restaurantId, p_active: active, p_reason: reason || null }),
   setSubscriptionStatus: (restaurantId, action, reason) => rpc('platform_owner_set_subscription_status', { p_restaurant_id: restaurantId, p_action: action, p_reason: reason || null }),
+  changeSubscriptionPlan: (restaurantId, planId, reason) => rpc('platform_owner_change_subscription_plan', { p_restaurant_id: restaurantId, p_plan_id: planId, p_reason: reason || null }),
   extendTrial: (restaurantId, days) => rpc('platform_owner_extend_trial', { p_restaurant_id: restaurantId, p_days: days }),
   featureOverride: (restaurantId, feature, enabled, reason) => rpc('platform_owner_set_feature_override', { p_restaurant_id: restaurantId, p_feature_key: feature, p_enabled: enabled, p_reason: reason || null }),
   saveManualPaymentSettings: (settings) => rpc('platform_owner_set_manual_payment_settings', {
@@ -43,4 +45,11 @@ export const platformOwnerApi = {
     p_coupon_code: promotion.couponCode || null,
     p_is_active: Boolean(promotion.isActive),
   }),
+  paymentProofUrl: async (objectKey) => {
+    if (!objectKey) throw new Error('PAYMENT_PROOF_NOT_AVAILABLE');
+    const { data, error } = await supabase.storage.from('payment-proofs').createSignedUrl(objectKey, 60);
+    if (error) throw error;
+    if (!data?.signedUrl) throw new Error('PAYMENT_PROOF_URL_UNAVAILABLE');
+    return data.signedUrl;
+  },
 };
