@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, ShieldCheck, Clock, CheckCircle2, Store, Square, CheckSquare, Truck } from 'lucide-react';
+import { Pencil, Trash2, ShieldCheck, Clock, CheckCircle2, Store, Square, CheckSquare, UserRound } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -14,7 +14,7 @@ const SETTLE_BADGE = {
   rejected: { label: 'Rejected', icon: null, cls: 'text-red-600 bg-red-50' },
 };
 
-export default function SalesListItem({ sale, onEdit, onDelete, selected = false, onToggleSelect = null }) {
+export default function SalesListItem({ sale, record = sale, onEdit, onDelete, selected = false, onToggleSelect = null }) {
   const { t, currency } = useLanguage();
   const { branches } = useTenant();
 
@@ -41,6 +41,7 @@ export default function SalesListItem({ sale, onEdit, onDelete, selected = false
 
   const total = rCash + rNet + credit + customSourcesTotal;
   const branchLabel = branches.find(b => b.key === sale.branch)?.label || sale.branch;
+  const managerName = sale.manager_name || sale.manager_email || sale.created_by || '—';
   const hasNetwork = rNet > 0;
 
   const { data: settlements = [] } = useQuery({
@@ -65,15 +66,21 @@ export default function SalesListItem({ sale, onEdit, onDelete, selected = false
           <span className="text-xs bg-secondary px-2 py-0.5 rounded-full text-secondary-foreground">{branchLabel}</span>
         </div>
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(sale)}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(record)}>
             <Pencil className="w-3.5 h-3.5" />
           </Button>
           {onDelete && (
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(sale)}>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(record)}>
               <Trash2 className="w-3.5 h-3.5" />
             </Button>
           )}
         </div>
+      </div>
+
+      <div className="mb-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <UserRound className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+        <span className="shrink-0 font-medium text-foreground">Manager:</span>
+        <span className="truncate font-medium text-foreground">{managerName}</span>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-secondary/40 rounded-lg px-2 py-1.5 mb-2">
@@ -105,11 +112,6 @@ export default function SalesListItem({ sale, onEdit, onDelete, selected = false
 
       <div className="mt-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {sale.driver_id && sale.driver_name && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700">
-              <Truck className="w-3 h-3" />{sale.driver_name}
-            </span>
-          )}
           {badge && (
             <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${badge.cls}`}>
               {badge.icon && <badge.icon className="w-3 h-3" />}

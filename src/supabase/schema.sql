@@ -110,6 +110,9 @@ CREATE TABLE IF NOT EXISTS daily_sales (
   network_account_id          TEXT,
   notes                       TEXT,
   created_by                  TEXT,
+  manager_user_id             UUID,
+  manager_name                TEXT,
+  manager_email               TEXT,
   created_date                TIMESTAMPTZ DEFAULT NOW(),
   updated_date                TIMESTAMPTZ DEFAULT NOW()
 );

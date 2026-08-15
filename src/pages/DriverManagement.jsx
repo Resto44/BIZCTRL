@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -40,7 +41,7 @@ function branchKeyFor(branch) {
   return branch?.key || branch?.branch_key || '';
 }
 
-function DriverDetailsDialog({ driver, analytics, sales, currency, onOpenChange }) {
+function DriverDetailsDialog({ driver, analytics, sales, currency, onOpenChange, onEditSale }) {
   if (!driver) return null;
 
   const row = analytics.driverRows.find((item) => String(item.driverId) === String(driver.id));
@@ -104,7 +105,7 @@ function DriverDetailsDialog({ driver, analytics, sales, currency, onOpenChange 
                         <p className="text-xs text-muted-foreground">{sale.branch || 'Branch'} · Cash {money(amounts.cash, currency)} · POS {money(amounts.network, currency)} · Credit {money(amounts.credit, currency)}</p>
                         {amounts.notes && <p className="mt-1 text-xs text-muted-foreground">Notes: {amounts.notes}</p>}
                       </div>
-                      <p className="font-bold text-primary">{money(amounts.revenue, currency)}</p>
+                      <div className="flex items-center gap-2"><p className="font-bold text-primary">{money(amounts.revenue, currency)}</p><Button type="button" size="sm" variant="outline" onClick={() => onEditSale(sale)}>Edit</Button></div>
                     </div>
                   );
                 })}
@@ -157,6 +158,9 @@ export default function DriverManagement() {
   const [showEditor, setShowEditor] = useState(false);
   const [editingDriver, setEditingDriver] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [driverSaleDriver, setDriverSaleDriver] = useState(null);
+  const [editingDriverSale, setEditingDriverSale] = useState(null);
+  const [driverSaleForm, setDriverSaleForm] = useState({ date: new Date().toISOString().slice(0, 10), cash: '', network: '', credit: '', notes: '' });
 
   useEffect(() => {
     if (!isManager) return;
@@ -318,6 +322,54 @@ export default function DriverManagement() {
     onError: (error) => toast.error(error?.message || 'Unable to update driver status'),
   });
 
+  const recordDriverSaleMutation = useMutation({
+    mutationFn: async () => {
+      if (!driverSaleDriver?.id || !driverSaleDriver.branch_id) throw new Error('Select an assigned driver.');
+      const cash = Math.max(0, Number(driverSaleForm.cash) || 0);
+      const network = Math.max(0, Number(driverSaleForm.network) || 0);
+      const credit = Math.max(0, Number(driverSaleForm.credit) || 0);
+      if (cash + network + credit <= 0) throw new Error('Enter at least one Driver Sales amount.');
+      const branch = branches.find((item) => String(item.id) === String(driverSaleDriver.branch_id));
+      if (!branch) throw new Error('The driver must be assigned to a valid branch.');
+      const driverEntry = {
+        driver_id: driverSaleDriver.id,
+        driver_name: driverSaleDriver.full_name || '',
+        cash, network, credit, total: cash + network + credit,
+        notes: driverSaleForm.notes.trim(),
+      };
+      const payload = {
+        date: driverSaleForm.date,
+        branch: branchKeyFor(branch),
+        branch_id: branch.id,
+        restaurant_id: activeRestaurant.id,
+        tenant_id: activeRestaurant.id,
+        created_by: user?.email || '',
+        restaurant_cash: cash,
+        cash,
+        restaurant_network: network,
+        network,
+        credit,
+        driver_id: driverSaleDriver.id,
+        driver_name: driverSaleDriver.full_name || '',
+        driver_cash: cash,
+        driver_network: network,
+        drivers_json: JSON.stringify([driverEntry]),
+        sales_notes: driverSaleForm.notes.trim(),
+      };
+      return editingDriverSale
+        ? base44.entities.DailySales.update(editingDriverSale.id, payload)
+        : base44.entities.DailySales.create(payload);
+    },
+    onSuccess: () => {
+      toast.success(editingDriverSale ? 'Driver sale updated' : 'Driver sale recorded');
+      invalidateDriverData();
+      setDriverSaleDriver(null);
+      setEditingDriverSale(null);
+      setDriverSaleForm({ date: new Date().toISOString().slice(0, 10), cash: '', network: '', credit: '', notes: '' });
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to record driver sale'),
+  });
+
   const selectedAnalytics = useMemo(() => buildDriverSalesAnalytics({
     drivers,
     sales,
@@ -426,6 +478,7 @@ export default function DriverManagement() {
                     <div className="flex items-center gap-2 text-xs text-muted-foreground"><Switch checked={active} onCheckedChange={() => toggleMutation.mutate(driver)} disabled={toggleMutation.isPending} />{active ? 'Active' : 'Inactive'}</div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => setSelectedDriver(driver)}>History</Button>
+                      <Button size="sm" variant="outline" className="gap-1" onClick={() => { setEditingDriverSale(null); setDriverSaleDriver(driver); }} disabled={!active}><ReceiptText className="h-3 w-3" />Record Sale</Button>
                       <Button size="sm" variant="outline" className="gap-1" onClick={() => openEdit(driver)}><Pencil className="h-3 w-3" />Edit</Button>
                     </div>
                   </div>
@@ -452,7 +505,24 @@ export default function DriverManagement() {
         </CardContent>
       </Card>
 
-      <DriverDetailsDialog driver={selectedDriver} analytics={selectedAnalytics} sales={sales} currency={currency} onOpenChange={setSelectedDriver} />
+      <DriverDetailsDialog driver={selectedDriver} analytics={selectedAnalytics} sales={sales} currency={currency} onOpenChange={setSelectedDriver} onEditSale={(sale) => { setEditingDriverSale(sale); setDriverSaleDriver(selectedDriver); setDriverSaleForm({ date: sale.date || new Date().toISOString().slice(0, 10), cash: String(sale.driverAmounts?.cash || ''), network: String(sale.driverAmounts?.network || ''), credit: String(sale.driverAmounts?.credit || ''), notes: sale.driverAmounts?.notes || '' }); }} />
+
+      <Dialog open={!!driverSaleDriver} onOpenChange={(open) => { if (!open) { setDriverSaleDriver(null); setEditingDriverSale(null); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{editingDriverSale ? 'Edit Driver Sale' : 'Record Driver Sale'}</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This independent Driver Sales entry is not part of Daily Sales Add/Edit.</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2"><Label>Driver</Label><Input value={driverSaleDriver?.full_name || ''} readOnly /></div>
+            <div><Label>Date</Label><Input type="date" value={driverSaleForm.date} onChange={(event) => setDriverSaleForm((current) => ({ ...current, date: event.target.value }))} /></div>
+            <div><Label>Branch</Label><Input value={branchKeyFor(branches.find((item) => String(item.id) === String(driverSaleDriver?.branch_id))) || ''} readOnly /></div>
+            <div><Label>Cash</Label><Input type="number" min="0" step="0.01" value={driverSaleForm.cash} onChange={(event) => setDriverSaleForm((current) => ({ ...current, cash: event.target.value }))} /></div>
+            <div><Label>Network / POS</Label><Input type="number" min="0" step="0.01" value={driverSaleForm.network} onChange={(event) => setDriverSaleForm((current) => ({ ...current, network: event.target.value }))} /></div>
+            <div><Label>Credit</Label><Input type="number" min="0" step="0.01" value={driverSaleForm.credit} onChange={(event) => setDriverSaleForm((current) => ({ ...current, credit: event.target.value }))} /></div>
+            <div className="sm:col-span-2"><Label>Notes</Label><Textarea value={driverSaleForm.notes} onChange={(event) => setDriverSaleForm((current) => ({ ...current, notes: event.target.value }))} /></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => { setDriverSaleDriver(null); setEditingDriverSale(null); }}>Cancel</Button><Button onClick={() => recordDriverSaleMutation.mutate()} disabled={recordDriverSaleMutation.isPending}>{recordDriverSaleMutation.isPending ? 'Saving…' : editingDriverSale ? 'Update Driver Sale' : 'Record Driver Sale'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showEditor} onOpenChange={(open) => !open && setShowEditor(false)}>
         <DialogContent className="max-w-lg">

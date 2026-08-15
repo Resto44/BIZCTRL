@@ -30,6 +30,7 @@ import {
   createSalesInvoice,
   generateAndUploadPDF,
 } from '@/lib/salesInvoiceService';
+import { filterDailySalesRecords, toDailySalesCardRecord } from '@/lib/dailySalesPresentation';
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const firstRecord = (value) => asRecordArray(value).at(0) || null;
@@ -623,25 +624,7 @@ export default function Sales() {
     },
   });
 
-  const filtered = useMemo(() => {
-    return sales.filter(s => {
-      if (!s?.date) return false;
-      if (filters.branch !== 'all' && s.branch !== filters.branch) return false;
-      if (filters.from && s.date < filters.from) return false;
-      if (filters.to && s.date > filters.to) return false;
-      const customSrc = (() => {
-        if (Number(s.custom_sources_total) > 0) return Number(s.custom_sources_total);
-        if (s.sales_sources_json) {
-          try { const e = JSON.parse(s.sales_sources_json); if (Array.isArray(e)) return e.reduce((a, x) => a + (Number(x?.amount) || 0), 0); } catch { /* ignore */ }
-        }
-        return 0;
-      })();
-      const total = (Number(s.restaurant_cash) || Number(s.cash) || 0) + (Number(s.restaurant_network) || Number(s.network) || 0) + (Number(s.credit) || 0) + customSrc;
-      if (filters.minTotal && total < Number(filters.minTotal)) return false;
-      if (filters.maxTotal && total > Number(filters.maxTotal)) return false;
-      return true;
-    });
-  }, [sales, filters]);
+  const filtered = useMemo(() => filterDailySalesRecords(sales, filters), [sales, filters]);
 
   const toggleSelect = useCallback((id) => {
     setSelectedIds(prev => {
@@ -797,7 +780,8 @@ export default function Sales() {
               {filtered.map(s => (
                 <SalesListItem
                   key={s.id}
-                  sale={s}
+                  sale={toDailySalesCardRecord(s)}
+                  record={s}
                   onEdit={(sale) => {
                     if (isDriverSale(sale) && !canManageDriverSales) {
                       toast.error('Driver Sales can only be edited by the restaurant Owner or assigned Branch Manager.');
