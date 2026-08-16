@@ -6,6 +6,7 @@ const landingPath = new URL('../src/pages/LandingPage.jsx', import.meta.url);
 const guardPath = new URL('../src/components/subscription/FeatureRouteGuard.jsx', import.meta.url);
 const planChangePath = new URL('../src/supabase/20260814_plan_change_classification.sql', import.meta.url);
 const contextPath = new URL('../src/lib/SubscriptionContext.jsx', import.meta.url);
+const reactivationMigrationPath = new URL('../src/supabase/20260816_normal_subscription_reactivation_hardening.sql', import.meta.url);
 
 describe('subscription UI and plan-change contract', () => {
   it('uses the owner-only manual IBAN intent and payment-proof workflow rather than an obsolete permanent Free or mock-payment UI path', async () => {
@@ -64,6 +65,34 @@ describe('subscription UI and plan-change contract', () => {
     expect(billing).toContain('role="alert"');
     expect(billing).toContain('onClick={refresh}');
     expect(billing).toContain('Loading subscription');
+  });
+
+  it('routes inactive paid subscriptions through the server-authoritative payment-required reactivation flow', async () => {
+    const [billing, migration] = await Promise.all([
+      readFile(billingPath, 'utf8'),
+      readFile(reactivationMigrationPath, 'utf8'),
+    ]);
+    expect(billing).toContain("['CANCELED', 'EXPIRED', 'PAST_DUE'].includes(status)");
+    expect(billing).toContain('const intent = await renewSubscription();');
+    expect(billing).toContain('getManualPaymentInstructions()');
+    expect(billing).toContain('reactivationRequiresPayment');
+    expect(billing).toContain('Reactivate with payment');
+    expect(migration).toContain("v_subscription.subscription_status NOT IN ('CANCELED', 'EXPIRED', 'PAST_DUE')");
+    expect(migration).toContain("'REACTIVATION_PLAN_SELECTION_REQUIRED'");
+    expect(migration).toContain("'PENDING_PAYMENT'");
+    expect(migration).toContain("'reactivation_payment_requested'");
+    expect(migration).toContain("'manual_payment'");
+  });
+
+  it('clears cancellation markers on payment-request reactivation and approved payment without granting Active status early', async () => {
+    const migration = await readFile(reactivationMigrationPath, 'utf8');
+    expect(migration).toContain('cancel_at_period_end = false');
+    expect(migration).toContain('canceled_at = NULL');
+    expect(migration).toContain("'Manual IBAN reactivation pending review'");
+    expect(migration).toContain("'subscription_status', 'PENDING_PAYMENT'");
+    expect(migration).toContain('subscription_status = v_status');
+    expect(migration).toContain("v_status := CASE WHEN p_approve THEN 'ACTIVE' ELSE 'PAST_DUE' END;");
+    expect(migration).toContain("status = 'superseded'");
   });
 
   it('localizes the subscription entitlement guard for English, Arabic, and Persian', async () => {

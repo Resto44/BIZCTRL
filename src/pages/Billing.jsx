@@ -26,6 +26,7 @@ const COPY = {
     paymentSelected: 'A manual IBAN payment request has been created. This plan remains unavailable until your payment proof is approved by the Platform Owner.',
     actionFailed: 'The requested billing action could not be completed.', limits: 'Limits', modules: 'Included modules',
     pendingDetails: 'This paid plan is awaiting payment confirmation. It has not been activated.',
+    reactivate: 'Reactivate with payment', reactivateDetails: 'Reactivation requires a new payment request and Platform Owner approval. Your ERP access will resume only after approval.',
     testOnly: 'Test payment', iban: 'IBAN', bank: 'Bank', beneficiary: 'Beneficiary', amount: 'Amount', transferInstructions: 'Transfer instructions', selectedFile: 'Selected file', loadingSubscription: 'Loading subscription…', retry: 'Retry',
   },
   ar: {
@@ -40,6 +41,7 @@ const COPY = {
     paymentSelected: 'تم إنشاء طلب دفع يدوي عبر IBAN. تظل الخطة غير نشطة حتى يوافق مالك المنصة على إثبات الدفع.',
     actionFailed: 'تعذر إكمال إجراء الفوترة المطلوب.', limits: 'الحدود', modules: 'الوحدات المتاحة',
     pendingDetails: 'هذه الخطة المدفوعة بانتظار تأكيد الدفع ولم يتم تفعيلها.',
+    reactivate: 'إعادة التفعيل عبر الدفع', reactivateDetails: 'تتطلب إعادة التفعيل طلب دفع جديداً وموافقة مالك المنصة. سيعود الوصول إلى ERP بعد الموافقة فقط.',
     testOnly: 'دفعة اختبار', iban: 'IBAN', bank: 'البنك', beneficiary: 'المستفيد', amount: 'المبلغ', transferInstructions: 'تعليمات التحويل', selectedFile: 'الملف المحدد', loadingSubscription: 'جارٍ تحميل الاشتراك…', retry: 'إعادة المحاولة',
   },
   fa: {
@@ -54,6 +56,7 @@ const COPY = {
     paymentSelected: 'درخواست پرداخت دستی IBAN ایجاد شد. این طرح تا تأیید مدرک پرداخت توسط مالک پلتفرم فعال نمی‌شود.',
     actionFailed: 'اقدام صورتحساب مورد نظر انجام نشد.', limits: 'محدودیت‌ها', modules: 'ماژول‌های شامل',
     pendingDetails: 'این طرح پولی در انتظار تأیید پرداخت است و فعال نشده است.',
+    reactivate: 'فعال‌سازی مجدد با پرداخت', reactivateDetails: 'فعال‌سازی مجدد به درخواست پرداخت جدید و تأیید مالک پلتفرم نیاز دارد. دسترسی ERP فقط پس از تأیید بازمی‌گردد.',
     testOnly: 'پرداخت آزمایشی', iban: 'IBAN', bank: 'بانک', beneficiary: 'ذی‌نفع', amount: 'مبلغ', transferInstructions: 'دستورالعمل انتقال', selectedFile: 'فایل انتخاب‌شده', loadingSubscription: 'در حال بارگذاری اشتراک…', retry: 'تلاش دوباره',
   },
 };
@@ -160,9 +163,29 @@ export default function Billing() {
     }
   };
 
+  const beginReactivation = async () => {
+    setActing('reactivate');
+    setNotice('');
+    try {
+      const intent = await renewSubscription();
+      const instructions = await getManualPaymentInstructions();
+      setManualPayment({ ...intent, instructions });
+      setPendingInstructions(instructions);
+      setNotice(copy.paymentSelected);
+    } catch (nextError) {
+      setNotice(nextError?.message || copy.actionFailed);
+    } finally {
+      setActing('');
+    }
+  };
+
   const submitProof = () => runAction('submit-proof', () => submitManualPaymentProof(manualPayment?.payment_id || pendingPaymentId, paymentReference, paymentProof), copy.proofAccepted);
   const billingInstructions = manualPayment?.instructions || pendingInstructions;
   const billingAmountCents = manualPayment?.amount_cents || summary.pricing?.monthly_price_cents;
+  const reactivationRequiresPayment = canManageBilling
+    && ['CANCELED', 'EXPIRED', 'PAST_DUE'].includes(status)
+    && Boolean(plan)
+    && Number(summary.pricing?.monthly_price_cents || 0) > 0;
 
   return (
     <div className="space-y-6 pb-10" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -212,6 +235,9 @@ export default function Billing() {
             )}
             {canManageBilling && status === 'ACTIVE' && summary.cancel_at_period_end && (
               <Button onClick={() => runAction('renew', renewSubscription)} disabled={Boolean(acting)}><RotateCcw className="me-2 h-4 w-4" />{copy.renew}</Button>
+            )}
+            {reactivationRequiresPayment && (
+              <div className="flex flex-wrap items-center gap-2"><Button onClick={beginReactivation} disabled={Boolean(acting)}>{acting === 'reactivate' && <Loader2 className="me-2 h-4 w-4 animate-spin" />}<RotateCcw className="me-2 h-4 w-4" />{copy.reactivate}</Button><span className="text-sm text-muted-foreground">{copy.reactivateDetails}</span></div>
             )}
             {!canManageBilling && <p className="text-sm text-muted-foreground">{copy.ownerOnly}</p>}
           </div>
