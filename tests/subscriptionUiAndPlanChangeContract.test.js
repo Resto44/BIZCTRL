@@ -6,6 +6,7 @@ const landingPath = new URL('../src/pages/LandingPage.jsx', import.meta.url);
 const guardPath = new URL('../src/components/subscription/FeatureRouteGuard.jsx', import.meta.url);
 const planChangePath = new URL('../src/supabase/20260814_plan_change_classification.sql', import.meta.url);
 const contextPath = new URL('../src/lib/SubscriptionContext.jsx', import.meta.url);
+const subscriptionBoundaryPath = new URL('../src/components/subscription/SubscriptionErrorBoundary.jsx', import.meta.url);
 const reactivationMigrationPath = new URL('../src/supabase/20260816_normal_subscription_reactivation_hardening.sql', import.meta.url);
 
 describe('subscription UI and plan-change contract', () => {
@@ -65,6 +66,7 @@ describe('subscription UI and plan-change contract', () => {
     expect(billing).toContain('role="alert"');
     expect(billing).toContain('onClick={refresh}');
     expect(billing).toContain('Loading subscription');
+    expect(context).toContain('tenantReady, user?.id]);');
   });
 
   it('routes inactive paid subscriptions through the server-authoritative payment-required reactivation flow', async () => {
@@ -93,6 +95,18 @@ describe('subscription UI and plan-change contract', () => {
     expect(migration).toContain('subscription_status = v_status');
     expect(migration).toContain("v_status := CASE WHEN p_approve THEN 'ACTIVE' ELSE 'PAST_DUE' END;");
     expect(migration).toContain("status = 'superseded'");
+  });
+
+  it('isolates Billing render failures with a retryable subscription boundary in every access state', async () => {
+    const [app, boundary] = await Promise.all([
+      readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
+      readFile(subscriptionBoundaryPath, 'utf8'),
+    ]);
+    expect(app).toContain("import SubscriptionErrorBoundary from '@/components/subscription/SubscriptionErrorBoundary';");
+    expect(app).toContain('<SubscriptionErrorBoundary><Billing /></SubscriptionErrorBoundary>');
+    expect(boundary).toContain('Subscription error');
+    expect(boundary).toContain('Retry');
+    expect(boundary).toContain('Back to ERP');
   });
 
   it('localizes the subscription entitlement guard for English, Arabic, and Persian', async () => {

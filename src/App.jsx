@@ -20,6 +20,7 @@ import { Toaster } from 'sonner';
 import AppLayout from '@/components/layout/AppLayout';
 import PaywallScreen from '@/components/subscription/PaywallScreen';
 import FeatureRouteGuard from '@/components/subscription/FeatureRouteGuard';
+import SubscriptionErrorBoundary from '@/components/subscription/SubscriptionErrorBoundary';
 
 // ── Lazy-loaded pages (code splitting) ───────────────────────────────────────
 const Dashboard           = lazy(() => import('./pages/Dashboard'));
@@ -221,7 +222,7 @@ const SubscribedRoutes = () => {
         <Routes>
           <Route path="/onboarding" element={<Onboarding onComplete={() => window.location.replace('/owner-command-center')} />} />
           <Route element={<AppLayout />}>
-            <Route path="/billing" element={<Billing />} />
+            <Route path="/billing" element={<SubscriptionErrorBoundary><Billing /></SubscriptionErrorBoundary>} />
           </Route>
           <Route path="*" element={<PaywallScreen />} />
         </Routes>
@@ -311,7 +312,7 @@ const SubscribedRoutes = () => {
         <Route path="/approval-center" element={<Navigate to="/erp-approval-center" replace />} />
         <Route path="/sales-sources" element={<RoleGuard permission="viewBrandSettings"><SalesSources /></RoleGuard>} />
         <Route path="/telegram-settings" element={<RoleGuard permission="viewBrandSettings"><TelegramSettings /></RoleGuard>} />
-        <Route path="/billing" element={<RoleGuard permission="viewBilling"><Billing /></RoleGuard>} />
+        <Route path="/billing" element={<RoleGuard permission="viewBilling"><SubscriptionErrorBoundary><Billing /></SubscriptionErrorBoundary></RoleGuard>} />
         <Route path="/notifications" element={<RoleGuard permission="viewAlerts"><NotificationCenter /></RoleGuard>} />
         <Route path="/alerts" element={<RoleGuard permission="viewAlerts"><SmartAlertCenter /></RoleGuard>} />
         <Route path="/tasks" element={<RoleGuard permission="viewTasks"><Tasks /></RoleGuard>} />

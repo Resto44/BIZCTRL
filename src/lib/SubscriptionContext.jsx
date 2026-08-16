@@ -176,7 +176,7 @@ export function SubscriptionProvider({ children }) {
       applyTestPayment: (paymentId, outcome) => invoke('erp_apply_mock_test_payment', { p_payment_id: paymentId, p_outcome: outcome }),
       simulateSubscriptionLifecycle: (action) => invoke('erp_simulate_subscription_lifecycle', { p_action: action }),
     };
-  }, [error, events, invoke, loading, payments, plans, refresh, summary, tenantReady]);
+  }, [error, events, invoke, loading, payments, plans, refresh, summary, tenantReady, user?.id]);
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;
 }
