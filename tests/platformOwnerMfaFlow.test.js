@@ -10,6 +10,10 @@ describe('Platform Owner recovery and MFA flow', () => {
     expect(login).toContain("supabase.auth.updateUser({ password })");
     expect(login).toContain("supabase.auth.mfa.listFactors()");
     expect(login).toContain("supabase.auth.mfa.enroll({ factorType: 'totp'");
+    expect(login).toContain("factor.status === 'unverified'");
+    expect(login).toContain("setMfaStage('discard')");
+    expect(login).toContain("supabase.auth.mfa.unenroll({ factorId: mfaFactor.id })");
+    expect(login).toContain("discardAndReEnroll");
     expect(login).toContain("supabase.auth.mfa.challenge({ factorId: mfaFactor.id })");
     expect(login).toContain("supabase.auth.mfa.verify({ factorId: mfaFactor.id, challengeId: challenge.id, code: mfaCode.trim() })");
     expect(login).toContain("await beginMfa();");
