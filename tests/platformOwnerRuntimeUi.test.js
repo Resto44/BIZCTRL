@@ -5,6 +5,7 @@ const portalPath = new URL('../src/pages/PlatformOwnerPortal.jsx', import.meta.u
 const billingPath = new URL('../src/pages/Billing.jsx', import.meta.url);
 const apiPath = new URL('../src/lib/platformOwnerApi.js', import.meta.url);
 const migrationPath = new URL('../src/supabase/20260816_platform_owner_runtime_ui.sql', import.meta.url);
+const privilegeMigrationPath = new URL('../src/supabase/20260816_platform_owner_provision_privilege_hardening.sql', import.meta.url);
 
 describe('Platform Owner runtime UI fixes', () => {
   it('uses a responsive mobile-sheet side that respects RTL and renders data rows in a valid table body', async () => {
@@ -34,6 +35,25 @@ describe('Platform Owner runtime UI fixes', () => {
     expect(billing).toContain("testOnly: 'Test payment'");
     expect(billing).toContain("testOnly: 'دفعة اختبار'");
     expect(billing).toContain("testOnly: 'پرداخت آزمایشی'");
+  });
+
+  it('gates all data queries on the authorized server snapshot and exposes query failures', async () => {
+    const portal = await readFile(portalPath, 'utf8');
+    expect(portal).toContain('const ownerReady = snapshot.isSuccess');
+    expect(portal).toContain('enabled: ownerReady && (active === \'dashboard\' || active === \'reports\')');
+    expect(portal).toContain('retry: false');
+    expect(portal).toContain('snapshot.isError');
+    expect(portal).toContain('dashboard.isError');
+    expect(portal).toContain('role="alert"');
+    expect(portal).toContain('onRetry={() => dashboard.refetch()}');
+  });
+
+  it('hardens Platform Owner provisioning to service-role execution only', async () => {
+    const migration = await readFile(privilegeMigrationPath, 'utf8');
+    expect(migration).toContain('REVOKE ALL ON FUNCTION public.platform_owner_provision(uuid, boolean) FROM PUBLIC;');
+    expect(migration).toContain('REVOKE ALL ON FUNCTION public.platform_owner_provision(uuid, boolean) FROM anon;');
+    expect(migration).toContain('REVOKE ALL ON FUNCTION public.platform_owner_provision(uuid, boolean) FROM authenticated;');
+    expect(migration).toContain('GRANT EXECUTE ON FUNCTION public.platform_owner_provision(uuid, boolean) TO service_role;');
   });
 
   it('adds Owner-only settings retrieval and plan changes through the existing Platform Owner assertion, not direct table access', async () => {
