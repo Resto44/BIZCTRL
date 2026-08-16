@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useTenant } from '@/lib/TenantContext';
 
 const SubscriptionContext = createContext(null);
 
@@ -29,6 +30,8 @@ function normalizeError(error) {
 
 export function SubscriptionProvider({ children }) {
   const { user, isLoadingAuth } = useAuth();
+  const { activeRestaurant, loadingRestaurants, loadingPortalIdentity } = useTenant();
+  const tenantReady = !isLoadingAuth && !loadingRestaurants && (!activeRestaurant?.id || !loadingPortalIdentity);
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [plans, setPlans] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -37,7 +40,8 @@ export function SubscriptionProvider({ children }) {
   const [error, setError] = useState(null);
 
   const refresh = useCallback(async () => {
-    if (!user?.id) {
+    if (isLoadingAuth || loadingRestaurants || loadingPortalIdentity) return null;
+    if (!user?.id || !activeRestaurant?.id) {
       setSummary(EMPTY_SUMMARY);
       setPlans([]);
       setPayments([]);
@@ -78,8 +82,15 @@ export function SubscriptionProvider({ children }) {
           .order('created_at', { ascending: false })
           .limit(20),
       ]);
-      setPayments(paymentResult.error ? [] : paymentResult.data || []);
-      setEvents(eventResult.error ? [] : eventResult.data || []);
+      if (paymentResult.error || eventResult.error) {
+        const historyError = paymentResult.error || eventResult.error;
+        setPayments(paymentResult.data || []);
+        setEvents(eventResult.data || []);
+        setError(normalizeError(historyError));
+        return nextSummary;
+      }
+      setPayments(paymentResult.data || []);
+      setEvents(eventResult.data || []);
       return nextSummary;
     } catch (nextError) {
       const structured = normalizeError(nextError);
@@ -89,12 +100,12 @@ export function SubscriptionProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [activeRestaurant?.id, isLoadingAuth, loadingPortalIdentity, loadingRestaurants, user?.id]);
 
   useEffect(() => {
-    if (isLoadingAuth) return;
+    if (!tenantReady) return;
     refresh();
-  }, [isLoadingAuth, refresh]);
+  }, [refresh, tenantReady]);
 
   const invoke = useCallback(async (name, args = {}) => {
     const { data, error: mutationError } = await supabase.rpc(name, args);
@@ -116,6 +127,7 @@ export function SubscriptionProvider({ children }) {
       events,
       loading,
       error,
+      tenantReady,
       status,
       plan: summary.plan_id || null,
       planName: summary.plan_name || 'No active plan',
@@ -164,7 +176,7 @@ export function SubscriptionProvider({ children }) {
       applyTestPayment: (paymentId, outcome) => invoke('erp_apply_mock_test_payment', { p_payment_id: paymentId, p_outcome: outcome }),
       simulateSubscriptionLifecycle: (action) => invoke('erp_simulate_subscription_lifecycle', { p_action: action }),
     };
-  }, [error, events, invoke, loading, payments, plans, refresh, summary]);
+  }, [error, events, invoke, loading, payments, plans, refresh, summary, tenantReady]);
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;
 }

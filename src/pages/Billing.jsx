@@ -26,7 +26,7 @@ const COPY = {
     paymentSelected: 'A manual IBAN payment request has been created. This plan remains unavailable until your payment proof is approved by the Platform Owner.',
     actionFailed: 'The requested billing action could not be completed.', limits: 'Limits', modules: 'Included modules',
     pendingDetails: 'This paid plan is awaiting payment confirmation. It has not been activated.',
-    testOnly: 'Test payment', iban: 'IBAN', bank: 'Bank', beneficiary: 'Beneficiary', amount: 'Amount', transferInstructions: 'Transfer instructions', selectedFile: 'Selected file', loadingSubscription: 'Loading subscription…',
+    testOnly: 'Test payment', iban: 'IBAN', bank: 'Bank', beneficiary: 'Beneficiary', amount: 'Amount', transferInstructions: 'Transfer instructions', selectedFile: 'Selected file', loadingSubscription: 'Loading subscription…', retry: 'Retry',
   },
   ar: {
     title: 'الفوترة والاشتراك', currentPlan: 'الخطة الحالية', status: 'حالة الاشتراك',
@@ -40,7 +40,7 @@ const COPY = {
     paymentSelected: 'تم إنشاء طلب دفع يدوي عبر IBAN. تظل الخطة غير نشطة حتى يوافق مالك المنصة على إثبات الدفع.',
     actionFailed: 'تعذر إكمال إجراء الفوترة المطلوب.', limits: 'الحدود', modules: 'الوحدات المتاحة',
     pendingDetails: 'هذه الخطة المدفوعة بانتظار تأكيد الدفع ولم يتم تفعيلها.',
-    testOnly: 'دفعة اختبار', iban: 'IBAN', bank: 'البنك', beneficiary: 'المستفيد', amount: 'المبلغ', transferInstructions: 'تعليمات التحويل', selectedFile: 'الملف المحدد', loadingSubscription: 'جارٍ تحميل الاشتراك…',
+    testOnly: 'دفعة اختبار', iban: 'IBAN', bank: 'البنك', beneficiary: 'المستفيد', amount: 'المبلغ', transferInstructions: 'تعليمات التحويل', selectedFile: 'الملف المحدد', loadingSubscription: 'جارٍ تحميل الاشتراك…', retry: 'إعادة المحاولة',
   },
   fa: {
     title: 'صورتحساب و اشتراک', currentPlan: 'طرح فعلی', status: 'وضعیت اشتراک',
@@ -54,7 +54,7 @@ const COPY = {
     paymentSelected: 'درخواست پرداخت دستی IBAN ایجاد شد. این طرح تا تأیید مدرک پرداخت توسط مالک پلتفرم فعال نمی‌شود.',
     actionFailed: 'اقدام صورتحساب مورد نظر انجام نشد.', limits: 'محدودیت‌ها', modules: 'ماژول‌های شامل',
     pendingDetails: 'این طرح پولی در انتظار تأیید پرداخت است و فعال نشده است.',
-    testOnly: 'پرداخت آزمایشی', iban: 'IBAN', bank: 'بانک', beneficiary: 'ذی‌نفع', amount: 'مبلغ', transferInstructions: 'دستورالعمل انتقال', selectedFile: 'فایل انتخاب‌شده', loadingSubscription: 'در حال بارگذاری اشتراک…',
+    testOnly: 'پرداخت آزمایشی', iban: 'IBAN', bank: 'بانک', beneficiary: 'ذی‌نفع', amount: 'مبلغ', transferInstructions: 'دستورالعمل انتقال', selectedFile: 'فایل انتخاب‌شده', loadingSubscription: 'در حال بارگذاری اشتراک…', retry: 'تلاش دوباره',
   },
 };
 
@@ -100,7 +100,7 @@ export default function Billing() {
   const { lang, isRTL } = useLanguage();
   const subscription = useSubscription();
   const {
-    summary, plans, payments, events, loading, error, status, plan, planName, limits, usage,
+    summary, plans, payments, events, loading, error, status, plan, planName, limits, usage, refresh,
     trialDaysRemaining, isActive, pendingPaymentId, canManageBilling, cancelAtPeriodEnd, renewSubscription,
     getManualPaymentInstructions, submitManualPaymentProof,
   } = subscription;
@@ -174,8 +174,9 @@ export default function Billing() {
         </div>
       )}
       {error && (
-        <div className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
-          {error.message}
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
+          <span>{error.message}</span>
+          <Button type="button" variant="outline" size="sm" onClick={refresh} disabled={loading}><RotateCcw className="me-1 h-4 w-4" />{copy.retry}</Button>
         </div>
       )}
 

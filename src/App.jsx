@@ -422,18 +422,18 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <SubscriptionProvider>
-      <RoleProvider>
-        <TenantProvider>
+    <RoleProvider>
+      <TenantProvider>
+        <SubscriptionProvider>
           <BusinessModeProvider>
             <NotificationProvider>
               <RoleHomeRedirect />
               <SubscribedRoutes />
             </NotificationProvider>
           </BusinessModeProvider>
-        </TenantProvider>
-      </RoleProvider>
-    </SubscriptionProvider>
+        </SubscriptionProvider>
+      </TenantProvider>
+    </RoleProvider>
   );
 };
 

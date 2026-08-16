@@ -50,6 +50,22 @@ describe('subscription UI and plan-change contract', () => {
     expect(sql).toContain("'change_type', v_change_type");
   });
 
+  it('waits for tenant readiness before loading subscription data and exposes retryable errors', async () => {
+    const [billing, context, app] = await Promise.all([
+      readFile(billingPath, 'utf8'),
+      readFile(contextPath, 'utf8'),
+      readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
+    ]);
+    expect(context).toContain('const { activeRestaurant, loadingRestaurants, loadingPortalIdentity } = useTenant();');
+    expect(context).toContain('if (isLoadingAuth || loadingRestaurants || loadingPortalIdentity) return null;');
+    expect(context).toContain('const tenantReady = !isLoadingAuth && !loadingRestaurants');
+    expect(app).toContain('<TenantProvider>');
+    expect(app).toContain('<SubscriptionProvider>');
+    expect(billing).toContain('role="alert"');
+    expect(billing).toContain('onClick={refresh}');
+    expect(billing).toContain('Loading subscription');
+  });
+
   it('localizes the subscription entitlement guard for English, Arabic, and Persian', async () => {
     const guard = await readFile(guardPath, 'utf8');
     expect(guard).toContain('Plan feature required');
