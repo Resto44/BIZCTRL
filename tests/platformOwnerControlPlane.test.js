@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 const appPath = new URL('../src/App.jsx', import.meta.url);
 const portalPath = new URL('../src/pages/PlatformOwnerPortal.jsx', import.meta.url);
 const loginPath = new URL('../src/pages/PlatformOwnerLogin.jsx', import.meta.url);
+const appUrlPath = new URL('../src/lib/appUrl.js', import.meta.url);
 const apiPath = new URL('../src/lib/platformOwnerApi.js', import.meta.url);
 const controlPlanePath = new URL('../src/supabase/20260815_platform_owner_control_plane.sql', import.meta.url);
 const managementPath = new URL('../src/supabase/20260815_platform_owner_management_routines.sql', import.meta.url);
@@ -20,6 +21,15 @@ describe('Platform Owner control plane', () => {
     expect(app).toContain('path="/platform-owner/*"');
     expect(app).toContain('<Route path="/super-admin" element={<Navigate to="/platform-owner/login" replace />} />');
     expect(app).not.toContain('<Route path="/super-admin" element={<SuperAdmin />} />');
+  });
+
+  it('uses the canonical production recovery URL and preserves a development-local redirect path', async () => {
+    const [login, appUrl] = await Promise.all([readFile(loginPath, 'utf8'), readFile(appUrlPath, 'utf8')]);
+    expect(login).toContain('getPlatformOwnerRecoveryRedirectUrl()');
+    expect(login).not.toContain('window.location.origin}/platform-owner/login?mode=recovery');
+    expect(appUrl).toContain("const PRODUCTION_APP_URL = 'https://base44-rest-ctrl.vercel.app';");
+    expect(appUrl).toContain('if (import.meta.env.PROD) return PRODUCTION_APP_URL;');
+    expect(appUrl).toContain("window.location.origin : 'http://localhost:3000'");
   });
 
   it('requires a dedicated platform owner account and never derives global access from an organization owner role or client environment variable', async () => {

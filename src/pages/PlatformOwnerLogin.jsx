@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
+import { getPlatformOwnerRecoveryRedirectUrl } from '@/lib/appUrl';
 import { platformOwnerApi } from '@/lib/platformOwnerApi';
 import { useLanguage } from '@/lib/LanguageContext';
 import { Button } from '@/components/ui/button';
@@ -70,7 +71,7 @@ export default function PlatformOwnerLogin() {
 
   const forgotPassword = async () => {
     if (!email.trim()) { toast.error(text.emailRequired); return; }
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/platform-owner/login?mode=recovery` });
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: getPlatformOwnerRecoveryRedirectUrl() });
     if (error) toast.error(error.message); else toast.success(text.resetSent);
   };
 
