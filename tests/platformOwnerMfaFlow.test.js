@@ -13,6 +13,9 @@ describe('Platform Owner recovery and MFA flow', () => {
     expect(login).toContain("supabase.auth.mfa.challenge({ factorId: mfaFactor.id })");
     expect(login).toContain("supabase.auth.mfa.verify({ factorId: mfaFactor.id, challengeId: challenge.id, code: mfaCode.trim() })");
     expect(login).toContain("await beginMfa();");
+    expect(login).toContain('type="submit"');
+    expect(login).toContain("supabase.auth.getSession()");
+    expect(login).toContain('recoverySessionRequired');
     expect(login).not.toContain("await supabase.auth.signOut();\n      setRecovery(false);");
   });
 
