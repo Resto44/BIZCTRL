@@ -46,7 +46,7 @@ export function trialDays(plan) {
 export function trialDisclosure(plan) {
   const days = trialDays(plan);
   if (!days) return '';
-  return `${days}-day free trial. After the trial, your subscription renews at ${money(plan?.monthly_price_cents)}${monthlyLabel(plan)} unless cancelled.`;
+  return `First month free (${days}-day trial). After the free month, your subscription renews at ${money(plan?.monthly_price_cents)}${monthlyLabel(plan)} unless cancelled.`;
 }
 
 export function billingProductLabel(plan) {

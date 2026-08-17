@@ -23,8 +23,8 @@ UPDATE public.subscription_plans
 SET
   monthly_price_cents = CASE id
     WHEN 'starter_20' THEN 1000
-    WHEN 'growth_40' THEN 2400
-    WHEN 'enterprise_100' THEN 20000
+    WHEN 'growth_40' THEN 2000
+    WHEN 'enterprise_100' THEN 5000
     ELSE monthly_price_cents
   END,
   original_price_cents = CASE id
@@ -35,20 +35,20 @@ SET
   END,
   discount_percent = CASE id
     WHEN 'starter_20' THEN 75
-    WHEN 'growth_40' THEN 70
-    WHEN 'enterprise_100' THEN 0
+    WHEN 'growth_40' THEN 75
+    WHEN 'enterprise_100' THEN 75
     ELSE discount_percent
   END,
   discount_active = CASE id
     WHEN 'starter_20' THEN true
     WHEN 'growth_40' THEN true
-    WHEN 'enterprise_100' THEN false
+    WHEN 'enterprise_100' THEN true
     ELSE discount_active
   END,
   discount_label = CASE id
     WHEN 'starter_20' THEN '75% OFF'
-    WHEN 'growth_40' THEN '70% OFF'
-    WHEN 'enterprise_100' THEN NULL
+    WHEN 'growth_40' THEN '75% OFF'
+    WHEN 'enterprise_100' THEN '75% OFF'
     ELSE discount_label
   END,
   trial_days = CASE id

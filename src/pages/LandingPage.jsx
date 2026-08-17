@@ -129,7 +129,7 @@ export default function LandingPage() {
       </ContentSection>
 
       <ContentSection className="border-y border-white/10 bg-gradient-to-b from-slate-900/40 to-slate-950">
-        <SectionHeading eyebrow="Launch Pricing" title="Simple promotional pricing, clearly disclosed" description="Every public price comes from BizCTRL’s active plan catalog. Starter includes a 30-day free trial, then renews at its displayed monthly price unless cancelled." />
+        <SectionHeading eyebrow="Launch Pricing" title="Simple promotional pricing, clearly disclosed" description="Every public price comes from BizCTRL’s active plan catalog. Starter includes a free first month (a 30-day trial), then renews at its displayed monthly price unless cancelled." />
         {catalogPlans.length > 0 && <PublicPricingCards plans={catalogPlans} compact onStartFree={() => navigate('/erp-register?owner=1')} />}
         <div className="mt-8 flex justify-center"><Button asChild variant="outline" className="border-white/20 bg-transparent font-bold text-white hover:bg-white/10 hover:text-white"><Link to="/pricing">View Full Pricing <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></div>
       </ContentSection>

@@ -24,7 +24,7 @@ function PublicCta({ secondary = true }) {
 }
 
 export function PricingPage() {
-  usePublicPageMetadata('BizCTRL Pricing — ERP SaaS Plans', 'Explore BizCTRL launch pricing for multi-tenant ERP software, including the Starter 30-day free trial and the active public plan catalog.');
+  usePublicPageMetadata('BizCTRL Pricing — ERP SaaS Plans', 'Explore BizCTRL launch pricing for multi-tenant ERP software, including the Starter first-month-free 30-day trial and the active public plan catalog.');
   const [plans, setPlans] = useState([]);
   const [status, setStatus] = useState('loading');
   const navigate = useNavigate();
@@ -54,7 +54,7 @@ export function PricingPage() {
       <PublicHero
         eyebrow="Launch Pricing"
         title="Flexible plans for growing businesses"
-        description="Clear introductory pricing for BizCTRL’s multi-tenant ERP SaaS. Starter begins with a 30-day free trial; each plan shows its active monthly price, capabilities, and configured operating limits."
+        description="Clear introductory pricing for BizCTRL’s multi-tenant ERP SaaS. Starter begins with a free first month (a 30-day trial); each plan shows its active monthly price, capabilities, and configured operating limits."
       >
         <PublicCta secondary={false} />
       </PublicHero>
@@ -66,7 +66,7 @@ export function PricingPage() {
       <ContentSection className="pt-0">
         <div className="grid gap-5 md:grid-cols-3">{[
           ['Launch Pricing', 'Promotional prices are clearly shown without artificial urgency or an unconfigured expiry date.'],
-          ['Billing clarity', 'Starter begins with a 30-day free trial. After the trial, the configured recurring monthly price applies unless cancelled.'],
+          ['Billing clarity', 'Starter begins with a free first month (a 30-day trial). After the free month, the configured recurring monthly price applies unless cancelled.'],
           ['Paddle readiness', 'Each plan carries a centralized product concept and an empty provider-price reference until verified Paddle credentials and price IDs are configured.'],
         ].map(([title, description]) => <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-6"><h2 className="font-bold text-white">{title}</h2><p className="mt-2 text-sm leading-6 text-slate-400">{description}</p></div>)}</div>
       </ContentSection>

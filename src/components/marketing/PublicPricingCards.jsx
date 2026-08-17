@@ -35,14 +35,14 @@ export default function PublicPricingCards({ plans, onStartFree, compact = false
               <span className="text-4xl font-black text-white">{money(plan.monthly_price_cents)}</span>
               <span className="pb-1 text-sm text-slate-400">{monthlyLabel(plan)}</span>
             </div>
-            {trial > 0 ? <div className="mt-5 rounded-2xl border border-cyan-400/25 bg-cyan-400/10 p-4"><p className="font-bold text-cyan-100">{trial}-day free trial</p><p className="mt-2 text-sm leading-6 text-cyan-50/80">{trialDisclosure(plan)}</p></div> : <p className="mt-5 min-h-16 text-sm leading-6 text-slate-400">{isEnterprise ? 'Highest-tier plan for organizations that need all available ERP modules and expanded operating capacity.' : 'Launch Pricing is shown directly from the active BizCTRL plan catalog.'}</p>}
+            {trial > 0 ? <div className="mt-5 rounded-2xl border border-cyan-400/25 bg-cyan-400/10 p-4"><p className="font-bold text-cyan-100">First month free</p><p className="mt-2 text-sm leading-6 text-cyan-50/80">{trialDisclosure(plan)}</p></div> : <p className="mt-5 min-h-16 text-sm leading-6 text-slate-400">{isEnterprise ? 'Highest-tier plan for organizations that need all available ERP modules and expanded operating capacity.' : 'Launch Pricing is shown directly from the active BizCTRL plan catalog.'}</p>}
             <div className="mt-6 space-y-2 text-sm text-slate-300">
               {capacities.map((label, index) => <p key={label} className="flex items-center gap-2"><CapacityIcon index={index} />{label}</p>)}
             </div>
             <ul className="mt-6 flex-1 space-y-3 border-t border-white/10 pt-5 text-sm text-slate-300">
               {(features.length ? features : ['Included capabilities are configured for this plan.']).slice(0, compact ? 4 : 6).map((feature) => <li key={feature} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />{feature}</li>)}
             </ul>
-            <Button onClick={() => onStartFree(plan)} className="mt-7 w-full bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400">{trial > 0 ? 'Start 30-Day Free Trial' : 'Start Free'} <ArrowRight className="ml-2 h-4 w-4" /></Button>
+            <Button onClick={() => onStartFree(plan)} className="mt-7 w-full bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400">{trial > 0 ? 'Start Free First Month' : 'Start Free'} <ArrowRight className="ml-2 h-4 w-4" /></Button>
           </article>
         );
       })}

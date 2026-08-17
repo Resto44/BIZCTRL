@@ -12,9 +12,9 @@ describe('BizCTRL launch pricing contract', () => {
     const migration = await readFile(migrationPath, 'utf8');
     expect(migration).toContain("WHEN 'starter_20' THEN 1000");
     expect(migration).toContain("WHEN 'starter_20' THEN 4000");
-    expect(migration).toContain("WHEN 'growth_40' THEN 2400");
+    expect(migration).toContain("WHEN 'growth_40' THEN 2000");
     expect(migration).toContain("WHEN 'growth_40' THEN 8000");
-    expect(migration).toContain("WHEN 'enterprise_100' THEN 20000");
+    expect(migration).toContain("WHEN 'enterprise_100' THEN 5000");
     expect(migration).toContain("WHEN 'starter_20' THEN 30");
     expect(migration).toContain("'starter_monthly'");
     expect(migration).toContain("'growth_monthly'");
@@ -32,13 +32,13 @@ describe('BizCTRL launch pricing contract', () => {
     expect(pricing).toContain('PUBLIC_PLAN_FIELDS');
     expect(landing).toContain('<PublicPricingCards');
     expect(pricing).toContain('<PublicPricingCards');
-    expect(catalog).toContain('${days}-day free trial');
+    expect(catalog).toContain('First month free (${days}-day trial)');
     expect(catalog).toContain('paddle_price_id');
   });
 
   it('does not retain the legacy Vercel URL as a hardcoded production recovery origin', async () => {
     const appUrl = await readFile(appUrlPath, 'utf8');
     expect(appUrl).not.toContain('base44-rest-ctrl.vercel.app');
-    expect(appUrl).toContain("window.location?.origin");
+    expect(appUrl).toContain("import.meta.env.VITE_PUBLIC_APP_URL || 'https://mybizctrl.site'");
   });
 });

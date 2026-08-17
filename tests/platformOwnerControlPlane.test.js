@@ -23,12 +23,12 @@ describe('Platform Owner control plane', () => {
     expect(app).not.toContain('<Route path="/super-admin" element={<SuperAdmin />} />');
   });
 
-  it('uses the active runtime origin for recovery redirects without hardcoding a legacy production domain', async () => {
+  it('uses the verified custom production domain for recovery redirects without retaining the legacy URL', async () => {
     const [login, appUrl] = await Promise.all([readFile(loginPath, 'utf8'), readFile(appUrlPath, 'utf8')]);
     expect(login).toContain('getPlatformOwnerRecoveryRedirectUrl()');
     expect(login).not.toContain('window.location.origin}/platform-owner/login?mode=recovery');
-    expect(appUrl).toContain("const PRODUCTION_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || '';");
-    expect(appUrl).toContain("typeof window !== 'undefined' && window.location?.origin");
+    expect(appUrl).toContain("const PRODUCTION_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || 'https://mybizctrl.site';");
+    expect(appUrl).toContain('if (import.meta.env.PROD) return PRODUCTION_APP_URL;');
     expect(appUrl).not.toContain('base44-rest-ctrl.vercel.app');
   });
 

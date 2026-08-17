@@ -4,24 +4,37 @@ import { ArrowRight, Menu, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export const PRODUCT_DESCRIPTION = 'BizCTRL is a multi-tenant ERP SaaS built for restaurants, retail stores, pharmacies, warehouses, factories, and more. Manage inventory, sales, purchasing, HR, finance, and suppliers — all in one place.';
+export const PUBLIC_APP_URL = (import.meta.env.VITE_PUBLIC_APP_URL || 'https://mybizctrl.site').replace(/\/$/, '');
 
 export function usePublicPageMetadata(title, description = PRODUCT_DESCRIPTION) {
   useEffect(() => {
     document.title = title;
-    const setMeta = (selector, attribute, content) => {
+    const setMeta = (selector, content) => {
       let element = document.head.querySelector(selector);
       if (!element) {
         element = document.createElement('meta');
+        const attributeMatch = selector.match(/^meta\[(name|property)="([^"]+)"\]$/);
+        if (attributeMatch) element.setAttribute(attributeMatch[1], attributeMatch[2]);
         document.head.appendChild(element);
       }
-      element.setAttribute(attribute, content);
+      element.setAttribute('content', content);
     };
 
-    setMeta('meta[name="description"]', 'name', description);
-    setMeta('meta[property="og:title"]', 'property', title);
-    setMeta('meta[property="og:description"]', 'property', description);
-    setMeta('meta[name="twitter:title"]', 'name', title);
-    setMeta('meta[name="twitter:description"]', 'name', description);
+    setMeta('meta[name="description"]', description);
+    setMeta('meta[property="og:title"]', title);
+    setMeta('meta[property="og:description"]', description);
+    setMeta('meta[name="twitter:title"]', title);
+    setMeta('meta[name="twitter:description"]', description);
+
+    const canonicalUrl = `${PUBLIC_APP_URL}${window.location.pathname}${window.location.search}`;
+    let canonical = document.head.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.setAttribute('rel', 'canonical');
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute('href', canonicalUrl);
+    setMeta('meta[property="og:url"]', canonicalUrl);
   }, [description, title]);
 }
 
