@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useSubscription } from '@/lib/SubscriptionContext';
 import { createPaymentProvider } from '@/lib/payment/PaymentProvider';
@@ -27,7 +27,7 @@ const COPY = {
     actionFailed: 'The requested billing action could not be completed.', limits: 'Limits', modules: 'Included modules',
     pendingDetails: 'This paid plan is awaiting payment confirmation. It has not been activated.',
     reactivate: 'Reactivate with payment', reactivateDetails: 'Reactivation requires a new payment request and Platform Owner approval. Your ERP access will resume only after approval.',
-    testOnly: 'Test payment', iban: 'IBAN', bank: 'Bank', beneficiary: 'Beneficiary', amount: 'Amount', transferInstructions: 'Transfer instructions', selectedFile: 'Selected file', loadingSubscription: 'Loading subscription…', retry: 'Retry',
+    testOnly: 'Test payment', iban: 'IBAN', bank: 'Bank', beneficiary: 'Beneficiary', amount: 'Amount', selectedPlan: 'Selected plan', currency: 'Currency', paymentStatus: 'Payment status', proofStatus: 'Payment proof', waitingForPayment: 'Waiting for payment', pendingReview: 'Pending review', proofReady: 'Ready to submit', proofNotSubmitted: 'Not submitted', transferInstructions: 'Transfer instructions', selectedFile: 'Selected file', loadingSubscription: 'Loading subscription…', retry: 'Retry',
   },
   ar: {
     title: 'الفوترة والاشتراك', currentPlan: 'الخطة الحالية', status: 'حالة الاشتراك',
@@ -42,7 +42,7 @@ const COPY = {
     actionFailed: 'تعذر إكمال إجراء الفوترة المطلوب.', limits: 'الحدود', modules: 'الوحدات المتاحة',
     pendingDetails: 'هذه الخطة المدفوعة بانتظار تأكيد الدفع ولم يتم تفعيلها.',
     reactivate: 'إعادة التفعيل عبر الدفع', reactivateDetails: 'تتطلب إعادة التفعيل طلب دفع جديداً وموافقة مالك المنصة. سيعود الوصول إلى ERP بعد الموافقة فقط.',
-    testOnly: 'دفعة اختبار', iban: 'IBAN', bank: 'البنك', beneficiary: 'المستفيد', amount: 'المبلغ', transferInstructions: 'تعليمات التحويل', selectedFile: 'الملف المحدد', loadingSubscription: 'جارٍ تحميل الاشتراك…', retry: 'إعادة المحاولة',
+    testOnly: 'دفعة اختبار', iban: 'IBAN', bank: 'البنك', beneficiary: 'المستفيد', amount: 'المبلغ', selectedPlan: 'الخطة المختارة', currency: 'العملة', paymentStatus: 'حالة الدفع', proofStatus: 'إثبات الدفع', waitingForPayment: 'بانتظار الدفع', pendingReview: 'قيد المراجعة', proofReady: 'جاهز للإرسال', proofNotSubmitted: 'لم يُرسل', transferInstructions: 'تعليمات التحويل', selectedFile: 'الملف المحدد', loadingSubscription: 'جارٍ تحميل الاشتراك…', retry: 'إعادة المحاولة',
   },
   fa: {
     title: 'صورتحساب و اشتراک', currentPlan: 'طرح فعلی', status: 'وضعیت اشتراک',
@@ -57,7 +57,7 @@ const COPY = {
     actionFailed: 'اقدام صورتحساب مورد نظر انجام نشد.', limits: 'محدودیت‌ها', modules: 'ماژول‌های شامل',
     pendingDetails: 'این طرح پولی در انتظار تأیید پرداخت است و فعال نشده است.',
     reactivate: 'فعال‌سازی مجدد با پرداخت', reactivateDetails: 'فعال‌سازی مجدد به درخواست پرداخت جدید و تأیید مالک پلتفرم نیاز دارد. دسترسی ERP فقط پس از تأیید بازمی‌گردد.',
-    testOnly: 'پرداخت آزمایشی', iban: 'IBAN', bank: 'بانک', beneficiary: 'ذی‌نفع', amount: 'مبلغ', transferInstructions: 'دستورالعمل انتقال', selectedFile: 'فایل انتخاب‌شده', loadingSubscription: 'در حال بارگذاری اشتراک…', retry: 'تلاش دوباره',
+    testOnly: 'پرداخت آزمایشی', iban: 'IBAN', bank: 'بانک', beneficiary: 'ذی‌نفع', amount: 'مبلغ', selectedPlan: 'طرح انتخاب‌شده', currency: 'ارز', paymentStatus: 'وضعیت پرداخت', proofStatus: 'مدرک پرداخت', waitingForPayment: 'در انتظار پرداخت', pendingReview: 'در انتظار بررسی', proofReady: 'آماده ارسال', proofNotSubmitted: 'ارسال نشده', transferInstructions: 'دستورالعمل انتقال', selectedFile: 'فایل انتخاب‌شده', loadingSubscription: 'در حال بارگذاری اشتراک…', retry: 'تلاش دوباره',
   },
 };
 
@@ -114,16 +114,24 @@ export default function Billing() {
   const [paymentReference, setPaymentReference] = useState('');
   const [paymentProof, setPaymentProof] = useState(null);
   const [pendingInstructions, setPendingInstructions] = useState(null);
+  const paymentIntentInFlight = useRef(false);
   const copy = COPY[lang] || COPY.en;
+  const safePlans = Array.isArray(plans) ? plans : [];
+  const selectedPlan = safePlans.find((item) => item.id === (manualPayment?.plan_id || plan)) || null;
 
   useEffect(() => {
     let mounted = true;
     if (!canManageBilling || status !== 'PENDING_PAYMENT' || manualPayment?.instructions) return undefined;
     getManualPaymentInstructions()
       .then((instructions) => { if (mounted) setPendingInstructions(instructions); })
-      .catch(() => { if (mounted) setPendingInstructions(null); });
+      .catch(() => {
+        if (mounted) {
+          setPendingInstructions(null);
+          setNotice(copy.actionFailed);
+        }
+      });
     return () => { mounted = false; };
-  }, [canManageBilling, getManualPaymentInstructions, manualPayment?.instructions, status]);
+  }, [canManageBilling, copy.actionFailed, getManualPaymentInstructions, manualPayment?.instructions, status]);
 
   const runAction = async (action, work, successMessage = '') => {
     setActing(action);
@@ -148,6 +156,8 @@ export default function Billing() {
   ];
 
   const beginManualPayment = async (planId) => {
+    if (paymentIntentInFlight.current) return;
+    paymentIntentInFlight.current = true;
     setActing(`plan-${planId}`);
     setNotice('');
     try {
@@ -159,6 +169,7 @@ export default function Billing() {
     } catch (nextError) {
       setNotice(nextError?.message || copy.actionFailed);
     } finally {
+      paymentIntentInFlight.current = false;
       setActing('');
     }
   };
@@ -182,6 +193,11 @@ export default function Billing() {
   const submitProof = () => runAction('submit-proof', () => submitManualPaymentProof(manualPayment?.payment_id || pendingPaymentId, paymentReference, paymentProof), copy.proofAccepted);
   const billingInstructions = manualPayment?.instructions || pendingInstructions;
   const billingAmountCents = manualPayment?.amount_cents || summary.pricing?.monthly_price_cents;
+  const billingCurrency = manualPayment?.currency || billingInstructions?.currency || 'USD';
+  const paymentStatus = manualPayment?.status || (pendingPaymentId ? 'pending' : 'waiting_for_payment');
+  const proofStatus = paymentProof ? 'ready_to_submit' : (payments.find((payment) => payment.id === (manualPayment?.payment_id || pendingPaymentId))?.payment_proof_key ? 'submitted' : 'not_submitted');
+  const paymentStatusLabel = paymentStatus === 'pending' ? copy.pendingReview : copy.waitingForPayment;
+  const proofStatusLabel = proofStatus === 'ready_to_submit' ? copy.proofReady : proofStatus === 'submitted' ? copy.pendingReview : copy.proofNotSubmitted;
   const reactivationRequiresPayment = canManageBilling
     && ['CANCELED', 'EXPIRED', 'PAST_DUE'].includes(status)
     && Boolean(plan)
@@ -259,12 +275,13 @@ export default function Billing() {
       <section>
         <div className="mb-3 flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /><h2 className="text-lg font-bold">{copy.availablePlans}</h2></div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {plans.map((item) => {
+          {safePlans.map((item) => {
             const isCurrent = item.id === plan && ['TRIAL', 'ACTIVE', 'PENDING_PAYMENT'].includes(status);
             const discount = Boolean(item.discount_active) && Number(item.original_price_cents) > Number(item.monthly_price_cents);
             const selectedPending = status === 'PENDING_PAYMENT' && item.id === plan;
             const allModules = lang === 'ar' ? 'جميع وحدات ERP' : lang === 'fa' ? 'همه ماژول‌های ERP' : 'All ERP modules';
-            const features = item.feature_flags?.includes('all') ? [allModules] : (item.feature_flags || []).map((feature) => FEATURE_LABELS[lang]?.[feature] || FEATURE_LABELS.en[feature] || feature.replaceAll('_', ' '));
+            const featureFlags = Array.isArray(item.feature_flags) ? item.feature_flags : [];
+            const features = featureFlags.includes('all') ? [allModules] : featureFlags.map((feature) => FEATURE_LABELS[lang]?.[feature] || FEATURE_LABELS.en[feature] || String(feature).replaceAll('_', ' '));
             const isDowngrade = Number(item.monthly_price_cents) < Number(summary.pricing?.monthly_price_cents || 0);
             const paidAction = isDowngrade ? copy.downgrade : copy.upgrade;
             return <Card key={item.id} className={`relative overflow-hidden ${isCurrent ? 'ring-2 ring-primary shadow-md' : ''}`}>
@@ -274,10 +291,33 @@ export default function Billing() {
             </Card>;
           })}
         </div>
+        {!safePlans.length && !loading && <p className="mt-3 text-sm text-muted-foreground">{copy.noRecords}</p>}
       </section>
 
       {canManageBilling && (manualPayment || (status === 'PENDING_PAYMENT' && summary.payment_provider === 'manual_iban')) && (
-        <Card className="border-violet-300 bg-violet-50/60 dark:bg-violet-950/15"><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-violet-900 dark:text-violet-200"><Landmark className="h-5 w-5" />{copy.ibanTitle}</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-violet-900/80 dark:text-violet-100/80">{copy.ibanInstructions}</p>{billingInstructions && <><div className="grid gap-3 rounded-xl border bg-background p-4 text-sm sm:grid-cols-2"><p><span className="text-muted-foreground">{copy.iban}</span><br /><strong dir="ltr">{billingInstructions.iban}</strong></p><p><span className="text-muted-foreground">{copy.bank}</span><br /><strong>{billingInstructions.bank_name || '—'}</strong></p><p><span className="text-muted-foreground">{copy.beneficiary}</span><br /><strong>{billingInstructions.beneficiary_name || '—'}</strong></p><p><span className="text-muted-foreground">{copy.amount}</span><br /><strong>{money(billingAmountCents)}</strong></p></div>{billingInstructions.instructions && <p className="rounded-lg bg-background/70 p-3 text-sm"><span className="font-semibold">{copy.transferInstructions}: </span>{billingInstructions.instructions}</p>}</>}<div className="grid gap-3 sm:grid-cols-2"><div><label className="text-sm font-medium">{copy.paymentReference}</label><Input className="mt-1" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></div><div><label className="text-sm font-medium">{copy.uploadProof}</label><Input className="mt-1" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => setPaymentProof(event.target.files?.[0] || null)} />{paymentProof && <p className="mt-1 text-xs text-muted-foreground">{copy.selectedFile}: {paymentProof.name}</p>}</div></div><Button disabled={Boolean(acting) || !paymentReference || !paymentProof} onClick={submitProof}>{acting === 'submit-proof' && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{copy.submitProof}</Button></CardContent></Card>
+        <Card className="border-violet-300 bg-violet-50/60 dark:bg-violet-950/15">
+          <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-violet-900 dark:text-violet-200"><Landmark className="h-5 w-5" />{copy.ibanTitle}</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-violet-900/80 dark:text-violet-100/80">{copy.ibanInstructions}</p>
+            <div className="grid gap-3 rounded-xl border bg-background p-4 text-sm sm:grid-cols-2">
+              <p><span className="text-muted-foreground">{copy.selectedPlan}</span><br /><strong>{selectedPlan?.display_name || planName}</strong></p>
+              <p><span className="text-muted-foreground">{copy.amount}</span><br /><strong>{money(billingAmountCents)}</strong></p>
+              <p><span className="text-muted-foreground">{copy.currency}</span><br /><strong>{billingCurrency}</strong></p>
+              <p><span className="text-muted-foreground">{copy.paymentStatus}</span><br /><strong>{paymentStatusLabel}</strong></p>
+              <p><span className="text-muted-foreground">{copy.proofStatus}</span><br /><strong>{proofStatusLabel}</strong></p>
+            </div>
+            {billingInstructions && <>
+              <div className="grid gap-3 rounded-xl border bg-background p-4 text-sm sm:grid-cols-2">
+                <p><span className="text-muted-foreground">{copy.iban}</span><br /><strong dir="ltr">{billingInstructions.iban}</strong></p>
+                <p><span className="text-muted-foreground">{copy.bank}</span><br /><strong>{billingInstructions.bank_name || '—'}</strong></p>
+                <p><span className="text-muted-foreground">{copy.beneficiary}</span><br /><strong>{billingInstructions.beneficiary_name || '—'}</strong></p>
+                {billingInstructions.instructions && <p className="sm:col-span-2"><span className="font-semibold">{copy.transferInstructions}: </span>{billingInstructions.instructions}</p>}
+              </div>
+            </>}
+            <div className="grid gap-3 sm:grid-cols-2"><div><label className="text-sm font-medium">{copy.paymentReference}</label><Input className="mt-1" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></div><div><label className="text-sm font-medium">{copy.uploadProof}</label><Input className="mt-1" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => setPaymentProof(event.target.files?.[0] || null)} />{paymentProof && <p className="mt-1 text-xs text-muted-foreground">{copy.selectedFile}: {paymentProof.name}</p>}</div></div>
+            <Button disabled={Boolean(acting) || !billingInstructions || !paymentReference || !paymentProof} onClick={submitProof}>{acting === 'submit-proof' && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{copy.submitProof}</Button>
+          </CardContent>
+        </Card>
       )}
 
       <section className="grid gap-5 xl:grid-cols-2">

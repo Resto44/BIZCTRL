@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
@@ -33,11 +33,16 @@ export function SubscriptionProvider({ children }) {
   const { activeRestaurant, loadingRestaurants, loadingPortalIdentity } = useTenant();
   const tenantReady = !isLoadingAuth && !loadingRestaurants && (!activeRestaurant?.id || !loadingPortalIdentity);
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
+  const summaryRef = useRef(EMPTY_SUMMARY);
   const [plans, setPlans] = useState([]);
   const [payments, setPayments] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    summaryRef.current = summary;
+  }, [summary]);
 
   const refresh = useCallback(async () => {
     if (isLoadingAuth || loadingRestaurants || loadingPortalIdentity) return null;
@@ -50,7 +55,9 @@ export function SubscriptionProvider({ children }) {
       return EMPTY_SUMMARY;
     }
 
-    setLoading(true);
+    // Keep a previously verified subscription visible while a background refresh
+    // runs so focus/navigation cannot flash the ERP into its loading shell.
+    if (!summaryRef.current?.found) setLoading(true);
     setError(null);
     try {
       const [snapshotResult, planResult] = await Promise.all([
@@ -64,11 +71,14 @@ export function SubscriptionProvider({ children }) {
       ]);
 
       if (snapshotResult.error) throw snapshotResult.error;
-      if (planResult.error) throw planResult.error;
 
+      // A catalog failure must not erase a valid server subscription snapshot.
+      // Otherwise an already active ERP user is switched to the paywall while
+      // Billing is still mounted, which presents as a flash/reload.
       const nextSummary = { ...EMPTY_SUMMARY, ...(snapshotResult.data || {}) };
       setSummary(nextSummary);
       setPlans(planResult.data || []);
+      if (planResult.error) setError(normalizeError(planResult.error));
 
       const [paymentResult, eventResult] = await Promise.all([
         supabase
@@ -95,8 +105,10 @@ export function SubscriptionProvider({ children }) {
     } catch (nextError) {
       const structured = normalizeError(nextError);
       setError(structured);
-      setSummary(EMPTY_SUMMARY);
-      return EMPTY_SUMMARY;
+      // Retain a previously verified snapshot during a transient refresh failure
+      // so an active user's route does not disappear before they can retry.
+      setSummary((previous) => previous?.found ? previous : EMPTY_SUMMARY);
+      return summaryRef.current?.found ? summaryRef.current : EMPTY_SUMMARY;
     } finally {
       setLoading(false);
     }
@@ -105,6 +117,19 @@ export function SubscriptionProvider({ children }) {
   useEffect(() => {
     if (!tenantReady) return;
     refresh();
+  }, [refresh, tenantReady]);
+
+  useEffect(() => {
+    if (!tenantReady) return undefined;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [refresh, tenantReady]);
 
   const invoke = useCallback(async (name, args = {}) => {

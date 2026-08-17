@@ -8,6 +8,7 @@ const planChangePath = new URL('../src/supabase/20260814_plan_change_classificat
 const contextPath = new URL('../src/lib/SubscriptionContext.jsx', import.meta.url);
 const subscriptionBoundaryPath = new URL('../src/components/subscription/SubscriptionErrorBoundary.jsx', import.meta.url);
 const reactivationMigrationPath = new URL('../src/supabase/20260816_normal_subscription_reactivation_hardening.sql', import.meta.url);
+const paymentIntentIdempotencyMigrationPath = new URL('../src/supabase/20260817_manual_iban_payment_intent_idempotency.sql', import.meta.url);
 
 describe('subscription UI and plan-change contract', () => {
   it('uses the owner-only manual IBAN intent and payment-proof workflow rather than an obsolete permanent Free or mock-payment UI path', async () => {
@@ -67,6 +68,25 @@ describe('subscription UI and plan-change contract', () => {
     expect(billing).toContain('onClick={refresh}');
     expect(billing).toContain('Loading subscription');
     expect(context).toContain('tenantReady, user?.id]);');
+    expect(context).toContain('summaryRef.current?.found ? summaryRef.current : EMPTY_SUMMARY');
+    expect(context).toContain("window.addEventListener('focus', refreshWhenVisible)");
+    expect(billing).toContain('paymentIntentInFlight.current');
+  });
+
+  it('keeps the canonical snapshot visible if secondary billing data fails instead of forcing a paywall flash', async () => {
+    const context = await readFile(contextPath, 'utf8');
+    expect(context).toContain('if (planResult.error) setError(normalizeError(planResult.error));');
+    expect(context).toContain('if (!summaryRef.current?.found) setLoading(true);');
+    expect(context).toContain('setSummary((previous) => previous?.found ? previous : EMPTY_SUMMARY);');
+  });
+
+  it('uses a locked, server-side idempotent Manual IBAN payment intent for repeat requests', async () => {
+    const migration = await readFile(paymentIntentIdempotencyMigrationPath, 'utf8');
+    expect(migration).toContain('WHERE restaurant_id = v_restaurant_id\n  FOR UPDATE;');
+    expect(migration).toContain("AND status = 'pending'");
+    expect(migration).toContain('IF v_existing_payment.plan_id = v_plan.id THEN');
+    expect(migration).toContain("'reused', true");
+    expect(migration).toContain("MESSAGE = 'PENDING_PAYMENT_REVIEW_REQUIRED'");
   });
 
   it('routes inactive paid subscriptions through the server-authoritative payment-required reactivation flow', async () => {
