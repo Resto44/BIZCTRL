@@ -24,13 +24,12 @@ describe('subscription UI and plan-change contract', () => {
     expect(context).toContain("submit_manual_iban_payment_proof");
   });
 
-  it('renders landing discounts only from canonical public plan data with badge, original price, and final price', async () => {
+  it('renders landing pricing only from canonical public plan data through the shared pricing component', async () => {
     const landing = await readFile(landingPath, 'utf8');
     expect(landing).toContain("from('subscription_plans')");
     expect(landing).toContain(".eq('is_public', true)");
-    expect(landing).toContain('catalog.discount_label || `-${catalog.discount_percent}%`');
-    expect(landing).toContain('pricing.original');
-    expect(landing).toContain('pricing.final');
+    expect(landing).toContain('PUBLIC_PLAN_FIELDS');
+    expect(landing).toContain('<PublicPricingCards');
   });
 
   it('uses the canonical monthly price as the final discounted amount on Billing while retaining the original amount and badge', async () => {

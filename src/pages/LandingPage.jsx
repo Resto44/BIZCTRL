@@ -6,8 +6,10 @@ import {
   Warehouse, Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import PublicPricingCards from '@/components/marketing/PublicPricingCards';
 import { supabase } from '@/api/supabaseClient';
 import { ContentSection, PRODUCT_DESCRIPTION, PublicHero, PublicLayout, SectionHeading, usePublicPageMetadata } from '@/components/marketing/PublicLayout';
+import { PUBLIC_PLAN_FIELDS } from '@/lib/pricingCatalog';
 
 const INDUSTRIES = [
   { icon: Store, title: 'Restaurants', description: 'Manage branches, ingredients, inventory, purchasing, sales, expenses, and reports.' },
@@ -32,8 +34,6 @@ const MODULES = [
   { icon: Users, title: 'Customer Management', description: 'Manage customer records and related account activity.' },
   { icon: Zap, title: 'Business Dashboard', description: 'Bring essential operational insights together for faster decisions.' },
 ];
-
-const pricing = { original: 'Original', final: 'Final' };
 
 const FAQS = [
   ['What is BizCTRL?', 'BizCTRL is a cloud-based, multi-tenant ERP SaaS that brings key business operations—including inventory, sales, purchasing, suppliers, people, finance, branches, and reporting—into one platform.'],
@@ -73,16 +73,17 @@ function DashboardPreview() {
 }
 
 export default function LandingPage() {
-  usePublicPageMetadata('BizCTRL — Multi-Tenant ERP SaaS for Modern Businesses', PRODUCT_DESCRIPTION);
+  usePublicPageMetadata('BizCTRL — Multi-Tenant ERP SaaS', PRODUCT_DESCRIPTION);
   const navigate = useNavigate();
   const [catalogPlans, setCatalogPlans] = useState([]);
 
   useEffect(() => {
     let active = true;
     supabase.from('subscription_plans')
-      .select('display_name, monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label')
+      .select(PUBLIC_PLAN_FIELDS)
       .eq('is_active', true)
       .eq('is_public', true)
+      .order('sort_order', { ascending: true })
       .then(({ data }) => { if (active) setCatalogPlans(Array.isArray(data) ? data : []); });
     return () => { active = false; };
   }, []);
@@ -128,9 +129,9 @@ export default function LandingPage() {
       </ContentSection>
 
       <ContentSection className="border-y border-white/10 bg-gradient-to-b from-slate-900/40 to-slate-950">
-        <SectionHeading eyebrow="Pricing" title="Pricing that reflects your active plan catalog" description="View current public plans, billing periods, available modules, and configured workspace limits. BizCTRL does not invent commercial pricing where a plan has not been configured." />
-        <div className="flex justify-center"><Button asChild className="bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400"><Link to="/pricing">View Pricing <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></div>
-        {catalogPlans.filter((catalog) => Boolean(catalog.discount_active) && Number(catalog.original_price_cents) > Number(catalog.monthly_price_cents)).length > 0 && <div className="mx-auto mt-7 grid max-w-3xl gap-3 sm:grid-cols-2">{catalogPlans.filter((catalog) => Boolean(catalog.discount_active) && Number(catalog.original_price_cents) > Number(catalog.monthly_price_cents)).slice(0, 2).map((catalog) => <div key={catalog.display_name} className="rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-4 text-center"><p className="text-sm font-bold text-white">{catalog.display_name} <span className="ml-2 rounded-full bg-emerald-400 px-2 py-1 text-[10px] font-black text-slate-950">{catalog.discount_label || `-${catalog.discount_percent}%`}</span></p><p className="mt-2 text-xs text-slate-400"><span className="line-through">{pricing.original}: ${(Number(catalog.original_price_cents) / 100).toFixed(2)}</span> · <span className="font-semibold text-emerald-200">{pricing.final}: ${(Number(catalog.monthly_price_cents) / 100).toFixed(2)}</span></p></div>)}</div>}
+        <SectionHeading eyebrow="Launch Pricing" title="Simple promotional pricing, clearly disclosed" description="Every public price comes from BizCTRL’s active plan catalog. Starter includes a 30-day free trial, then renews at its displayed monthly price unless cancelled." />
+        {catalogPlans.length > 0 && <PublicPricingCards plans={catalogPlans} compact onStartFree={() => navigate('/erp-register?owner=1')} />}
+        <div className="mt-8 flex justify-center"><Button asChild variant="outline" className="border-white/20 bg-transparent font-bold text-white hover:bg-white/10 hover:text-white"><Link to="/pricing">View Full Pricing <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></div>
       </ContentSection>
 
       <ContentSection>

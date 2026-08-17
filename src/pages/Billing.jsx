@@ -99,9 +99,9 @@ function money(cents, currency = 'USD', lang = 'en') {
 }
 
 function capacitySummary(item, lang) {
-  if (lang === 'ar') return `${item.max_restaurants} مطاعم · ${item.max_branches} فروع · ${item.max_employees} موظفين`;
-  if (lang === 'fa') return `${item.max_restaurants} رستوران · ${item.max_branches} شعبه · ${item.max_employees} کارمند`;
-  return `${item.max_restaurants} restaurants · ${item.max_branches} branches · ${item.max_employees} employees`;
+  if (lang === 'ar') return `${item.max_users} مستخدمين · ${item.max_branches} فروع · ${item.max_employees} موظفين`;
+  if (lang === 'fa') return `${item.max_users} کاربر · ${item.max_branches} شعبه · ${item.max_employees} کارمند`;
+  return `${item.max_users} users · ${item.max_branches} branches · ${item.max_employees} employees`;
 }
 
 export default function Billing() {
@@ -318,7 +318,7 @@ export default function Billing() {
             const paidAction = isDowngrade ? copy.downgrade : copy.upgrade;
             return <Card key={item.id} className={`relative overflow-hidden ${isCurrent ? 'ring-2 ring-primary shadow-md' : ''}`}>
               {discount && <Badge className="absolute end-3 top-3 bg-rose-600 text-white">{item.discount_label || `-${item.discount_percent}%`}</Badge>}
-              <CardHeader className="pb-2"><CardTitle className="text-lg">{item.display_name}</CardTitle><div className="flex items-end gap-2"><span className="text-3xl font-black">{money(item.monthly_price_cents)}</span><span className="pb-1 text-xs text-muted-foreground">{copy.priceMonth}</span></div>{discount && <p className="text-xs text-muted-foreground"><span className="line-through">{copy.original}: {money(item.original_price_cents)}</span> · <span className="font-semibold text-emerald-700">{copy.final}: {money(item.monthly_price_cents)}</span></p>}</CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-lg">{item.display_name}</CardTitle><div className="flex items-end gap-2"><span className="text-3xl font-black">{money(item.monthly_price_cents)}</span><span className="pb-1 text-xs text-muted-foreground">{copy.priceMonth}</span></div>{discount && <p className="text-xs text-muted-foreground"><span className="line-through">{copy.original}: {money(item.original_price_cents)}</span> · <span className="font-semibold text-emerald-700">{copy.final}: {money(item.monthly_price_cents)}</span></p>}{Number(item.trial_days) > 0 && <p className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs leading-5 text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">{item.trial_days}-day free trial. After the trial, your subscription renews at {money(item.monthly_price_cents)}{copy.priceMonth} unless cancelled.</p>}</CardHeader>
               <CardContent className="space-y-4"><p className="text-xs text-muted-foreground">{capacitySummary(item, lang)}</p><ul className="space-y-1.5 text-sm text-muted-foreground">{features.slice(0, 5).map((feature) => <li key={feature} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{feature}</li>)}</ul>{isCurrent && !selectedPending ? <Badge variant="secondary" className="w-full justify-center py-2">{copy.current}</Badge> : !canManageBilling ? <Button className="w-full" disabled>{copy.ownerOnly}</Button> : <Button className="w-full" disabled={Boolean(acting) || selectedPending} onClick={() => beginManualPayment(item.id)}><CreditCard className="me-2 h-4 w-4" />{selectedPending ? copy.pending : paidAction}</Button>}</CardContent>
             </Card>;
           })}

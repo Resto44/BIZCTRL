@@ -1,55 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowRight, Building2, CheckCircle2, CreditCard, HelpCircle,
+  ArrowRight, Building2, CreditCard, HelpCircle,
   LockKeyhole, Mail, MessageSquare, Scale, ShieldCheck,
 } from 'lucide-react';
 import { supabase } from '@/api/supabaseClient';
 import { Button } from '@/components/ui/button';
+import PublicPricingCards from '@/components/marketing/PublicPricingCards';
 import { ContentSection, PublicHero, PublicLayout, usePublicPageMetadata } from '@/components/marketing/PublicLayout';
+import { PUBLIC_PLAN_FIELDS } from '@/lib/pricingCatalog';
 
-const FEATURE_LABELS = {
-  sales: 'Sales management',
-  purchases: 'Purchasing',
-  expenses: 'Expense management',
-  inventory: 'Inventory management',
-  basic_reports: 'Business reports',
-  treasury: 'Treasury and finance',
-  suppliers: 'Supplier management',
-  reports: 'Reports and analytics',
-  pdf_exports: 'PDF exports',
-  ocr: 'Document processing',
-  advanced_analytics: 'Advanced analytics',
-  driver_analytics: 'Driver analytics',
-  scheduled_reports: 'Scheduled reports',
-  cashflow_forecast: 'Cash-flow forecasting',
-  network_management: 'Network management',
-  ai_copilot: 'AI business copilot',
-};
-
-function money(cents) {
-  const amount = Number(cents || 0) / 100;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
-function billingLabel(months) {
-  const period = Number(months || 1);
-  if (period === 1) return 'Monthly billing';
-  if (period === 12) return 'Annual billing';
-  return `Billed every ${period} months`;
-}
-
-function capacityLabels(plan) {
-  return [
-    Number(plan.max_users) > 0 ? `${plan.max_users} users` : null,
-    Number(plan.max_branches) > 0 ? `${plan.max_branches} branches` : null,
-    Number(plan.max_employees) > 0 ? `${plan.max_employees} employees` : null,
-  ].filter(Boolean);
-}
 
 function PublicCta({ secondary = true }) {
   const navigate = useNavigate();
@@ -64,18 +24,19 @@ function PublicCta({ secondary = true }) {
 }
 
 export function PricingPage() {
-  usePublicPageMetadata('BizCTRL Pricing — ERP SaaS Plans', 'Explore BizCTRL subscription plans for multi-tenant ERP software. Public plan details are drawn from the active BizCTRL catalog.');
+  usePublicPageMetadata('BizCTRL Pricing — ERP SaaS Plans', 'Explore BizCTRL launch pricing for multi-tenant ERP software, including the Starter 30-day free trial and the active public plan catalog.');
   const [plans, setPlans] = useState([]);
   const [status, setStatus] = useState('loading');
+  const navigate = useNavigate();
 
   useEffect(() => {
     let active = true;
     supabase
       .from('subscription_plans')
-      .select('id, display_name, monthly_price_cents, billing_period_months, max_branches, max_employees, max_users, feature_flags')
+      .select(PUBLIC_PLAN_FIELDS)
       .eq('is_active', true)
       .eq('is_public', true)
-      .order('monthly_price_cents', { ascending: true })
+      .order('sort_order', { ascending: true })
       .then(({ data, error }) => {
         if (!active) return;
         if (error) {
@@ -91,62 +52,23 @@ export function PricingPage() {
   return (
     <PublicLayout>
       <PublicHero
-        eyebrow="Pricing"
+        eyebrow="Launch Pricing"
         title="Flexible plans for growing businesses"
-        description="BizCTRL pricing is based on the active public plan catalog. Each plan lists its billing period, included capabilities, and configured business limits."
+        description="Clear introductory pricing for BizCTRL’s multi-tenant ERP SaaS. Starter begins with a 30-day free trial; each plan shows its active monthly price, capabilities, and configured operating limits."
       >
         <PublicCta secondary={false} />
       </PublicHero>
       <ContentSection className="pt-0">
-        {status === 'loading' && (
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4" aria-label="Loading available plans">
-            {[0, 1, 2, 3].map((item) => <div key={item} className="h-80 animate-pulse rounded-3xl border border-white/10 bg-white/5" />)}
-          </div>
-        )}
-        {status === 'ready' && plans.length > 0 && (
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            {plans.map((plan) => {
-              const flags = Array.isArray(plan.feature_flags) ? plan.feature_flags : [];
-              const features = flags.includes('all')
-                ? ['All ERP modules included']
-                : flags.map((feature) => FEATURE_LABELS[feature] || String(feature).replaceAll('_', ' '));
-              const capacities = capacityLabels(plan);
-              return (
-                <article key={plan.id} className="flex min-h-full flex-col rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-slate-950/20">
-                  <p className="text-lg font-black text-white">{plan.display_name}</p>
-                  <div className="mt-5 flex items-end gap-2">
-                    <span className="text-4xl font-black text-white">{money(plan.monthly_price_cents)}</span>
-                    <span className="pb-1 text-sm text-slate-400">{billingLabel(plan.billing_period_months)}</span>
-                  </div>
-                  <div className="mt-5 min-h-16 space-y-2 text-sm text-slate-300">
-                    {capacities.map((label) => <p key={label} className="flex items-center gap-2"><Building2 className="h-4 w-4 text-cyan-300" />{label}</p>)}
-                  </div>
-                  <ul className="mt-5 flex-1 space-y-3 border-t border-white/10 pt-5 text-sm text-slate-300">
-                    {(features.length ? features : ['Included capabilities are configured for this plan.']).slice(0, 6).map((feature) => <li key={feature} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />{feature}</li>)}
-                  </ul>
-                  <Button onClick={() => window.location.assign('/erp-register?owner=1')} className="mt-7 w-full bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400">Start Free</Button>
-                </article>
-              );
-            })}
-          </div>
-        )}
-        {(status === 'error' || (status === 'ready' && plans.length === 0)) && (
-          <div className="mx-auto max-w-2xl rounded-3xl border border-cyan-400/20 bg-cyan-400/5 p-8 text-center">
-            <CreditCard className="mx-auto h-8 w-8 text-cyan-300" />
-            <h2 className="mt-4 text-2xl font-black text-white">Plan details are being finalized</h2>
-            <p className="mt-3 leading-7 text-slate-300">BizCTRL does not publish unverified commercial terms. Please start with a free account or contact the BizCTRL team to discuss the current plan catalog.</p>
-            <div className="mt-6"><PublicCta /></div>
-          </div>
-        )}
+        {status === 'loading' && <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-label="Loading available plans">{[0, 1, 2].map((item) => <div key={item} className="h-[34rem] animate-pulse rounded-3xl border border-white/10 bg-white/5" />)}</div>}
+        {status === 'ready' && plans.length > 0 && <PublicPricingCards plans={plans} onStartFree={() => navigate('/erp-register?owner=1')} />}
+        {(status === 'error' || (status === 'ready' && plans.length === 0)) && <div className="mx-auto max-w-2xl rounded-3xl border border-cyan-400/20 bg-cyan-400/5 p-8 text-center"><CreditCard className="mx-auto h-8 w-8 text-cyan-300" /><h2 className="mt-4 text-2xl font-black text-white">Plan details are being finalized</h2><p className="mt-3 leading-7 text-slate-300">BizCTRL does not publish unverified commercial terms. Please start with a free account or contact the BizCTRL team to discuss the current plan catalog.</p><div className="mt-6"><PublicCta /></div></div>}
       </ContentSection>
       <ContentSection className="pt-0">
-        <div className="grid gap-5 md:grid-cols-3">
-          {[
-            ['Billing clarity', 'Every published plan identifies its configured billing period and available limits.'],
-            ['Plan changes', 'Subscription management, cancellation, and payment status are available to authorized account owners inside BizCTRL.'],
-            ['Annual billing', 'Annual billing appears only when it is configured as an active public plan.'],
-          ].map(([title, description]) => <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-6"><h2 className="font-bold text-white">{title}</h2><p className="mt-2 text-sm leading-6 text-slate-400">{description}</p></div>)}
-        </div>
+        <div className="grid gap-5 md:grid-cols-3">{[
+          ['Launch Pricing', 'Promotional prices are clearly shown without artificial urgency or an unconfigured expiry date.'],
+          ['Billing clarity', 'Starter begins with a 30-day free trial. After the trial, the configured recurring monthly price applies unless cancelled.'],
+          ['Paddle readiness', 'Each plan carries a centralized product concept and an empty provider-price reference until verified Paddle credentials and price IDs are configured.'],
+        ].map(([title, description]) => <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-6"><h2 className="font-bold text-white">{title}</h2><p className="mt-2 text-sm leading-6 text-slate-400">{description}</p></div>)}</div>
       </ContentSection>
     </PublicLayout>
   );

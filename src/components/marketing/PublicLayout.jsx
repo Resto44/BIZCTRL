@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Menu, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export const PRODUCT_DESCRIPTION = 'BizCTRL is a multi-tenant ERP SaaS for restaurants, retail stores, pharmacies, warehouses, factories, and more. Manage inventory, sales, purchasing, HR, finance, suppliers, and branches from one platform.';
+export const PRODUCT_DESCRIPTION = 'BizCTRL is a multi-tenant ERP SaaS built for restaurants, retail stores, pharmacies, warehouses, factories, and more. Manage inventory, sales, purchasing, HR, finance, and suppliers — all in one place.';
 
 export function usePublicPageMetadata(title, description = PRODUCT_DESCRIPTION) {
   useEffect(() => {

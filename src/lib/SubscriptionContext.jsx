@@ -64,7 +64,7 @@ export function SubscriptionProvider({ children }) {
         supabase.rpc('erp_subscription_snapshot'),
         supabase
           .from('subscription_plans')
-          .select('id, display_name, monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label, max_restaurants, max_branches, max_employees, max_users, max_storage_mb, max_pdf_exports, max_ocr_scans, advanced_analytics, feature_flags, sort_order')
+          .select('id, display_name, monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label, trial_days, billing_period_months, billing_product_key, paddle_price_id, max_restaurants, max_branches, max_employees, max_users, max_storage_mb, max_pdf_exports, max_ocr_scans, advanced_analytics, feature_flags, sort_order')
           .eq('is_active', true)
           .eq('is_public', true)
           .order('sort_order'),

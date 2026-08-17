@@ -1,8 +1,8 @@
-const PRODUCTION_APP_URL = 'https://base44-rest-ctrl.vercel.app';
+const PRODUCTION_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || '';
 
 export function getApplicationBaseUrl() {
-  if (import.meta.env.PROD) return PRODUCTION_APP_URL;
-  return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
+  return PRODUCTION_APP_URL || 'http://localhost:3000';
 }
 
 export function getPlatformOwnerRecoveryRedirectUrl() {
@@ -10,4 +10,3 @@ export function getPlatformOwnerRecoveryRedirectUrl() {
 }
 
 export { PRODUCTION_APP_URL };
-

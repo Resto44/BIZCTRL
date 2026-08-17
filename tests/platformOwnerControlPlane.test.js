@@ -23,13 +23,13 @@ describe('Platform Owner control plane', () => {
     expect(app).not.toContain('<Route path="/super-admin" element={<SuperAdmin />} />');
   });
 
-  it('uses the canonical production recovery URL and preserves a development-local redirect path', async () => {
+  it('uses the active runtime origin for recovery redirects without hardcoding a legacy production domain', async () => {
     const [login, appUrl] = await Promise.all([readFile(loginPath, 'utf8'), readFile(appUrlPath, 'utf8')]);
     expect(login).toContain('getPlatformOwnerRecoveryRedirectUrl()');
     expect(login).not.toContain('window.location.origin}/platform-owner/login?mode=recovery');
-    expect(appUrl).toContain("const PRODUCTION_APP_URL = 'https://base44-rest-ctrl.vercel.app';");
-    expect(appUrl).toContain('if (import.meta.env.PROD) return PRODUCTION_APP_URL;');
-    expect(appUrl).toContain("window.location.origin : 'http://localhost:3000'");
+    expect(appUrl).toContain("const PRODUCTION_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || '';");
+    expect(appUrl).toContain("typeof window !== 'undefined' && window.location?.origin");
+    expect(appUrl).not.toContain('base44-rest-ctrl.vercel.app');
   });
 
   it('requires a dedicated platform owner account and never derives global access from an organization owner role or client environment variable', async () => {
