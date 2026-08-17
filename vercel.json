@@ -29,6 +29,18 @@
   ],
   "redirects": [
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "host",
+          "value": "^base44-rest-ctrl\\.vercel\\.app$"
+        }
+      ],
+      "destination": "https://mybizctrl.site/",
+      "statusCode": 301
+    },
+    {
       "source": "/:path*",
       "has": [
         {
