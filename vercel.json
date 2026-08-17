@@ -27,6 +27,20 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "header",
+          "key": "host",
+          "value": "^base44-rest-ctrl\\.vercel\\.app$"
+        }
+      ],
+      "destination": "https://mybizctrl.site/:path*",
+      "statusCode": 301
+    }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
