@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import {
   Building2, Check, CircleDollarSign, Clock3, CreditCard, FileText, Loader2,
-  Sparkles, UserRound, Users, RotateCcw, Camera, Database, Landmark,
+  Sparkles, UserRound, Users, RotateCcw, Camera, Database, Landmark, Copy,
 } from 'lucide-react';
 
 const COPY = {
@@ -27,7 +27,7 @@ const COPY = {
     actionFailed: 'The requested billing action could not be completed.', limits: 'Limits', modules: 'Included modules',
     pendingDetails: 'This paid plan is awaiting payment confirmation. It has not been activated.',
     reactivate: 'Reactivate with payment', reactivateDetails: 'Reactivation requires a new payment request and Platform Owner approval. Your ERP access will resume only after approval.',
-    testOnly: 'Test payment', iban: 'IBAN', bank: 'Bank', beneficiary: 'Beneficiary', amount: 'Amount', selectedPlan: 'Selected plan', currency: 'Currency', paymentStatus: 'Payment status', proofStatus: 'Payment proof', waitingForPayment: 'Waiting for payment', pendingReview: 'Pending review', proofReady: 'Ready to submit', proofNotSubmitted: 'Not submitted', transferInstructions: 'Transfer instructions', selectedFile: 'Selected file', loadingSubscription: 'Loading subscription…', retry: 'Retry',
+    testOnly: 'Test payment', iban: 'IBAN', bank: 'Bank', beneficiary: 'Account holder', company: 'Company', amount: 'Amount', selectedPlan: 'Selected plan', currency: 'Currency', paymentStatus: 'Payment status', proofStatus: 'Payment proof', waitingForPayment: 'Waiting for payment', pendingReview: 'Pending review', proofReady: 'Ready to submit', proofNotSubmitted: 'Not submitted', transferInstructions: 'Transfer instructions', paymentReferenceRules: 'Payment reference rules', selectedFile: 'Selected file', copyIban: 'Copy IBAN', copied: 'Copied', ibanCopied: 'IBAN copied successfully', loadingSubscription: 'Loading subscription…', retry: 'Retry',
   },
   ar: {
     title: 'الفوترة والاشتراك', currentPlan: 'الخطة الحالية', status: 'حالة الاشتراك',
@@ -42,7 +42,7 @@ const COPY = {
     actionFailed: 'تعذر إكمال إجراء الفوترة المطلوب.', limits: 'الحدود', modules: 'الوحدات المتاحة',
     pendingDetails: 'هذه الخطة المدفوعة بانتظار تأكيد الدفع ولم يتم تفعيلها.',
     reactivate: 'إعادة التفعيل عبر الدفع', reactivateDetails: 'تتطلب إعادة التفعيل طلب دفع جديداً وموافقة مالك المنصة. سيعود الوصول إلى ERP بعد الموافقة فقط.',
-    testOnly: 'دفعة اختبار', iban: 'IBAN', bank: 'البنك', beneficiary: 'المستفيد', amount: 'المبلغ', selectedPlan: 'الخطة المختارة', currency: 'العملة', paymentStatus: 'حالة الدفع', proofStatus: 'إثبات الدفع', waitingForPayment: 'بانتظار الدفع', pendingReview: 'قيد المراجعة', proofReady: 'جاهز للإرسال', proofNotSubmitted: 'لم يُرسل', transferInstructions: 'تعليمات التحويل', selectedFile: 'الملف المحدد', loadingSubscription: 'جارٍ تحميل الاشتراك…', retry: 'إعادة المحاولة',
+    testOnly: 'دفعة اختبار', iban: 'IBAN', bank: 'البنك', beneficiary: 'صاحب الحساب', company: 'الشركة', amount: 'المبلغ', selectedPlan: 'الخطة المختارة', currency: 'العملة', paymentStatus: 'حالة الدفع', proofStatus: 'إثبات الدفع', waitingForPayment: 'بانتظار الدفع', pendingReview: 'قيد المراجعة', proofReady: 'جاهز للإرسال', proofNotSubmitted: 'لم يُرسل', transferInstructions: 'تعليمات التحويل', paymentReferenceRules: 'قواعد مرجع الدفع', selectedFile: 'الملف المحدد', copyIban: 'نسخ IBAN', copied: 'تم النسخ', ibanCopied: 'تم نسخ IBAN بنجاح', loadingSubscription: 'جارٍ تحميل الاشتراك…', retry: 'إعادة المحاولة',
   },
   fa: {
     title: 'صورتحساب و اشتراک', currentPlan: 'طرح فعلی', status: 'وضعیت اشتراک',
@@ -57,7 +57,7 @@ const COPY = {
     actionFailed: 'اقدام صورتحساب مورد نظر انجام نشد.', limits: 'محدودیت‌ها', modules: 'ماژول‌های شامل',
     pendingDetails: 'این طرح پولی در انتظار تأیید پرداخت است و فعال نشده است.',
     reactivate: 'فعال‌سازی مجدد با پرداخت', reactivateDetails: 'فعال‌سازی مجدد به درخواست پرداخت جدید و تأیید مالک پلتفرم نیاز دارد. دسترسی ERP فقط پس از تأیید بازمی‌گردد.',
-    testOnly: 'پرداخت آزمایشی', iban: 'IBAN', bank: 'بانک', beneficiary: 'ذی‌نفع', amount: 'مبلغ', selectedPlan: 'طرح انتخاب‌شده', currency: 'ارز', paymentStatus: 'وضعیت پرداخت', proofStatus: 'مدرک پرداخت', waitingForPayment: 'در انتظار پرداخت', pendingReview: 'در انتظار بررسی', proofReady: 'آماده ارسال', proofNotSubmitted: 'ارسال نشده', transferInstructions: 'دستورالعمل انتقال', selectedFile: 'فایل انتخاب‌شده', loadingSubscription: 'در حال بارگذاری اشتراک…', retry: 'تلاش دوباره',
+    testOnly: 'پرداخت آزمایشی', iban: 'IBAN', bank: 'بانک', beneficiary: 'صاحب حساب', company: 'شرکت', amount: 'مبلغ', selectedPlan: 'طرح انتخاب‌شده', currency: 'ارز', paymentStatus: 'وضعیت پرداخت', proofStatus: 'مدرک پرداخت', waitingForPayment: 'در انتظار پرداخت', pendingReview: 'در انتظار بررسی', proofReady: 'آماده ارسال', proofNotSubmitted: 'ارسال نشده', transferInstructions: 'دستورالعمل انتقال', paymentReferenceRules: 'قوانین مرجع پرداخت', selectedFile: 'فایل انتخاب‌شده', copyIban: 'کپی IBAN', copied: 'کپی شد', ibanCopied: 'IBAN با موفقیت کپی شد', loadingSubscription: 'در حال بارگذاری اشتراک…', retry: 'تلاش دوباره',
   },
 };
 
@@ -89,8 +89,13 @@ function formatDate(value, lang) {
   }
 }
 
-function money(cents) {
-  return `$${(Number(cents || 0) / 100).toFixed(0)}`;
+function money(cents, currency = 'USD', lang = 'en') {
+  const amount = Number(cents || 0) / 100;
+  try {
+    return new Intl.NumberFormat(lang === 'fa' ? 'fa-IR' : lang === 'ar' ? 'ar-SA' : 'en-US', { style: 'currency', currency: String(currency || 'USD').toUpperCase(), maximumFractionDigits: 2 }).format(amount);
+  } catch {
+    return `${String(currency || 'USD').toUpperCase()} ${amount.toFixed(2)}`;
+  }
 }
 
 function capacitySummary(item, lang) {
@@ -114,6 +119,7 @@ export default function Billing() {
   const [paymentReference, setPaymentReference] = useState('');
   const [paymentProof, setPaymentProof] = useState(null);
   const [pendingInstructions, setPendingInstructions] = useState(null);
+  const [ibanCopied, setIbanCopied] = useState(false);
   const paymentIntentInFlight = useRef(false);
   const copy = COPY[lang] || COPY.en;
   const safePlans = Array.isArray(plans) ? plans : [];
@@ -202,6 +208,32 @@ export default function Billing() {
     && ['CANCELED', 'EXPIRED', 'PAST_DUE'].includes(status)
     && Boolean(plan)
     && Number(summary.pricing?.monthly_price_cents || 0) > 0;
+
+  const copyIban = async () => {
+    const iban = String(billingInstructions?.iban || '').trim();
+    if (!iban) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(iban);
+      } else {
+        const fallback = document.createElement('textarea');
+        fallback.value = iban;
+        fallback.setAttribute('readonly', '');
+        fallback.style.position = 'fixed';
+        fallback.style.opacity = '0';
+        document.body.appendChild(fallback);
+        fallback.select();
+        const copied = document.execCommand('copy');
+        document.body.removeChild(fallback);
+        if (!copied) throw new Error('CLIPBOARD_WRITE_FAILED');
+      }
+      setIbanCopied(true);
+      setNotice(copy.ibanCopied);
+      window.setTimeout(() => setIbanCopied(false), 1800);
+    } catch (nextError) {
+      setNotice(nextError?.message || copy.actionFailed);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-10" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -301,16 +333,18 @@ export default function Billing() {
             <p className="text-sm text-violet-900/80 dark:text-violet-100/80">{copy.ibanInstructions}</p>
             <div className="grid gap-3 rounded-xl border bg-background p-4 text-sm sm:grid-cols-2">
               <p><span className="text-muted-foreground">{copy.selectedPlan}</span><br /><strong>{selectedPlan?.display_name || planName}</strong></p>
-              <p><span className="text-muted-foreground">{copy.amount}</span><br /><strong>{money(billingAmountCents)}</strong></p>
+              <p><span className="text-muted-foreground">{copy.amount}</span><br /><strong>{money(billingAmountCents, billingCurrency, lang)}</strong></p>
               <p><span className="text-muted-foreground">{copy.currency}</span><br /><strong>{billingCurrency}</strong></p>
               <p><span className="text-muted-foreground">{copy.paymentStatus}</span><br /><strong>{paymentStatusLabel}</strong></p>
               <p><span className="text-muted-foreground">{copy.proofStatus}</span><br /><strong>{proofStatusLabel}</strong></p>
             </div>
             {billingInstructions && <>
               <div className="grid gap-3 rounded-xl border bg-background p-4 text-sm sm:grid-cols-2">
-                <p><span className="text-muted-foreground">{copy.iban}</span><br /><strong dir="ltr">{billingInstructions.iban}</strong></p>
+                <p><span className="text-muted-foreground">{copy.company}</span><br /><strong>{billingInstructions.company_name || '—'}</strong></p>
                 <p><span className="text-muted-foreground">{copy.bank}</span><br /><strong>{billingInstructions.bank_name || '—'}</strong></p>
-                <p><span className="text-muted-foreground">{copy.beneficiary}</span><br /><strong>{billingInstructions.beneficiary_name || '—'}</strong></p>
+                <div className="sm:col-span-2"><span className="text-muted-foreground">{copy.iban}</span><div className="mt-1 flex flex-wrap items-center gap-2"><strong className="select-all break-all font-mono tracking-wide" dir="ltr">{billingInstructions.iban}</strong><Button type="button" size="sm" variant="outline" onClick={copyIban} aria-label={copy.copyIban}><Copy className="me-1 h-4 w-4" />{ibanCopied ? copy.copied : copy.copyIban}</Button></div></div>
+                <p><span className="text-muted-foreground">{copy.beneficiary}</span><br /><strong>{billingInstructions.account_holder || billingInstructions.beneficiary_name || '—'}</strong></p>
+                {billingInstructions.payment_reference_rules && <p><span className="text-muted-foreground">{copy.paymentReferenceRules}</span><br /><strong>{billingInstructions.payment_reference_rules}</strong></p>}
                 {billingInstructions.instructions && <p className="sm:col-span-2"><span className="font-semibold">{copy.transferInstructions}: </span>{billingInstructions.instructions}</p>}
               </div>
             </>}
