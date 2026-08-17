@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="BizCTRL">
+  <defs>
+    <linearGradient id="b" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#b)"/>
+  <path d="M20 16h12.5c6.9 0 11.5 3.5 11.5 9.1 0 3.5-1.9 6.1-5.1 7.4 4 1.2 6.1 4.1 6.1 7.7 0 5.8-4.7 9.8-12.1 9.8H20V16Zm11.2 13c3.1 0 4.8-1.2 4.8-3.5 0-2.3-1.7-3.5-4.8-3.5H28v7h3.2Zm1.2 14.9c3.4 0 5.3-1.4 5.3-3.9s-1.9-3.9-5.3-3.9H28v7.8h4.4Z" fill="white"/>
+</svg>

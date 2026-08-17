@@ -114,6 +114,7 @@ const SerialNumbers       = lazy(() => import('@/pages/retail/SerialNumbers'));
 
 // ── Public pages (eager — shown before auth) ─────────────────────────────────
 import LandingPage            from '@/pages/LandingPage';
+import { PricingPage, TermsPage, PrivacyPage, RefundPage, ContactPage } from '@/pages/PublicPages';
 // AuthPage removed — replaced by ERPLogin
 import ERPLogin               from '@/pages/ERPLogin';
 import ERPRegister            from '@/pages/ERPRegister';
@@ -462,8 +463,13 @@ function App() {
               <Route path="/employee-invite" element={<LegacyInvitationRedirect />} />
               <Route path="/auth/employee-login" element={<Navigate to="/erp-login?role=employee" replace />} />
               <Route path="/supplier-registration" element={<LegacyInvitationRedirect />} />
-              {/* ── Landing page ── */}
+              {/* ── Public marketing and policy pages ── */}
               <Route path="/" element={<LandingPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/refund" element={<RefundPage />} />
+              <Route path="/contact" element={<ContactPage />} />
               {/* All authenticated routes */}
               <Route path="*" element={<AuthenticatedApp />} />
             </Routes>

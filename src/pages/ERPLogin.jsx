@@ -360,7 +360,7 @@ export default function ERPLogin() {
         )}
 
         <p className="text-center text-slate-600 text-xs mt-6">
-          © 2026 RestoCTRL ERP · All rights reserved
+          © 2026 BizCTRL · All rights reserved
         </p>
       </div>
     </div>

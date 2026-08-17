@@ -1,7 +1,7 @@
 {
-  "name": "Restaurant Manager Pro",
-  "short_name": "RestaurantPro",
-  "description": "Professional restaurant management app for owners and managers",
+  "name": "BizCTRL — Multi-Tenant ERP SaaS",
+  "short_name": "BizCTRL",
+  "description": "Multi-tenant ERP SaaS for modern businesses: manage inventory, sales, purchasing, finance, people, suppliers, branches, and reporting.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f8fafc",

@@ -1,440 +1,146 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useLanguage } from '@/lib/LanguageContext';
-import { supabase } from '@/api/supabaseClient';
-import { Button } from '@/components/ui/button';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  Building2, ChefHat, ShoppingBag, Warehouse, Factory,
-  Pill, Stethoscope, Package, Wrench, BarChart3,
-  Users, DollarSign, ShieldCheck, Globe,
-  ArrowRight, CheckCircle2, Zap,
-  LayoutDashboard, Truck, Receipt,
-  ChevronRight, Menu, X, CreditCard, Clock, Sparkles
+  ArrowRight, BarChart3, Building2, CheckCircle2, ChevronDown, ClipboardList,
+  Factory, Landmark, Package, Pill, Receipt, ShoppingBag, Store, Truck, Users,
+  Warehouse, Zap,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/api/supabaseClient';
+import { ContentSection, PRODUCT_DESCRIPTION, PublicHero, PublicLayout, SectionHeading, usePublicPageMetadata } from '@/components/marketing/PublicLayout';
 
-const BUSINESS_TYPES = [
-  { icon: ChefHat,      label: 'Restaurant',  color: 'from-orange-500 to-red-600' },
-  { icon: ShoppingBag,  label: 'Retail',      color: 'from-blue-500 to-cyan-600' },
-  { icon: Warehouse,    label: 'Warehouse',   color: 'from-slate-500 to-slate-700' },
-  { icon: Factory,      label: 'Factory',     color: 'from-gray-500 to-gray-700' },
-  { icon: Pill,         label: 'Pharmacy',    color: 'from-green-500 to-emerald-600' },
-  { icon: Stethoscope,  label: 'Clinic',      color: 'from-teal-500 to-cyan-600' },
-  { icon: Package,      label: 'Wholesale',   color: 'from-purple-500 to-violet-600' },
-  { icon: Wrench,       label: 'Services',    color: 'from-amber-500 to-yellow-600' },
-  { icon: Building2,    label: 'Café',        color: 'from-amber-600 to-orange-700' },
-  { icon: Globe,        label: 'Other',       color: 'from-pink-500 to-rose-600' },
+const INDUSTRIES = [
+  { icon: Store, title: 'Restaurants', description: 'Manage branches, ingredients, inventory, purchasing, sales, expenses, and reports.' },
+  { icon: ShoppingBag, title: 'Retail Stores', description: 'Manage products, stock, sales, purchasing, suppliers, and branches.' },
+  { icon: Pill, title: 'Pharmacies', description: 'Manage inventory, products, purchasing, suppliers, sales, and business reporting.' },
+  { icon: Warehouse, title: 'Warehouses', description: 'Track inventory, transfers, purchasing, receiving, suppliers, and stock levels.' },
+  { icon: Factory, title: 'Factories', description: 'Organize inventory, purchasing, supplier relationships, and reporting for factory operations.' },
+  { icon: Building2, title: 'More Businesses', description: 'Use configurable modules and permissions to support additional business types as your operation grows.' },
 ];
 
-const FEATURES = [
-  {
-    icon: LayoutDashboard,
-    title: 'Unified Owner Dashboard',
-    desc: 'Real-time KPIs, operating results, branch comparisons, and AI-powered insights — all in one command center.',
-    color: 'text-cyan-400',
-    bg: 'bg-cyan-500/10',
-  },
-  {
-    icon: Users,
-    title: 'Role-Based Access Control',
-    desc: 'Owner, Manager, Employee, and Supplier access is protected by tailored dashboards and granular permissions.',
-    color: 'text-purple-400',
-    bg: 'bg-purple-500/10',
-  },
-  {
-    icon: Truck,
-    title: 'Supplier Management',
-    desc: 'Owner-issued supplier invitations, purchase orders, invoices, and outstanding balance tracking.',
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/10',
-  },
-  {
-    icon: Package,
-    title: 'Smart Inventory',
-    desc: 'Multi-branch inventory, batch/lot tracking, expiry alerts, serial numbers, and automatic reorder points.',
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10',
-  },
-  {
-    icon: Receipt,
-    title: 'Sales & POS',
-    desc: 'Cash register, invoicing, customer debts, loyalty programs, and multi-channel sales analytics.',
-    color: 'text-rose-400',
-    bg: 'bg-rose-500/10',
-  },
-  {
-    icon: DollarSign,
-    title: 'Finance & Treasury',
-    desc: 'Profit & Loss, cash flow, payroll, expense tracking, network settlement, and multi-currency support.',
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10',
-  },
-  {
-    icon: BarChart3,
-    title: 'BI & Analytics',
-    desc: 'Advanced reports, scheduled exports, AI business copilot, and predictive inventory forecasting.',
-    color: 'text-violet-400',
-    bg: 'bg-violet-500/10',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Multi-Tenant & Secure',
-    desc: 'Each business is fully isolated. Row-level security, audit logs, and role-based data access.',
-    color: 'text-teal-400',
-    bg: 'bg-teal-500/10',
-  },
+const MODULES = [
+  { icon: Package, title: 'Inventory Management', description: 'Track products, stock, and inventory activity across your workspace.' },
+  { icon: Receipt, title: 'Sales Management', description: 'Record sales activity, invoices, and business performance.' },
+  { icon: ClipboardList, title: 'Purchasing', description: 'Manage purchases, purchase orders, and related workflows.' },
+  { icon: Truck, title: 'Supplier Management', description: 'Maintain supplier records, orders, balances, and procurement visibility.' },
+  { icon: Users, title: 'HR & Employees', description: 'Manage employees, attendance, payroll, and controlled staff access.' },
+  { icon: Landmark, title: 'Finance & Expenses', description: 'Work with expenses, treasury, cash flow, and financial reporting tools.' },
+  { icon: Building2, title: 'Branch Management', description: 'Organize multiple branches with centralized operational visibility.' },
+  { icon: BarChart3, title: 'Reports & Analytics', description: 'Review dashboards, reporting, and business trends from one place.' },
+  { icon: Package, title: 'Product Management', description: 'Maintain products and product information used across operations.' },
+  { icon: Truck, title: 'Transfers', description: 'Track inventory transfers between business locations.' },
+  { icon: Users, title: 'Customer Management', description: 'Manage customer records and related account activity.' },
+  { icon: Zap, title: 'Business Dashboard', description: 'Bring essential operational insights together for faster decisions.' },
 ];
 
-const PRICING_COPY = {
-  en: {
-    trial: '30-Day Full ERP Trial', title: 'Plans that scale with your operation',
-    intro: 'Create your organization to start a 30-day full-access trial. After the trial, choose the permanent Free plan or a paid plan. Paid selections remain payment-pending until a payment provider confirms them.',
-    start: 'Start Free Trial', choose: 'Choose Plan', recommended: 'Recommended', original: 'Original', final: 'Final',
-    tiers: [
-      { name: 'Free', amount: 0, price: '$0', detail: 'Permanent limited access', limits: ['1 restaurant · 1 branch', '5 employees · 5 users', '512 MB storage', '10 PDF reports · 10 OCR/month', 'Core sales, purchasing & inventory'] },
-      { name: 'Starter', amount: 20, price: '$20', detail: 'per month', limits: ['1 restaurant · 3 branches', '20 employees · 20 users', '5 GB storage', '100 PDF reports · 100 OCR/month', 'Treasury, suppliers & reports'] },
-      { name: 'Growth', amount: 40, price: '$40', detail: 'per month', limits: ['3 restaurants · 10 branches', '75 employees · 75 users', '25 GB storage', '500 PDF reports · 500 OCR/month', 'Advanced & scheduled analytics'] },
-      { name: 'Enterprise', amount: 100, price: '$100', detail: 'per month', limits: ['10 restaurants · 50 branches', '250 employees · 250 users', '100 GB storage', '2,000 PDF reports · 2,000 OCR/month', 'All ERP modules'] },
-    ],
-  },
-  ar: {
-    trial: 'تجربة ERP كاملة لمدة 30 يوماً', title: 'خطط تنمو مع عملياتك',
-    intro: 'أنشئ مؤسستك لبدء تجربة وصول كامل لمدة 30 يوماً. بعد التجربة، اختر الخطة المجانية الدائمة أو خطة مدفوعة. تبقى الخطط المدفوعة بانتظار تأكيد الدفع ولا تُفعّل قبل ذلك.',
-    start: 'ابدأ التجربة المجانية', choose: 'اختر الخطة', recommended: 'موصى بها', original: 'الأصلي', final: 'النهائي',
-    tiers: [
-      { name: 'مجاني', amount: 0, price: '$0', detail: 'وصول محدود دائم', limits: ['مطعم واحد · فرع واحد', '5 موظفين · 5 مستخدمين', '512 ميجابايت تخزين', '10 تقارير PDF · 10 OCR/شهر', 'المبيعات والمشتريات والمخزون الأساسية'] },
-      { name: 'Starter', amount: 20, price: '$20', detail: 'شهرياً', limits: ['مطعم واحد · 3 فروع', '20 موظفاً · 20 مستخدماً', '5 جيجابايت تخزين', '100 تقرير PDF · 100 OCR/شهر', 'الخزينة والموردون والتقارير'] },
-      { name: 'Growth', amount: 40, price: '$40', detail: 'شهرياً', limits: ['3 مطاعم · 10 فروع', '75 موظفاً · 75 مستخدماً', '25 جيجابايت تخزين', '500 تقرير PDF · 500 OCR/شهر', 'تحليلات متقدمة ومجدولة'] },
-      { name: 'Enterprise', amount: 100, price: '$100', detail: 'شهرياً', limits: ['10 مطاعم · 50 فرعاً', '250 موظفاً · 250 مستخدماً', '100 جيجابايت تخزين', '2,000 تقرير PDF · 2,000 OCR/شهر', 'جميع وحدات ERP'] },
-    ],
-  },
-  fa: {
-    trial: 'آزمایش کامل ERP برای ۳۰ روز', title: 'طرح‌هایی متناسب با رشد کسب‌وکار شما',
-    intro: 'سازمان خود را ایجاد کنید تا آزمایش دسترسی کامل ۳۰ روزه را شروع کنید. پس از آزمایش، طرح رایگان دائمی یا طرح پولی را انتخاب کنید. طرح پولی تا تأیید پرداخت در حالت انتظار باقی می‌ماند و فعال نمی‌شود.',
-    start: 'شروع آزمایش رایگان', choose: 'انتخاب طرح', recommended: 'پیشنهادی', original: 'قیمت اصلی', final: 'قیمت نهایی',
-    tiers: [
-      { name: 'رایگان', amount: 0, price: '$0', detail: 'دسترسی محدود دائمی', limits: ['۱ رستوران · ۱ شعبه', '۵ کارمند · ۵ کاربر', '۵۱۲ مگابایت فضا', '۱۰ گزارش PDF · ۱۰ OCR/ماه', 'فروش، خرید و انبار پایه'] },
-      { name: 'Starter', amount: 20, price: '$20', detail: 'ماهانه', limits: ['۱ رستوران · ۳ شعبه', '۲۰ کارمند · ۲۰ کاربر', '۵ گیگابایت فضا', '۱۰۰ گزارش PDF · ۱۰۰ OCR/ماه', 'خزانه، تأمین‌کنندگان و گزارش‌ها'] },
-      { name: 'Growth', amount: 40, price: '$40', detail: 'ماهانه', limits: ['۳ رستوران · ۱۰ شعبه', '۷۵ کارمند · ۷۵ کاربر', '۲۵ گیگابایت فضا', '۵۰۰ گزارش PDF · ۵۰۰ OCR/ماه', 'تحلیل‌های پیشرفته و زمان‌بندی‌شده'] },
-      { name: 'Enterprise', amount: 100, price: '$100', detail: 'ماهانه', limits: ['۱۰ رستوران · ۵۰ شعبه', '۲۵۰ کارمند · ۲۵۰ کاربر', '۱۰۰ گیگابایت فضا', '۲٬۰۰۰ گزارش PDF · ۲٬۰۰۰ OCR/ماه', 'همه ماژول‌های ERP'] },
-    ],
-  },
-};
+const pricing = { original: 'Original', final: 'Final' };
+
+const FAQS = [
+  ['What is BizCTRL?', 'BizCTRL is a cloud-based, multi-tenant ERP SaaS that brings key business operations—including inventory, sales, purchasing, suppliers, people, finance, branches, and reporting—into one platform.'],
+  ['Which businesses can use BizCTRL?', 'BizCTRL is positioned for restaurants, retail stores, pharmacies, warehouses, factories, and other businesses that need configurable operational modules and centralized control.'],
+  ['Is BizCTRL multi-tenant?', 'BizCTRL is designed as a multi-tenant platform, where each business has its own workspace and data context.'],
+  ['Can I manage multiple branches?', 'BizCTRL includes branch management and related operational visibility for businesses with multiple locations, subject to the capabilities and limits of the active plan.'],
+  ['What modules are available?', 'Available modules include inventory, sales, purchasing, suppliers, customers, expenses, finance, employee tools, branches, product management, transfers, reports, and dashboards. Availability may depend on permissions and plan configuration.'],
+  ['Does BizCTRL support subscriptions?', 'BizCTRL includes an account billing area for subscription management. Public plan details are shown on the Pricing page when they are active in the public catalog.'],
+  ['Can I cancel my subscription?', 'Authorized account owners can manage subscription cancellation through the BizCTRL billing area. See the Refund Policy for refund-review information.'],
+  ['How does billing work?', 'Billing terms, price, plan limits, and billing period are shown in the active plan catalog and within the account billing area. BizCTRL does not publish commercial terms that are not configured.'],
+  ['How can I contact support?', 'Existing users can access the authenticated Support Center after logging in. For business or public inquiries, visit the Contact page.'],
+];
+
+function FaqItem({ question, answer }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <article className="rounded-2xl border border-white/10 bg-white/5">
+      <button type="button" onClick={() => setOpen((value) => !value)} className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left" aria-expanded={open}>
+        <span className="font-bold text-white">{question}</span>
+        <ChevronDown className={`h-5 w-5 shrink-0 text-cyan-300 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <p className="border-t border-white/10 px-5 py-5 leading-7 text-slate-300">{answer}</p>}
+    </article>
+  );
+}
+
+function DashboardPreview() {
+  return (
+    <div className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900 p-3 shadow-2xl shadow-cyan-950/30 sm:p-5">
+      <div className="flex items-center gap-2 border-b border-white/10 pb-4"><span className="h-2.5 w-2.5 rounded-full bg-rose-400" /><span className="h-2.5 w-2.5 rounded-full bg-amber-300" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /><span className="ml-3 text-xs font-medium text-slate-500">BizCTRL dashboard</span></div>
+      <div className="grid gap-3 pt-5 sm:grid-cols-[0.26fr_1fr]">
+        <aside className="hidden rounded-2xl border border-white/10 bg-slate-950 p-4 sm:block"><p className="text-xs font-bold uppercase tracking-wider text-slate-500">Workspace</p><div className="mt-4 space-y-3">{['Dashboard', 'Inventory', 'Sales', 'Purchasing', 'Reports'].map((item, index) => <div key={item} className={`rounded-lg px-3 py-2 text-xs ${index === 0 ? 'bg-cyan-400/10 text-cyan-200' : 'text-slate-500'}`}>{item}</div>)}</div></aside>
+        <div className="space-y-3"><div className="flex items-center justify-between"><div><p className="text-xs text-slate-500">Business overview</p><p className="mt-1 text-sm font-bold text-white">Centralized operating view</p></div><span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-bold text-cyan-200">Live workspace</span></div><div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{['Sales', 'Expenses', 'Inventory', 'Branches'].map((item) => <div key={item} className="rounded-xl border border-white/10 bg-white/5 p-3"><div className="h-2 w-14 rounded bg-slate-700" /><p className="mt-3 text-xs font-semibold text-slate-200">{item}</p><div className="mt-2 h-2 w-full rounded bg-gradient-to-r from-cyan-500/70 to-blue-500/30" /></div>)}</div><div className="grid gap-3 lg:grid-cols-[1.35fr_0.65fr]"><div className="rounded-xl border border-white/10 bg-white/5 p-4"><p className="text-xs font-semibold text-slate-300">Business trends</p><div className="mt-5 flex h-28 items-end gap-2">{[35, 58, 45, 70, 60, 82, 74, 95].map((height, index) => <span key={index} className="flex-1 rounded-t bg-gradient-to-t from-cyan-500/25 to-cyan-300" style={{ height: `${height}%` }} />)}</div></div><div className="rounded-xl border border-white/10 bg-white/5 p-4"><p className="text-xs font-semibold text-slate-300">Recent activity</p><div className="mt-4 space-y-3">{[0, 1, 2].map((item) => <div key={item} className="flex gap-2"><span className="mt-1 h-2 w-2 rounded-full bg-emerald-400" /><span className="h-2 flex-1 rounded bg-slate-700" /></div>)}</div></div></div></div>
+      </div>
+    </div>
+  );
+}
 
 export default function LandingPage() {
+  usePublicPageMetadata('BizCTRL — Multi-Tenant ERP SaaS for Modern Businesses', PRODUCT_DESCRIPTION);
   const navigate = useNavigate();
-  const { lang, isRTL } = useLanguage();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [catalogPlans, setCatalogPlans] = useState([]);
-  const pricing = PRICING_COPY[lang] || PRICING_COPY.en;
 
   useEffect(() => {
     let active = true;
     supabase.from('subscription_plans')
-      .select('monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label')
+      .select('display_name, monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label')
       .eq('is_active', true)
       .eq('is_public', true)
-      .then(({ data }) => { if (active && data) setCatalogPlans(data); });
+      .then(({ data }) => { if (active) setCatalogPlans(Array.isArray(data) ? data : []); });
     return () => { active = false; };
   }, []);
-
   return (
-    <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
-      {/* ── Navbar ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/90 backdrop-blur-xl border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <span className="text-lg font-black text-white tracking-tight">
-                Biz<span className="text-cyan-400">CTRL</span>
-              </span>
-              <p className="text-[9px] text-slate-500 -mt-0.5 uppercase tracking-widest">Enterprise ERP</p>
-            </div>
-          </div>
-
-          {/* Desktop Nav Links */}
-          <div className="hidden md:flex items-center gap-6 text-sm text-slate-400">
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#business-types" className="hover:text-white transition-colors">Industries</a>
-            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-          </div>
-
-          {/* Secure ERP entry points */}
-          <div className="hidden md:flex items-center gap-3">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/erp-login')}
-              className="text-slate-300 hover:text-white hover:bg-white/5 text-sm"
-            >
-              Sign In
-            </Button>
-            <Button
-              onClick={() => navigate('/erp-register?owner=1')}
-              className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm px-5"
-            >
-              Create Organization
-            </Button>
-          </div>
-
-          {/* Mobile menu toggle */}
-          <button
-            className="md:hidden text-slate-400 hover:text-white"
-            onClick={() => setMobileMenuOpen(o => !o)}
-          >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+    <PublicLayout>
+      <PublicHero
+        eyebrow="Cloud-based business management"
+        title={<><span>Run Your Entire Business</span><br /><span className="bg-gradient-to-r from-cyan-300 via-blue-300 to-violet-300 bg-clip-text text-transparent">From One Platform</span></>}
+        description={PRODUCT_DESCRIPTION}
+      >
+        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <Button onClick={() => navigate('/erp-register?owner=1')} className="h-13 min-h-13 w-full bg-cyan-500 px-7 py-3 text-base font-black text-slate-950 hover:bg-cyan-400 sm:w-auto">Start Free <ArrowRight className="ml-2 h-5 w-5" /></Button>
+          <Button asChild variant="outline" className="h-13 min-h-13 w-full border-white/20 bg-transparent px-7 py-3 text-base font-bold text-white hover:bg-white/10 hover:text-white sm:w-auto"><Link to="/pricing">View Pricing</Link></Button>
         </div>
+        <p className="mt-7 flex items-center justify-center gap-2 text-sm font-medium text-slate-400"><CheckCircle2 className="h-4 w-4 text-emerald-400" />One platform. Multiple branches. Complete business control.</p>
+      </PublicHero>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden px-4 pb-4 space-y-3 border-t border-white/5 pt-4">
-            <a href="#features" className="block text-slate-300 hover:text-white text-sm py-1">Features</a>
-            <a href="#business-types" className="block text-slate-300 hover:text-white text-sm py-1">Industries</a>
-            <a href="#pricing" className="block text-slate-300 hover:text-white text-sm py-1">Pricing</a>
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" onClick={() => navigate('/erp-login')} className="flex-1 border-white/20 text-slate-300 text-sm">Sign In</Button>
-              <Button onClick={() => navigate('/erp-register?owner=1')} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm">Create Organization</Button>
-            </div>
-          </div>
-        )}
-      </nav>
+      <ContentSection className="pt-0" id="industries">
+        <SectionHeading eyebrow="Industries" title="Built for Your Business" description="BizCTRL adapts its ERP foundation to different business operations. Restaurants are one supported industry—not the entire identity of the platform." />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{INDUSTRIES.map(({ icon: Icon, title, description }) => <article key={title} className="rounded-3xl border border-white/10 bg-white/5 p-6 transition duration-200 hover:-translate-y-1 hover:border-cyan-400/30 hover:bg-white/[0.07]"><span className="grid h-12 w-12 place-items-center rounded-xl bg-cyan-400/10 text-cyan-300"><Icon className="h-6 w-6" /></span><h3 className="mt-5 text-xl font-black text-white">{title}</h3><p className="mt-3 text-sm leading-6 text-slate-400">{description}</p></article>)}</div>
+      </ContentSection>
 
-      {/* ── Hero ── */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 max-w-7xl mx-auto text-center relative">
-        {/* Background glow */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-3xl" />
-          <div className="absolute top-40 left-1/4 w-[300px] h-[300px] bg-blue-500/5 rounded-full blur-3xl" />
-          <div className="absolute top-40 right-1/4 w-[300px] h-[300px] bg-purple-500/5 rounded-full blur-3xl" />
+      <ContentSection id="features" className="border-y border-white/10 bg-slate-900/30">
+        <SectionHeading eyebrow="Core ERP modules" title="Everything Your Business Needs" description="BizCTRL brings together the modules already available across the application. Access is governed by your plan and workspace permissions." />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{MODULES.map(({ icon: Icon, title, description }) => <article key={title} className="rounded-2xl border border-white/10 bg-slate-950/50 p-5"><Icon className="h-5 w-5 text-cyan-300" /><h3 className="mt-4 font-bold text-white">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-400">{description}</p></article>)}</div>
+      </ContentSection>
+
+      <ContentSection>
+        <div className="grid gap-12 rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-400/10 via-slate-900 to-blue-500/10 p-7 lg:grid-cols-2 lg:p-12">
+          <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-cyan-300">Multi-tenant SaaS</p><h2 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">One Platform for Multiple Businesses</h2><p className="mt-5 max-w-xl leading-7 text-slate-300">BizCTRL is designed as a multi-tenant platform so each business can work from its own workspace and data context, while giving authorized users the tools they need for their role.</p><div className="mt-7 grid gap-3 sm:grid-cols-2">{['Business-level data isolation', 'Role-based access', 'Multiple branches', 'Centralized reporting', 'User permissions', 'Secure authentication'].map((item) => <p key={item} className="flex items-center gap-2 text-sm font-semibold text-slate-100"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />{item}</p>)}</div></div>
+          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-6"><p className="text-sm font-bold text-white">Designed for controlled access</p><div className="mt-6 space-y-4">{[['Organization workspace', 'A distinct business context for each organization'], ['User roles', 'Permissions help control what each user can access'], ['Branch operations', 'Manage locations from a central business workspace']].map(([title, description]) => <div key={title} className="rounded-xl border border-white/10 bg-white/5 p-4"><p className="font-semibold text-slate-100">{title}</p><p className="mt-1 text-sm leading-6 text-slate-400">{description}</p></div>)}</div></div>
         </div>
+      </ContentSection>
 
-        <div className="relative">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold uppercase tracking-widest mb-6">
-            <Zap className="w-3 h-3" />
-            <span>The All-in-One Business ERP Platform</span>
-          </div>
+      <ContentSection className="border-y border-white/10 bg-slate-900/30">
+        <div className="grid items-center gap-12 lg:grid-cols-2"><div><SectionHeading align="left" eyebrow="Multi-branch operations" title="Control Every Branch From One Dashboard" description="Keep a clearer view of operations across locations. BizCTRL provides a centralized workspace for branch-aware sales, inventory, expenses, transfers, employee access, reporting, and performance review where those modules are enabled." /><Button onClick={() => navigate('/erp-register?owner=1')} className="bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400">Get Started <ArrowRight className="ml-2 h-4 w-4" /></Button></div><div className="grid gap-3 sm:grid-cols-2">{['Monitor sales', 'Track inventory', 'Manage expenses', 'Transfer stock', 'Manage employees', 'Review branch performance'].map((item) => <div key={item} className="rounded-2xl border border-white/10 bg-white/5 p-5"><CheckCircle2 className="h-5 w-5 text-cyan-300" /><p className="mt-4 font-bold text-white">{item}</p></div>)}</div></div>
+      </ContentSection>
 
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white leading-tight mb-6">
-            Run Your Entire Business
-            <br />
-            <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-              From One Platform
-            </span>
-          </h1>
+      <ContentSection>
+        <SectionHeading eyebrow="Dashboard and analytics" title="See Your Business Clearly" description="Use BizCTRL’s existing dashboards and reporting modules to centralize visibility into the areas that matter to your operation, without fabricated statistics or performance claims." />
+        <DashboardPreview />
+        <div className="mt-8 flex flex-wrap justify-center gap-x-7 gap-y-3 text-sm font-semibold text-slate-300">{['Sales', 'Expenses', 'Inventory', 'Profit and performance', 'Branch activity', 'Customers', 'Suppliers', 'Business trends'].map((item) => <span key={item} className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-cyan-300" />{item}</span>)}</div>
+      </ContentSection>
 
-          <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            BizCTRL is a multi-tenant ERP SaaS built for restaurants, retail stores, pharmacies, warehouses, factories, and more. Manage inventory, sales, purchasing, HR, finance, and suppliers — all in one place.
-          </p>
+      <ContentSection className="border-y border-white/10 bg-gradient-to-b from-slate-900/40 to-slate-950">
+        <SectionHeading eyebrow="Pricing" title="Pricing that reflects your active plan catalog" description="View current public plans, billing periods, available modules, and configured workspace limits. BizCTRL does not invent commercial pricing where a plan has not been configured." />
+        <div className="flex justify-center"><Button asChild className="bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400"><Link to="/pricing">View Pricing <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></div>
+        {catalogPlans.filter((catalog) => Boolean(catalog.discount_active) && Number(catalog.original_price_cents) > Number(catalog.monthly_price_cents)).length > 0 && <div className="mx-auto mt-7 grid max-w-3xl gap-3 sm:grid-cols-2">{catalogPlans.filter((catalog) => Boolean(catalog.discount_active) && Number(catalog.original_price_cents) > Number(catalog.monthly_price_cents)).slice(0, 2).map((catalog) => <div key={catalog.display_name} className="rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-4 text-center"><p className="text-sm font-bold text-white">{catalog.display_name} <span className="ml-2 rounded-full bg-emerald-400 px-2 py-1 text-[10px] font-black text-slate-950">{catalog.discount_label || `-${catalog.discount_percent}%`}</span></p><p className="mt-2 text-xs text-slate-400"><span className="line-through">{pricing.original}: ${(Number(catalog.original_price_cents) / 100).toFixed(2)}</span> · <span className="font-semibold text-emerald-200">{pricing.final}: ${(Number(catalog.monthly_price_cents) / 100).toFixed(2)}</span></p></div>)}</div>}
+      </ContentSection>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-            <Button
-              onClick={() => navigate('/erp-register?owner=1')}
-              className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-500 text-white font-black text-base px-8 py-6 rounded-xl shadow-lg shadow-cyan-500/20 flex items-center gap-2"
-            >
-              Create Organization <ArrowRight className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate('/erp-login')}
-              className="w-full sm:w-auto border-white/20 text-slate-300 hover:bg-white/5 font-bold text-base px-8 py-6 rounded-xl flex items-center gap-2"
-            >
-              <Users className="w-5 h-5" /> Staff sign in
-            </Button>
-          </div>
+      <ContentSection>
+        <SectionHeading eyebrow="Frequently asked questions" title="Answers for modern business operators" description="Learn how BizCTRL is positioned, which businesses it supports, and how subscriptions and support work." />
+        <div className="mx-auto max-w-3xl space-y-3">{FAQS.map(([question, answer]) => <FaqItem key={question} question={question} answer={answer} />)}</div>
+      </ContentSection>
 
-          {/* Trust indicators */}
-          <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-slate-500">
-            {['No credit card required', '30-day free trial', 'Cancel anytime', 'Secure by design'].map(item => (
-              <span key={item} className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Business Types ── */}
-      <section id="business-types" className="py-20 px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
-            Built for Every Industry
-          </h2>
-          <p className="text-slate-400 max-w-xl mx-auto">
-            Whether you run a restaurant, pharmacy, or factory — BizCTRL adapts to your business type with tailored modules and workflows.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-          {BUSINESS_TYPES.map(({ icon: Icon, label, color }) => (
-            <div
-              key={label}
-              className="group flex flex-col items-center gap-3 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
-              onClick={() => navigate('/erp-register?owner=1')}
-            >
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-                <Icon className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-sm font-semibold text-slate-300 group-hover:text-white transition-colors text-center">
-                {label}
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Features ── */}
-      <section id="features" className="py-20 px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold uppercase tracking-widest mb-4">
-            <BarChart3 className="w-3 h-3" />
-            <span>Enterprise Features</span>
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
-            Everything You Need to Run Your Business
-          </h2>
-          <p className="text-slate-400 max-w-xl mx-auto">
-            From inventory to payroll, from supplier management to AI analytics — BizCTRL covers every aspect of your operations.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {FEATURES.map(({ icon: Icon, title, desc, color, bg }) => (
-            <div
-              key={title}
-              className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/8 hover:border-white/20 transition-all group"
-            >
-              <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                <Icon className={`w-5 h-5 ${color}`} />
-              </div>
-              <h3 className="text-white font-bold mb-2 text-sm">{title}</h3>
-              <p className="text-slate-500 text-xs leading-relaxed">{desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Role Access Section ── */}
-      <section className="py-20 px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 border border-white/10 p-8 md:p-12">
-          <div className="grid md:grid-cols-2 gap-10 items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-widest mb-4">
-                <ShieldCheck className="w-3 h-3" />
-                <span>Role-Based Access</span>
-              </div>
-              <h2 className="text-3xl font-black text-white mb-4">
-                The Right Access for Every Team Member
-              </h2>
-              <p className="text-slate-400 mb-6">
-                BizCTRL gives each role a dedicated, purpose-built experience. Owners see everything; employees see only what they need.
-              </p>
-              <Button
-                onClick={() => navigate('/erp-login')}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-2"
-              >
-                Staff sign in <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { role: 'Owner', desc: 'Full command center with KPIs, P&L, and approvals', color: 'border-cyan-500/30 bg-cyan-500/5' },
-                { role: 'Manager', desc: 'Branch operations, staff, inventory, and sales', color: 'border-purple-500/30 bg-purple-500/5' },
-                { role: 'Employee', desc: 'Attendance, tasks, payslips, and shift schedule', color: 'border-emerald-500/30 bg-emerald-500/5' },
-                { role: 'Supplier', desc: 'Purchase orders, invoices, payments, and balance', color: 'border-amber-500/30 bg-amber-500/5' },
-              ].map(({ role, desc, color }) => (
-                <div key={role} className={`p-3 rounded-xl border ${color}`}>
-                  <p className="text-white font-bold text-sm">{role}</p>
-                  <p className="text-slate-500 text-xs mt-0.5">{desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Pricing ── */}
-      <section id="pricing" className="py-20 px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-bold uppercase tracking-widest mb-4">
-            <Clock className="w-3 h-3" /> {pricing.trial}
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">{pricing.title}</h2>
-          <p className="text-slate-400 max-w-2xl mx-auto">{pricing.intro}</p>
-          <Button onClick={() => navigate('/erp-register?owner=1')} className="mt-6 bg-cyan-600 hover:bg-cyan-500 text-white font-bold"><Sparkles className="w-4 h-4 me-2" />{pricing.start}</Button>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {pricing.tiers.map((tier, index) => {
-            const accents = ['border-white/10', 'border-cyan-500/30', 'border-violet-500/50', 'border-amber-400/40'];
-            const featured = index === 2;
-            const catalog = catalogPlans.find((item) => Number(item.monthly_price_cents) === tier.amount * 100);
-            const finalPrice = catalog ? `$${Number(catalog.monthly_price_cents) / 100}` : tier.price;
-            const hasDiscount = Boolean(catalog?.discount_active) && Number(catalog?.original_price_cents) > Number(catalog?.monthly_price_cents);
-            return (
-            <div key={tier.name} className={`relative p-6 rounded-2xl bg-white/5 border ${accents[index]} flex flex-col ${featured ? 'shadow-xl shadow-violet-950/30' : ''}`}>
-              {hasDiscount ? <span className="absolute top-3 end-3 text-[10px] px-2 py-1 rounded-full bg-rose-600 text-white font-bold uppercase tracking-wide">{catalog.discount_label || `-${catalog.discount_percent}%`}</span> : featured && <span className="absolute top-3 end-3 text-[10px] px-2 py-1 rounded-full bg-violet-500 text-white font-bold uppercase tracking-wide">{pricing.recommended}</span>}
-              <h3 className="text-xl font-black text-white">{tier.name}</h3>
-              <div className="mt-3"><span className="text-4xl font-black text-white">{finalPrice}</span><span className="text-slate-400 text-sm ms-1">{tier.detail}</span></div>
-              {hasDiscount && <p className="mt-1 text-xs text-slate-400"><span className="line-through">{pricing.original}: ${Number(catalog.original_price_cents) / 100}</span> · <span className="font-semibold text-emerald-300">{pricing.final}: {finalPrice}</span></p>}
-              <ul className="mt-6 space-y-3 flex-1">{tier.limits.map((limit) => <li key={limit} className="flex gap-2 text-sm text-slate-300"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />{limit}</li>)}</ul>
-              <Button onClick={() => navigate('/erp-register?owner=1')} variant={featured ? 'default' : 'outline'} className={featured ? 'mt-6 bg-violet-600 hover:bg-violet-500 font-bold' : 'mt-6 border-white/20 text-slate-200 hover:bg-white/10 font-bold'}><CreditCard className="w-4 h-4 me-2" />{pricing.choose}</Button>
-            </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ── CTA ── */}
-      <section className="py-20 px-4 sm:px-6 max-w-4xl mx-auto text-center">
-        <div className="rounded-3xl bg-gradient-to-br from-cyan-900/40 to-blue-900/40 border border-cyan-500/20 p-10 md:p-16">
-          <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-cyan-500/30">
-            <Zap className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
-            Ready to Transform Your Business?
-          </h2>
-          <p className="text-slate-400 mb-8 max-w-xl mx-auto">
-            Start your 30-day full-access trial today. No credit card required. Set up in minutes.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button
-              onClick={() => navigate('/erp-register?owner=1')}
-              className="bg-cyan-600 hover:bg-cyan-500 text-white font-black text-base px-8 py-6 rounded-xl shadow-lg shadow-cyan-500/20 flex items-center gap-2"
-            >
-              Create Organization <ArrowRight className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate('/erp-login')}
-              className="border-white/20 text-slate-300 hover:bg-white/5 font-bold text-base px-8 py-6 rounded-xl flex items-center gap-2"
-            >
-              <Users className="w-5 h-5" /> Staff sign in
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Footer ── */}
-      <footer className="border-t border-white/5 py-10 px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
-              <Zap className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-white font-black">Biz<span className="text-cyan-400">CTRL</span></span>
-          </div>
-          <div className="flex flex-wrap gap-6 text-sm text-slate-500">
-            <a href="/erp-login" className="hover:text-white transition-colors">ERP Sign In</a>
-            <a href="/erp-register?owner=1" className="hover:text-white transition-colors">Create Organization</a>
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#business-types" className="hover:text-white transition-colors">Industries</a>
-          </div>
-          <p className="text-slate-600 text-xs">© 2026 BizCTRL. All rights reserved.</p>
-        </div>
-      </footer>
-    </div>
+      <ContentSection className="pt-0">
+        <div className="rounded-3xl border border-cyan-400/20 bg-gradient-to-br from-cyan-400/15 to-blue-600/15 px-6 py-12 text-center sm:px-12"><Zap className="mx-auto h-8 w-8 text-cyan-300" /><h2 className="mt-5 text-3xl font-black text-white sm:text-4xl">Run your business with more control.</h2><p className="mx-auto mt-4 max-w-2xl leading-7 text-slate-300">Create an organization to begin with BizCTRL, or explore the current public pricing catalog first.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><Button onClick={() => navigate('/erp-register?owner=1')} className="bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400">Start Free <ArrowRight className="ml-2 h-4 w-4" /></Button><Button asChild variant="outline" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"><Link to="/contact">Contact BizCTRL</Link></Button></div></div>
+      </ContentSection>
+    </PublicLayout>
   );
 }
