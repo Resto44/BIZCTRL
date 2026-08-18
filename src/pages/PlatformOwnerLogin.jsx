@@ -51,11 +51,16 @@ export default function PlatformOwnerLogin() {
   };
 
   const beginMfa = async ({ recoveryEnrollment = false } = {}) => {
-    const snapshot = await platformOwnerApi.snapshot();
-    if (!snapshot?.authorized) throw new Error('PLATFORM_OWNER_REQUIRED');
-    if (!snapshot.mfa_required || snapshot.mfa_verified) {
-      await verify();
-      return;
+    // Recovery enrollment is allowed only after the server-side recovery endpoint
+    // has recorded an email-verified, time-limited recovery request. Do not call
+    // the AAL2-gated owner portal snapshot while the ceremony is in progress.
+    if (!recoveryEnrollment) {
+      const snapshot = await platformOwnerApi.snapshot();
+      if (!snapshot?.authorized) throw new Error('PLATFORM_OWNER_REQUIRED');
+      if (!snapshot.mfa_required || snapshot.mfa_verified) {
+        await verify();
+        return;
+      }
     }
     const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
     if (factorsError) throw factorsError;
@@ -191,11 +196,11 @@ export default function PlatformOwnerLogin() {
     if (password !== confirmation) { toast.error(text.passwordMismatch); return; }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
-      const { data: recoveryRequest, error: recoveryError } = await supabase.rpc('platform_owner_begin_mfa_recovery');
-      if (recoveryError || !recoveryRequest?.recovery_id) throw recoveryError || new Error(text.mfaUnavailable);
-      setMfaRecoveryId(recoveryRequest.recovery_id);
+      const { data: recoveryResult, error: recoveryError } = await supabase.functions.invoke('platform-owner-mfa-recovery-password', {
+        body: { newPassword: password },
+      });
+      if (recoveryError || !recoveryResult?.recoveryId) throw new Error(recoveryResult?.error || recoveryError?.message || text.mfaUnavailable);
+      setMfaRecoveryId(recoveryResult.recoveryId);
       setPassword('');
       setConfirmation('');
       setRecovery(false);

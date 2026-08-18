@@ -5,6 +5,8 @@ const loginPath = new URL('../src/pages/PlatformOwnerLogin.jsx', import.meta.url
 const controlPlanePath = new URL('../src/supabase/20260815_platform_owner_control_plane.sql', import.meta.url);
 const recoveryMigrationPath = new URL('../src/supabase/20260818_platform_owner_mfa_recovery.sql', import.meta.url);
 const recoveryFinalizerPath = new URL('../supabase/functions/platform-owner-mfa-recovery-finalize/index.ts', import.meta.url);
+const recoveryPasswordPath = new URL('../supabase/functions/platform-owner-mfa-recovery-password/index.ts', import.meta.url);
+const recoveryPasswordMigrationPath = new URL('../src/supabase/20260818_platform_owner_mfa_recovery_password_stage.sql', import.meta.url);
 
 describe('Platform Owner recovery and MFA flow', () => {
   it('uses Supabase-backed Google Authenticator enrollment and never persists a setup secret', async () => {
@@ -26,15 +28,26 @@ describe('Platform Owner recovery and MFA flow', () => {
     expect(login).not.toMatch(/console\.(log|warn|error).*enrollment\.(secret|uri|qr_code)/i);
   });
 
-  it('requires a Supabase email-recovery session before allowing a new factor to be enrolled for recovery', async () => {
-    const login = await readFile(loginPath, 'utf8');
+  it('requires a Supabase email-recovery session before a recovery-only server endpoint can update the password and allow new-factor enrollment', async () => {
+    const [login, passwordEndpoint, passwordMigration] = await Promise.all([
+      readFile(loginPath, 'utf8'),
+      readFile(recoveryPasswordPath, 'utf8'),
+      readFile(recoveryPasswordMigrationPath, 'utf8'),
+    ]);
     const completeRecovery = login.slice(login.indexOf('const completeRecovery'), login.indexOf('const submit'));
 
     expect(login).toContain("resetPasswordForEmail(email.trim(), { redirectTo: getPlatformOwnerRecoveryRedirectUrl() })");
-    expect(completeRecovery).toContain("supabase.auth.updateUser({ password })");
-    expect(completeRecovery).toContain("supabase.rpc('platform_owner_begin_mfa_recovery')");
+    expect(completeRecovery).toContain("supabase.functions.invoke('platform-owner-mfa-recovery-password'");
+    expect(completeRecovery).not.toContain('supabase.auth.updateUser({ password })');
     expect(completeRecovery).toContain("await beginMfa({ recoveryEnrollment: true })");
     expect(completeRecovery).toContain('mfaRecoveryReady');
+    expect(passwordEndpoint).toContain('caller.auth.getUser()');
+    expect(passwordEndpoint).toContain('caller.rpc("platform_owner_begin_mfa_recovery")');
+    expect(passwordEndpoint).toContain('service.auth.admin.updateUserById');
+    expect(passwordEndpoint.indexOf('platform_owner_begin_mfa_recovery')).toBeLessThan(passwordEndpoint.indexOf('updateUserById'));
+    expect(passwordEndpoint).toContain('caller.rpc("platform_owner_mark_mfa_recovery_password_updated", {');
+    expect(passwordMigration).toContain("status IN ('authorized', 'password_updated', 'finalizing', 'completed', 'expired', 'failed')");
+    expect(passwordMigration).toContain("status = 'password_updated'");
   });
 
   it('retires a prior factor only after a new factor was verified and the recovery session has stepped up to AAL2', async () => {
@@ -64,12 +77,17 @@ describe('Platform Owner recovery and MFA flow', () => {
 
   it('contains no raw TOTP secret, QR data, recovery token, or service-role key in recovery persistence or response payloads', async () => {
     const sql = await readFile(recoveryMigrationPath, 'utf8');
-    const finalizer = await readFile(recoveryFinalizerPath, 'utf8');
+    const [finalizer, passwordEndpoint] = await Promise.all([
+      readFile(recoveryFinalizerPath, 'utf8'),
+      readFile(recoveryPasswordPath, 'utf8'),
+    ]);
 
     expect(sql).not.toMatch(/\b(secret|qr_code|otpauth|access_token|refresh_token)\b\s+(text|jsonb|varchar)/i);
     expect(finalizer).not.toMatch(/console\.(log|warn|error).*?(secret|qr|token|authorization)/i);
     expect(finalizer).not.toContain('replacement.secret');
     expect(finalizer).not.toContain('replacement.uri');
+    expect(passwordEndpoint).not.toMatch(/console\.(log|warn|error).*?(password|secret|qr|token|authorization)/i);
+    expect(passwordEndpoint).not.toMatch(/JSON\.stringify\([^)]*newPassword/);
   });
 });
 
