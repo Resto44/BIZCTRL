@@ -5,6 +5,8 @@ import {
   LockKeyhole, Mail, MessageSquare, Scale, ShieldCheck,
 } from 'lucide-react';
 import { supabase } from '@/api/supabaseClient';
+import { useAuth } from '@/lib/AuthContext';
+import { beginPaddleSandboxCheckout } from '@/lib/paddleBilling';
 import { Button } from '@/components/ui/button';
 import PublicPricingCards from '@/components/marketing/PublicPricingCards';
 import { ContentSection, PublicHero, PublicLayout, usePublicPageMetadata } from '@/components/marketing/PublicLayout';
@@ -27,6 +29,9 @@ export function PricingPage() {
   usePublicPageMetadata('BizCTRL Pricing — ERP SaaS Plans', 'Explore BizCTRL launch pricing for multi-tenant ERP software, including the Starter first-month-free 30-day trial and the active public plan catalog.');
   const [plans, setPlans] = useState([]);
   const [status, setStatus] = useState('loading');
+  const [checkoutNotice, setCheckoutNotice] = useState('');
+  const [checkoutPlanId, setCheckoutPlanId] = useState('');
+  const { user, isLoadingAuth } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,6 +54,30 @@ export function PricingPage() {
     return () => { active = false; };
   }, []);
 
+  const beginPlanCheckout = async (plan) => {
+    const planId = String(plan?.id || '').trim();
+    if (!planId) return;
+    if (!user) {
+      navigate(`/erp-register?owner=1&plan=${encodeURIComponent(planId)}&returnTo=${encodeURIComponent('/pricing')}`);
+      return;
+    }
+    if (planId === 'enterprise_100' && !plan?.paddle_price_id) {
+      navigate('/contact?topic=enterprise');
+      return;
+    }
+
+    setCheckoutPlanId(planId);
+    setCheckoutNotice('');
+    try {
+      await beginPaddleSandboxCheckout(planId);
+      setCheckoutNotice('Paddle Sandbox checkout has opened. BizCTRL access will update only after a verified Paddle webhook synchronizes your subscription.');
+    } catch (error) {
+      setCheckoutNotice(error?.message || 'Paddle Sandbox checkout is not available yet.');
+    } finally {
+      setCheckoutPlanId('');
+    }
+  };
+
   return (
     <PublicLayout>
       <PublicHero
@@ -60,7 +89,8 @@ export function PricingPage() {
       </PublicHero>
       <ContentSection className="pt-0">
         {status === 'loading' && <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-label="Loading available plans">{[0, 1, 2].map((item) => <div key={item} className="h-[34rem] animate-pulse rounded-3xl border border-white/10 bg-white/5" />)}</div>}
-        {status === 'ready' && plans.length > 0 && <PublicPricingCards plans={plans} onStartFree={() => navigate('/erp-register?owner=1')} />}
+        {status === 'ready' && plans.length > 0 && <PublicPricingCards plans={plans} onStartFree={beginPlanCheckout} busyPlanId={checkoutPlanId} disabled={isLoadingAuth} enterpriseContactMode />}
+        {checkoutNotice && <p role="status" className="mx-auto mt-6 max-w-3xl rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-5 py-4 text-center text-sm leading-6 text-cyan-50">{checkoutNotice}</p>}
         {(status === 'error' || (status === 'ready' && plans.length === 0)) && <div className="mx-auto max-w-2xl rounded-3xl border border-cyan-400/20 bg-cyan-400/5 p-8 text-center"><CreditCard className="mx-auto h-8 w-8 text-cyan-300" /><h2 className="mt-4 text-2xl font-black text-white">Plan details are being finalized</h2><p className="mt-3 leading-7 text-slate-300">BizCTRL does not publish unverified commercial terms. Please start with a free account or contact the BizCTRL team to discuss the current plan catalog.</p><div className="mt-6"><PublicCta /></div></div>}
       </ContentSection>
       <ContentSection className="pt-0">
