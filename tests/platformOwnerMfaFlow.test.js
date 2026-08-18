@@ -23,6 +23,22 @@ describe('Platform Owner recovery and MFA flow', () => {
     expect(login).not.toContain("await supabase.auth.signOut();\n      setRecovery(false);");
   });
 
+  it('uses Supabase-backed Google Authenticator enrollment only when no verified factor exists and never persists the setup secret', async () => {
+    const login = await readFile(loginPath, 'utf8');
+    const beginMfa = login.indexOf('const beginMfa = async');
+    const discardAndReEnroll = login.indexOf('const discardAndReEnroll');
+    const beginMfaSource = login.slice(beginMfa, discardAndReEnroll);
+    expect(login).toContain("enrollTitle: 'Set up Google Authenticator'");
+    expect(login).toContain('Scan this QR code with Google Authenticator, then enter the 6-digit verification code.');
+    expect(login).toContain("enrollMfa: 'Verify & Enable MFA'");
+    expect(login).toContain('Google Authenticator setup QR code');
+    expect(beginMfaSource).toContain("factor.status === 'verified'");
+    expect(beginMfaSource).toContain("setMfaStage('verify')");
+    expect(beginMfaSource).not.toContain('unenroll');
+    expect(login).not.toMatch(/localStorage\.(setItem|getItem).*enrollment/i);
+    expect(login).not.toMatch(/console\.(log|warn|error).*enrollment\.secret/i);
+  });
+
   it('does not call the AAL2-protected dashboard route until MFA is verified', async () => {
     const login = await readFile(loginPath, 'utf8');
     const beginMfa = login.indexOf('const beginMfa = async');
