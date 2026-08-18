@@ -9,6 +9,7 @@ const recoveryPasswordPath = new URL('../supabase/functions/platform-owner-mfa-r
 const recoveryPasswordMigrationPath = new URL('../src/supabase/20260818_platform_owner_mfa_recovery_password_stage.sql', import.meta.url);
 const recoveryEmailBindingMigrationPath = new URL('../src/supabase/20260818_platform_owner_mfa_recovery_email_binding.sql', import.meta.url);
 const recoverySessionBindingMigrationPath = new URL('../src/supabase/20260818_platform_owner_mfa_recovery_session_binding.sql', import.meta.url);
+const recoverySessionPrecisionFixMigrationPath = new URL('../src/supabase/20260818_platform_owner_mfa_recovery_session_precision_fix.sql', import.meta.url);
 
 describe('Platform Owner recovery and MFA flow', () => {
   it('uses Supabase-backed Google Authenticator enrollment and never persists a setup secret', async () => {
@@ -69,6 +70,20 @@ describe('Platform Owner recovery and MFA flow', () => {
     expect(emailBindingMigration).toContain("v_request.session_id = v_session_id");
     expect(emailBindingMigration).toContain("status = 'email_requested'");
     expect(login.indexOf("resetPasswordForEmail(email.trim(), { redirectTo: getPlatformOwnerRecoveryRedirectUrl() })")).toBeLessThan(login.indexOf("await supabase.auth.signOut({ scope: 'local' })"));
+  });
+
+  it('binds recovery to the signed post-email session without rejecting a valid same-second JWT or relying on an old Auth delivery timestamp', async () => {
+    const [login, precisionFix] = await Promise.all([
+      readFile(loginPath, 'utf8'),
+      readFile(recoverySessionPrecisionFixMigrationPath, 'utf8'),
+    ]);
+
+    expect(precisionFix).toContain("date_trunc('second', v_request.email_requested_at)");
+    expect(precisionFix).toContain('v_session_created_at < v_request.email_requested_at');
+    expect(precisionFix).toContain("v_request.session_id = v_session_id");
+    expect(precisionFix).not.toContain('v_recovery_sent_at');
+    expect(precisionFix).not.toContain("platform_owner_mfa_recovery_amr_present('recovery')");
+    expect(login).toContain('if (!recoveryRequested(location)) toast.dismiss();');
   });
 
   it('retires a prior factor only after a new factor was verified and the recovery session has stepped up to AAL2', async () => {

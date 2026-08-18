@@ -149,6 +149,13 @@ export default function PlatformOwnerLogin() {
   };
 
   useEffect(() => {
+    // A failed recovery request can leave a transient global notification visible
+    // while the user returns to normal sign-in. Normal login must never display
+    // stale recovery state or a previous Edge Function error.
+    if (!recoveryRequested(location)) toast.dismiss();
+  }, [location.pathname, location.search, location.hash]);
+
+  useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setRecovery(true);
