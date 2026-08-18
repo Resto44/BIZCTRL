@@ -14,7 +14,7 @@ const copy = {
   en: {
     badge: 'Separate SaaS control plane',
     title: 'Platform Owner sign in',
-    recoveryTitle: 'Platform Owner MFA recovery',
+    recoveryTitle: 'Platform Owner MFA Recovery',
     mfaTitle: 'Verify your authenticator',
     enrollTitle: 'Set up new authenticator',
     compromisedTitle: 'Replace unfinished authenticator setup',
@@ -306,13 +306,14 @@ export default function PlatformOwnerLogin() {
     if (!email.trim()) { toast.error(text.emailRequired); return; }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: getPlatformOwnerRecoveryRedirectUrl(),
+      const { error } = await supabase.functions.invoke('platform-owner-mfa-recovery-session', {
+        body: { action: 'request', redirectTo: getPlatformOwnerRecoveryRedirectUrl() },
       });
       if (error) throw error;
       await supabase.auth.signOut({ scope: 'local' });
       clearEnrollment();
       setRecoveryAuthorized(false);
+      navigate('/platform-owner/recover', { replace: true });
       toast.dismiss();
       toast.success(mfaStage === 'verify' ? text.mfaRecoverySent : text.resetSent);
     } catch {
@@ -336,8 +337,10 @@ export default function PlatformOwnerLogin() {
 
     setLoading(true);
     try {
-      const { error: passwordError } = await supabase.auth.updateUser({ password });
-      if (passwordError) throw passwordError;
+      const { data: recoveryResult, error: passwordError } = await supabase.functions.invoke('platform-owner-mfa-recovery-session', {
+        body: { action: 'complete', newPassword: password },
+      });
+      if (passwordError || !recoveryResult?.authorized) throw passwordError || new Error('MFA_RECOVERY_SESSION_NOT_AUTHORIZED');
       setPassword('');
       setConfirmation('');
       toast.dismiss();
