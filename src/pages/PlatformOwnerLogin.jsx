@@ -187,8 +187,10 @@ export default function PlatformOwnerLogin() {
       // and records a short-lived request before the recovery email is sent.
       // Standard password-reset behavior remains unchanged for other cases.
       if (mfaStage === 'verify') {
-        const { error: prepareError } = await supabase.rpc('platform_owner_prepare_mfa_recovery');
-        if (prepareError) throw prepareError;
+        const { data: initiation, error: initiationError } = await supabase.functions.invoke('platform-owner-mfa-recovery-password', {
+          body: { action: 'initiate' },
+        });
+        if (initiationError || !initiation?.initiated) throw new Error(initiation?.error || initiationError?.message || text.mfaUnavailable);
       }
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: getPlatformOwnerRecoveryRedirectUrl() });
       if (error) throw error;

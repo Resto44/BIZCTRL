@@ -16,6 +16,15 @@ function fail(code: string, status = 400, headers?: HeadersInit) {
   return new Response(JSON.stringify({ error: code }), { status, headers: headers ?? { "Content-Type": "application/json" } });
 }
 
+function randomReplacementPassword() {
+  const bytes = crypto.getRandomValues(new Uint8Array(48));
+  return `${crypto.randomUUID()}-${btoa(String.fromCharCode(...bytes)).replace(/[+/=]/g, "")}`;
+}
+
+function bearerToken(authorization: string) {
+  return authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+}
+
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get("Origin");
   const headers = corsHeaders(origin);
@@ -28,17 +37,11 @@ Deno.serve(async (req: Request) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const authorization = req.headers.get("Authorization") ?? "";
-    if (!supabaseUrl || !anonKey || !serviceRoleKey || !authorization) {
+    const accessToken = bearerToken(authorization);
+    if (!supabaseUrl || !anonKey || !serviceRoleKey || !accessToken) {
       return fail("MFA_RECOVERY_SERVICE_UNAVAILABLE", 503, headers);
     }
 
-    const body = await req.json().catch(() => null) as { newPassword?: unknown } | null;
-    const newPassword = typeof body?.newPassword === "string" ? body.newPassword : "";
-    if (newPassword.length < 12) return fail("MFA_RECOVERY_PASSWORD_POLICY", 400, headers);
-
-    // Verify the bearer token before using any privileged API. The corresponding
-    // RPC enforces active Platform Owner status, AAL1, recovery AMR, session ID,
-    // 15-minute expiry, and the single-use authorized request state.
     const caller = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authorization } },
       auth: { autoRefreshToken: false, persistSession: false },
@@ -46,16 +49,43 @@ Deno.serve(async (req: Request) => {
     const { data: userData, error: userError } = await caller.auth.getUser();
     if (userError || !userData.user) return fail("UNAUTHENTICATED", 401, headers);
 
+    const service = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const body = await req.json().catch(() => null) as { action?: unknown; newPassword?: unknown } | null;
+
+    if (body?.action === "initiate") {
+      // This RPC requires an active Platform Owner AAL1 password session and
+      // creates a single 15-minute request before any recovery email is sent.
+      const { error: prepareError } = await caller.rpc("platform_owner_prepare_mfa_recovery");
+      if (prepareError) return fail("MFA_RECOVERY_INITIATION_NOT_AUTHORIZED", 403, headers);
+
+      // A random replacement password and global session revocation eliminate
+      // every pre-email password session. The subsequent signed recovery-link
+      // session is therefore the only session eligible for password replacement.
+      const { error: invalidatePasswordError } = await service.auth.admin.updateUserById(
+        userData.user.id,
+        { password: randomReplacementPassword() },
+      );
+      if (invalidatePasswordError) return fail("MFA_RECOVERY_SESSION_INVALIDATION_FAILED", 409, headers);
+
+      const { error: revokeSessionsError } = await service.auth.admin.signOut(accessToken, "global");
+      if (revokeSessionsError) return fail("MFA_RECOVERY_SESSION_REVOCATION_FAILED", 409, headers);
+
+      return new Response(JSON.stringify({ initiated: true }), { status: 200, headers });
+    }
+
+    const newPassword = typeof body?.newPassword === "string" ? body.newPassword : "";
+    if (newPassword.length < 12) return fail("MFA_RECOVERY_PASSWORD_POLICY", 400, headers);
+
+    // The RPC verifies the active owner, exact email-link session binding,
+    // server-side recovery-email time, signed session time, and single-use state.
     const { data: recovery, error: recoveryError } = await caller.rpc("platform_owner_begin_mfa_recovery");
     const recoveryId = typeof recovery?.recovery_id === "string" ? recovery.recovery_id : "";
     if (recoveryError || !UUID_PATTERN.test(recoveryId)) return fail("MFA_RECOVERY_NOT_AUTHORIZED", 403, headers);
 
-    // Supabase Auth blocks updateUser() from an AAL1 recovery session when MFA is
-    // present. Privileged updateUserById() is therefore limited to this endpoint,
-    // after the recovery JWT and database state have passed the checks above.
-    const service = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    // Native updateUser() is correctly AAL2-gated when MFA exists. This privileged
+    // update is reached only after the recovery-link session has passed every gate.
     const { error: updateError } = await service.auth.admin.updateUserById(userData.user.id, { password: newPassword });
     if (updateError) return fail("MFA_RECOVERY_PASSWORD_UPDATE_FAILED", 409, headers);
 
