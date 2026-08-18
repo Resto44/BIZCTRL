@@ -420,7 +420,7 @@ export default function Sales() {
 
       // Generate and store permanent PDF in background
       try {
-        await generateAndUploadPDF(invoice, 'RestoCTRL', currency, { lang, dir, translateLiteral });
+        await generateAndUploadPDF(invoice, 'BizCTRL', currency, { lang, dir, translateLiteral });
         qc.invalidateQueries({ queryKey: ['sales_invoices'] });
       } catch (pdfErr) {
         console.warn('[Sales] Silent PDF generation failed:', pdfErr);

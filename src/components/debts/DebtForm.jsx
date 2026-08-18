@@ -120,7 +120,7 @@ export default function DebtForm({ initial = {}, onSave, onCancel }) {
           debtRecord: { ...savedRecord, ...finalData },
           restaurantId: activeRestaurantId,
           createdBy: user?.email,
-          brandName: 'RestoCTRL',
+          brandName: 'BizCTRL',
         });
         setSaveResult(result);
       }

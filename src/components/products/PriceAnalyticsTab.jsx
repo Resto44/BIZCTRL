@@ -1,6 +1,6 @@
 /**
  * PriceAnalyticsTab.jsx
- * Product Price Analytics — RestoCTRL44
+ * Product Price Analytics — BizCTRL
  * Shows full price history, analytics summary, and trend charts.
  */
 

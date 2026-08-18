@@ -143,7 +143,7 @@ export async function createSalesInvoice({ invoiceNumber, saleId, saleData, rest
 }
 
 /** Localized HTML is retained for browser printing when a native print dialog is preferred. */
-export function buildInvoiceHTML(invoice, brandName = 'RestoCTRL', currency = '', options = {}) {
+export function buildInvoiceHTML(invoice, brandName = 'BizCTRL', currency = '', options = {}) {
   const resolved = optionsWithDefaults(options);
   const rtl = resolved.dir === 'rtl' || resolved.lang === 'ar' || resolved.lang === 'fa';
   const details = invoiceDetails(invoice, currency, resolved);
@@ -176,7 +176,7 @@ export function buildInvoiceHTML(invoice, brandName = 'RestoCTRL', currency = ''
 </body></html>`;
 }
 
-export function createLocalizedInvoicePDF(invoice, brandName = 'RestoCTRL', currency = '', options = {}) {
+export function createLocalizedInvoicePDF(invoice, brandName = 'BizCTRL', currency = '', options = {}) {
   const resolved = optionsWithDefaults(options);
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
   const { rtl } = prepareLocalizedPdf(doc, resolved);

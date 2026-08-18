@@ -209,10 +209,10 @@ export default function SalesInvoices() {
               invoice={inv}
               currency={currency}
               onView={(i) => setViewInvoice(i)}
-              onDownload={(i) => downloadInvoicePDF(i, 'RestoCTRL', currency, invoiceOptions)}
-              onPrint={(i) => printInvoice(i, 'RestoCTRL', currency, invoiceOptions)}
+              onDownload={(i) => downloadInvoicePDF(i, 'BizCTRL', currency, invoiceOptions)}
+              onPrint={(i) => printInvoice(i, 'BizCTRL', currency, invoiceOptions)}
               onWhatsApp={(i) => shareInvoiceWhatsApp(i, currency, invoiceOptions)}
-              onShare={(i) => shareInvoiceNative(i, 'RestoCTRL', currency, invoiceOptions)}
+              onShare={(i) => shareInvoiceNative(i, 'BizCTRL', currency, invoiceOptions)}
             />
           ))}
         </div>
@@ -309,16 +309,16 @@ export default function SalesInvoices() {
 
               {/* Action buttons */}
               <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="h-10" onClick={() => downloadInvoicePDF(viewInvoice, 'RestoCTRL', currency, invoiceOptions)}>
+                <Button variant="outline" className="h-10" onClick={() => downloadInvoicePDF(viewInvoice, 'BizCTRL', currency, invoiceOptions)}>
                   <Download className="w-4 h-4 mr-1" />Download
                 </Button>
-                <Button variant="outline" className="h-10" onClick={() => openInvoicePrint(viewInvoice, 'RestoCTRL', currency, invoiceOptions)}>
+                <Button variant="outline" className="h-10" onClick={() => openInvoicePrint(viewInvoice, 'BizCTRL', currency, invoiceOptions)}>
                   <FileText className="w-4 h-4 mr-1" />View PDF
                 </Button>
-                <Button variant="outline" className="h-10" onClick={() => shareInvoiceNative(viewInvoice, 'RestoCTRL', currency, invoiceOptions)}>
+                <Button variant="outline" className="h-10" onClick={() => shareInvoiceNative(viewInvoice, 'BizCTRL', currency, invoiceOptions)}>
                   <Share2 className="w-4 h-4 mr-1" />Share PDF
                 </Button>
-                <Button variant="outline" className="h-10" onClick={() => printInvoice(viewInvoice, 'RestoCTRL', currency, invoiceOptions)}>
+                <Button variant="outline" className="h-10" onClick={() => printInvoice(viewInvoice, 'BizCTRL', currency, invoiceOptions)}>
                   <Printer className="w-4 h-4 mr-1" />Print
                 </Button>
                 <Button className="h-10 col-span-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => shareInvoiceWhatsApp(viewInvoice, currency, invoiceOptions)}>

@@ -1,6 +1,6 @@
 /**
  * ProductManagement.jsx
- * Full Product Management System — RestoCTRL44
+ * Full Product Management System — BizCTRL
  * Route: /product-management
  */
 import { useState, useMemo, useRef, useCallback } from 'react';

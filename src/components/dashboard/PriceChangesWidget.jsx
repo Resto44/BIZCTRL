@@ -1,6 +1,6 @@
 /**
  * PriceChangesWidget.jsx
- * Dashboard widget showing recent product price changes — RestoCTRL44
+ * Dashboard widget showing recent product price changes — BizCTRL
  */
 
 import { useMemo } from 'react';

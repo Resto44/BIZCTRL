@@ -74,7 +74,7 @@ export default function PaymentForm({ debt, onSave, onCancel }) {
           debtRecord: debt,
           restaurantId: activeRestaurantId,
           createdBy: user?.email,
-          brandName: 'RestoCTRL',
+          brandName: 'BizCTRL',
         });
       }
 

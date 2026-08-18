@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const portalPath = new URL('../src/pages/PlatformOwnerPortal.jsx', import.meta.url);
+const loginPath = new URL('../src/pages/PlatformOwnerLogin.jsx', import.meta.url);
+const appUrlPath = new URL('../src/lib/appUrl.js', import.meta.url);
 const billingPath = new URL('../src/pages/Billing.jsx', import.meta.url);
 const apiPath = new URL('../src/lib/platformOwnerApi.js', import.meta.url);
 const migrationPath = new URL('../src/supabase/20260816_platform_owner_runtime_ui.sql', import.meta.url);
@@ -20,6 +22,20 @@ describe('Platform Owner runtime UI fixes', () => {
     for (const language of ['en:', 'ar:', 'fa:']) expect(portal).toContain(language);
     for (const phrase of ['Payments & IBAN proofs', 'المدفوعات وإثباتات IBAN', 'پرداخت‌ها و مدارک IBAN', 'Print / Save PDF', 'چاپ / ذخیره PDF', 'طباعة / حفظ PDF']) expect(portal).toContain(phrase);
     expect(portal).toContain('window.print()');
+  });
+
+  it('renders only BizCTRL branding in both Platform Owner shells and keeps recovery on the canonical domain', async () => {
+    const [portal, login, appUrl] = await Promise.all([
+      readFile(portalPath, 'utf8'),
+      readFile(loginPath, 'utf8'),
+      readFile(appUrlPath, 'utf8'),
+    ]);
+    expect(portal).toContain('BizCTRL');
+    expect(login).toContain('BizCTRL Platform');
+    expect(`${portal}\n${login}`).not.toContain('RestoCTRL');
+    expect(appUrl).toContain("'https://mybizctrl.site'");
+    expect(appUrl).toContain('/platform-owner/login?mode=recovery');
+    expect(appUrl).not.toContain('base44-rest-ctrl.vercel.app');
   });
 
   it('keeps sensitive proof access delegated to the restricted payment-proofs storage policy through short-lived signed URLs', async () => {
