@@ -3,133 +3,93 @@ import { describe, expect, it } from 'vitest';
 
 const loginPath = new URL('../src/pages/PlatformOwnerLogin.jsx', import.meta.url);
 const controlPlanePath = new URL('../src/supabase/20260815_platform_owner_control_plane.sql', import.meta.url);
-const recoveryMigrationPath = new URL('../src/supabase/20260818_platform_owner_mfa_recovery.sql', import.meta.url);
-const recoveryFinalizerPath = new URL('../supabase/functions/platform-owner-mfa-recovery-finalize/index.ts', import.meta.url);
-const recoveryPasswordPath = new URL('../supabase/functions/platform-owner-mfa-recovery-password/index.ts', import.meta.url);
-const recoveryPasswordMigrationPath = new URL('../src/supabase/20260818_platform_owner_mfa_recovery_password_stage.sql', import.meta.url);
-const recoveryEmailBindingMigrationPath = new URL('../src/supabase/20260818_platform_owner_mfa_recovery_email_binding.sql', import.meta.url);
-const recoverySessionBindingMigrationPath = new URL('../src/supabase/20260818_platform_owner_mfa_recovery_session_binding.sql', import.meta.url);
-const recoverySessionPrecisionFixMigrationPath = new URL('../src/supabase/20260818_platform_owner_mfa_recovery_session_precision_fix.sql', import.meta.url);
+const reenrollmentMigrationPath = new URL('../src/supabase/20260818_platform_owner_mfa_reenrollment.sql', import.meta.url);
+const retiredPasswordFunctionPath = new URL('../supabase/functions/platform-owner-mfa-recovery-password/index.ts', import.meta.url);
+const retiredFinalizerPath = new URL('../supabase/functions/platform-owner-mfa-recovery-finalize/index.ts', import.meta.url);
 
-describe('Platform Owner recovery and MFA flow', () => {
-  it('uses Supabase-backed Google Authenticator enrollment and never persists a setup secret', async () => {
+describe('Platform Owner native MFA re-enrollment flow', () => {
+  it('uses a real server-backed Google Authenticator enrollment and never persists a setup secret', async () => {
     const login = await readFile(loginPath, 'utf8');
-    const beginMfa = login.indexOf('const beginMfa = async');
-    const discardAndReEnroll = login.indexOf('const discardAndReEnroll');
-    const beginMfaSource = login.slice(beginMfa, discardAndReEnroll);
 
-    expect(login).toContain("enrollTitle: 'Set up Google Authenticator'");
-    expect(login).toContain('Scan this QR code with Google Authenticator, then enter the 6-digit verification code.');
-    expect(login).toContain("enrollMfa: 'Verify & Enable MFA'");
+    expect(login).toContain("factorType: 'totp'");
     expect(login).toContain("friendlyName: 'BizCTRL Platform Owner — mybizctrl.site'");
     expect(login).toContain('Google Authenticator setup QR code');
-    expect(beginMfaSource).toContain("factor.status === 'verified'");
-    expect(beginMfaSource).toContain("setMfaStage('verify')");
-    expect(beginMfaSource).toContain('recoveryEnrollment');
-    expect(beginMfaSource).not.toContain('unenroll');
+    expect(login).toContain('enrollment?.qr_code');
+    expect(login).toContain('enrollment.secret');
+    expect(login).toContain("mfaStage === 'enroll'");
+    expect(login).toContain('recoveryAuthorized');
+    expect(login).toContain("supabase.auth.mfa.challenge({ factorId: mfaFactor.id })");
+    expect(login).toContain('supabase.auth.mfa.verify({');
+    expect(login).toContain('code: mfaCode.trim()');
     expect(login).not.toMatch(/localStorage\.(setItem|getItem).*enrollment/i);
     expect(login).not.toMatch(/console\.(log|warn|error).*enrollment\.(secret|uri|qr_code)/i);
+    expect(login).not.toContain('enrollment.uri');
   });
 
-  it('requires a Supabase email-recovery session before a recovery-only server endpoint can update the password and allow new-factor enrollment', async () => {
-    const [login, passwordEndpoint, passwordMigration, emailBindingMigration, sessionBindingMigration] = await Promise.all([
-      readFile(loginPath, 'utf8'),
-      readFile(recoveryPasswordPath, 'utf8'),
-      readFile(recoveryPasswordMigrationPath, 'utf8'),
-      readFile(recoveryEmailBindingMigrationPath, 'utf8'),
-      readFile(recoverySessionBindingMigrationPath, 'utf8'),
-    ]);
-    const completeRecovery = login.slice(login.indexOf('const completeRecovery'), login.indexOf('const submit'));
-
-    expect(login).toContain("supabase.functions.invoke('platform-owner-mfa-recovery-password'");
-    expect(login).toContain("body: { action: 'initiate' }");
-    expect(login).toContain("resetPasswordForEmail(email.trim(), { redirectTo: getPlatformOwnerRecoveryRedirectUrl() })");
-    expect(login).toContain("await supabase.auth.signOut({ scope: 'local' })");
-    expect(completeRecovery).toContain("supabase.functions.invoke('platform-owner-mfa-recovery-password'");
-    expect(completeRecovery).not.toContain('supabase.auth.updateUser({ password })');
-    expect(completeRecovery).toContain("await beginMfa({ recoveryEnrollment: true })");
-    expect(completeRecovery).toContain('mfaRecoveryReady');
-    expect(passwordEndpoint).toContain('caller.auth.getUser()');
-    expect(passwordEndpoint).toContain('caller.rpc("platform_owner_begin_mfa_recovery")');
-    expect(passwordEndpoint).toContain('service.auth.admin.updateUserById');
-    expect(passwordEndpoint.indexOf('platform_owner_begin_mfa_recovery')).toBeLessThan(passwordEndpoint.indexOf('const { error: updateError }'));
-    expect(passwordEndpoint).toContain('caller.rpc("platform_owner_mark_mfa_recovery_password_updated", {');
-    expect(passwordMigration).toContain("status IN ('authorized', 'password_updated', 'finalizing', 'completed', 'expired', 'failed')");
-    expect(passwordMigration).toContain("status = 'password_updated'");
-    expect(emailBindingMigration).toContain("status IN ('email_requested', 'authorized', 'password_updated', 'finalizing', 'completed', 'expired', 'failed')");
-    expect(emailBindingMigration).toContain('platform_owner_prepare_mfa_recovery');
-    expect(emailBindingMigration).toContain("platform_owner_mfa_recovery_amr_present('password')");
-    expect(emailBindingMigration).toContain("platform_owner_mfa_recovery_amr_present('recovery')");
-    expect(emailBindingMigration).toContain('recovery_sent_at');
-    expect(sessionBindingMigration).toContain('auth.sessions');
-    expect(sessionBindingMigration).toContain('v_session_created_at < v_recovery_sent_at');
-    expect(sessionBindingMigration).not.toContain("platform_owner_mfa_recovery_amr_present('recovery')");
-    expect(sessionBindingMigration).toContain("platform_owner_mfa_recovery_amr_present('totp')");
-    expect(passwordEndpoint).toContain('service.auth.admin.signOut(accessToken, "global")');
-    expect(passwordEndpoint).toContain('randomReplacementPassword()');
-    expect(emailBindingMigration).toContain("v_request.session_id = v_session_id");
-    expect(emailBindingMigration).toContain("status = 'email_requested'");
-    expect(login.indexOf("resetPasswordForEmail(email.trim(), { redirectTo: getPlatformOwnerRecoveryRedirectUrl() })")).toBeLessThan(login.indexOf("await supabase.auth.signOut({ scope: 'local' })"));
-  });
-
-  it('binds recovery to the signed post-email session without rejecting a valid same-second JWT or relying on an old Auth delivery timestamp', async () => {
-    const [login, precisionFix] = await Promise.all([
-      readFile(loginPath, 'utf8'),
-      readFile(recoverySessionPrecisionFixMigrationPath, 'utf8'),
-    ]);
-
-    expect(precisionFix).toContain("date_trunc('second', v_request.email_requested_at)");
-    expect(precisionFix).toContain('v_session_created_at < v_request.email_requested_at');
-    expect(precisionFix).toContain("v_request.session_id = v_session_id");
-    expect(precisionFix).not.toContain('v_recovery_sent_at');
-    expect(precisionFix).not.toContain("platform_owner_mfa_recovery_amr_present('recovery')");
-    expect(login).toContain('if (!recoveryRequested(location)) toast.dismiss();');
-  });
-
-  it('retires a prior factor only after a new factor was verified and the recovery session has stepped up to AAL2', async () => {
+  it('uses a native Supabase password-recovery session as the approved recovery mechanism and keeps it on the canonical domain', async () => {
     const login = await readFile(loginPath, 'utf8');
-    const sql = await readFile(recoveryMigrationPath, 'utf8');
-    const finalizer = await readFile(recoveryFinalizerPath, 'utf8');
 
-    expect(login).toContain("supabase.auth.mfa.verify({ factorId: mfaFactor.id, challengeId: challenge.id, code: mfaCode.trim() })");
-    expect(login).toContain('await finalizeMfaRecovery(mfaFactor.id)');
-    expect(sql).toContain("platform_owner_mfa_recovery_amr_present('recovery')");
-    expect(sql).toContain("platform_owner_mfa_recovery_amr_present('totp')");
-    expect(sql).toContain('PERFORM public.platform_owner_assert();');
-    expect(sql).toContain("p_new_factor_id uuid");
-    expect(finalizer).toContain("platform_owner_claim_mfa_recovery");
-    expect(finalizer).toContain("factor.id === newFactorId");
-    expect(finalizer).toContain('service.auth.admin.mfa.deleteFactor');
-    expect(finalizer.indexOf('platform_owner_claim_mfa_recovery')).toBeLessThan(finalizer.indexOf('service.auth.admin.mfa.deleteFactor'));
-    expect(login).toContain("await supabase.auth.signOut()");
+    expect(login).toContain('supabase.auth.resetPasswordForEmail(email.trim(), {');
+    expect(login).toContain('redirectTo: getPlatformOwnerRecoveryRedirectUrl()');
+    expect(login).toContain('event === \'PASSWORD_RECOVERY\'');
+    expect(login).toContain("window.history.replaceState(null, document.title, '/platform-owner/recover')");
+    expect(login).toContain('supabase.auth.updateUser({ password })');
+    expect(login).toContain("supabase.rpc('platform_owner_authorize_mfa_reenrollment')");
+    expect(login).not.toContain("supabase.functions.invoke('platform-owner-mfa-recovery-password'");
+    expect(login).not.toContain("supabase.functions.invoke('platform-owner-mfa-recovery-finalize'");
   });
 
-  it('keeps Platform Owner authorization and MFA enforcement separate from tenant access', async () => {
+  it('enforces server-side Platform Owner authorization for recovery enrollment and retains old factors until the new TOTP factor verifies', async () => {
+    const [login, migration] = await Promise.all([
+      readFile(loginPath, 'utf8'),
+      readFile(reenrollmentMigrationPath, 'utf8'),
+    ]);
+
+    expect(login).toContain('platformOwnerApi.snapshot()');
+    expect(login).toContain('snapshot?.authorized');
+    expect(login).toContain('snapshot.mfa_required');
+    expect(login).toContain('snapshot.mfa_verified');
+    expect(login).toContain('setPriorFactorIds(verifiedFactors.map((factor) => factor.id))');
+    expect(login).toContain("mfaStage === 'enroll'");
+    expect(login.indexOf('supabase.auth.mfa.verify({')).toBeLessThan(login.indexOf('await retirePriorFactors(mfaFactor.id)'));
+    expect(login).toContain("supabase.rpc('platform_owner_record_mfa_reenrollment_verified'");
+    expect(login).toContain('supabase.auth.mfa.unenroll({ factorId })');
+    expect(login).toContain("supabase.rpc('platform_owner_record_mfa_reenrollment_completed'");
+    expect(login).toContain("await supabase.auth.signOut({ scope: 'local' })");
+
+    expect(migration).toContain('public.platform_owner_is_authorized()');
+    expect(migration).toContain("auth.jwt() ->> 'aal', 'aal1'");
+    expect(migration).toContain("platform_owner_mfa_recovery_amr_present('recovery')");
+    expect(migration).toContain("platform_owner_mfa_recovery_amr_present('totp')");
+    expect(migration).toContain('status = \'verified\'');
+    expect(migration).toContain('PLATFORM_OWNER_MFA_RECOVERY_RETIREMENT_INCOMPLETE');
+    expect(migration).toContain('REVOKE EXECUTE ON FUNCTION public.platform_owner_prepare_mfa_recovery() FROM authenticated;');
+    expect(migration).toContain('REVOKE EXECUTE ON FUNCTION public.platform_owner_claim_mfa_recovery(uuid, uuid) FROM authenticated;');
+  });
+
+  it('keeps normal Platform Owner authorization and MFA enforcement separate from tenant access', async () => {
     const sql = await readFile(controlPlanePath, 'utf8');
     expect(sql).toContain("v_aal := coalesce(auth.jwt() ->> 'aal', 'aal1');");
     expect(sql).toContain("IF v_mfa_required AND v_aal <> 'aal2' THEN");
     expect(sql).toContain("MESSAGE = 'PLATFORM_OWNER_MFA_REQUIRED'");
   });
 
-  it('contains no raw TOTP secret, QR data, recovery token, or service-role key in recovery persistence or response payloads', async () => {
-    const sql = await readFile(recoveryMigrationPath, 'utf8');
-    const [finalizer, passwordEndpoint, emailBindingMigration, sessionBindingMigration] = await Promise.all([
-      readFile(recoveryFinalizerPath, 'utf8'),
-      readFile(recoveryPasswordPath, 'utf8'),
-      readFile(recoveryEmailBindingMigrationPath, 'utf8'),
-      readFile(recoverySessionBindingMigrationPath, 'utf8'),
+  it('contains no raw TOTP secret, QR data, recovery token, or service-role key in persistence, audit calls, or active recovery functions', async () => {
+    const [login, migration, passwordFunction, finalizer] = await Promise.all([
+      readFile(loginPath, 'utf8'),
+      readFile(reenrollmentMigrationPath, 'utf8'),
+      readFile(retiredPasswordFunctionPath, 'utf8'),
+      readFile(retiredFinalizerPath, 'utf8'),
     ]);
 
-    expect(sql).not.toMatch(/\b(secret|qr_code|otpauth|access_token|refresh_token)\b\s+(text|jsonb|varchar)/i);
-    expect(finalizer).not.toMatch(/console\.(log|warn|error).*?(secret|qr|token|authorization)/i);
-    expect(finalizer).not.toContain('replacement.secret');
-    expect(finalizer).not.toContain('replacement.uri');
-    expect(passwordEndpoint).not.toMatch(/console\.(log|warn|error).*?(password|secret|qr|token|authorization)/i);
-    expect(passwordEndpoint).not.toMatch(/JSON\.stringify\([^)]*newPassword/);
-    expect(emailBindingMigration).not.toMatch(/\b(secret|qr_code|otpauth|access_token|refresh_token)\b\s+(text|jsonb|varchar)/i);
-    expect(sessionBindingMigration).not.toMatch(/\b(secret|qr_code|otpauth|access_token|refresh_token)\b\s+(text|jsonb|varchar)/i);
+    expect(migration).not.toMatch(/\b(secret|qr_code|otpauth|access_token|refresh_token)\b\s+(text|jsonb|varchar)/i);
+    expect(login).not.toMatch(/console\.(log|warn|error).*?(secret|qr|token|authorization)/i);
+    expect(login).not.toContain('enrollment.uri');
+    expect(passwordFunction).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
+    expect(finalizer).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
+    expect(passwordFunction).not.toContain('createClient');
+    expect(finalizer).not.toContain('createClient');
+    expect(passwordFunction).toContain('MFA_RECOVERY_FLOW_RETIRED');
+    expect(finalizer).toContain('MFA_RECOVERY_FLOW_RETIRED');
   });
 });
-
-const mfaFlowContract = true;
-void mfaFlowContract;
