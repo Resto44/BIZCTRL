@@ -182,8 +182,20 @@ export default function PlatformOwnerLogin() {
 
   const forgotPassword = async () => {
     if (!email.trim()) { toast.error(text.emailRequired); return; }
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: getPlatformOwnerRecoveryRedirectUrl() });
-    if (error) toast.error(error.message); else toast.success(mfaStage === 'verify' ? text.mfaRecoverySent : text.resetSent);
+    try {
+      // Lost-authenticator recovery starts only after a verified password login
+      // and records a short-lived request before the recovery email is sent.
+      // Standard password-reset behavior remains unchanged for other cases.
+      if (mfaStage === 'verify') {
+        const { error: prepareError } = await supabase.rpc('platform_owner_prepare_mfa_recovery');
+        if (prepareError) throw prepareError;
+      }
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: getPlatformOwnerRecoveryRedirectUrl() });
+      if (error) throw error;
+      toast.success(mfaStage === 'verify' ? text.mfaRecoverySent : text.resetSent);
+    } catch (error) {
+      toast.error(error.message || text.signInFailed);
+    }
   };
 
   const completeRecovery = async (event) => {
