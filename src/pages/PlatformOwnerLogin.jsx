@@ -192,6 +192,14 @@ export default function PlatformOwnerLogin() {
       }
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: getPlatformOwnerRecoveryRedirectUrl() });
       if (error) throw error;
+      if (mfaStage === 'verify') {
+        // Remove the AAL1 password-login session from this browser before the
+        // recovery email is opened. The recovery link must establish the only
+        // session allowed to invoke the recovery-password endpoint.
+        await supabase.auth.signOut({ scope: 'local' });
+        setMfaStage(null);
+        setPassword('');
+      }
       toast.success(mfaStage === 'verify' ? text.mfaRecoverySent : text.resetSent);
     } catch (error) {
       toast.error(error.message || text.signInFailed);

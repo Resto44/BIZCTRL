@@ -40,6 +40,7 @@ describe('Platform Owner recovery and MFA flow', () => {
 
     expect(login).toContain("supabase.rpc('platform_owner_prepare_mfa_recovery')");
     expect(login).toContain("resetPasswordForEmail(email.trim(), { redirectTo: getPlatformOwnerRecoveryRedirectUrl() })");
+    expect(login).toContain("await supabase.auth.signOut({ scope: 'local' })");
     expect(completeRecovery).toContain("supabase.functions.invoke('platform-owner-mfa-recovery-password'");
     expect(completeRecovery).not.toContain('supabase.auth.updateUser({ password })');
     expect(completeRecovery).toContain("await beginMfa({ recoveryEnrollment: true })");
@@ -58,6 +59,7 @@ describe('Platform Owner recovery and MFA flow', () => {
     expect(emailBindingMigration).toContain('recovery_sent_at');
     expect(emailBindingMigration).toContain("v_request.session_id = v_session_id");
     expect(emailBindingMigration).toContain("status = 'email_requested'");
+    expect(login.indexOf("resetPasswordForEmail(email.trim(), { redirectTo: getPlatformOwnerRecoveryRedirectUrl() })")).toBeLessThan(login.indexOf("await supabase.auth.signOut({ scope: 'local' })"));
   });
 
   it('retires a prior factor only after a new factor was verified and the recovery session has stepped up to AAL2', async () => {
