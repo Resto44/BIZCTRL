@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 const portalPath = new URL('../src/pages/PlatformOwnerPortal.jsx', import.meta.url);
 const loginPath = new URL('../src/pages/PlatformOwnerLogin.jsx', import.meta.url);
 const appUrlPath = new URL('../src/lib/appUrl.js', import.meta.url);
+const appPath = new URL('../src/App.jsx', import.meta.url);
 const billingPath = new URL('../src/pages/Billing.jsx', import.meta.url);
 const apiPath = new URL('../src/lib/platformOwnerApi.js', import.meta.url);
 const migrationPath = new URL('../src/supabase/20260816_platform_owner_runtime_ui.sql', import.meta.url);
@@ -34,8 +35,20 @@ describe('Platform Owner runtime UI fixes', () => {
     expect(login).toContain('BizCTRL Platform');
     expect(`${portal}\n${login}`).not.toContain('RestoCTRL');
     expect(appUrl).toContain("'https://mybizctrl.site'");
-    expect(appUrl).toContain('/platform-owner/login?mode=recovery');
+    expect(appUrl).toContain('/platform-owner/recover');
+    expect(appUrl).not.toContain('/platform-owner/login?mode=recovery');
     expect(appUrl).not.toContain('base44-rest-ctrl.vercel.app');
+  });
+
+  it('registers a dedicated Platform Owner recovery route and retains owner recovery context after the password update', async () => {
+    const [app, login] = await Promise.all([
+      readFile(appPath, 'utf8'),
+      readFile(loginPath, 'utf8'),
+    ]);
+    expect(app).toContain('<Route path="/platform-owner/recover"');
+    expect(login).toContain("location.pathname === '/platform-owner/recover'");
+    expect(login).toContain("navigate('/platform-owner/recover', { replace: true })");
+    expect(login).toContain("recoveryTitle: 'Platform Owner MFA Recovery'");
   });
 
   it('keeps sensitive proof access delegated to the restricted payment-proofs storage policy through short-lived signed URLs', async () => {

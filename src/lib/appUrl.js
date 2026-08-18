@@ -7,7 +7,7 @@ export function getApplicationBaseUrl() {
 }
 
 export function getPlatformOwnerRecoveryRedirectUrl() {
-  return `${getApplicationBaseUrl()}/platform-owner/login?mode=recovery`;
+  return `${getApplicationBaseUrl()}/platform-owner/recover`;
 }
 
 export { PRODUCTION_APP_URL };

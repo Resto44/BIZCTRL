@@ -451,6 +451,7 @@ function App() {
               <Route path="/erp-login" element={<ERPLogin />} />
               <Route path="/erp-register" element={<ERPRegister />} />
               <Route path="/platform-owner/login" element={<Suspense fallback={<PageLoader />}><PlatformOwnerLogin /></Suspense>} />
+              <Route path="/platform-owner/recover" element={<Suspense fallback={<PageLoader />}><PlatformOwnerLogin /></Suspense>} />
               <Route path="/platform-owner/*" element={<Suspense fallback={<PageLoader />}><PlatformOwnerPortal /></Suspense>} />
               {import.meta.env.DEV && BillingVisualHarness && <Route path="/__test/billing" element={<Suspense fallback={<PageLoader />}><BillingVisualHarness /></Suspense>} />}
               {/* ── Legacy auth routes — all redirect to unified ERP login ── */}
