@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/api/supabaseClient';
+import { supabase } from '@/api/supabaseClient';
 import { getPlatformOwnerRecoveryRedirectUrl } from '@/lib/appUrl';
 import { platformOwnerApi } from '@/lib/platformOwnerApi';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -82,47 +82,6 @@ function currentSessionIsUsable(session) {
   );
 }
 
-async function requireLivePlatformOwnerMfaSession() {
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  const session = sessionData?.session;
-  if (sessionError || !currentSessionIsUsable(session)) throw new Error('MFA_RECOVERY_SESSION_REQUIRED');
-
-  // Verify the access token with Supabase Auth before it is forwarded to the
-  // JWT-enforced recovery function. This prevents an expired persisted browser
-  // session from silently falling back to the anonymous project credential.
-  const { data: userData, error: userError } = await supabase.auth.getUser(session.access_token);
-  if (userError || userData?.user?.id !== session.user.id) throw new Error('MFA_RECOVERY_SESSION_REQUIRED');
-
-  const snapshot = await platformOwnerApi.snapshot();
-  if (!snapshot?.authorized || !snapshot.mfa_required || snapshot.mfa_verified) {
-    throw new Error('PLATFORM_OWNER_MFA_RECOVERY_NOT_AUTHORIZED');
-  }
-
-  // Keep the Functions client synchronized with the same verified owner token
-  // that was just checked against Supabase Auth. This is transport only; the
-  // Edge Function independently verifies the received JWT and owner record.
-  supabase.functions.setAuth(session.access_token);
-  return session;
-}
-
-async function invokeAuthenticatedMfaRecovery(session, body) {
-  // Use an explicit transport for this security-sensitive request. The public
-  // anon key identifies the project, while the verified current user JWT is
-  // always the Authorization credential; the Edge Function verifies it again.
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/platform-owner-mfa-recovery-session`, {
-    method: 'POST',
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : 'MFA_RECOVERY_UNAVAILABLE');
-  return payload;
-}
-
 export default function PlatformOwnerLogin() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -135,20 +94,17 @@ export default function PlatformOwnerLogin() {
   const [loading, setLoading] = useState(false);
   const [recovery, setRecovery] = useState(() => recoveryRequested(location));
   const [recoverySessionReady, setRecoverySessionReady] = useState(() => !recoveryRequested(location));
-  const [recoveryAuthorized, setRecoveryAuthorized] = useState(false);
   const [mfaStage, setMfaStage] = useState(null);
   const [mfaCode, setMfaCode] = useState('');
   const [mfaFactor, setMfaFactor] = useState(null);
   const [enrollment, setEnrollment] = useState(null);
-  const [priorFactorIds, setPriorFactorIds] = useState([]);
-  const cleanOwnerSetupMode = useMemo(() => location.pathname === '/platform-owner/new-owner-setup', [location.pathname]);
+  const cleanOwnerSetupMode = useMemo(() => ['/platform-owner/new-owner-setup', '/platform-owner/recover'].includes(location.pathname), [location.pathname]);
   const recoveryMode = useMemo(() => recovery || recoveryRequested(location), [location, recovery]);
 
   const clearEnrollment = () => {
     setMfaCode('');
     setMfaFactor(null);
     setEnrollment(null);
-    setPriorFactorIds([]);
     setMfaStage(null);
   };
 
@@ -161,50 +117,17 @@ export default function PlatformOwnerLogin() {
     navigate('/platform-owner', { replace: true });
   };
 
-  const assertRecoveryEnrollmentAuthorized = async () => {
-    await requireLivePlatformOwnerMfaSession();
-
-    const { data, error } = await supabase.rpc('platform_owner_authorize_mfa_reenrollment');
-    if (error || !data?.authorized) throw new Error('PLATFORM_OWNER_MFA_RECOVERY_NOT_AUTHORIZED');
-    setRecoveryAuthorized(true);
-  };
-
-  const beginMfa = async ({ recoveryEnrollment = false } = {}) => {
-    if (!recoveryEnrollment) {
-      const snapshot = await platformOwnerApi.snapshot();
-      if (!snapshot?.authorized) throw new Error('PLATFORM_OWNER_REQUIRED');
-      if (!snapshot.mfa_required || snapshot.mfa_verified) {
-        await verifyPortalAccess();
-        return;
-      }
-    } else if (!recoveryAuthorized) {
-      throw new Error('PLATFORM_OWNER_MFA_RECOVERY_NOT_AUTHORIZED');
+  const beginMfa = async () => {
+    const snapshot = await platformOwnerApi.snapshot();
+    if (!snapshot?.authorized) throw new Error('PLATFORM_OWNER_REQUIRED');
+    if (!snapshot.mfa_required || snapshot.mfa_verified) {
+      await verifyPortalAccess();
+      return;
     }
 
     const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
     if (factorsError) throw factorsError;
-    const verifiedFactors = (factors?.totp || []).filter((factor) => factor.status === 'verified');
-
-    if (recoveryEnrollment) {
-      if (!verifiedFactors.length) throw new Error('PLATFORM_OWNER_MFA_RECOVERY_NO_VERIFIED_FACTOR');
-      const abandonedFactors = (factors?.totp || []).filter((factor) => factor.status === 'unverified');
-      for (const factor of abandonedFactors) {
-        const { error: discardError } = await supabase.auth.mfa.unenroll({ factorId: factor.id });
-        if (discardError) throw discardError;
-      }
-      const { data: enrolled, error: enrollError } = await supabase.auth.mfa.enroll({
-        factorType: 'totp',
-        friendlyName: 'BizCTRL Platform Owner — mybizctrl.site',
-      });
-      if (enrollError) throw enrollError;
-      setPriorFactorIds(verifiedFactors.map((factor) => factor.id));
-      setMfaFactor(enrolled);
-      setEnrollment(enrolled?.totp || null);
-      setMfaStage('enroll');
-      return;
-    }
-
-    const verifiedFactor = verifiedFactors[0];
+    const verifiedFactor = (factors?.totp || []).find((factor) => factor.status === 'verified');
     if (verifiedFactor) {
       setMfaFactor(verifiedFactor);
       setMfaStage('verify');
@@ -251,24 +174,6 @@ export default function PlatformOwnerLogin() {
     }
   };
 
-  const retirePriorFactors = async (newFactorId) => {
-    const { data: verifiedAudit, error: verifiedAuditError } = await supabase.rpc('platform_owner_record_mfa_reenrollment_verified', {
-      p_new_factor_id: newFactorId,
-    });
-    if (verifiedAuditError || !verifiedAudit?.verified) throw new Error('PLATFORM_OWNER_MFA_RECOVERY_NEW_FACTOR_UNVERIFIED');
-
-    for (const factorId of priorFactorIds) {
-      if (factorId === newFactorId) continue;
-      const { error: unenrollError } = await supabase.auth.mfa.unenroll({ factorId });
-      if (unenrollError) throw new Error('PLATFORM_OWNER_MFA_RECOVERY_RETIREMENT_INCOMPLETE');
-    }
-
-    const { data: completionAudit, error: completionAuditError } = await supabase.rpc('platform_owner_record_mfa_reenrollment_completed', {
-      p_new_factor_id: newFactorId,
-    });
-    if (completionAuditError || !completionAudit?.completed) throw new Error('PLATFORM_OWNER_MFA_RECOVERY_RETIREMENT_INCOMPLETE');
-  };
-
   const completeMfa = async (event) => {
     event.preventDefault();
     if (!mfaFactor?.id || !/^\d{6}$/.test(mfaCode.trim())) { toast.error(text.invalidMfa); return; }
@@ -283,23 +188,10 @@ export default function PlatformOwnerLogin() {
       });
       if (verifyError) throw verifyError;
 
-      if (recoveryAuthorized && mfaStage === 'enroll') {
-        await retirePriorFactors(mfaFactor.id);
-        await supabase.auth.signOut({ scope: 'local' });
-        clearEnrollment();
-        setRecoveryAuthorized(false);
-        setRecovery(false);
-        setRecoverySessionReady(false);
-        toast.dismiss();
-        navigate('/platform-owner/login', { replace: true });
-        toast.success(text.mfaRecoveryComplete);
-        return;
-      }
-
       clearEnrollment();
       await verifyPortalAccess();
-    } catch (error) {
-      toast.error(error?.message === 'PLATFORM_OWNER_MFA_RECOVERY_RETIREMENT_INCOMPLETE' ? text.mfaRetirementIncomplete : text.invalidMfa);
+    } catch {
+      toast.error(text.invalidMfa);
     } finally {
       setLoading(false);
     }
@@ -310,10 +202,9 @@ export default function PlatformOwnerLogin() {
       if (event === 'PASSWORD_RECOVERY') {
         setRecovery(true);
         setRecoverySessionReady(currentSessionIsUsable(session));
-        setRecoveryAuthorized(false);
         clearEnrollment();
         toast.dismiss();
-        window.history.replaceState(null, document.title, cleanOwnerSetupMode ? '/platform-owner/new-owner-setup' : '/platform-owner/recover');
+        window.history.replaceState(null, document.title, '/platform-owner/new-owner-setup');
       }
     });
 
@@ -363,22 +254,15 @@ export default function PlatformOwnerLogin() {
   };
 
   const forgotPassword = async () => {
-    // At this point the user has already completed the password step and is at
-    // the owner MFA challenge. The authenticated server session—not a retained
-    // form value—authorizes recovery and supplies the recipient identity.
+    if (!email.trim()) { toast.error(text.emailRequired); return; }
     setLoading(true);
     try {
-      const session = await requireLivePlatformOwnerMfaSession();
-      await invokeAuthenticatedMfaRecovery(session, {
-        action: 'request',
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: getPlatformOwnerRecoveryRedirectUrl(),
       });
-      await supabase.auth.signOut({ scope: 'local' });
-      clearEnrollment();
-      setRecoveryAuthorized(false);
-      navigate('/platform-owner/recover', { replace: true });
+      if (error) throw error;
       toast.dismiss();
-      toast.success(mfaStage === 'verify' ? text.mfaRecoverySent : text.resetSent);
+      toast.success(text.resetSent);
     } catch {
       toast.error(text.signInFailed);
     } finally {
@@ -400,37 +284,19 @@ export default function PlatformOwnerLogin() {
 
     setLoading(true);
     try {
-      if (cleanOwnerSetupMode) {
-        const { error: passwordError } = await supabase.auth.updateUser({ password });
-        if (passwordError) throw passwordError;
-        const snapshot = await platformOwnerApi.snapshot();
-        if (!snapshot?.authorized || !snapshot.mfa_required || snapshot.mfa_verified) {
-          throw new Error('CLEAN_OWNER_SETUP_NOT_AUTHORIZED');
-        }
-        setPassword('');
-        setConfirmation('');
-        toast.dismiss();
-        toast.success(text.passwordUpdated);
-        await beginMfa();
-        return;
+      const { error: passwordError } = await supabase.auth.updateUser({ password });
+      if (passwordError) throw passwordError;
+      const snapshot = await platformOwnerApi.snapshot();
+      if (!snapshot?.authorized || !snapshot.mfa_required) {
+        throw new Error('CLEAN_OWNER_SETUP_NOT_AUTHORIZED');
       }
-
-      const session = await requireLivePlatformOwnerMfaSession();
-      const recoveryResult = await invokeAuthenticatedMfaRecovery(session, {
-        action: 'complete',
-        newPassword: password,
-      });
-      if (!recoveryResult?.authorized) throw new Error('MFA_RECOVERY_SESSION_NOT_AUTHORIZED');
       setPassword('');
       setConfirmation('');
       toast.dismiss();
       toast.success(text.passwordUpdated);
-      await assertRecoveryEnrollmentAuthorized();
-      await beginMfa({ recoveryEnrollment: true });
-      toast.success(text.mfaRecoveryReady);
+      await beginMfa();
     } catch {
-      setRecoveryAuthorized(false);
-      toast.error(cleanOwnerSetupMode ? text.cleanSetupUnavailable : text.recoveryAuthorizationRequired);
+      toast.error(text.cleanSetupUnavailable);
     } finally {
       setLoading(false);
     }

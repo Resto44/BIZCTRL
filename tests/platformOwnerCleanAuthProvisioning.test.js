@@ -78,8 +78,9 @@ describe('Platform Owner clean Auth provisioning contract', () => {
     expect(app).toContain("setDecision('authorization-error')");
     expect(app).toContain('Authorization check unavailable');
     expect(app).toContain('<Route path="/" element={<RootEntryRoute />} />');
-    expect(login).toContain('if (cleanOwnerSetupMode) {');
     expect(login).toContain('supabase.auth.updateUser({ password })');
+    expect(login).toContain('await beginMfa();');
+    expect(login).not.toContain('platform_owner_authorize_mfa_reenrollment');
     expect(login).toContain('await beginMfa();');
     expect(login).toContain("factorType: 'totp'");
     expect(login).toContain("supabase.auth.mfa.verify({");
