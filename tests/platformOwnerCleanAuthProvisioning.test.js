@@ -67,6 +67,10 @@ describe('Platform Owner clean Auth provisioning contract', () => {
     expect(login).toContain("location.pathname === '/platform-owner/new-owner-setup'");
     expect(app).toContain('<Route path="/platform-owner/new-owner-setup" element={<Suspense fallback={<PageLoader />}><PlatformOwnerLogin /></Suspense>} />');
     expect(app).toContain("useNavigate } from 'react-router-dom'");
+    expect(app).toContain('function PlatformOwnerRecoveryCallbackRouter()');
+    expect(app).toContain("event === 'PASSWORD_RECOVERY'");
+    expect(app).toContain("navigate('/platform-owner/new-owner-setup', { replace: true })");
+    expect(app).toContain('<PlatformOwnerRecoveryCallbackRouter />');
     expect(app).toContain('function RootEntryRoute()');
     expect(app).toContain("supabase.rpc('platform_owner_session_snapshot')");
     expect(app).toContain("navigate(snapshot.mfa_required && !snapshot.mfa_verified ? '/platform-owner/login' : '/platform-owner', { replace: true })");

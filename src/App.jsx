@@ -379,6 +379,50 @@ function LegacyInvitationRedirect() {
   return <Navigate to={token ? `/erp-register?token=${encodeURIComponent(token)}` : '/erp-register'} replace />;
 }
 
+// ── Platform Owner recovery callback preservation ─────────────────────────────
+// Hosted Auth can return a recovery grant to the canonical root when a redirect
+// is normalized. Only the server-authorized Platform Owner session is moved to
+// the password-setup route; ordinary users remain on their own recovery flow.
+function PlatformOwnerRecoveryCallbackRouter() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const query = new URLSearchParams(location.search);
+    const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const recoveryCallbackHint = query.has('code') || query.get('type') === 'recovery' || fragment.get('type') === 'recovery';
+
+    const routeAuthorizedOwnerRecovery = async (session) => {
+      if (!session?.access_token) return;
+      try {
+        const { data: snapshot, error } = await supabase.rpc('platform_owner_session_snapshot');
+        if (!error && snapshot?.authenticated && snapshot?.authorized && !cancelled) {
+          navigate('/platform-owner/new-owner-setup', { replace: true });
+        }
+      } catch {
+        // The dedicated setup page retains its own recovery-session validation.
+        // A transient callback check must never grant or remove any access.
+      }
+    };
+
+    if (recoveryCallbackHint) {
+      void supabase.auth.getSession().then(({ data }) => routeAuthorizedOwnerRecovery(data?.session));
+    }
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') void routeAuthorizedOwnerRecovery(session);
+    });
+
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
+  }, [location.hash, location.search, navigate]);
+
+  return null;
+}
+
 // ── Root Platform Owner entry resolution ─────────────────────────────────────
 // The public landing page remains public. Only a live Supabase session that the
 // server resolves to the active Platform Owner record may enter the control plane.
@@ -509,6 +553,7 @@ function App() {
       <LanguageProvider>
         <Router>
           <AuthProvider>
+              <PlatformOwnerRecoveryCallbackRouter />
               <Routes>
               {/* ── NEW ERP Unified Auth (primary entry points) ── */}
               <Route path="/erp-login" element={<ERPLogin />} />
