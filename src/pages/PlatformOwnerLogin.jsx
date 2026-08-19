@@ -72,7 +72,30 @@ function recoveryRequested(location) {
 }
 
 function currentSessionIsUsable(session) {
-  return Boolean(session && (!session.expires_at || session.expires_at * 1000 > Date.now()));
+  return Boolean(
+    session?.access_token
+    && session?.user?.id
+    && (!session.expires_at || session.expires_at * 1000 > Date.now())
+  );
+}
+
+async function requireLivePlatformOwnerMfaSession() {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  const session = sessionData?.session;
+  if (sessionError || !currentSessionIsUsable(session)) throw new Error('MFA_RECOVERY_SESSION_REQUIRED');
+
+  // Verify the access token with Supabase Auth before it is forwarded to the
+  // JWT-enforced recovery function. This prevents an expired persisted browser
+  // session from silently falling back to the anonymous project credential.
+  const { data: userData, error: userError } = await supabase.auth.getUser(session.access_token);
+  if (userError || userData?.user?.id !== session.user.id) throw new Error('MFA_RECOVERY_SESSION_REQUIRED');
+
+  const snapshot = await platformOwnerApi.snapshot();
+  if (!snapshot?.authorized || !snapshot.mfa_required || snapshot.mfa_verified) {
+    throw new Error('PLATFORM_OWNER_MFA_RECOVERY_NOT_AUTHORIZED');
+  }
+
+  return session;
 }
 
 export default function PlatformOwnerLogin() {
@@ -113,13 +136,7 @@ export default function PlatformOwnerLogin() {
   };
 
   const assertRecoveryEnrollmentAuthorized = async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!currentSessionIsUsable(sessionData?.session)) throw new Error('MFA_RECOVERY_SESSION_REQUIRED');
-
-    const snapshot = await platformOwnerApi.snapshot();
-    if (!snapshot?.authorized || !snapshot.mfa_required || snapshot.mfa_verified) {
-      throw new Error('PLATFORM_OWNER_MFA_RECOVERY_NOT_AUTHORIZED');
-    }
+    await requireLivePlatformOwnerMfaSession();
 
     const { data, error } = await supabase.rpc('platform_owner_authorize_mfa_reenrollment');
     if (error || !data?.authorized) throw new Error('PLATFORM_OWNER_MFA_RECOVERY_NOT_AUTHORIZED');
@@ -274,15 +291,32 @@ export default function PlatformOwnerLogin() {
       }
     });
 
-    supabase.auth.getSession().then(({ data }) => {
+    const restoreSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
       const session = data?.session;
       if (recoveryRequested(location)) {
-        setRecoverySessionReady(currentSessionIsUsable(session));
-        if (!currentSessionIsUsable(session)) toast.dismiss();
-      } else if (session) {
-        verifyPortalAccess().catch(() => {});
+        setRecoverySessionReady(!error && currentSessionIsUsable(session));
+        if (error || !currentSessionIsUsable(session)) toast.dismiss();
+        return;
       }
-    });
+      if (!session) return;
+
+      try {
+        const { data: userData, error: userError } = await supabase.auth.getUser(session.access_token);
+        if (userError || userData?.user?.id !== session.user.id) throw new Error('SESSION_INVALID');
+        const snapshot = await platformOwnerApi.snapshot();
+        if (!snapshot?.authorized) throw new Error('PLATFORM_OWNER_REQUIRED');
+        if (snapshot.mfa_required && !snapshot.mfa_verified) {
+          await beginMfa();
+        } else {
+          await verifyPortalAccess();
+        }
+      } catch {
+        await supabase.auth.signOut({ scope: 'local' });
+        clearEnrollment();
+      }
+    };
+    restoreSession();
 
     return () => listener.subscription.unsubscribe();
   }, []);
@@ -306,8 +340,10 @@ export default function PlatformOwnerLogin() {
     if (!email.trim()) { toast.error(text.emailRequired); return; }
     setLoading(true);
     try {
+      const session = await requireLivePlatformOwnerMfaSession();
       const { error } = await supabase.functions.invoke('platform-owner-mfa-recovery-session', {
         body: { action: 'request', redirectTo: getPlatformOwnerRecoveryRedirectUrl() },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (error) throw error;
       await supabase.auth.signOut({ scope: 'local' });
@@ -337,8 +373,10 @@ export default function PlatformOwnerLogin() {
 
     setLoading(true);
     try {
+      const session = await requireLivePlatformOwnerMfaSession();
       const { data: recoveryResult, error: passwordError } = await supabase.functions.invoke('platform-owner-mfa-recovery-session', {
         body: { action: 'complete', newPassword: password },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (passwordError || !recoveryResult?.authorized) throw passwordError || new Error('MFA_RECOVERY_SESSION_NOT_AUTHORIZED');
       setPassword('');

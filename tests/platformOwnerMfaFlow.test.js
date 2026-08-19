@@ -18,6 +18,9 @@ describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
     ]);
 
     expect(login).toContain("supabase.functions.invoke('platform-owner-mfa-recovery-session'");
+    expect(login).toContain('requireLivePlatformOwnerMfaSession');
+    expect(login).toContain('supabase.auth.getUser(session.access_token)');
+    expect(login).toContain('headers: { Authorization: `Bearer ${session.access_token}` }');
     expect(login).toContain("action: 'request'");
     expect(login).toContain('redirectTo: getPlatformOwnerRecoveryRedirectUrl()');
     expect(authority).toContain('caller.rpc("platform_owner_prepare_mfa_recovery")');
@@ -39,6 +42,7 @@ describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
     ]);
 
     expect(login).toContain("action: 'complete', newPassword: password");
+    expect(login).toContain("throw new Error('MFA_RECOVERY_SESSION_REQUIRED')");
     expect(login).not.toContain('supabase.auth.updateUser({ password })');
     expect(authority).toContain('caller.rpc("platform_owner_begin_mfa_recovery")');
     expect(authority).toContain('service.auth.admin.updateUserById(userData.user.id, { password: newPassword })');

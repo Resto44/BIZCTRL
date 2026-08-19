@@ -1,5 +1,5 @@
 // Service Worker — network-first for JS/CSS, cache-first for images/fonts only
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE_NAME = `app-cache-${CACHE_VERSION}`;
 
 // On install: skip waiting so the new SW activates immediately
