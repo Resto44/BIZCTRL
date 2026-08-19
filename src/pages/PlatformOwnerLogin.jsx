@@ -341,7 +341,9 @@ export default function PlatformOwnerLogin() {
   };
 
   const forgotPassword = async () => {
-    if (!email.trim()) { toast.error(text.emailRequired); return; }
+    // At this point the user has already completed the password step and is at
+    // the owner MFA challenge. The authenticated server session—not a retained
+    // form value—authorizes recovery and supplies the recipient identity.
     setLoading(true);
     try {
       const session = await requireLivePlatformOwnerMfaSession();

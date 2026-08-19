@@ -25,6 +25,7 @@ describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
     expect(login).toContain('headers: { Authorization: `Bearer ${session.access_token}` }');
     expect(login).toContain("action: 'request'");
     expect(login).toContain('redirectTo: getPlatformOwnerRecoveryRedirectUrl()');
+    expect(login).not.toContain("if (!email.trim()) { toast.error(text.emailRequired); return; }");
     expect(authority).toContain('caller.auth.getUser(accessToken)');
     expect(authority).toContain('AUTHENTICATED_OWNER_SESSION_REQUIRED');
     expect(authority).toContain('caller.rpc("platform_owner_session_snapshot")');
