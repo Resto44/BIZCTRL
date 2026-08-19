@@ -56,7 +56,9 @@ describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
     expect(login).toContain("action: 'complete',");
     expect(login).toContain('newPassword: password');
     expect(login).toContain("throw new Error('MFA_RECOVERY_SESSION_REQUIRED')");
-    expect(login).not.toContain('supabase.auth.updateUser({ password })');
+    expect(login).toContain('if (cleanOwnerSetupMode) {');
+    expect(login).toContain('supabase.auth.updateUser({ password })');
+    expect(login).toContain("location.pathname === '/platform-owner/new-owner-setup'");
     expect(authority).toContain('caller.rpc("platform_owner_begin_mfa_recovery")');
     expect(authority).toContain('service.auth.admin.updateUserById(userData.user.id, { password: newPassword })');
     expect(authority).toContain('caller.rpc("platform_owner_mark_mfa_recovery_password_updated"');

@@ -15,6 +15,9 @@ const copy = {
     badge: 'Separate SaaS control plane',
     title: 'Platform Owner sign in',
     recoveryTitle: 'Platform Owner MFA Recovery',
+    cleanSetupTitle: 'Set up your new Platform Owner account',
+    cleanSetupIntro: 'Choose a new password, then enroll a new Google Authenticator factor to secure this Platform Owner account.',
+    cleanSetupUnavailable: 'Open the newest secure account-setup link sent to your email.',
     mfaTitle: 'Verify your authenticator',
     enrollTitle: 'Set up new authenticator',
     compromisedTitle: 'Replace unfinished authenticator setup',
@@ -68,7 +71,7 @@ const copy = {
 function recoveryRequested(location) {
   const query = new URLSearchParams(location.search);
   const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
-  return location.pathname === '/platform-owner/recover' || query.get('mode') === 'recovery' || fragment.get('type') === 'recovery';
+  return location.pathname === '/platform-owner/recover' || location.pathname === '/platform-owner/new-owner-setup' || query.get('mode') === 'recovery' || fragment.get('type') === 'recovery';
 }
 
 function currentSessionIsUsable(session) {
@@ -138,6 +141,7 @@ export default function PlatformOwnerLogin() {
   const [mfaFactor, setMfaFactor] = useState(null);
   const [enrollment, setEnrollment] = useState(null);
   const [priorFactorIds, setPriorFactorIds] = useState([]);
+  const cleanOwnerSetupMode = useMemo(() => location.pathname === '/platform-owner/new-owner-setup', [location.pathname]);
   const recoveryMode = useMemo(() => recovery || recoveryRequested(location), [location, recovery]);
 
   const clearEnrollment = () => {
@@ -309,7 +313,7 @@ export default function PlatformOwnerLogin() {
         setRecoveryAuthorized(false);
         clearEnrollment();
         toast.dismiss();
-        window.history.replaceState(null, document.title, '/platform-owner/recover');
+        window.history.replaceState(null, document.title, cleanOwnerSetupMode ? '/platform-owner/new-owner-setup' : '/platform-owner/recover');
       }
     });
 
@@ -396,6 +400,21 @@ export default function PlatformOwnerLogin() {
 
     setLoading(true);
     try {
+      if (cleanOwnerSetupMode) {
+        const { error: passwordError } = await supabase.auth.updateUser({ password });
+        if (passwordError) throw passwordError;
+        const snapshot = await platformOwnerApi.snapshot();
+        if (!snapshot?.authorized || !snapshot.mfa_required || snapshot.mfa_verified) {
+          throw new Error('CLEAN_OWNER_SETUP_NOT_AUTHORIZED');
+        }
+        setPassword('');
+        setConfirmation('');
+        toast.dismiss();
+        toast.success(text.passwordUpdated);
+        await beginMfa();
+        return;
+      }
+
       const session = await requireLivePlatformOwnerMfaSession();
       const recoveryResult = await invokeAuthenticatedMfaRecovery(session, {
         action: 'complete',
@@ -411,15 +430,15 @@ export default function PlatformOwnerLogin() {
       toast.success(text.mfaRecoveryReady);
     } catch {
       setRecoveryAuthorized(false);
-      toast.error(text.recoveryAuthorizationRequired);
+      toast.error(cleanOwnerSetupMode ? text.cleanSetupUnavailable : text.recoveryAuthorizationRequired);
     } finally {
       setLoading(false);
     }
   };
 
   const submit = mfaStage === 'discard' ? discardAndReEnroll : mfaStage ? completeMfa : recoveryMode ? completeRecovery : signIn;
-  const pageTitle = mfaStage === 'verify' ? text.mfaTitle : mfaStage === 'enroll' ? text.enrollTitle : mfaStage === 'discard' ? text.compromisedTitle : recoveryMode ? text.recoveryTitle : text.title;
-  const pageIntro = mfaStage === 'verify' ? text.mfaIntro : mfaStage === 'enroll' ? text.enrollIntro : mfaStage === 'discard' ? text.compromisedIntro : recoveryMode ? text.recoveryIntro : text.intro;
+  const pageTitle = mfaStage === 'verify' ? text.mfaTitle : mfaStage === 'enroll' ? text.enrollTitle : mfaStage === 'discard' ? text.compromisedTitle : cleanOwnerSetupMode ? text.cleanSetupTitle : recoveryMode ? text.recoveryTitle : text.title;
+  const pageIntro = mfaStage === 'verify' ? text.mfaIntro : mfaStage === 'enroll' ? text.enrollIntro : mfaStage === 'discard' ? text.compromisedIntro : cleanOwnerSetupMode ? text.cleanSetupIntro : recoveryMode ? text.recoveryIntro : text.intro;
 
   return <main className="min-h-screen bg-slate-950 text-slate-100 grid lg:grid-cols-[1.1fr_.9fr]" dir={lang === 'en' ? 'ltr' : 'rtl'}>
     <section className="hidden lg:flex relative overflow-hidden p-12 bg-gradient-to-br from-cyan-950 via-slate-950 to-indigo-950 flex-col justify-between">
@@ -432,7 +451,7 @@ export default function PlatformOwnerLogin() {
       <button onClick={() => navigate('/erp-login')} className="mb-10 inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white"><ArrowLeft className="size-4" />{text.back}</button>
       <div className="mb-8 lg:hidden flex items-center gap-3 font-black text-xl"><span className="grid size-10 place-items-center rounded-xl bg-cyan-400 text-slate-950"><ShieldCheck /></span> BizCTRL Platform</div>
       <div className="rounded-3xl border border-slate-700/80 bg-slate-900/70 p-6 shadow-2xl sm:p-8"><div className="mb-7"><div className="mb-4 grid size-12 place-items-center rounded-2xl bg-cyan-400/15 text-cyan-300"><LockKeyhole /></div><h2 className="text-2xl font-bold">{pageTitle}</h2><p className="mt-2 text-sm leading-6 text-slate-400">{pageIntro}</p></div>
-        <form onSubmit={submit} className="space-y-5">{mfaStage ? <>{mfaStage === 'discard' ? <Button type="submit" className="w-full bg-amber-400 font-bold text-slate-950 hover:bg-amber-300" disabled={loading}>{loading ? <><Loader2 className="me-2 size-4 animate-spin" />{text.checking}</> : text.discardMfa}</Button> : <>{mfaStage === 'enroll' && enrollment?.qr_code && <div className="space-y-3 rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-center"><img src={enrollment.qr_code} alt="Google Authenticator setup QR code" className="mx-auto size-56 rounded-lg bg-white p-2" referrerPolicy="no-referrer" /><p className="break-all text-xs text-slate-400"><span className="font-semibold text-slate-200">{text.secret}:</span> {enrollment.secret}</p></div>}<div><Label className="text-slate-200">{text.mfaCode}</Label><Input className="mt-2 border-slate-700 bg-slate-950 text-white tracking-[0.35em]" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={mfaCode} onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, ''))} required autoComplete="one-time-code" /></div><Button type="submit" className="w-full bg-cyan-400 font-bold text-slate-950 hover:bg-cyan-300" disabled={loading || (recoveryMode && !recoveryAuthorized)}>{loading ? <><Loader2 className="me-2 size-4 animate-spin" />{text.checking}</> : mfaStage === 'enroll' ? text.enrollMfa : text.verifyMfa}</Button>{mfaStage === 'verify' && <button type="button" onClick={forgotPassword} className="w-full text-center text-xs font-semibold text-cyan-300 hover:text-cyan-200">{text.recoverAuthenticator}</button>}</>}</> : <>{!recoveryMode && <div><Label className="text-slate-200">{text.email}</Label><Input className="mt-2 border-slate-700 bg-slate-950 text-white" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" /></div>}<div><div className="flex items-center justify-between"><Label className="text-slate-200">{recoveryMode ? text.newPassword : text.password}</Label>{!recoveryMode && <button type="button" onClick={forgotPassword} className="text-xs font-semibold text-cyan-300 hover:text-cyan-200" disabled={loading}>{text.forgot}</button>}</div><div className="relative mt-2"><Input className="border-slate-700 bg-slate-950 pe-11 text-white" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} required autoComplete={recoveryMode ? 'new-password' : 'current-password'} /><button type="button" aria-label={text.password} onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 end-0 px-3 text-slate-400">{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button></div></div>{recoveryMode && <div><Label className="text-slate-200">{text.confirmPassword}</Label><Input className="mt-2 border-slate-700 bg-slate-950 text-white" type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} required autoComplete="new-password" /></div>}<Button type="submit" className="w-full bg-cyan-400 font-bold text-slate-950 hover:bg-cyan-300" disabled={loading || (recoveryMode && !recoverySessionReady)}>{loading ? <><Loader2 className="me-2 size-4 animate-spin" />{text.checking}</> : recoveryMode ? text.savePassword : text.signIn}</Button></>}</form>
+        <form onSubmit={submit} className="space-y-5">{mfaStage ? <>{mfaStage === 'discard' ? <Button type="submit" className="w-full bg-amber-400 font-bold text-slate-950 hover:bg-amber-300" disabled={loading}>{loading ? <><Loader2 className="me-2 size-4 animate-spin" />{text.checking}</> : text.discardMfa}</Button> : <>{mfaStage === 'enroll' && enrollment?.qr_code && <div className="space-y-3 rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-center"><img src={enrollment.qr_code} alt="Google Authenticator setup QR code" className="mx-auto size-56 rounded-lg bg-white p-2" referrerPolicy="no-referrer" /><p className="break-all text-xs text-slate-400"><span className="font-semibold text-slate-200">{text.secret}:</span> {enrollment.secret}</p></div>}<div><Label className="text-slate-200">{text.mfaCode}</Label><Input className="mt-2 border-slate-700 bg-slate-950 text-white tracking-[0.35em]" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={mfaCode} onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, ''))} required autoComplete="one-time-code" /></div><Button type="submit" className="w-full bg-cyan-400 font-bold text-slate-950 hover:bg-cyan-300" disabled={loading || (recoveryMode && !cleanOwnerSetupMode && !recoveryAuthorized)}>{loading ? <><Loader2 className="me-2 size-4 animate-spin" />{text.checking}</> : mfaStage === 'enroll' ? text.enrollMfa : text.verifyMfa}</Button>{mfaStage === 'verify' && <button type="button" onClick={forgotPassword} className="w-full text-center text-xs font-semibold text-cyan-300 hover:text-cyan-200">{text.recoverAuthenticator}</button>}</>}</> : <>{!recoveryMode && <div><Label className="text-slate-200">{text.email}</Label><Input className="mt-2 border-slate-700 bg-slate-950 text-white" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" /></div>}<div><div className="flex items-center justify-between"><Label className="text-slate-200">{recoveryMode ? text.newPassword : text.password}</Label>{!recoveryMode && <button type="button" onClick={forgotPassword} className="text-xs font-semibold text-cyan-300 hover:text-cyan-200" disabled={loading}>{text.forgot}</button>}</div><div className="relative mt-2"><Input className="border-slate-700 bg-slate-950 pe-11 text-white" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} required autoComplete={recoveryMode ? 'new-password' : 'current-password'} /><button type="button" aria-label={text.password} onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 end-0 px-3 text-slate-400">{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button></div></div>{recoveryMode && <div><Label className="text-slate-200">{text.confirmPassword}</Label><Input className="mt-2 border-slate-700 bg-slate-950 text-white" type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} required autoComplete="new-password" /></div>}<Button type="submit" className="w-full bg-cyan-400 font-bold text-slate-950 hover:bg-cyan-300" disabled={loading || (recoveryMode && !recoverySessionReady)}>{loading ? <><Loader2 className="me-2 size-4 animate-spin" />{text.checking}</> : recoveryMode ? text.savePassword : text.signIn}</Button></>}</form>
         {!recoveryMode && !mfaStage && <p className="mt-5 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs leading-5 text-slate-400">{text.mfa}</p>}
       </div>
     </div></section>
