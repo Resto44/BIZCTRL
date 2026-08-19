@@ -34,7 +34,7 @@
         {
           "type": "header",
           "key": "host",
-          "value": "^base44-rest-ctrl\\.vercel\\.app$"
+          "value": "^(?:www\\.mybizctrl\\.site|base44-rest-ctrl(?:-[a-z0-9-]+)?\\.vercel\\.app)$"
         }
       ],
       "destination": "https://mybizctrl.site/",
@@ -46,7 +46,7 @@
         {
           "type": "header",
           "key": "host",
-          "value": "^base44-rest-ctrl\\.vercel\\.app$"
+          "value": "^(?:www\\.mybizctrl\\.site|base44-rest-ctrl(?:-[a-z0-9-]+)?\\.vercel\\.app)$"
         }
       ],
       "destination": "https://mybizctrl.site/:path*",

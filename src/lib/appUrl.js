@@ -1,4 +1,4 @@
-const PRODUCTION_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || 'https://mybizctrl.site';
+const PRODUCTION_APP_URL = 'https://mybizctrl.site';
 
 export function getApplicationBaseUrl() {
   if (import.meta.env.PROD) return PRODUCTION_APP_URL;

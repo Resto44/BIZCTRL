@@ -13,6 +13,8 @@ const hardeningPath = new URL('../src/supabase/20260815_platform_owner_hardening
 const explicitRlsPath = new URL('../src/supabase/20260815_platform_owner_explicit_rls.sql', import.meta.url);
 const revokePrivilegesPath = new URL('../src/supabase/20260815_platform_owner_revoke_direct_privileges.sql', import.meta.url);
 const billingPath = new URL('../src/pages/Billing.jsx', import.meta.url);
+const vercelConfigPath = new URL('../vercel.json', import.meta.url);
+const serviceWorkerPath = new URL('../public/sw.js', import.meta.url);
 
 describe('Platform Owner control plane', () => {
   it('keeps the Platform Owner route outside the customer ERP layout and replaces the legacy super-admin route', async () => {
@@ -27,9 +29,22 @@ describe('Platform Owner control plane', () => {
     const [login, appUrl] = await Promise.all([readFile(loginPath, 'utf8'), readFile(appUrlPath, 'utf8')]);
     expect(login).toContain('getPlatformOwnerRecoveryRedirectUrl()');
     expect(login).not.toContain('window.location.origin}/platform-owner/login?mode=recovery');
-    expect(appUrl).toContain("const PRODUCTION_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || 'https://mybizctrl.site';");
+    expect(appUrl).toContain("const PRODUCTION_APP_URL = 'https://mybizctrl.site';");
+    expect(appUrl).not.toContain('VITE_PUBLIC_APP_URL');
     expect(appUrl).toContain('if (import.meta.env.PROD) return PRODUCTION_APP_URL;');
     expect(appUrl).not.toContain('base44-rest-ctrl.vercel.app');
+  });
+
+  it('redirects obsolete aliases to the canonical Owner domain and rotates the service-worker cache', async () => {
+    const [vercelConfig, serviceWorker] = await Promise.all([
+      readFile(vercelConfigPath, 'utf8'),
+      readFile(serviceWorkerPath, 'utf8'),
+    ]);
+    expect(vercelConfig).toContain('www\\\\.mybizctrl\\\\.site');
+    expect(vercelConfig).toContain('base44-rest-ctrl(?:-[a-z0-9-]+)?\\\\.vercel\\\\.app');
+    expect(vercelConfig).toContain('https://mybizctrl.site/:path*');
+    expect(serviceWorker).toContain("const CACHE_VERSION = 'v9';");
+    expect(serviceWorker).toContain('caches.keys()');
   });
 
   it('requires a dedicated platform owner account and never derives global access from an organization owner role or client environment variable', async () => {

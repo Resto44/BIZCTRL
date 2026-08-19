@@ -39,6 +39,7 @@ describe('BizCTRL launch pricing contract', () => {
   it('does not retain the legacy Vercel URL as a hardcoded production recovery origin', async () => {
     const appUrl = await readFile(appUrlPath, 'utf8');
     expect(appUrl).not.toContain('base44-rest-ctrl.vercel.app');
-    expect(appUrl).toContain("import.meta.env.VITE_PUBLIC_APP_URL || 'https://mybizctrl.site'");
+    expect(appUrl).toContain("const PRODUCTION_APP_URL = 'https://mybizctrl.site';");
+    expect(appUrl).not.toContain('VITE_PUBLIC_APP_URL');
   });
 });
