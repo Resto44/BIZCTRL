@@ -9,6 +9,7 @@ const sessionAuthorityFunctionPath = new URL('../supabase/functions/platform-own
 const retiredPasswordFunctionPath = new URL('../supabase/functions/platform-owner-mfa-recovery-password/index.ts', import.meta.url);
 const retiredFinalizerPath = new URL('../supabase/functions/platform-owner-mfa-recovery-finalize/index.ts', import.meta.url);
 const recoveryRpcGrantsMigrationPath = new URL('../src/supabase/20260819_platform_owner_mfa_recovery_rpc_grants.sql', import.meta.url);
+const recoveryTransitionBindingPath = new URL('../src/supabase/20260819_platform_owner_mfa_recovery_transition_binding.sql', import.meta.url);
 
 describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
   it('creates recovery email authorization only from the authenticated owner MFA screen and binds it server-side', async () => {
@@ -64,6 +65,27 @@ describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
     expect(sessionMigration).toContain('session_id = v_session_id');
     expect(sessionMigration).toContain('PLATFORM_OWNER_MFA_RECOVERY_NOT_AUTHORIZED');
     expect(sessionMigration).toContain('PLATFORM_OWNER_MFA_RECOVERY_AAL1_REQUIRED');
+  });
+
+  it('rejects anonymous, wrong-user, expired, reused, and normal AAL1 sessions while allowing only the server-bound verified recovery session to advance', async () => {
+    const transition = await readFile(recoveryTransitionBindingPath, 'utf8');
+
+    // A verified recovery record must be tied to the server-authenticated owner,
+    // exact recovery session, intended purpose, and a still-live single-use state.
+    expect(transition).toContain('NOT public.platform_owner_is_authorized()');
+    expect(transition).toContain("coalesce(auth.jwt() ->> 'aal', 'aal1') <> 'aal1'");
+    expect(transition).toContain('user_id = auth.uid()');
+    expect(transition).toContain('session_id = v_session_id');
+    expect(transition).toContain("status = 'authorized'");
+    expect(transition).toContain('email_requested_at IS NOT NULL');
+    expect(transition).toContain('authorized_at IS NOT NULL');
+    expect(transition).toContain('authorized_at >= email_requested_at');
+    expect(transition).toContain('expires_at > now()');
+    expect(transition).toContain("MESSAGE = 'PLATFORM_OWNER_MFA_RECOVERY_NOT_AUTHORIZED'");
+    expect(transition).toContain("SET status = 'password_updated'");
+    expect(transition).toContain('password_updated_at = now()');
+    expect(transition).toContain('REVOKE ALL ON FUNCTION public.platform_owner_mark_mfa_recovery_password_updated(uuid) FROM anon;');
+    expect(transition).not.toContain("OR NOT public.platform_owner_mfa_recovery_amr_present('recovery')");
   });
 
   it('generates a real Supabase Auth TOTP enrollment only after server authorization and verifies the six-digit code through Supabase Auth', async () => {
