@@ -20,9 +20,14 @@ describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
     expect(login).toContain("supabase.functions.invoke('platform-owner-mfa-recovery-session'");
     expect(login).toContain('requireLivePlatformOwnerMfaSession');
     expect(login).toContain('supabase.auth.getUser(session.access_token)');
+    expect(login).toContain('supabase.functions.setAuth(session.access_token)');
     expect(login).toContain('headers: { Authorization: `Bearer ${session.access_token}` }');
     expect(login).toContain("action: 'request'");
     expect(login).toContain('redirectTo: getPlatformOwnerRecoveryRedirectUrl()');
+    expect(authority).toContain('caller.auth.getUser(accessToken)');
+    expect(authority).toContain('AUTHENTICATED_OWNER_SESSION_REQUIRED');
+    expect(authority).toContain('caller.rpc("platform_owner_session_snapshot")');
+    expect(authority).toContain('PLATFORM_OWNER_MFA_RECOVERY_NOT_AUTHORIZED');
     expect(authority).toContain('caller.rpc("platform_owner_prepare_mfa_recovery")');
     expect(authority).toContain('caller.auth.resetPasswordForEmail');
     expect(authority).toContain('redirectTo !== `${APP_ORIGIN}/platform-owner/recover`');

@@ -38,12 +38,20 @@ Deno.serve(async (req: Request) => {
   try {
     const body = await req.json().catch(() => null) as { action?: unknown; newPassword?: unknown; redirectTo?: unknown } | null;
     const action = typeof body?.action === "string" ? body.action : "";
+    // The anon key identifies the public project API only. It is never used as
+    // caller authentication: this exact received bearer token is verified by
+    // Supabase Auth, and all subsequent RPCs execute under that verified JWT.
     const caller = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authorization } },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
       auth: { autoRefreshToken: false, persistSession: false },
     });
-    const { data: userData, error: userError } = await caller.auth.getUser();
-    if (userError || !userData.user) return response("UNAUTHENTICATED", 401, headers);
+    const { data: userData, error: userError } = await caller.auth.getUser(accessToken);
+    if (userError || !userData.user) return response("AUTHENTICATED_OWNER_SESSION_REQUIRED", 401, headers);
+
+    const { data: ownerSession, error: ownerSessionError } = await caller.rpc("platform_owner_session_snapshot");
+    if (ownerSessionError || !ownerSession?.authenticated || !ownerSession?.authorized || !ownerSession?.mfa_required || ownerSession?.mfa_verified) {
+      return response("PLATFORM_OWNER_MFA_RECOVERY_NOT_AUTHORIZED", 403, headers);
+    }
 
     if (action === "request") {
       const redirectTo = typeof body?.redirectTo === "string" ? body.redirectTo : "";

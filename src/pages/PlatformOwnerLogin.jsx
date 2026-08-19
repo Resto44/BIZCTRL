@@ -95,6 +95,10 @@ async function requireLivePlatformOwnerMfaSession() {
     throw new Error('PLATFORM_OWNER_MFA_RECOVERY_NOT_AUTHORIZED');
   }
 
+  // Keep the Functions client synchronized with the same verified owner token
+  // that was just checked against Supabase Auth. This is transport only; the
+  // Edge Function independently verifies the received JWT and owner record.
+  supabase.functions.setAuth(session.access_token);
   return session;
 }
 
