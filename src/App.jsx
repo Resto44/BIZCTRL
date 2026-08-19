@@ -15,6 +15,7 @@ import { BusinessModeProvider } from '@/lib/BusinessModeContext';
 import { NotificationProvider } from '@/lib/NotificationContext';
 import { useRole, ROLES, ROLE_HOME, NON_OWNER_ROLES } from '@/lib/RoleContext';
 import { Toaster } from 'sonner';
+import { supabase } from '@/api/supabaseClient';
 
 // ── Core layout (always loaded eagerly) ──────────────────────────────────────
 import AppLayout from '@/components/layout/AppLayout';
@@ -378,6 +379,54 @@ function LegacyInvitationRedirect() {
   return <Navigate to={token ? `/erp-register?token=${encodeURIComponent(token)}` : '/erp-register'} replace />;
 }
 
+// ── Root Platform Owner entry resolution ─────────────────────────────────────
+// The public landing page remains public. Only a live Supabase session that the
+// server resolves to the active Platform Owner record may enter the control plane.
+function RootEntryRoute() {
+  const navigate = useNavigate();
+  const [decision, setDecision] = React.useState('checking');
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const resolve = async () => {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const session = sessionData?.session;
+      if (sessionError || !session?.access_token || !session?.user?.id) {
+        if (!cancelled) setDecision('public');
+        return;
+      }
+
+      // Verify the persisted access token with Auth before relying on it for the
+      // server-side owner snapshot. A stale browser session cannot select a route.
+      const { data: userData, error: userError } = await supabase.auth.getUser(session.access_token);
+      if (userError || userData?.user?.id !== session.user.id) {
+        await supabase.auth.signOut({ scope: 'local' });
+        if (!cancelled) setDecision('public');
+        return;
+      }
+
+      const { data: snapshot, error: snapshotError } = await supabase.rpc('platform_owner_session_snapshot');
+      if (snapshotError || !snapshot?.authenticated || !snapshot?.authorized) {
+        if (!cancelled) setDecision('public');
+        return;
+      }
+
+      if (snapshot.mfa_required && !snapshot.mfa_verified) {
+        navigate('/platform-owner/login', { replace: true });
+        return;
+      }
+
+      navigate('/platform-owner', { replace: true });
+    };
+
+    resolve();
+    return () => { cancelled = true; };
+  }, [navigate]);
+
+  return decision === 'checking' ? <PageLoader /> : <LandingPage />;
+}
+
 // ── Authenticated app shell ───────────────────────────────────────────────────
 const AuthenticatedApp = () => {
   const { isLoadingAuth, authError, user, navigateToLogin } = useAuth();
@@ -466,7 +515,7 @@ function App() {
               <Route path="/auth/employee-login" element={<Navigate to="/erp-login?role=employee" replace />} />
               <Route path="/supplier-registration" element={<LegacyInvitationRedirect />} />
               {/* ── Public marketing and policy pages ── */}
-              <Route path="/" element={<LandingPage />} />
+              <Route path="/" element={<RootEntryRoute />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />

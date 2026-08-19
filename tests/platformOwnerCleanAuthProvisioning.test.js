@@ -66,6 +66,10 @@ describe('Platform Owner clean Auth provisioning contract', () => {
 
     expect(login).toContain("location.pathname === '/platform-owner/new-owner-setup'");
     expect(app).toContain('<Route path="/platform-owner/new-owner-setup" element={<Suspense fallback={<PageLoader />}><PlatformOwnerLogin /></Suspense>} />');
+    expect(app).toContain('function RootEntryRoute()');
+    expect(app).toContain("supabase.rpc('platform_owner_session_snapshot')");
+    expect(app).toContain("navigate('/platform-owner', { replace: true })");
+    expect(app).toContain('<Route path="/" element={<RootEntryRoute />} />');
     expect(login).toContain('if (cleanOwnerSetupMode) {');
     expect(login).toContain('supabase.auth.updateUser({ password })');
     expect(login).toContain('await beginMfa();');
