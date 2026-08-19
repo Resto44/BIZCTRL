@@ -385,46 +385,60 @@ function LegacyInvitationRedirect() {
 function RootEntryRoute() {
   const navigate = useNavigate();
   const [decision, setDecision] = React.useState('checking');
+  const [attempt, setAttempt] = React.useState(0);
 
   React.useEffect(() => {
     let cancelled = false;
 
     const resolve = async () => {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      const session = sessionData?.session;
-      if (sessionError || !session?.access_token || !session?.user?.id) {
-        if (!cancelled) setDecision('public');
-        return;
-      }
+      setDecision('checking');
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const session = sessionData?.session;
+        if (!session?.access_token || !session?.user?.id) {
+          if (!cancelled) setDecision('public');
+          return;
+        }
 
-      // Verify the persisted access token with Auth before relying on it for the
-      // server-side owner snapshot. A stale browser session cannot select a route.
-      const { data: userData, error: userError } = await supabase.auth.getUser(session.access_token);
-      if (userError || userData?.user?.id !== session.user.id) {
-        await supabase.auth.signOut({ scope: 'local' });
-        if (!cancelled) setDecision('public');
-        return;
-      }
+        // A persisted browser session never selects a destination by itself. Auth
+        // verifies the token first, then the server resolves the owner record.
+        const { data: userData, error: userError } = await supabase.auth.getUser(session.access_token);
+        if (userError) throw userError;
+        if (userData?.user?.id !== session.user.id) {
+          await supabase.auth.signOut({ scope: 'local' });
+          if (!cancelled) setDecision('public');
+          return;
+        }
 
-      const { data: snapshot, error: snapshotError } = await supabase.rpc('platform_owner_session_snapshot');
-      if (snapshotError || !snapshot?.authenticated || !snapshot?.authorized) {
-        if (!cancelled) setDecision('public');
-        return;
-      }
+        const { data: snapshot, error: snapshotError } = await supabase.rpc('platform_owner_session_snapshot');
+        if (snapshotError || !snapshot?.authenticated) {
+          throw snapshotError || new Error('PLATFORM_OWNER_AUTHORIZATION_UNAVAILABLE');
+        }
 
-      if (snapshot.mfa_required && !snapshot.mfa_verified) {
-        navigate('/platform-owner/login', { replace: true });
-        return;
-      }
+        if (snapshot.authorized) {
+          navigate(snapshot.mfa_required && !snapshot.mfa_verified ? '/platform-owner/login' : '/platform-owner', { replace: true });
+          return;
+        }
 
-      navigate('/platform-owner', { replace: true });
+        // A live non-owner session is never sent to public marketing. Existing
+        // ERP login resolves its normal profile and canonical tenant dashboard.
+        navigate('/erp-login', { replace: true });
+      } catch {
+        // Do not silently downgrade a live but unresolved session to public.
+        // The user may retry the authoritative authorization lookup in place.
+        if (!cancelled) setDecision('authorization-error');
+      }
     };
 
     resolve();
     return () => { cancelled = true; };
-  }, [navigate]);
+  }, [attempt, navigate]);
 
-  return decision === 'checking' ? <PageLoader /> : <LandingPage />;
+  if (decision === 'checking') return <PageLoader />;
+  if (decision === 'authorization-error') {
+    return <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-100"><section className="max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 text-center"><h1 className="text-xl font-bold">Authorization check unavailable</h1><p className="mt-3 text-sm leading-6 text-slate-300">Your active session could not be validated for routing. No access has been granted or removed. Retry the server authorization check.</p><button type="button" className="mt-5 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950" onClick={() => setAttempt((value) => value + 1)}>Retry authorization check</button></section></main>;
+  }
+  return <LandingPage />;
 }
 
 // ── Authenticated app shell ───────────────────────────────────────────────────

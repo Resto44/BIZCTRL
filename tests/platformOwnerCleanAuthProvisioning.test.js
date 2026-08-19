@@ -69,7 +69,10 @@ describe('Platform Owner clean Auth provisioning contract', () => {
     expect(app).toContain("useNavigate } from 'react-router-dom'");
     expect(app).toContain('function RootEntryRoute()');
     expect(app).toContain("supabase.rpc('platform_owner_session_snapshot')");
-    expect(app).toContain("navigate('/platform-owner', { replace: true })");
+    expect(app).toContain("navigate(snapshot.mfa_required && !snapshot.mfa_verified ? '/platform-owner/login' : '/platform-owner', { replace: true })");
+    expect(app).toContain("navigate('/erp-login', { replace: true })");
+    expect(app).toContain("setDecision('authorization-error')");
+    expect(app).toContain('Authorization check unavailable');
     expect(app).toContain('<Route path="/" element={<RootEntryRoute />} />');
     expect(login).toContain('if (cleanOwnerSetupMode) {');
     expect(login).toContain('supabase.auth.updateUser({ password })');
