@@ -19,11 +19,15 @@ describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
       readFile(sessionAuthorityFunctionPath, 'utf8'),
     ]);
 
-    expect(login).toContain("supabase.functions.invoke('platform-owner-mfa-recovery-session'");
+    expect(login).toContain('invokeAuthenticatedMfaRecovery');
+    expect(login).toContain('`${SUPABASE_URL}/functions/v1/platform-owner-mfa-recovery-session`');
+    expect(login).toContain('apikey: SUPABASE_ANON_KEY');
+    expect(login).toContain('Authorization: `Bearer ${session.access_token}`');
+    expect(login).not.toContain("supabase.functions.invoke('platform-owner-mfa-recovery-session'");
     expect(login).toContain('requireLivePlatformOwnerMfaSession');
     expect(login).toContain('supabase.auth.getUser(session.access_token)');
     expect(login).toContain('supabase.functions.setAuth(session.access_token)');
-    expect(login).toContain('headers: { Authorization: `Bearer ${session.access_token}` }');
+    expect(login).toContain('Authorization: `Bearer ${session.access_token}`');
     expect(login).toContain("action: 'request'");
     expect(login).toContain('redirectTo: getPlatformOwnerRecoveryRedirectUrl()');
     expect(login).not.toContain("if (!email.trim()) { toast.error(text.emailRequired); return; }");
@@ -49,7 +53,8 @@ describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
       readFile(sessionAuthorityFunctionPath, 'utf8'),
     ]);
 
-    expect(login).toContain("action: 'complete', newPassword: password");
+    expect(login).toContain("action: 'complete',");
+    expect(login).toContain('newPassword: password');
     expect(login).toContain("throw new Error('MFA_RECOVERY_SESSION_REQUIRED')");
     expect(login).not.toContain('supabase.auth.updateUser({ password })');
     expect(authority).toContain('caller.rpc("platform_owner_begin_mfa_recovery")');
@@ -144,9 +149,12 @@ describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
     expect(controlPlane).toContain("MESSAGE = 'PLATFORM_OWNER_MFA_REQUIRED'");
     expect(login).not.toContain("supabase.functions.invoke('platform-owner-mfa-recovery-password'");
     expect(login).not.toContain("supabase.functions.invoke('platform-owner-mfa-recovery-finalize'");
-    expect(authority).not.toMatch(/console\.(log|warn|error).*?(password|token|secret|authorization)/i);
+    expect(authority).toContain("platform_owner_mfa_recovery_auth_rejected");
+    expect(authority).toContain("platform_owner_mfa_recovery_mail_rejected");
+    expect(authority).toContain("platform_owner_mfa_recovery_mail_accepted_by_auth");
+    expect(authority).not.toMatch(/console\.(log|warn|error|info).*?(accessToken|userData\.user\.email|password|secret|recoveryId|authorization)/i);
+    expect(authority).not.toMatch(/console\.(log|warn|error|info).*?\.message/i);
     expect(authority).toContain('SUPABASE_SERVICE_ROLE_KEY');
-    expect(authority).not.toContain('console.');
     expect(rpcGrants).toContain('REVOKE ALL ON FUNCTION public.platform_owner_prepare_mfa_recovery() FROM anon;');
     expect(rpcGrants).toContain('REVOKE ALL ON FUNCTION public.platform_owner_begin_mfa_recovery() FROM anon;');
     expect(rpcGrants).toContain('GRANT EXECUTE ON FUNCTION public.platform_owner_prepare_mfa_recovery() TO authenticated;');

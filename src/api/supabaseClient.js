@@ -76,7 +76,7 @@ try {
   console.error('[supabaseClient] Supabase init failed:', e.message);
 }
 
-export { supabase };
+export { supabase, SUPABASE_URL, SUPABASE_ANON_KEY };
 
 // ── Base44 SDK — safe init (for functions/integrations) ────────────────────
 let _b44 = null;

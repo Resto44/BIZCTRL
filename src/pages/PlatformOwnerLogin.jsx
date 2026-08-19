@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { supabase } from '@/api/supabaseClient';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/api/supabaseClient';
 import { getPlatformOwnerRecoveryRedirectUrl } from '@/lib/appUrl';
 import { platformOwnerApi } from '@/lib/platformOwnerApi';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -100,6 +100,24 @@ async function requireLivePlatformOwnerMfaSession() {
   // Edge Function independently verifies the received JWT and owner record.
   supabase.functions.setAuth(session.access_token);
   return session;
+}
+
+async function invokeAuthenticatedMfaRecovery(session, body) {
+  // Use an explicit transport for this security-sensitive request. The public
+  // anon key identifies the project, while the verified current user JWT is
+  // always the Authorization credential; the Edge Function verifies it again.
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/platform-owner-mfa-recovery-session`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : 'MFA_RECOVERY_UNAVAILABLE');
+  return payload;
 }
 
 export default function PlatformOwnerLogin() {
@@ -347,11 +365,10 @@ export default function PlatformOwnerLogin() {
     setLoading(true);
     try {
       const session = await requireLivePlatformOwnerMfaSession();
-      const { error } = await supabase.functions.invoke('platform-owner-mfa-recovery-session', {
-        body: { action: 'request', redirectTo: getPlatformOwnerRecoveryRedirectUrl() },
-        headers: { Authorization: `Bearer ${session.access_token}` },
+      await invokeAuthenticatedMfaRecovery(session, {
+        action: 'request',
+        redirectTo: getPlatformOwnerRecoveryRedirectUrl(),
       });
-      if (error) throw error;
       await supabase.auth.signOut({ scope: 'local' });
       clearEnrollment();
       setRecoveryAuthorized(false);
@@ -380,11 +397,11 @@ export default function PlatformOwnerLogin() {
     setLoading(true);
     try {
       const session = await requireLivePlatformOwnerMfaSession();
-      const { data: recoveryResult, error: passwordError } = await supabase.functions.invoke('platform-owner-mfa-recovery-session', {
-        body: { action: 'complete', newPassword: password },
-        headers: { Authorization: `Bearer ${session.access_token}` },
+      const recoveryResult = await invokeAuthenticatedMfaRecovery(session, {
+        action: 'complete',
+        newPassword: password,
       });
-      if (passwordError || !recoveryResult?.authorized) throw passwordError || new Error('MFA_RECOVERY_SESSION_NOT_AUTHORIZED');
+      if (!recoveryResult?.authorized) throw new Error('MFA_RECOVERY_SESSION_NOT_AUTHORIZED');
       setPassword('');
       setConfirmation('');
       toast.dismiss();

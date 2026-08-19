@@ -46,7 +46,10 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
     const { data: userData, error: userError } = await caller.auth.getUser(accessToken);
-    if (userError || !userData.user) return response("AUTHENTICATED_OWNER_SESSION_REQUIRED", 401, headers);
+    if (userError || !userData.user) {
+      console.warn(JSON.stringify({ event: 'platform_owner_mfa_recovery_auth_rejected', reason: userError?.code ?? userError?.name ?? 'unknown' }));
+      return response("AUTHENTICATED_OWNER_SESSION_REQUIRED", 401, headers);
+    }
 
     const { data: ownerSession, error: ownerSessionError } = await caller.rpc("platform_owner_session_snapshot");
     if (ownerSessionError || !ownerSession?.authenticated || !ownerSession?.authorized || !ownerSession?.mfa_required || ownerSession?.mfa_verified) {
@@ -61,11 +64,19 @@ Deno.serve(async (req: Request) => {
 
       // This records the recent, AAL1 password-authenticated owner session and
       // captures the still-active verified factor IDs for the later safe swap.
-      const { error: prepareError } = await caller.rpc("platform_owner_prepare_mfa_recovery");
-      if (prepareError) return response("MFA_RECOVERY_REQUEST_NOT_AUTHORIZED", 403, headers);
-
+            const { error: prepareError } = await caller.rpc("platform_owner_prepare_mfa_recovery");
+      if (prepareError) {
+        console.warn(JSON.stringify({ event: 'platform_owner_mfa_recovery_prepare_rejected', reason: prepareError.code ?? prepareError.name ?? 'unknown' }));
+        return response("MFA_RECOVERY_REQUEST_NOT_AUTHORIZED", 403, headers);
+      }
+      // The recipient is sourced only from the server-verified Auth user above;
+      // neither the email nor the recovery link is logged or accepted from input.
       const { error: emailError } = await caller.auth.resetPasswordForEmail(userData.user.email ?? "", { redirectTo });
-      if (emailError) return response("MFA_RECOVERY_EMAIL_UNAVAILABLE", 503, headers);
+      if (emailError) {
+        console.warn(JSON.stringify({ event: 'platform_owner_mfa_recovery_mail_rejected', reason: emailError.code ?? emailError.name ?? 'unknown' }));
+        return response("MFA_RECOVERY_EMAIL_UNAVAILABLE", 503, headers);
+      }
+      console.info(JSON.stringify({ event: 'platform_owner_mfa_recovery_mail_accepted_by_auth' }));
       return new Response(JSON.stringify({ requested: true }), { status: 200, headers });
     }
 
