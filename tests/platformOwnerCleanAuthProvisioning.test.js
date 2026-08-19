@@ -7,6 +7,7 @@ const triggerTicketGuardPath = new URL('../src/supabase/20260819_platform_owner_
 const provisionerPath = new URL('../supabase/functions/platform-owner-clean-auth-provision/index.ts', import.meta.url);
 const loginPath = new URL('../src/pages/PlatformOwnerLogin.jsx', import.meta.url);
 const appPath = new URL('../src/App.jsx', import.meta.url);
+const passwordChangePath = new URL('../src/pages/PlatformOwnerPasswordChange.jsx', import.meta.url);
 
 describe('Platform Owner clean Auth provisioning contract', () => {
   it('records a non-secret rollback point and changes only the Platform Owner Auth binding', async () => {
@@ -86,5 +87,21 @@ describe('Platform Owner clean Auth provisioning contract', () => {
     expect(login).toContain("supabase.auth.mfa.verify({");
     expect(login).toContain('cleanOwnerSetupMode ? text.cleanSetupTitle');
     expect(login).not.toContain('cleanOwnerSetupMode ? await assertRecoveryEnrollmentAuthorized');
+  });
+
+  it('restricts in-product password change to an active AAL2 Platform Owner session without touching MFA factors', async () => {
+    const [app, passwordChange] = await Promise.all([
+      readFile(appPath, 'utf8'),
+      readFile(passwordChangePath, 'utf8'),
+    ]);
+
+    expect(app).toContain('<Route path="/platform-owner/change-password"');
+    expect(passwordChange).toContain('supabase.auth.getUser(session.access_token)');
+    expect(passwordChange).toContain('const snapshot = await platformOwnerApi.snapshot()');
+    expect(passwordChange).toContain('!snapshot?.authorized || !snapshot.mfa_required || !snapshot.mfa_verified');
+    expect(passwordChange).toContain('supabase.auth.updateUser({ password })');
+    expect(passwordChange).toContain("navigate('/platform-owner', { replace: true })");
+    expect(passwordChange).not.toContain('supabase.auth.mfa.unenroll');
+    expect(passwordChange).not.toContain('supabase.auth.mfa.enroll');
   });
 });

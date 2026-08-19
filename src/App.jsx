@@ -97,6 +97,7 @@ const Billing             = lazy(() => import('@/pages/Billing'));
 const Support             = lazy(() => import('@/pages/Support'));
 const PlatformOwnerPortal = lazy(() => import('@/pages/PlatformOwnerPortal'));
 const PlatformOwnerLogin  = lazy(() => import('@/pages/PlatformOwnerLogin'));
+const PlatformOwnerPasswordChange = lazy(() => import('@/pages/PlatformOwnerPasswordChange'));
 
 const Tasks               = lazy(() => import('@/pages/Tasks'));
 const NotificationCenter  = lazy(() => import('@/pages/NotificationCenter'));
@@ -561,6 +562,7 @@ function App() {
               <Route path="/platform-owner/login" element={<Suspense fallback={<PageLoader />}><PlatformOwnerLogin /></Suspense>} />
               <Route path="/platform-owner/recover" element={<Suspense fallback={<PageLoader />}><PlatformOwnerLogin /></Suspense>} />
               <Route path="/platform-owner/new-owner-setup" element={<Suspense fallback={<PageLoader />}><PlatformOwnerLogin /></Suspense>} />
+              <Route path="/platform-owner/change-password" element={<Suspense fallback={<PageLoader />}><PlatformOwnerPasswordChange /></Suspense>} />
               <Route path="/platform-owner/*" element={<Suspense fallback={<PageLoader />}><PlatformOwnerPortal /></Suspense>} />
               {import.meta.env.DEV && BillingVisualHarness && <Route path="/__test/billing" element={<Suspense fallback={<PageLoader />}><BillingVisualHarness /></Suspense>} />}
               {/* ── Legacy auth routes — all redirect to unified ERP login ── */}
