@@ -6,6 +6,7 @@ const triggerGuardPath = new URL('../src/supabase/20260819_platform_owner_clean_
 const triggerTicketGuardPath = new URL('../src/supabase/20260819_platform_owner_clean_auth_trigger_ticket_guard.sql', import.meta.url);
 const provisionerPath = new URL('../supabase/functions/platform-owner-clean-auth-provision/index.ts', import.meta.url);
 const loginPath = new URL('../src/pages/PlatformOwnerLogin.jsx', import.meta.url);
+const appPath = new URL('../src/App.jsx', import.meta.url);
 
 describe('Platform Owner clean Auth provisioning contract', () => {
   it('records a non-secret rollback point and changes only the Platform Owner Auth binding', async () => {
@@ -58,9 +59,13 @@ describe('Platform Owner clean Auth provisioning contract', () => {
   });
 
   it('uses normal authenticated password setup and TOTP enrollment on the isolated new-owner route instead of recovery-session MFA authorization', async () => {
-    const login = await readFile(loginPath, 'utf8');
+    const [login, app] = await Promise.all([
+      readFile(loginPath, 'utf8'),
+      readFile(appPath, 'utf8'),
+    ]);
 
     expect(login).toContain("location.pathname === '/platform-owner/new-owner-setup'");
+    expect(app).toContain('<Route path="/platform-owner/new-owner-setup" element={<Suspense fallback={<PageLoader />}><PlatformOwnerLogin /></Suspense>} />');
     expect(login).toContain('if (cleanOwnerSetupMode) {');
     expect(login).toContain('supabase.auth.updateUser({ password })');
     expect(login).toContain('await beginMfa();');
