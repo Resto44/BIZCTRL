@@ -8,6 +8,7 @@ const recoveryBindingMigrationPath = new URL('../src/supabase/20260818_platform_
 const sessionAuthorityFunctionPath = new URL('../supabase/functions/platform-owner-mfa-recovery-session/index.ts', import.meta.url);
 const retiredPasswordFunctionPath = new URL('../supabase/functions/platform-owner-mfa-recovery-password/index.ts', import.meta.url);
 const retiredFinalizerPath = new URL('../supabase/functions/platform-owner-mfa-recovery-finalize/index.ts', import.meta.url);
+const recoveryRpcGrantsMigrationPath = new URL('../src/supabase/20260819_platform_owner_mfa_recovery_rpc_grants.sql', import.meta.url);
 
 describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
   it('creates recovery email authorization only from the authenticated owner MFA screen and binds it server-side', async () => {
@@ -107,12 +108,13 @@ describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
   });
 
   it('keeps Platform Owner authorization and global MFA enforcement intact and isolates all active recovery operations from the retired endpoints', async () => {
-    const [controlPlane, login, authority, passwordFunction, finalizer] = await Promise.all([
+    const [controlPlane, login, authority, passwordFunction, finalizer, rpcGrants] = await Promise.all([
       readFile(controlPlanePath, 'utf8'),
       readFile(loginPath, 'utf8'),
       readFile(sessionAuthorityFunctionPath, 'utf8'),
       readFile(retiredPasswordFunctionPath, 'utf8'),
       readFile(retiredFinalizerPath, 'utf8'),
+      readFile(recoveryRpcGrantsMigrationPath, 'utf8'),
     ]);
 
     expect(controlPlane).toContain("IF v_mfa_required AND v_aal <> 'aal2' THEN");
@@ -122,6 +124,10 @@ describe('Platform Owner recovery-session MFA re-enrollment contract', () => {
     expect(authority).not.toMatch(/console\.(log|warn|error).*?(password|token|secret|authorization)/i);
     expect(authority).toContain('SUPABASE_SERVICE_ROLE_KEY');
     expect(authority).not.toContain('console.');
+    expect(rpcGrants).toContain('REVOKE ALL ON FUNCTION public.platform_owner_prepare_mfa_recovery() FROM anon;');
+    expect(rpcGrants).toContain('REVOKE ALL ON FUNCTION public.platform_owner_begin_mfa_recovery() FROM anon;');
+    expect(rpcGrants).toContain('GRANT EXECUTE ON FUNCTION public.platform_owner_prepare_mfa_recovery() TO authenticated;');
+    expect(rpcGrants).toContain('GRANT EXECUTE ON FUNCTION public.platform_owner_begin_mfa_recovery() TO authenticated;');
     expect(passwordFunction).toContain('MFA_RECOVERY_FLOW_RETIRED');
     expect(finalizer).toContain('MFA_RECOVERY_FLOW_RETIRED');
     expect(passwordFunction).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
