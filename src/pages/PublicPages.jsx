@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
-import { beginPaddleSandboxCheckout } from '@/lib/paddleBilling';
+import { beginPaddleCheckout } from '@/lib/paddleBilling';
 import { Button } from '@/components/ui/button';
 import PublicPricingCards from '@/components/marketing/PublicPricingCards';
 import { ContentSection, PublicHero, PublicLayout, usePublicPageMetadata } from '@/components/marketing/PublicLayout';
@@ -69,10 +69,10 @@ export function PricingPage() {
     setCheckoutPlanId(planId);
     setCheckoutNotice('');
     try {
-      await beginPaddleSandboxCheckout(planId);
-      setCheckoutNotice('Paddle Sandbox checkout has opened. BizCTRL access will update only after a verified Paddle webhook synchronizes your subscription.');
+      await beginPaddleCheckout(planId);
+      setCheckoutNotice('Paddle checkout has opened. BizCTRL access will update only after a verified Paddle webhook synchronizes your subscription.');
     } catch (error) {
-      setCheckoutNotice(error?.message || 'Paddle Sandbox checkout is not available yet.');
+      setCheckoutNotice(error?.message || 'Paddle checkout is not available yet.');
     } finally {
       setCheckoutPlanId('');
     }

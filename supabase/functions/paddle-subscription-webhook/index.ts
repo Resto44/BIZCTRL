@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const PADDLE_ENVIRONMENT = Deno.env.get("PADDLE_ENVIRONMENT") ?? "sandbox";
+const PADDLE_ENVIRONMENT = Deno.env.get("PADDLE_ENVIRONMENT") ?? "production";
 const MAX_WEBHOOK_AGE_SECONDS = 300;
 const encoder = new TextEncoder();
 
@@ -38,7 +38,7 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
 
   try {
-    if (PADDLE_ENVIRONMENT !== "sandbox") return json(503, { error: "PADDLE_SANDBOX_ONLY" });
+    if (PADDLE_ENVIRONMENT !== "production") return json(503, { error: "PADDLE_LIVE_ONLY" });
 
     const webhookSecret = Deno.env.get("PADDLE_WEBHOOK_SECRET")?.trim();
     const supabaseUrl = Deno.env.get("SUPABASE_URL");

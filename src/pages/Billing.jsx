@@ -24,7 +24,7 @@ const COPY = {
     ibanTitle: 'Manual IBAN payment', ibanInstructions: 'Transfer the exact amount using the information below, then upload a PDF or image proof for Platform Owner review.', paymentReference: 'Bank transfer reference', uploadProof: 'Upload payment proof', submitProof: 'Submit proof for review', proofAccepted: 'Your proof has been submitted. The subscription will activate only after Platform Owner approval.', ownerOnly: 'Billing actions are available to the organization owner.',
     priceMonth: '/ month', original: 'Original', final: 'Final', noRecords: 'No records yet.',
     paymentSelected: 'A manual IBAN payment request has been created. This plan remains unavailable until your payment proof is approved by the Platform Owner.',
-    paddlePending: 'Paddle Sandbox checkout has opened. Your plan will update only after Paddle sends a verified subscription event.', managePaddle: 'Manage in Paddle',
+    paddlePending: 'Paddle checkout has opened. Your plan will update only after Paddle sends a verified subscription event.', managePaddle: 'Manage in Paddle',
     actionFailed: 'The requested billing action could not be completed.', limits: 'Limits', modules: 'Included modules',
     pendingDetails: 'This paid plan is awaiting payment confirmation. It has not been activated.',
     reactivate: 'Reactivate with payment', reactivateDetails: 'Reactivation requires a new payment request and Platform Owner approval. Your ERP access will resume only after approval.',
@@ -40,7 +40,7 @@ const COPY = {
     ibanTitle: 'دفع يدوي عبر IBAN', ibanInstructions: 'حوّل المبلغ الدقيق بالمعلومات أدناه، ثم ارفع إثبات PDF أو صورة لمراجعة مالك المنصة.', paymentReference: 'مرجع التحويل البنكي', uploadProof: 'رفع إثبات الدفع', submitProof: 'إرسال الإثبات للمراجعة', proofAccepted: 'تم إرسال الإثبات. لا يُفعّل الاشتراك إلا بعد موافقة مالك المنصة.', ownerOnly: 'إجراءات الفوترة متاحة لمالك المؤسسة فقط.',
     priceMonth: '/ شهرياً', original: 'الأصلي', final: 'النهائي', noRecords: 'لا توجد سجلات بعد.',
     paymentSelected: 'تم إنشاء طلب دفع يدوي عبر IBAN. تظل الخطة غير نشطة حتى يوافق مالك المنصة على إثبات الدفع.',
-    paddlePending: 'تم فتح صفحة Paddle Sandbox. لا تتغير الخطة إلا بعد وصول حدث اشتراك موثّق من Paddle.', managePaddle: 'الإدارة في Paddle',
+    paddlePending: 'تم فتح صفحة Paddle. لا تتغير الخطة إلا بعد وصول حدث اشتراك موثّق من Paddle.', managePaddle: 'الإدارة في Paddle',
     actionFailed: 'تعذر إكمال إجراء الفوترة المطلوب.', limits: 'الحدود', modules: 'الوحدات المتاحة',
     pendingDetails: 'هذه الخطة المدفوعة بانتظار تأكيد الدفع ولم يتم تفعيلها.',
     reactivate: 'إعادة التفعيل عبر الدفع', reactivateDetails: 'تتطلب إعادة التفعيل طلب دفع جديداً وموافقة مالك المنصة. سيعود الوصول إلى ERP بعد الموافقة فقط.',
@@ -56,7 +56,7 @@ const COPY = {
     ibanTitle: 'پرداخت دستی IBAN', ibanInstructions: 'مبلغ دقیق را با اطلاعات زیر انتقال دهید و سپس مدرک PDF یا تصویر را برای بررسی مالک پلتفرم بارگذاری کنید.', paymentReference: 'مرجع انتقال بانکی', uploadProof: 'بارگذاری مدرک پرداخت', submitProof: 'ارسال مدرک برای بررسی', proofAccepted: 'مدرک ارسال شد. اشتراک فقط پس از تأیید مالک پلتفرم فعال می‌شود.', ownerOnly: 'اقدامات صورتحساب فقط برای مالک سازمان در دسترس است.',
     priceMonth: '/ ماه', original: 'قیمت اصلی', final: 'قیمت نهایی', noRecords: 'هنوز رکوردی وجود ندارد.',
     paymentSelected: 'درخواست پرداخت دستی IBAN ایجاد شد. این طرح تا تأیید مدرک پرداخت توسط مالک پلتفرم فعال نمی‌شود.',
-    paddlePending: 'پرداخت Paddle Sandbox باز شد. طرح فقط پس از رویداد تأییدشده اشتراک از Paddle به‌روزرسانی می‌شود.', managePaddle: 'مدیریت در Paddle',
+    paddlePending: 'پرداخت Paddle باز شد. طرح فقط پس از رویداد تأییدشده اشتراک از Paddle به‌روزرسانی می‌شود.', managePaddle: 'مدیریت در Paddle',
     actionFailed: 'اقدام صورتحساب مورد نظر انجام نشد.', limits: 'محدودیت‌ها', modules: 'ماژول‌های شامل',
     pendingDetails: 'این طرح پولی در انتظار تأیید پرداخت است و فعال نشده است.',
     reactivate: 'فعال‌سازی مجدد با پرداخت', reactivateDetails: 'فعال‌سازی مجدد به درخواست پرداخت جدید و تأیید مالک پلتفرم نیاز دارد. دسترسی ERP فقط پس از تأیید بازمی‌گردد.',
@@ -127,7 +127,7 @@ export default function Billing() {
   const copy = COPY[lang] || COPY.en;
   const safePlans = Array.isArray(plans) ? plans : [];
   const selectedPlan = safePlans.find((item) => item.id === (manualPayment?.plan_id || plan)) || null;
-  const isPaddleSandboxProvider = provider.id === 'paddle_sandbox';
+  const isPaddleProvider = provider.id === 'paddle';
   const isPaddleSubscription = summary.payment_provider === 'paddle';
 
   useEffect(() => {
@@ -173,7 +173,7 @@ export default function Billing() {
     setNotice('');
     try {
       const intent = await provider.createCheckout(planId);
-      if (isPaddleSandboxProvider) {
+      if (isPaddleProvider) {
         await refresh();
         setNotice(copy.paddlePending);
         return;
@@ -194,7 +194,7 @@ export default function Billing() {
     setActing('reactivate');
     setNotice('');
     try {
-      if (isPaddleSandboxProvider) {
+      if (isPaddleProvider) {
         await provider.createCheckout(plan);
         await refresh();
         setNotice(copy.paddlePending);

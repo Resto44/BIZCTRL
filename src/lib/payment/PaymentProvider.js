@@ -1,4 +1,4 @@
-import { isPaddleSandboxClientConfigured } from '@/lib/paddleSandbox';
+import { isPaddleClientConfigured } from '@/lib/paddle';
 
 /**
  * Payment providers are adapters, not entitlement authorities. Every adapter
@@ -97,18 +97,18 @@ export class ManualIbanPaymentProvider extends PaymentProvider {
   }
 }
 
-export class PaddleSandboxPaymentProvider extends PaymentProvider {
+export class PaddlePaymentProvider extends PaymentProvider {
   constructor(subscriptionApi) {
     super();
     this.subscriptionApi = subscriptionApi;
-    this.id = 'paddle_sandbox';
-    this.label = 'Paddle Billing Sandbox';
-    this.isLiveGateway = false;
+    this.id = 'paddle';
+    this.label = 'Paddle Billing';
+    this.isLiveGateway = true;
   }
 
   async createCheckout(planId) {
-    const { beginPaddleSandboxCheckout } = await import('@/lib/paddleBilling');
-    return beginPaddleSandboxCheckout(planId);
+    const { beginPaddleCheckout } = await import('@/lib/paddleBilling');
+    return beginPaddleCheckout(planId, this.subscriptionApi.summary?.paddle_customer_id);
   }
 
   async verifyPayment() {
@@ -136,9 +136,9 @@ export class PaddleSandboxPaymentProvider extends PaymentProvider {
 }
 
 export function createPaymentProvider(subscriptionApi) {
-  // Retain the existing manual billing path until the real, public-safe Paddle
-  // Sandbox token is configured. No unverified provider IDs or secret fallback
-  // values are ever substituted.
-  if (isPaddleSandboxClientConfigured()) return new PaddleSandboxPaymentProvider(subscriptionApi);
+  // Retain the existing manual billing path until a validated public live Paddle
+  // token is configured. No unverified provider IDs or secret fallback values
+  // are ever substituted.
+  if (isPaddleClientConfigured()) return new PaddlePaymentProvider(subscriptionApi);
   return new ManualIbanPaymentProvider(subscriptionApi);
 }

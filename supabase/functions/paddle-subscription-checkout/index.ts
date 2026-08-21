@@ -2,8 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const APP_ORIGIN = Deno.env.get("APP_URL") ?? "https://mybizctrl.site";
-const PADDLE_ENVIRONMENT = Deno.env.get("PADDLE_ENVIRONMENT") ?? "sandbox";
-const SANDBOX_API_URL = "https://sandbox-api.paddle.com";
+const PADDLE_ENVIRONMENT = Deno.env.get("PADDLE_ENVIRONMENT") ?? "production";
+const PADDLE_API_URL = "https://api.paddle.com";
 const TRANSACTION_ID_PATTERN = /^txn_[a-z\d]{26}$/i;
 
 const corsHeaders = (origin: string | null) => ({
@@ -24,14 +24,14 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return new Response(JSON.stringify({ error: "method_not_allowed" }), { status: 405, headers });
 
   try {
-    if (PADDLE_ENVIRONMENT !== "sandbox") return fail("PADDLE_SANDBOX_ONLY", 503);
+    if (PADDLE_ENVIRONMENT !== "production") return fail("PADDLE_LIVE_ONLY", 503);
 
     const paddleApiKey = Deno.env.get("PADDLE_API_KEY")?.trim();
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const authorization = req.headers.get("Authorization") ?? "";
-    if (!paddleApiKey) return fail("PADDLE_SANDBOX_NOT_CONFIGURED", 503);
+    if (!paddleApiKey) return fail("PADDLE_LIVE_NOT_CONFIGURED", 503);
     if (!supabaseUrl || !anonKey || !serviceRoleKey || !authorization) return fail("BILLING_SERVICE_NOT_CONFIGURED", 503);
 
     const body = await req.json().catch(() => null) as { planId?: unknown } | null;
@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const service = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const transactionResponse = await fetch(`${SANDBOX_API_URL}/transactions`, {
+    const transactionResponse = await fetch(`${PADDLE_API_URL}/transactions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${paddleApiKey}`,
@@ -69,7 +69,7 @@ Deno.serve(async (req: Request) => {
           bizctrl_restaurant_id: context.restaurant_id,
           bizctrl_user_id: userData.user.id,
           bizctrl_plan_id: context.plan_id,
-          bizctrl_environment: "sandbox",
+          bizctrl_environment: "production",
         },
       }),
     });
