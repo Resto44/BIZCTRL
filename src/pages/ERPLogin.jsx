@@ -10,6 +10,7 @@ import {
   Eye, EyeOff, Loader2, ArrowLeft, ShieldCheck, LogIn
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { safeInternalReturnTo } from '@/lib/publicPlanCheckout';
 
 const ROLE_CONFIG = [
   {
@@ -67,6 +68,8 @@ const ROLE_CONFIG = [
 export default function ERPLogin() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const postAuthenticationDestination = safeInternalReturnTo(searchParams.get('returnTo'), '');
+  const ownerRegistrationPath = `/erp-register?owner=1${postAuthenticationDestination ? `&returnTo=${encodeURIComponent(postAuthenticationDestination)}` : ''}`;
   const [selectedRole, setSelectedRole] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -106,12 +109,12 @@ export default function ERPLogin() {
               }
             }
             const home = ROLE_HOME[profile.role] || '/owner-command-center';
-            navigate(home, { replace: true });
+            navigate(postAuthenticationDestination || home, { replace: true });
           }
         } catch (_) {}
       }
     });
-  }, [navigate]);
+  }, [navigate, postAuthenticationDestination]);
 
   const handleRoleSelect = (roleConfig) => {
     setSelectedRole(roleConfig);
@@ -225,7 +228,7 @@ export default function ERPLogin() {
       }
 
       toast.success(`Welcome back, ${profile.full_name || email}!`);
-      navigate(home, { replace: true });
+      navigate(postAuthenticationDestination || home, { replace: true });
     } catch (err) {
       toast.error('Login failed. Please try again.');
     } finally {
@@ -344,7 +347,7 @@ export default function ERPLogin() {
 
             <div className="mt-4 text-center">
               <p className="text-slate-500 text-sm">Staff accounts are invitation-only. Ask your organization owner for a secure activation link.</p>
-              <button onClick={() => navigate('/erp-register?owner=1')} className="mt-2 text-xs font-medium text-violet-400 hover:text-violet-300">Create a new owner organization account</button>
+              <button onClick={() => navigate(ownerRegistrationPath)} className="mt-2 text-xs font-medium text-violet-400 hover:text-violet-300">Create a new owner organization account</button>
             </div>
           </div>
         )}

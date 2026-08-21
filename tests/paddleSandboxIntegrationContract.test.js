@@ -100,11 +100,12 @@ describe('Paddle live integration contract', () => {
     expect(portal).toContain('https://api.paddle.com');
   });
 
-  it('connects the public pricing page to the secure live checkout action after authentication', async () => {
+  it('connects the public pricing page to the secure shared checkout action after authentication', async () => {
     const pricing = await readFile(pricingPagePath, 'utf8');
-    expect(pricing).toContain('beginPaddleCheckout(planId)');
-    expect(pricing).toContain('/erp-register?owner=1&plan=');
-    expect(pricing).toContain('verified Paddle webhook synchronizes your subscription');
+    expect(pricing).toContain("usePublicPlanCheckout");
+    expect(pricing).toContain('beginPlanCheckout');
+    expect(pricing).toContain("searchParams.get('checkout_plan')");
+    expect(pricing).toContain('void beginPlanCheckout(selectedPlan);');
     expect(pricing).toContain('enterpriseContactMode');
     expect(pricing).not.toContain('Paddle Sandbox');
   });

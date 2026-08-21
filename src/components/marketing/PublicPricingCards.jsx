@@ -16,7 +16,7 @@ function CapacityIcon({ index }) {
   return index === 0 ? <Users className="h-4 w-4 text-cyan-300" /> : <Building2 className="h-4 w-4 text-cyan-300" />;
 }
 
-export default function PublicPricingCards({ plans, onStartFree, compact = false, busyPlanId = '', disabled = false, enterpriseContactMode = false }) {
+export default function PublicPricingCards({ plans, onStartFree, onContactSales, compact = false, busyPlanId = '', disabled = false, enterpriseContactMode = false }) {
   return (
     <div className={`grid gap-5 ${compact ? 'lg:grid-cols-3' : 'md:grid-cols-2 xl:grid-cols-3'}`}>
       {plans.map((plan) => {
@@ -44,7 +44,7 @@ export default function PublicPricingCards({ plans, onStartFree, compact = false
             <ul className="mt-6 flex-1 space-y-3 border-t border-white/10 pt-5 text-sm text-slate-300">
               {(features.length ? features : ['Included capabilities are configured for this plan.']).slice(0, compact ? 4 : 6).map((feature) => <li key={feature} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />{feature}</li>)}
             </ul>
-            <Button onClick={() => onStartFree(plan)} disabled={disabled || isBusy} className="mt-7 w-full bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400">{isBusy ? 'Opening secure checkout…' : missingEnterprisePrice ? 'Contact Sales' : trial > 0 ? 'Start Free First Month' : 'Start Free'} <ArrowRight className="ml-2 h-4 w-4" /></Button>
+            <Button onClick={() => (missingEnterprisePrice && onContactSales ? onContactSales(plan) : onStartFree(plan))} disabled={disabled || isBusy} className="mt-7 w-full bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400">{isBusy ? 'Opening secure checkout…' : missingEnterprisePrice ? 'Contact Sales' : trial > 0 ? 'Start Free First Month' : 'Start Free'} <ArrowRight className="ml-2 h-4 w-4" /></Button>
           </article>
         );
       })}

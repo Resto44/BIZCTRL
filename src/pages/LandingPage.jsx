@@ -10,6 +10,7 @@ import PublicPricingCards from '@/components/marketing/PublicPricingCards';
 import { supabase } from '@/api/supabaseClient';
 import { ContentSection, PRODUCT_DESCRIPTION, PublicHero, PublicLayout, SectionHeading, usePublicPageMetadata } from '@/components/marketing/PublicLayout';
 import { PUBLIC_PLAN_FIELDS } from '@/lib/pricingCatalog';
+import { usePublicPlanCheckout } from '@/lib/publicPlanCheckout';
 
 const INDUSTRIES = [
   { icon: Store, title: 'Restaurants', description: 'Manage branches, ingredients, inventory, purchasing, sales, expenses, and reports.' },
@@ -76,6 +77,7 @@ export default function LandingPage() {
   usePublicPageMetadata('BizCTRL — Multi-Tenant ERP SaaS', PRODUCT_DESCRIPTION);
   const navigate = useNavigate();
   const [catalogPlans, setCatalogPlans] = useState([]);
+  const { beginPlanCheckout, contactSales, checkoutNotice, checkoutPlanId, isLoadingAuth } = usePublicPlanCheckout();
 
   useEffect(() => {
     let active = true;
@@ -130,7 +132,8 @@ export default function LandingPage() {
 
       <ContentSection className="border-y border-white/10 bg-gradient-to-b from-slate-900/40 to-slate-950">
         <SectionHeading eyebrow="Launch Pricing" title="Simple promotional pricing, clearly disclosed" description="Every public price comes from BizCTRL’s active plan catalog. Starter includes a free first month (a 30-day trial), then renews at its displayed monthly price unless cancelled." />
-        {catalogPlans.length > 0 && <PublicPricingCards plans={catalogPlans} compact onStartFree={() => navigate('/erp-register?owner=1')} />}
+        {catalogPlans.length > 0 && <PublicPricingCards plans={catalogPlans} compact onStartFree={beginPlanCheckout} onContactSales={contactSales} busyPlanId={checkoutPlanId} disabled={isLoadingAuth} enterpriseContactMode />}
+        {checkoutNotice && <p role="status" className="mx-auto mt-6 max-w-3xl rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-5 py-4 text-center text-sm leading-6 text-cyan-50">{checkoutNotice}</p>}
         <div className="mt-8 flex justify-center"><Button asChild variant="outline" className="border-white/20 bg-transparent font-bold text-white hover:bg-white/10 hover:text-white"><Link to="/pricing">View Full Pricing <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></div>
       </ContentSection>
 

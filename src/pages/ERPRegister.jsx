@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { publicCheckoutReturnTo, safeInternalReturnTo } from '@/lib/publicPlanCheckout';
 import { ArrowLeft, Building2, Eye, EyeOff, KeyRound, Loader2, LockKeyhole, MailCheck, ShieldCheck, Smartphone, UserRoundCheck } from 'lucide-react';
 
 const validPassword = (password) => password.length >= 10 && /[A-Za-z]/.test(password) && /\d/.test(password);
@@ -22,6 +23,12 @@ export default function ERPRegister() {
   const [params] = useSearchParams();
   const token = params.get('token')?.trim() || '';
   const isOwnerSetup = params.get('owner') === '1';
+  const selectedPlanId = params.get('plan')?.trim() || '';
+  const postAuthenticationDestination = safeInternalReturnTo(
+    params.get('returnTo'),
+    selectedPlanId ? publicCheckoutReturnTo(selectedPlanId) : '/owner-command-center',
+  );
+  const ownerRegistrationPath = `/erp-register?owner=1${selectedPlanId ? `&plan=${encodeURIComponent(selectedPlanId)}` : ''}&returnTo=${encodeURIComponent(postAuthenticationDestination)}`;
   const started = useRef(false);
   const [session, setSession] = useState(null);
   const [loadingSession, setLoadingSession] = useState(true);
@@ -45,6 +52,12 @@ export default function ERPRegister() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => { if (alive) setSession(next || null); });
     return () => { alive = false; subscription.unsubscribe(); };
   }, []);
+
+  useEffect(() => {
+    if (isOwnerSetup && !token && session?.user?.id && !loadingSession) {
+      navigate(postAuthenticationDestination, { replace: true });
+    }
+  }, [isOwnerSetup, loadingSession, navigate, postAuthenticationDestination, session?.user?.id, token]);
 
   const activate = useCallback(async () => {
     if (!token || !session?.user?.id || started.current) return;
@@ -121,10 +134,10 @@ export default function ERPRegister() {
     if (owner.password !== owner.confirm) return toast.error('Passwords do not match.');
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.auth.signUp({ email: clean.email, password: owner.password, options: { emailRedirectTo: `${window.location.origin}/erp-login`, data: { role: 'owner', full_name: clean.fullName, company_name: clean.organization, branch_name: clean.branch } } });
+      const { data, error } = await supabase.auth.signUp({ email: clean.email, password: owner.password, options: { emailRedirectTo: `${window.location.origin}${ownerRegistrationPath}`, data: { role: 'owner', full_name: clean.fullName, company_name: clean.organization, branch_name: clean.branch } } });
       if (error) throw error;
-      if (data.session) navigate('/owner-command-center', { replace: true });
-      else { toast.success('Verify your email, then sign in as the organization owner.'); navigate('/erp-login', { replace: true }); }
+      if (data.session) navigate(postAuthenticationDestination, { replace: true });
+      else { toast.success('Verify your email, then sign in as the organization owner.'); navigate(`/erp-login?returnTo=${encodeURIComponent(postAuthenticationDestination)}`, { replace: true }); }
     } catch (error) { toast.error(error.message || 'Unable to create the owner account.'); } finally { setSubmitting(false); }
   };
 
