@@ -76,6 +76,7 @@ export const MODULE_PERMISSIONS = [
   { key: 'viewDelivery',         label: 'Delivery',          group: 'Operations' },
   { key: 'viewAlerts',           label: 'Smart Alerts',      group: 'Operations' },
   { key: 'manageSettings',       label: 'Settings',          group: 'Admin' },
+  { key: 'manageDashboardCustomization', label: 'Customize Owner Dashboard', group: 'Admin' },
   { key: 'manageBranches',       label: 'Branch Management', group: 'Admin' },
   { key: 'manageUsers',          label: 'User Management',   group: 'Admin' },
   { key: 'viewBrandSettings',    label: 'Brand Settings',    group: 'Admin' },

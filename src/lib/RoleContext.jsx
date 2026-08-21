@@ -135,6 +135,7 @@ function buildCan(role) {
     manageCustomers:    false,
     manageDrivers:      false,
     manageSponsors:     false,
+    manageDashboardCustomization: false,
     // Legacy / Misc
     uploadSales:        is(ROLES.MANAGER),
     viewAlerts:         is(ROLES.MANAGER),
@@ -151,7 +152,7 @@ const PERMISSIONS_LIST = {
   placeOrders: false,
   trackOrders: false, manageSettings: false, manageBranches: false, manageUsers: false,
   manageRoles: false, manageCustomers: false, manageDrivers: false,
-  manageSponsors: false, uploadSales: false, viewAlerts: false, viewSupport: true,
+  manageSponsors: false, manageDashboardCustomization: false, uploadSales: false, viewAlerts: false, viewSupport: true,
   // Additional permissions used in route guards — must be listed here so Owner reduce() grants them
   viewEmployees: false, viewPayroll: false, viewTreasury: false, viewExpenses: false,
   viewDelivery: false, viewBrandSettings: false, viewBilling: false, viewDebts: false,

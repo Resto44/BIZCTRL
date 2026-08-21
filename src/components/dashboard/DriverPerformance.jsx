@@ -19,7 +19,14 @@ function money(value, currency) {
   return `${currency || '$'}${(Number(value) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
-const DriverPerformance = memo(function DriverPerformance({ restaurantId, branches, selectedBranch, currency }) {
+const DriverPerformance = memo(function DriverPerformance({
+  restaurantId,
+  branches,
+  selectedBranch,
+  currency,
+  title,
+  description,
+}) {
   const [period, setPeriod] = useState('today');
   const range = useMemo(() => getDriverAnalyticsDateRange(period), [period]);
   const branchList = asArray(branches);
@@ -93,8 +100,8 @@ const DriverPerformance = memo(function DriverPerformance({ restaurantId, branch
             <Truck className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-foreground leading-tight">Driver Analytics</h2>
-            <p className="text-[11px] text-muted-foreground leading-tight">Branch and driver sales performance, refreshed from canonical driver and sales records.</p>
+            <h2 className="text-sm font-bold text-foreground leading-tight">{title}</h2>
+            {description && <p className="text-[11px] text-muted-foreground leading-tight">{description}</p>}
           </div>
         </div>
         <span className="flex w-fit items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">

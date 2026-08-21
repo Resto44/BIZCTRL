@@ -26,7 +26,7 @@
  *   8. Product Price Intelligence
  *   9. Alerts
  */
-import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useCallback, useEffect, memo } from 'react';
 import ModeBadge from '@/components/shared/ModeBadge';
 import { ModeSpecificDashboardSection } from '@/components/dashboard/DashboardWidgetRegistry';
 import { useNavigate } from 'react-router-dom';
@@ -51,6 +51,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 // SalesForm removed to enforce single ERP workspace entry point
 import PriceChangesWidget from '@/components/dashboard/PriceChangesWidget';
 import DriverPerformance from '@/components/dashboard/DriverPerformance';
+import CustomizeDashboardDialog from '@/components/dashboard/CustomizeDashboardDialog';
+import { useDashboardCustomization } from '@/hooks/useDashboardCustomization';
+import { getDashboardCustomizationCopy } from '@/lib/dashboardCustomization';
 import { computeProcurementKPIs } from '@/lib/procurementEngine';
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package,
@@ -60,7 +63,7 @@ import {
   Scale, Target, ChevronRight, ArrowUpRight, ArrowDownRight,
   CheckCircle2, XCircle, AlertCircle,
   LayoutDashboard, Layers, Clock, MapPin, Globe, ChevronDown,
-  Building2, Radio,
+  Building2, Radio, Settings2,
 } from 'lucide-react';
 import {
   format, startOfMonth, startOfWeek, startOfYear,
@@ -145,6 +148,8 @@ const SectionHeader = memo(({
   );
 });
 
+const DashboardCustomizationContext = createContext({});
+
 const DashboardAccordionSection = memo(({
   id,
   expandedId,
@@ -158,13 +163,18 @@ const DashboardAccordionSection = memo(({
   controls,
   children,
 }) => {
+  const widgetsById = useContext(DashboardCustomizationContext);
+  const configuredWidget = widgetsById?.[id];
+  if (configuredWidget?.isVisible === false) return null;
+  const displayedTitle = configuredWidget?.title ?? title;
+  const displayedSubtitle = configuredWidget?.description ?? subtitle;
   const expanded = expandedId === id;
   return (
     <section className="rounded-2xl border border-border/60 bg-card/30 p-2.5 shadow-sm sm:p-3">
       <SectionHeader
         icon={icon}
-        title={title}
-        subtitle={subtitle}
+        title={displayedTitle}
+        subtitle={displayedSubtitle}
         summary={summary}
         action={action}
         color={color}
@@ -528,9 +538,9 @@ export default function OwnerDashboard() {
 }
 
 function OwnerDashboardContent() {
-  const { t, currency } = useLanguage();
+  const { t, currency, lang } = useLanguage();
   const { branches, ownerFilter, orgId, activeRestaurant } = useTenant();
-  const { role } = useRole();
+  const { role, can } = useRole();
   const { user } = useAuth();
   const navigate = useNavigate();
   const notif = useNotify();
@@ -555,6 +565,7 @@ function OwnerDashboardContent() {
   // 'all' means aggregate all active branches; any other value is a branch key/id.
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [expandedSection, setExpandedSection] = useState(null);
+  const [isDashboardCustomizerOpen, setDashboardCustomizerOpen] = useState(false);
   const toggleSection = useCallback((sectionId) => {
     setExpandedSection((current) => current === sectionId ? null : sectionId);
   }, []);
@@ -606,6 +617,35 @@ function OwnerDashboardContent() {
     const b =  (branches || []).find(br => (br.key || br.id) === selectedBranch);
     return b ? (b.name || b.key || selectedBranch) : selectedBranch;
   }, [selectedBranch, branches, t]);
+
+  const { data: dashboardCustomizationMembership } = useQuery({
+    queryKey: ['dashboard-customization-membership', activeRestaurant?.id, user?.id],
+    enabled: Boolean(activeRestaurant?.id && user?.id),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('erp_memberships')
+        .select('role, permissions')
+        .eq('restaurant_id', activeRestaurant.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 60_000,
+  });
+
+  const dashboardCustomization = useDashboardCustomization({
+    restaurantId: activeRestaurant?.id,
+    lang,
+    t,
+    selectedBranch,
+    selectedBranchLabel,
+    activeAlertCount,
+  });
+  const dashboardCopy = getDashboardCustomizationCopy(lang);
+  const canCustomizeDashboard = role === 'owner'
+    || can?.manageDashboardCustomization === true
+    || dashboardCustomizationMembership?.permissions?.manageDashboardCustomization === true;
 
   const today       = format(new Date(), 'yyyy-MM-dd');
   const yesterday   = format(subDays(new Date(), 1), 'yyyy-MM-dd');
@@ -1342,6 +1382,7 @@ function OwnerDashboardContent() {
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────────
   return (
+    <DashboardCustomizationContext.Provider value={dashboardCustomization.widgetsById}>
     <div className="space-y-6 pb-8">
 
       {/* ── HEADER ── */}
@@ -1376,6 +1417,16 @@ function OwnerDashboardContent() {
             {realtimeStatus === 'SUBSCRIBED' ? 'LIVE' : 'Sync…'}
           </div>
           <ModeBadge />
+          {canCustomizeDashboard && (
+            <button
+              type="button"
+              onClick={() => setDashboardCustomizerOpen(true)}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{dashboardCopy.customizeDashboard}</span>
+            </button>
+          )}
           <Badge variant="outline" className="text-xs capitalize">{role}</Badge>
         </div>
       </div>
@@ -1414,8 +1465,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={Truck}
-          title="Driver Analytics"
-          subtitle="Branch and driver sales performance"
           summary="Live data"
           color="cyan"
         >
@@ -1424,6 +1473,8 @@ function OwnerDashboardContent() {
             branches={branches}
             selectedBranch={selectedBranch}
             currency={currency}
+            title={dashboardCustomization.widgetsById['driver-analytics']?.title}
+            description={dashboardCustomization.widgetsById['driver-analytics']?.description}
           />
         </DashboardAccordionSection>
       </WidgetErrorBoundary>
@@ -1439,8 +1490,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={LayoutDashboard}
-          title="Enterprise Financial Center"
-          subtitle="Quick access to enterprise reports"
           summary="6 reports"
           color="purple"
         >
@@ -1551,8 +1600,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={BarChart3}
-          title="6-Month Trend Analytics"
-          subtitle={`${selectedBranchLabel} — Last 6 calendar months`}
           summary={fmt(sixMonthTrend.at(-1)?.NetProfit || 0)}
           color="indigo"
           action={{ label: 'Reports', onClick: () => navigate('/reports') }}
@@ -1603,8 +1650,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={LayoutDashboard}
-          title={t('executive_summary')}
-          subtitle={t('todays_kpi')}
           summary={fmt(execSummary.salesToday)}
           color="blue"
         >
@@ -1664,8 +1709,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={Scale}
-          title={t('operating_result')}
-          subtitle={t('sales_revenue_minus_purchases')}
           summary={fmt(operatingResult.result)}
           color="green"
         >
@@ -1688,8 +1731,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={Wallet}
-          title={t('cash_reconciliation')}
-          subtitle={t('todays_cash_position')}
           summary={fmt(cashRecon.closingCash)}
           color="amber"
           action={{ label: t('treasury') || 'Treasury', onClick: () => navigate('/treasury') }}
@@ -1717,8 +1758,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={BarChart3}
-          title={t('sales_analytics')}
-          subtitle={t('multi_period_sales')}
           summary={fmt(salesAnalytics.monthAmt)}
           color="green"
           action={{ label: t('reports') || 'Reports', onClick: () => navigate('/reports') }}
@@ -1749,8 +1788,6 @@ function OwnerDashboardContent() {
             expandedId={expandedSection}
             onToggle={toggleSection}
             icon={Building2}
-            title={t('additional_sales_sources')}
-            subtitle={t('delivery_catering_subtitle')}
             summary={fmt(additionalSources.reduce((total, source) => total + (Number(source.today) || 0), 0))}
             color="purple"
             action={{ label: t('reports') || 'Reports', onClick: () => navigate('/reports') }}
@@ -1786,8 +1823,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={ShoppingCart}
-          title={t('purchase_analytics')}
-          subtitle={t('approved_invoices_branch')}
           summary={fmt(purchaseAnalytics.monthAmt)}
           color="amber"
           action={{ label: t('purchases') || 'Purchases', onClick: () => navigate('/enterprise-purchases') }}
@@ -1866,8 +1901,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={BarChart3}
-          title={t('product_consumption_analytics')}
-          subtitle={`${t('purchase_items_branch')} · ${selectedBranch === 'all' ? t('all_branches') : selectedBranchLabel}`}
           summary={`${productQuantityAnalytics.combinedProducts.length} products`}
           color="purple"
           action={{ label: t('purchases') || 'Purchases', onClick: () => navigate('/enterprise-purchases') }}
@@ -2055,8 +2088,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={Package}
-          title={t('inventory_analytics')}
-          subtitle={t('stock_health_overview')}
           summary={fmt(inventoryAnalytics.inventoryValue)}
           color="indigo"
           action={{ label: t('inventory') || 'Inventory', onClick: () => navigate('/inventory') }}
@@ -2111,8 +2142,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={Receipt}
-          title="Variable Expenses"
-          subtitle="Variable costs only — fixed expenses excluded"
           summary={fmt(expenseSummary.monthlyVariable)}
           color="amber"
           action={{ label: t('expenses_label') || 'Expenses', onClick: () => navigate('/expenses') }}
@@ -2174,8 +2203,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={Activity}
-          title={t('cash_flow')}
-          subtitle={t('todays_money_movement')}
           summary={fmt(cashFlow.netCashFlow)}
           color="cyan"
           action={{ label: t('treasury') || 'Treasury', onClick: () => navigate('/treasury') }}
@@ -2201,8 +2228,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={TrendingUp}
-          title={t('price_intelligence')}
-          subtitle={t('price_changes_subtitle')}
           summary={`${priceIntelligence.length} changes`}
           color="purple"
           action={{ label: t('products') || 'Products', onClick: () => navigate('/product-management') }}
@@ -2263,8 +2288,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={AlertTriangle}
-          title={t('alerts_label')}
-          subtitle={`${activeAlertCount} ${activeAlertCount === 1 ? t('active_alert') : t('active_alerts')}`}
           summary={loadingActiveAlerts ? 'Loading…' : `${activeAlertCount} active`}
           color="red"
           action={{ label: 'View all', onClick: () => navigate('/alerts') }}
@@ -2329,8 +2352,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={TrendingUp}
-          title="Price Changes"
-          subtitle="Recent supplier and product price activity"
           summary="Recent activity"
           color="purple"
         >
@@ -2347,8 +2368,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={Radio}
-          title="Live Activity Feed"
-          subtitle="Real-time branch events"
           summary={realtimeStatus === 'SUBSCRIBED' ? 'LIVE' : 'Syncing'}
           color="green"
         >
@@ -2365,8 +2384,6 @@ function OwnerDashboardContent() {
           expandedId={expandedSection}
           onToggle={toggleSection}
           icon={Layers}
-          title={t('mode_specific_insights')}
-          subtitle={t('mode_specific_subtitle')}
           summary="Operational"
           color="indigo"
         >
@@ -2378,5 +2395,17 @@ function OwnerDashboardContent() {
         </DashboardAccordionSection>
       </WidgetErrorBoundary>
     </div>
+    {canCustomizeDashboard && (
+      <CustomizeDashboardDialog
+        open={isDashboardCustomizerOpen}
+        onOpenChange={setDashboardCustomizerOpen}
+        widgets={dashboardCustomization.widgets}
+        overrides={dashboardCustomization.overrides}
+        lang={lang}
+        onSave={dashboardCustomization.saveOverrides}
+        isSaving={dashboardCustomization.isSaving}
+      />
+    )}
+    </DashboardCustomizationContext.Provider>
   );
 }
