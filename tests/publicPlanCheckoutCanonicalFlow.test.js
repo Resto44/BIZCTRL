@@ -38,7 +38,9 @@ describe('public plan checkout canonical flow', () => {
 
     expect(registration).toContain("params.get('plan')?.trim()");
     expect(registration).toContain('postAuthenticationDestination');
+    expect(registration).toContain('const signInPath = `/erp-login?returnTo=${encodeURIComponent(postAuthenticationDestination)}`;');
     expect(registration).toContain('emailRedirectTo: `${window.location.origin}${ownerRegistrationPath}`');
+    expect(registration).toContain('navigate(signInPath)');
     expect(registration).toContain('navigate(postAuthenticationDestination, { replace: true });');
     expect(login).toContain("safeInternalReturnTo(searchParams.get('returnTo'), '')");
     expect(login).toContain('navigate(postAuthenticationDestination || home, { replace: true });');
