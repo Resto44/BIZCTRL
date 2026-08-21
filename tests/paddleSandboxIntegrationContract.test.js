@@ -7,6 +7,7 @@ const paymentProviderPath = new URL('../src/lib/payment/PaymentProvider.js', imp
 const pricingPagePath = new URL('../src/pages/PublicPages.jsx', import.meta.url);
 const billingPath = new URL('../src/pages/Billing.jsx', import.meta.url);
 const migrationPath = new URL('../src/supabase/20260821_paddle_live_runtime.sql', import.meta.url);
+const liveWebhookMigrationPath = new URL('../src/supabase/20260821_paddle_live_webhook_label.sql', import.meta.url);
 const checkoutFunctionPath = new URL('../supabase/functions/paddle-subscription-checkout/index.ts', import.meta.url);
 const portalFunctionPath = new URL('../supabase/functions/paddle-customer-portal/index.ts', import.meta.url);
 const webhookFunctionPath = new URL('../supabase/functions/paddle-subscription-webhook/index.ts', import.meta.url);
@@ -72,6 +73,16 @@ describe('Paddle live integration contract', () => {
     expect(webhook).not.toContain('34.237.3.244');
     expect(webhook).not.toContain('34.195.105.136');
     expect(webhook).not.toContain('34.232.58.13');
+  });
+
+  it('records live webhook events with a production label while retaining the canonical event guards', async () => {
+    const migration = await readFile(liveWebhookMigrationPath, 'utf8');
+    expect(migration).toContain("display_label = 'Paddle Live ' || p_event_type");
+    expect(migration).not.toContain("display_label = 'Paddle Sandbox '");
+    expect(migration).toContain("MESSAGE = 'PADDLE_SERVER_ONLY'");
+    expect(migration).toContain("RETURN jsonb_build_object('processed', false, 'reason', 'duplicate_event')");
+    expect(migration).toContain("MESSAGE = 'PADDLE_EVENT_PRICE_MISMATCH'");
+    expect(migration).toContain("MESSAGE = 'PADDLE_EVENT_TENANT_MISMATCH'");
   });
 
   it('loads the Paddle source allowlist dynamically and rejects requests with no current approved source address', async () => {
