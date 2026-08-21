@@ -20,6 +20,7 @@ describe('public plan checkout canonical flow', () => {
 
     expect(landing).toContain("import { usePublicPlanCheckout } from '@/lib/publicPlanCheckout';");
     expect(landing).toContain('onStartFree={beginPlanCheckout}');
+    expect(pricing).toContain("import { Link, useNavigate, useSearchParams } from 'react-router-dom';");
     expect(pricing).toContain("import { usePublicPlanCheckout } from '@/lib/publicPlanCheckout';");
     expect(pricing).toContain("searchParams.get('checkout_plan')");
     expect(pricing).toContain('void beginPlanCheckout(selectedPlan);');

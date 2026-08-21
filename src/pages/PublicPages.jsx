@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight, Building2, CreditCard, HelpCircle,
   LockKeyhole, Mail, MessageSquare, Scale, ShieldCheck,
