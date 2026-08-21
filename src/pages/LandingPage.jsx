@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight, BarChart3, Building2, CheckCircle2, ChevronDown, ClipboardList,
   Factory, Landmark, Package, Pill, Receipt, ShoppingBag, Store, Truck, Users,
@@ -76,8 +76,10 @@ function DashboardPreview() {
 export default function LandingPage() {
   usePublicPageMetadata('BizCTRL — Multi-Tenant ERP SaaS', PRODUCT_DESCRIPTION);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [catalogPlans, setCatalogPlans] = useState([]);
-  const { beginPlanCheckout, contactSales, checkoutNotice, checkoutPlanId, isLoadingAuth } = usePublicPlanCheckout();
+  const resumedCheckoutPlanId = useRef('');
+  const { beginPlanCheckout, contactSales, checkoutNotice, checkoutPlanId, isLoadingAuth, setCheckoutNotice } = usePublicPlanCheckout();
 
   useEffect(() => {
     let active = true;
@@ -89,6 +91,21 @@ export default function LandingPage() {
       .then(({ data }) => { if (active) setCatalogPlans(Array.isArray(data) ? data : []); });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    const planId = String(searchParams.get('checkout_plan') || '').trim();
+    if (!planId || catalogPlans.length === 0 || isLoadingAuth || resumedCheckoutPlanId.current === planId) return;
+
+    const selectedPlan = catalogPlans.find((plan) => plan.id === planId);
+    resumedCheckoutPlanId.current = planId;
+    setSearchParams({}, { replace: true });
+    if (!selectedPlan) {
+      setCheckoutNotice('The selected plan is no longer available.');
+      return;
+    }
+    void beginPlanCheckout(selectedPlan);
+  }, [beginPlanCheckout, catalogPlans, isLoadingAuth, searchParams, setCheckoutNotice, setSearchParams]);
+
   return (
     <PublicLayout>
       <PublicHero
@@ -98,7 +115,7 @@ export default function LandingPage() {
       >
         <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
           <Button onClick={() => navigate('/erp-register?owner=1')} className="h-13 min-h-13 w-full bg-cyan-500 px-7 py-3 text-base font-black text-slate-950 hover:bg-cyan-400 sm:w-auto">Start Free <ArrowRight className="ml-2 h-5 w-5" /></Button>
-          <Button asChild variant="outline" className="h-13 min-h-13 w-full border-white/20 bg-transparent px-7 py-3 text-base font-bold text-white hover:bg-white/10 hover:text-white sm:w-auto"><Link to="/pricing">View Pricing</Link></Button>
+          <Button asChild variant="outline" className="h-13 min-h-13 w-full border-white/20 bg-transparent px-7 py-3 text-base font-bold text-white hover:bg-white/10 hover:text-white sm:w-auto"><a href="#pricing">View Pricing</a></Button>
         </div>
         <p className="mt-7 flex items-center justify-center gap-2 text-sm font-medium text-slate-400"><CheckCircle2 className="h-4 w-4 text-emerald-400" />One platform. Multiple branches. Complete business control.</p>
       </PublicHero>
@@ -130,11 +147,11 @@ export default function LandingPage() {
         <div className="mt-8 flex flex-wrap justify-center gap-x-7 gap-y-3 text-sm font-semibold text-slate-300">{['Sales', 'Expenses', 'Inventory', 'Profit and performance', 'Branch activity', 'Customers', 'Suppliers', 'Business trends'].map((item) => <span key={item} className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-cyan-300" />{item}</span>)}</div>
       </ContentSection>
 
-      <ContentSection className="border-y border-white/10 bg-gradient-to-b from-slate-900/40 to-slate-950">
+      <ContentSection id="pricing" className="border-y border-white/10 bg-gradient-to-b from-slate-900/40 to-slate-950">
         <SectionHeading eyebrow="Launch Pricing" title="Simple promotional pricing, clearly disclosed" description="Every public price comes from BizCTRL’s active plan catalog. Starter includes a free first month (a 30-day trial), then renews at its displayed monthly price unless cancelled." />
         {catalogPlans.length > 0 && <PublicPricingCards plans={catalogPlans} compact onStartFree={beginPlanCheckout} onContactSales={contactSales} busyPlanId={checkoutPlanId} disabled={isLoadingAuth} enterpriseContactMode />}
         {checkoutNotice && <p role="status" className="mx-auto mt-6 max-w-3xl rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-5 py-4 text-center text-sm leading-6 text-cyan-50">{checkoutNotice}</p>}
-        <div className="mt-8 flex justify-center"><Button asChild variant="outline" className="border-white/20 bg-transparent font-bold text-white hover:bg-white/10 hover:text-white"><Link to="/pricing">View Full Pricing <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></div>
+
       </ContentSection>
 
       <ContentSection>

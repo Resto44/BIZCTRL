@@ -41,7 +41,7 @@ export function usePublicPageMetadata(title, description = PRODUCT_DESCRIPTION) 
 const headerLinks = [
   { label: 'Features', href: '/#features' },
   { label: 'Industries', href: '/#industries' },
-  { label: 'Pricing', to: '/pricing' },
+  { label: 'Pricing', href: '/#pricing' },
   { label: 'Contact', to: '/contact' },
 ];
 
@@ -119,7 +119,7 @@ export function PublicLayout({ children }) {
             <div className="mt-4 flex flex-col gap-3 text-sm text-slate-400">
               <a href="/#features" className="hover:text-white">Features</a>
               <a href="/#industries" className="hover:text-white">Industries</a>
-              <Link to="/pricing" className="hover:text-white">Pricing</Link>
+              <a href="/#pricing" className="hover:text-white">Pricing</a>
               <Link to="/erp-login" className="hover:text-white">Login</Link>
             </div>
           </div>

@@ -1,97 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  ArrowRight, Building2, CreditCard, HelpCircle,
+  Building2, CreditCard, HelpCircle,
   LockKeyhole, Mail, MessageSquare, Scale, ShieldCheck,
 } from 'lucide-react';
-import { supabase } from '@/api/supabaseClient';
-import { usePublicPlanCheckout } from '@/lib/publicPlanCheckout';
 import { Button } from '@/components/ui/button';
-import PublicPricingCards from '@/components/marketing/PublicPricingCards';
 import { ContentSection, PublicHero, PublicLayout, usePublicPageMetadata } from '@/components/marketing/PublicLayout';
-import { PUBLIC_PLAN_FIELDS } from '@/lib/pricingCatalog';
 
-
-function PublicCta({ secondary = true }) {
-  const navigate = useNavigate();
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-      <Button onClick={() => navigate('/erp-register?owner=1')} className="h-12 bg-cyan-500 px-6 font-bold text-slate-950 hover:bg-cyan-400">
-        Start Free <ArrowRight className="ml-2 h-4 w-4" />
-      </Button>
-      {secondary && <Button asChild variant="outline" className="h-12 border-white/20 bg-transparent px-6 font-bold text-slate-100 hover:bg-white/10 hover:text-white"><Link to="/pricing">View Pricing</Link></Button>}
-    </div>
-  );
-}
-
-export function PricingPage() {
-  usePublicPageMetadata('BizCTRL Pricing — ERP SaaS Plans', 'Explore BizCTRL launch pricing for multi-tenant ERP software, including the Starter first-month-free 30-day trial and the active public plan catalog.');
-  const [plans, setPlans] = useState([]);
-  const [status, setStatus] = useState('loading');
-  const [searchParams, setSearchParams] = useSearchParams();
-  const resumedCheckoutPlanId = useRef('');
-  const { beginPlanCheckout, contactSales, checkoutNotice, checkoutPlanId, isLoadingAuth, setCheckoutNotice } = usePublicPlanCheckout();
-
-  useEffect(() => {
-    let active = true;
-    supabase
-      .from('subscription_plans')
-      .select(PUBLIC_PLAN_FIELDS)
-      .eq('is_active', true)
-      .eq('is_public', true)
-      .order('sort_order', { ascending: true })
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error) {
-          setStatus('error');
-          return;
-        }
-        setPlans(Array.isArray(data) ? data : []);
-        setStatus('ready');
-      });
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    const planId = String(searchParams.get('checkout_plan') || '').trim();
-    if (!planId || status !== 'ready' || isLoadingAuth || resumedCheckoutPlanId.current === planId) return;
-    const selectedPlan = plans.find((plan) => plan.id === planId);
-    if (!selectedPlan) {
-      resumedCheckoutPlanId.current = planId;
-      setCheckoutNotice('The selected plan is no longer available.');
-      setSearchParams({}, { replace: true });
-      return;
-    }
-    resumedCheckoutPlanId.current = planId;
-    setSearchParams({}, { replace: true });
-    void beginPlanCheckout(selectedPlan);
-  }, [beginPlanCheckout, isLoadingAuth, plans, searchParams, setCheckoutNotice, setSearchParams, status]);
-
-  return (
-    <PublicLayout>
-      <PublicHero
-        eyebrow="Launch Pricing"
-        title="Flexible plans for growing businesses"
-        description="Clear introductory pricing for BizCTRL’s multi-tenant ERP SaaS. Starter begins with a free first month (a 30-day trial); each plan shows its active monthly price, capabilities, and configured operating limits."
-      >
-        <PublicCta secondary={false} />
-      </PublicHero>
-      <ContentSection className="pt-0">
-        {status === 'loading' && <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-label="Loading available plans">{[0, 1, 2].map((item) => <div key={item} className="h-[34rem] animate-pulse rounded-3xl border border-white/10 bg-white/5" />)}</div>}
-        {status === 'ready' && plans.length > 0 && <PublicPricingCards plans={plans} onStartFree={beginPlanCheckout} onContactSales={contactSales} busyPlanId={checkoutPlanId} disabled={isLoadingAuth} enterpriseContactMode />}
-        {checkoutNotice && <p role="status" className="mx-auto mt-6 max-w-3xl rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-5 py-4 text-center text-sm leading-6 text-cyan-50">{checkoutNotice}</p>}
-        {(status === 'error' || (status === 'ready' && plans.length === 0)) && <div className="mx-auto max-w-2xl rounded-3xl border border-cyan-400/20 bg-cyan-400/5 p-8 text-center"><CreditCard className="mx-auto h-8 w-8 text-cyan-300" /><h2 className="mt-4 text-2xl font-black text-white">Plan details are being finalized</h2><p className="mt-3 leading-7 text-slate-300">BizCTRL does not publish unverified commercial terms. Please start with a free account or contact the BizCTRL team to discuss the current plan catalog.</p><div className="mt-6"><PublicCta /></div></div>}
-      </ContentSection>
-      <ContentSection className="pt-0">
-        <div className="grid gap-5 md:grid-cols-3">{[
-          ['Launch Pricing', 'Promotional prices are clearly shown without artificial urgency or an unconfigured expiry date.'],
-          ['Billing clarity', 'Starter begins with a free first month (a 30-day trial). After the free month, the configured recurring monthly price applies unless cancelled.'],
-          ['Paddle readiness', 'Each paid plan has a verified live Paddle price mapping. Online checkout remains disabled until the required live client token and verified webhook delivery connection are configured.'],
-        ].map(([title, description]) => <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-6"><h2 className="font-bold text-white">{title}</h2><p className="mt-2 text-sm leading-6 text-slate-400">{description}</p></div>)}</div>
-      </ContentSection>
-    </PublicLayout>
-  );
-}
 
 const TERMS = [
   ['Service description', 'BizCTRL is a cloud-based multi-tenant ERP SaaS that helps organizations manage selected business operations, including inventory, sales, purchasing, suppliers, people, finance, reporting, and branches. Available capabilities depend on the customer’s active plan, configuration, permissions, and supported modules.'],

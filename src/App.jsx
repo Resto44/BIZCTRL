@@ -116,7 +116,7 @@ const SerialNumbers       = lazy(() => import('@/pages/retail/SerialNumbers'));
 
 // ── Public pages (eager — shown before auth) ─────────────────────────────────
 import LandingPage            from '@/pages/LandingPage';
-import { PricingPage, TermsPage, PrivacyPage, RefundPage, ContactPage } from '@/pages/PublicPages';
+import { TermsPage, PrivacyPage, RefundPage, ContactPage } from '@/pages/PublicPages';
 // AuthPage removed — replaced by ERPLogin
 import ERPLogin               from '@/pages/ERPLogin';
 import ERPRegister            from '@/pages/ERPRegister';
@@ -429,6 +429,8 @@ function PlatformOwnerRecoveryCallbackRouter() {
 // server resolves to the active Platform Owner record may enter the control plane.
 function RootEntryRoute() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const checkoutPlanId = new URLSearchParams(location.search).get('checkout_plan');
   const [decision, setDecision] = React.useState('checking');
   const [attempt, setAttempt] = React.useState(0);
 
@@ -437,6 +439,10 @@ function RootEntryRoute() {
 
     const resolve = async () => {
       setDecision('checking');
+      if (checkoutPlanId) {
+        if (!cancelled) setDecision('public');
+        return;
+      }
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const session = sessionData?.session;
@@ -477,7 +483,7 @@ function RootEntryRoute() {
 
     resolve();
     return () => { cancelled = true; };
-  }, [attempt, navigate]);
+  }, [attempt, checkoutPlanId, navigate]);
 
   if (decision === 'checking') return <PageLoader />;
   if (decision === 'authorization-error') {
@@ -577,7 +583,6 @@ function App() {
               <Route path="/supplier-registration" element={<LegacyInvitationRedirect />} />
               {/* ── Public marketing and policy pages ── */}
               <Route path="/" element={<RootEntryRoute />} />
-              <Route path="/pricing" element={<PricingPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/refund" element={<RefundPage />} />

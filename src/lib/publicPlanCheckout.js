@@ -12,7 +12,7 @@ export function safeInternalReturnTo(value, fallback = '/') {
 
 export function publicCheckoutReturnTo(planId) {
   const safePlanId = String(planId || '').trim();
-  return safePlanId ? `/pricing?checkout_plan=${encodeURIComponent(safePlanId)}` : '/pricing';
+  return safePlanId ? `/?checkout_plan=${encodeURIComponent(safePlanId)}` : '/#pricing';
 }
 
 export function ownerRegistrationForPlan(planId) {
