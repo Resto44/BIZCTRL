@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
+import { subscriptionLimitErrorMessage } from '@/lib/subscriptionLimits';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -157,7 +158,7 @@ export default function OwnerStaffProvisioning() {
       await loadInvitations(selectedOrganizationId);
     } catch (error) {
       console.error('[OwnerStaffProvisioning] invitation creation failed', error);
-      toast.error(error.message || 'Unable to create the secure invitation.');
+      toast.error(subscriptionLimitErrorMessage(error, 'Unable to create the secure invitation.'));
     } finally {
       setSubmitting(false);
     }

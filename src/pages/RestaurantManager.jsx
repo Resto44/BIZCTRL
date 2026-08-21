@@ -12,6 +12,8 @@
 import React, { useState } from 'react';
 import { useTenant } from '@/lib/TenantContext';
 import { useRole } from '@/lib/RoleContext';
+import { useSubscription } from '@/lib/SubscriptionContext';
+import { subscriptionLimitErrorMessage, subscriptionLimitMessage } from '@/lib/subscriptionLimits';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +36,7 @@ export default function RestaurantManager() {
   const { user } = useAuth();
   const { restaurants, activeRestaurant, setActiveRestaurant, allBranches, updateRestaurantBranches, createRestaurant, refetchRestaurants } = useTenant();
   const { role } = useRole();
+  const { withinLimit, usage, limits, planName } = useSubscription();
   const queryClient = useQueryClient();
 
   const [showNewRestaurant, setShowNewRestaurant] = useState(false);
@@ -88,6 +91,15 @@ export default function RestaurantManager() {
     setSaving(true);
     try {
       const key = branchForm.key || branchForm.label.toLowerCase().replace(/\s+/g, '_');
+      if (Number(limits?.branches || 0) > 0 && !withinLimit('branches')) {
+        toast.error(subscriptionLimitMessage({
+          resource: 'branches',
+          used: usage?.branches,
+          limit: limits?.branches,
+          planName,
+        }));
+        return;
+      }
       const updated = [...allBranches, { ...branchForm, key, is_active: true }];
       await updateRestaurantBranches(updated);
       setBranchForm({ key: '', label: '', manager_email: '' });
@@ -95,7 +107,7 @@ export default function RestaurantManager() {
       toast.success('Branch added!');
     } catch (error) {
       console.error('[RestaurantManager] branch create failed', error);
-      toast.error(error.message || 'Unable to add this branch.');
+      toast.error(subscriptionLimitErrorMessage(error, 'Unable to add this branch.'));
     } finally {
       setSaving(false);
     }

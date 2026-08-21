@@ -19,6 +19,8 @@ import { Plus, Pencil, Trash2, UserRound, Phone, Mail, Building2, UserPlus, Bell
 import BranchSelect from '@/components/shared/BranchSelect';
 import { formatCurrency } from '@/lib/helpers';
 import { useTenant } from '@/lib/TenantContext';
+import { useSubscription } from '@/lib/SubscriptionContext';
+import { subscriptionLimitErrorMessage, subscriptionLimitMessage } from '@/lib/subscriptionLimits';
 import { toast } from 'sonner';
 
 const emptyForm = { full_name: '', employee_id: '', branch: '', position: '', base_salary: '', joining_date: '', phone: '', email: '', is_active: true, notes: '' };
@@ -27,7 +29,8 @@ export default function Employees() {
   const { currency } = useLanguage();
   const { role, user } = useRole();
   const qc = useQueryClient();
-  const { ownerFilter } = useTenant();
+  const { ownerFilter, activeRestaurant } = useTenant();
+  const { withinLimit, usage, limits, planName } = useSubscription();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -45,8 +48,11 @@ export default function Employees() {
   });
 
   const saveMut = useMutation({
-    mutationFn: d => editing ? base44.entities.Employee.update(editing.id, d) : base44.entities.Employee.create(d),
+    mutationFn: d => editing
+      ? base44.entities.Employee.update(editing.id, d)
+      : base44.entities.Employee.create({ ...d, restaurant_id: activeRestaurant?.id || null }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['employees'] }); setShowForm(false); setEditing(null); setForm(emptyForm); },
+    onError: (error) => toast.error(subscriptionLimitErrorMessage(error, 'Unable to save employee.')),
   });
 
   const deleteMut = useMutation({
@@ -82,6 +88,15 @@ export default function Employees() {
 
   const handleSave = () => {
     if (!form.full_name || !form.branch) return;
+    if (!editing && Number(limits?.employees || 0) > 0 && !withinLimit('employees')) {
+      toast.error(subscriptionLimitMessage({
+        resource: 'employees',
+        used: usage?.employees,
+        limit: limits?.employees,
+        planName,
+      }));
+      return;
+    }
     saveMut.mutate({ ...form, full_name: form.full_name, base_salary: Number(form.base_salary) || 0 });
   };
 

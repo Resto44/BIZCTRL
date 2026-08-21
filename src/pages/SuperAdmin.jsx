@@ -24,10 +24,12 @@ import { XAxis, YAxis, Tooltip,
 import { format, subMonths } from 'date-fns';
 
 // ─── Plan definitions ─────────────────────────────────────────────────────────
+// Presentation metadata only. Canonical prices and capacities are read and enforced
+// exclusively from public.subscription_plans through the subscription control plane.
 const PLANS = {
-  starter:    { label: 'Starter',    price: 49,  color: 'bg-emerald-100 text-emerald-700', icon: Zap,    limits: { restaurants: 1, branches: 3,  employees: 20,  ocr: 100,  pdf: 50  } },
-  pro:        { label: 'Pro',        price: 99,  color: 'bg-blue-100 text-blue-700',       icon: Star,   limits: { restaurants: 5, branches: 15, employees: 100, ocr: 500,  pdf: 200 } },
-  enterprise: { label: 'Enterprise', price: 299, color: 'bg-violet-100 text-violet-700',   icon: Crown,  limits: { restaurants: -1, branches: -1, employees: -1, ocr: -1,  pdf: -1  } },
+  starter_20: { label: 'Starter', color: 'bg-emerald-100 text-emerald-700', icon: Zap },
+  growth_40: { label: 'Growth', color: 'bg-blue-100 text-blue-700', icon: Star },
+  enterprise_100: { label: 'Enterprise', color: 'bg-violet-100 text-violet-700', icon: Crown },
 };
 
 const STATUS_COLORS = {
@@ -42,7 +44,7 @@ const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function MrrCard({ tenants }) {
   const mrr = tenants.filter(t => t.status === 'active')
-    .reduce((s, t) => s + (t.monthly_revenue || PLANS[t.plan]?.price || 0), 0);
+    .reduce((s, t) => s + (t.monthly_revenue || 0), 0);
   const activeTrial = tenants.filter(t => t.status === 'trial').length;
   const activePaid = tenants.filter(t => t.status === 'active').length;
   const suspended = tenants.filter(t => t.status === 'suspended').length;
@@ -147,7 +149,7 @@ export default function SuperAdmin() {
     });
     // Add current MRR as latest month
     const activeMRR = tenants.filter(t => t.status === 'active')
-      .reduce((s, t) => s + (t.monthly_revenue || PLANS[t.plan]?.price || 0), 0);
+      .reduce((s, t) => s + (t.monthly_revenue || 0), 0);
     months[months.length - 1].mrr = activeMRR;
     months[months.length - 1].tenants = tenants.filter(t => t.status === 'active').length;
     return months;
@@ -171,22 +173,6 @@ export default function SuperAdmin() {
     await updateTenantMut.mutateAsync({
       id: tenant.id,
       data: { status: 'active', is_suspended: false, suspension_reason: '' },
-    });
-  };
-
-  const handlePlanChange = async (tenant, newPlan) => {
-    const limits = PLANS[newPlan]?.limits || {};
-    await updateTenantMut.mutateAsync({
-      id: tenant.id,
-      data: {
-        plan: newPlan,
-        monthly_revenue: PLANS[newPlan]?.price || 0,
-        max_restaurants: limits.restaurants === -1 ? 9999 : limits.restaurants,
-        max_branches: limits.branches === -1 ? 9999 : limits.branches,
-        max_employees: limits.employees === -1 ? 9999 : limits.employees,
-        max_ocr_scans: limits.ocr === -1 ? 9999 : limits.ocr,
-        max_pdf_exports: limits.pdf === -1 ? 9999 : limits.pdf,
-      },
     });
   };
 
@@ -286,7 +272,7 @@ export default function SuperAdmin() {
                       <div className="text-[10px] text-muted-foreground">{t.owner_email}</div>
                     </div>
                     <Badge className={PLANS[t.plan]?.color || ''}>{PLANS[t.plan]?.label || t.plan}</Badge>
-                    <span className="text-xs font-bold text-green-600">${(t.monthly_revenue || PLANS[t.plan]?.price || 0)}/mo</span>
+                    <span className="text-xs font-bold text-green-600">${(t.monthly_revenue || 0)}/mo</span>
                   </div>
                 ))}
               {tenants.filter(t => t.status === 'active').length === 0 && (
@@ -481,7 +467,7 @@ export default function SuperAdmin() {
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2.5">
                   <div className="text-[10px] text-muted-foreground">MRR</div>
-                  <div className="text-xs font-bold text-green-600">${selectedTenant.monthly_revenue || PLANS[selectedTenant.plan]?.price || 0}/mo</div>
+                  <div className="text-xs font-bold text-green-600">${selectedtenant.monthly_revenue || 0}/mo</div>
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2.5">
                   <div className="text-[10px] text-muted-foreground">Restaurants</div>
@@ -524,10 +510,18 @@ export default function SuperAdmin() {
       {editingTenant && (
         <TenantEditDialog
           tenant={editingTenant}
-          plans={PLANS}
           onSave={(data) => {
-            if (editingTenant._new) createTenantMut.mutate(data);
-            else updateTenantMut.mutate({ id: editingTenant.id, data });
+            const nonSubscriptionData = {
+              owner_email: data.owner_email,
+              business_name: data.business_name,
+              phone: data.phone,
+              country: data.country,
+              notes: data.notes,
+            };
+            // Subscription plans, status, pricing, and capacities are canonical
+            // server data. This legacy editor may update profile fields only.
+            if (editingTenant._new) createTenantMut.mutate(nonSubscriptionData);
+            else updateTenantMut.mutate({ id: editingTenant.id, data: nonSubscriptionData });
           }}
           onClose={() => setEditingTenant(null)}
           saving={updateTenantMut.isPending || createTenantMut.isPending}
@@ -558,52 +552,20 @@ export default function SuperAdmin() {
 }
 
 // ─── Tenant Edit Dialog ─────────────────────────────────────────────────────
-function TenantEditDialog({ tenant, plans, onSave, onClose, saving }) {
+function TenantEditDialog({ tenant, onSave, onClose, saving }) {
   const [form, setForm] = useState({
     owner_email: tenant.owner_email || '',
     business_name: tenant.business_name || '',
-    plan: tenant.plan || 'starter',
-    status: tenant.status || 'trial',
-    monthly_revenue: tenant.monthly_revenue || plans[tenant.plan || 'starter']?.price || 0,
-    max_restaurants: tenant.max_restaurants || 1,
-    max_branches: tenant.max_branches || 3,
-    max_employees: tenant.max_employees || 20,
-    max_ocr_scans: tenant.max_ocr_scans || 100,
-    max_pdf_exports: tenant.max_pdf_exports || 50,
-    current_period_end: tenant.current_period_end || '',
-    trial_end: tenant.trial_end || '',
     notes: tenant.notes || '',
     phone: tenant.phone || '',
     country: tenant.country || '',
   });
-
-  const applyPlanDefaults = (plan) => {
-    const limits = plans[plan]?.limits || {};
-    setForm(f => ({
-      ...f,
-      plan,
-      monthly_revenue: plans[plan]?.price || 0,
-      max_restaurants: limits.restaurants === -1 ? 9999 : (limits.restaurants || 1),
-      max_branches: limits.branches === -1 ? 9999 : (limits.branches || 3),
-      max_employees: limits.employees === -1 ? 9999 : (limits.employees || 20),
-      max_ocr_scans: limits.ocr === -1 ? 9999 : (limits.ocr || 100),
-      max_pdf_exports: limits.pdf === -1 ? 9999 : (limits.pdf || 50),
-    }));
-  };
 
   const fields = [
     ['owner_email', 'Owner Email', 'email'],
     ['business_name', 'Business Name', 'text'],
     ['phone', 'Phone', 'text'],
     ['country', 'Country', 'text'],
-    ['monthly_revenue', 'MRR ($)', 'number'],
-    ['max_restaurants', 'Max Restaurants', 'number'],
-    ['max_branches', 'Max Branches', 'number'],
-    ['max_employees', 'Max Employees', 'number'],
-    ['max_ocr_scans', 'Max OCR Scans', 'number'],
-    ['max_pdf_exports', 'Max PDF Exports', 'number'],
-    ['current_period_end', 'Period End (YYYY-MM-DD)', 'text'],
-    ['trial_end', 'Trial End (YYYY-MM-DD)', 'text'],
   ];
 
   return (
@@ -613,30 +575,9 @@ function TenantEditDialog({ tenant, plans, onSave, onClose, saving }) {
           <DialogTitle>{tenant._new ? 'Create Tenant' : 'Edit Tenant'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-xs">Plan</Label>
-              <Select value={form.plan} onValueChange={applyPlanDefaults}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(plans).map(([k, p]) => <SelectItem key={k} value={k}>{p.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Status</Label>
-              <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="trial">Trial</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="canceled">Canceled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            Subscription plan, pricing, and capacity are managed only through the canonical Platform Owner subscription controls.
           </div>
-
           {fields.map(([key, label, type]) => (
             <div key={key}>
               <Label className="text-xs">{label}</Label>

@@ -16,6 +16,8 @@ const EMPTY_SUMMARY = {
   usage: {},
   feature_flags: [],
   pricing: {},
+  exceeded_limits: [],
+  is_within_capacity: true,
   pending_payment_id: null,
   test_mode_enabled: false,
   can_manage_billing: false,
@@ -144,6 +146,7 @@ export function SubscriptionProvider({ children }) {
     const limits = summary.limits || {};
     const usage = summary.usage || {};
     const featureFlags = summary.feature_flags || [];
+    const exceededLimits = Array.isArray(summary.exceeded_limits) ? summary.exceeded_limits : [];
 
     return {
       summary,
@@ -158,6 +161,9 @@ export function SubscriptionProvider({ children }) {
       planName: summary.plan_name || 'No active plan',
       limits,
       usage,
+      exceededLimits,
+      isWithinCapacity: summary.is_within_capacity !== false,
+      isResourceExceeded: (metric) => exceededLimits.some((item) => item?.resource === String(metric || '').toLowerCase()),
       trialDaysRemaining: Number(summary.trial_days_remaining || 0),
       isTrial: status === 'TRIAL',
       isActive: Boolean(summary.has_erp_access),

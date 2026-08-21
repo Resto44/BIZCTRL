@@ -5,6 +5,8 @@ import { supabase } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
 import { useRole } from '@/lib/RoleContext';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useSubscription } from '@/lib/SubscriptionContext';
+import { subscriptionLimitErrorMessage, subscriptionLimitMessage } from '@/lib/subscriptionLimits';
 import { formatCurrency } from '@/lib/helpers';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -703,6 +705,7 @@ export default function BranchManagement() {
   const u = UI[lang] || UI.en;
   const { role } = useRole();
   const { allBranches, updateRestaurantBranches, ownerFilter, activeRestaurantId } = useTenant();
+  const { withinLimit, usage, limits, planName } = useSubscription();
 
   // Branch form state
   const [showForm, setShowForm] = useState(false);
@@ -857,12 +860,21 @@ export default function BranchManagement() {
         toast.success(u.edit_branch);
       } else {
         if (allBranches.find(b => b.key === key)) { toast.error('Branch key already exists.'); return; }
+        if (Number(limits?.branches || 0) > 0 && !withinLimit('branches')) {
+          toast.error(subscriptionLimitMessage({
+            resource: 'branches',
+            used: usage?.branches,
+            limit: limits?.branches,
+            planName,
+          }));
+          return;
+        }
         await updateRestaurantBranches([...allBranches, { ...form, key }]);
         toast.success(u.add_branch);
       }
       setShowForm(false); setEditing(null);
     } catch (error) {
-      toast.error(error.message || 'Unable to save branch.');
+      toast.error(subscriptionLimitErrorMessage(error, 'Unable to save branch.'));
     } finally { setSaving(false); }
   };
 

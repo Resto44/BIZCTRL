@@ -111,7 +111,7 @@ export default function Billing() {
   const { lang, isRTL } = useLanguage();
   const subscription = useSubscription();
   const {
-    summary, plans, payments, events, loading, error, status, plan, planName, limits, usage, refresh,
+    summary, plans, payments, events, loading, error, status, plan, planName, limits, usage, exceededLimits, isWithinCapacity, refresh,
     trialDaysRemaining, isActive, pendingPaymentId, canManageBilling, cancelAtPeriodEnd, renewSubscription,
     getManualPaymentInstructions, submitManualPaymentProof,
   } = subscription;
@@ -321,13 +321,20 @@ export default function Billing() {
           {usageItems.map(({ key, label, icon: Icon }) => {
             const used = Number(usage[key] || 0);
             const limit = Number(limits[key] || 0);
+            const exceeded = limit > 0 && used > limit;
             const percent = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
-            return <Card key={key}><CardContent className="p-4"><div className="mb-3 flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-medium"><Icon className="h-4 w-4 text-muted-foreground" />{label}</span><span className="text-xs text-muted-foreground">{used} / {limit || '—'}</span></div><Progress value={percent} className={percent >= 80 ? '[&>div]:bg-rose-500' : ''} /></CardContent></Card>;
+            return <Card key={key} className={exceeded ? 'border-rose-300 bg-rose-50/50 dark:border-rose-900 dark:bg-rose-950/20' : ''}><CardContent className="p-4"><div className="mb-3 flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-medium"><Icon className={`h-4 w-4 ${exceeded ? 'text-rose-600' : 'text-muted-foreground'}`} />{label}</span><span className={`text-xs ${exceeded ? 'font-semibold text-rose-700 dark:text-rose-300' : 'text-muted-foreground'}`}>{used} / {limit || '—'}</span></div><Progress value={percent} className={percent >= 80 || exceeded ? '[&>div]:bg-rose-500' : ''} />{exceeded && <p className="mt-2 text-xs font-medium text-rose-700 dark:text-rose-300">Limit exceeded — Upgrade Plan required for additional {label.toLowerCase()}.</p>}</CardContent></Card>;
           })}
         </div>
+        {!isWithinCapacity && exceededLimits.length > 0 && (
+          <div role="alert" className="mt-4 flex flex-col gap-3 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-950 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100 sm:flex-row sm:items-center sm:justify-between">
+            <div><p className="font-semibold">Upgrade Plan required for additional resources.</p><p className="mt-1">Existing data is retained. Creation is blocked only for resources above the current plan limit.</p><ul className="mt-2 list-inside list-disc">{exceededLimits.map((item) => <li key={item.resource}>{item.resource}: {item.used} / {item.limit}</li>)}</ul></div>
+            <Button asChild className="shrink-0"><a href="#available-plans">Upgrade Plan</a></Button>
+          </div>
+        )}
       </section>
 
-      <section>
+      <section id="available-plans">
         <div className="mb-3 flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /><h2 className="text-lg font-bold">{copy.availablePlans}</h2></div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {safePlans.map((item) => {

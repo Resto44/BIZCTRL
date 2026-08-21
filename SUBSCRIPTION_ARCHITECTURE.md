@@ -23,11 +23,11 @@ The organization is the billing tenant. An organization can have many users, res
 | Plan | Monthly price | Restaurants | Branches | Employees | Users | Storage | PDF reports / month | OCR / month | Advanced analytics | ERP module policy |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
 | Free | $0 | 1 | 1 | 5 | 5 | 512 MB | 10 | 10 | No | Core sales, purchases, expenses, inventory, and basic reports only. |
-| Starter 20 | $20 | 1 | 3 | 20 | 20 | 5 GB | 100 | 100 | No | Free modules plus treasury, suppliers, reports, PDF export, and OCR. |
-| Growth 40 | $40 | 3 | 10 | 75 | 75 | 25 GB | 500 | 500 | Yes | Starter modules plus advanced analytics, driver analytics, scheduled reports, and cash-flow forecasting. |
-| Enterprise 100 | $100 | 10 | 50 | 250 | 250 | 100 GB | 2,000 | 2,000 | Yes | All ERP modules. |
+| Starter | $10 | 1 | 1 | 5 | 3 | 5 GB | 100 | 100 | No | Free modules plus treasury, suppliers, reports, PDF export, and OCR. |
+| Growth | $20 | 3 | 3 | 15 | 10 | 25 GB | 500 | 500 | Yes | Starter modules plus advanced analytics, driver analytics, scheduled reports, and cash-flow forecasting. |
+| Enterprise | $50 | 10 | 10 | 50 | 30 | 100 GB | 2,000 | 2,000 | Yes | All ERP modules. |
 
-The `TRIAL` state grants temporary access to every published ERP module and applies the Scale plan’s quotas for thirty calendar days. This is an entitlement override, not a fifth plan record. The Free plan is permanent and can be selected after trial expiry or cancellation without a payment event.
+The `TRIAL` state grants temporary access to every published ERP module and applies the Starter plan’s quotas for thirty calendar days. This is an entitlement override, not a fifth plan record. The Free plan is permanent and can be selected after trial expiry or cancellation without a payment event.
 
 ## Lifecycle State Machine
 
