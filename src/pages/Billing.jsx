@@ -174,6 +174,10 @@ export default function Billing() {
     try {
       const intent = await provider.createCheckout(planId);
       if (isPaddleProvider) {
+        if (intent?.flow === 'manage_existing_subscription' && intent?.url) {
+          window.location.assign(intent.url);
+          return;
+        }
         await refresh();
         setNotice(copy.paddlePending);
         return;
@@ -195,7 +199,11 @@ export default function Billing() {
     setNotice('');
     try {
       if (isPaddleProvider) {
-        await provider.createCheckout(plan);
+        const intent = await provider.createCheckout(plan);
+        if (intent?.flow === 'manage_existing_subscription' && intent?.url) {
+          window.location.assign(intent.url);
+          return;
+        }
         await refresh();
         setNotice(copy.paddlePending);
         return;

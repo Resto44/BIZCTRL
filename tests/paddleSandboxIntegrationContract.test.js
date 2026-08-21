@@ -134,4 +134,20 @@ describe('Paddle live integration contract', () => {
     expect(envTemplate).not.toMatch(/PADDLE_API_KEY=[^\n#\s]+/);
     expect(envTemplate).not.toMatch(/PADDLE_WEBHOOK_SECRET=[^\n#\s]+/);
   });
+
+  it('routes an already-linked Paddle customer through the hosted portal and blocks duplicate server checkout contexts', async () => {
+    const [provider, billing, guardMigration] = await Promise.all([
+      readFile(paymentProviderPath, 'utf8'),
+      readFile(billingPath, 'utf8'),
+      readFile(new URL('../src/supabase/20260821_paddle_duplicate_subscription_guard.sql', import.meta.url), 'utf8'),
+    ]);
+    expect(provider).toContain("summary.payment_provider === 'paddle' && summary.paddle_customer_id");
+    expect(provider).toContain("flow: 'manage_existing_subscription'");
+    expect(provider).toContain('await this.openCustomerPortal()');
+    expect(billing).toContain("intent?.flow === 'manage_existing_subscription' && intent?.url");
+    expect(billing).toContain('window.location.assign(intent.url)');
+    expect(guardMigration).toContain("MESSAGE = 'PADDLE_EXISTING_SUBSCRIPTION_MANAGE_REQUIRED'");
+    expect(guardMigration).toContain("MESSAGE = 'PADDLE_PENDING_CHECKOUT_EXISTS'");
+    expect(guardMigration).toContain("AND status = 'pending'");
+  });
 });

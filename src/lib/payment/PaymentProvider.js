@@ -107,8 +107,16 @@ export class PaddlePaymentProvider extends PaymentProvider {
   }
 
   async createCheckout(planId) {
+    const summary = this.subscriptionApi.summary || {};
+    // An already-linked Paddle customer/subscription must be managed in Paddle's
+    // hosted portal. Creating a second checkout transaction here could create a
+    // duplicate subscription for the same tenant.
+    if (summary.payment_provider === 'paddle' && summary.paddle_customer_id) {
+      return { flow: 'manage_existing_subscription', url: await this.openCustomerPortal() };
+    }
+
     const { beginPaddleCheckout } = await import('@/lib/paddleBilling');
-    return beginPaddleCheckout(planId, this.subscriptionApi.summary?.paddle_customer_id);
+    return beginPaddleCheckout(planId, summary.paddle_customer_id);
   }
 
   async verifyPayment() {
@@ -136,9 +144,12 @@ export class PaddlePaymentProvider extends PaymentProvider {
 }
 
 export function createPaymentProvider(subscriptionApi) {
-  // Retain the existing manual billing path until a validated public live Paddle
-  // token is configured. No unverified provider IDs or secret fallback values
-  // are ever substituted.
-  if (isPaddleClientConfigured()) return new PaddlePaymentProvider(subscriptionApi);
+  const summary = subscriptionApi?.summary || {};
+  // A verified existing Paddle subscription must remain manageable even if the
+  // browser's public token is temporarily unavailable; the hosted portal is
+  // server-created and does not rely on browser checkout initialization.
+  if (isPaddleClientConfigured() || (summary.payment_provider === 'paddle' && summary.paddle_customer_id)) {
+    return new PaddlePaymentProvider(subscriptionApi);
+  }
   return new ManualIbanPaymentProvider(subscriptionApi);
 }
