@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight, BarChart3, Building2, CheckCircle2, ChevronDown, ClipboardList,
   Factory, Landmark, Package, Pill, Receipt, ShoppingBag, Store, Truck, Users,
