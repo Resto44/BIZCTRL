@@ -64,6 +64,23 @@ describe('Paddle live integration contract', () => {
     expect(webhook).toContain('subscription.trialing');
     expect(webhook).toContain('transaction.payment_failed');
     expect(webhook).toContain('PADDLE_LIVE_ONLY');
+    expect(webhook).toContain('const PADDLE_IPS_URL = "https://api.paddle.com/ips";');
+    expect(webhook).toContain('getPaddleIpv4Allowlist');
+    expect(webhook).toContain('x-forwarded-for');
+    expect(webhook).toContain('PADDLE_SOURCE_NOT_ALLOWED');
+    expect(webhook).toContain('PADDLE_IP_ALLOWLIST_UNAVAILABLE');
+    expect(webhook).not.toContain('34.237.3.244');
+    expect(webhook).not.toContain('34.195.105.136');
+    expect(webhook).not.toContain('34.232.58.13');
+  });
+
+  it('loads the Paddle source allowlist dynamically and rejects requests with no current approved source address', async () => {
+    const webhook = await readFile(webhookFunctionPath, 'utf8');
+    expect(webhook).toContain('fetch(PADDLE_IPS_URL');
+    expect(webhook).toContain('entry.endsWith("/32")');
+    expect(webhook).toContain('if (!allowedOrigin) return json(403, { error: "PADDLE_SOURCE_NOT_ALLOWED" });');
+    expect(webhook).toContain('if (ips.length === 0) throw new Error("PADDLE_IP_ALLOWLIST_UNAVAILABLE");');
+    expect(webhook).toContain('return json(503, { error: "PADDLE_IP_ALLOWLIST_UNAVAILABLE" });');
   });
 
   it('continues to use the hosted portal and manual billing fallback while selecting a configured live Paddle provider', async () => {

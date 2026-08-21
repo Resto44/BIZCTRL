@@ -2,8 +2,13 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const PADDLE_ENVIRONMENT = Deno.env.get("PADDLE_ENVIRONMENT") ?? "production";
+const PADDLE_IPS_URL = "https://api.paddle.com/ips";
+const PADDLE_IP_CACHE_TTL_MS = 60_000;
 const MAX_WEBHOOK_AGE_SECONDS = 300;
 const encoder = new TextEncoder();
+
+let paddleIpv4Allowlist: Set<string> | null = null;
+let paddleIpv4AllowlistExpiresAt = 0;
 
 function json(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -21,6 +26,37 @@ function parseSignature(header: string) {
   const timestamp = fields.find(([key]) => key === "ts")?.[1] ?? "";
   const signatures = fields.filter(([key]) => key === "h1").map(([, value]) => value).filter((value): value is string => Boolean(value));
   return { timestamp, signatures };
+}
+
+function forwardedIpv4(request: Request) {
+  const firstAddress = (request.headers.get("x-forwarded-for") ?? "").split(",", 1)[0]?.trim() ?? "";
+  return /^(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(firstAddress) ? firstAddress : null;
+}
+
+async function getPaddleIpv4Allowlist() {
+  if (paddleIpv4Allowlist && Date.now() < paddleIpv4AllowlistExpiresAt) return paddleIpv4Allowlist;
+
+  const response = await fetch(PADDLE_IPS_URL, { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error("PADDLE_IP_ALLOWLIST_UNAVAILABLE");
+
+  const payload = await response.json().catch(() => null) as { data?: { ipv4_cidrs?: unknown } } | null;
+  const ips = Array.isArray(payload?.data?.ipv4_cidrs)
+    ? payload.data.ipv4_cidrs
+      .filter((entry): entry is string => typeof entry === "string" && entry.endsWith("/32"))
+      .map((entry) => entry.slice(0, -3))
+      .filter((entry) => /^(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(entry))
+    : [];
+  if (ips.length === 0) throw new Error("PADDLE_IP_ALLOWLIST_UNAVAILABLE");
+
+  paddleIpv4Allowlist = new Set(ips);
+  paddleIpv4AllowlistExpiresAt = Date.now() + PADDLE_IP_CACHE_TTL_MS;
+  return paddleIpv4Allowlist;
+}
+
+async function isAllowedPaddleOrigin(request: Request) {
+  const sourceIp = forwardedIpv4(request);
+  if (!sourceIp) return false;
+  return (await getPaddleIpv4Allowlist()).has(sourceIp);
 }
 
 async function verifyPaddleSignature(rawBody: string, signatureHeader: string, secret: string) {
@@ -45,6 +81,15 @@ Deno.serve(async (req: Request) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const signature = req.headers.get("Paddle-Signature") ?? req.headers.get("paddle-signature") ?? "";
     if (!webhookSecret || !supabaseUrl || !serviceRoleKey || !signature) return json(503, { error: "PADDLE_WEBHOOK_NOT_CONFIGURED" });
+
+    let allowedOrigin = false;
+    try {
+      allowedOrigin = await isAllowedPaddleOrigin(req);
+    } catch (error) {
+      console.error("[paddle-subscription-webhook] Paddle IP allowlist lookup failed", error);
+      return json(503, { error: "PADDLE_IP_ALLOWLIST_UNAVAILABLE" });
+    }
+    if (!allowedOrigin) return json(403, { error: "PADDLE_SOURCE_NOT_ALLOWED" });
 
     const rawBody = await req.text();
     if (!(await verifyPaddleSignature(rawBody, signature, webhookSecret))) return json(401, { error: "invalid_signature" });
