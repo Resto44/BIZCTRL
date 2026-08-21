@@ -86,7 +86,7 @@ export function PricingPage() {
         <div className="grid gap-5 md:grid-cols-3">{[
           ['Launch Pricing', 'Promotional prices are clearly shown without artificial urgency or an unconfigured expiry date.'],
           ['Billing clarity', 'Starter begins with a free first month (a 30-day trial). After the free month, the configured recurring monthly price applies unless cancelled.'],
-          ['Paddle readiness', 'Each plan carries a centralized product concept and an empty provider-price reference until verified Paddle credentials and price IDs are configured.'],
+          ['Paddle readiness', 'Each paid plan has a verified live Paddle price mapping. Online checkout remains disabled until the required live client token and verified webhook delivery connection are configured.'],
         ].map(([title, description]) => <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-6"><h2 className="font-bold text-white">{title}</h2><p className="mt-2 text-sm leading-6 text-slate-400">{description}</p></div>)}</div>
       </ContentSection>
     </PublicLayout>

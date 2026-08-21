@@ -66,6 +66,13 @@ describe('public plan checkout canonical flow', () => {
     expect(migration).toContain("'Paddle checkout pending'");
   });
 
+  it('states that verified live price mappings do not enable checkout without the client token and webhook connection', async () => {
+    const pricing = await readFile(pricingPath, 'utf8');
+    expect(pricing).toContain('Each paid plan has a verified live Paddle price mapping.');
+    expect(pricing).toContain('Online checkout remains disabled until the required live client token and verified webhook delivery connection are configured.');
+    expect(pricing).not.toContain('empty provider-price reference');
+  });
+
   it('keeps payment activation exclusively with the verified provider event path', async () => {
     const [checkout, checkoutFunction] = await Promise.all([
       readFile(checkoutPath, 'utf8'),
