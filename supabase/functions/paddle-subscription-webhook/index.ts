@@ -1,143 +1,163 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import {
+  Environment,
+  EventName,
+  Paddle,
+} from "npm:@paddle/paddle-node-sdk@3.9.0";
 
 const PADDLE_ENVIRONMENT = Deno.env.get("PADDLE_ENVIRONMENT") ?? "production";
-const PADDLE_IPS_URL = "https://api.paddle.com/ips";
-const PADDLE_IP_CACHE_TTL_MS = 60_000;
-const MAX_WEBHOOK_AGE_SECONDS = 300;
-const encoder = new TextEncoder();
 
-let paddleIpv4Allowlist: Set<string> | null = null;
-let paddleIpv4AllowlistExpiresAt = 0;
+const supportedEventNames = new Set<string>([
+  EventName.SubscriptionCreated,
+  EventName.SubscriptionUpdated,
+  EventName.SubscriptionCanceled,
+  EventName.CustomerCreated,
+  EventName.CustomerUpdated,
+  EventName.TransactionCompleted,
+]);
+
+type VerifiedWebhookEvent = Awaited<ReturnType<Paddle["webhooks"]["unmarshal"]>>;
+type SubscriptionWebhookEvent = Extract<
+  VerifiedWebhookEvent,
+  { eventType: EventName.SubscriptionCreated | EventName.SubscriptionUpdated | EventName.SubscriptionCanceled }
+>;
+type CustomerWebhookEvent = Extract<
+  VerifiedWebhookEvent,
+  { eventType: EventName.CustomerCreated | EventName.CustomerUpdated }
+>;
+type TransactionCompletedWebhookEvent = Extract<
+  VerifiedWebhookEvent,
+  { eventType: EventName.TransactionCompleted }
+>;
+
+type WebhookApplicationResult = {
+  processed?: boolean;
+  reason?: string;
+  subscription_status?: string;
+};
 
 function json(status: number, body: Record<string, unknown>) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
-function safeEqual(left: string, right: string) {
-  if (left.length !== right.length) return false;
-  let difference = 0;
-  for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  return difference === 0;
+function createPaddleClient(apiKey: string) {
+  return new Paddle(apiKey, {
+    environment: PADDLE_ENVIRONMENT === "production" ? Environment.production : Environment.sandbox,
+  });
 }
 
-function parseSignature(header: string) {
-  const fields = header.split(";").map((entry) => entry.trim().split("=", 2));
-  const timestamp = fields.find(([key]) => key === "ts")?.[1] ?? "";
-  const signatures = fields.filter(([key]) => key === "h1").map(([, value]) => value).filter((value): value is string => Boolean(value));
-  return { timestamp, signatures };
+function eventPayload(event: VerifiedWebhookEvent) {
+  return {
+    p_event_id: event.eventId,
+    p_event_type: event.eventType,
+    p_occurred_at: event.occurredAt,
+    p_data: event.data,
+  };
 }
 
-function forwardedIpv4(request: Request) {
-  const firstAddress = (request.headers.get("x-forwarded-for") ?? "").split(",", 1)[0]?.trim() ?? "";
-  return /^(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(firstAddress) ? firstAddress : null;
+async function applyVerifiedEvent(
+  service: SupabaseClient,
+  event: VerifiedWebhookEvent,
+): Promise<WebhookApplicationResult> {
+  const { data, error } = await service.rpc("paddle_sync_verified_webhook_event", eventPayload(event));
+  if (error) throw new Error(error.message);
+  return (data ?? {}) as WebhookApplicationResult;
 }
 
-async function getPaddleIpv4Allowlist() {
-  if (paddleIpv4Allowlist && Date.now() < paddleIpv4AllowlistExpiresAt) return paddleIpv4Allowlist;
-
-  const response = await fetch(PADDLE_IPS_URL, { headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error("PADDLE_IP_ALLOWLIST_UNAVAILABLE");
-
-  const payload = await response.json().catch(() => null) as { data?: { ipv4_cidrs?: unknown } } | null;
-  const ips = Array.isArray(payload?.data?.ipv4_cidrs)
-    ? payload.data.ipv4_cidrs
-      .filter((entry): entry is string => typeof entry === "string" && entry.endsWith("/32"))
-      .map((entry) => entry.slice(0, -3))
-      .filter((entry) => /^(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(entry))
-    : [];
-  if (ips.length === 0) throw new Error("PADDLE_IP_ALLOWLIST_UNAVAILABLE");
-
-  paddleIpv4Allowlist = new Set(ips);
-  paddleIpv4AllowlistExpiresAt = Date.now() + PADDLE_IP_CACHE_TTL_MS;
-  return paddleIpv4Allowlist;
+async function handleSubscriptionEvent(
+  service: SupabaseClient,
+  event: SubscriptionWebhookEvent,
+): Promise<WebhookApplicationResult> {
+  return applyVerifiedEvent(service, event);
 }
 
-async function isAllowedPaddleOrigin(request: Request) {
-  const sourceIp = forwardedIpv4(request);
-  if (!sourceIp) return false;
-  return (await getPaddleIpv4Allowlist()).has(sourceIp);
+async function handleCustomerEvent(
+  service: SupabaseClient,
+  event: CustomerWebhookEvent,
+): Promise<WebhookApplicationResult> {
+  return applyVerifiedEvent(service, event);
 }
 
-async function verifyPaddleSignature(rawBody: string, signatureHeader: string, secret: string) {
-  const { timestamp, signatures } = parseSignature(signatureHeader);
-  if (!/^\d+$/.test(timestamp) || signatures.length === 0) return false;
-  if (Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > MAX_WEBHOOK_AGE_SECONDS) return false;
+async function handleTransactionCompleted(
+  service: SupabaseClient,
+  event: TransactionCompletedWebhookEvent,
+): Promise<WebhookApplicationResult> {
+  return applyVerifiedEvent(service, event);
+}
 
-  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const signed = await crypto.subtle.sign("HMAC", key, encoder.encode(`${timestamp}:${rawBody}`));
-  const expected = Array.from(new Uint8Array(signed)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  return signatures.some((signature) => safeEqual(signature, expected));
+async function routeVerifiedEvent(
+  service: SupabaseClient,
+  event: VerifiedWebhookEvent,
+): Promise<WebhookApplicationResult | null> {
+  switch (event.eventType) {
+    case EventName.SubscriptionCreated:
+    case EventName.SubscriptionUpdated:
+    case EventName.SubscriptionCanceled:
+      return handleSubscriptionEvent(service, event as SubscriptionWebhookEvent);
+    case EventName.CustomerCreated:
+    case EventName.CustomerUpdated:
+      return handleCustomerEvent(service, event as CustomerWebhookEvent);
+    case EventName.TransactionCompleted:
+      return handleTransactionCompleted(service, event as TransactionCompletedWebhookEvent);
+    default:
+      return null;
+  }
 }
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
 
+  const webhookSecret = Deno.env.get("PADDLE_WEBHOOK_SECRET")?.trim();
+  const paddleApiKey = Deno.env.get("PADDLE_API_KEY")?.trim();
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const signature = req.headers.get("Paddle-Signature") ?? req.headers.get("paddle-signature") ?? "";
+
+  if (PADDLE_ENVIRONMENT !== "production") return json(503, { error: "PADDLE_LIVE_ONLY" });
+  if (!webhookSecret || !paddleApiKey || !supabaseUrl || !serviceRoleKey) {
+    return json(503, { error: "PADDLE_WEBHOOK_NOT_CONFIGURED" });
+  }
+  if (!signature) return json(400, { error: "missing_signature" });
+
+  // Preserve the exact raw body. The Paddle SDK verifies this string before it
+  // parses it into a typed event object; JSON.parse must never run beforehand.
+  const rawBody = await req.text();
+  let event: VerifiedWebhookEvent;
   try {
-    if (PADDLE_ENVIRONMENT !== "production") return json(503, { error: "PADDLE_LIVE_ONLY" });
-
-    const webhookSecret = Deno.env.get("PADDLE_WEBHOOK_SECRET")?.trim();
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const signature = req.headers.get("Paddle-Signature") ?? req.headers.get("paddle-signature") ?? "";
-    if (!webhookSecret || !supabaseUrl || !serviceRoleKey || !signature) return json(503, { error: "PADDLE_WEBHOOK_NOT_CONFIGURED" });
-
-    let allowedOrigin = false;
-    try {
-      allowedOrigin = await isAllowedPaddleOrigin(req);
-    } catch (error) {
-      console.error("[paddle-subscription-webhook] Paddle IP allowlist lookup failed", error);
-      return json(503, { error: "PADDLE_IP_ALLOWLIST_UNAVAILABLE" });
-    }
-    if (!allowedOrigin) return json(403, { error: "PADDLE_SOURCE_NOT_ALLOWED" });
-
-    const rawBody = await req.text();
-    if (!(await verifyPaddleSignature(rawBody, signature, webhookSecret))) return json(401, { error: "invalid_signature" });
-
-    const event = JSON.parse(rawBody) as {
-      event_id?: unknown;
-      event_type?: unknown;
-      occurred_at?: unknown;
-      data?: unknown;
-    };
-    if (typeof event.event_id !== "string" || typeof event.event_type !== "string" || !event.data || typeof event.data !== "object") {
-      return json(400, { error: "PADDLE_EVENT_INVALID" });
-    }
-
-    const supported = new Set([
-      "subscription.created",
-      "subscription.trialing",
-      "subscription.activated",
-      "subscription.updated",
-      "subscription.canceled",
-      "subscription.past_due",
-      "subscription.paused",
-      "subscription.resumed",
-      "transaction.paid",
-      "transaction.completed",
-      "transaction.payment_failed",
-      "transaction.past_due",
-      "transaction.refunded",
-    ]);
-    if (!supported.has(event.event_type)) return json(200, { received: true, ignored: true });
-
-    const occurredAt = typeof event.occurred_at === "string" && Number.isFinite(Date.parse(event.occurred_at)) ? event.occurred_at : new Date().toISOString();
-    const service = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const { data, error } = await service.rpc("paddle_apply_webhook_event", {
-      p_event_id: event.event_id,
-      p_event_type: event.event_type,
-      p_occurred_at: occurredAt,
-      p_data: event.data,
-    });
-    if (error) {
-      console.error("[paddle-subscription-webhook] application failed", error.message);
-      return json(500, { error: "PADDLE_EVENT_PROCESSING_FAILED" });
-    }
-
-    return json(200, { received: true, result: data });
+    event = await createPaddleClient(paddleApiKey).webhooks.unmarshal(rawBody, webhookSecret, signature);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "PADDLE_WEBHOOK_PROCESSING_FAILED";
-    console.error("[paddle-subscription-webhook]", message);
-    return json(400, { error: "PADDLE_WEBHOOK_PROCESSING_FAILED" });
+    console.warn("[paddle-subscription-webhook] signature verification failed", error instanceof Error ? error.message : "unknown_error");
+    return json(400, { error: "invalid_signature" });
+  }
+
+  if (!supportedEventNames.has(event.eventType)) {
+    return json(200, { received: true, ignored: true, event_type: event.eventType });
+  }
+
+  try {
+    const service = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const result = await routeVerifiedEvent(service, event);
+    return json(200, {
+      received: true,
+      event_id: event.eventId,
+      event_type: event.eventType,
+      result,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "PADDLE_EVENT_PROCESSING_FAILED";
+    console.error("[paddle-subscription-webhook] verified event processing failed", {
+      event_id: event.eventId,
+      event_type: event.eventType,
+      message,
+    });
+    // A non-2xx response preserves Paddle's retry behavior for verified events
+    // that could not be mirrored or applied to the canonical subscription state.
+    return json(500, { error: "PADDLE_EVENT_PROCESSING_FAILED" });
   }
 });
