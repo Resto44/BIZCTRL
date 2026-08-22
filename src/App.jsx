@@ -11,6 +11,7 @@ import { RoleProvider } from '@/lib/RoleContext';
 import RoleGuard from '@/components/rbac/RoleGuard';
 import ERPRoleGuard from '@/components/rbac/ERPRoleGuard';
 import { TenantProvider, useTenant } from '@/lib/TenantContext';
+import { WorkspaceCustomizationProvider } from '@/lib/WorkspaceCustomizationContext';
 import { BusinessModeProvider } from '@/lib/BusinessModeContext';
 import { NotificationProvider } from '@/lib/NotificationContext';
 import { useRole, ROLES, ROLE_HOME, NON_OWNER_ROLES } from '@/lib/RoleContext';
@@ -83,6 +84,7 @@ const CustomerPortal      = lazy(() => import('@/pages/CustomerPortal'));
 const LoyaltyProgram      = lazy(() => import('@/pages/LoyaltyProgram'));
 
 const SettingsPage        = lazy(() => import('@/pages/SettingsPage'));
+const CustomizeWorkspace  = lazy(() => import('@/pages/CustomizeWorkspace'));
 const BrandSettings       = lazy(() => import('@/pages/BrandSettings'));
 const BranchManagement    = lazy(() => import('@/pages/BranchManagement'));
 const RolePermissionCenter = lazy(() => import('@/pages/RolePermissionCenter'));
@@ -306,6 +308,7 @@ const SubscribedRoutes = () => {
 
         {/* ── Configuration ── */}
         <Route path="/settings" element={<RoleGuard permission="manageSettings"><SettingsPage /></RoleGuard>} />
+        <Route path="/customize-workspace" element={<CustomizeWorkspace />} />
         <Route path="/brand" element={<RoleGuard permission="viewBrandSettings"><BrandSettings /></RoleGuard>} />
         <Route path="/restaurants" element={<RoleGuard permission="viewBrandSettings"><RestaurantManager /></RoleGuard>} />
         <Route path="/branch-management" element={<RoleGuard permission="viewBrandSettings"><BranchManagement /></RoleGuard>} />
@@ -541,12 +544,14 @@ const AuthenticatedApp = () => {
     <RoleProvider>
       <TenantProvider>
         <SubscriptionProvider>
-          <BusinessModeProvider>
-            <NotificationProvider>
-              <RoleHomeRedirect />
-              <SubscribedRoutes />
-            </NotificationProvider>
-          </BusinessModeProvider>
+          <WorkspaceCustomizationProvider>
+            <BusinessModeProvider>
+              <NotificationProvider>
+                <RoleHomeRedirect />
+                <SubscribedRoutes />
+              </NotificationProvider>
+            </BusinessModeProvider>
+          </WorkspaceCustomizationProvider>
         </SubscriptionProvider>
       </TenantProvider>
     </RoleProvider>

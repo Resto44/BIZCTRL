@@ -28,6 +28,8 @@ import {
 import NotificationBell from '@/components/notifications/NotificationBell';
 import { useERPNavigation } from '@/hooks/useERPNavigation';
 import { ERP_NAV_GROUPS } from './ERPSidebar';
+import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
+import { getCustomizedNavigationGroups } from '@/lib/workspaceCustomization';
 import ModeBadge from '@/components/shared/ModeBadge';
 import LogoutButton from './LogoutButton';
 import LanguageSwitcher from '@/components/shared/LanguageSwitcher';
@@ -37,7 +39,8 @@ import PortalIdentityHeader from './PortalIdentityHeader';
 function ERPBreadcrumb() {
   const location = useLocation();
   const { translateLiteral } = useLanguage();
-  const allItems = useMemo(() => ERP_NAV_GROUPS.flatMap(g => g.items), []);
+  const { configuration } = useWorkspaceCustomization();
+  const allItems = useMemo(() => getCustomizedNavigationGroups(ERP_NAV_GROUPS, configuration).flatMap((group) => group.items), [configuration]);
 
   const crumbs = useMemo(() => {
     const parts = location.pathname.split('/').filter(Boolean);
@@ -89,10 +92,11 @@ function GlobalSearch() {
   const navigate = useNavigate();
   const inputRef = useRef(null);
   const { can } = useRole();
+  const { configuration } = useWorkspaceCustomization();
 
   const allItems = useMemo(
-    () => ERP_NAV_GROUPS.flatMap(g => g.items).filter(i => !i.permission || can[i.permission]),
-    [can]
+    () => getCustomizedNavigationGroups(ERP_NAV_GROUPS, configuration).flatMap((group) => group.items).filter((item) => !item.permission || can[item.permission]),
+    [can, configuration]
   );
 
   const results = useMemo(() => {
@@ -204,7 +208,8 @@ function FavoriteToggle() {
   const location = useLocation();
   const { translateLiteral } = useLanguage();
   const { favorites, toggleFavorite } = useERPNavigation();
-  const allItems = useMemo(() => ERP_NAV_GROUPS.flatMap(g => g.items), []);
+  const { configuration } = useWorkspaceCustomization();
+  const allItems = useMemo(() => getCustomizedNavigationGroups(ERP_NAV_GROUPS, configuration).flatMap((group) => group.items), [configuration]);
 
   const currentItem = useMemo(
     () => allItems.find(i => i.path !== '/' && location.pathname.startsWith(i.path)),
@@ -311,8 +316,6 @@ function UserMenu() {
 
 // ─── Main ERPHeader ───────────────────────────────────────────────────────────
 export default function ERPHeader({ onMobileMenuToggle }) {
-  const { role } = useRole();
-
   return (
     <header className="sticky top-0 z-50 h-[60px] bg-card/95 backdrop-blur-md border-b border-border flex items-center px-4 gap-3 shrink-0">
       {/* Mobile menu toggle */}

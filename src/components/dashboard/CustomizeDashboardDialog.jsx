@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Settings2, RotateCcw } from 'lucide-react';
+import { ArrowDown, ArrowUp, Settings2, RotateCcw } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ function buildDraft(widgets) {
       title: widget.title,
       description: widget.description,
       isVisible: widget.isVisible,
+      order: widget.order,
     };
     return draft;
   }, {});
@@ -54,8 +55,27 @@ export default function CustomizeDashboardDialog({
         title: widget.defaultTitle,
         description: widget.defaultDescription,
         isVisible: true,
+        order: widget.defaultOrder,
       },
     }));
+  };
+
+  const orderedWidgets = useMemo(
+    () => [...widgets].sort((a, b) => (draft[a.id]?.order ?? a.order) - (draft[b.id]?.order ?? b.order)),
+    [draft, widgets],
+  );
+
+  const moveWidget = (widgetId, direction) => {
+    const ids = orderedWidgets.map((widget) => widget.id);
+    const index = ids.indexOf(widgetId);
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (index < 0 || target < 0 || target >= ids.length) return;
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    setDraft((current) => {
+      const next = { ...current };
+      ids.forEach((id, order) => { next[id] = { ...next[id], order }; });
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -65,6 +85,7 @@ export default function CustomizeDashboardDialog({
       if (value.title !== widget.defaultTitle) override.title = value.title;
       if (value.description !== widget.defaultDescription) override.description = value.description;
       if (widget.isOptional && value.isVisible === false) override.is_visible = false;
+      if (value.order !== widget.defaultOrder) override.order = value.order;
       if (Object.keys(override).length > 0) result[widget.id] = override;
       return result;
     }, {});
@@ -91,7 +112,7 @@ export default function CustomizeDashboardDialog({
         </DialogHeader>
 
         <div className="space-y-4 px-6 py-5">
-          {widgets.map((widget) => {
+          {orderedWidgets.map((widget, index) => {
             const value = draft[widget.id] || {};
             return (
               <section key={widget.id} className="rounded-xl border border-border/70 bg-card p-4">
@@ -102,17 +123,21 @@ export default function CustomizeDashboardDialog({
                       {widget.isOptional ? copy.optional : copy.required}
                     </Badge>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 text-xs"
-                    disabled={isSaving}
-                    onClick={() => resetWidget(widget)}
-                  >
-                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                    {copy.resetWidget}
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button type="button" size="icon" variant="ghost" className="h-8 w-8" disabled={isSaving || index === 0} onClick={() => moveWidget(widget.id, 'up')} aria-label={`Move ${widget.defaultTitle} up`}><ArrowUp className="h-3.5 w-3.5" /></Button>
+                    <Button type="button" size="icon" variant="ghost" className="h-8 w-8" disabled={isSaving || index === orderedWidgets.length - 1} onClick={() => moveWidget(widget.id, 'down')} aria-label={`Move ${widget.defaultTitle} down`}><ArrowDown className="h-3.5 w-3.5" /></Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 text-xs"
+                      disabled={isSaving}
+                      onClick={() => resetWidget(widget)}
+                    >
+                      <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                      {copy.resetWidget}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">

@@ -152,7 +152,7 @@ export function getDashboardWidgetDefaults({ lang = 'en', t, selectedBranch, sel
 
 export function normalizeDashboardWidgetConfiguration(defaults = [], overrides = {}) {
   const safeOverrides = overrides && typeof overrides === 'object' && !Array.isArray(overrides) ? overrides : {};
-  return defaults.map((widget) => {
+  return defaults.map((widget, index) => {
     const override = safeOverrides[widget.id] && typeof safeOverrides[widget.id] === 'object'
       ? safeOverrides[widget.id]
       : {};
@@ -160,12 +160,14 @@ export function normalizeDashboardWidgetConfiguration(defaults = [], overrides =
       ...widget,
       defaultTitle: widget.title,
       defaultDescription: widget.description,
+      defaultOrder: index,
+      order: Number.isInteger(override.order) && override.order >= 0 ? override.order : index,
       // Do not trim custom text. Exact owner input, including Arabic/Persian
       // characters and deliberate whitespace, is preserved in persistence.
       title: isString(override.title) && override.title.length > 0 ? override.title : widget.title,
       description: isString(override.description) ? override.description : widget.description,
       isVisible: widget.isOptional ? override.is_visible !== false : true,
-      isCustomized: isString(override.title) || isString(override.description) || (widget.isOptional && typeof override.is_visible === 'boolean'),
+      isCustomized: isString(override.title) || isString(override.description) || (widget.isOptional && typeof override.is_visible === 'boolean') || Number.isInteger(override.order),
     };
   });
 }
@@ -176,6 +178,7 @@ export function toDashboardWidgetOverrides(widgets = []) {
       title: widget.title,
       description: widget.description,
       ...(widget.isOptional ? { is_visible: widget.isVisible } : {}),
+      order: Number.isInteger(widget.order) ? widget.order : 0,
     };
     return overrides;
   }, {});

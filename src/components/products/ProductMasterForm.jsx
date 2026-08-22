@@ -10,15 +10,32 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 function nanoid8() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
+function CustomAttributeControl({ field, value, onChange }) {
+  const label = <Label className="text-xs">{field.label}{field.required ? ' *' : ''}</Label>;
+  if (field.type === 'boolean') {
+    return <div className="flex items-center justify-between rounded-lg border border-border p-3"><span className="text-xs font-medium">{field.label}</span><Switch checked={Boolean(value)} onCheckedChange={onChange} /></div>;
+  }
+  if (field.type === 'long_text') {
+    return <div><>{label}</><Textarea value={value ?? ''} onChange={(event) => onChange(event.target.value)} required={field.required} placeholder={field.placeholder || undefined} rows={3} /></div>;
+  }
+  if (field.type === 'multiselect') {
+    return <div><>{label}</><Input value={Array.isArray(value) ? value.join(', ') : value || ''} onChange={(event) => onChange(event.target.value.split(',').map((entry) => entry.trim()).filter(Boolean))} required={field.required} placeholder={field.options?.join(', ') || field.placeholder || undefined} /></div>;
+  }
+  const inputType = ({ number: 'number', decimal: 'number', currency: 'number', date: 'date', datetime: 'datetime-local', email: 'email', phone: 'tel', url: 'url' })[field.type] || 'text';
+  return <div><>{label}</><Input type={inputType} step={['decimal', 'currency'].includes(field.type) ? '0.01' : undefined} value={value ?? ''} onChange={(event) => onChange(event.target.value)} required={field.required} placeholder={field.placeholder || undefined} /></div>;
+}
+
 export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
   const { activeRestaurant } = useTenant();
   const { t } = useLanguage();
+  const { isProductFieldVisible, isProductFieldRequired, productCustomFields } = useWorkspaceCustomization();
 
   const [form, setForm] = useState({
     name: '',
@@ -48,6 +65,7 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
     subcategory_id: '',
     child_category_id: '',
     restaurant_id: activeRestaurant?.id,
+    custom_attributes: {},
     ...initial,
   });
 
@@ -92,6 +110,10 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
   }, [categories, form.subcategory_id]);
 
   const set = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+  const setCustomAttribute = (field, value) => setForm((previous) => ({
+    ...previous,
+    custom_attributes: { ...(previous.custom_attributes || {}), [field]: value },
+  }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -101,6 +123,13 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
     
     if (form.category_id && !selectedCat) {
       toast.error('Invalid category selected. Please choose a category from the list.');
+      return;
+    }
+    const requiredFields = ['sku', 'barcode', 'brand', 'description', 'status'];
+    const missingRequired = requiredFields.find((field) => isProductFieldRequired(field) && (form[field] === '' || form[field] === null || form[field] === undefined));
+    const missingCustom = productCustomFields.find((field) => field.required && (form.custom_attributes?.[field.id] === '' || form.custom_attributes?.[field.id] === null || form.custom_attributes?.[field.id] === undefined));
+    if (missingRequired || missingCustom) {
+      toast.error(`Complete the required ${missingCustom?.label || missingRequired?.replaceAll('_', ' ') || 'field'}.`);
       return;
     }
 
@@ -131,16 +160,18 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
       status: form.status || 'active',
       is_active: form.status === 'active',
       restaurant_id: activeRestaurant?.id,
+      custom_attributes: form.custom_attributes || {},
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <Tabs defaultValue="basic">
-        <TabsList className="grid grid-cols-3 w-full text-xs">
+        <TabsList className="grid grid-cols-4 w-full text-xs">
           <TabsTrigger value="basic">Basic</TabsTrigger>
           <TabsTrigger value="pricing">Pricing</TabsTrigger>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          {productCustomFields.length > 0 && <TabsTrigger value="custom">Custom</TabsTrigger>}
         </TabsList>
 
         {/* ── BASIC INFO ── */}
@@ -163,16 +194,16 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
             <Label className="text-xs">{t('name_fa')}</Label>
             <Input value={form.name_fa} onChange={e => set('name_fa', e.target.value)} placeholder="نام محصول" dir="rtl" />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-xs">{t('sku')}</Label>
-              <Input value={form.sku} onChange={e => set('sku', e.target.value)} placeholder="SKU-001" />
-            </div>
-            <div>
-              <Label className="text-xs">{t('barcode')}</Label>
-              <Input value={form.barcode} onChange={e => set('barcode', e.target.value)} placeholder="1234567890" />
-            </div>
-          </div>
+          {(isProductFieldVisible('sku') || isProductFieldVisible('barcode')) && <div className="grid grid-cols-2 gap-2">
+            {isProductFieldVisible('sku') && <div>
+              <Label className="text-xs">{t('sku')}{isProductFieldRequired('sku') ? ' *' : ''}</Label>
+              <Input value={form.sku} onChange={e => set('sku', e.target.value)} required={isProductFieldRequired('sku')} placeholder="SKU-001" />
+            </div>}
+            {isProductFieldVisible('barcode') && <div>
+              <Label className="text-xs">{t('barcode')}{isProductFieldRequired('barcode') ? ' *' : ''}</Label>
+              <Input value={form.barcode} onChange={e => set('barcode', e.target.value)} required={isProductFieldRequired('barcode')} placeholder="1234567890" />
+            </div>}
+          </div>}
           {/* Category — 3-level cascading dropdowns */}
           <div className="space-y-2">
             <div>
@@ -236,10 +267,10 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-xs">{t('brand')}</Label>
-              <Input value={form.brand} onChange={e => set('brand', e.target.value)} placeholder={t('optional')} />
-            </div>
+            {isProductFieldVisible('brand') && <div>
+              <Label className="text-xs">{t('brand')}{isProductFieldRequired('brand') ? ' *' : ''}</Label>
+              <Input value={form.brand} onChange={e => set('brand', e.target.value)} required={isProductFieldRequired('brand')} placeholder={t('optional')} />
+            </div>}
           </div>
           <div>
             <Label className="text-xs">{t('supplier')}</Label>
@@ -253,15 +284,15 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label className="text-xs">{t('description')}</Label>
-            <Textarea value={form.description} onChange={e => set('description', e.target.value)} rows={2} placeholder={t('optional')} />
-          </div>
+          {isProductFieldVisible('description') && <div>
+            <Label className="text-xs">{t('description')}{isProductFieldRequired('description') ? ' *' : ''}</Label>
+            <Textarea value={form.description} onChange={e => set('description', e.target.value)} required={isProductFieldRequired('description')} rows={2} placeholder={t('optional')} />
+          </div>}
           <div>
             <Label className="text-xs">{t('image_upload')}</Label>
             <Input value={form.image_url} onChange={e => set('image_url', e.target.value)} placeholder="https://... or leave blank" />
           </div>
-          <div className="flex items-center justify-between">
+          {isProductFieldVisible('status') && <div className="flex items-center justify-between">
             <Label className="text-xs">{t('status')}</Label>
             <Select value={form.status} onValueChange={v => set('status', v)}>
               <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
@@ -271,7 +302,7 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
                 <SelectItem value="discontinued">{t('discontinued')}</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </div>}
         </TabsContent>
 
         {/* ── PRICING ── */}
@@ -330,6 +361,10 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
             Stock levels are automatically updated via inventory transactions.
           </p>
         </TabsContent>
+
+        {productCustomFields.length > 0 && <TabsContent value="custom" className="space-y-3 pt-2">
+          {productCustomFields.map((field) => <CustomAttributeControl key={field.id} field={field} value={form.custom_attributes?.[field.id] ?? field.default_value} onChange={(value) => setCustomAttribute(field.id, value)} />)}
+        </TabsContent>}
       </Tabs>
 
       <div className="flex gap-2 pt-2">

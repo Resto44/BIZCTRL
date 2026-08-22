@@ -169,8 +169,9 @@ const DashboardAccordionSection = memo(({
   const displayedTitle = configuredWidget?.title ?? title;
   const displayedSubtitle = configuredWidget?.description ?? subtitle;
   const expanded = expandedId === id;
+  const order = Number.isInteger(configuredWidget?.order) ? configuredWidget.order : undefined;
   return (
-    <section className="rounded-2xl border border-border/60 bg-card/30 p-2.5 shadow-sm sm:p-3">
+    <section style={order === undefined ? undefined : { order }} className="rounded-2xl border border-border/60 bg-card/30 p-2.5 shadow-sm sm:p-3">
       <SectionHeader
         icon={icon}
         title={displayedTitle}
@@ -1456,6 +1457,7 @@ function OwnerDashboardContent() {
         </div>
       </div>
 
+      <div className="flex flex-col gap-6">
       {/* ══════════════════════════════════════════════════════════════════════
           DRIVER PERFORMANCE — restaurant-wide, branch-filter aware
       ══════════════════════════════════════════════════════════════════════ */}
@@ -2394,6 +2396,7 @@ function OwnerDashboardContent() {
           />
         </DashboardAccordionSection>
       </WidgetErrorBoundary>
+      </div>
     </div>
     {canCustomizeDashboard && (
       <CustomizeDashboardDialog

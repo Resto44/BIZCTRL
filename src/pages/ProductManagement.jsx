@@ -3,15 +3,12 @@
  * Full Product Management System — BizCTRL
  * Route: /product-management
  */
-import { useState, useMemo, useRef, useCallback } from 'react';
-import { useBusinessMode } from '@/lib/BusinessModeContext';
-import ModeBadge from '@/components/shared/ModeBadge';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { supabase } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
-import { useAuth } from '@/lib/AuthContext';
+import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,8 +18,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import PageHeader from '@/components/shared/PageHeader';
 import ProductMasterForm from '@/components/products/ProductMasterForm';
 import BarcodeGenerator from '@/components/products/BarcodeGenerator';
@@ -33,19 +28,18 @@ import PriceAnalyticsTab from '@/components/products/PriceAnalyticsTab';
 import {
   Package, Plus, Pencil, Trash2, Search, BarChart3, Tag, Ruler,
   Barcode, Layers, ArrowUpDown, TrendingUp, Upload, Download,
-  AlertTriangle, CheckCircle, XCircle, RefreshCw, Filter, Eye,
-  QrCode, FileText, FileSpreadsheet, ChevronRight, ChevronDown,
-  MoreVertical, Star, DollarSign
+  AlertTriangle, CheckCircle, XCircle, RefreshCw,
+  FileText, ChevronRight, Star, DollarSign
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function stockBadge(product) {
+function stockBadge(product, lowStockThreshold = 0, lowStockEnabled = true) {
   const stock = product.current_stock || 0;
-  const min = product.min_stock || 0;
+  const min = Math.max(product.min_stock || 0, lowStockThreshold || 0);
   if (stock <= 0) return <Badge variant="destructive" className="text-xs">Out of Stock</Badge>;
-  if (stock <= min) return <Badge className="text-xs bg-orange-500">Low Stock</Badge>;
+  if (lowStockEnabled && stock <= min) return <Badge className="text-xs bg-orange-500">Low Stock</Badge>;
   return <Badge variant="secondary" className="text-xs text-green-600">In Stock</Badge>;
 }
 
@@ -188,6 +182,10 @@ function DashboardTab({ products, currency }) {
 function ProductMasterTab({ products, categories, isLoading, onRefresh, currency }) {
   const { t } = useLanguage();
   const { activeRestaurant } = useTenant();
+  const { configuration, productCustomFields } = useWorkspaceCustomization();
+  const productListSettings = configuration.tables.products;
+  const visibleColumns = new Set(productListSettings.visible_columns || []);
+  const lowStockSettings = configuration.notifications;
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -219,7 +217,7 @@ function ProductMasterTab({ products, categories, isLoading, onRefresh, currency
   });
 
   const filtered = useMemo(() => {
-    return products.filter(p => {
+    const filteredProducts = products.filter(p => {
       const matchSearch = !search ||
         p.name?.toLowerCase().includes(search.toLowerCase()) ||
         p.sku?.toLowerCase().includes(search.toLowerCase()) ||
@@ -230,7 +228,15 @@ function ProductMasterTab({ products, categories, isLoading, onRefresh, currency
       const matchCat = filterCategory === 'all' || p.category_id === filterCategory || p.category === filterCategory;
       return matchSearch && matchStatus && matchCat;
     });
-  }, [products, search, filterStatus, filterCategory]);
+    const direction = productListSettings.default_sort_direction === 'desc' ? -1 : 1;
+    const key = productListSettings.default_sort || 'name';
+    return filteredProducts.sort((a, b) => {
+      const aValue = a?.[key] ?? '';
+      const bValue = b?.[key] ?? '';
+      if (typeof aValue === 'number' || typeof bValue === 'number') return (Number(aValue) - Number(bValue)) * direction;
+      return String(aValue).localeCompare(String(bValue)) * direction;
+    });
+  }, [products, search, filterStatus, filterCategory, productListSettings.default_sort, productListSettings.default_sort_direction]);
 
   return (
     <div className="space-y-3">
@@ -294,17 +300,19 @@ function ProductMasterTab({ products, categories, isLoading, onRefresh, currency
                   <div className="flex items-start justify-between gap-1">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold truncate">{p.name}</p>
+                      {visibleColumns.has('sku') && p.sku && <p className="text-xs text-muted-foreground">SKU: {p.sku}</p>}
+                      {visibleColumns.has('category') && p.category && <p className="text-xs text-muted-foreground">{p.category}</p>}
                       {p.name_ar && <p className="text-xs text-muted-foreground" dir="rtl">{p.name_ar}</p>}
                     </div>
                     <div className="flex gap-1 flex-shrink-0">
-                      {statusBadge(p.status)}
-                      {stockBadge(p)}
+                      {visibleColumns.has('status') && statusBadge(p.status)}
+                      {visibleColumns.has('current_stock') && stockBadge(p, lowStockSettings.low_stock_threshold, lowStockSettings.low_stock_enabled)}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 mt-1.5 text-xs">
-                    <span className="text-muted-foreground">Cost: <span className="font-medium text-foreground">{currency}{(p.purchase_cost || p.default_cost || 0).toFixed(2)}</span></span>
-                    <span className="text-muted-foreground">Price: <span className="font-medium text-primary">{currency}{(p.selling_price || p.default_price || 0).toFixed(2)}</span></span>
-                    <span className="text-muted-foreground">Stock: <span className={`font-medium ${(p.current_stock || 0) <= (p.min_stock || 0) ? 'text-red-600' : 'text-green-600'}`}>{p.current_stock || 0}</span></span>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs">
+                    {visibleColumns.has('selling_price') && <span className="text-muted-foreground">Price: <span className="font-medium text-primary">{currency}{(p.selling_price || p.default_price || 0).toFixed(2)}</span></span>}
+                    {visibleColumns.has('current_stock') && <span className="text-muted-foreground">Stock: <span className={`font-medium ${(p.current_stock || 0) <= Math.max(p.min_stock || 0, lowStockSettings.low_stock_threshold || 0) ? 'text-red-600' : 'text-green-600'}`}>{p.current_stock || 0}</span></span>}
+                    {productCustomFields.filter((field) => field.visible !== false && p.custom_attributes?.[field.id] !== undefined && p.custom_attributes?.[field.id] !== '').map((field) => <span key={field.id} className="text-muted-foreground">{field.label}: <span className="font-medium text-foreground">{Array.isArray(p.custom_attributes[field.id]) ? p.custom_attributes[field.id].join(', ') : String(p.custom_attributes[field.id])}</span></span>)}
                   </div>
                 </div>
               </div>

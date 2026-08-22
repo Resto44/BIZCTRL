@@ -14,7 +14,6 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useRole } from '@/lib/RoleContext';
-import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { cn } from '@/lib/utils';
@@ -29,9 +28,11 @@ import {
   Receipt, FileText, AlertTriangle, Zap, Activity, CreditCard,
   Banknote, Network, UserCheck, GitBranch, Store, Globe,
   PieChart, Target, Layers, ClipboardList, Handshake,
-  ArrowLeftRight, ShieldCheck
+  ArrowLeftRight, ShieldCheck, SlidersHorizontal
 } from 'lucide-react';
 import { useERPNavigation } from '@/hooks/useERPNavigation';
+import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
+import { getCustomizedNavigationGroups } from '@/lib/workspaceCustomization';
 
 // ─── Nav groups definition ────────────────────────────────────────────────────
 export const ERP_NAV_GROUPS = [
@@ -115,6 +116,7 @@ export const ERP_NAV_GROUPS = [
       { path: '/settings',           label: 'Settings',             icon: Settings,  permission: 'manageSettings' },
       { path: '/erp-approval-center',label: 'Approvals',            icon: ShieldCheck,permission: 'manageSettings' },
       { path: '/notifications',      label: 'Notifications',        icon: Bell,      permission: 'viewAlerts' },
+      { path: '/customize-workspace', label: 'Customize your workspace', icon: SlidersHorizontal, permission: 'manageDashboardCustomization' },
     ],
   },
 ];
@@ -210,12 +212,15 @@ function NavGroup({ group, collapsed, location, can }) {
 export default function ERPSidebar({ collapsed, onToggle }) {
   const location = useLocation();
   const { can, role } = useRole();
-  const { user } = useAuth();
   const { activeRestaurant } = useTenant();
   const { favorites, recentPages } = useERPNavigation();
   const { translateLiteral } = useLanguage();
+  const { configuration } = useWorkspaceCustomization();
+  const navigationGroups = useMemo(
+    () => getCustomizedNavigationGroups(ERP_NAV_GROUPS, configuration),
+    [configuration],
+  );
 
-  const isOwner = role === 'owner' || role === 'general_manager';
 
   return (
     <aside
@@ -291,7 +296,7 @@ export default function ERPSidebar({ collapsed, onToggle }) {
         )}
 
         {/* Main nav groups */}
-        {ERP_NAV_GROUPS.map(group => (
+        {navigationGroups.map(group => (
           <NavGroup
             key={group.key}
             group={group}

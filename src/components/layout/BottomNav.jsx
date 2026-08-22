@@ -20,6 +20,7 @@ import {
 import { useLanguage } from '@/lib/LanguageContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import { useBusinessMode } from '@/lib/BusinessModeContext';
+import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 
 // ── Primary Nav by Role + Mode ────────────────────────────────────────────────
 
@@ -120,6 +121,7 @@ const MORE_SECTIONS_OWNER_RESTAURANT = [
     title: 'Settings',
     items: [
       { path: '/settings',                  icon: Zap,         labelKey: 'settings' },
+      { path: '/customize-workspace',       icon: Grid3x3,     labelKey: 'customize_workspace' },
       { path: '/branch-management',         icon: Building2,   labelKey: 'branches' },
       { path: '/billing',                   icon: CreditCard,  labelKey: 'billing' },
     ],
@@ -179,6 +181,7 @@ const MORE_SECTIONS_OWNER_RETAIL = [
     title: 'Settings',
     items: [
       { path: '/settings',                  icon: Zap,         labelKey: 'settings' },
+      { path: '/customize-workspace',       icon: Grid3x3,     labelKey: 'customize_workspace' },
       { path: '/branch-management',         icon: Building2,   labelKey: 'branches' },
       { path: '/billing',                   icon: CreditCard,  labelKey: 'billing' },
     ],
@@ -292,9 +295,10 @@ const BottomNav = memo(function BottomNav() {
   const { t } = useLanguage();
   const { role } = useRole();
   const { isRetail } = useBusinessMode();
+  const { configuration } = useWorkspaceCustomization();
   const [showMore, setShowMore] = useState(false);
 
-  const { visibleNav, moreSections } = useMemo(() => {
+  const { visibleNav: baseNav, moreSections: baseMoreSections } = useMemo(() => {
     if (role === ROLES.EMPLOYEE) return { visibleNav: PRIMARY_NAV_EMPLOYEE, moreSections: [] };
     if (role === ROLES.SPONSOR) return { visibleNav: PRIMARY_NAV_SPONSOR, moreSections: [] };
     if (role === ROLES.CUSTOMER) return { visibleNav: PRIMARY_NAV_CUSTOMER, moreSections: [] };
@@ -314,6 +318,19 @@ const BottomNav = memo(function BottomNav() {
       ? { visibleNav: PRIMARY_NAV_OWNER_RETAIL, moreSections: MORE_SECTIONS_OWNER_RETAIL }
       : { visibleNav: PRIMARY_NAV_OWNER_RESTAURANT, moreSections: MORE_SECTIONS_OWNER_RESTAURANT };
   }, [role, isRetail]);
+
+  const { visibleNav, moreSections } = useMemo(() => {
+    const hidden = new Set(configuration?.navigation?.hidden_paths || []);
+    const rank = new Map((configuration?.navigation?.order || []).map((path, index) => [path, index]));
+    const compare = (a, b) => (rank.get(a.path) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.path) ?? Number.MAX_SAFE_INTEGER);
+    const visibleNav = baseNav
+      .filter((item) => item.isMore || !hidden.has(item.path))
+      .sort((a, b) => a.isMore ? 1 : b.isMore ? -1 : compare(a, b));
+    const moreSections = baseMoreSections
+      .map((section) => ({ ...section, items: section.items.filter((item) => !hidden.has(item.path)).sort(compare) }))
+      .filter((section) => section.items.length > 0);
+    return { visibleNav, moreSections };
+  }, [baseMoreSections, baseNav, configuration]);
 
   return (
     <>

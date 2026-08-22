@@ -29,6 +29,14 @@ const englishPhraseIndex = createEnglishPhraseIndex(translations);
 export function LanguageProvider({ children }) {
   const [lang, setLanguage] = useState(() => normalizeLanguage(safeGet(LANGUAGE_STORAGE_KEY, 'en')));
   const [currency, setCurrency] = useState(() => safeGet('rc_currency', 'SAR'));
+  const [regionalPreferences, setRegionalPreferences] = useState(() => {
+    try {
+      const parsed = JSON.parse(safeGet('rc_regional_preferences', '{}'));
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  });
   const [darkMode, setDarkMode] = useState(() => safeGet('rc_dark', 'false') === 'true');
 
   const locale = useMemo(() => getLanguageMeta(lang), [lang]);
@@ -54,9 +62,23 @@ export function LanguageProvider({ children }) {
   }, [lang, t]);
 
   const translateLabel = useCallback((value, fallback) => translateDataLabel(value, t, fallback), [t]);
-  const formatNumber = useCallback((value, options) => formatLocalizedNumber(value, lang, options), [lang]);
-  const formatDate = useCallback((value, options) => formatLocalizedDate(value, lang, options), [lang]);
-  const formatMoney = useCallback((value, options) => formatLocalizedCurrency(value, lang, currency, options), [lang, currency]);
+  const formatNumber = useCallback((value, options = {}) => {
+    const decimalPlaces = Number.isInteger(regionalPreferences.decimal_places) ? regionalPreferences.decimal_places : 2;
+    return formatLocalizedNumber(value, lang, { maximumFractionDigits: decimalPlaces, ...options });
+  }, [lang, regionalPreferences.decimal_places]);
+  const formatDate = useCallback((value, options = {}) => {
+    const format = regionalPreferences.date_format || 'YYYY-MM-DD';
+    const formatOptions = format === 'DD/MM/YYYY'
+      ? { day: '2-digit', month: '2-digit', year: 'numeric' }
+      : format === 'MM/DD/YYYY'
+        ? { month: '2-digit', day: '2-digit', year: 'numeric' }
+        : { year: 'numeric', month: '2-digit', day: '2-digit' };
+    return formatLocalizedDate(value, lang, { ...formatOptions, ...options });
+  }, [lang, regionalPreferences.date_format]);
+  const formatMoney = useCallback((value, options = {}) => {
+    const decimalPlaces = Number.isInteger(regionalPreferences.decimal_places) ? regionalPreferences.decimal_places : 2;
+    return formatLocalizedCurrency(value, lang, currency, { currencyDisplay: regionalPreferences.currency_display || 'symbol', maximumFractionDigits: decimalPlaces, ...options });
+  }, [lang, currency, regionalPreferences.currency_display, regionalPreferences.decimal_places]);
 
   useDocumentLocalization({ lang, translateLiteral });
 
@@ -82,6 +104,14 @@ export function LanguageProvider({ children }) {
 
   useEffect(() => {
     try {
+      localStorage.setItem('rc_regional_preferences', JSON.stringify(regionalPreferences || {}));
+    } catch {
+      // Regional display preferences remain available for the active session if storage is unavailable.
+    }
+  }, [regionalPreferences]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem('rc_dark', darkMode);
     } catch {
       // Theme remains available for the current session if storage is unavailable.
@@ -101,12 +131,14 @@ export function LanguageProvider({ children }) {
     translateLabel,
     currency,
     setCurrency,
+    regionalPreferences,
+    setRegionalPreferences,
     darkMode,
     setDarkMode,
     formatNumber,
     formatDate,
     formatMoney,
-  }), [lang, setLang, locale, dir, isRTL, t, translateLiteral, translateLabel, currency, darkMode, formatNumber, formatDate, formatMoney]);
+  }), [lang, setLang, locale, dir, isRTL, t, translateLiteral, translateLabel, currency, regionalPreferences, darkMode, formatNumber, formatDate, formatMoney]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
@@ -127,6 +159,8 @@ export function useLanguage() {
     translateLabel: (value) => value,
     currency: 'SAR',
     setCurrency: () => {},
+    regionalPreferences: {},
+    setRegionalPreferences: () => {},
     darkMode: false,
     setDarkMode: () => {},
     formatNumber: (value) => String(value ?? ''),
