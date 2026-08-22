@@ -51,6 +51,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 // SalesForm removed to enforce single ERP workspace entry point
 import PriceChangesWidget from '@/components/dashboard/PriceChangesWidget';
 import DriverPerformance from '@/components/dashboard/DriverPerformance';
+import QuickActionsDock from '@/components/dashboard/QuickActionsDock';
 import CustomizeDashboardDialog from '@/components/dashboard/CustomizeDashboardDialog';
 import { useDashboardCustomization } from '@/hooks/useDashboardCustomization';
 import { getDashboardCustomizationCopy } from '@/lib/dashboardCustomization';
@@ -1456,6 +1457,8 @@ function OwnerDashboardContent() {
           </span>
         </div>
       </div>
+
+      <QuickActionsDock />
 
       <div className="flex w-full min-w-0 max-w-full flex-col gap-6">
       {/* ══════════════════════════════════════════════════════════════════════

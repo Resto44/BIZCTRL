@@ -68,7 +68,7 @@ export default function ERPLayout({ children }) {
           className={cn(
             'flex-1 min-w-0 max-w-full overflow-y-auto',
             // Bottom padding on mobile accounts for BottomNav and iPhone safe-area.
-            'pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] lg:pb-0'
+            'pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+1rem)] lg:pb-0'
           )}
         >
           {children}

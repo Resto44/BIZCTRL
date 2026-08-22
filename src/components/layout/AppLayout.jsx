@@ -16,7 +16,6 @@ import { useAuth } from '@/lib/AuthContext';
 import { initAuditLogger } from '@/lib/auditLogger';
 import { useRouteGuard } from '@/lib/RoleContext';
 import PWAInstallBanner from '@/components/pwa/PWAInstallBanner';
-import QuickActionsDock from '@/components/dashboard/QuickActionsDock';
 import SubscriptionStatusBanner from '@/components/subscription/SubscriptionStatusBanner';
 
 function RouteEnforcer() {
@@ -38,7 +37,6 @@ export default function AppLayout() {
         <SubscriptionStatusBanner />
         <Outlet />
       </div>
-      <QuickActionsDock />
       <NotificationPopups />
       <PWAInstallBanner />
     </ERPLayout>

@@ -40,16 +40,21 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
     expect(trend).toContain('min-w-[800px]');
   });
 
-  it('uses a contained two-column quick-action grid on mobile and preserves safe-area padding', async () => {
-    const [quickActions, bottomNav, erpLayout] = await Promise.all([
+  it('keeps Quick Shortcuts in dashboard flow and preserves bottom-navigation safe-area clearance', async () => {
+    const [quickActions, owner, appLayout, bottomNav, erpLayout] = await Promise.all([
       source('../src/components/dashboard/QuickActionsDock.jsx'),
+      source('../src/pages/OwnerDashboard.jsx'),
+      source('../src/components/layout/AppLayout.jsx'),
       source('../src/components/layout/BottomNav.jsx'),
       source('../src/components/layout/ERPLayout.jsx'),
     ]);
-    expect(quickActions).toContain('grid grid-cols-2');
-    expect(quickActions).toContain('sm:flex sm:gap-3 sm:overflow-x-auto');
-    expect(quickActions).toContain('sm:min-w-[72px]');
+    expect(quickActions).toContain('grid min-w-0 grid-cols-2');
+    expect(quickActions).toContain('sm:grid-cols-3 sm:gap-3 xl:grid-cols-6');
+    expect(quickActions).not.toMatch(/className="fixed|position:\s*fixed|z-\[9999\]/);
+    expect(owner).toContain("import QuickActionsDock from '@/components/dashboard/QuickActionsDock';");
+    expect(owner).toContain('<QuickActionsDock />');
+    expect(appLayout).not.toContain('QuickActionsDock');
     expect(bottomNav).toContain('pb-[env(safe-area-inset-bottom,0px)]');
-    expect(erpLayout).toContain('pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))]');
+    expect(erpLayout).toContain('pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+1rem)]');
   });
 });

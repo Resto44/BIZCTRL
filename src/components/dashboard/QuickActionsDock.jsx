@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
 import {
@@ -7,17 +6,17 @@ import {
   Wallet,
   ArrowDownLeft,
   Truck,
-  Banknote
+  Banknote,
 } from 'lucide-react';
 
 export default function QuickActionsDock() {
   const { t } = useLanguage();
   const location = useLocation();
 
-  // Only show on Dashboard pages
-  const isDashboard = location.pathname === '/owner-command-center' || 
-                      location.pathname === '/manager-dashboard' ||
-                      location.pathname === '/';
+  // Quick Shortcuts are only normal dashboard content; they never float above it.
+  const isDashboard = location.pathname === '/owner-command-center'
+    || location.pathname === '/manager-dashboard'
+    || location.pathname === '/';
 
   if (!isDashboard) return null;
 
@@ -31,32 +30,27 @@ export default function QuickActionsDock() {
   ];
 
   return (
-    <div className="fixed inset-x-0 z-[9999] max-w-full pointer-events-none"
-         style={{ bottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px))' }}>
-      <div className="mx-auto w-full max-w-2xl px-3 pointer-events-auto sm:px-4">
-        <div className="w-full max-w-full overflow-hidden rounded-t-2xl border-x border-t border-border/50 bg-background/80 backdrop-blur-xl">
-          <div className="grid grid-cols-2 gap-2 p-3 sm:flex sm:gap-3 sm:overflow-x-auto sm:snap-x sm:snap-mandatory">
-            {actions.map((action, idx) => (
-              <Link
-                key={idx}
-                to={action.to}
-                className="flex w-full min-w-0 flex-col items-center gap-1.5 rounded-lg px-1 py-0.5 text-center transition-transform active:scale-95 sm:w-auto sm:min-w-[72px] sm:snap-center"
-              >
-                <div className={`${action.color} p-2.5 rounded-xl text-white shadow-lg`}>
-                  <action.icon className="w-5 h-5" />
-                </div>
-                <span className="w-full break-words px-1 text-[10px] font-bold leading-tight">
-                  {action.label}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
+    <section className="w-full min-w-0 max-w-full rounded-2xl border border-border/50 bg-card p-3 shadow-sm sm:p-4" aria-label="Quick Shortcuts">
+      <div className="mb-3 min-w-0">
+        <h2 className="text-sm font-bold text-foreground">Quick Shortcuts</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">Create and review daily ERP records.</p>
       </div>
-      <style dangerouslySetInnerHTML={{ __html: `
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}} />
-    </div>
+      <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 xl:grid-cols-6">
+        {actions.map((action) => (
+          <Link
+            key={action.to}
+            to={action.to}
+            className="flex w-full min-w-0 flex-col items-center gap-1.5 rounded-xl border border-border/50 bg-background px-2 py-3 text-center transition-colors hover:bg-muted active:scale-[0.98]"
+          >
+            <div className={`${action.color} rounded-xl p-2.5 text-white shadow-sm`}>
+              <action.icon className="h-5 w-5" />
+            </div>
+            <span className="w-full break-words text-[11px] font-bold leading-tight text-foreground">
+              {action.label}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
