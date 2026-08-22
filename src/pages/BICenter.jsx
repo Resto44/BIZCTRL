@@ -221,12 +221,14 @@ export default function BICenter() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full grid grid-cols-4 h-9">
-          <TabsTrigger value="revenue" className="text-xs">Revenue</TabsTrigger>
-          <TabsTrigger value="monthly" className="text-xs">Monthly</TabsTrigger>
-          <TabsTrigger value="payments" className="text-xs">Payments</TabsTrigger>
-          <TabsTrigger value="branches" className="text-xs">Branches</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-1" aria-label="Business Intelligence sections">
+          <TabsList className="inline-flex h-9 min-w-full w-max">
+            <TabsTrigger value="revenue" className="min-w-[84px] text-xs">Revenue</TabsTrigger>
+            <TabsTrigger value="monthly" className="min-w-[84px] text-xs">Monthly</TabsTrigger>
+            <TabsTrigger value="payments" className="min-w-[84px] text-xs">Payments</TabsTrigger>
+            <TabsTrigger value="branches" className="min-w-[84px] text-xs">Branches</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Revenue Trend */}
         <TabsContent value="revenue" className="mt-3 space-y-3">

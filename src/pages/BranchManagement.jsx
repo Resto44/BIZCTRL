@@ -1022,13 +1022,15 @@ export default function BranchManagement() {
       <p className="text-xs text-muted-foreground mb-4">{u.subtitle}</p>
 
       <Tabs defaultValue="overview">
-        <TabsList className="w-full mb-4 flex-wrap h-auto gap-0.5">
-          <TabsTrigger value="overview" className="flex-1 text-xs min-w-[80px]"><GitBranch className="w-3 h-3 mr-1" />{u.overview}</TabsTrigger>
-          <TabsTrigger value="analytics" className="flex-1 text-xs min-w-[80px]"><BarChart3 className="w-3 h-3 mr-1" />{u.analytics}</TabsTrigger>
-          <TabsTrigger value="compare" className="flex-1 text-xs min-w-[80px]"><TrendingUp className="w-3 h-3 mr-1" />{u.compare}</TabsTrigger>
-          <TabsTrigger value="users" className="flex-1 text-xs min-w-[80px]"><Shield className="w-3 h-3 mr-1" />{u.users}</TabsTrigger>
-          <TabsTrigger value="audit" className="flex-1 text-xs min-w-[80px]"><History className="w-3 h-3 mr-1" />{u.audit}</TabsTrigger>
-        </TabsList>
+        <div className="mb-4 overflow-x-auto pb-1" aria-label="Branch Management sections">
+          <TabsList className="inline-flex h-9 min-w-full w-max gap-0.5">
+            <TabsTrigger value="overview" className="min-w-[80px] text-xs"><GitBranch className="w-3 h-3 mr-1" />{u.overview}</TabsTrigger>
+            <TabsTrigger value="analytics" className="min-w-[80px] text-xs"><BarChart3 className="w-3 h-3 mr-1" />{u.analytics}</TabsTrigger>
+            <TabsTrigger value="compare" className="min-w-[80px] text-xs"><TrendingUp className="w-3 h-3 mr-1" />{u.compare}</TabsTrigger>
+            <TabsTrigger value="users" className="min-w-[80px] text-xs"><Shield className="w-3 h-3 mr-1" />{u.users}</TabsTrigger>
+            <TabsTrigger value="audit" className="min-w-[80px] text-xs"><History className="w-3 h-3 mr-1" />{u.audit}</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ── OVERVIEW TAB ── */}
         <TabsContent value="overview">

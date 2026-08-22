@@ -339,7 +339,12 @@ export default function ERPHeader({ onMobileMenuToggle }) {
         <FavoriteToggle />
         <LanguageSwitcher />
         <ThemeToggle />
-        <ModeBadge size="xs" />
+        <div className="sm:hidden">
+          <ModeBadge size="xs" showLabel={false} />
+        </div>
+        <div className="hidden sm:block">
+          <ModeBadge size="xs" />
+        </div>
         <NotificationBell />
         <UserMenu />
       </div>
