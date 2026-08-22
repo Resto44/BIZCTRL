@@ -8,6 +8,7 @@ const landingPagePath = new URL('../src/pages/LandingPage.jsx', import.meta.url)
 const billingPath = new URL('../src/pages/Billing.jsx', import.meta.url);
 const migrationPath = new URL('../src/supabase/20260821_paddle_live_runtime.sql', import.meta.url);
 const liveWebhookMigrationPath = new URL('../src/supabase/20260821_paddle_live_webhook_label.sql', import.meta.url);
+const customerWebhookMigrationPath = new URL('../src/supabase/20260822_paddle_customer_webhook_mirror.sql', import.meta.url);
 const checkoutFunctionPath = new URL('../supabase/functions/paddle-subscription-checkout/index.ts', import.meta.url);
 const portalFunctionPath = new URL('../supabase/functions/paddle-customer-portal/index.ts', import.meta.url);
 const webhookFunctionPath = new URL('../supabase/functions/paddle-subscription-webhook/index.ts', import.meta.url);
@@ -49,7 +50,7 @@ describe('Paddle live integration contract', () => {
     expect(migration).toContain("v_plan.monthly_price_cents, 'USD', false, 'Paddle checkout pending'");
   });
 
-  it('keeps payment activation out of browser callbacks and delegates state changes to verified webhooks', async () => {
+  it('keeps payment activation out of browser callbacks and delegates state changes to SDK-verified raw-body webhooks', async () => {
     const [provider, billing, webhook] = await Promise.all([
       readFile(paymentProviderPath, 'utf8'),
       readFile(billingPath, 'utf8'),
@@ -57,22 +58,20 @@ describe('Paddle live integration contract', () => {
     ]);
     expect(provider).toContain('Paddle webhooks, not browser callbacks, are authoritative for activation.');
     expect(billing).toContain('after Paddle sends a verified subscription event');
+    expect(webhook).toContain('import { Paddle } from "npm:@paddle/paddle-node-sdk@3.10.0";');
     expect(webhook).toContain('const rawBody = await req.text();');
-    expect(webhook).toContain('verifyPaddleSignature(rawBody, signature, webhookSecret)');
-    expect(webhook).toContain('`${timestamp}:${rawBody}`');
-    expect(webhook).toContain('safeEqual');
+    expect(webhook).toContain('paddle.webhooks.unmarshal(rawBody, webhookSecret, signature)');
+    expect(webhook).toContain('PADDLE_SIGNATURE_MISSING');
+    expect(webhook).toContain('invalid_signature');
     expect(webhook).toContain('paddle_apply_webhook_event');
+    expect(webhook).toContain('paddle_apply_customer_webhook_event');
     expect(webhook).toContain('subscription.trialing');
     expect(webhook).toContain('transaction.payment_failed');
+    expect(webhook).toContain('customer.created');
+    expect(webhook).toContain('customer.updated');
     expect(webhook).toContain('PADDLE_LIVE_ONLY');
-    expect(webhook).toContain('const PADDLE_IPS_URL = "https://api.paddle.com/ips";');
-    expect(webhook).toContain('getPaddleIpv4Allowlist');
-    expect(webhook).toContain('x-forwarded-for');
-    expect(webhook).toContain('PADDLE_SOURCE_NOT_ALLOWED');
-    expect(webhook).toContain('PADDLE_IP_ALLOWLIST_UNAVAILABLE');
-    expect(webhook).not.toContain('34.237.3.244');
-    expect(webhook).not.toContain('34.195.105.136');
-    expect(webhook).not.toContain('34.232.58.13');
+    expect(webhook).not.toContain('JSON.parse(rawBody)');
+    expect(webhook).not.toContain('PADDLE_SOURCE_NOT_ALLOWED');
   });
 
   it('records live webhook events with a production label while retaining the canonical event guards', async () => {
@@ -85,13 +84,16 @@ describe('Paddle live integration contract', () => {
     expect(migration).toContain("MESSAGE = 'PADDLE_EVENT_TENANT_MISMATCH'");
   });
 
-  it('loads the Paddle source allowlist dynamically and rejects requests with no current approved source address', async () => {
-    const webhook = await readFile(webhookFunctionPath, 'utf8');
-    expect(webhook).toContain('fetch(PADDLE_IPS_URL');
-    expect(webhook).toContain('entry.endsWith("/32")');
-    expect(webhook).toContain('if (!allowedOrigin) return json(403, { error: "PADDLE_SOURCE_NOT_ALLOWED" });');
-    expect(webhook).toContain('if (ips.length === 0) throw new Error("PADDLE_IP_ALLOWLIST_UNAVAILABLE");');
-    expect(webhook).toContain('return json(503, { error: "PADDLE_IP_ALLOWLIST_UNAVAILABLE" });');
+  it('mirrors verified Paddle customer events into the existing canonical subscription records without a duplicate entitlement model', async () => {
+    const migration = await readFile(customerWebhookMigrationPath, 'utf8');
+    expect(migration).toContain('CREATE OR REPLACE FUNCTION public.paddle_apply_customer_webhook_event');
+    expect(migration).toContain("auth.role() <> 'service_role'");
+    expect(migration).toContain("'customer.created', 'customer.updated'");
+    expect(migration).toContain('UPDATE public.subscriptions');
+    expect(migration).toContain('billing_email = coalesce(v_email, billing_email)');
+    expect(migration).toContain('REVOKE ALL ON FUNCTION public.paddle_apply_customer_webhook_event');
+    expect(migration).toContain('TO service_role');
+    expect(migration).not.toContain('CREATE TABLE');
   });
 
   it('continues to use the hosted portal and manual billing fallback while selecting a configured live Paddle provider', async () => {
