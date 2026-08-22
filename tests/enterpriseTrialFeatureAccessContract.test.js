@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const migrationPath = path.join(repoRoot, 'src', 'supabase', '20260822_enterprise_trial_feature_flags.sql');
+const rowAccessMigrationPath = path.join(repoRoot, 'src', 'supabase', '20260822_feature_row_access_lifecycle_guard.sql');
 const guardPath = path.join(repoRoot, 'src', 'components', 'subscription', 'FeatureRouteGuard.jsx');
 const appPath = path.join(repoRoot, 'src', 'App.jsx');
 
@@ -33,6 +34,15 @@ describe('canonical Enterprise trial feature access', () => {
     expect(sql).toContain("UPDATE public.subscriptions SET subscription_status = 'EXPIRED'");
     expect(sql).toContain("'has_erp_access', public.erp_subscription_has_erp_access(v_restaurant_id)");
     expect(sql).toContain('GRANT EXECUTE ON FUNCTION public.erp_subscription_snapshot(uuid) TO authenticated;');
+  });
+
+  it('keeps protected feature rows constrained by tenant scope and canonical lifecycle access', async () => {
+    const sql = await readFile(rowAccessMigrationPath, 'utf8');
+
+    expect(sql).toContain('CREATE OR REPLACE FUNCTION public.erp_subscription_feature_row_allowed(p_feature text, p_restaurant_id text)');
+    expect(sql).toContain('public.erp_can_access_scope_text(p_restaurant_id, NULL)');
+    expect(sql).toContain('public.erp_subscription_has_erp_access(s.restaurant_id)');
+    expect(sql).toContain('public.erp_subscription_can_use_feature(p_feature, s.restaurant_id)');
   });
 
   it('preserves the same client and server guard path for each affected module', async () => {
