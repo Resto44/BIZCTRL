@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const migrationPath = new URL('../src/supabase/20260821_subscription_limit_policy.sql', import.meta.url);
+const ownerRegistrationMigrationPath = new URL('../src/supabase/20260822_owner_registration_initial_branch_scope_guard.sql', import.meta.url);
 const billingPath = new URL('../src/pages/Billing.jsx', import.meta.url);
 const contextPath = new URL('../src/lib/SubscriptionContext.jsx', import.meta.url);
 const employeePath = new URL('../src/pages/Employees.jsx', import.meta.url);
@@ -60,6 +61,22 @@ describe('central subscription limit policy', () => {
     expect(migration).toContain('CREATE TRIGGER subscription_capacity_invitations');
     expect(migration).toContain("v_used := coalesce((v_capacity -> 'usage' ->> 'users')::bigint, 0);");
     expect(migration).toContain('IF v_used >= v_limit THEN');
+  });
+
+  it('permits only the nested auth-triggered owner seed branch while retaining normal client scope enforcement', async () => {
+    const migration = await readFile(ownerRegistrationMigrationPath, 'utf8');
+
+    expect(migration).toContain('v_is_auth_owner_seed boolean := false;');
+    expect(migration).toContain("IF TG_TABLE_NAME = 'branches' THEN");
+    expect(migration).toContain('auth.uid() IS NULL');
+    expect(migration).toContain('pg_trigger_depth() > 1');
+    expect(migration).toContain('-- branch trigger rows');
+    expect(migration).toContain("NEW.branch_key LIKE 'main-%'");
+    expect(migration).toContain('restaurant.tenant_id = NEW.tenant_id');
+    expect(migration).toContain("lower(coalesce(restaurant.created_by, '')) = lower(coalesce(NEW.created_by, ''))");
+    expect(migration).toContain('AND NOT v_is_auth_owner_seed');
+    expect(migration).toContain("MESSAGE = 'SUBSCRIPTION_SCOPE_DENIED'");
+    expect(migration).not.toContain('DISABLE ROW LEVEL SECURITY');
   });
 
   it('prevents employee tenant-scope omission from bypassing the server limit', async () => {
