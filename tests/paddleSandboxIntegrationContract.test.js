@@ -9,6 +9,7 @@ const billingPath = new URL('../src/pages/Billing.jsx', import.meta.url);
 const migrationPath = new URL('../src/supabase/20260821_paddle_live_runtime.sql', import.meta.url);
 const liveWebhookMigrationPath = new URL('../src/supabase/20260821_paddle_live_webhook_label.sql', import.meta.url);
 const customerWebhookMigrationPath = new URL('../src/supabase/20260822_paddle_customer_webhook_mirror.sql', import.meta.url);
+const webhookGrantMigrationPath = new URL('../src/supabase/20260822_paddle_webhook_server_only_grants.sql', import.meta.url);
 const checkoutFunctionPath = new URL('../supabase/functions/paddle-subscription-checkout/index.ts', import.meta.url);
 const portalFunctionPath = new URL('../supabase/functions/paddle-customer-portal/index.ts', import.meta.url);
 const webhookFunctionPath = new URL('../supabase/functions/paddle-subscription-webhook/index.ts', import.meta.url);
@@ -94,6 +95,14 @@ describe('Paddle live integration contract', () => {
     expect(migration).toContain('REVOKE ALL ON FUNCTION public.paddle_apply_customer_webhook_event');
     expect(migration).toContain('TO service_role');
     expect(migration).not.toContain('CREATE TABLE');
+  });
+
+  it('restricts canonical Paddle webhook reconciliation routines to the service role', async () => {
+    const grants = await readFile(webhookGrantMigrationPath, 'utf8');
+    expect(grants).toContain('REVOKE ALL ON FUNCTION public.paddle_apply_webhook_event');
+    expect(grants).toContain('REVOKE ALL ON FUNCTION public.paddle_apply_customer_webhook_event');
+    expect(grants).toContain('FROM PUBLIC, anon, authenticated');
+    expect(grants).toContain('TO service_role');
   });
 
   it('continues to use the hosted portal and manual billing fallback while selecting a configured live Paddle provider', async () => {
