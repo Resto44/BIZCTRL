@@ -11,6 +11,23 @@ type RoutedEvent = {
   data: Record<string, unknown>;
 };
 
+function snakeCaseKey(key: string) {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1_$2")
+    .toLowerCase();
+}
+
+function normalizePaddlePayload(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalizePaddlePayload);
+  if (!value || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([key, nestedValue]) => [snakeCaseKey(key), normalizePaddlePayload(nestedValue)]),
+  );
+}
+
 const subscriptionAndTransactionEvents = new Set([
   "subscription.created",
   "subscription.trialing",
@@ -44,7 +61,9 @@ function asRoutedEvent(event: unknown): RoutedEvent | null {
   const data = value.data && typeof value.data === "object" && !Array.isArray(value.data)
     ? value.data as Record<string, unknown>
     : null;
-  return eventId && eventType && data ? { eventId, eventType, occurredAt, data } : null;
+  return eventId && eventType && data
+    ? { eventId, eventType, occurredAt, data: normalizePaddlePayload(data) as Record<string, unknown> }
+    : null;
 }
 
 Deno.serve(async (req: Request) => {

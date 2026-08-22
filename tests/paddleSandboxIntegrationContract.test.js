@@ -69,6 +69,9 @@ describe('Paddle live integration contract', () => {
     expect(webhook).toContain('invalid_signature');
     expect(webhook).toContain('paddle_apply_webhook_event');
     expect(webhook).toContain('paddle_apply_customer_webhook_event');
+    expect(webhook).toContain('function snakeCaseKey');
+    expect(webhook).toContain('function normalizePaddlePayload');
+    expect(webhook).toContain('data: normalizePaddlePayload(data) as Record<string, unknown>');
     expect(webhook).toContain('subscription.trialing');
     expect(webhook).toContain('transaction.payment_failed');
     expect(webhook).toContain('customer.created');
