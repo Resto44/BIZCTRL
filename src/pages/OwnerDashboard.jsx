@@ -1385,7 +1385,7 @@ function OwnerDashboardContent() {
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <DashboardCustomizationContext.Provider value={dashboardCustomization.widgetsById}>
-    <div className="w-full min-w-0 max-w-full space-y-6 pb-8">
+    <div className="w-full min-w-0 max-w-full space-y-6 pb-[calc(var(--quick-shortcuts-height)+1rem)] lg:pb-8">
 
       {/* ── HEADER ── */}
       <div className="flex w-full min-w-0 max-w-full flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">

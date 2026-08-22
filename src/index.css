@@ -79,6 +79,7 @@
 
     /* ── Layout ── */
     --bottom-nav-height:     64px;
+    --quick-shortcuts-height: 88px;
     --erp-header-height:     60px;
     --erp-sidebar-width:     260px;
     --erp-sidebar-collapsed: 64px;

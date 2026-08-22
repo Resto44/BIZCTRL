@@ -13,7 +13,6 @@ export default function QuickActionsDock() {
   const { t } = useLanguage();
   const location = useLocation();
 
-  // Quick Shortcuts are only normal dashboard content; they never float above it.
   const isDashboard = location.pathname === '/owner-command-center'
     || location.pathname === '/manager-dashboard'
     || location.pathname === '/';
@@ -30,26 +29,28 @@ export default function QuickActionsDock() {
   ];
 
   return (
-    <section className="w-full min-w-0 max-w-full rounded-2xl border border-border/50 bg-card p-3 shadow-sm sm:p-4" aria-label="Quick Shortcuts">
-      <div className="mb-3 min-w-0">
-        <h2 className="text-sm font-bold text-foreground">Quick Shortcuts</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">Create and review daily ERP records.</p>
-      </div>
-      <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 xl:grid-cols-6">
-        {actions.map((action) => (
-          <Link
-            key={action.to}
-            to={action.to}
-            className="flex w-full min-w-0 flex-col items-center gap-1.5 rounded-xl border border-border/50 bg-background px-2 py-3 text-center transition-colors hover:bg-muted active:scale-[0.98]"
-          >
-            <div className={`${action.color} rounded-xl p-2.5 text-white shadow-sm`}>
-              <action.icon className="h-5 w-5" />
-            </div>
-            <span className="w-full break-words text-[11px] font-bold leading-tight text-foreground">
-              {action.label}
-            </span>
-          </Link>
-        ))}
+    <section
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] z-40 w-full max-w-full lg:static lg:mt-4 lg:z-auto"
+      aria-label="Quick Shortcuts"
+    >
+      <div className="pointer-events-auto mx-auto h-[var(--quick-shortcuts-height)] w-full max-w-2xl border-t border-border/70 bg-card/95 px-2 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] backdrop-blur lg:rounded-xl lg:border lg:shadow-sm">
+        <h2 className="sr-only">Quick Shortcuts</h2>
+        <div className="flex h-full w-full items-center gap-2 overflow-x-auto overscroll-x-contain py-2 [scrollbar-width:thin] lg:justify-center lg:overflow-x-visible">
+          {actions.map((action) => (
+            <Link
+              key={action.to}
+              to={action.to}
+              className="flex h-full w-[82px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-1 text-center transition-colors hover:bg-muted active:scale-95"
+            >
+              <div className={`${action.color} rounded-lg p-2 text-white shadow-sm`}>
+                <action.icon className="h-4 w-4" />
+              </div>
+              <span className="w-full truncate text-[10px] font-bold leading-tight text-foreground">
+                {action.label}
+              </span>
+            </Link>
+          ))}
+        </div>
       </div>
     </section>
   );
