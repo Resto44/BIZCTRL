@@ -146,6 +146,14 @@ describe('Paddle live integration contract', () => {
     expect(envTemplate).not.toMatch(/PADDLE_WEBHOOK_SECRET=[^\n#\s]+/);
   });
 
+  it('returns checkout errors with the canonical CORS headers so the Billing client can display the server result', async () => {
+    const checkoutFunction = await readFile(checkoutFunctionPath, 'utf8');
+    expect(checkoutFunction).toContain('function fail(code: string, status = 400, headers: HeadersInit = {})');
+    expect(checkoutFunction).toContain('headers: { "Content-Type": "application/json", ...headers }');
+    expect(checkoutFunction).toContain('return fail("PADDLE_TRANSACTION_CREATE_FAILED", 502, headers);');
+    expect(checkoutFunction).toContain('return fail(contextError?.message ?? "PADDLE_CHECKOUT_CONTEXT_FAILED", 400, headers);');
+  });
+
   it('routes an already-linked Paddle customer through the hosted portal and blocks duplicate server checkout contexts', async () => {
     const [provider, billing, guardMigration] = await Promise.all([
       readFile(paymentProviderPath, 'utf8'),

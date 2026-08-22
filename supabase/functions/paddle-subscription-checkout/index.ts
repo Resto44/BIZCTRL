@@ -14,8 +14,11 @@ const corsHeaders = (origin: string | null) => ({
   "Vary": "Origin",
 });
 
-function fail(code: string, status = 400) {
-  return new Response(JSON.stringify({ error: code }), { status, headers: { "Content-Type": "application/json" } });
+function fail(code: string, status = 400, headers: HeadersInit = {}) {
+  return new Response(JSON.stringify({ error: code }), {
+    status,
+    headers: { "Content-Type": "application/json", ...headers },
+  });
 }
 
 Deno.serve(async (req: Request) => {
@@ -24,30 +27,30 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return new Response(JSON.stringify({ error: "method_not_allowed" }), { status: 405, headers });
 
   try {
-    if (PADDLE_ENVIRONMENT !== "production") return fail("PADDLE_LIVE_ONLY", 503);
+    if (PADDLE_ENVIRONMENT !== "production") return fail("PADDLE_LIVE_ONLY", 503, headers);
 
     const paddleApiKey = Deno.env.get("PADDLE_API_KEY")?.trim();
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const authorization = req.headers.get("Authorization") ?? "";
-    if (!paddleApiKey) return fail("PADDLE_LIVE_NOT_CONFIGURED", 503);
-    if (!supabaseUrl || !anonKey || !serviceRoleKey || !authorization) return fail("BILLING_SERVICE_NOT_CONFIGURED", 503);
+    if (!paddleApiKey) return fail("PADDLE_LIVE_NOT_CONFIGURED", 503, headers);
+    if (!supabaseUrl || !anonKey || !serviceRoleKey || !authorization) return fail("BILLING_SERVICE_NOT_CONFIGURED", 503, headers);
 
     const body = await req.json().catch(() => null) as { planId?: unknown } | null;
     const planId = typeof body?.planId === "string" ? body.planId.trim() : "";
-    if (!planId) return fail("PAID_PLAN_REQUIRED");
+    if (!planId) return fail("PAID_PLAN_REQUIRED", 400, headers);
 
     const caller = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
     const { data: userData, error: userError } = await caller.auth.getUser();
-    if (userError || !userData.user) return fail("UNAUTHENTICATED", 401);
+    if (userError || !userData.user) return fail("UNAUTHENTICATED", 401, headers);
 
     // This guarded RPC owns tenant resolution, plan validation, the local pending
     // payment record, and state transition. Client data never determines a price
     // or organization reference.
     const { data: context, error: contextError } = await caller.rpc("paddle_create_checkout_context", { p_plan_id: planId });
     if (contextError || !context?.payment_id || !context?.paddle_price_id) {
-      return fail(contextError?.message ?? "PADDLE_CHECKOUT_CONTEXT_FAILED");
+      return fail(contextError?.message ?? "PADDLE_CHECKOUT_CONTEXT_FAILED", 400, headers);
     }
 
     if (context.transaction_id && TRANSACTION_ID_PATTERN.test(context.transaction_id)) {
@@ -77,7 +80,7 @@ Deno.serve(async (req: Request) => {
     const transactionId = transactionBody?.data?.id ?? "";
     if (!transactionResponse.ok || !TRANSACTION_ID_PATTERN.test(transactionId)) {
       console.error("[paddle-subscription-checkout] transaction creation failed", transactionResponse.status);
-      return fail("PADDLE_TRANSACTION_CREATE_FAILED", 502);
+      return fail("PADDLE_TRANSACTION_CREATE_FAILED", 502, headers);
     }
 
     const { error: linkError } = await service.rpc("paddle_link_checkout_transaction", {
@@ -86,13 +89,13 @@ Deno.serve(async (req: Request) => {
     });
     if (linkError) {
       console.error("[paddle-subscription-checkout] transaction link failed", linkError.message);
-      return fail("PADDLE_TRANSACTION_LINK_FAILED", 500);
+      return fail("PADDLE_TRANSACTION_LINK_FAILED", 500, headers);
     }
 
     return new Response(JSON.stringify({ transactionId, reused: false }), { status: 200, headers });
   } catch (error) {
     const message = error instanceof Error ? error.message : "PADDLE_CHECKOUT_UNAVAILABLE";
     console.error("[paddle-subscription-checkout]", message);
-    return fail(message === "UNAUTHENTICATED" ? message : "PADDLE_CHECKOUT_UNAVAILABLE", message === "UNAUTHENTICATED" ? 401 : 500);
+    return fail(message === "UNAUTHENTICATED" ? message : "PADDLE_CHECKOUT_UNAVAILABLE", message === "UNAUTHENTICATED" ? 401 : 500, headers);
   }
 });

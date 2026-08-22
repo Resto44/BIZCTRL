@@ -68,7 +68,7 @@ describe('public plan checkout canonical flow', () => {
     expect(paddleClient).toContain('LIVE_TOKEN_PATTERN');
     expect(paddleClient).toContain("paddleEnvironment() === PADDLE_LIVE && LIVE_TOKEN_PATTERN.test(paddleClientToken())");
     expect(checkoutFunction).toContain('paddle_create_checkout_context');
-    expect(checkoutFunction).toContain('if (!paddleApiKey) return fail("PADDLE_LIVE_NOT_CONFIGURED", 503);');
+    expect(checkoutFunction).toContain('if (!paddleApiKey) return fail("PADDLE_LIVE_NOT_CONFIGURED", 503, headers);');
     expect(migration).toContain("subscription_status = 'PENDING_PAYMENT'");
     expect(migration).toContain("'Paddle checkout pending'");
   });
