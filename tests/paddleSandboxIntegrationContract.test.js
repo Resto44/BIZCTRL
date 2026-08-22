@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 const checkoutClientPath = new URL('../src/lib/paddle.js', import.meta.url);
 const checkoutApiPath = new URL('../src/lib/paddleBilling.js', import.meta.url);
 const paymentProviderPath = new URL('../src/lib/payment/PaymentProvider.js', import.meta.url);
-const pricingPagePath = new URL('../src/pages/PublicPages.jsx', import.meta.url);
+const landingPagePath = new URL('../src/pages/LandingPage.jsx', import.meta.url);
 const billingPath = new URL('../src/pages/Billing.jsx', import.meta.url);
 const migrationPath = new URL('../src/supabase/20260821_paddle_live_runtime.sql', import.meta.url);
 const liveWebhookMigrationPath = new URL('../src/supabase/20260821_paddle_live_webhook_label.sql', import.meta.url);
@@ -111,14 +111,14 @@ describe('Paddle live integration contract', () => {
     expect(portal).toContain('https://api.paddle.com');
   });
 
-  it('connects the public pricing page to the secure shared checkout action after authentication', async () => {
-    const pricing = await readFile(pricingPagePath, 'utf8');
-    expect(pricing).toContain("usePublicPlanCheckout");
-    expect(pricing).toContain('beginPlanCheckout');
-    expect(pricing).toContain("searchParams.get('checkout_plan')");
-    expect(pricing).toContain('void beginPlanCheckout(selectedPlan);');
-    expect(pricing).toContain('enterpriseContactMode');
-    expect(pricing).not.toContain('Paddle Sandbox');
+  it('connects the public landing-page pricing surface to the secure shared checkout action after authentication', async () => {
+    const landing = await readFile(landingPagePath, 'utf8');
+    expect(landing).toContain("usePublicPlanCheckout");
+    expect(landing).toContain('beginPlanCheckout');
+    expect(landing).toContain("searchParams.get('checkout_plan')");
+    expect(landing).toContain('void beginPlanCheckout(selectedPlan);');
+    expect(landing).toContain('enterpriseContactMode');
+    expect(landing).not.toContain('Paddle Sandbox');
   });
 
   it('exposes a Paddle customer ID only to the authorized billing owner and documents live-only public configuration', async () => {
