@@ -28,7 +28,7 @@ import {
   Receipt, FileText, AlertTriangle, Zap, Activity, CreditCard,
   Banknote, Network, UserCheck, GitBranch, Store, Globe,
   PieChart, Target, Layers, ClipboardList, Handshake,
-  ArrowLeftRight, ShieldCheck, SlidersHorizontal
+  ArrowLeftRight, ShieldCheck, SlidersHorizontal, X
 } from 'lucide-react';
 import { useERPNavigation } from '@/hooks/useERPNavigation';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
@@ -51,6 +51,7 @@ export const ERP_NAV_GROUPS = [
     items: [
       { path: '/sales',          label: 'Sales',          icon: ShoppingCart, permission: 'viewSales' },
       { path: '/sales-invoices', label: 'Sales Invoices', icon: Receipt,      permission: 'viewSales' },
+      { path: '/cash-register',  label: 'Cash Register',  icon: Banknote,     permission: 'viewSales' },
       { path: '/purchases',      label: 'Purchases',      icon: Package,      permission: 'viewPurchases' },
       { path: '/purchase-orders',label: 'Purchase Orders',icon: ClipboardList,permission: 'viewPurchases' },
       { path: '/expenses',       label: 'Expenses',       icon: DollarSign,   permission: 'viewExpenses' },
@@ -83,6 +84,7 @@ export const ERP_NAV_GROUPS = [
       { path: '/cashflow',          label: 'Cash Flow',         icon: Activity,  permission: 'viewReports' },
       { path: '/balance-sheet',     label: 'Balance Sheet',     icon: FileText,  permission: 'viewReports' },
       { path: '/debt-management',   label: 'Debt Management',   icon: Banknote,  permission: 'viewDebts' },
+      { path: '/customer-management',label: 'Customer Management',icon: Users,    permission: 'viewDebts' },
       { path: '/network-management',label: 'Network Settlement',icon: Network,   permission: 'viewNetworkAccounts' },
       { path: '/payroll',           label: 'Payroll',           icon: CreditCard,permission: 'viewPayroll' },
     ],
@@ -94,6 +96,7 @@ export const ERP_NAV_GROUPS = [
       { path: '/employees',          label: 'Employees',       icon: Users,      permission: 'viewEmployees' },
       { path: '/employee-attendance',label: 'Attendance',      icon: UserCheck,  permission: 'viewAttendance' },
       { path: '/employee-control',   label: 'Staff Control',   icon: ShieldCheck,permission: 'viewEmployeeControl' },
+      { path: '/driver-management',  label: 'Driver Management',icon: Truck,      permission: 'viewEmployees' },
     ],
   },
   {
@@ -102,6 +105,7 @@ export const ERP_NAV_GROUPS = [
     items: [
       { path: '/reports',         label: 'Reports',         icon: BarChart3, permission: 'viewReports' },
       { path: '/oracle-analytics',label: 'Oracle Analytics',icon: Zap,       permission: 'viewReports' },
+      { path: '/bi-center',       label: 'Business Intelligence',icon: BarChart3, permission: 'viewReports' },
       { path: '/branch-analytics',label: 'Branch Analytics',icon: GitBranch, permission: 'viewReports' },
       { path: '/alerts',          label: 'Smart Alerts',    icon: Bell,      permission: 'viewAlerts' },
     ],
@@ -116,13 +120,15 @@ export const ERP_NAV_GROUPS = [
       { path: '/settings',           label: 'Settings',             icon: Settings,  permission: 'manageSettings' },
       { path: '/erp-approval-center',label: 'Approvals',            icon: ShieldCheck,permission: 'manageSettings' },
       { path: '/notifications',      label: 'Notifications',        icon: Bell,      permission: 'viewAlerts' },
+      { path: '/billing',            label: 'Billing & Subscription',icon: CreditCard,permission: 'viewBilling' },
+      { path: '/support',            label: 'Support',              icon: Bell },
       { path: '/customize-workspace', label: 'Customize your workspace', icon: SlidersHorizontal, permission: 'manageDashboardCustomization' },
     ],
   },
 ];
 
 // ─── Single nav item ──────────────────────────────────────────────────────────
-function NavItem({ item, collapsed, isActive }) {
+function NavItem({ item, collapsed, isActive, onNavigate }) {
   const Icon = item.icon;
   const { translateLiteral } = useLanguage();
   const label = translateLiteral(item.label);
@@ -137,7 +143,7 @@ function NavItem({ item, collapsed, isActive }) {
       <TooltipProvider delayDuration={0}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Link to={item.path} className={cn(base, 'justify-center px-0 w-10 h-10 mx-auto')}>
+            <Link to={item.path} onClick={onNavigate} className={cn(base, 'justify-center px-0 w-10 h-10 mx-auto')}>
               <Icon className="w-5 h-5 shrink-0" />
             </Link>
           </TooltipTrigger>
@@ -150,7 +156,7 @@ function NavItem({ item, collapsed, isActive }) {
   }
 
   return (
-    <Link to={item.path} className={base}>
+    <Link to={item.path} onClick={onNavigate} className={base}>
       <Icon className="w-4 h-4 shrink-0" />
       <span className="truncate">{label}</span>
       {item.badge && (
@@ -163,7 +169,7 @@ function NavItem({ item, collapsed, isActive }) {
 }
 
 // ─── Nav group ────────────────────────────────────────────────────────────────
-function NavGroup({ group, collapsed, location, can }) {
+function NavGroup({ group, collapsed, location, can, onNavigate }) {
   const [open, setOpen] = useState(true);
   const { translateLiteral } = useLanguage();
   const visibleItems = useMemo(
@@ -200,6 +206,7 @@ function NavGroup({ group, collapsed, location, can }) {
                   ? location.pathname === '/'
                   : location.pathname.startsWith(item.path)
               }
+              onNavigate={onNavigate}
             />
           ))}
         </div>
@@ -209,7 +216,7 @@ function NavGroup({ group, collapsed, location, can }) {
 }
 
 // ─── Main ERPSidebar ──────────────────────────────────────────────────────────
-export default function ERPSidebar({ collapsed, onToggle }) {
+export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavigate }) {
   const location = useLocation();
   const { can, role } = useRole();
   const { activeRestaurant } = useTenant();
@@ -225,9 +232,10 @@ export default function ERPSidebar({ collapsed, onToggle }) {
   return (
     <aside
       className={cn(
-        'hidden lg:flex flex-col h-screen sticky top-0 bg-sidebar border-r border-sidebar-border',
-        'transition-all duration-200 ease-in-out overflow-hidden',
-        collapsed ? 'w-[var(--erp-sidebar-collapsed)]' : 'w-[var(--erp-sidebar-width)]'
+        mobile
+          ? 'flex h-dvh w-[min(20rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex-col overflow-hidden bg-sidebar border-r border-sidebar-border shadow-2xl'
+          : 'hidden lg:flex h-screen sticky top-0 bg-sidebar border-r border-sidebar-border transition-all duration-200 ease-in-out overflow-hidden',
+        !mobile && (collapsed ? 'w-[var(--erp-sidebar-collapsed)]' : 'w-[var(--erp-sidebar-width)]')
       )}
       style={{
         '--erp-sidebar-width': '260px',
@@ -268,6 +276,7 @@ export default function ERPSidebar({ collapsed, onToggle }) {
                   item={{ path: fav.path, label: fav.label, icon: Star }}
                   collapsed={false}
                   isActive={location.pathname.startsWith(fav.path)}
+                  onNavigate={onNavigate}
                 />
               ))}
             </div>
@@ -288,6 +297,7 @@ export default function ERPSidebar({ collapsed, onToggle }) {
                   item={{ path: page.path, label: page.label, icon: Clock }}
                   collapsed={false}
                   isActive={location.pathname.startsWith(page.path)}
+                  onNavigate={onNavigate}
                 />
               ))}
             </div>
@@ -303,6 +313,7 @@ export default function ERPSidebar({ collapsed, onToggle }) {
             collapsed={collapsed}
             location={location}
             can={can}
+            onNavigate={onNavigate}
           />
         ))}
       </div>
@@ -313,14 +324,17 @@ export default function ERPSidebar({ collapsed, onToggle }) {
           variant="ghost"
           size="sm"
           onClick={onToggle}
+          aria-label={mobile ? translateLiteral('Close navigation') : translateLiteral('Collapse navigation')}
           className={cn(
-            'w-full h-8 text-muted-foreground hover:text-foreground',
+            'w-full h-10 text-muted-foreground hover:text-foreground',
             collapsed ? 'justify-center px-0' : 'justify-start gap-2'
           )}
         >
-          {collapsed
-            ? <ChevronRight className="w-4 h-4" />
-            : <><ChevronLeft className="w-4 h-4" /><span className="text-xs">{translateLiteral('Collapse')}</span></>
+          {mobile
+            ? <><X className="w-4 h-4" /><span className="text-xs">{translateLiteral('Close')}</span></>
+            : collapsed
+              ? <ChevronRight className="w-4 h-4" />
+              : <><ChevronLeft className="w-4 h-4" /><span className="text-xs">{translateLiteral('Collapse')}</span></>
           }
         </Button>
       </div>

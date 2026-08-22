@@ -44,16 +44,20 @@ export default function ERPLayout({ children }) {
       )}
 
       {/* Mobile sidebar overlay */}
-      {showSidebar && mobileMenuOpen && (
+      {mobileMenuOpen && (
         <>
-          <div
-            className="fixed inset-0 z-[100] bg-black/50 lg:hidden"
+          <button
+            type="button"
+            className="fixed inset-0 z-[100] cursor-default bg-black/50 lg:hidden"
+            aria-label="Close navigation drawer"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="fixed left-0 top-0 bottom-0 z-[110] lg:hidden">
+          <div className="fixed left-0 top-0 bottom-0 z-[110] lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation drawer">
             <ERPSidebar
               collapsed={false}
+              mobile
               onToggle={() => setMobileMenuOpen(false)}
+              onNavigate={() => setMobileMenuOpen(false)}
             />
           </div>
         </>
