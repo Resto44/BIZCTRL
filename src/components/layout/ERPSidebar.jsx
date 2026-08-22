@@ -28,7 +28,7 @@ import {
   Receipt, FileText, AlertTriangle, Zap, Activity, CreditCard,
   Banknote, Network, UserCheck, GitBranch, Store, Globe,
   PieChart, Target, Layers, ClipboardList, Handshake,
-  ArrowLeftRight, ShieldCheck, SlidersHorizontal, X
+  ArrowLeftRight, ShieldCheck, SlidersHorizontal, Truck, X
 } from 'lucide-react';
 import { useERPNavigation } from '@/hooks/useERPNavigation';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';

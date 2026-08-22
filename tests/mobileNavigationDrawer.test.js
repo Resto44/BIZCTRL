@@ -47,4 +47,11 @@ describe('mobile navigation drawer contract', () => {
     expect(role).toContain('if (role === ROLES.OWNER)');
     expect(role).toContain('[key]: true');
   });
+
+  it('imports every icon used by the expanded mobile module registry', async () => {
+    const sidebar = await source('../src/components/layout/ERPSidebar.jsx');
+
+    expect(sidebar).toContain('SlidersHorizontal, Truck, X');
+    expect(sidebar).toContain("label: 'Driver Management',icon: Truck");
+  });
 });

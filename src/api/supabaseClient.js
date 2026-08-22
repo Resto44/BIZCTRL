@@ -80,17 +80,21 @@ export { supabase, SUPABASE_URL, SUPABASE_ANON_KEY };
 
 // ── Base44 SDK — safe init (for functions/integrations) ────────────────────
 let _b44 = null;
-try {
-  _b44 = createBase44Client({
-    appId: appParams.appId,
-    token: appParams.token,
-    functionsVersion: appParams.functionsVersion,
-    serverUrl: '',
-    requiresAuth: false,
-    appBaseUrl: appParams.appBaseUrl,
-  });
-} catch (e) {
-  console.warn('[supabaseClient] Base44 SDK init failed (functions/integrations unavailable):', e.message);
+if (appParams.appId) {
+  try {
+    _b44 = createBase44Client({
+      appId: appParams.appId,
+      token: appParams.token,
+      functionsVersion: appParams.functionsVersion,
+      serverUrl: '',
+      requiresAuth: false,
+      appBaseUrl: appParams.appBaseUrl,
+    });
+  } catch (e) {
+    console.warn('[supabaseClient] Base44 SDK init failed (functions/integrations unavailable):', e.message);
+  }
+} else {
+  console.info('[supabaseClient] Base44 SDK is not configured; optional functions and integrations use safe fallbacks.');
 }
 
 const stubFn = { invoke: async () => ({ data: null }) };

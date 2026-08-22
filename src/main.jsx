@@ -28,6 +28,9 @@ class GlobalErrorBoundary extends React.Component {
           >
             Reload App
           </button>
+          <a href="mailto:support@mybizctrl.site" style={{ marginTop: '1rem', color: '#1d4ed8', fontWeight: 600 }}>
+            Contact support
+          </a>
         </div>
       );
     }
