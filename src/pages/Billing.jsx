@@ -20,7 +20,7 @@ const COPY = {
     renewal: 'Next renewal', planAccess: 'ERP access', granted: 'Available', restricted: 'Billing only',
     usage: 'Usage & limits', availablePlans: 'Available plans', paymentHistory: 'Payment history',
     subscriptionHistory: 'Subscription history', choose: 'Choose Plan', upgrade: 'Upgrade plan', downgrade: 'Downgrade plan', current: 'Current plan',
-    pending: 'Payment pending', cancel: 'Cancel at period end', renew: 'Keep subscription',
+    pending: 'Payment pending', resumeCheckout: 'Resume checkout', cancel: 'Cancel at period end', renew: 'Keep subscription',
     ibanTitle: 'Manual IBAN payment', ibanInstructions: 'Transfer the exact amount using the information below, then upload a PDF or image proof for Platform Owner review.', paymentReference: 'Bank transfer reference', uploadProof: 'Upload payment proof', submitProof: 'Submit proof for review', proofAccepted: 'Your proof has been submitted. The subscription will activate only after Platform Owner approval.', ownerOnly: 'Billing actions are available to the organization owner.',
     priceMonth: '/ month', original: 'Original', final: 'Final', noRecords: 'No records yet.',
     paymentSelected: 'A manual IBAN payment request has been created. This plan remains unavailable until your payment proof is approved by the Platform Owner.',
@@ -36,7 +36,7 @@ const COPY = {
     renewal: 'التجديد القادم', planAccess: 'دخول نظام ERP', granted: 'متاح', restricted: 'الفوترة فقط',
     usage: 'الاستخدام والحدود', availablePlans: 'الخطط المتاحة', paymentHistory: 'سجل المدفوعات',
     subscriptionHistory: 'سجل الاشتراك', choose: 'اختر الخطة', upgrade: 'ترقية الخطة', downgrade: 'تخفيض الخطة', current: 'الخطة الحالية',
-    pending: 'الدفع قيد الانتظار', cancel: 'إلغاء عند نهاية الفترة', renew: 'الاحتفاظ بالاشتراك',
+    pending: 'الدفع قيد الانتظار', resumeCheckout: 'استئناف الدفع', cancel: 'إلغاء عند نهاية الفترة', renew: 'الاحتفاظ بالاشتراك',
     ibanTitle: 'دفع يدوي عبر IBAN', ibanInstructions: 'حوّل المبلغ الدقيق بالمعلومات أدناه، ثم ارفع إثبات PDF أو صورة لمراجعة مالك المنصة.', paymentReference: 'مرجع التحويل البنكي', uploadProof: 'رفع إثبات الدفع', submitProof: 'إرسال الإثبات للمراجعة', proofAccepted: 'تم إرسال الإثبات. لا يُفعّل الاشتراك إلا بعد موافقة مالك المنصة.', ownerOnly: 'إجراءات الفوترة متاحة لمالك المؤسسة فقط.',
     priceMonth: '/ شهرياً', original: 'الأصلي', final: 'النهائي', noRecords: 'لا توجد سجلات بعد.',
     paymentSelected: 'تم إنشاء طلب دفع يدوي عبر IBAN. تظل الخطة غير نشطة حتى يوافق مالك المنصة على إثبات الدفع.',
@@ -52,7 +52,7 @@ const COPY = {
     renewal: 'تمدید بعدی', planAccess: 'دسترسی ERP', granted: 'در دسترس', restricted: 'فقط صورتحساب',
     usage: 'مصرف و محدودیت‌ها', availablePlans: 'طرح‌های موجود', paymentHistory: 'تاریخچه پرداخت',
     subscriptionHistory: 'تاریخچه اشتراک', choose: 'انتخاب طرح', upgrade: 'ارتقای طرح', downgrade: 'کاهش طرح', current: 'طرح فعلی',
-    pending: 'پرداخت در انتظار', cancel: 'لغو در پایان دوره', renew: 'ادامه اشتراک',
+    pending: 'پرداخت در انتظار', resumeCheckout: 'ادامه پرداخت', cancel: 'لغو در پایان دوره', renew: 'ادامه اشتراک',
     ibanTitle: 'پرداخت دستی IBAN', ibanInstructions: 'مبلغ دقیق را با اطلاعات زیر انتقال دهید و سپس مدرک PDF یا تصویر را برای بررسی مالک پلتفرم بارگذاری کنید.', paymentReference: 'مرجع انتقال بانکی', uploadProof: 'بارگذاری مدرک پرداخت', submitProof: 'ارسال مدرک برای بررسی', proofAccepted: 'مدرک ارسال شد. اشتراک فقط پس از تأیید مالک پلتفرم فعال می‌شود.', ownerOnly: 'اقدامات صورتحساب فقط برای مالک سازمان در دسترس است.',
     priceMonth: '/ ماه', original: 'قیمت اصلی', final: 'قیمت نهایی', noRecords: 'هنوز رکوردی وجود ندارد.',
     paymentSelected: 'درخواست پرداخت دستی IBAN ایجاد شد. این طرح تا تأیید مدرک پرداخت توسط مالک پلتفرم فعال نمی‌شود.',
@@ -357,7 +357,7 @@ export default function Billing() {
             return <Card key={item.id} className={`relative overflow-hidden ${isCurrent ? 'ring-2 ring-primary shadow-md' : ''}`}>
               {discount && <Badge className="absolute end-3 top-3 bg-rose-600 text-white">{item.discount_label || `-${item.discount_percent}%`}</Badge>}
               <CardHeader className="pb-2"><CardTitle className="text-lg">{item.display_name}</CardTitle><div className="flex items-end gap-2"><span className="text-3xl font-black">{money(item.monthly_price_cents)}</span><span className="pb-1 text-xs text-muted-foreground">{copy.priceMonth}</span></div>{discount && <p className="text-xs text-muted-foreground"><span className="line-through">{copy.original}: {money(item.original_price_cents)}</span> · <span className="font-semibold text-emerald-700">{copy.final}: {money(item.monthly_price_cents)}</span></p>}{Number(item.trial_days) > 0 && <p className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs leading-5 text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">First month free ({item.trial_days}-day trial). After the free month, your subscription renews at {money(item.monthly_price_cents)}{copy.priceMonth} unless cancelled.</p>}</CardHeader>
-              <CardContent className="space-y-4"><p className="text-xs text-muted-foreground">{capacitySummary(item, lang)}</p><ul className="space-y-1.5 text-sm text-muted-foreground">{features.slice(0, 5).map((feature) => <li key={feature} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{feature}</li>)}</ul>{isCurrent && !selectedPending ? <Badge variant="secondary" className="w-full justify-center py-2">{copy.current}</Badge> : !canManageBilling ? <Button className="w-full" disabled>{copy.ownerOnly}</Button> : <Button className="w-full" disabled={Boolean(acting) || selectedPending} onClick={() => beginManualPayment(item.id)}><CreditCard className="me-2 h-4 w-4" />{selectedPending ? copy.pending : paidAction}</Button>}</CardContent>
+              <CardContent className="space-y-4"><p className="text-xs text-muted-foreground">{capacitySummary(item, lang)}</p><ul className="space-y-1.5 text-sm text-muted-foreground">{features.slice(0, 5).map((feature) => <li key={feature} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{feature}</li>)}</ul>{isCurrent && !selectedPending ? <Badge variant="secondary" className="w-full justify-center py-2">{copy.current}</Badge> : !canManageBilling ? <Button className="w-full" disabled>{copy.ownerOnly}</Button> : <Button className="w-full" disabled={Boolean(acting) || (selectedPending && !isPaddleProvider)} onClick={() => beginManualPayment(item.id)}><CreditCard className="me-2 h-4 w-4" />{selectedPending ? (isPaddleProvider ? copy.resumeCheckout : copy.pending) : paidAction}</Button>}</CardContent>
             </Card>;
           })}
         </div>

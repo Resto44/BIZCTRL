@@ -128,6 +128,15 @@ describe('subscription UI and plan-change contract', () => {
     expect(boundary).toContain('Back to ERP');
   });
 
+  it('keeps a canonical pending Paddle checkout resumable while preserving the Manual IBAN pending lock', async () => {
+    const billing = await readFile(billingPath, 'utf8');
+    expect(billing).toContain("disabled={Boolean(acting) || (selectedPending && !isPaddleProvider)}");
+    expect(billing).toContain("selectedPending ? (isPaddleProvider ? copy.resumeCheckout : copy.pending) : paidAction");
+    expect(billing).toContain("resumeCheckout: 'Resume checkout'");
+    expect(billing).toContain("resumeCheckout: 'استئناف الدفع'");
+    expect(billing).toContain("resumeCheckout: 'ادامه پرداخت'");
+  });
+
   it('localizes the subscription entitlement guard for English, Arabic, and Persian', async () => {
     const guard = await readFile(guardPath, 'utf8');
     expect(guard).toContain('Plan feature required');
