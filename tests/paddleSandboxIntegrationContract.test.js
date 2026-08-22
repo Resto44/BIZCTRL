@@ -38,6 +38,9 @@ describe('Paddle live integration contract', () => {
     ]);
     expect(clientApi).toContain("supabase.functions.invoke('paddle-subscription-checkout'");
     expect(clientApi).toContain('openPaddleTransaction(data.transactionId, paddleCustomerId)');
+    expect(clientApi).toContain("const context = result?.error?.context;");
+    expect(clientApi).toContain('context.clone().json().catch(() => null)');
+    expect(clientApi).toContain("throw await responseError({ data, error }, 'PADDLE_CHECKOUT_UNAVAILABLE');");
     expect(checkoutFunction).toContain('paddle_create_checkout_context');
     expect(checkoutFunction).toContain('https://api.paddle.com');
     expect(checkoutFunction).not.toContain('sandbox-api.paddle.com');
