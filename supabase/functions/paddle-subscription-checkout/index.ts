@@ -5,6 +5,11 @@ const APP_ORIGIN = Deno.env.get("APP_URL") ?? "https://mybizctrl.site";
 const PADDLE_ENVIRONMENT = Deno.env.get("PADDLE_ENVIRONMENT") ?? "production";
 const PADDLE_API_URL = "https://api.paddle.com";
 const TRANSACTION_ID_PATTERN = /^txn_[a-z\d]{26}$/i;
+const SAFE_PADDLE_ERROR_FIELD_PATTERN = /^[a-z\d._-]{1,100}$/i;
+
+function safePaddleErrorField(value: unknown) {
+  return typeof value === "string" && SAFE_PADDLE_ERROR_FIELD_PATTERN.test(value) ? value : "unknown";
+}
 
 const corsHeaders = (origin: string | null) => ({
   "Access-Control-Allow-Origin": origin === APP_ORIGIN ? origin : APP_ORIGIN,
@@ -76,10 +81,20 @@ Deno.serve(async (req: Request) => {
         },
       }),
     });
-    const transactionBody = await transactionResponse.json().catch(() => null) as { data?: { id?: string } } | null;
+    const transactionBody = await transactionResponse.json().catch(() => null) as {
+      data?: { id?: string };
+      error?: { code?: unknown; type?: unknown };
+    } | null;
     const transactionId = transactionBody?.data?.id ?? "";
     if (!transactionResponse.ok || !TRANSACTION_ID_PATTERN.test(transactionId)) {
-      console.error("[paddle-subscription-checkout] transaction creation failed", transactionResponse.status);
+      console.error("[paddle-subscription-checkout] transaction creation failed", JSON.stringify({
+        http_status: transactionResponse.status,
+        paddle_error_code: safePaddleErrorField(transactionBody?.error?.code),
+        paddle_error_type: safePaddleErrorField(transactionBody?.error?.type),
+        request_endpoint: "/transactions",
+        environment: PADDLE_ENVIRONMENT,
+        paddle_price_id: context.paddle_price_id,
+      }));
       return fail("PADDLE_TRANSACTION_CREATE_FAILED", 502, headers);
     }
 

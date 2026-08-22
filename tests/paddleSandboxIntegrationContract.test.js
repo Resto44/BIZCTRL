@@ -155,6 +155,12 @@ describe('Paddle live integration contract', () => {
     expect(checkoutFunction).toContain('headers: { "Content-Type": "application/json", ...headers }');
     expect(checkoutFunction).toContain('return fail("PADDLE_TRANSACTION_CREATE_FAILED", 502, headers);');
     expect(checkoutFunction).toContain('return fail(contextError?.message ?? "PADDLE_CHECKOUT_CONTEXT_FAILED", 400, headers);');
+    expect(checkoutFunction).toContain('SAFE_PADDLE_ERROR_FIELD_PATTERN');
+    expect(checkoutFunction).toContain('paddle_error_code: safePaddleErrorField(transactionBody?.error?.code)');
+    expect(checkoutFunction).toContain('paddle_error_type: safePaddleErrorField(transactionBody?.error?.type)');
+    expect(checkoutFunction).toContain('request_endpoint: "/transactions"');
+    expect(checkoutFunction).toContain('environment: PADDLE_ENVIRONMENT');
+    expect(checkoutFunction).not.toContain('console.error("[paddle-subscription-checkout] transaction creation failed", transactionBody');
   });
 
   it('routes an already-linked Paddle customer through the hosted portal and blocks duplicate server checkout contexts', async () => {
