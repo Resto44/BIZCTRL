@@ -41,20 +41,23 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
   });
 
   it('keeps Quick Shortcuts in dashboard flow and preserves bottom-navigation safe-area clearance', async () => {
-    const [quickActions, owner, appLayout, bottomNav, erpLayout] = await Promise.all([
+    const [quickActions, owner, appLayout, bottomNav, erpLayout, serviceWorker] = await Promise.all([
       source('../src/components/dashboard/QuickActionsDock.jsx'),
       source('../src/pages/OwnerDashboard.jsx'),
       source('../src/components/layout/AppLayout.jsx'),
       source('../src/components/layout/BottomNav.jsx'),
       source('../src/components/layout/ERPLayout.jsx'),
+      source('../public/sw.js'),
     ]);
     expect(quickActions).toContain('grid min-w-0 grid-cols-2');
     expect(quickActions).toContain('sm:grid-cols-3 sm:gap-3 xl:grid-cols-6');
-    expect(quickActions).not.toMatch(/className="fixed|position:\s*fixed|z-\[9999\]/);
+    expect(quickActions).not.toMatch(/className="fixed|position:\s*fixed|z-\[9999\]|overflow-x-auto|snap-x|sticky|absolute/);
     expect(owner).toContain("import QuickActionsDock from '@/components/dashboard/QuickActionsDock';");
     expect(owner).toContain('<QuickActionsDock />');
+    expect(owner.indexOf('<QuickActionsDock />')).toBeGreaterThan(owner.indexOf('id="mode-insights"'));
     expect(appLayout).not.toContain('QuickActionsDock');
     expect(bottomNav).toContain('pb-[env(safe-area-inset-bottom,0px)]');
     expect(erpLayout).toContain('pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+1rem)]');
+    expect(serviceWorker).toContain("const CACHE_VERSION = 'v10';");
   });
 });

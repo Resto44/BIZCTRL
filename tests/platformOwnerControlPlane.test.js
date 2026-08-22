@@ -43,7 +43,7 @@ describe('Platform Owner control plane', () => {
     expect(vercelConfig).toContain('www\\\\.mybizctrl\\\\.site');
     expect(vercelConfig).toContain('base44-rest-ctrl(?:-[a-z0-9-]+)?\\\\.vercel\\\\.app');
     expect(vercelConfig).toContain('https://mybizctrl.site/:path*');
-    expect(serviceWorker).toContain("const CACHE_VERSION = 'v9';");
+    expect(serviceWorker).toContain("const CACHE_VERSION = 'v10';");
     expect(serviceWorker).toContain('caches.keys()');
   });
 

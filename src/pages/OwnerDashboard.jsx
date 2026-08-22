@@ -1458,8 +1458,6 @@ function OwnerDashboardContent() {
         </div>
       </div>
 
-      <QuickActionsDock />
-
       <div className="flex w-full min-w-0 max-w-full flex-col gap-6">
       {/* ══════════════════════════════════════════════════════════════════════
           DRIVER PERFORMANCE — restaurant-wide, branch-filter aware
@@ -2399,6 +2397,8 @@ function OwnerDashboardContent() {
           />
         </DashboardAccordionSection>
       </WidgetErrorBoundary>
+
+      <QuickActionsDock />
       </div>
     </div>
     {canCustomizeDashboard && (
