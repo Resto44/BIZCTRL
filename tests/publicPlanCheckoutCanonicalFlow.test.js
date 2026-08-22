@@ -10,6 +10,7 @@ const checkoutPath = new URL('../src/lib/publicPlanCheckout.js', import.meta.url
 const paddleClientPath = new URL('../src/lib/paddle.js', import.meta.url);
 const checkoutFunctionPath = new URL('../supabase/functions/paddle-subscription-checkout/index.ts', import.meta.url);
 const liveMigrationPath = new URL('../src/supabase/20260821_paddle_live_runtime.sql', import.meta.url);
+const pendingPlanSwitchMigrationPath = new URL('../src/supabase/20260822_paddle_pending_checkout_plan_switch.sql', import.meta.url);
 
 describe('public plan checkout canonical flow', () => {
   it('uses the landing page as the only public plan-selection and checkout-resume surface', async () => {
@@ -71,6 +72,17 @@ describe('public plan checkout canonical flow', () => {
     expect(checkoutFunction).toContain('if (!paddleApiKey) return fail("PADDLE_LIVE_NOT_CONFIGURED", 503, headers);');
     expect(migration).toContain("subscription_status = 'PENDING_PAYMENT'");
     expect(migration).toContain("'Paddle checkout pending'");
+  });
+
+  it('supersedes only a stale cross-plan pending Paddle checkout while reusing a same-plan checkout', async () => {
+    const migration = await readFile(pendingPlanSwitchMigrationPath, 'utf8');
+
+    expect(migration).toContain("v_existing_payment.plan_id = v_plan.id");
+    expect(migration).toContain("'transaction_id', v_existing_payment.paddle_transaction_id");
+    expect(migration).toContain("SET status = 'superseded', updated_at = now()");
+    expect(migration).not.toContain('PADDLE_PENDING_CHECKOUT_EXISTS');
+    expect(migration).toContain("status = 'pending'");
+    expect(migration).toContain("payment_provider = 'paddle'");
   });
 
   it('keeps payment activation exclusively with the verified provider event path', async () => {
