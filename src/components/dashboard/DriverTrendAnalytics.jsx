@@ -88,16 +88,16 @@ const DriverTrendAnalytics = memo(function DriverTrendAnalytics({
   const topDrivers = trends.driverRows.filter((row) => row.orders > 0).slice(0, 10);
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+    <section className="w-full min-w-0 max-w-full space-y-3">
+      <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-base font-black text-foreground">Trend Analytics</h2>
-          <p className="text-xs text-muted-foreground">Branch and driver performance for {periodLabel.toLowerCase()}, calculated from canonical Driver Sales records.</p>
+          <p className="break-words text-xs text-muted-foreground">Branch and driver performance for {periodLabel.toLowerCase()}, calculated from canonical Driver Sales records.</p>
         </div>
         <span className="w-fit rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">LIVE CANONICAL DATA</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+      <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
         <Metric label="Total Drivers" value={trends.totals.drivers} icon={Users} tone="text-cyan-600" />
         <Metric label="Active Drivers" value={trends.totals.activeDrivers} icon={Truck} tone="text-emerald-600" />
         <Metric label="Driver Sales / Orders" value={trends.totals.orders} icon={ReceiptText} tone="text-violet-600" />
@@ -107,7 +107,7 @@ const DriverTrendAnalytics = memo(function DriverTrendAnalytics({
         <Metric label="Total Driver Revenue" value={money(trends.totals.revenue, currency)} icon={BarChart3} tone="text-primary" />
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className="grid min-w-0 gap-3 xl:grid-cols-2">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Driver Revenue Trend</CardTitle></CardHeader>
           <CardContent className="h-56 p-3 pt-0">
@@ -154,20 +154,20 @@ const DriverTrendAnalytics = memo(function DriverTrendAnalytics({
         <CardContent className="p-3 pt-0">
           {trends.branchRows.length === 0 ? <EmptyState label="No branch data for this period." /> : <>
             <BranchMobileCards rows={trends.branchRows} currency={currency} />
-            <div className="hidden overflow-x-auto rounded-lg border border-border/70 md:block">
+            <div className="hidden w-full max-w-full overflow-x-auto rounded-lg border border-border/70 md:block">
               <table className="w-full min-w-[760px] text-left text-xs"><thead className="bg-muted/50 text-muted-foreground"><tr><th className="px-3 py-2">Branch</th><th className="px-3 py-2">Drivers</th><th className="px-3 py-2">Active</th><th className="px-3 py-2">Cash</th><th className="px-3 py-2">Network / POS</th><th className="px-3 py-2">Credit</th><th className="px-3 py-2">Total Revenue</th></tr></thead><tbody>{trends.branchRows.map((row) => <tr key={row.branchId || row.branchKey} className="border-t border-border/60"><td className="px-3 py-2 font-semibold">{row.branchName}</td><td className="px-3 py-2">{row.drivers}</td><td className="px-3 py-2">{row.activeDrivers}</td><td className="px-3 py-2">{money(row.cash, currency)}</td><td className="px-3 py-2">{money(row.network, currency)}</td><td className="px-3 py-2">{money(row.credit, currency)}</td><td className="px-3 py-2 font-bold text-primary">{money(row.revenue, currency)}</td></tr>)}</tbody></table>
             </div>
           </>}
         </CardContent>
       </Card>
 
-      <div className="grid gap-3 xl:grid-cols-[1.05fr_.95fr]">
+      <div className="grid min-w-0 gap-3 xl:grid-cols-[1.05fr_.95fr]">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Driver Breakdown</CardTitle></CardHeader>
           <CardContent className="p-3 pt-0">
             {trends.driverRows.length === 0 ? <EmptyState label="No drivers are available in this scope." /> : <>
               <DriverMobileCards rows={trends.driverRows} currency={currency} />
-              <div className="hidden overflow-x-auto rounded-lg border border-border/70 md:block">
+              <div className="hidden w-full max-w-full overflow-x-auto rounded-lg border border-border/70 md:block">
                 <table className="w-full min-w-[800px] text-left text-xs"><thead className="bg-muted/50 text-muted-foreground"><tr><th className="px-3 py-2">Driver</th><th className="px-3 py-2">Branch</th><th className="px-3 py-2">Orders</th><th className="px-3 py-2">Cash</th><th className="px-3 py-2">Network / POS</th><th className="px-3 py-2">Credit</th><th className="px-3 py-2">Total Revenue</th></tr></thead><tbody>{trends.driverRows.map((row) => <tr key={row.driverId} className="border-t border-border/60"><td className="px-3 py-2 font-semibold">{row.name}</td><td className="px-3 py-2">{row.branchName}</td><td className="px-3 py-2">{row.orders}</td><td className="px-3 py-2">{money(row.cash, currency)}</td><td className="px-3 py-2">{money(row.network, currency)}</td><td className="px-3 py-2">{money(row.credit, currency)}</td><td className="px-3 py-2 font-bold text-primary">{money(row.revenue, currency)}</td></tr>)}</tbody></table>
               </div>
             </>}

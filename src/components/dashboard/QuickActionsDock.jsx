@@ -7,8 +7,6 @@ import {
   Wallet,
   ArrowDownLeft,
   Truck,
-  FileText,
-  PackagePlus,
   Banknote
 } from 'lucide-react';
 
@@ -33,21 +31,21 @@ export default function QuickActionsDock() {
   ];
 
   return (
-    <div className="fixed left-0 right-0 z-[9999] pointer-events-none" 
+    <div className="fixed inset-x-0 z-[9999] max-w-full pointer-events-none"
          style={{ bottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px))' }}>
-      <div className="max-w-2xl mx-auto px-4 pointer-events-auto">
-        <div className="bg-background/80 backdrop-blur-xl border-x border-t border-border/50 rounded-t-2xl overflow-hidden">
-          <div className="flex overflow-x-auto hide-scrollbar gap-3 p-3 snap-x snap-mandatory">
+      <div className="mx-auto w-full max-w-2xl px-3 pointer-events-auto sm:px-4">
+        <div className="w-full max-w-full overflow-hidden rounded-t-2xl border-x border-t border-border/50 bg-background/80 backdrop-blur-xl">
+          <div className="grid grid-cols-2 gap-2 p-3 sm:flex sm:gap-3 sm:overflow-x-auto sm:snap-x sm:snap-mandatory">
             {actions.map((action, idx) => (
               <Link
                 key={idx}
                 to={action.to}
-                className="flex flex-col items-center gap-1.5 min-w-[72px] snap-center active:scale-95 transition-transform"
+                className="flex w-full min-w-0 flex-col items-center gap-1.5 rounded-lg px-1 py-0.5 text-center transition-transform active:scale-95 sm:w-auto sm:min-w-[72px] sm:snap-center"
               >
                 <div className={`${action.color} p-2.5 rounded-xl text-white shadow-lg`}>
                   <action.icon className="w-5 h-5" />
                 </div>
-                <span className="text-[10px] font-bold text-center leading-tight whitespace-nowrap px-1">
+                <span className="w-full break-words px-1 text-[10px] font-bold leading-tight">
                   {action.label}
                 </span>
               </Link>

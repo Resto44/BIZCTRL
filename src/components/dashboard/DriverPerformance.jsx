@@ -93,15 +93,15 @@ const DriverPerformance = memo(function DriverPerformance({
   const error = driversError || salesError;
 
   return (
-    <section className="space-y-4">
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-center gap-2.5">
+    <section className="w-full min-w-0 max-w-full space-y-4">
+      <div className="mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-2.5">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-100 text-cyan-600 dark:bg-cyan-900/40">
             <Truck className="h-4 w-4" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h2 className="text-sm font-bold text-foreground leading-tight">{title}</h2>
-            {description && <p className="text-[11px] text-muted-foreground leading-tight">{description}</p>}
+            {description && <p className="break-words text-[11px] leading-tight text-muted-foreground">{description}</p>}
           </div>
         </div>
         <span className="flex w-fit items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
@@ -109,7 +109,7 @@ const DriverPerformance = memo(function DriverPerformance({
         </span>
       </div>
 
-      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+      <div className="mb-3 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-5">
         {DRIVER_ANALYTICS_PERIODS.map((item) => (
           <button key={item.id} type="button" onClick={() => setPeriod(item.id)} className={`rounded-lg border px-2 py-2 text-[11px] font-semibold transition-colors ${period === item.id ? 'border-cyan-600 bg-cyan-600 text-white shadow-sm' : 'border-border bg-card text-muted-foreground hover:bg-muted'}`}>
             {item.label}
@@ -135,7 +135,7 @@ const DriverPerformance = memo(function DriverPerformance({
               </div>
 
               {selectedBranch === 'all' && (
-                <div className="mb-4 overflow-x-auto rounded-xl border border-border/70">
+                <div className="mb-4 w-full max-w-full overflow-x-auto rounded-xl border border-border/70">
                   <table className="w-full min-w-[580px] text-left text-xs">
                     <thead className="bg-muted/50 text-muted-foreground"><tr><th className="px-3 py-2 font-semibold">Branch</th><th className="px-3 py-2 font-semibold">Drivers</th><th className="px-3 py-2 font-semibold">Active</th><th className="px-3 py-2 font-semibold">Cash</th><th className="px-3 py-2 font-semibold">Network / POS</th><th className="px-3 py-2 font-semibold">Credit</th><th className="px-3 py-2 font-semibold">Total Revenue</th></tr></thead>
                     <tbody>{branchRows.map((row) => <tr key={row.branchId || row.branchKey} className="border-t border-border/60"><td className="px-3 py-2 font-semibold">{row.branchName}</td><td className="px-3 py-2">{row.drivers}</td><td className="px-3 py-2">{row.activeDrivers}</td><td className="px-3 py-2">{money(row.cash, currency)}</td><td className="px-3 py-2">{money(row.network, currency)}</td><td className="px-3 py-2">{money(row.credit, currency)}</td><td className="px-3 py-2 font-semibold">{money(row.revenue, currency)}</td></tr>)}</tbody>
@@ -143,7 +143,7 @@ const DriverPerformance = memo(function DriverPerformance({
                 </div>
               )}
 
-              <div className="mb-2 flex items-center gap-2"><Award className="h-4 w-4 text-amber-600" /><h3 className="text-sm font-bold">Top 10 Drivers</h3></div>
+              <div className="mb-2 flex min-w-0 items-center gap-2"><Award className="h-4 w-4 text-amber-600" /><h3 className="text-sm font-bold">Top 10 Drivers</h3></div>
               {analytics.rankedDrivers.length === 0 ? (
                 <div className="py-7 text-center"><Truck className="mx-auto mb-2 h-8 w-8 text-muted-foreground/35" /><p className="text-xs font-medium text-muted-foreground">No driver-linked sales for this period.</p></div>
               ) : (

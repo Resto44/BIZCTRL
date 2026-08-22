@@ -34,7 +34,7 @@ export default function ERPLayout({ children }) {
   const showSidebar = ERP_SIDEBAR_ROLES.includes(role);
 
   return (
-    <div className="flex min-h-dvh bg-background">
+    <div className="flex min-h-dvh w-full min-w-0 max-w-full bg-background">
       {/* Desktop Sidebar */}
       {showSidebar && (
         <ERPSidebar
@@ -60,15 +60,15 @@ export default function ERPLayout({ children }) {
       )}
 
       {/* Main content area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-dvh">
+      <div className="flex min-h-dvh min-w-0 max-w-full flex-1 flex-col">
         <ERPHeader onMobileMenuToggle={() => setMobileMenuOpen(o => !o)} />
 
         {/* Page content */}
         <main
           className={cn(
-            'flex-1 overflow-y-auto',
-            // Bottom padding on mobile for BottomNav
-            'pb-[var(--bottom-nav-height)] lg:pb-0'
+            'flex-1 min-w-0 max-w-full overflow-y-auto',
+            // Bottom padding on mobile accounts for BottomNav and iPhone safe-area.
+            'pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] lg:pb-0'
           )}
         >
           {children}

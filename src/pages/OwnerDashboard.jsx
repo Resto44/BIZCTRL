@@ -127,7 +127,7 @@ const SectionHeader = memo(({
   );
 
   return (
-    <div className="owner-dashboard-section-header mb-2 flex items-center gap-2">
+    <div className="owner-dashboard-section-header mb-2 flex w-full min-w-0 max-w-full flex-wrap items-start gap-2 sm:flex-nowrap sm:items-center">
       {onToggle ? (
         <button
           type="button"
@@ -171,7 +171,7 @@ const DashboardAccordionSection = memo(({
   const expanded = expandedId === id;
   const order = Number.isInteger(configuredWidget?.order) ? configuredWidget.order : undefined;
   return (
-    <section style={order === undefined ? undefined : { order }} className="rounded-2xl border border-border/60 bg-card/30 p-2.5 shadow-sm sm:p-3">
+    <section style={order === undefined ? undefined : { order }} className="w-full min-w-0 max-w-full rounded-2xl border border-border/60 bg-card/30 p-2.5 shadow-sm sm:p-3">
       <SectionHeader
         icon={icon}
         title={displayedTitle}
@@ -183,8 +183,8 @@ const DashboardAccordionSection = memo(({
         isExpanded={expanded}
         onToggle={() => onToggle(id)}
       />
-      <div className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none ${expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-        <div className="min-h-0 overflow-hidden" aria-hidden={!expanded} inert={expanded ? undefined : ''}>
+      <div className={`grid min-w-0 transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none ${expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+        <div className="min-h-0 min-w-0 overflow-hidden" aria-hidden={!expanded} inert={expanded ? undefined : ''}>
           <div className="pt-1">{children}</div>
         </div>
       </div>
@@ -210,12 +210,12 @@ const MetricCard = memo(({
   const c = colorMap[color] || colorMap.blue;
   return (
     <Card
-      className={`border ${c.border} ${onClick ? 'cursor-pointer hover:shadow-md active:scale-[0.98]' : ''} transition-all duration-200`}
+      className={`min-w-0 max-w-full border ${c.border} ${onClick ? 'cursor-pointer hover:shadow-md active:scale-[0.98]' : ''} transition-all duration-200`}
       onClick={onClick}
     >
       <CardContent className="p-3.5">
-        <div className="flex items-start justify-between mb-2">
-          <div className={`w-9 h-9 rounded-xl ${c.bg} flex items-center justify-center`}>
+        <div className="mb-2 flex min-w-0 items-start justify-between gap-2">
+          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${c.bg}`}>
             <Icon className={`w-4 h-4 ${c.icon}`} />
           </div>
           {trend !== undefined && (
@@ -225,9 +225,9 @@ const MetricCard = memo(({
             </span>
           )}
         </div>
-        <p className={`font-black leading-tight ${large ? 'text-xl' : 'text-lg'} ${c.val}`}>{value}</p>
-        <p className="text-[11px] font-medium text-muted-foreground mt-0.5 leading-tight">{title}</p>
-        {subtitle && <p className="text-[10px] text-muted-foreground/70 mt-0.5 leading-tight">{subtitle}</p>}
+        <p className={`break-words font-black leading-tight ${large ? 'text-xl' : 'text-lg'} ${c.val}`}>{value}</p>
+        <p className="mt-0.5 break-words text-[11px] font-medium leading-tight text-muted-foreground">{title}</p>
+        {subtitle && <p className="mt-0.5 break-words text-[10px] leading-tight text-muted-foreground/70">{subtitle}</p>}
         {trendLabel && <p className="text-[10px] text-muted-foreground/60 mt-0.5">{trendLabel}</p>}
       </CardContent>
     </Card>
@@ -270,26 +270,26 @@ const BranchSelector = memo(({ branches, selectedBranch, onSelect, t }) => {
   const isAll = selectedBranch === 'all';
 
   return (
-    <div className="relative">
+    <div className="relative w-full min-w-0 max-w-full">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl border-2 border-primary/30 bg-primary/5 hover:bg-primary/10 active:scale-[0.98] transition-all"
+        className="flex w-full min-w-0 max-w-full items-center justify-between gap-2 rounded-xl border-2 border-primary/30 bg-primary/5 px-3.5 py-2.5 transition-all hover:bg-primary/10 active:scale-[0.98]"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {isAll
             ? <Globe className="w-4 h-4 text-primary shrink-0" />
             : <MapPin className="w-4 h-4 text-primary shrink-0" />
           }
-          <div className="text-left">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider leading-none mb-0.5">{t('selected_branch')}</p>
-            <p className="text-sm font-bold text-foreground leading-tight">{selectedLabel}</p>
+          <div className="min-w-0 text-left">
+            <p className="mb-0.5 text-[10px] font-semibold uppercase leading-none tracking-wider text-muted-foreground">{t('selected_branch')}</p>
+            <p className="truncate text-sm font-bold leading-tight text-foreground">{selectedLabel}</p>
           </div>
         </div>
-        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-background border border-border rounded-xl shadow-xl overflow-hidden">
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 w-full max-w-full overflow-hidden rounded-xl border border-border bg-background shadow-xl">
           {/* All Branches option */}
           <button
             className={`w-full flex items-center gap-2.5 px-4 py-3 text-left hover:bg-muted/60 transition-colors ${selectedBranch === 'all' ? 'bg-primary/10' : ''}`}
@@ -318,9 +318,9 @@ const BranchSelector = memo(({ branches, selectedBranch, onSelect, t }) => {
                 onClick={() => { onSelect(key); setOpen(false); }}
               >
                 <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{name}</p>
-                  {br.address && <p className="text-[10px] text-muted-foreground truncate max-w-[200px]">{br.address}</p>}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-foreground">{name}</p>
+                  {br.address && <p className="truncate text-[10px] text-muted-foreground">{br.address}</p>}
                 </div>
                 {isSelected && <CheckCircle2 className="w-4 h-4 text-primary ml-auto shrink-0" />}
               </button>
@@ -1384,18 +1384,18 @@ function OwnerDashboardContent() {
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <DashboardCustomizationContext.Provider value={dashboardCustomization.widgetsById}>
-    <div className="space-y-6 pb-8">
+    <div className="w-full min-w-0 max-w-full space-y-6 pb-8">
 
       {/* ── HEADER ── */}
-      <div className="flex items-center justify-between pt-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <LayoutDashboard className="w-5 h-5 text-primary" />
-            <h1 className="text-xl font-black text-foreground tracking-tight">{t('executive_dashboard')}</h1>
+      <div className="flex w-full min-w-0 max-w-full flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="w-full min-w-0 sm:w-auto">
+          <div className="flex min-w-0 items-center gap-2">
+            <LayoutDashboard className="h-5 w-5 shrink-0 text-primary" />
+            <h1 className="min-w-0 break-words text-xl font-black tracking-tight text-foreground">{t('executive_dashboard')}</h1>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5 ml-7">{format(new Date(), 'EEEE, MMMM d yyyy')}</p>
+          <p className="ml-7 mt-0.5 break-words text-xs text-muted-foreground">{format(new Date(), 'EEEE, MMMM d yyyy')}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           <button
             onClick={() => navigate('/alerts')}
             className="bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5 transition-colors cursor-pointer active:scale-95"
@@ -1435,7 +1435,7 @@ function OwnerDashboardContent() {
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 0 — BRANCH SELECTOR  (always at top)
       ══════════════════════════════════════════════════════════════════════ */}
-      <div className="space-y-2">
+      <div className="w-full min-w-0 max-w-full space-y-2">
         <BranchSelector
           branches={branches}
           selectedBranch={selectedBranch}
@@ -1443,12 +1443,12 @@ function OwnerDashboardContent() {
           t={t}
         />
         {/* Branch badge below selector */}
-        <div className="flex items-center gap-1.5 px-1">
+        <div className="flex min-w-0 items-start gap-1.5 px-1">
           {selectedBranch === 'all'
             ? <Globe className="w-3.5 h-3.5 text-primary" />
             : <MapPin className="w-3.5 h-3.5 text-primary" />
           }
-          <span className="text-[11px] text-muted-foreground">
+          <span className="min-w-0 break-words text-[11px] text-muted-foreground">
             {t('showing_data_for')}{' '}
             <strong className="text-foreground">
               {selectedBranch === 'all' ? `🌐 ${t('all_branches')}` : `📍 ${selectedBranchLabel}`}
@@ -1457,7 +1457,7 @@ function OwnerDashboardContent() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-6">
+      <div className="flex w-full min-w-0 max-w-full flex-col gap-6">
       {/* ══════════════════════════════════════════════════════════════════════
           DRIVER PERFORMANCE — restaurant-wide, branch-filter aware
       ══════════════════════════════════════════════════════════════════════ */}
@@ -1495,11 +1495,11 @@ function OwnerDashboardContent() {
           summary="6 reports"
           color="purple"
         >
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3">
             {/* 1. Profit & Loss */}
             <button
               onClick={() => navigate('/profit-loss')}
-              className="group flex flex-col items-start gap-2 p-3.5 rounded-2xl border border-emerald-100 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 active:scale-95 transition-all text-left"
+              className="group flex w-full min-w-0 flex-col items-start gap-2 p-3.5 rounded-2xl border border-emerald-100 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 active:scale-95 transition-all text-left"
             >
               <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
                 <FileText className="w-4 h-4 text-emerald-600" />
@@ -1514,7 +1514,7 @@ function OwnerDashboardContent() {
             {/* 2. Oracle Analytics */}
             <button
               onClick={() => navigate('/oracle-analytics')}
-              className="group flex flex-col items-start gap-2 p-3.5 rounded-2xl border border-indigo-100 dark:border-indigo-900/60 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 active:scale-95 transition-all text-left"
+              className="group flex w-full min-w-0 flex-col items-start gap-2 p-3.5 rounded-2xl border border-indigo-100 dark:border-indigo-900/60 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 active:scale-95 transition-all text-left"
             >
               <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
                 <BarChart3 className="w-4 h-4 text-indigo-600" />
@@ -1529,7 +1529,7 @@ function OwnerDashboardContent() {
             {/* 3. Cash Flow */}
             <button
               onClick={() => navigate('/cashflow')}
-              className="group flex flex-col items-start gap-2 p-3.5 rounded-2xl border border-blue-100 dark:border-blue-900/60 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 active:scale-95 transition-all text-left"
+              className="group flex w-full min-w-0 flex-col items-start gap-2 p-3.5 rounded-2xl border border-blue-100 dark:border-blue-900/60 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 active:scale-95 transition-all text-left"
             >
               <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
                 <Wallet className="w-4 h-4 text-blue-600" />
@@ -1544,7 +1544,7 @@ function OwnerDashboardContent() {
             {/* 4. Balance Sheet */}
             <button
               onClick={() => navigate('/balance-sheet')}
-              className="group flex flex-col items-start gap-2 p-3.5 rounded-2xl border border-amber-100 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-950/50 active:scale-95 transition-all text-left"
+              className="group flex w-full min-w-0 flex-col items-start gap-2 p-3.5 rounded-2xl border border-amber-100 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-950/50 active:scale-95 transition-all text-left"
             >
               <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
                 <Scale className="w-4 h-4 text-amber-600" />
@@ -1559,7 +1559,7 @@ function OwnerDashboardContent() {
             {/* 5. Branch Analytics */}
             <button
               onClick={() => navigate('/branch-analytics')}
-              className="group flex flex-col items-start gap-2 p-3.5 rounded-2xl border border-cyan-100 dark:border-cyan-900/60 bg-cyan-50 dark:bg-cyan-950/30 hover:bg-cyan-100 dark:hover:bg-cyan-950/50 active:scale-95 transition-all text-left"
+              className="group flex w-full min-w-0 flex-col items-start gap-2 p-3.5 rounded-2xl border border-cyan-100 dark:border-cyan-900/60 bg-cyan-50 dark:bg-cyan-950/30 hover:bg-cyan-100 dark:hover:bg-cyan-950/50 active:scale-95 transition-all text-left"
             >
               <div className="w-9 h-9 rounded-xl bg-cyan-100 dark:bg-cyan-900/50 flex items-center justify-center">
                 <Building2 className="w-4 h-4 text-cyan-600" />
@@ -1574,7 +1574,7 @@ function OwnerDashboardContent() {
             {/* 6. Executive Dashboard */}
             <button
               onClick={() => navigate('/ceo-dashboard')}
-              className="group flex flex-col items-start gap-2 p-3.5 rounded-2xl border border-purple-100 dark:border-purple-900/60 bg-purple-50 dark:bg-purple-950/30 hover:bg-purple-100 dark:hover:bg-purple-950/50 active:scale-95 transition-all text-left"
+              className="group flex w-full min-w-0 flex-col items-start gap-2 p-3.5 rounded-2xl border border-purple-100 dark:border-purple-900/60 bg-purple-50 dark:bg-purple-950/30 hover:bg-purple-100 dark:hover:bg-purple-950/50 active:scale-95 transition-all text-left"
             >
               <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center">
                 <Activity className="w-4 h-4 text-purple-600" />
@@ -1656,11 +1656,11 @@ function OwnerDashboardContent() {
           color="blue"
         >
           {loadingSales ? (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid min-w-0 grid-cols-2 gap-3">
               {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid min-w-0 grid-cols-2 gap-3">
               <MetricCard title={t('todays_sales')}      value={fmt(execSummary.salesToday)}       subtitle={`${t('cash_label') || 'Cash'} ${fmt(execSummary.cashSalesToday)} · ${t('network_label') || 'Net'} ${fmt(execSummary.networkSalesToday)} · ${t('credit_label') || 'Credit'} ${fmt(execSummary.creditSalesToday)}`} icon={DollarSign}   color="green"  large onClick={() => navigate('/sales')} />
               <MetricCard title={t('todays_purchases')}  value={fmt(execSummary.purchasesToday)}   subtitle={t('approved_invoices')}          icon={ShoppingCart}  color="amber"  large onClick={() => navigate('/enterprise-purchases')} />
               <MetricCard title={t('gross_profit')}       value={fmt(execSummary.grossProfit)}      subtitle={t('sales_minus_purchases')}          icon={execSummary.grossProfit >= 0 ? TrendingUp : TrendingDown} color={execSummary.grossProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
@@ -1686,7 +1686,7 @@ function OwnerDashboardContent() {
               <MetricCard title={t('weekly_net_profit')} value={fmt(periodProfit.week.netProfit)} subtitle={t('net_profit_subtitle_weekly')} icon={periodProfit.week.netProfit >= 0 ? TrendingUp : TrendingDown} color={periodProfit.week.netProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
               <MetricCard title={t('monthly_net_profit')} value={fmt(periodProfit.month.netProfit)} subtitle={t('net_profit_subtitle_monthly')} icon={periodProfit.month.netProfit >= 0 ? TrendingUp : TrendingDown} color={periodProfit.month.netProfit >= 0 ? 'green' : 'red'} onClick={() => navigate('/profit-loss')} />
               {/* NETWORK BALANCE — 3-column row: Today / Yesterday / Month */}
-              <div className="col-span-2 grid grid-cols-3 gap-2">
+              <div className="col-span-2 grid min-w-0 grid-cols-3 gap-2">
                 <MetricCard title={t('network_today')}     value={fmt(execSummary.networkToday)}     subtitle={t('pos_network_today')}          icon={Wifi}  color="cyan"   onClick={() => navigate('/network-management')} />
                 <MetricCard title={t('network_yesterday')} value={fmt(execSummary.networkYesterday)} subtitle={t('pos_network_yesterday')}      icon={Wifi}  color="cyan"   onClick={() => navigate('/network-management')} />
                 <MetricCard title={t('month_network')}     value={fmt(execSummary.networkMonth)}     subtitle={t('pos_network_month')}  icon={Wifi}  color="cyan"   onClick={() => navigate('/network-management')} />
@@ -1794,7 +1794,7 @@ function OwnerDashboardContent() {
             color="purple"
             action={{ label: t('reports') || 'Reports', onClick: () => navigate('/reports') }}
           >
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid min-w-0 grid-cols-2 gap-3">
               {additionalSources.map((src, i) => {
                 const colors = ['purple', 'cyan', 'orange', 'indigo', 'green', 'amber', 'blue', 'red'];
                 const color = colors[i % colors.length];

@@ -243,7 +243,7 @@ function MoreMenu({ sections, onClose }) {
   return (
     <div className="fixed inset-0 z-[60] bg-black/50" onClick={onClose}>
       <div
-        className="absolute bottom-16 left-0 right-0 bg-background rounded-t-2xl max-h-[75vh] overflow-y-auto"
+        className="absolute bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] left-0 right-0 w-full max-w-full max-h-[75vh] overflow-y-auto rounded-t-2xl bg-background"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -273,7 +273,7 @@ function MoreMenu({ sections, onClose }) {
                       }`}
                     >
                       <item.icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : ''}`} />
-                      <span className="text-[10px] font-medium text-center leading-tight">
+                        <span className="w-full break-words text-[10px] font-medium text-center leading-tight">
                         {t(item.labelKey) || item.labelKey.replace(/_/g, ' ')}
                       </span>
                     </Link>
@@ -337,8 +337,8 @@ const BottomNav = memo(function BottomNav() {
       {showMore && moreSections.length > 0 && (
         <MoreMenu sections={moreSections} onClose={() => setShowMore(false)} />
       )}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg pb-[env(safe-area-inset-bottom,0px)]">
-        <div className="flex items-center justify-between h-[var(--bottom-nav-height)] max-w-lg mx-auto px-0.5">
+      <nav className="fixed inset-x-0 bottom-0 z-50 w-full max-w-full border-t border-border bg-card pb-[env(safe-area-inset-bottom,0px)] shadow-lg">
+        <div className="mx-auto flex h-[var(--bottom-nav-height)] w-full max-w-lg items-center justify-between px-0.5">
           {visibleNav.map(({ path, icon: NavIcon, labelKey, isMore }) => {
             if (isMore) {
               return (
@@ -350,7 +350,7 @@ const BottomNav = memo(function BottomNav() {
                   }`}
                 >
                   <NavIcon className={`w-5 h-5 flex-shrink-0 ${showMore ? 'stroke-[2.5]' : ''}`} />
-                  <span className={`text-[9px] mt-0.5 w-full text-center leading-tight whitespace-nowrap ${showMore ? 'font-semibold' : 'font-medium'}`}>
+                  <span className={`mt-0.5 w-full break-words text-center text-[9px] leading-tight ${showMore ? 'font-semibold' : 'font-medium'}`}>
                     {t(labelKey) || 'More'}
                   </span>
                 </button>
@@ -368,7 +368,7 @@ const BottomNav = memo(function BottomNav() {
                 }`}
               >
                 <NavIcon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'stroke-[2.5]' : ''}`} />
-                <span className={`text-[9px] mt-0.5 w-full text-center leading-tight whitespace-nowrap ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                <span className={`mt-0.5 w-full break-words text-center text-[9px] leading-tight ${isActive ? 'font-semibold' : 'font-medium'}`}>
                   {t(labelKey) || labelKey.replace(/_/g, ' ')}
                 </span>
               </Link>

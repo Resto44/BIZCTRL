@@ -317,7 +317,7 @@ function UserMenu() {
 // ─── Main ERPHeader ───────────────────────────────────────────────────────────
 export default function ERPHeader({ onMobileMenuToggle }) {
   return (
-    <header className="sticky top-0 z-50 h-[60px] bg-card/95 backdrop-blur-md border-b border-border flex items-center px-4 gap-3 shrink-0">
+    <header className="sticky top-0 z-50 flex min-h-[60px] w-full min-w-0 max-w-full shrink-0 items-center gap-1 border-b border-border bg-card/95 px-2 py-1 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md sm:gap-3 sm:px-4 sm:py-0">
       {/* Mobile menu toggle */}
       <Button
         variant="ghost"
@@ -331,20 +331,19 @@ export default function ERPHeader({ onMobileMenuToggle }) {
       {/* Breadcrumb */}
       <ERPBreadcrumb />
 
-      <PortalIdentityHeader />
+      <div className="min-w-0 flex-1 sm:flex-none">
+        <PortalIdentityHeader />
+      </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      {/* Desktop spacer */}
+      <div className="hidden flex-1 sm:block" />
 
       {/* Right actions */}
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
         <GlobalSearch />
-        <FavoriteToggle />
-        <LanguageSwitcher />
-        <ThemeToggle />
-        <div className="sm:hidden">
-          <ModeBadge size="xs" showLabel={false} />
-        </div>
+        <div className="hidden sm:block"><FavoriteToggle /></div>
+        <LanguageSwitcher compact />
+        <div className="hidden sm:block"><ThemeToggle /></div>
         <div className="hidden sm:block">
           <ModeBadge size="xs" />
         </div>
