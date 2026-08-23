@@ -99,7 +99,10 @@ function computeRecordRevenue(record, revenueSources) {
 }
 
 export default function SalesDashboard() {
-  const { t, currency, branches } = useLanguage();
+  const { t, currency, branches: contextBranches } = useLanguage();
+  // LanguageContext does not own branch data. The sidebar can mount this page
+  // before tenant branches are available, so keep analytics rendering safe.
+  const branches = Array.isArray(contextBranches) ? contextBranches : [];
   const [period, setPeriod] = useState('30d');
   const [branchFilter, setBranchFilter] = useState('all');
 
