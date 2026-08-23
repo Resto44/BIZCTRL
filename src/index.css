@@ -169,6 +169,42 @@
   }
 }
 
+/* ─── Dark surface consistency ──────────────────────────────────────────────
+   Older ERP screens include direct Tailwind light surface utilities.  In dark
+   mode, convert only elements that do not already declare a `dark:bg-*`
+   companion, preserving intentionally themed Owner Dashboard widgets while
+   preventing white/light cards, alerts, and panels from leaking through. */
+.dark :is([class*="bg-white"], [class*="bg-slate-50"], [class*="bg-slate-100"], [class*="bg-slate-200"], [class*="bg-gray-50"], [class*="bg-gray-100"], [class*="bg-gray-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(222 47% 9%) !important;
+}
+.dark :is([class*="bg-blue-50"], [class*="bg-blue-100"], [class*="bg-blue-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(217 42% 13%) !important;
+}
+.dark :is([class*="bg-emerald-50"], [class*="bg-emerald-100"], [class*="bg-emerald-200"], [class*="bg-green-50"], [class*="bg-green-100"], [class*="bg-green-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(158 38% 12%) !important;
+}
+.dark :is([class*="bg-amber-50"], [class*="bg-amber-100"], [class*="bg-amber-200"], [class*="bg-yellow-50"], [class*="bg-yellow-100"], [class*="bg-yellow-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(38 42% 12%) !important;
+}
+.dark :is([class*="bg-red-50"], [class*="bg-red-100"], [class*="bg-red-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(0 38% 13%) !important;
+}
+.dark :is([class*="bg-purple-50"], [class*="bg-purple-100"], [class*="bg-purple-200"], [class*="bg-violet-50"], [class*="bg-violet-100"], [class*="bg-violet-200"], [class*="bg-indigo-50"], [class*="bg-indigo-100"], [class*="bg-indigo-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(262 38% 13%) !important;
+}
+.dark :is([class*="bg-cyan-50"], [class*="bg-cyan-100"], [class*="bg-cyan-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(199 38% 12%) !important;
+}
+.dark :is([class*="border-slate-100"], [class*="border-gray-100"], [class*="border-slate-200"], [class*="border-gray-200"]):not([class*="dark:border-"]) {
+  border-color: hsl(var(--border)) !important;
+}
+.dark [class*="border-blue-100"]:not([class*="dark:border-"]) { border-color: hsl(217 42% 23%) !important; }
+.dark :is([class*="border-emerald-100"], [class*="border-green-100"]):not([class*="dark:border-"]) { border-color: hsl(158 38% 22%) !important; }
+.dark :is([class*="border-amber-100"], [class*="border-yellow-100"]):not([class*="dark:border-"]) { border-color: hsl(38 42% 24%) !important; }
+.dark [class*="border-red-100"]:not([class*="dark:border-"]) { border-color: hsl(0 38% 24%) !important; }
+.dark :is([class*="border-purple-100"], [class*="border-violet-100"], [class*="border-indigo-100"]):not([class*="dark:border-"]) { border-color: hsl(262 38% 24%) !important; }
+.dark [class*="border-cyan-100"]:not([class*="dark:border-"]) { border-color: hsl(199 38% 23%) !important; }
+
 /* ─── RTL support ─────────────────────────────────────────────────────────── */
 [dir="rtl"] {
   text-align: right;

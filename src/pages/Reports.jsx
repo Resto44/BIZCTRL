@@ -85,13 +85,13 @@ function Section({ title, icon: Icon, children, defaultOpen = true }) {
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
 function KPICard({ label, value, sub, trend, icon: Icon, color = 'blue' }) {
   const colorMap = {
-    blue:   'bg-blue-50 border-blue-100',
-    green:  'bg-emerald-50 border-emerald-100',
-    amber:  'bg-amber-50 border-amber-100',
-    red:    'bg-red-50 border-red-100',
-    purple: 'bg-purple-50 border-purple-100',
-    cyan:   'bg-cyan-50 border-cyan-100',
-    slate:  'bg-slate-50 border-slate-100',
+    blue:   'bg-blue-50 border-blue-100 dark:bg-blue-950/40 dark:border-blue-900/70',
+    green:  'bg-emerald-50 border-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-900/70',
+    amber:  'bg-amber-50 border-amber-100 dark:bg-amber-950/40 dark:border-amber-900/70',
+    red:    'bg-red-50 border-red-100 dark:bg-red-950/40 dark:border-red-900/70',
+    purple: 'bg-purple-50 border-purple-100 dark:bg-purple-950/40 dark:border-purple-900/70',
+    cyan:   'bg-cyan-50 border-cyan-100 dark:bg-cyan-950/40 dark:border-cyan-900/70',
+    slate:  'bg-slate-50 border-slate-100 dark:bg-slate-900/60 dark:border-slate-700',
   };
   const iconColorMap = {
     blue: 'text-blue-500', green: 'text-emerald-500', amber: 'text-amber-500',
@@ -375,7 +375,7 @@ export default function Reports() {
       </div>
 
       {pdfError && (
-        <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
+        <div className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-600 dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-300">
           {pdfError}
         </div>
       )}
@@ -402,15 +402,15 @@ export default function Reports() {
       <Section title={t('sales_performance')} icon={TrendingUp}>
         {/* Best/Worst/Peak row */}
         <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-100 text-center">
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-2 text-center dark:border-emerald-900/70 dark:bg-emerald-950/40">
             <p className="text-xs text-muted-foreground">{t('best_day')}</p>
             <p className="text-sm font-bold text-emerald-700 truncate">{performance.bestDay ? `${performance.bestDay.date?.slice(5)} — ${fmtC(performance.bestDay.total, currency)}` : '—'}</p>
           </div>
-          <div className="p-2 bg-red-50 rounded-lg border border-red-100 text-center">
+          <div className="rounded-lg border border-red-100 bg-red-50 p-2 text-center dark:border-red-900/70 dark:bg-red-950/40">
             <p className="text-xs text-muted-foreground">{t('worst_day')}</p>
             <p className="text-sm font-bold text-red-600 truncate">{performance.worstDay ? `${performance.worstDay.date?.slice(5)} — ${fmtC(performance.worstDay.total, currency)}` : '—'}</p>
           </div>
-          <div className="p-2 bg-blue-50 rounded-lg border border-blue-100 text-center">
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-2 text-center dark:border-blue-900/70 dark:bg-blue-950/40">
             <p className="text-xs text-muted-foreground">{t('peak_day')}</p>
             <p className="text-sm font-bold text-blue-700">{performance.peakDay || '—'}</p>
             <p className="text-xs text-muted-foreground">{t('growth_direction')}: <span className={growthColor(performance.growthDirection === 'up' ? 1 : -1)}>{t(`growth_${performance.growthDirection}`)}</span></p>
@@ -616,7 +616,7 @@ export default function Reports() {
                 <p className="font-bold text-emerald-700 text-sm truncate">{branchPerf[0]?.label}</p>
                 <p className="text-xs text-emerald-600">{fmtC(branchPerf[0]?.profit, currency)} {t('profit')}</p>
               </div>
-              <div className="p-2 bg-red-50 border border-red-100 rounded-lg">
+              <div className="rounded-lg border border-red-100 bg-red-50 p-2 dark:border-red-900/70 dark:bg-red-950/40">
                 <p className="text-xs text-muted-foreground">{t('weakest_branch')}</p>
                 <p className="font-bold text-red-600 text-sm truncate">{branchPerf[branchPerf.length - 1]?.label}</p>
                 <p className="text-xs text-red-500">{fmtC(branchPerf[branchPerf.length - 1]?.profit, currency)} {t('profit')}</p>
@@ -746,7 +746,7 @@ export default function Reports() {
       <Section title="Product Consumption Analytics" icon={Package}>
         <div className="grid grid-cols-2 gap-2 mb-3">
           {productQtyAnalytics.topConsumedMonth && (
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5">
+            <div className="rounded-lg border border-purple-200 bg-purple-50 p-2.5 dark:border-purple-900/70 dark:bg-purple-950/40">
               <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mb-1">Top Consumed (Month)</p>
               <p className="text-xs font-bold text-foreground truncate">{productQtyAnalytics.topConsumedMonth.productName}</p>
               <p className="text-sm font-black text-purple-700">
@@ -801,7 +801,7 @@ export default function Reports() {
             <p className="text-xs font-semibold text-muted-foreground mb-2">Today's Product Usage</p>
             <div className="space-y-1.5">
               {productQtyAnalytics.todayProducts.slice(0, 8).map((p) => (
-                <div key={p.productId} className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-purple-50/60 border border-purple-100">
+                <div key={p.productId} className="flex items-center justify-between rounded-lg border border-purple-100 bg-purple-50/60 px-2 py-1.5 dark:border-purple-900/70 dark:bg-purple-950/40">
                   <div>
                     <p className="text-xs font-semibold text-foreground">{p.productName}</p>
                     <p className="text-[10px] text-muted-foreground">
@@ -831,9 +831,9 @@ export default function Reports() {
               <p className="text-xs font-semibold">{t('recommendations')}</p>
               {recommendations.map((rec, i) => (
                 <div key={i} className={`flex items-start gap-2 p-2 rounded text-xs ${
-                  rec.severity === 'critical' ? 'bg-red-50 border border-red-200 text-red-700' :
-                  rec.severity === 'warning'  ? 'bg-amber-50 border border-amber-200 text-amber-700' :
-                  'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  rec.severity === 'critical' ? 'bg-red-50 border border-red-200 text-red-700 dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-300' :
+                  rec.severity === 'warning'  ? 'bg-amber-50 border border-amber-200 text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-300' :
+                  'bg-emerald-50 border border-emerald-200 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300'
                 }`}>
                   <span className="flex-shrink-0 mt-0.5">
                     {rec.severity === 'success' ? '✓' : rec.severity === 'critical' ? '⚠' : '→'}
