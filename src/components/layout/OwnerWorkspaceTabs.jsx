@@ -94,6 +94,8 @@ export default function OwnerWorkspaceTabs() {
   const cacheRef = useRef(new Map());
   const scrollPositionsRef = useRef(new Map());
   const previousActivePathRef = useRef(DEFAULT_TAB_PATH);
+  const tabsRef = useRef([DEFAULT_TAB]);
+  const mruPathsRef = useRef([DEFAULT_TAB_PATH]);
   const [tabs, setTabs] = useState([DEFAULT_TAB]);
   const [mruPaths, setMruPaths] = useState([DEFAULT_TAB_PATH]);
 
@@ -107,12 +109,18 @@ export default function OwnerWorkspaceTabs() {
   useEffect(() => {
     if (!ownerWorkspace) return;
 
-    setTabs((currentTabs) => (
-      currentTabs.some((tab) => tab.path === activePath)
+    setTabs((currentTabs) => {
+      const nextTabs = currentTabs.some((tab) => tab.path === activePath)
         ? currentTabs
-        : [...currentTabs, createTab(activePath)]
-    ));
-    setMruPaths((currentPaths) => [...currentPaths.filter((path) => path !== activePath), activePath]);
+        : [...currentTabs, createTab(activePath)];
+      tabsRef.current = nextTabs;
+      return nextTabs;
+    });
+    setMruPaths((currentPaths) => {
+      const nextPaths = [...currentPaths.filter((path) => path !== activePath), activePath];
+      mruPathsRef.current = nextPaths;
+      return nextPaths;
+    });
   }, [activePath, ownerWorkspace]);
 
   useLayoutEffect(() => {
@@ -137,20 +145,20 @@ export default function OwnerWorkspaceTabs() {
   const closeTab = useCallback((path) => {
     if (path === DEFAULT_TAB_PATH) return;
 
-    const remainingTabs = tabs.filter((tab) => tab.path !== path);
+    const remainingTabs = tabsRef.current.filter((tab) => tab.path !== path);
     const remainingPaths = new Set(remainingTabs.map((tab) => tab.path));
-    const nextMruPaths = mruPaths.filter((candidate) => candidate !== path && remainingPaths.has(candidate));
+    const nextMruPaths = mruPathsRef.current.filter((candidate) => candidate !== path && remainingPaths.has(candidate));
+    const nextPath = nextMruPaths.at(-1) || DEFAULT_TAB_PATH;
 
+    tabsRef.current = remainingTabs;
+    mruPathsRef.current = nextMruPaths;
     cacheRef.current.delete(path);
     scrollPositionsRef.current.delete(path);
     setTabs(remainingTabs);
     setMruPaths(nextMruPaths);
 
-    if (path === activePath) {
-      const nextPath = nextMruPaths.at(-1) || DEFAULT_TAB_PATH;
-      navigate(nextPath, { replace: true });
-    }
-  }, [activePath, mruPaths, navigate, tabs]);
+    if (path === activePath) navigate(nextPath, { replace: true });
+  }, [activePath, navigate]);
 
   const mountedTabs = useMemo(() => tabs.map((tab) => ({
     ...tab,

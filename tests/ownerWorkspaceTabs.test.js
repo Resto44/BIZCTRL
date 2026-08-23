@@ -26,7 +26,7 @@ describe('Owner workspace tab lifecycle contract', () => {
     const tabs = await source('../src/components/layout/OwnerWorkspaceTabs.jsx');
 
     expect(tabs).toContain("if (path === DEFAULT_TAB_PATH) return");
-    expect(tabs).toContain('const remainingTabs = tabs.filter((tab) => tab.path !== path)');
+    expect(tabs).toContain('const remainingTabs = tabsRef.current.filter((tab) => tab.path !== path)');
     expect(tabs).toContain('const nextPath = nextMruPaths.at(-1) || DEFAULT_TAB_PATH');
     expect(tabs).toContain('navigate(nextPath, { replace: true })');
     expect(tabs).toContain('event.stopPropagation(); onClose(tab.path);');
