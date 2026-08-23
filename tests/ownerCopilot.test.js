@@ -14,7 +14,8 @@ describe('Owner AI Copilot contract', () => {
     expect(dock).toContain('onOpenCopilot');
     expect(dock).toContain("label: 'AI Copilot'");
     expect(dock).toContain('Ask anything about your business or BizCTRL.');
-    expect(dashboard).toContain('<QuickActionsDock onOpenCopilot={() => setCopilotOpen(true)} />');
+    expect(dashboard).toContain('<QuickActionsDock');
+    expect(dashboard).toContain('onOpenCopilot={() => setCopilotOpen(true)}');
     expect(dashboard).toContain('<OwnerCopilotPanel');
     expect(panel).toContain("supabase.functions.invoke('owner-copilot'");
     expect(panel).toContain('fixed inset-0 z-[130]');

@@ -138,7 +138,7 @@ export function TenantProvider({ children }) {
       if (!activeRestaurant?.id) return [];
       const { data, error } = await supabase
         .from('branches')
-        .select('id, name, branch_key, location, is_active, restaurant_id')
+        .select('id, name, branch_key, location, city, phone, manager_name, is_active, restaurant_id')
         .eq('restaurant_id', activeRestaurant.id)
         .order('name');
       if (error) return [];
@@ -183,6 +183,9 @@ export function TenantProvider({ children }) {
         key,
         label: branch.name || legacy.label || key,
         address: branch.location || legacy.address || '',
+        city: branch.city || legacy.city || '',
+        phone: branch.phone || legacy.phone || '',
+        manager_name: branch.manager_name || legacy.manager_name || '',
       };
     });
 
@@ -282,7 +285,10 @@ export function TenantProvider({ children }) {
       restaurant_id: restaurantId,
       branch_key: branch.key,
       name: branch.label,
-      location: branch.address || null,
+      location: branch.address || branch.location || null,
+      city: branch.city || null,
+      phone: branch.phone || null,
+      manager_name: branch.manager_name || null,
       is_active: branch.is_active !== false,
       business_mode: branch.business_mode || activeRestaurant.business_mode || null,
       updated_date: now,

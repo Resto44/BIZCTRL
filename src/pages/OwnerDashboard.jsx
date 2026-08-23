@@ -53,6 +53,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import PriceChangesWidget from '@/components/dashboard/PriceChangesWidget';
 import DriverPerformance from '@/components/dashboard/DriverPerformance';
 import QuickActionsDock from '@/components/dashboard/QuickActionsDock';
+import QuickAddBranchDialog from '@/components/dashboard/QuickAddBranchDialog';
 import OwnerCopilotPanel from '@/components/dashboard/OwnerCopilotPanel';
 import CustomizeDashboardDialog from '@/components/dashboard/CustomizeDashboardDialog';
 import { useDashboardCustomization } from '@/hooks/useDashboardCustomization';
@@ -578,6 +579,7 @@ function OwnerDashboardContent() {
   const [expandedSection, setExpandedSection] = useState(null);
   const [isDashboardCustomizerOpen, setDashboardCustomizerOpen] = useState(false);
   const [isCopilotOpen, setCopilotOpen] = useState(false);
+  const [isQuickAddBranchOpen, setQuickAddBranchOpen] = useState(false);
   const toggleSection = useCallback((sectionId) => {
     setExpandedSection((current) => current === sectionId ? null : sectionId);
   }, []);
@@ -2385,7 +2387,11 @@ function OwnerDashboardContent() {
         </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
-      <QuickActionsDock onOpenCopilot={() => setCopilotOpen(true)} />
+      <QuickActionsDock
+        onOpenCopilot={() => setCopilotOpen(true)}
+        onAddBranch={role === 'owner' ? () => setQuickAddBranchOpen(true) : undefined}
+      />
+      <QuickAddBranchDialog open={isQuickAddBranchOpen} onOpenChange={setQuickAddBranchOpen} />
       </div>
     </div>
     <OwnerCopilotPanel
