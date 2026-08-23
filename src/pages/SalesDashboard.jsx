@@ -2,7 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useTenant } from '@/lib/TenantContext';
 import { useSalesSources } from '@/hooks/useSalesSources';
+import { normalizeSalesDashboardBranches, saleMatchesBranch, salesDashboardBranchLabel } from '@/lib/salesDashboardBranches';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -99,18 +101,22 @@ function computeRecordRevenue(record, revenueSources) {
 }
 
 export default function SalesDashboard() {
-  const { t, currency, branches: contextBranches } = useLanguage();
-  // LanguageContext does not own branch data. The sidebar can mount this page
-  // before tenant branches are available, so keep analytics rendering safe.
-  const branches = Array.isArray(contextBranches) ? contextBranches : [];
+  const { t, currency } = useLanguage();
+  const { branches: tenantBranches, activeRestaurant } = useTenant();
+  const branches = useMemo(() => normalizeSalesDashboardBranches(tenantBranches), [tenantBranches]);
   const [period, setPeriod] = useState('30d');
   const [branchFilter, setBranchFilter] = useState('all');
 
   const { sources: salesSources, revenueSources, kpiSources, isLoading: sourcesLoading } = useSalesSources();
 
   const { data: sales = [], isLoading } = useQuery({
-    queryKey: ['sales'],
-    queryFn: () => base44.entities.DailySales.list('-date', 2000),
+    queryKey: ['sales-dashboard', activeRestaurant?.id],
+    queryFn: () => base44.entities.DailySales.filter(
+      activeRestaurant?.id ? { restaurant_id: activeRestaurant.id } : {},
+      '-date',
+      2000,
+    ),
+    enabled: Boolean(activeRestaurant?.id),
     staleTime: 120000,
   });
 
@@ -123,14 +129,20 @@ export default function SalesDashboard() {
     };
   }, [period]);
 
+  const selectedBranch = useMemo(
+    () => branches.find((branch) => (branch.key || branch.id) === branchFilter) || null,
+    [branches, branchFilter],
+  );
+  const matchesSelectedBranch = (sale) => branchFilter === 'all' || saleMatchesBranch(sale, selectedBranch);
+
   const filtered = useMemo(() =>
-    sales.filter(s => s.date >= from && (branchFilter === 'all' || s.branch === branchFilter)),
-    [sales, from, branchFilter]
+    sales.filter((sale) => sale.date >= from && matchesSelectedBranch(sale)),
+    [sales, from, branchFilter, selectedBranch]
   );
 
   const prevPeriod = useMemo(() =>
-    sales.filter(s => s.date >= fromPrev && s.date < from && (branchFilter === 'all' || s.branch === branchFilter)),
-    [sales, from, fromPrev, branchFilter]
+    sales.filter((sale) => sale.date >= fromPrev && sale.date < from && matchesSelectedBranch(sale)),
+    [sales, from, fromPrev, branchFilter, selectedBranch]
   );
 
   // Revenue-aware totals (respects included_in_revenue flag)
@@ -223,7 +235,7 @@ export default function SalesDashboard() {
   const branchData = useMemo(() => {
     const map = {};
     filtered.forEach(s => {
-      const bl = branches.find(b => b.key === s.branch)?.label || s.branch;
+      const bl = salesDashboardBranchLabel(s, branches);
       if (!map[bl]) map[bl] = { branch: bl, Total: 0, Cash: 0, Network: 0 };
       map[bl].Total += computeRecordRevenue(s, revenueSources);
       map[bl].Cash += Number(s.restaurant_cash) || Number(s.cash) || 0;
@@ -294,7 +306,7 @@ export default function SalesDashboard() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Branches</SelectItem>
-            {branches.map(b => <SelectItem key={b.key} value={b.key}>{b.label}</SelectItem>)}
+            {branches.map((branch) => <SelectItem key={branch.id || branch.key} value={branch.key || branch.id}>{branch.label}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
