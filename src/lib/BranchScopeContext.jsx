@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
@@ -43,11 +43,21 @@ export function BranchScopeProvider({ children }) {
   );
   const managerBranchId = isBranchScoped && managerBranchObject?.id ? String(managerBranchObject.id) : null;
   const key = storageKey(user?.id, restaurantId);
+  const availableBranchIds = useMemo(
+    () => availableBranches.map((branch) => String(branch.id)).sort().join(','),
+    [availableBranches],
+  );
+  const restoredScopeRef = useRef(null);
   const [requestedBranchId, setRequestedBranchId] = useState(ALL_BRANCHES);
 
-  // Restore only a branch that is part of the authenticated restaurant. This makes
-  // local storage a convenience cache, not an authorization source.
+  // Restore only when the authenticated tenant/branch set changes. A branch click
+  // updates state synchronously; repeatedly restoring from storage on every
+  // rerender could otherwise overwrite that in-session UUID with a stale value.
   useEffect(() => {
+    const restorationKey = `${key}:${managerBranchId || ''}:${availableBranchIds}`;
+    if (restoredScopeRef.current === restorationKey) return;
+    restoredScopeRef.current = restorationKey;
+
     if (!restaurantId) {
       setRequestedBranchId(ALL_BRANCHES);
       return;
@@ -59,7 +69,7 @@ export function BranchScopeProvider({ children }) {
     const saved = normalizeBranchId(localStorage.getItem(key));
     const isAllowed = saved === ALL_BRANCHES || availableBranches.some((branch) => String(branch.id) === saved);
     setRequestedBranchId(isAllowed ? saved : ALL_BRANCHES);
-  }, [key, managerBranchId, restaurantId, availableBranches]);
+  }, [availableBranchIds, availableBranches, key, managerBranchId, restaurantId]);
 
   const selectedBranchId = useMemo(() => {
     if (!restaurantId) return ALL_BRANCHES;

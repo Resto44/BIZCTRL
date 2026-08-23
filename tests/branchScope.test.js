@@ -13,6 +13,8 @@ describe('central branch UUID scope contract', () => {
     expect(context).toContain("export const ALL_BRANCHES = 'all'");
     expect(context).toContain('bizctrl.selected-branch.${userId || \'anonymous\'}.${restaurantId || \'none\'}');
     expect(context).toContain('localStorage.getItem(key)');
+    expect(context).toContain('const restoredScopeRef = useRef(null);');
+    expect(context).toContain('if (restoredScopeRef.current === restorationKey) return;');
     expect(context).toContain('localStorage.setItem(storageKey(user?.id, restaurantId), safeId)');
     expect(context).toContain('availableBranches.some((branch) => String(branch.id) === nextId)');
     expect(context).toContain('managerBranchId && nextId !== managerBranchId');
