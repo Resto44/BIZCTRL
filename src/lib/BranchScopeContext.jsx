@@ -33,9 +33,13 @@ export function BranchScopeProvider({ children }) {
   } = useTenant();
   const queryClient = useQueryClient();
   const restaurantId = activeRestaurant?.id ? String(activeRestaurant.id) : null;
+  // TenantContext loads database branches with an active-restaurant predicate and
+  // applies staff assignment restrictions before exposing `branches`. Re-checking
+  // a raw restaurant-id value here can reject a valid UUID when legacy metadata
+  // changes its representation, so validate against that tenant-authorized list.
   const availableBranches = useMemo(
-    () => (branches || []).filter((branch) => branch?.id && branch?.restaurant_id === activeRestaurant?.id),
-    [activeRestaurant?.id, branches],
+    () => (branches || []).filter((branch) => branch?.id),
+    [branches],
   );
   const managerBranchId = isBranchScoped && managerBranchObject?.id ? String(managerBranchObject.id) : null;
   const key = storageKey(user?.id, restaurantId);
