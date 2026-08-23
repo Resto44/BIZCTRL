@@ -128,12 +128,12 @@ export const ERP_NAV_GROUPS = [
 ];
 
 // ─── Single nav item ──────────────────────────────────────────────────────────
-function NavItem({ item, collapsed, isActive, onNavigate }) {
+function NavItem({ item, collapsed, isActive, onNavigate, mobile = false }) {
   const Icon = item.icon;
   const { translateLiteral } = useLanguage();
   const label = translateLiteral(item.label);
   const base = cn(
-    'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer',
+    'flex min-w-0 max-w-full items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer',
     'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60',
     isActive && 'bg-sidebar-accent text-sidebar-primary font-semibold'
   );
@@ -158,7 +158,7 @@ function NavItem({ item, collapsed, isActive, onNavigate }) {
   return (
     <Link to={item.path} onClick={onNavigate} className={base}>
       <Icon className="w-4 h-4 shrink-0" />
-      <span className="truncate">{label}</span>
+      <span className={cn('min-w-0 max-w-full', mobile ? 'break-words [overflow-wrap:anywhere] [word-break:break-word]' : 'truncate')}>{label}</span>
       {item.badge && (
         <Badge variant="secondary" className="ml-auto text-[10px] h-4 px-1.5">
           {item.badge}
@@ -169,7 +169,7 @@ function NavItem({ item, collapsed, isActive, onNavigate }) {
 }
 
 // ─── Nav group ────────────────────────────────────────────────────────────────
-function NavGroup({ group, collapsed, location, can, onNavigate }) {
+function NavGroup({ group, collapsed, location, can, onNavigate, mobile = false }) {
   const [open, setOpen] = useState(true);
   const { translateLiteral } = useLanguage();
   const visibleItems = useMemo(
@@ -183,9 +183,9 @@ function NavGroup({ group, collapsed, location, can, onNavigate }) {
       {!collapsed && (
         <button
           onClick={() => setOpen(o => !o)}
-          className="w-full flex items-center justify-between px-3 py-1 group"
+          className="flex w-full min-w-0 max-w-full items-center justify-between gap-2 px-3 py-1 group"
         >
-          <span className="erp-section-title">{translateLiteral(group.label)}</span>
+          <span className={cn('min-w-0 max-w-full text-left', mobile && 'break-words [overflow-wrap:anywhere] [word-break:break-word]')}>{translateLiteral(group.label)}</span>
           <ChevronRight
             className={cn(
               'w-3 h-3 text-muted-foreground/50 transition-transform',
@@ -207,6 +207,7 @@ function NavGroup({ group, collapsed, location, can, onNavigate }) {
                   : location.pathname.startsWith(item.path)
               }
               onNavigate={onNavigate}
+              mobile={mobile}
             />
           ))}
         </div>
@@ -233,7 +234,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
     <aside
       className={cn(
         mobile
-          ? 'flex h-dvh w-[min(20rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex-col overflow-hidden bg-sidebar border-r border-sidebar-border shadow-2xl'
+          ? 'flex h-dvh max-h-dvh w-full min-w-0 max-w-full flex-col overflow-x-hidden overflow-y-auto overscroll-contain box-border bg-sidebar border-r border-sidebar-border shadow-2xl'
           : 'hidden lg:flex h-screen sticky top-0 bg-sidebar border-r border-sidebar-border transition-all duration-200 ease-in-out overflow-hidden',
         !mobile && (collapsed ? 'w-[var(--erp-sidebar-collapsed)]' : 'w-[var(--erp-sidebar-width)]')
       )}
@@ -244,7 +245,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
     >
       {/* ── Logo / Brand ── */}
       <div className={cn(
-        'flex items-center gap-3 px-4 h-[60px] border-b border-sidebar-border shrink-0',
+        'flex min-w-0 max-w-full items-center gap-3 px-4 h-[60px] border-b border-sidebar-border shrink-0 box-border',
         collapsed && 'justify-center px-0'
       )}>
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
@@ -252,7 +253,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
         </div>
         {!collapsed && (
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-bold text-sidebar-foreground truncate">
+            <span className="min-w-0 max-w-full text-sm font-bold text-sidebar-foreground break-words [overflow-wrap:anywhere] [word-break:break-word]">
               {activeRestaurant?.name || ''}
             </span>
             <span className="text-[10px] text-muted-foreground capitalize">{role}</span>
@@ -261,7 +262,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
       </div>
 
       {/* ── Scrollable nav area ── */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin py-2">
+      <nav className="flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-auto overscroll-contain scrollbar-thin py-2" aria-label={translateLiteral('Main navigation')}>
 
         {/* Favorites */}
         {!collapsed && favorites.length > 0 && (
@@ -277,6 +278,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
                   collapsed={false}
                   isActive={location.pathname.startsWith(fav.path)}
                   onNavigate={onNavigate}
+                  mobile={mobile}
                 />
               ))}
             </div>
@@ -298,6 +300,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
                   collapsed={false}
                   isActive={location.pathname.startsWith(page.path)}
                   onNavigate={onNavigate}
+                  mobile={mobile}
                 />
               ))}
             </div>
@@ -314,12 +317,13 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
             location={location}
             can={can}
             onNavigate={onNavigate}
+            mobile={mobile}
           />
         ))}
-      </div>
+      </nav>
 
       {/* ── Collapse toggle ── */}
-      <div className="shrink-0 border-t border-sidebar-border p-2">
+      <div className="sticky bottom-0 z-10 shrink-0 border-t border-sidebar-border bg-sidebar p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <Button
           variant="ghost"
           size="sm"

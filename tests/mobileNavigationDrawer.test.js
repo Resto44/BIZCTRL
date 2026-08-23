@@ -15,11 +15,19 @@ describe('mobile navigation drawer contract', () => {
     expect(header).toContain('aria-label="Open navigation drawer"');
     expect(header).toContain('onClick={() => onMobileMenuToggle?.()}');
     expect(layout).toContain('{mobileMenuOpen && (');
-    expect(layout).toContain('mobile');
+    expect(layout).toContain('w-[min(86vw,420px)] max-w-full min-w-0');
+    expect(layout).toContain('touch-none overscroll-none bg-black/50');
+    expect(layout).toContain("body.style.overflow = 'hidden'");
+    expect(layout).toContain("documentElement.style.overflow = 'hidden'");
     expect(layout).toContain('onNavigate={() => setMobileMenuOpen(false)}');
     expect(sidebar).toContain('mobile = false');
-    expect(sidebar).toContain('flex h-dvh');
-    expect(sidebar).toContain('overflow-y-auto scrollbar-thin py-2');
+    expect(sidebar).toContain('h-dvh max-h-dvh w-full min-w-0 max-w-full');
+    expect(sidebar).toContain('overflow-x-hidden overflow-y-auto overscroll-contain');
+    expect(sidebar).toContain('flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-auto overscroll-contain');
+    expect(sidebar).toContain('sticky bottom-0 z-10 shrink-0');
+    expect(sidebar).toContain('pb-[max(0.5rem,env(safe-area-inset-bottom))]');
+    expect(sidebar).toContain('[overflow-wrap:anywhere]');
+    expect(sidebar).toContain('[word-break:break-word]');
     expect(sidebar).toContain('onClick={onNavigate}');
   });
 

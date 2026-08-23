@@ -6,7 +6,7 @@
  *
  * The sidebar is hidden on mobile; BottomNav handles mobile navigation.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import ERPSidebar from './ERPSidebar';
 import ERPHeader from './ERPHeader';
@@ -33,6 +33,28 @@ export default function ERPLayout({ children }) {
 
   const showSidebar = ERP_SIDEBAR_ROLES.includes(role);
 
+  useEffect(() => {
+    if (!mobileMenuOpen) return undefined;
+
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyOverscrollBehavior = body.style.overscrollBehavior;
+    const previousRootOverflow = documentElement.style.overflow;
+    const previousRootOverscrollBehavior = documentElement.style.overscrollBehavior;
+
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+    documentElement.style.overflow = 'hidden';
+    documentElement.style.overscrollBehavior = 'none';
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      body.style.overscrollBehavior = previousBodyOverscrollBehavior;
+      documentElement.style.overflow = previousRootOverflow;
+      documentElement.style.overscrollBehavior = previousRootOverscrollBehavior;
+    };
+  }, [mobileMenuOpen]);
+
   return (
     <div className="flex min-h-dvh w-full min-w-0 max-w-full bg-background">
       {/* Desktop Sidebar */}
@@ -48,11 +70,11 @@ export default function ERPLayout({ children }) {
         <>
           <button
             type="button"
-            className="fixed inset-0 z-[100] cursor-default bg-black/50 lg:hidden"
+            className="fixed inset-0 z-[100] cursor-default touch-none overscroll-none bg-black/50 lg:hidden"
             aria-label="Close navigation drawer"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="fixed left-0 top-0 bottom-0 z-[110] lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation drawer">
+          <div className="fixed inset-y-0 left-0 z-[110] w-[min(86vw,420px)] max-w-full min-w-0 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation drawer">
             <ERPSidebar
               collapsed={false}
               mobile
