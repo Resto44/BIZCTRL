@@ -24,7 +24,7 @@ describe('subscription and owner-control runtime hardening', () => {
   it('uses only guarded RPCs for owner-managed payment settings, pricing, archive, and anonymization actions', async () => {
     const api = await readFile(ownerApiPath, 'utf8');
     expect(api).toContain("rpc('platform_owner_save_manual_payment_settings'");
-    expect(api).toContain("rpc('platform_owner_save_plan'");
+    expect(api).toContain("rpc('platform_owner_upsert_plan'");
     expect(api).toContain("rpc('platform_owner_archive_user'");
     expect(api).toContain("rpc('platform_owner_anonymize_user'");
     expect(api).not.toContain("from('platform_manual_payment_settings')");
