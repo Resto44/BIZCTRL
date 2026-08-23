@@ -17,6 +17,7 @@ describe('central branch UUID scope contract', () => {
     expect(context).toContain('if (restoredScopeRef.current === restorationKey) return;');
     expect(context).toContain('const persistedId = normalizeBranchId(localStorage.getItem(key));');
     expect(context).toContain('availableBranches.some((branch) => String(branch.id) === persistedId)');
+    expect(context).toContain('const selectedBranch = availableBranches.find((branch) => String(branch.id) === selectedBranchId) || null;');
     expect(context).toContain('localStorage.setItem(storageKey(user?.id, restaurantId), safeId)');
     expect(context).toContain('availableBranches.some((branch) => String(branch.id) === nextId)');
     expect(context).toContain('managerBranchId && nextId !== managerBranchId');
@@ -38,6 +39,7 @@ describe('central branch UUID scope contract', () => {
     expect(dashboard).toContain('const selectedBranch = selectedBranchId;');
     expect(dashboard).not.toContain("const [selectedBranch, setSelectedBranch] = useState('all')");
     expect(dashboard).toContain('onSelect={setSelectedBranchId}');
+    expect(dashboard).toContain("const selectedLabel = selectedBranch === 'all'");
     expect(dashboard).toContain("queryKey: ['sales_today', activeRestaurant?.id, selectedBranchId, today]");
     expect(dashboard).toContain("createQuery().eq('branch_id', selectedBranchId)");
     expect(dashboard).toContain("createQuery().is('branch_id', null).eq(legacyColumn, selectedBranchKey)");

@@ -85,10 +85,7 @@ export function BranchScopeProvider({ children }) {
       : ALL_BRANCHES;
   }, [availableBranches, key, managerBranchId, requestedBranchId, restaurantId]);
 
-  const selectedBranch = useMemo(
-    () => availableBranches.find((branch) => String(branch.id) === selectedBranchId) || null,
-    [availableBranches, selectedBranchId],
-  );
+  const selectedBranch = availableBranches.find((branch) => String(branch.id) === selectedBranchId) || null;
   const selectedBranchKey = selectedBranch?.branch_key || selectedBranch?.key || null;
   const selectedBranchLabel = selectedBranch?.name || selectedBranch?.label || selectedBranchKey || 'All Branches';
   const isAllBranches = selectedBranchId === ALL_BRANCHES;
@@ -105,30 +102,28 @@ export function BranchScopeProvider({ children }) {
     queryClient.invalidateQueries({ queryKey: ['branch-scope', restaurantId] });
   }, [availableBranches, managerBranchId, queryClient, restaurantId, user?.id]);
 
-  const value = useMemo(() => {
-    const tenantFilter = restaurantId ? { restaurant_id: restaurantId } : null;
-    const branchFilter = !tenantFilter
+  const tenantFilter = restaurantId ? { restaurant_id: restaurantId } : null;
+  const branchFilter = !tenantFilter
+    ? null
+    : isAllBranches
+      ? tenantFilter
+      : { ...tenantFilter, branch_id: selectedBranchId };
+  const value = {
+    selectedBranchId,
+    selectedBranchKey,
+    selectedBranchLabel: isAllBranches ? 'All Branches' : selectedBranchLabel,
+    selectedBranch,
+    isAllBranches,
+    // Canonical table filter: tenant UUID plus optional branch UUID.
+    branchFilter,
+    // Some legacy tables retain branch_key; callers must still pair it with tenant scope.
+    branchKeyFilter: !tenantFilter
       ? null
       : isAllBranches
         ? tenantFilter
-        : { ...tenantFilter, branch_id: selectedBranchId };
-    return {
-      selectedBranchId,
-      selectedBranchKey,
-      selectedBranchLabel: isAllBranches ? 'All Branches' : selectedBranchLabel,
-      selectedBranch,
-      isAllBranches,
-      // Canonical table filter: tenant UUID plus optional branch UUID.
-      branchFilter,
-      // Some legacy tables retain branch_key; callers must still pair it with tenant scope.
-      branchKeyFilter: !tenantFilter
-        ? null
-        : isAllBranches
-          ? tenantFilter
-          : { ...tenantFilter, branch_key: selectedBranchKey },
-      setSelectedBranchId,
-    };
-  }, [isAllBranches, restaurantId, selectedBranch, selectedBranchId, selectedBranchKey, selectedBranchLabel, setSelectedBranchId]);
+        : { ...tenantFilter, branch_key: selectedBranchKey },
+    setSelectedBranchId,
+  };
 
   return <BranchScopeContext.Provider value={value}>{children}</BranchScopeContext.Provider>;
 }

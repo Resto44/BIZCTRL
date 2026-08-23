@@ -264,11 +264,12 @@ const LedgerRow = memo(({ label, value, color = 'default', bold = false, separat
 const BranchSelector = memo(({ branches, selectedBranch, onSelect, t }) => {
   const [open, setOpen] = useState(false);
 
-  const selectedLabel = useMemo(() => {
-    if (selectedBranch === 'all') return t('all_branches');
-    const b = (branches || []).find((branch) => String(branch.id) === String(selectedBranch));
-    return b ? (b.name || b.label || b.branch_key || selectedBranch) : selectedBranch;
-  }, [selectedBranch, branches, t]);
+  const selectedLabel = selectedBranch === 'all'
+    ? t('all_branches')
+    : (() => {
+      const branch = (branches || []).find((item) => String(item.id) === String(selectedBranch));
+      return branch ? (branch.name || branch.label || branch.branch_key || selectedBranch) : selectedBranch;
+    })();
 
   const isAll = selectedBranch === 'all';
 
