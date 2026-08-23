@@ -60,6 +60,10 @@ describe('central branch UUID scope contract', () => {
     expect(reports).toContain('useBranchScope');
     expect(reports).toContain("queryKey: ['sales', 'reports', activeRestaurant?.id, selectedBranchId]");
     expect(reports).toContain("isAllBranches ? 'all' : selectedBranchKey");
+    expect(reports).toContain('const scopedBranches = useMemo(');
+    expect(reports).toContain("String(branch.id) === String(selectedBranchId)");
+    expect(reports).toContain('branches: scopedBranches || []');
+    expect(reports).toContain('Showing data for: ${selectedBranchLabel}');
     expect(reports).not.toContain("computeProductQuantityAnalytics(purchases, 'all'");
 
     for (const page of [sales, purchases, expenses, inventory, treasury]) {

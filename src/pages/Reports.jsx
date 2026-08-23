@@ -123,6 +123,7 @@ export default function Reports() {
   const {
     selectedBranchId,
     selectedBranchKey,
+    selectedBranchLabel,
     isAllBranches,
     branchFilter,
   } = useBranchScope();
@@ -247,9 +248,16 @@ export default function Reports() {
     [sales, walletTransactions]
   );
 
+  const scopedBranches = useMemo(
+    () => isAllBranches
+      ? branches
+      : (branches || []).filter((branch) => String(branch.id) === String(selectedBranchId)),
+    [branches, isAllBranches, selectedBranchId],
+  );
+
   const branchPerf = useMemo(
-    () => computeBranchPerformance(branches, sales, purchases, expenses, revenueSources, expenseCategories),
-    [branches, sales, purchases, expenses, revenueSources, expenseCategories]
+    () => computeBranchPerformance(scopedBranches, sales, purchases, expenses, revenueSources, expenseCategories),
+    [scopedBranches, sales, purchases, expenses, revenueSources, expenseCategories]
   );
 
   const cost = useMemo(
@@ -290,7 +298,7 @@ export default function Reports() {
         fromStr: formatDate(dr.from),
         toStr: formatDate(dr.to),
         t, lang, currency,
-        branches: branches || [],
+        branches: scopedBranches || [],
         dir,
         brandSettings: brandSettingsList[0] || null,
         inventory,
@@ -306,7 +314,7 @@ export default function Reports() {
       setPdfError(e.message || 'Generation failed');
       setPdfStatus('error');
     }
-  }, [sales, purchases, expenses, branches, walletTransactions, revenueSources, expenseCategories, brandSettingsList, t, lang, currency, dir, activeRestaurant?.id, selectedBranchId, selectedBranchKey, isAllBranches]);
+  }, [sales, purchases, expenses, scopedBranches, walletTransactions, revenueSources, expenseCategories, brandSettingsList, t, lang, currency, dir, activeRestaurant?.id, selectedBranchId, selectedBranchKey, isAllBranches]);
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (isLoading) {
@@ -342,6 +350,9 @@ export default function Reports() {
   return (
     <div className="max-w-full overflow-x-hidden px-3 pb-8">
       <PageHeader title={t('erp_analytics')} action={PDFButton} />
+      <p className="mb-3 text-xs font-medium text-muted-foreground">
+        {isAllBranches ? 'Showing data for: All Branches' : `Showing data for: ${selectedBranchLabel}`}
+      </p>
 
       {pdfError && (
         <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
