@@ -149,7 +149,7 @@ export default function PlatformOwnerPortal() {
   } else if (active === 'plans') {
     content = plans.isLoading && controlCenter.isLoading ? <Empty text={t.loadingRecords} /> : plans.isError && controlCenter.isError ? <QueryError t={t} onRetry={() => { plans.refetch(); controlCenter.refetch(); }} /> : <div><div className="flex flex-wrap items-end justify-between gap-3"><Title title={t.plans} t={t} /><Button onClick={() => setPlanEditor({})}>Create plan</Button></div><div className="mt-5 grid gap-4 lg:grid-cols-3">{plansData.map((plan) => <div key={plan.id} className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm font-semibold text-cyan-700">{plan.display_name}</p><p className="mt-3 text-3xl font-black">{currency(plan.monthly_price_cents, lang)}<span className="text-sm font-medium text-slate-500"> {t.month}</span></p>{Number(plan.original_price_cents) > Number(plan.monthly_price_cents) && <p className="mt-1 text-sm text-slate-500 line-through">{currency(plan.original_price_cents, lang)}</p>}<p className="mt-3 text-sm text-slate-500">{plan.max_branches} · {plan.max_employees} · {plan.max_users} {t.planLimits}</p><div className="mt-4 flex flex-wrap gap-1">{(plan.feature_flags || []).slice(0, 6).map((flag) => <Badge key={flag} variant="secondary">{flag}</Badge>)}</div><Button className="mt-5" size="sm" variant="outline" onClick={() => setPlanEditor(plan)}>{t.view}</Button></div>)}</div></div>;
   } else if (active === 'modules') {
-    content = controlCenter.isLoading ? <Empty text={t.loadingRecords} /> : controlCenter.isError ? <QueryError t={t} onRetry={() => controlCenter.refetch()} /> : <ModuleManagement modules={modulesData} pending={mutation.isPending} onSave={(module) => mutation.mutate({ fn: platformOwnerApi.saveModule, args: [module] })} />;
+    content = controlCenter.isLoading ? <Empty text={t.loadingRecords} /> : controlCenter.isError ? <QueryError t={t} onRetry={() => controlCenter.refetch()} /> : <ModuleManagement modules={modulesData} pending={mutation.isPending} onSave={(module, options) => mutation.mutate({ fn: platformOwnerApi.saveModule, args: [module] }, options)} />;
   } else if (active === 'promotions') {
     const list = promotions.data?.items || [];
     content = promotions.isLoading ? <Empty text={t.loadingRecords} /> : promotions.isError ? <QueryError t={t} onRetry={() => promotions.refetch()} /> : <div><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><Title title={t.promotions} t={t} /><Button onClick={() => setPromotionOpen(true)}>{t.createPromotion}</Button></div>{list.length ? <><div className="grid gap-3 md:grid-cols-2">{list.map((item) => <div key={item.id} className="rounded-2xl border bg-white p-4"><div className="flex flex-wrap justify-between gap-2"><p className="font-bold">{item.name}</p><Badge className={item.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-800'}>{item.is_active ? t.activeLabel : t.inactiveLabel}</Badge></div><p className="mt-2 text-sm text-slate-500">{item.plan_name} · {item.percent_off ? `${item.percent_off}%` : currency(item.fixed_amount_cents, lang)}</p><p className="mt-2 text-xs text-slate-500">{dateTime(item.starts_at, lang)} → {dateTime(item.ends_at, lang)}</p></div>)}</div><Pager result={promotions.data} page={page} setPage={setPage} t={t} /></> : <Empty text={t.noData} />}</div>;
@@ -205,15 +205,58 @@ function PlanEditor({ item, modules, t, pending, onClose, onSave }) {
 function PromotionDialog({ open, close, promotion, setPromotion, plans, t, pending, onSave }) { const invalid = !promotion.name || !promotion.planId || !promotion.percentOff || !promotion.startsAt || !promotion.endsAt; return <Dialog open={open} onOpenChange={close}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{t.createPromotion}</DialogTitle></DialogHeader><div className="space-y-3"><div><Label>{t.promotionName}</Label><Input value={promotion.name} onChange={(event) => setPromotion({ ...promotion, name: event.target.value })} /></div><div><Label>{t.plan}</Label><select className="mt-2 w-full rounded-lg border p-2" value={promotion.planId} onChange={(event) => setPromotion({ ...promotion, planId: event.target.value })}>{plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.display_name}</option>)}</select></div><div><Label>{t.percentOff}</Label><Input type="number" min="1" max="100" value={promotion.percentOff} onChange={(event) => setPromotion({ ...promotion, percentOff: event.target.value, fixedAmountCents: '' })} /></div><div><Label>{t.couponCode}</Label><Input value={promotion.couponCode} onChange={(event) => setPromotion({ ...promotion, couponCode: event.target.value })} /></div><div><Label>{t.maxRedemptions}</Label><Input type="number" min="1" value={promotion.maxRedemptions} onChange={(event) => setPromotion({ ...promotion, maxRedemptions: event.target.value })} /></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={promotion.firstTimeOnly} onChange={(event) => setPromotion({ ...promotion, firstTimeOnly: event.target.checked })} />{t.firstTimeOnly}</label><div className="grid gap-3 sm:grid-cols-2"><div><Label>{t.starts}</Label><Input type="datetime-local" value={promotion.startsAt} onChange={(event) => setPromotion({ ...promotion, startsAt: event.target.value })} /></div><div><Label>{t.ends}</Label><Input type="datetime-local" value={promotion.endsAt} onChange={(event) => setPromotion({ ...promotion, endsAt: event.target.value })} /></div></div><Button disabled={pending || invalid} onClick={onSave}>{t.save}</Button></div></DialogContent></Dialog>; }
 
 function ModuleManagement({ modules, pending, onSave }) {
-  const [draft, setDraft] = useState({ featureKey: '', displayName: '', category: 'Operations', description: '', enabled: true, sortOrder: 0 });
+  const emptyDraft = { featureKey: '', displayName: '', category: 'Operations', description: '', enabled: true, sortOrder: 0 };
+  const [draft, setDraft] = useState(emptyDraft);
   const [editing, setEditing] = useState(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const form = editing || draft;
+
+  const closeEditor = () => {
+    setEditorOpen(false);
+    setEditing(null);
+    setDraft(emptyDraft);
+  };
   const update = (key, value) => (editing ? setEditing({ ...editing, [key]: value }) : setDraft({ ...draft, [key]: value }));
+  const openEdit = (module) => {
+    setEditing({
+      featureKey: module.feature_key,
+      displayName: module.display_name,
+      category: module.category,
+      description: module.description || '',
+      enabled: module.is_globally_enabled,
+      sortOrder: module.sort_order || 0,
+    });
+    setEditorOpen(true);
+  };
+  const openCreate = () => {
+    setEditing(null);
+    setDraft(emptyDraft);
+    setEditorOpen(true);
+  };
   const submit = () => {
     if (!form.featureKey || !form.displayName || !form.category) return;
-    onSave(form);
-    setEditing(null);
-    setDraft({ featureKey: '', displayName: '', category: 'Operations', description: '', enabled: true, sortOrder: 0 });
+    onSave(form, { onSuccess: closeEditor });
   };
-  return <div><div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-black text-slate-950">Modules</h1><p className="mt-1 text-sm text-slate-500">Global module switches are enforced by the server-side entitlement guard.</p></div></div><div className="mt-5 grid gap-3 lg:grid-cols-2">{modules.map((module) => <div key={module.feature_key} className="rounded-2xl border bg-white p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-bold">{module.display_name}</p><p className="mt-1 text-xs text-slate-500">{module.category} · {module.feature_key}</p></div><Badge className={module.is_globally_enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}>{module.is_globally_enabled ? 'Enabled' : 'Disabled'}</Badge></div><p className="mt-3 min-h-5 text-sm text-slate-500">{module.description || 'No description configured.'}</p><div className="mt-4 flex gap-2"><Button size="sm" variant="outline" onClick={() => setEditing({ featureKey: module.feature_key, displayName: module.display_name, category: module.category, description: module.description || '', enabled: module.is_globally_enabled, sortOrder: module.sort_order || 0 })}>Edit</Button><Button size="sm" disabled={pending} onClick={() => onSave({ featureKey: module.feature_key, displayName: module.display_name, category: module.category, description: module.description || '', enabled: !module.is_globally_enabled, sortOrder: module.sort_order || 0 })}>{module.is_globally_enabled ? 'Disable globally' : 'Enable globally'}</Button></div></div>)}</div><div className="mt-6 max-w-2xl rounded-2xl border bg-white p-5"><h2 className="font-bold">{editing ? 'Edit module' : 'Add module'}</h2><div className="mt-4 grid gap-3 sm:grid-cols-2"><div><Label>Feature key</Label><Input disabled={Boolean(editing)} value={form.featureKey} onChange={(event) => update('featureKey', event.target.value.toLowerCase().replaceAll(' ', '_'))} /></div><div><Label>Display name</Label><Input value={form.displayName} onChange={(event) => update('displayName', event.target.value)} /></div><div><Label>Category</Label><Input value={form.category} onChange={(event) => update('category', event.target.value)} /></div><div><Label>Sort order</Label><Input type="number" value={form.sortOrder} onChange={(event) => update('sortOrder', event.target.value)} /></div><div className="sm:col-span-2"><Label>Description</Label><Textarea value={form.description} onChange={(event) => update('description', event.target.value)} /></div></div><label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(form.enabled)} onChange={(event) => update('enabled', event.target.checked)} />Enabled globally</label><div className="mt-5 flex gap-2"><Button disabled={pending || !form.featureKey || !form.displayName || !form.category} onClick={submit}>Save module</Button>{editing && <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>}</div></div></div>;
+
+  return <div>
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div><h1 className="text-2xl font-black text-slate-950">Modules</h1><p className="mt-1 text-sm text-slate-500">Global module switches are enforced by the server-side entitlement guard.</p></div>
+      <Button onClick={openCreate}>Add module</Button>
+    </div>
+    <div className="mt-5 grid gap-3 lg:grid-cols-2">
+      {modules.map((module) => <div key={module.feature_key} className="rounded-2xl border bg-white p-4">
+        <div className="flex items-start justify-between gap-3"><div><p className="font-bold">{module.display_name}</p><p className="mt-1 text-xs text-slate-500">{module.category} · {module.feature_key}</p></div><Badge className={module.is_globally_enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}>{module.is_globally_enabled ? 'Enabled' : 'Disabled'}</Badge></div>
+        <p className="mt-3 min-h-5 text-sm text-slate-500">{module.description || 'No description configured.'}</p>
+        <div className="mt-4 flex gap-2"><Button size="sm" variant="outline" onClick={() => openEdit(module)}>Edit</Button><Button size="sm" disabled={pending} onClick={() => onSave({ featureKey: module.feature_key, displayName: module.display_name, category: module.category, description: module.description || '', enabled: !module.is_globally_enabled, sortOrder: module.sort_order || 0 })}>{module.is_globally_enabled ? 'Disable globally' : 'Enable globally'}</Button></div>
+      </div>)}
+    </div>
+    <Dialog open={editorOpen} onOpenChange={(open) => { if (!open) closeEditor(); }}>
+      <DialogContent className="max-h-[88dvh] max-w-lg overflow-y-auto">
+        <DialogHeader><DialogTitle>{editing ? 'Edit module' : 'Add module'}</DialogTitle></DialogHeader>
+        <div className="grid gap-3 sm:grid-cols-2"><div><Label>Feature key</Label><Input disabled={Boolean(editing)} value={form.featureKey} onChange={(event) => update('featureKey', event.target.value.toLowerCase().replaceAll(' ', '_'))} /></div><div><Label>Display name</Label><Input value={form.displayName} onChange={(event) => update('displayName', event.target.value)} /></div><div><Label>Category</Label><Input value={form.category} onChange={(event) => update('category', event.target.value)} /></div><div><Label>Sort order</Label><Input type="number" value={form.sortOrder} onChange={(event) => update('sortOrder', event.target.value)} /></div><div className="sm:col-span-2"><Label>Description</Label><Textarea value={form.description} onChange={(event) => update('description', event.target.value)} /></div></div>
+        <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(form.enabled)} onChange={(event) => update('enabled', event.target.checked)} />Enabled globally</label>
+        <div className="mt-5 flex flex-wrap gap-2"><Button disabled={pending || !form.featureKey || !form.displayName || !form.category} onClick={submit}>Save module</Button><Button variant="outline" onClick={closeEditor}>Cancel</Button></div>
+      </DialogContent>
+    </Dialog>
+  </div>;
 }
