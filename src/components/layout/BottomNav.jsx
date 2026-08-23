@@ -74,6 +74,42 @@ const PRIMARY_NAV_SPONSOR = [
 ];
 const PRIMARY_NAV_CUSTOMER = [];
 
+// Keep the mobile More menu aligned with the established role permission matrix.
+// Route guards and RLS remain authoritative; this prevents navigation to pages a role
+// cannot use in the first place, especially when General Manager shares Owner sections.
+const MORE_PERMISSION_BY_PATH = {
+  '/erp-approval-center': 'manageSettings',
+  '/cash-register': 'viewSales',
+  '/sales/invoices': 'viewSales',
+  '/inventory': 'viewInventory',
+  '/product-management': 'viewInventory',
+  '/inventory-waste': 'viewInventory',
+  '/purchases': 'viewPurchases',
+  '/suppliers': 'viewSuppliers',
+  '/network-management': 'viewNetworkAccounts',
+  '/bi-center': 'viewReports',
+  '/reports': 'viewReports',
+  '/profit-loss': 'viewReports',
+  '/ai-copilot': 'viewDashboard',
+  '/employees': 'viewEmployees',
+  '/staff-invitations': 'manageUsers',
+  '/customer-management': 'manageCustomers',
+  '/driver-management': 'manageDrivers',
+  '/debt-management': 'viewDebts',
+  '/treasury': 'viewTreasury',
+  '/payroll': 'viewPayroll',
+  '/settings': 'manageSettings',
+  '/customize-workspace': 'manageDashboardCustomization',
+  '/branch-management': 'manageBranches',
+  '/billing': 'viewBilling',
+  '/retail/barcode': 'viewInventory',
+  '/retail/sku': 'viewInventory',
+  '/retail/variants': 'viewInventory',
+  '/retail/batches': 'viewInventory',
+  '/retail/expiry': 'viewInventory',
+  '/retail/serials': 'viewInventory',
+};
+
 // ── More Menu Sections ────────────────────────────────────────────────────────
 
 const MORE_SECTIONS_OWNER_RESTAURANT = [
@@ -293,7 +329,7 @@ function MoreMenu({ sections, onClose }) {
 const BottomNav = memo(function BottomNav() {
   const location = useLocation();
   const { t } = useLanguage();
-  const { role } = useRole();
+  const { role, can } = useRole();
   const { isRetail } = useBusinessMode();
   const { configuration } = useWorkspaceCustomization();
   const [showMore, setShowMore] = useState(false);
@@ -327,10 +363,18 @@ const BottomNav = memo(function BottomNav() {
       .filter((item) => item.isMore || !hidden.has(item.path))
       .sort((a, b) => a.isMore ? 1 : b.isMore ? -1 : compare(a, b));
     const moreSections = baseMoreSections
-      .map((section) => ({ ...section, items: section.items.filter((item) => !hidden.has(item.path)).sort(compare) }))
+      .map((section) => ({
+        ...section,
+        items: section.items
+          .filter((item) => {
+            const permission = MORE_PERMISSION_BY_PATH[item.path];
+            return (!permission || can[permission]) && !hidden.has(item.path);
+          })
+          .sort(compare),
+      }))
       .filter((section) => section.items.length > 0);
     return { visibleNav, moreSections };
-  }, [baseMoreSections, baseNav, configuration]);
+  }, [baseMoreSections, baseNav, can, configuration]);
 
   return (
     <>

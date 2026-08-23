@@ -184,9 +184,7 @@ function createEntity(tableName) {
 
     async create(record) {
       if (tableName === 'categories') record = mapCategoryPayload(record);
-      console.log(`[entity:${tableName}] create() called with record:`, JSON.stringify(record));
       const email = await getCurrentUserEmail();
-      console.log(`[entity:${tableName}] current user email:`, email);
       const now = new Date().toISOString();
       // Strip server-generated / computed columns that cannot be inserted by the client.
       // Also strip daily_sales app-only fields that have no DB column.
@@ -223,13 +221,11 @@ function createEntity(tableName) {
           payload[col] = null;
         }
       });
-      console.log(`[entity:${tableName}] FINAL PAYLOAD being sent to Supabase:`, JSON.stringify(payload));
       const { data, error } = await supabase.from(tableName).insert(payload).select().single();
       if (error) {
         console.error(`[entity:${tableName}] INSERT ERROR:`, error.code, error.message, error.details, error.hint);
         throw error;
       }
-      console.log(`[entity:${tableName}] INSERT SUCCESS:`, JSON.stringify(data));
       return data;
     },
 
