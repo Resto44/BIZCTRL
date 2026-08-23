@@ -115,7 +115,7 @@ export default function LandingPage() {
       >
         <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
           <Button onClick={() => navigate('/erp-register?owner=1')} className="h-13 min-h-13 w-full bg-cyan-500 px-7 py-3 text-base font-black text-slate-950 hover:bg-cyan-400 sm:w-auto">Start Free <ArrowRight className="ml-2 h-5 w-5" /></Button>
-          <Button asChild variant="outline" className="h-13 min-h-13 w-full border-white/20 bg-transparent px-7 py-3 text-base font-bold text-white hover:bg-white/10 hover:text-white sm:w-auto"><a href="#pricing">View Pricing</a></Button>
+          <Button variant="outline" className="h-13 min-h-13 w-full border-white/20 bg-transparent px-7 py-3 text-base font-bold text-white hover:bg-white/10 hover:text-white sm:w-auto" onClick={() => { document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); window.history.pushState(null, '', '/#pricing'); }}>View Pricing</Button>
         </div>
         <p className="mt-7 flex items-center justify-center gap-2 text-sm font-medium text-slate-400"><CheckCircle2 className="h-4 w-4 text-emerald-400" />One platform. Multiple branches. Complete business control.</p>
       </PublicHero>

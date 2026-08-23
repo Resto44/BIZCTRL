@@ -45,6 +45,21 @@ const headerLinks = [
   { label: 'Contact', to: '/contact' },
 ];
 
+function scrollToPublicSection(sectionId) {
+  const target = document.getElementById(sectionId);
+  if (!target) return false;
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return true;
+}
+
+function handlePublicHashLink(event, href) {
+  if (!href?.startsWith('/#') || window.location.pathname !== '/') return;
+  const sectionId = href.slice(2);
+  if (!scrollToPublicSection(sectionId)) return;
+  event.preventDefault();
+  window.history.pushState(null, '', `/#${encodeURIComponent(sectionId)}`);
+}
+
 function BrandMark() {
   return (
     <Link to="/" className="flex items-center gap-3 text-white" aria-label="BizCTRL home">
@@ -62,13 +77,28 @@ function BrandMark() {
 function HeaderLink({ item, onClick }) {
   const className = 'text-sm font-medium text-slate-300 transition-colors hover:text-white';
   if (item.to) return <Link to={item.to} className={className} onClick={onClick}>{item.label}</Link>;
-  return <a href={item.href} className={className} onClick={onClick}>{item.label}</a>;
+  const handleClick = (event) => {
+    handlePublicHashLink(event, item.href);
+    onClick?.(event);
+  };
+  return <a href={item.href} className={className} onClick={handleClick}>{item.label}</a>;
 }
 
 export function PublicLayout({ children }) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
+
+  useEffect(() => {
+    const scrollFromHash = () => {
+      const sectionId = decodeURIComponent(window.location.hash.replace(/^#/, ''));
+      if (!sectionId) return;
+      window.requestAnimationFrame(() => scrollToPublicSection(sectionId));
+    };
+    scrollFromHash();
+    window.addEventListener('hashchange', scrollFromHash);
+    return () => window.removeEventListener('hashchange', scrollFromHash);
+  }, []);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-slate-950 text-white">
@@ -117,9 +147,9 @@ export function PublicLayout({ children }) {
           <div>
             <p className="text-sm font-bold text-white">Product</p>
             <div className="mt-4 flex flex-col gap-3 text-sm text-slate-400">
-              <a href="/#features" className="hover:text-white">Features</a>
-              <a href="/#industries" className="hover:text-white">Industries</a>
-              <a href="/#pricing" className="hover:text-white">Pricing</a>
+              <a href="/#features" className="hover:text-white" onClick={(event) => handlePublicHashLink(event, '/#features')}>Features</a>
+              <a href="/#industries" className="hover:text-white" onClick={(event) => handlePublicHashLink(event, '/#industries')}>Industries</a>
+              <a href="/#pricing" className="hover:text-white" onClick={(event) => handlePublicHashLink(event, '/#pricing')}>Pricing</a>
               <Link to="/erp-login" className="hover:text-white">Login</Link>
             </div>
           </div>
@@ -168,6 +198,6 @@ export function SectionHeading({ eyebrow, title, description, align = 'center' }
   );
 }
 
-export function ContentSection({ children, className = '' }) {
-  return <section className={`mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 ${className}`}>{children}</section>;
+export function ContentSection({ children, className = '', id }) {
+  return <section id={id} className={`scroll-mt-20 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 ${className}`}>{children}</section>;
 }
