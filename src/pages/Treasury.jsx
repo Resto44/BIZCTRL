@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import { useTenant } from '@/lib/TenantContext';
+import { useBranchScope } from '@/lib/BranchScopeContext';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -93,7 +95,8 @@ const transactionType = (transaction) => transaction?.transaction_type || transa
 export default function Treasury() {
   const { currency, t, translateLiteral } = useLanguage();
   const { role } = useRole();
-  const { branches, activeRestaurantId } = useTenant();
+  const { branches, activeRestaurantId, activeRestaurant, ownerFilter } = useTenant();
+  const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const notif = useNotify();
   const qc = useQueryClient();
   const isOwner = role === ROLES.OWNER;
@@ -107,10 +110,29 @@ export default function Treasury() {
   const [deleteId, setDeleteId] = useState(null);
   const [deleteAccountId, setDeleteAccountId] = useState(null);
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [filterBranch, setFilterBranch] = useState('all');
+  const filterBranch = isAllBranches ? 'all' : (selectedBranchKey || 'all');
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const { ownerFilter } = useTenant();
+  const fetchScopedRows = async (table, legacyColumn = 'branch', orderColumn = 'date') => {
+    if (!activeRestaurant?.id) return [];
+    const baseQuery = () => supabase.from(table).select('*')
+      .eq('restaurant_id', activeRestaurant.id)
+      .order(orderColumn, { ascending: false })
+      .limit(2000);
+    if (isAllBranches) {
+      const { data, error } = await baseQuery();
+      if (error) throw error;
+      return data || [];
+    }
+    if (!selectedBranchId || !selectedBranchKey) return [];
+    const [canonical, legacy] = await Promise.all([
+      baseQuery().eq('branch_id', selectedBranchId),
+      baseQuery().is('branch_id', null).eq(legacyColumn, selectedBranchKey),
+    ]);
+    if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+    return Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+      .map((record) => [record.id, record])).values());
+  };
 
   const { data: accounts = [] } = useQuery({
     queryKey: ['treasury_accounts', activeRestaurantId],
@@ -120,28 +142,28 @@ export default function Treasury() {
   });
 
   const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ['wallet_transactions', ownerFilter],
-    queryFn: () => base44.entities.WalletTransaction.filter(ownerFilter || {}, '-transaction_date', 2000),
+    queryKey: ['wallet_transactions', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchScopedRows('wallet_transactions', 'branch', 'transaction_date'),
     staleTime: 60000,
-    enabled: !!ownerFilter?.created_by,
+    enabled: Boolean(activeRestaurant?.id),
   });
   const { data: employees = [] } = useQuery({
-    queryKey: ['employees', ownerFilter],
-    queryFn: () => base44.entities.Employee.filter(ownerFilter || {}, 'full_name', 500),
-    enabled: !!ownerFilter?.created_by,
+    queryKey: ['employees', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => base44.entities.Employee.filter({ restaurant_id: activeRestaurant?.id }, 'full_name', 500),
+    enabled: Boolean(activeRestaurant?.id),
   });
   const { data: allSales = [] } = useQuery({
-    queryKey: ['sales', ownerFilter],
-    queryFn: () => base44.entities.DailySales.filter(ownerFilter || {}, '-date', 2000),
+    queryKey: ['sales', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchScopedRows('daily_sales'),
     staleTime: 60000,
-    enabled: !!ownerFilter?.created_by,
+    enabled: Boolean(activeRestaurant?.id),
   });
 
   const { data: settlements = [] } = useQuery({
-    queryKey: ['settlements_all', ownerFilter],
-    queryFn: () => base44.entities.SettlementRecord.filter(ownerFilter || {}, '-date', 500),
+    queryKey: ['settlements_all', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchScopedRows('settlement_records'),
     staleTime: 30000,
-    enabled: !!ownerFilter?.created_by,
+    enabled: Boolean(activeRestaurant?.id),
   });
 
   // Sponsor ledger summary for overview
@@ -211,10 +233,7 @@ export default function Treasury() {
     transactions.filter(tx => transactionDate(tx).startsWith(filterMonth)),
     [transactions, filterMonth]
   );
-  const filteredTx = useMemo(() =>
-    monthTx.filter(tx => filterBranch === 'all' || !tx.branch || tx.branch === filterBranch),
-    [monthTx, filterBranch]
-  );
+  const filteredTx = useMemo(() => monthTx, [monthTx]);
 
   // ── Wallet balances ───────────────────────────────────────────────────
   const walletBalance = useMemo(() => {
@@ -316,12 +335,13 @@ export default function Treasury() {
       notif.error(local('Select an active Treasury account.'));
       return;
     }
+    const formBranch = branches.find((branch) => (branch.key || branch.branch_key) === form.branch) || null;
     saveMut.mutate({
       transaction_date: form.date,
       transaction_type: form.type,
       account_id: selectedAccount.id,
-      branch: form.branch || selectedAccount.branch_key || '',
-      branch_id: selectedAccount.branch_id || null,
+      branch: form.branch || selectedAccount.branch_key || selectedBranchKey || '',
+      branch_id: formBranch?.id || selectedAccount.branch_id || (isAllBranches ? null : selectedBranchId),
       amount,
       payment_method: form.payment_method,
       description: form.description || null,
@@ -634,7 +654,13 @@ export default function Treasury() {
                 {MONTH_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
               </SelectContent>
             </Select>
-            <BranchSelect value={filterBranch} onChange={setFilterBranch} includeAll />
+            <BranchSelect
+              value={filterBranch}
+              onChange={(branchKey) => setSelectedBranchId(
+                branchKey === 'all' ? 'all' : branches.find((branch) => (branch.key || branch.branch_key) === branchKey)?.id || 'all'
+              )}
+              includeAll
+            />
           </div>
 
           <div className="space-y-2">
@@ -806,7 +832,10 @@ export default function Treasury() {
             </div>
 
             {showBranch && (
-              <div><Label className="text-xs">{local('Branch')}</Label><BranchSelect value={form.branch} onChange={v => set('branch', v)} /></div>
+              <div><Label className="text-xs">{local('Branch')}</Label><BranchSelect value={form.branch} onChange={(branchKey) => {
+                set('branch', branchKey);
+                setSelectedBranchId(branchKey === 'all' ? 'all' : branches.find((branch) => (branch.key || branch.branch_key) === branchKey)?.id || 'all');
+              }} /></div>
             )}
 
             <div>

@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import PageHeader from '@/components/shared/PageHeader';
 // SalesForm removed to enforce single ERP workspace entry point
@@ -19,6 +20,7 @@ import { useNetworkSettlement } from '@/hooks/useNetworkSettlement';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
+import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import { format } from 'date-fns';
 import CustomerCollections from '@/components/sales/CustomerCollections';
@@ -43,6 +45,11 @@ const dailySalesTotal = (sale) =>
 export default function Sales() {
   const { t, currency, lang, dir, translateLiteral } = useLanguage();
   const { branches: tenantBranches, orgId, ownerFilter, activeRestaurant } = useTenant();
+  const {
+    selectedBranchId,
+    selectedBranchKey,
+    isAllBranches,
+  } = useBranchScope();
   const branches = asRecordArray(tenantBranches);
   const qc = useQueryClient();
   const notif = useNotify();
@@ -62,26 +69,44 @@ export default function Sales() {
   const [showExport, setShowExport] = useState(false);
   const [showFinancialPanel, setShowFinancialPanel] = useState(false);
   const [filters, setFilters] = useState({ branch: 'all', from: '', to: '', minTotal: '', maxTotal: '' });
+  useEffect(() => {
+    setFilters((current) => ({ ...current, branch: isAllBranches ? 'all' : (selectedBranchKey || 'all') }));
+  }, [isAllBranches, selectedBranchKey]);
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   // Invoice state — shown after successful save
   const [savedInvoice, setSavedInvoice] = useState(null);
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
 
-  // BUG FIX: Owner history must query by restaurant_id so that records created
-  // by Branch Managers (who write with their own email as created_by) are visible.
-  // Manager history still queries by branch key (ownerFilter.branch).
-  const salesQueryFilter = useMemo(() => {
-    if (ownerFilter?.branch) return ownerFilter; // manager: branch-scoped
-    if (activeRestaurant?.id) return { restaurant_id: activeRestaurant.id }; // owner: restaurant-scoped
-    return ownerFilter || {};
-  }, [ownerFilter, activeRestaurant?.id]);
+  // Canonical UUID branch rows and legacy key rows are both filtered by the
+  // authenticated restaurant on the server. No broad tenant dataset is filtered
+  // in the browser when a particular branch is selected.
+  const fetchScopedSales = useCallback(async () => {
+    if (!activeRestaurant?.id) return [];
+    const baseQuery = () => supabase.from('daily_sales').select('*')
+      .eq('restaurant_id', activeRestaurant.id)
+      .order('date', { ascending: false })
+      .limit(2000);
+    if (isAllBranches) {
+      const { data, error } = await baseQuery();
+      if (error) throw error;
+      return asRecordArray(data);
+    }
+    if (!selectedBranchId || !selectedBranchKey) return [];
+    const [canonical, legacy] = await Promise.all([
+      baseQuery().eq('branch_id', selectedBranchId),
+      baseQuery().is('branch_id', null).eq('branch', selectedBranchKey),
+    ]);
+    if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+    return asRecordArray(Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+      .map((record) => [record.id, record])).values()));
+  }, [activeRestaurant?.id, isAllBranches, selectedBranchId, selectedBranchKey]);
 
   const { data: salesData, isLoading, isError } = useQuery({
-    queryKey: ['sales', salesQueryFilter],
-    queryFn: async () => asRecordArray(await base44.entities.DailySales.filter(salesQueryFilter, '-date', 2000)),
+    queryKey: ['sales', activeRestaurant?.id, selectedBranchId],
+    queryFn: fetchScopedSales,
     staleTime: 120000,
-    enabled: !!ownerFilter && (!!ownerFilter.created_by || !!ownerFilter.branch || !!activeRestaurant?.id),
+    enabled: Boolean(activeRestaurant?.id),
   });
   const sales = asRecordArray(salesData);
 
@@ -718,10 +743,10 @@ export default function Sales() {
       {/* Financial Panel — toggled by Summary button */}
       {showFinancialPanel && (
         <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <CustomerCollections date={todayStr} branch={filters.branch} />
-          <DailySummary date={todayStr} branch={filters.branch} />
-          <CashRegister date={todayStr} branch={filters.branch} />
-          <POSReconciliation date={todayStr} branch={filters.branch} />
+          <CustomerCollections date={todayStr} branch={isAllBranches ? filters.branch : selectedBranchKey} />
+          <DailySummary date={todayStr} branch={isAllBranches ? filters.branch : selectedBranchKey} />
+          <CashRegister date={todayStr} branch={isAllBranches ? filters.branch : selectedBranchKey} />
+          <POSReconciliation date={todayStr} branch={isAllBranches ? filters.branch : selectedBranchKey} />
         </div>
       )}
 

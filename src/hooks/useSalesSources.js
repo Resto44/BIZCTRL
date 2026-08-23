@@ -11,19 +11,21 @@ import { useTenant } from '@/lib/TenantContext';
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 
-export function useSalesSources({ branchKey } = {}) {
-  const { activeRestaurant, managerBranch } = useTenant();
+export function useSalesSources({ branchId } = {}) {
+  const { activeRestaurant, managerBranchObject } = useTenant();
   const activeRestaurantId = activeRestaurant?.id ? String(activeRestaurant.id) : null;
 
-  // Determine effective branch key: explicit prop > manager branch
-  const effectiveBranch = branchKey || managerBranch || null;
+  // Determine effective canonical branch UUID: explicit scope > manager assignment.
+  const effectiveBranchId = branchId || managerBranchObject?.id || null;
 
   const { data: allSourcesData, isLoading, error, refetch } = useQuery({
-    queryKey: ['sales_sources_active', activeRestaurantId],
+    queryKey: ['sales_sources_active', activeRestaurantId, effectiveBranchId || 'all'],
     queryFn: async () => {
-      const all = await base44.entities.SalesSource.list('sort_order', 200);
-      // Return: system sources (created_by IS NULL) + current restaurant/tenant sources + current user created sources
-      // RLS will filter what the user can actually see based on their role and permissions
+      const filters = { restaurant_id: activeRestaurantId };
+      if (effectiveBranchId) filters.branch_id = effectiveBranchId;
+      const all = await base44.entities.SalesSource.filter(filters, 'sort_order', 200);
+      // RLS remains authoritative. The UUID filter limits the returned tenant data
+      // before any display-only normalization is applied.
       return asRecordArray(all);
     },
     staleTime: 60000,
@@ -37,8 +39,8 @@ export function useSalesSources({ branchKey } = {}) {
     .filter(s => s.is_active)
     .filter(s => {
       if (s.is_global) return true;
-      if (!effectiveBranch) return true;
-      return s.branch_id === effectiveBranch;
+      if (!effectiveBranchId) return true;
+      return !s.branch_id || String(s.branch_id) === String(effectiveBranchId);
     })
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 

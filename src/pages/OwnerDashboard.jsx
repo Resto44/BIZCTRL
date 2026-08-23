@@ -30,11 +30,12 @@ import React, { createContext, useContext, useState, useMemo, useCallback, useEf
 import ModeBadge from '@/components/shared/ModeBadge';
 import { ModeSpecificDashboardSection } from '@/components/dashboard/DashboardWidgetRegistry';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
+import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useRole } from '@/lib/RoleContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useNetworkSettlement } from '@/hooks/useNetworkSettlement';
@@ -265,8 +266,8 @@ const BranchSelector = memo(({ branches, selectedBranch, onSelect, t }) => {
 
   const selectedLabel = useMemo(() => {
     if (selectedBranch === 'all') return t('all_branches');
-    const b =  (branches || []).find(br => (br.key || br.id) === selectedBranch);
-    return b ? (b.name || b.key || selectedBranch) : selectedBranch;
+    const b = (branches || []).find((branch) => String(branch.id) === String(selectedBranch));
+    return b ? (b.name || b.label || b.branch_key || selectedBranch) : selectedBranch;
   }, [selectedBranch, branches, t]);
 
   const isAll = selectedBranch === 'all';
@@ -310,14 +311,14 @@ const BranchSelector = memo(({ branches, selectedBranch, onSelect, t }) => {
 
           {/* Individual branches */}
           { (branches || []).map((br) => {
-            const key = br.key || br.id;
-            const name = br.name || br.key || key;
-            const isSelected = selectedBranch === key;
+            const id = String(br.id);
+            const name = br.name || br.label || br.branch_key || id;
+            const isSelected = String(selectedBranch) === id;
             return (
               <button
-                key={key}
+                key={id}
                 className={`w-full flex items-center gap-2.5 px-4 py-3 text-left hover:bg-muted/60 transition-colors ${isSelected ? 'bg-primary/10' : ''}`}
-                onClick={() => { onSelect(key); setOpen(false); }}
+                onClick={() => { onSelect(id); setOpen(false); }}
               >
                 <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -547,8 +548,14 @@ function OwnerDashboardContent() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const notif = useNotify();
-  const qc = useQueryClient();
   const { autoSettle } = useNetworkSettlement({ orgId, user, currency });
+  const {
+    selectedBranchId,
+    selectedBranchKey,
+    selectedBranchLabel,
+    isAllBranches,
+    setSelectedBranchId,
+  } = useBranchScope();
 
   // ── ENTERPRISE REAL-TIME SYNCHRONIZATION ─────────────────────────────────
   // Subscribe to all ERP tables for this restaurant via Supabase Realtime.
@@ -564,9 +571,9 @@ function OwnerDashboardContent() {
     isLoading: loadingActiveAlerts,
   } = useActiveAlerts();
 
-  // ── BRANCH SELECTION STATE ────────────────────────────────────────────────
-  // 'all' means aggregate all active branches; any other value is a branch key/id.
-  const [selectedBranch, setSelectedBranch] = useState('all');
+  // The shared branch scope stores only an authenticated tenant branch UUID or `all`.
+  // Local components retain the legacy variable name only as a read-only alias.
+  const selectedBranch = selectedBranchId;
   const [expandedSection, setExpandedSection] = useState(null);
   const [isDashboardCustomizerOpen, setDashboardCustomizerOpen] = useState(false);
   const [isCopilotOpen, setCopilotOpen] = useState(false);
@@ -574,53 +581,56 @@ function OwnerDashboardContent() {
     setExpandedSection((current) => current === sectionId ? null : sectionId);
   }, []);
 
-  const activeBranchKeys = useMemo(
-    () => (branches || [])
-      .map(branch => String(branch.key || branch.branch_key || branch.id || '').trim())
-      .filter(Boolean),
+  const activeBranchSignature = useMemo(
+    () => (branches || []).map((branch) => String(branch.id || '')).filter(Boolean).join('|'),
     [branches],
   );
-  const activeBranchSignature = useMemo(() => activeBranchKeys.join('|'), [activeBranchKeys]);
-  const selectedBranchKey = useMemo(() => {
-    if (selectedBranch === 'all') return null;
-    const branchObj = (branches || []).find(branch => (branch.key || branch.id) === selectedBranch);
-    return String(branchObj?.key || branchObj?.branch_key || selectedBranch || '').trim() || null;
-  }, [branches, selectedBranch]);
-  const isRecordInActiveBranchScope = useCallback((record, field = 'branch') => {
-    const recordBranch = String(record?.[field] || '').trim();
-    return Boolean(recordBranch)
-      && activeBranchKeys.includes(recordBranch)
-      && (selectedBranch === 'all' || recordBranch === selectedBranchKey);
-  }, [activeBranchKeys, selectedBranch, selectedBranchKey]);
 
-  // Sales-source configuration is branch-aware as well, so revenue inclusion is
-  // evaluated against the selected branch rather than a stale owner-wide source list.
+  // Sales-source configuration is scoped by canonical branch UUID and its cache key
+  // includes that UUID, so changing branch cannot reuse all-branch revenue settings.
   const { revenueSources } = useSalesSources({
-    branchKey: selectedBranch === 'all' ? undefined : selectedBranchKey,
+    branchId: isAllBranches ? undefined : selectedBranchId,
   });
 
-  // Build the effective filter: active restaurant + optional selected branch.
-  const branchFilter = useMemo(() => {
-    if (!activeRestaurant?.id) return null;
-    const baseFilter = { restaurant_id: activeRestaurant.id };
-    if (selectedBranch === 'all') return baseFilter;
-    return { ...baseFilter, branch: selectedBranchKey };
-  }, [activeRestaurant?.id, selectedBranch, selectedBranchKey]);
-
-  // Expenses store their branch key in `branch_key`, unlike sales and purchases.
-  const expenseBranchFilter = useMemo(() => {
-    if (!activeRestaurant?.id) return null;
-    const baseFilter = { restaurant_id: activeRestaurant.id };
-    if (selectedBranch === 'all') return baseFilter;
-    return { ...baseFilter, branch_key: selectedBranchKey };
-  }, [activeRestaurant?.id, selectedBranch, selectedBranchKey]);
-
-  // Branch display info for the badge
-  const selectedBranchLabel = useMemo(() => {
-    if (selectedBranch === 'all') return t('all_branches');
-    const b =  (branches || []).find(br => (br.key || br.id) === selectedBranch);
-    return b ? (b.name || b.key || selectedBranch) : selectedBranch;
-  }, [selectedBranch, branches, t]);
+  // Canonical branch reads always start with the active tenant. For a selected
+  // branch, canonical UUID rows and legacy rows with no UUID are fetched as two
+  // server-filtered result sets and de-duplicated. This preserves historical
+  // branch-keyed data without using a branch name or downloading all tenant rows.
+  const fetchBranchScopedRows = useCallback(async (table, {
+    legacyColumn = 'branch',
+    dateColumn,
+    dateFrom,
+    dateTo,
+    filters = {},
+    orderColumn = 'date',
+    ascending = false,
+    limit = 1000,
+  } = {}) => {
+    if (!activeRestaurant?.id) return [];
+    const createQuery = () => {
+      let query = supabase.from(table).select('*').eq('restaurant_id', activeRestaurant.id);
+      if (dateColumn && dateFrom) query = query.gte(dateColumn, dateFrom);
+      if (dateColumn && dateTo) query = query.lte(dateColumn, dateTo);
+      Object.entries(filters).forEach(([column, value]) => {
+        query = query.eq(column, value);
+      });
+      if (orderColumn) query = query.order(orderColumn, { ascending });
+      return query.limit(limit);
+    };
+    if (isAllBranches) {
+      const { data, error } = await createQuery();
+      if (error) throw error;
+      return data || [];
+    }
+    if (!selectedBranchId || !selectedBranchKey) return [];
+    const [canonical, legacy] = await Promise.all([
+      createQuery().eq('branch_id', selectedBranchId),
+      createQuery().is('branch_id', null).eq(legacyColumn, selectedBranchKey),
+    ]);
+    if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+    return Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+      .map((record) => [record.id, record])).values());
+  }, [activeRestaurant?.id, isAllBranches, selectedBranchId, selectedBranchKey]);
 
   const { data: dashboardCustomizationMembership } = useQuery({
     queryKey: ['dashboard-customization-membership', activeRestaurant?.id, user?.id],
@@ -670,113 +680,100 @@ function OwnerDashboardContent() {
   const fmtPct = useCallback((n) =>
     `${n >= 0 ? '+' : ''}${(n || 0).toFixed(1)}%`, []);
 
-  // ── DATA QUERIES — all use branchFilter + selectedBranch in queryKey ──────
-  // This ensures React Query invalidates and refetches when branch changes.
+  // ── DATA QUERIES — every key includes tenant ID and selected branch UUID ──
+  // This ensures React Query refetches immediately when the central scope changes.
 
   const { data: todaySales = [], isLoading: loadingSales } = useQuery({
-    queryKey: ['sales_today', branchFilter, today, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.DailySales.filter({ ...(branchFilter || {}), date: today }, '-date', 100),
+    queryKey: ['sales_today', activeRestaurant?.id, selectedBranchId, today],
+    queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: today, dateTo: today, limit: 100 }),
     staleTime: 15000,
     enabled,
-    select: (data) => data.filter(sale => isRecordInActiveBranchScope(sale, 'branch')),
   });
 
   const { data: yesterdaySales = [] } = useQuery({
-    queryKey: ['sales_yesterday', branchFilter, yesterday, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.DailySales.filter({ ...(branchFilter || {}), date: yesterday }, '-date', 100),
+    queryKey: ['sales_yesterday', activeRestaurant?.id, selectedBranchId, yesterday],
+    queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: yesterday, dateTo: yesterday, limit: 100 }),
     staleTime: 60000,
     enabled,
-    select: (data) => data.filter(sale => isRecordInActiveBranchScope(sale, 'branch')),
   });
 
   const { data: weekSales = [] } = useQuery({
-    queryKey: ['sales_week', branchFilter, weekStart, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.DailySales.filter(branchFilter || {}, '-date', 500),
+    queryKey: ['sales_week', activeRestaurant?.id, selectedBranchId, weekStart],
+    queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: weekStart, dateTo: today, limit: 500 }),
     staleTime: 60000,
     enabled,
-    select: (data) => data.filter(sale => sale.date >= weekStart && isRecordInActiveBranchScope(sale, 'branch')),
   });
 
   const { data: monthSales = [] } = useQuery({
-    queryKey: ['sales_month', branchFilter, monthStart, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.DailySales.filter(branchFilter || {}, '-date', 1000),
+    queryKey: ['sales_month', activeRestaurant?.id, selectedBranchId, monthStart],
+    queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: monthStart, dateTo: today, limit: 1000 }),
     staleTime: 60000,
     enabled,
-    select: (data) => data.filter(sale => sale.date >= monthStart && isRecordInActiveBranchScope(sale, 'branch')),
   });
 
   const { data: yearSales = [] } = useQuery({
-    queryKey: ['sales_year', branchFilter, yearStart, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.DailySales.filter(branchFilter || {}, '-date', 5000),
+    queryKey: ['sales_year', activeRestaurant?.id, selectedBranchId, yearStart],
+    queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: yearStart, dateTo: today, limit: 5000 }),
     staleTime: 120000,
     enabled,
-    select: (data) => data.filter(sale => sale.date >= yearStart && isRecordInActiveBranchScope(sale, 'branch')),
   });
 
   const { data: prevWeekSales = [] } = useQuery({
-    queryKey: ['sales_prev_week', branchFilter, prevWeekStart, weekStart, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.DailySales.filter(branchFilter || {}, '-date', 500),
+    queryKey: ['sales_prev_week', activeRestaurant?.id, selectedBranchId, prevWeekStart, weekStart],
+    queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: prevWeekStart, dateTo: yesterday, limit: 500 }),
     staleTime: 120000,
     enabled,
-    select: (data) => data.filter(sale => sale.date >= prevWeekStart && sale.date < weekStart && isRecordInActiveBranchScope(sale, 'branch')),
   });
 
   const { data: prevMonthSales = [] } = useQuery({
-    queryKey: ['sales_prev_month', branchFilter, prevMonthStart, monthStart, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.DailySales.filter(branchFilter || {}, '-date', 1000),
+    queryKey: ['sales_prev_month', activeRestaurant?.id, selectedBranchId, prevMonthStart, monthStart],
+    queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: prevMonthStart, dateTo: format(subDays(new Date(monthStart), 1), 'yyyy-MM-dd'), limit: 1000 }),
     staleTime: 120000,
     enabled,
-    select: (data) => data.filter(sale => sale.date >= prevMonthStart && sale.date < monthStart && isRecordInActiveBranchScope(sale, 'branch')),
   });
 
   const { data: todayExpenses = [] } = useQuery({
-    queryKey: ['expenses_today', expenseBranchFilter, today, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.Expense.filter({ ...(expenseBranchFilter || {}), date: today }, '-date', 200),
+    queryKey: ['expenses_today', activeRestaurant?.id, selectedBranchId, today],
+    queryFn: () => fetchBranchScopedRows('expenses', { legacyColumn: 'branch_key', dateColumn: 'date', dateFrom: today, dateTo: today, limit: 200 }),
     staleTime: 15000,
     enabled,
-    select: (data) => data.filter(expense => isRecordInActiveBranchScope(expense, 'branch_key')),
   });
 
   const { data: yesterdayExpenses = [] } = useQuery({
-    queryKey: ['expenses_yesterday', expenseBranchFilter, yesterday, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.Expense.filter({ ...(expenseBranchFilter || {}), date: yesterday }, '-date', 200),
+    queryKey: ['expenses_yesterday', activeRestaurant?.id, selectedBranchId, yesterday],
+    queryFn: () => fetchBranchScopedRows('expenses', { legacyColumn: 'branch_key', dateColumn: 'date', dateFrom: yesterday, dateTo: yesterday, limit: 200 }),
     staleTime: 60000,
     enabled,
-    select: (data) => data.filter(expense => isRecordInActiveBranchScope(expense, 'branch_key')),
   });
 
   const { data: weekExpenses = [] } = useQuery({
-    queryKey: ['expenses_week', expenseBranchFilter, weekStart, today, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.Expense.filter(expenseBranchFilter || {}, '-date', 500),
+    queryKey: ['expenses_week', activeRestaurant?.id, selectedBranchId, weekStart],
+    queryFn: () => fetchBranchScopedRows('expenses', { legacyColumn: 'branch_key', dateColumn: 'date', dateFrom: weekStart, dateTo: today, limit: 500 }),
     staleTime: 60000,
     enabled,
-    select: (data) => data.filter(expense => expense.date >= weekStart && expense.date <= today && isRecordInActiveBranchScope(expense, 'branch_key')),
   });
 
   const { data: monthExpenses = [] } = useQuery({
-    queryKey: ['expenses_month', expenseBranchFilter, monthStart, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.Expense.filter(expenseBranchFilter || {}, '-date', 500),
+    queryKey: ['expenses_month', activeRestaurant?.id, selectedBranchId, monthStart],
+    queryFn: () => fetchBranchScopedRows('expenses', { legacyColumn: 'branch_key', dateColumn: 'date', dateFrom: monthStart, dateTo: today, limit: 500 }),
     staleTime: 60000,
     enabled,
-    select: (data) => data.filter(expense => expense.date >= monthStart && isRecordInActiveBranchScope(expense, 'branch_key')),
   });
 
   // Previous month expenses — needed for Product Consumption Analytics
   const { data: prevMonthExpenses = [] } = useQuery({
-    queryKey: ['expenses_prev_month', expenseBranchFilter, prevMonthStart, monthStart, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.Expense.filter(expenseBranchFilter || {}, '-date', 500),
+    queryKey: ['expenses_prev_month', activeRestaurant?.id, selectedBranchId, prevMonthStart, monthStart],
+    queryFn: () => fetchBranchScopedRows('expenses', { legacyColumn: 'branch_key', dateColumn: 'date', dateFrom: prevMonthStart, dateTo: format(subDays(new Date(monthStart), 1), 'yyyy-MM-dd'), limit: 500 }),
     staleTime: 120000,
     enabled,
-    select: (data) => data.filter(expense => expense.date >= prevMonthStart && expense.date < monthStart && isRecordInActiveBranchScope(expense, 'branch_key')),
   });
 
   // Year-to-date expenses — needed for Yearly Variable Expense KPI
   const { data: yearExpenses = [] } = useQuery({
-    queryKey: ['expenses_year', expenseBranchFilter, yearStart, selectedBranch, activeBranchSignature],
-    queryFn: () => base44.entities.Expense.filter(expenseBranchFilter || {}, '-date', 2000),
+    queryKey: ['expenses_year', activeRestaurant?.id, selectedBranchId, yearStart],
+    queryFn: () => fetchBranchScopedRows('expenses', { legacyColumn: 'branch_key', dateColumn: 'date', dateFrom: yearStart, dateTo: today, limit: 2000 }),
     staleTime: 120000,
     enabled,
-    select: (data) => data.filter(expense => expense.date >= yearStart && isRecordInActiveBranchScope(expense, 'branch_key')),
   });
 
   // Expense categories — needed to tag fixed vs variable expenses
@@ -794,80 +791,73 @@ function OwnerDashboardContent() {
   });
 
   const { data: supplierInvoices = [], isLoading: loadingSupplierInvoices } = useQuery({
-    queryKey: ['supplier_invoices', activeRestaurant?.id, selectedBranch, activeBranchSignature],
-    queryFn: async () => {
-      if (!activeRestaurant?.id) return [];
-      const { data, error } = await supabase
-        .from('supplier_invoices')
-        .select('*')
-        .eq('restaurant_id', activeRestaurant.id)
-        .order('date', { ascending: false })
-        .limit(5000);
-      if (error) { console.warn('[OwnerDashboard] supplier_invoices fetch error:', error.message); return []; }
-      return (data || []).filter(invoice => isRecordInActiveBranchScope(invoice, 'branch'));
-    },
+    queryKey: ['supplier_invoices', activeRestaurant?.id, selectedBranchId, activeBranchSignature],
+    queryFn: () => fetchBranchScopedRows('supplier_invoices', { legacyColumn: 'branch', limit: 5000 }),
     staleTime: 15000,
     enabled,
   });
 
   const { data: customerDebts = [], isLoading: loadingCustomerDebts } = useQuery({
-    queryKey: ['debts_customer_dash', branchFilter, selectedBranch],
-    queryFn: () => base44.entities.DebtRecord.filter(
-      { ...(branchFilter || {}), type: 'receivable', party_type: 'customer' },
-      '-date', 500
-    ),
+    queryKey: ['debts_customer_dash', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchBranchScopedRows('debt_records', {
+      legacyColumn: 'branch',
+      filters: { type: 'receivable', party_type: 'customer' },
+      limit: 500,
+    }),
     staleTime: 30000,
     enabled,
   });
 
   const { data: inventory = [], isLoading: loadingInventory } = useQuery({
-    queryKey: ['inventory_dash', branchFilter, selectedBranch],
-    queryFn: () => base44.entities.Inventory.filter(branchFilter || {}, 'product_name', 500),
+    queryKey: ['inventory_dash', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchBranchScopedRows('inventory', { legacyColumn: 'branch', orderColumn: 'product_name', ascending: true, limit: 500 }),
     staleTime: 60000,
     enabled,
   });
 
   const { data: networkAccounts = [] } = useQuery({
-    queryKey: ['network_accounts_dash', branchFilter, selectedBranch],
-    queryFn: () => base44.entities.NetworkAccount.filter(branchFilter || {}),
+    queryKey: ['network_accounts_dash', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchBranchScopedRows('network_accounts', { legacyColumn: 'branch_key', orderColumn: 'account_name', ascending: true, limit: 500 }),
     staleTime: 120000,
     enabled,
   });
 
   const { data: walletTransactions = [] } = useQuery({
-    queryKey: ['wallet_transactions_dash', branchFilter, selectedBranch],
-    queryFn: () => base44.entities.WalletTransaction.filter(branchFilter || {}, '-transaction_date', 1000),
+    queryKey: ['wallet_transactions_dash', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchBranchScopedRows('wallet_transactions', { legacyColumn: 'branch', orderColumn: 'transaction_date', limit: 1000 }),
     staleTime: 30000,
     enabled,
   });
 
   const { data: todayInvoices = [] } = useQuery({
-    queryKey: ['sales_invoices_today', branchFilter, today, selectedBranch],
+    queryKey: ['sales_invoices_today', activeRestaurant?.id, selectedBranchId, today],
     queryFn: () => base44.entities.SalesInvoice
-      ? base44.entities.SalesInvoice.filter({ ...(branchFilter || {}), sale_date: today }, '-created_date', 100)
+      ? fetchBranchScopedRows('sales_invoices', { legacyColumn: 'branch', dateColumn: 'sale_date', dateFrom: today, dateTo: today, orderColumn: 'created_date', limit: 100 })
       : Promise.resolve([]),
     staleTime: 15000,
     enabled,
   });
 
   const { data: priceHistory = [] } = useQuery({
-    queryKey: ['price_history_dash', user?.email || ownerFilter?.created_by],
+    queryKey: ['price_history_dash', activeRestaurant?.id, selectedBranchId],
     queryFn: async () => {
       const createdBy = user?.email || ownerFilter?.created_by;
       if (!createdBy) return [];
       const since = subDays(new Date(), 30).toISOString();
-      const { data, error } = await supabase
+      let query = supabase
         .from('product_price_history')
         .select('*')
-        .eq('created_by', createdBy)
+        .eq('restaurant_id', activeRestaurant.id)
         .gte('recorded_at', since)
         .order('recorded_at', { ascending: false })
         .limit(50);
+      if (!isAllBranches) query = query.eq('branch_id', selectedBranchId);
+      const { data, error } = await query;
       if (error) { console.warn('price history error:', error.message); return []; }
       return data || [];
     },
     staleTime: 60000,
-    enabled: !!(user?.email || ownerFilter?.created_by),
+    enabled: !!activeRestaurant?.id,
   });
 
   // ── MEMOIZED CALCULATIONS ─────────────────────────────────────────────────────
@@ -1240,14 +1230,9 @@ function OwnerDashboardContent() {
 
   // ── Section 5: Purchase Analytics ────────────────────────────────────────────
   const purchaseAnalytics = useMemo(() => {
-    // Filter invoices by branch for procurement KPIs
-    const branchPurchAnObj = (branches || []).find(b => (b.key || b.id) === selectedBranch);
-    const branchPurchAnKey = branchPurchAnObj?.key || selectedBranch;
-
-    // Filter by branch to match Procurement Dashboard
-    const branchFilteredInvoices = selectedBranch === 'all' 
-      ? supplierInvoices 
-      : supplierInvoices.filter(inv => inv.branch === branchPurchAnKey);
+    // Supplier invoices are already constrained by the central tenant-plus-branch
+    // server query; do not re-filter them in the browser by a legacy branch key.
+    const branchFilteredInvoices = supplierInvoices;
 
     // USE EXACT SAME HELPER AS PROCUREMENT DASHBOARD
     const kpis = computeProcurementKPIs(branchFilteredInvoices, []);
@@ -1294,21 +1279,19 @@ function OwnerDashboardContent() {
       outstandingPayables: kpis.outstandingPayables,
       overduePayables: kpis.overduePayables,
     };
-  }, [supplierInvoices, selectedBranch, today, branches]);
+  }, [supplierInvoices, today]);
 
   // ── Section 5b: Product Quantity Analytics (ERP) ──────────────────────────────
   const productQuantityAnalytics = useMemo(() => {
-    const branchObj = (branches || []).find(b => (b.key || b.id) === selectedBranch);
-    const branchKey = branchObj?.key || selectedBranch;
     return computeProductQuantityAnalytics(
       supplierInvoices,
-      branchKey,
+      isAllBranches ? 'all' : selectedBranchKey,
       today,
       monthStart,
       prevMonthStart,
       monthStart  // prevMonthEnd is exclusive = current monthStart
     );
-  }, [supplierInvoices, selectedBranch, today, monthStart, prevMonthStart, branches]);
+  }, [supplierInvoices, isAllBranches, selectedBranchKey, today, monthStart, prevMonthStart]);
 
   // ── Section 6: Inventory Analytics ───────────────────────────────────────────
   const inventoryAnalytics = useMemo(() => {
@@ -1442,7 +1425,7 @@ function OwnerDashboardContent() {
         <BranchSelector
           branches={branches}
           selectedBranch={selectedBranch}
-          onSelect={setSelectedBranch}
+          onSelect={setSelectedBranchId}
           t={t}
         />
         {/* Branch badge below selector */}
@@ -2407,7 +2390,7 @@ function OwnerDashboardContent() {
       open={isCopilotOpen}
       onOpenChange={setCopilotOpen}
       restaurantId={activeRestaurant?.id}
-      selectedBranch={selectedBranch}
+      selectedBranchId={selectedBranchId}
       selectedBranchLabel={selectedBranchLabel}
       role={role}
       can={can}

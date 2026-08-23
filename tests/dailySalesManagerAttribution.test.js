@@ -32,7 +32,9 @@ describe('Daily Sales manager attribution', () => {
     expect(workspace).toContain('custom_sources_total: customTotal');
     expect(salesPage).toContain("import { filterDailySalesRecords, toDailySalesCardRecord } from '@/lib/dailySalesPresentation';");
     expect(salesPage).toContain('sale={toDailySalesCardRecord(s)}');
-    expect(salesPage).toContain('if (ownerFilter?.branch) return ownerFilter; // manager: branch-scoped');
+    expect(salesPage).toContain("queryKey: ['sales', activeRestaurant?.id, selectedBranchId]");
+    expect(salesPage).toContain("baseQuery().eq('branch_id', selectedBranchId)");
+    expect(salesPage).toContain("baseQuery().is('branch_id', null).eq('branch', selectedBranchKey)");
   });
 
   it('stores server-derived manager identity, preserves it on edits, and rejects a manager branch mismatch', async () => {

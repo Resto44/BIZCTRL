@@ -10,6 +10,7 @@ import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
+import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -33,7 +34,8 @@ const STATUS_FILTERS = ['all', 'draft', 'pending', 'approved', 'paid', 'partial'
 
 export default function Purchases() {
   const { currency } = useLanguage();
-  const { ownerFilter } = useTenant();
+  const { ownerFilter, activeRestaurant, branches } = useTenant();
+  const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const { user } = useAuth();
   const { role } = useRole();
   const qc = useQueryClient();
@@ -44,35 +46,38 @@ export default function Purchases() {
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [bulkDeletingIds, setBulkDeletingIds] = useState(null);
-  const [filterBranch, setFilterBranch] = useState('all');
+  const filterBranch = isAllBranches ? 'all' : (selectedBranchKey || 'all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   // ── Fetch invoices ─────────────────────────────────────────────────────
-  // BUG FIX: Owner history must query by restaurant_id so that invoices created
-  // by Branch Managers (different created_by) are visible to the owner.
-  // Managers still see only their branch.
-  const { activeRestaurant } = useTenant();
+  // Scope every request by the authenticated restaurant. For a selected branch,
+  // canonical UUID records and legacy branch-keyed records are fetched server-side
+  // and merged by primary key; no branch-name or client-side tenant-wide filter is used.
   const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['supplier_invoices', ownerFilter, activeRestaurant?.id],
+    queryKey: ['supplier_invoices', activeRestaurant?.id, selectedBranchId],
     queryFn: async () => {
-      let q = supabase.from('supplier_invoices').select('*').order('date', { ascending: false }).limit(5000);
-      if (ownerFilter?.branch) {
-        // Manager: scope to assigned branch only
-        q = q.eq('branch', ownerFilter.branch);
-      } else if (activeRestaurant?.id) {
-        // Owner: scope to entire restaurant (all branches, all managers)
-        q = q.eq('restaurant_id', activeRestaurant.id);
-      } else if (ownerFilter?.created_by) {
-        // Fallback: legacy created_by filter
-        q = q.eq('created_by', ownerFilter.created_by);
+      if (!activeRestaurant?.id) return [];
+      const baseQuery = () => supabase.from('supplier_invoices').select('*')
+        .eq('restaurant_id', activeRestaurant.id)
+        .order('date', { ascending: false })
+        .limit(5000);
+      if (isAllBranches) {
+        const { data, error } = await baseQuery();
+        if (error) throw error;
+        return data || [];
       }
-      const { data, error } = await q;
-      if (error) { console.warn('supplier_invoices fetch error:', error.message); return []; }
-      return data || [];
+      if (!selectedBranchId || !selectedBranchKey) return [];
+      const [canonical, legacy] = await Promise.all([
+        baseQuery().eq('branch_id', selectedBranchId),
+        baseQuery().is('branch_id', null).eq('branch', selectedBranchKey),
+      ]);
+      if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+      return Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+        .map((record) => [record.id, record])).values());
     },
     staleTime: 120000,
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch || activeRestaurant?.id),
+    enabled: Boolean(activeRestaurant?.id),
   });
 
   const invalidatePurchaseQueries = () => {
@@ -111,14 +116,13 @@ export default function Purchases() {
   // ── Filtered invoices ──────────────────────────────────────────────────
   const filtered = useMemo(() => {
     return invoices.filter(inv => {
-      const branchMatch = filterBranch === 'all' || inv.branch === filterBranch;
       const statusMatch = filterStatus === 'all' || inv.status === filterStatus;
       const searchMatch = !searchQuery ||
         (inv.supplier_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (inv.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase());
-      return branchMatch && statusMatch && searchMatch;
+      return statusMatch && searchMatch;
     });
-  }, [invoices, filterBranch, filterStatus, searchQuery]);
+  }, [invoices, filterStatus, searchQuery]);
 
   // ── Summary stats ──────────────────────────────────────────────────────
   const totalOutstanding = invoices
@@ -199,7 +203,13 @@ export default function Purchases() {
           />
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <BranchSelect value={filterBranch} onChange={setFilterBranch} includeAll />
+          <BranchSelect
+            value={filterBranch}
+            onChange={(branchKey) => setSelectedBranchId(
+              branchKey === 'all' ? 'all' : branches.find((branch) => (branch.key || branch.branch_key) === branchKey)?.id || 'all'
+            )}
+            includeAll
+          />
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="h-9">
               <SelectValue placeholder="All Status" />
@@ -217,7 +227,7 @@ export default function Purchases() {
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{filtered.length} invoice{filtered.length !== 1 ? 's' : ''}</span>
         {filterStatus !== 'all' || filterBranch !== 'all' || searchQuery ? (
-          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => { setFilterBranch('all'); setFilterStatus('all'); setSearchQuery(''); }}>
+          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => { setSelectedBranchId('all'); setFilterStatus('all'); setSearchQuery(''); }}>
             Clear filters
           </Button>
         ) : null}

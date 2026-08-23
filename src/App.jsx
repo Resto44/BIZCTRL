@@ -11,6 +11,7 @@ import { RoleProvider } from '@/lib/RoleContext';
 import RoleGuard from '@/components/rbac/RoleGuard';
 import ERPRoleGuard from '@/components/rbac/ERPRoleGuard';
 import { TenantProvider, useTenant } from '@/lib/TenantContext';
+import { BranchScopeProvider } from '@/lib/BranchScopeContext';
 import { WorkspaceCustomizationProvider } from '@/lib/WorkspaceCustomizationContext';
 import { BusinessModeProvider } from '@/lib/BusinessModeContext';
 import { NotificationProvider } from '@/lib/NotificationContext';
@@ -543,16 +544,18 @@ const AuthenticatedApp = () => {
   return (
     <RoleProvider>
       <TenantProvider>
-        <SubscriptionProvider>
-          <WorkspaceCustomizationProvider>
-            <BusinessModeProvider>
-              <NotificationProvider>
-                <RoleHomeRedirect />
-                <SubscribedRoutes />
-              </NotificationProvider>
-            </BusinessModeProvider>
-          </WorkspaceCustomizationProvider>
-        </SubscriptionProvider>
+        <BranchScopeProvider>
+          <SubscriptionProvider>
+            <WorkspaceCustomizationProvider>
+              <BusinessModeProvider>
+                <NotificationProvider>
+                  <RoleHomeRedirect />
+                  <SubscribedRoutes />
+                </NotificationProvider>
+              </BusinessModeProvider>
+            </WorkspaceCustomizationProvider>
+          </SubscriptionProvider>
+        </BranchScopeProvider>
       </TenantProvider>
     </RoleProvider>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import PageHeader from '@/components/shared/PageHeader';
 import BranchSelect from '@/components/shared/BranchSelect';
@@ -15,6 +16,7 @@ import { AlertTriangle, Plus, Package, Pencil, MessageSquare, Bell } from 'lucid
 import { format } from 'date-fns';
 import { computeLiveStock, sendWhatsAppAlert, groupLowStockByBranch } from '@/lib/stockEngine';
 import { useTenant } from '@/lib/TenantContext';
+import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useNotify } from '@/lib/useNotify';
 
 
@@ -28,12 +30,12 @@ const emptyForm = { product_id: '', product_name: '', branch: '', unit: 'kg', op
 
 export default function Inventory() {
   const { lang } = useLanguage();
-  const { branches } = useTenant();
+  const { branches, ownerFilter, activeRestaurant } = useTenant();
+  const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const m = ui[lang] || ui.en;
   const qc = useQueryClient();
   const notif = useNotify();
-  const { ownerFilter } = useTenant();
-  const [branchFilter, setBranchFilter] = useState('all');
+  const branchFilter = isAllBranches ? 'all' : (selectedBranchKey || 'all');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -41,25 +43,45 @@ export default function Inventory() {
   const [managerPhone, setManagerPhone] = useState('');
   const [showAlertSetup, setShowAlertSetup] = useState(false);
 
-  const { data: items = [] } = useQuery({ 
-    queryKey: ['inventory', ownerFilter], 
-    queryFn: () => base44.entities.Inventory.filter(ownerFilter || {}, '-date', 2000), staleTime: 120000, 
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch) 
+  const fetchScopedRows = async (table, legacyColumn = 'branch') => {
+    if (!activeRestaurant?.id) return [];
+    const baseQuery = () => supabase.from(table).select('*')
+      .eq('restaurant_id', activeRestaurant.id)
+      .order('date', { ascending: false })
+      .limit(2000);
+    if (isAllBranches) {
+      const { data, error } = await baseQuery();
+      if (error) throw error;
+      return data || [];
+    }
+    if (!selectedBranchId || !selectedBranchKey) return [];
+    const [canonical, legacy] = await Promise.all([
+      baseQuery().eq('branch_id', selectedBranchId),
+      baseQuery().is('branch_id', null).eq(legacyColumn, selectedBranchKey),
+    ]);
+    if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+    return Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+      .map((record) => [record.id, record])).values());
+  };
+  const { data: items = [] } = useQuery({
+    queryKey: ['inventory', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchScopedRows('inventory'), staleTime: 120000,
+    enabled: Boolean(activeRestaurant?.id),
   });
-  const { data: products = [] } = useQuery({ 
-    queryKey: ['products', ownerFilter], 
-    queryFn: () => base44.entities.Product.filter(ownerFilter || {}, 'name', 500), 
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch) 
+  const { data: products = [] } = useQuery({
+    queryKey: ['products', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => base44.entities.Product.filter({ restaurant_id: activeRestaurant.id }, 'name', 500),
+    enabled: Boolean(activeRestaurant?.id),
   });
-  const { data: purchases = [] } = useQuery({ 
-    queryKey: ['purchases', ownerFilter], 
-    queryFn: () => base44.entities.Purchase.filter(ownerFilter || {}, '-date', 2000), staleTime: 120000, 
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch) 
+  const { data: purchases = [] } = useQuery({
+    queryKey: ['purchases', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchScopedRows('purchases'), staleTime: 120000,
+    enabled: Boolean(activeRestaurant?.id),
   });
-  const { data: wastage = [] } = useQuery({ 
-    queryKey: ['inventory_waste', ownerFilter], 
-    queryFn: () => base44.entities.InventoryWaste.filter(ownerFilter || {}, '-date', 2000), staleTime: 120000, 
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch) 
+  const { data: wastage = [] } = useQuery({
+    queryKey: ['inventory_waste', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchScopedRows('inventory_waste'), staleTime: 120000,
+    enabled: Boolean(activeRestaurant?.id),
   });
 
   const saveMutation = useMutation({
@@ -73,7 +95,11 @@ export default function Inventory() {
       
       const res = editing 
         ? await base44.entities.Inventory.update(editing.id, data) 
-        : await base44.entities.Inventory.create({ ...data, ...(ownerFilter || {}) });
+        : await base44.entities.Inventory.create({
+          ...data,
+          restaurant_id: activeRestaurant?.id,
+          branch_id: data.branch_id || (selectedBranchId === 'all' ? null : selectedBranchId),
+        });
       
       // Check if current stock is low and notify
       const updatedLiveStock = computeLiveStock([res], [], []);
@@ -95,7 +121,15 @@ export default function Inventory() {
     },
   });
 
-  const openAdd = () => { setEditing(null); setForm(emptyForm); setShowForm(true); };
+  const openAdd = () => {
+    setEditing(null);
+    setForm({
+      ...emptyForm,
+      branch: isAllBranches ? '' : (selectedBranchKey || ''),
+      branch_id: isAllBranches ? null : selectedBranchId,
+    });
+    setShowForm(true);
+  };
   const openEdit = (item) => { setEditing(item); setForm({ ...item }); setShowForm(true); };
   const closeForm = () => { setShowForm(false); setEditing(null); };
 
@@ -105,8 +139,8 @@ export default function Inventory() {
   const totalLow = liveStock.filter(i => i.isLow).length;
 
   const filtered = useMemo(() =>
-    liveStock.filter(item => branchFilter === 'all' || item.branch === branchFilter),
-    [liveStock, branchFilter]
+    liveStock,
+    [liveStock]
   );
 
   const branchLabel = (key) => branches.find(b => b.key === key)?.label || key;
@@ -128,7 +162,13 @@ export default function Inventory() {
       />
 
       <div className="mb-4">
-        <BranchSelect value={branchFilter} onChange={setBranchFilter} includeAll />
+        <BranchSelect
+          value={branchFilter}
+          onChange={(branchKey) => setSelectedBranchId(
+            branchKey === 'all' ? 'all' : branches.find((branch) => (branch.key || branch.branch_key) === branchKey)?.id || 'all'
+          )}
+          includeAll
+        />
       </div>
 
       <div className="space-y-2">
@@ -216,7 +256,11 @@ export default function Inventory() {
             </div>
             <div>
               <Label className="text-xs">{m.branch}</Label>
-              <BranchSelect value={form.branch} onChange={v => setForm(f => ({ ...f, branch: v }))} />
+              <BranchSelect value={form.branch} onChange={v => setForm((current) => ({
+                ...current,
+                branch: v,
+                branch_id: branches.find((branch) => (branch.key || branch.branch_key) === v)?.id || null,
+              }))} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>

@@ -11,7 +11,7 @@ const TenantContext = createContext({
   setActiveRestaurant: () => {}, branches: [], allBranches: [], createRestaurant: async () => {},
   updateRestaurant: async () => {}, updateRestaurantBranches: async () => {}, refetchRestaurants: () => {},
   orgId: '', orgFilter: {}, restaurantFilter: null,
-  managerBranch: null, managerBranchObject: null, isManager: false,
+  managerBranch: null, managerBranchObject: null, isManager: false, isBranchScoped: false,
   portalIdentity: null, loadingPortalIdentity: false, portalIdentityError: null, refetchPortalIdentity: () => {},
 });
 
@@ -36,6 +36,7 @@ export function TenantProvider({ children }) {
   const isOwner = normalizedRole === ROLES.OWNER;
   const isManager = normalizedRole === ROLES.MANAGER;
   const isEmployee = normalizedRole === ROLES.EMPLOYEE;
+  const isBranchScoped = isManager || isEmployee;
   const isCustomer = normalizedRole === ROLES.CUSTOMER;
   const isSponsor = normalizedRole === ROLES.SPONSOR;
 
@@ -337,13 +338,13 @@ export function TenantProvider({ children }) {
   // the key is absent on an assigned Branch Manager profile.
   const assignedBranch = isStaffRole ? (user?.branch || user?.branch_id || null) : null;
   const managerBranchObject = React.useMemo(() => {
-    if (!isManager || !assignedBranch) return null;
+    if (!isBranchScoped || !assignedBranch) return null;
     return branches.find((branch) =>
       branch.id === user?.branch_id ||
       branch.key === user?.branch ||
       branch.branch_key === user?.branch,
     ) || null;
-  }, [assignedBranch, branches, isManager, user?.branch, user?.branch_id]);
+  }, [assignedBranch, branches, isBranchScoped, user?.branch, user?.branch_id]);
 
   // TENANT ISOLATION
   const ownerFilter = React.useMemo(() => {
@@ -373,7 +374,7 @@ export function TenantProvider({ children }) {
 
   // For managers: restrict branches list to only their assigned branch
   const effectiveBranches = React.useMemo(() => {
-    if (isManager && assignedBranch) {
+    if (isBranchScoped && assignedBranch) {
       return branches.filter((branch) =>
         branch.id === user?.branch_id ||
         branch.key === user?.branch ||
@@ -382,7 +383,7 @@ export function TenantProvider({ children }) {
       );
     }
     return branches;
-  }, [assignedBranch, branches, isManager, user?.branch, user?.branch_id]);
+  }, [assignedBranch, branches, isBranchScoped, user?.branch, user?.branch_id]);
 
   return (
     <TenantContext.Provider value={{
@@ -404,6 +405,7 @@ export function TenantProvider({ children }) {
       managerBranch: managerBranchObject?.key || managerBranchObject?.branch_key || assignedBranch,
       managerBranchObject,
       isManager,
+      isBranchScoped,
       isEmployee,
       isCustomer,
       isSponsor,

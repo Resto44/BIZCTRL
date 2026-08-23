@@ -62,9 +62,11 @@ describe('Pharmacy Owner portal resilience', () => {
   it('keeps every owner dashboard data path tenant-scoped and safely disabled until a canonical organization exists', async () => {
     const dashboard = await readFile(dashboardPath, 'utf8');
     expect(dashboard).toContain('const enabled = !!(activeRestaurant?.id);');
-    expect(dashboard).toContain("const baseFilter = { restaurant_id: activeRestaurant.id };");
-    expect(dashboard).toContain("queryKey: ['sales_today', branchFilter");
-    expect(dashboard).toContain("queryKey: ['expenses_today', expenseBranchFilter");
+    expect(dashboard).toContain('const fetchBranchScopedRows = useCallback(async (table, {');
+    expect(dashboard).toContain(".eq('restaurant_id', activeRestaurant.id)");
+    expect(dashboard).toContain("queryKey: ['sales_today', activeRestaurant?.id, selectedBranchId, today]");
+    expect(dashboard).toContain("queryKey: ['expenses_today', activeRestaurant?.id, selectedBranchId, today]");
+    expect(dashboard).toContain("createQuery().eq('branch_id', selectedBranchId)");
     expect(dashboard).toContain(".eq('restaurant_id', activeRestaurant.id)");
     expect(dashboard).toContain('<WidgetErrorBoundary>');
     expect(dashboard).toContain('lowStockItems={[]}');

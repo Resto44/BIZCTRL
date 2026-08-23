@@ -61,6 +61,7 @@ type Scope = {
   restaurantId: string;
   role: string;
   permissions: Record<string, boolean>;
+  branchId: string | null;
   branchKey: string | null;
   branchName: string | null;
   currency: string;
@@ -174,7 +175,7 @@ async function logEvent(caller: ReturnType<typeof createClient>, scope: Scope, u
   });
 }
 
-async function resolveScope(caller: ReturnType<typeof createClient>, userId: string, restaurantId: string, selectedBranch: unknown, availableModules: unknown): Promise<Scope> {
+async function resolveScope(caller: ReturnType<typeof createClient>, userId: string, restaurantId: string, selectedBranchId: unknown, availableModules: unknown): Promise<Scope> {
   const { data: identityRows, error: identityError } = await caller.rpc("erp_get_authenticated_portal_identity", { p_restaurant_id: restaurantId });
   if (identityError || !Array.isArray(identityRows) || !identityRows[0]) throw new Error("TENANT_SCOPE_DENIED");
   const identity = identityRows[0];
@@ -195,19 +196,21 @@ async function resolveScope(caller: ReturnType<typeof createClient>, userId: str
     .maybeSingle();
   if (restaurantError || !restaurant) throw new Error("TENANT_SCOPE_DENIED");
 
+  let branchId: string | null = null;
   let branchKey: string | null = null;
   let branchName: string | null = null;
-  const requestedBranch = trimText(selectedBranch, 100);
+  const requestedBranchId = trimText(selectedBranchId, 100);
   if (String(identity.viewer_role || "").toLowerCase() === "owner") {
-    if (requestedBranch && requestedBranch !== "all") {
+    if (requestedBranchId && requestedBranchId !== "all") {
       const { data: branch } = await caller
         .from("branches")
-        .select("branch_key, name")
+        .select("id, branch_key, name")
         .eq("restaurant_id", identity.restaurant_id)
-        .eq("branch_key", requestedBranch)
+        .eq("id", requestedBranchId)
         .eq("is_active", true)
         .maybeSingle();
       if (!branch) throw new Error("BRANCH_SCOPE_DENIED");
+      branchId = branch.id;
       branchKey = branch.branch_key;
       branchName = branch.name;
     }
@@ -216,12 +219,13 @@ async function resolveScope(caller: ReturnType<typeof createClient>, userId: str
     if (!assignedId) throw new Error("BRANCH_SCOPE_DENIED");
     const { data: branch } = await caller
       .from("branches")
-      .select("branch_key, name")
+      .select("id, branch_key, name")
       .eq("restaurant_id", identity.restaurant_id)
       .eq("id", assignedId)
       .eq("is_active", true)
       .maybeSingle();
     if (!branch) throw new Error("BRANCH_SCOPE_DENIED");
+    branchId = branch.id;
     branchKey = branch.branch_key;
     branchName = branch.name;
   }
@@ -233,6 +237,7 @@ async function resolveScope(caller: ReturnType<typeof createClient>, userId: str
     restaurantId: identity.restaurant_id,
     role: String(identity.viewer_role || membership.role || "member").toLowerCase(),
     permissions: typeof membership.permissions === "object" && membership.permissions ? membership.permissions : {},
+    branchId,
     branchKey,
     branchName,
     currency: String(restaurant.currency || "SAR"),
@@ -241,8 +246,12 @@ async function resolveScope(caller: ReturnType<typeof createClient>, userId: str
   };
 }
 
-function applyBranchFilter(query: any, scope: Scope, column = "branch") {
-  return scope.branchKey ? query.eq(column, scope.branchKey) : query;
+function applyBranchFilter(query: any, scope: Scope, legacyColumn = "branch") {
+  if (!scope.branchId || !scope.branchKey) return query;
+  // Every query is already constrained to scope.restaurantId. UUID matches cover
+  // canonical records; the second arm admits only same-tenant legacy rows without
+  // a branch_id, avoiding a client-side tenant-wide fetch during the migration.
+  return query.or(`branch_id.eq.${scope.branchId},and(branch_id.is.null,${legacyColumn}.eq.${scope.branchKey})`);
 }
 
 async function dashboardSummary(caller: ReturnType<typeof createClient>, scope: Scope) {
@@ -335,7 +344,7 @@ async function prepareExpense(caller: ReturnType<typeof createClient>, scope: Sc
   const { data: category } = args.category
     ? await caller.from("expense_categories").select("id, name, name_en, name_ar").eq("restaurant_id", scope.restaurantId).ilike("name", `%${trimText(args.category, 120)}%`).limit(1).maybeSingle()
     : { data: null };
-  const payload = { amount, description, branch_key: scope.branchKey, category_id: category?.id || null, category_name: category?.name || category?.name_en || category?.name_ar || null, date: formatDate(new Date()) };
+  const payload = { amount, description, branch_id: scope.branchId, branch_key: scope.branchKey, category_id: category?.id || null, category_name: category?.name || category?.name_en || category?.name_ar || null, date: formatDate(new Date()) };
   const { data: request, error } = await caller.from("copilot_action_requests").insert({ restaurant_id: scope.restaurantId, user_id: userId, action_type: "create_expense", payload }).select("id, expires_at").single();
   if (error || !request) throw new Error("ACTION_PREPARATION_FAILED");
   return { status: "confirmation_required", action_request_id: request.id, expires_at: request.expires_at, action: "create_expense", payload, message: "The expense is only prepared. It will not be created unless the user confirms in the application." };
@@ -354,7 +363,7 @@ async function executeTool(caller: ReturnType<typeof createClient>, scope: Scope
     else if (name === "explain_module_access") result = await explainModuleAccess(scope, trimText(args.module_name, 120));
     else if (name === "prepare_create_expense") result = await prepareExpense(caller, scope, userId, args);
     else throw new Error("TOOL_NOT_ALLOWED");
-    await logEvent(caller, scope, userId, name, true, startedAt, { branch_key: scope.branchKey });
+    await logEvent(caller, scope, userId, name, true, startedAt, { branch_id: scope.branchId, branch_key: scope.branchKey });
     return result;
   } catch (error) {
     await logEvent(caller, scope, userId, name, false, startedAt, { code: error instanceof Error ? error.message : "TOOL_FAILED" });
@@ -459,10 +468,11 @@ async function confirmAction(caller: ReturnType<typeof createClient>, scope: Sco
   }
   if (decision !== "confirm" || request.action_type !== "create_expense") throw new Error("ACTION_CONFIRMATION_REQUIRED");
   const payload = request.payload || {};
-  if (!scope.branchKey || payload.branch_key !== scope.branchKey || !Number.isFinite(Number(payload.amount)) || Number(payload.amount) <= 0 || !trimText(payload.description, 500)) throw new Error("ACTION_PAYLOAD_INVALID");
+  if (!scope.branchId || !scope.branchKey || payload.branch_id !== scope.branchId || payload.branch_key !== scope.branchKey || !Number.isFinite(Number(payload.amount)) || Number(payload.amount) <= 0 || !trimText(payload.description, 500)) throw new Error("ACTION_PAYLOAD_INVALID");
 
   const { data: expense, error: expenseError } = await caller.from("expenses").insert({
     restaurant_id: scope.restaurantId,
+    branch_id: scope.branchId,
     branch_key: scope.branchKey,
     category_id: payload.category_id || null,
     amount: Number(payload.amount),
@@ -490,7 +500,7 @@ Deno.serve(async (req: Request) => {
     const { data: userData, error: userError } = await caller.auth.getUser();
     if (userError || !userData.user) throw new Error("UNAUTHENTICATED");
     const body = await req.json();
-    const scope = await resolveScope(caller, userData.user.id, trimText(body.restaurantId, 100), body.selectedBranch, body.availableModules);
+    const scope = await resolveScope(caller, userData.user.id, trimText(body.restaurantId, 100), body.selectedBranchId, body.availableModules);
     if (body.operation === "confirm_action") {
       const result = await confirmAction(caller, scope, userData.user.id, body.actionRequestId, body.decision);
       return new Response(JSON.stringify(result), { status: 200, headers });

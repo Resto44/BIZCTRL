@@ -13,6 +13,7 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
+import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useSalesSources } from '@/hooks/useSalesSources';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -118,68 +119,92 @@ function KPICard({ label, value, sub, trend, icon: Icon, color = 'blue' }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function Reports() {
   const { t, currency, lang, dir } = useLanguage();
-  const { ownerFilter, branches, isManager, managerBranch, activeRestaurant } = useTenant();
-  const { revenueSources, isLoading: loadingSources } = useSalesSources();
+  const { branches, activeRestaurant } = useTenant();
+  const {
+    selectedBranchId,
+    selectedBranchKey,
+    isAllBranches,
+    branchFilter,
+  } = useBranchScope();
+  const { revenueSources, isLoading: loadingSources } = useSalesSources({
+    branchId: isAllBranches ? undefined : selectedBranchId,
+  });
 
-  // Owner reporting is restaurant-scoped so records entered by Branch Managers
-  // are included. Managers remain constrained to their assigned branch.
-  const reportScope = useMemo(() => {
-    const branch = managerBranch || ownerFilter?.branch || null;
-    if (isManager) return branch ? { branch } : null;
-    if (activeRestaurant?.id) return { restaurantId: activeRestaurant.id };
-    return ownerFilter?.created_by ? { createdBy: ownerFilter.created_by } : null;
-  }, [activeRestaurant?.id, isManager, managerBranch, ownerFilter?.branch, ownerFilter?.created_by]);
+  // Reports inherit the same tenant-authorized UUID selection as the Owner dashboard.
+  // A branch UUID is always combined with the active restaurant ID; there is no
+  // branch-name fallback and no independent report-page selection state.
+  const hasScope = Boolean(activeRestaurant?.id);
+  const salesFilter = branchFilter || {};
+  const expenseFilter = branchFilter || {};
+  const walletFilter = branchFilter || {};
 
-  const hasScope = !!reportScope;
-  const salesFilter = reportScope?.branch
-    ? { branch: reportScope.branch }
-    : reportScope?.restaurantId
-      ? { restaurant_id: reportScope.restaurantId }
-      : reportScope?.createdBy
-        ? { created_by: reportScope.createdBy }
-        : null;
-  const expenseFilter = reportScope?.branch ? { branch_key: reportScope.branch } : salesFilter;
-  const walletFilter = reportScope?.branch ? { branch: reportScope.branch } : salesFilter;
+  const fetchReportRows = async (table, legacyColumn = 'branch', orderColumn = 'date') => {
+    if (!activeRestaurant?.id) return [];
+    const createQuery = () => {
+      let query = supabase.from(table).select('*').eq('restaurant_id', activeRestaurant.id);
+      if (orderColumn) query = query.order(orderColumn, { ascending: false });
+      return query.limit(2000);
+    };
+    if (isAllBranches) {
+      const { data, error } = await createQuery();
+      if (error) throw error;
+      return data || [];
+    }
+    if (!selectedBranchId || !selectedBranchKey) return [];
+    const [canonical, legacy] = await Promise.all([
+      createQuery().eq('branch_id', selectedBranchId),
+      createQuery().is('branch_id', null).eq(legacyColumn, selectedBranchKey),
+    ]);
+    if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+    return Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+      .map((record) => [record.id, record])).values());
+  };
 
   // ── Data fetching ──────────────────────────────────────────────────────────
   const { data: sales = [], isLoading: loadingSales } = useQuery({
-    queryKey: ['sales', 'reports', salesFilter],
-    queryFn: () => base44.entities.DailySales.filter(salesFilter || {}, '-date', 2000),
+    queryKey: ['sales', 'reports', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchReportRows('daily_sales'),
     staleTime: 120000,
     enabled: hasScope,
   });
 
   const { data: purchases = [], isLoading: loadingPurchases } = useQuery({
-    queryKey: ['purchases_erp', reportScope],
+    queryKey: ['purchases_erp', activeRestaurant?.id, selectedBranchId],
     queryFn: async () => {
-      if (!reportScope) return [];
-      let query = supabase
+      if (!activeRestaurant?.id) return [];
+      const buildQuery = () => supabase
         .from('supplier_invoices')
         .select('*')
+        .eq('restaurant_id', activeRestaurant.id)
         .in('status', ['approved', 'partial', 'paid'])
         .order('date', { ascending: false })
         .limit(2000);
-      if (reportScope.branch) query = query.eq('branch', reportScope.branch);
-      else if (reportScope.restaurantId) query = query.eq('restaurant_id', reportScope.restaurantId);
-      else if (reportScope.createdBy) query = query.eq('created_by', reportScope.createdBy);
-      const { data, error } = await query;
-      if (error) return [];
-      return data || [];
+      if (isAllBranches) {
+        const { data, error } = await buildQuery();
+        return error ? [] : (data || []);
+      }
+      const [canonicalResult, legacyResult] = await Promise.all([
+        buildQuery().eq('branch_id', selectedBranchId),
+        selectedBranchKey ? buildQuery().is('branch_id', null).eq('branch', selectedBranchKey) : Promise.resolve({ data: [] }),
+      ]);
+      if (canonicalResult.error || legacyResult.error) return [];
+      return Array.from(new Map([...(canonicalResult.data || []), ...(legacyResult.data || [])]
+        .map((record) => [record.id, record])).values());
     },
     staleTime: 120000,
     enabled: hasScope,
   });
 
   const { data: expenses = [], isLoading: loadingExpenses } = useQuery({
-    queryKey: ['expenses', 'reports', expenseFilter],
-    queryFn: () => base44.entities.Expense.filter(expenseFilter || {}, '-date', 2000),
+    queryKey: ['expenses', 'reports', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchReportRows('expenses', 'branch_key'),
     staleTime: 120000,
     enabled: hasScope,
   });
 
   const { data: walletTransactions = [] } = useQuery({
-    queryKey: ['wallet_transactions', 'reports', walletFilter],
-    queryFn: () => base44.entities.WalletTransaction.filter(walletFilter || {}, '-transaction_date', 500),
+    queryKey: ['wallet_transactions', 'reports', activeRestaurant?.id, selectedBranchId],
+    queryFn: () => fetchReportRows('wallet_transactions', 'branch', 'transaction_date'),
     staleTime: 60000,
     enabled: hasScope,
   });
@@ -246,8 +271,8 @@ export default function Reports() {
   const productQtyAnalytics = useMemo(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-    return computeProductQuantityAnalytics(purchases, 'all', today, monthStart);
-  }, [purchases]);
+    return computeProductQuantityAnalytics(purchases, isAllBranches ? 'all' : selectedBranchKey, today, monthStart);
+  }, [purchases, isAllBranches, selectedBranchKey]);
 
   // ── PDF Generation ─────────────────────────────────────────────────────────
   const [pdfStatus, setPdfStatus] = useState('idle'); // idle | generating | done | error
@@ -258,14 +283,14 @@ export default function Reports() {
     setPdfError(null);
     try {
       const dr = getDateRange('month');
-      const inventory = await base44.entities.Inventory.filter(salesFilter || {}, '-date', 2000);
+      const inventory = await fetchReportRows('inventory');
       await generateUltimatePDF({
         sales, purchases, expenses,
         rangeType: 'month',
         fromStr: formatDate(dr.from),
         toStr: formatDate(dr.to),
         t, lang, currency,
-        branches: branches.length > 0 ? branches : [{ key: 'main', label: 'Main Branch' }],
+        branches: branches || [],
         dir,
         brandSettings: brandSettingsList[0] || null,
         inventory,
@@ -281,7 +306,7 @@ export default function Reports() {
       setPdfError(e.message || 'Generation failed');
       setPdfStatus('error');
     }
-  }, [sales, purchases, expenses, branches, salesFilter, walletTransactions, revenueSources, expenseCategories, brandSettingsList, t, lang, currency, dir]);
+  }, [sales, purchases, expenses, branches, walletTransactions, revenueSources, expenseCategories, brandSettingsList, t, lang, currency, dir, activeRestaurant?.id, selectedBranchId, selectedBranchKey, isAllBranches]);
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (isLoading) {

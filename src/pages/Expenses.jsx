@@ -22,11 +22,13 @@ import ReceiptScanner from '@/components/expenses/ReceiptScanner';
 import { Dialog as ScanDialog, DialogContent as ScanDialogContent, DialogHeader as ScanDialogHeader, DialogTitle as ScanDialogTitle } from '@/components/ui/dialog';
 import { useNotify } from '@/lib/useNotify';
 import { useTenant } from '@/lib/TenantContext';
+import { useBranchScope } from '@/lib/BranchScopeContext';
 
 function ExpenseForm({ initial, onSubmit, onCancel, categories }) {
   const { t } = useLanguage();
   const { branches, managerBranch } = useTenant();
-  const defaultBranch = managerBranch || branches[0]?.key || '';
+  const { selectedBranchId, selectedBranchKey, isAllBranches } = useBranchScope();
+  const defaultBranch = !isAllBranches ? (selectedBranchKey || '') : (managerBranch || branches[0]?.key || branches[0]?.branch_key || '');
   // Resolve branch_key: use stored value only if it matches a known branch or is 'all';
   // otherwise fall back to defaultBranch to prevent blank dropdown on edit.
   const knownBranchKeys = ['all', ...branches.map(b => b.key)];
@@ -36,6 +38,7 @@ function ExpenseForm({ initial, onSubmit, onCancel, categories }) {
   const [form, setForm] = useState({
     date: initial?.date || format(new Date(), 'yyyy-MM-dd'),
     branch_key: resolvedBranchKey,
+    branch_id: initial?.branch_id || (!isAllBranches ? selectedBranchId : (branches.find((branch) => (branch.key || branch.branch_key) === resolvedBranchKey)?.id || null)),
     category_id: initial?.category_id || '',
     description: initial?.description || '',
     amount: initial?.amount || '',
@@ -101,7 +104,11 @@ function ExpenseForm({ initial, onSubmit, onCancel, categories }) {
       <div><Label>{t('description')}</Label><Input value={form.description} onChange={e => set('description', e.target.value)} /></div>
       <div><Label>{t('amount')}</Label><Input type="number" value={form.amount} onChange={e => set('amount', e.target.value)} /></div>
       <div className="flex gap-2 pt-2">
-        <Button className="flex-1" onClick={() => onSubmit({ ...form, amount: Number(form.amount) || 0 })}>{t('save')}</Button>
+        <Button className="flex-1" onClick={() => onSubmit({
+          ...form,
+          branch_id: branches.find((branch) => (branch.key || branch.branch_key) === form.branch_key)?.id || form.branch_id || null,
+          amount: Number(form.amount) || 0,
+        })}>{t('save')}</Button>
         {onCancel && <Button variant="outline" onClick={onCancel}>{t('cancel')}</Button>}
       </div>
     </div>
@@ -110,31 +117,43 @@ function ExpenseForm({ initial, onSubmit, onCancel, categories }) {
 
 export default function Expenses() {
   const { t, currency } = useLanguage();
-  const { branches, ownerFilter } = useTenant();
+  const { branches, ownerFilter, activeRestaurant } = useTenant();
+  const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const qc = useQueryClient();
   const notif = useNotify();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
-  const [filterBranch, setFilterBranch] = useState('all');
+  const filterBranch = isAllBranches ? 'all' : (selectedBranchKey || 'all');
   const [showScanner, setShowScanner] = useState(false);
   const [scannedData, setScannedData] = useState(null);
 
-  // BUG FIX: Owner history must query by restaurant_id so that expenses created
-  // by Branch Managers (different created_by) are visible to the owner.
-  // Managers still see only their branch via branch_key.
-  const { activeRestaurant } = useTenant();
-  const expenseFilter = useMemo(() => {
-    if (ownerFilter?.branch) return { branch_key: ownerFilter.branch }; // manager: branch-scoped
-    if (activeRestaurant?.id) return { restaurant_id: activeRestaurant.id }; // owner: restaurant-scoped
-    return ownerFilter || {};
-  }, [ownerFilter, activeRestaurant?.id]);
-
+  // Canonical and legacy records are both restricted by restaurant server-side.
+  // The legacy path accepts only null-UUID rows of the selected branch key.
   const { data: expenses = [], isLoading } = useQuery({
-    queryKey: ['expenses', expenseFilter],
-    queryFn: () => base44.entities.Expense.filter(expenseFilter, '-date', 2000),
+    queryKey: ['expenses', activeRestaurant?.id, selectedBranchId],
+    queryFn: async () => {
+      if (!activeRestaurant?.id) return [];
+      const baseQuery = () => supabase.from('expenses').select('*')
+        .eq('restaurant_id', activeRestaurant.id)
+        .order('date', { ascending: false })
+        .limit(2000);
+      if (isAllBranches) {
+        const { data, error } = await baseQuery();
+        if (error) throw error;
+        return data || [];
+      }
+      if (!selectedBranchId || !selectedBranchKey) return [];
+      const [canonical, legacy] = await Promise.all([
+        baseQuery().eq('branch_id', selectedBranchId),
+        baseQuery().is('branch_id', null).eq('branch_key', selectedBranchKey),
+      ]);
+      if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+      return Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+        .map((record) => [record.id, record])).values());
+    },
     staleTime: 120000,
-    enabled: !!(expenseFilter?.created_by || expenseFilter?.branch_key || expenseFilter?.restaurant_id),
+    enabled: Boolean(activeRestaurant?.id),
   });
 
   const { data: categories = [] } = useExpenseCategories();
@@ -157,8 +176,10 @@ export default function Expenses() {
       const payload = {
         ...d,
         restaurant_id: resolvedRestaurantId,
-        // branch_key must not be empty string — use 'main' as fallback (matches DB default)
-        branch_key: d.branch_key || 'main',
+        // Use the selected branch key only when a branch is in scope. All-branch
+        // creation still requires an explicit form branch, never an unsafe fallback.
+        branch_key: d.branch_key || selectedBranchKey || '',
+        branch_id: d.branch_id || (selectedBranchId === 'all' ? null : selectedBranchId),
         // category_id must be null (not empty string) when not selected — UUID column
         category_id: d.category_id || null,
       };
@@ -264,7 +285,7 @@ export default function Expenses() {
     },
   });
 
-  const filtered = filterBranch === 'all' ? expenses : expenses.filter(e => e.branch_key === filterBranch || e.branch_key === 'all');
+  const filtered = expenses;
   const totalAmt = filtered.reduce((s, e) => s + (e.amount || 0), 0);
 
   return (
@@ -296,7 +317,13 @@ export default function Expenses() {
 
         <TabsContent value="list">
           <div className="mb-4">
-            <BranchSelect value={filterBranch} onChange={setFilterBranch} includeAll />
+            <BranchSelect
+              value={filterBranch}
+              onChange={(branchKey) => setSelectedBranchId(
+                branchKey === 'all' ? 'all' : branches.find((branch) => (branch.key || branch.branch_key) === branchKey)?.id || 'all'
+              )}
+              includeAll
+            />
           </div>
 
           {totalAmt > 0 && (
