@@ -57,7 +57,7 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
     expect(quickActions).toContain('lg:overflow-x-visible');
     expect(quickActions).not.toMatch(/sticky|absolute|bottom-0/);
     expect(owner).toContain("import QuickActionsDock from '@/components/dashboard/QuickActionsDock';");
-    expect(owner).toContain('<QuickActionsDock />');
+    expect(owner).toContain('<QuickActionsDock onOpenCopilot={() => setCopilotOpen(true)} />');
     expect(owner).toContain('pb-[calc(var(--quick-shortcuts-height)+1rem)]');
     expect(appLayout).not.toContain('QuickActionsDock');
     expect(bottomNav).toContain('fixed inset-x-0 bottom-0 z-50');

@@ -52,6 +52,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import PriceChangesWidget from '@/components/dashboard/PriceChangesWidget';
 import DriverPerformance from '@/components/dashboard/DriverPerformance';
 import QuickActionsDock from '@/components/dashboard/QuickActionsDock';
+import OwnerCopilotPanel from '@/components/dashboard/OwnerCopilotPanel';
 import CustomizeDashboardDialog from '@/components/dashboard/CustomizeDashboardDialog';
 import { useDashboardCustomization } from '@/hooks/useDashboardCustomization';
 import { getDashboardCustomizationCopy } from '@/lib/dashboardCustomization';
@@ -568,6 +569,7 @@ function OwnerDashboardContent() {
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [expandedSection, setExpandedSection] = useState(null);
   const [isDashboardCustomizerOpen, setDashboardCustomizerOpen] = useState(false);
+  const [isCopilotOpen, setCopilotOpen] = useState(false);
   const toggleSection = useCallback((sectionId) => {
     setExpandedSection((current) => current === sectionId ? null : sectionId);
   }, []);
@@ -2398,9 +2400,21 @@ function OwnerDashboardContent() {
         </DashboardAccordionSection>
       </WidgetErrorBoundary>
 
-      <QuickActionsDock />
+      <QuickActionsDock onOpenCopilot={() => setCopilotOpen(true)} />
       </div>
     </div>
+    <OwnerCopilotPanel
+      open={isCopilotOpen}
+      onOpenChange={setCopilotOpen}
+      restaurantId={activeRestaurant?.id}
+      selectedBranch={selectedBranch}
+      selectedBranchLabel={selectedBranchLabel}
+      role={role}
+      can={can}
+      currency={currency}
+      lang={lang}
+      userId={user?.id}
+    />
     {canCustomizeDashboard && (
       <CustomizeDashboardDialog
         open={isDashboardCustomizerOpen}
