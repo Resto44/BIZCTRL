@@ -1424,13 +1424,14 @@ function OwnerDashboardContent() {
       ══════════════════════════════════════════════════════════════════════ */}
       <div className="w-full min-w-0 max-w-full space-y-2">
         <BranchSelector
+          key={`branch-selector-${selectedBranchId}`}
           branches={branches}
           selectedBranch={selectedBranch}
           onSelect={setSelectedBranchId}
           t={t}
         />
         {/* Branch badge below selector */}
-        <div className="flex min-w-0 items-start gap-1.5 px-1">
+        <div key={`branch-badge-${selectedBranchId}`} className="flex min-w-0 items-start gap-1.5 px-1">
           {selectedBranch === 'all'
             ? <Globe className="w-3.5 h-3.5 text-primary" />
             : <MapPin className="w-3.5 h-3.5 text-primary" />
@@ -1444,7 +1445,7 @@ function OwnerDashboardContent() {
         </div>
       </div>
 
-      <div className="flex w-full min-w-0 max-w-full flex-col gap-6">
+      <div key={`branch-dashboard-${selectedBranchId}`} className="flex w-full min-w-0 max-w-full flex-col gap-6">
       {/* ══════════════════════════════════════════════════════════════════════
           DRIVER PERFORMANCE — restaurant-wide, branch-filter aware
       ══════════════════════════════════════════════════════════════════════ */}
