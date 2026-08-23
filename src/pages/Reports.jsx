@@ -18,6 +18,7 @@ import { useSalesSources } from '@/hooks/useSalesSources';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, Legend, AreaChart, Area,
@@ -119,13 +120,14 @@ function KPICard({ label, value, sub, trend, icon: Icon, color = 'blue' }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function Reports() {
   const { t, currency, lang, dir } = useLanguage();
-  const { branches, activeRestaurant } = useTenant();
+  const { branches, activeRestaurant, isBranchScoped } = useTenant();
   const {
     selectedBranchId,
     selectedBranchKey,
     selectedBranchLabel,
     isAllBranches,
     branchFilter,
+    setSelectedBranchId,
   } = useBranchScope();
   const { revenueSources, isLoading: loadingSources } = useSalesSources({
     branchId: isAllBranches ? undefined : selectedBranchId,
@@ -350,9 +352,27 @@ export default function Reports() {
   return (
     <div className="max-w-full overflow-x-hidden px-3 pb-8">
       <PageHeader title={t('erp_analytics')} action={PDFButton} />
-      <p className="mb-3 text-xs font-medium text-muted-foreground">
-        {isAllBranches ? 'Showing data for: All Branches' : `Showing data for: ${selectedBranchLabel}`}
-      </p>
+      <div className="mb-3 rounded-lg border bg-card p-3 sm:flex sm:items-end sm:justify-between sm:gap-3">
+        <div className="min-w-0 flex-1">
+          <label htmlFor="sales-analytics-branch" className="mb-1.5 block text-xs font-semibold text-foreground">Branch</label>
+          <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
+            <SelectTrigger id="sales-analytics-branch" className="w-full sm:max-w-sm">
+              <SelectValue placeholder="Select branch" />
+            </SelectTrigger>
+            <SelectContent>
+              {!isBranchScoped && <SelectItem value="all">All Branches</SelectItem>}
+              {(branches || []).map((branch) => (
+                <SelectItem key={branch.id} value={String(branch.id)}>
+                  {branch.name || branch.label || branch.branch_key || branch.key}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <p className="mt-2 text-xs font-medium text-muted-foreground sm:mb-2 sm:mt-0">
+          {isAllBranches ? 'Showing data for: All Branches' : `Showing data for: ${selectedBranchLabel}`}
+        </p>
+      </div>
 
       {pdfError && (
         <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
