@@ -32,11 +32,15 @@ describe('Owner AI Copilot contract', () => {
     expect(edge).toContain('erp_get_authenticated_portal_identity');
     expect(edge).toContain('erp_subscription_snapshot');
     expect(edge).toContain('BRANCH_SCOPE_DENIED');
-    expect(edge).toContain('OPENAI_API_KEY');
+    expect(edge).toContain('GEMINI_API_KEY');
+    expect(edge).toContain('AI_PROVIDER');
+    expect(edge).toContain('generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+    expect(edge).toContain('AI_COPILOT_PROVIDER_AUTH_FAILED');
     expect(edge).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
     expect(panel).toContain('ERP_NAV_GROUPS');
     expect(panel).toContain('availableModules');
     expect(panel).not.toContain('OPENAI_API_KEY');
+    expect(panel).not.toContain('GEMINI_API_KEY');
   });
 
   it('keeps business reads controlled and creates an expense only after explicit confirmation', async () => {

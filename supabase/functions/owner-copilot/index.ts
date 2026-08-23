@@ -2,10 +2,51 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const APP_ORIGIN = Deno.env.get("APP_URL") ?? "https://mybizctrl.site";
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-const MODEL = "gpt-5-mini";
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_HISTORY = 20;
+
+type ProviderName = "gemini" | "openai";
+type ProviderConfig = {
+  name: ProviderName;
+  apiKey: string | undefined;
+  endpoint: string;
+  model: string;
+};
+
+class ProviderCallError extends Error {
+  status: number;
+  provider: ProviderName;
+
+  constructor(message: string, status: number, provider: ProviderName) {
+    super(message);
+    this.name = "ProviderCallError";
+    this.status = status;
+    this.provider = provider;
+  }
+}
+
+function getProvider(): ProviderConfig {
+  const selected = String(Deno.env.get("AI_PROVIDER") || "gemini").trim().toLowerCase();
+  if (selected === "openai") {
+    return {
+      name: "openai",
+      apiKey: Deno.env.get("OPENAI_API_KEY"),
+      endpoint: Deno.env.get("OPENAI_CHAT_COMPLETIONS_URL") || "https://api.openai.com/v1/chat/completions",
+      model: Deno.env.get("OPENAI_MODEL") || "gpt-5-mini",
+    };
+  }
+  if (selected === "gemini") {
+    return {
+      name: "gemini",
+      apiKey: Deno.env.get("GEMINI_API_KEY"),
+      endpoint: Deno.env.get("GEMINI_OPENAI_BASE_URL") || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      // Flash-Lite is available on the Gemini free tier and is optimized for high-volume agentic tasks.
+      // Set GEMINI_MODEL to select a different compatible model without changing application code.
+      model: Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite",
+    };
+  }
+  throw new Error("AI_COPILOT_PROVIDER_UNSUPPORTED");
+}
 
 const corsHeaders = (origin: string | null) => ({
   "Access-Control-Allow-Origin": origin === APP_ORIGIN ? origin : APP_ORIGIN,
@@ -326,15 +367,40 @@ function systemPrompt(scope: Scope, language: Language) {
   return `You are BizCTRL AI Copilot for an authenticated ERP user. Reply only in ${language === "ar" ? "Arabic" : language === "fa" ? "Persian/Dari" : "English"}. Current role: ${scope.role}. Current branch scope: ${scope.branchName || "all authorized branches"}. Currency: ${scope.currency}. Canonical subscription snapshot: ${JSON.stringify(scope.subscription)}. Modules supplied directly from the current application registry: ${modules}. Use read tools for every question about business values; never invent numbers. If data is unavailable, say exactly that you do not have enough data. For access questions, call explain_module_access and make no promises beyond its facts. For create-expense requests, call prepare_create_expense only after the user has supplied a positive amount and clear description. Never say an expense was created until the application confirms it. Do not expose credentials, raw SQL, or cross-tenant data. Provide concise, professional product guidance for BizCTRL navigation based only on supplied modules.`;
 }
 
-async function callModel(messages: unknown[], tools: unknown[], toolChoice: "auto" | "none" = "auto") {
-  if (!OPENAI_API_KEY) throw new Error("AI_COPILOT_PROVIDER_NOT_CONFIGURED");
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+async function callModel(messages: unknown[], tools: unknown[] = []) {
+  const provider = getProvider();
+  if (!provider.apiKey) throw new ProviderCallError("AI_COPILOT_PROVIDER_NOT_CONFIGURED", 503, provider.name);
+
+  const payload: Record<string, unknown> = {
+    model: provider.model,
+    messages,
+    temperature: 0.2,
+    max_tokens: 900,
+  };
+  if (tools.length > 0) {
+    payload.tools = tools;
+    payload.tool_choice = "auto";
+  }
+
+  const response = await fetch(provider.endpoint, {
     method: "POST",
-    headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODEL, messages, tools, tool_choice: toolChoice, temperature: 0.2, max_completion_tokens: 900 }),
+    headers: { "Authorization": `Bearer ${provider.apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body?.error?.message || "AI_COPILOT_PROVIDER_UNAVAILABLE");
+  const responseText = await response.text();
+  const body = (() => {
+    try { return responseText ? JSON.parse(responseText) : {}; } catch { return {}; }
+  })();
+  if (!response.ok) {
+    const detail = trimText(body?.error?.message || body?.message || (typeof body?.error === "string" ? body.error : responseText) || "AI_COPILOT_PROVIDER_UNAVAILABLE", 500);
+    const code = response.status === 401 || response.status === 403
+      ? "AI_COPILOT_PROVIDER_AUTH_FAILED"
+      : response.status === 429
+        ? "AI_COPILOT_PROVIDER_RATE_LIMITED"
+        : "AI_COPILOT_PROVIDER_UNAVAILABLE";
+    console.error(`[owner-copilot:${provider.name}] ${response.status} ${detail}`);
+    throw new ProviderCallError(code, response.status === 429 ? 429 : 502, provider.name);
+  }
   return body?.choices?.[0]?.message;
 }
 
@@ -368,11 +434,14 @@ async function chat(caller: ReturnType<typeof createClient>, scope: Scope, userI
     if ((result as any)?.action_request_id) actionRequests.push(result);
     messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
   }
-  if ((modelMessage.tool_calls || []).length > 0) modelMessage = await callModel(messages, tools, "none");
+  // Gemini's OpenAI-compatible endpoint supports the original tool-call exchange;
+  // omit tools on the final synthesis request so the model returns a user-facing answer.
+  if ((modelMessage.tool_calls || []).length > 0) modelMessage = await callModel(messages);
   const reply = trimText(modelMessage?.content, 8000) || "I could not prepare a response from the authorized information.";
   await caller.from("copilot_messages").insert({ conversation_id: conversationId, restaurant_id: scope.restaurantId, user_id: userId, role: "assistant", content: reply, language, metadata: { action_request_ids: actionRequests.map((item) => item.action_request_id) } });
   await caller.from("copilot_conversations").update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", conversationId).eq("restaurant_id", scope.restaurantId).eq("user_id", userId);
-  return { conversation_id: conversationId, message: reply, action_requests: actionRequests, model: MODEL };
+  const provider = getProvider();
+  return { conversation_id: conversationId, message: reply, action_requests: actionRequests, provider: provider.name, model: provider.model };
 }
 
 async function confirmAction(caller: ReturnType<typeof createClient>, scope: Scope, userId: string, actionRequestId: unknown, decision: unknown) {
@@ -430,8 +499,15 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify(result), { status: 200, headers });
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI_COPILOT_UNAVAILABLE";
-    const status = ["UNAUTHENTICATED", "TENANT_SCOPE_DENIED", "BRANCH_SCOPE_DENIED", "CONVERSATION_SCOPE_DENIED"].includes(message) ? 403 : message === "MESSAGE_REQUIRED" ? 400 : 503;
+    const status = error instanceof ProviderCallError
+      ? error.status
+      : ["UNAUTHENTICATED", "TENANT_SCOPE_DENIED", "BRANCH_SCOPE_DENIED", "CONVERSATION_SCOPE_DENIED"].includes(message)
+        ? 403
+        : message === "MESSAGE_REQUIRED"
+          ? 400
+          : 503;
+    const provider = error instanceof ProviderCallError ? error.provider : undefined;
     console.error("[owner-copilot]", message);
-    return new Response(JSON.stringify({ error: message }), { status, headers });
+    return new Response(JSON.stringify({ error: message, ...(provider ? { provider } : {}) }), { status, headers });
   }
 });
