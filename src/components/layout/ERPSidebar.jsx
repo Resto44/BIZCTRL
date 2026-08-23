@@ -72,7 +72,9 @@ export const ERP_NAV_GROUPS = [
     label: 'Suppliers',
     items: [
       { path: '/suppliers',       label: 'Suppliers',       icon: Handshake,  permission: 'viewSuppliers' },
-      { path: '/supplier-portal', label: 'Supplier Portal', icon: Globe,      permission: 'viewSuppliers' },
+      // This is a supplier's self-service workspace, not an owner management page.
+      // Restricting the navigation item prevents an Owner from being sent to a supplier-only route.
+      { path: '/supplier-portal', label: 'Supplier Portal', icon: Globe,      permission: 'viewSuppliers', roles: ['supplier'] },
     ],
   },
   {
@@ -169,12 +171,15 @@ function NavItem({ item, collapsed, isActive, onNavigate, mobile = false }) {
 }
 
 // ─── Nav group ────────────────────────────────────────────────────────────────
-function NavGroup({ group, collapsed, location, can, onNavigate, mobile = false }) {
+function NavGroup({ group, collapsed, location, can, role, onNavigate, mobile = false }) {
   const [open, setOpen] = useState(true);
   const { translateLiteral } = useLanguage();
   const visibleItems = useMemo(
-    () => group.items.filter(item => !item.permission || can[item.permission]),
-    [group.items, can]
+    () => group.items.filter(item =>
+      (!item.permission || can[item.permission]) &&
+      (!item.roles || item.roles.includes(role))
+    ),
+    [group.items, can, role]
   );
   if (visibleItems.length === 0) return null;
 
@@ -316,6 +321,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
             collapsed={collapsed}
             location={location}
             can={can}
+            role={role}
             onNavigate={onNavigate}
             mobile={mobile}
           />
