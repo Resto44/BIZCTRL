@@ -26,11 +26,13 @@ import PageHeader from '@/components/shared/PageHeader';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 
 const COPY = {
   en: {
@@ -133,48 +135,67 @@ function NavigationEditor({ draft, setDraft }) {
 }
 
 function ProductFieldsEditor({ draft, setDraft }) {
+  const { savePatch, isSaving } = useWorkspaceCustomization();
   const productFields = draft.fields.products || [];
-  const update = (fields) => setDraft((current) => mergeWorkspaceCustomization(current, { fields: { products: fields } }));
-  const add = () => update([...productFields, { id: `field_${Date.now()}`, label: '', type: 'text', visible: true, required: false, searchable: false, sortable: false, filterable: false, order: productFields.length }]);
-  const updateField = (index, patch) => update(productFields.map((field, currentIndex) => currentIndex === index ? { ...field, ...patch } : field));
-  return (
-    <SectionCard title="Product custom fields" description="Define tenant-specific product attributes. Values are stored as validated product custom attributes and never alter canonical product, pricing, inventory, or accounting columns.">
-      <div className="space-y-3">
-        {productFields.map((field, index) => (
-          <div key={`${field.id}-${index}`} className="rounded-lg border border-border p-3">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div><Label>Field ID</Label><Input value={field.id} onChange={(event) => updateField(index, { id: event.target.value.replace(/[^a-zA-Z0-9_-]/g, '') })} maxLength={72} /></div>
-              <div><Label>Label</Label><Input value={field.label} onChange={(event) => updateField(index, { label: event.target.value })} maxLength={80} /></div>
-              <div><Label>Type</Label><Select value={field.type} onValueChange={(type) => updateField(index, { type })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{CUSTOM_FIELD_TYPES.map((type) => <SelectItem key={type} value={type}>{type.replace('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
-            </div>
-            {(field.type === 'multiselect') && <div className="mt-3"><Label>Options (comma separated)</Label><Input value={(field.options || []).join(', ')} onChange={(event) => updateField(index, { options: event.target.value.split(',').map((entry) => entry.trim()).filter(Boolean) })} /></div>}
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-              {['visible', 'required', 'searchable', 'sortable', 'filterable'].map((key) => <label className="flex items-center gap-2" key={key}><Checkbox checked={Boolean(field[key])} onCheckedChange={(checked) => updateField(index, { [key]: checked === true })} />{key}</label>)}
-              <Button type="button" variant="ghost" size="sm" className="ml-auto text-destructive" onClick={() => update(productFields.filter((_, currentIndex) => currentIndex !== index))}><Trash2 className="mr-1 h-4 w-4" />Remove</Button>
-            </div>
-          </div>
-        ))}
-        <Button type="button" variant="outline" onClick={add}><Plus className="mr-2 h-4 w-4" />Add product custom field</Button>
-      </div>
-    </SectionCard>
-  );
+  const [editor, setEditor] = useState(null);
+  const [fieldError, setFieldError] = useState('');
+  const newField = () => ({ id: '', label: '', type: 'text', required: false, active: true, visible: true, options: [], order: productFields.length });
+  const setEditorValue = (patch) => setEditor((current) => ({ ...current, field: { ...current.field, ...patch } }));
+  const persistFields = async (fields, message) => {
+    const normalizedFields = fields.map((field, index) => ({ ...field, order: Number.isFinite(Number(field.order)) ? Number(field.order) : index }));
+    try {
+      await savePatch({ fields: { products: normalizedFields } });
+      setDraft((current) => mergeWorkspaceCustomization(current, { fields: { products: normalizedFields } }));
+      toast.success(message);
+      return true;
+    } catch (saveError) {
+      console.error('Product custom field save failed', saveError);
+      toast.error(saveError?.message || 'Unable to save the product custom field.');
+      setFieldError(saveError?.message || 'Unable to save the product custom field.');
+      return false;
+    }
+  };
+  const openCreate = () => { setFieldError(''); setEditor({ mode: 'create', originalId: null, field: newField() }); };
+  const openEdit = (field) => { setFieldError(''); setEditor({ mode: 'edit', originalId: field.id, field: { ...field, options: field.options || [] } }); };
+  const saveField = async () => {
+    const field = { ...editor.field, id: editor.field.id.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_'), label: editor.field.label.trim(), options: (editor.field.options || []).map((option) => option.trim()).filter(Boolean) };
+    if (!field.id) { setFieldError('Field name is required.'); return; }
+    if (!field.label) { setFieldError('Label is required.'); return; }
+    if (!CUSTOM_FIELD_TYPES.includes(field.type)) { setFieldError('Choose a supported field type.'); return; }
+    if (['select', 'multiselect'].includes(field.type) && !field.options.length) { setFieldError('Dropdown fields require at least one option.'); return; }
+    if (field.required && field.visible === false) { setFieldError('A required field must remain visible on the product form.'); return; }
+    if (field.options.length !== new Set(field.options.map((option) => option.toLowerCase())).size) { setFieldError('Dropdown options must be unique.'); return; }
+    if (productFields.some((current) => current.id === field.id && current.id !== editor.originalId)) { setFieldError('Field name must be unique within this organization.'); return; }
+    const nextFields = editor.mode === 'edit' ? productFields.map((current) => current.id === editor.originalId ? field : current) : [...productFields, field];
+    if (await persistFields(nextFields, editor.mode === 'edit' ? 'Product custom field updated.' : 'Product custom field saved.')) setEditor(null);
+  };
+  const toggleActive = async (field) => persistFields(productFields.map((current) => current.id === field.id ? { ...current, active: !(current.active !== false) } : current), field.active === false ? 'Product custom field activated.' : 'Product custom field deactivated.');
+  const removeField = async (field) => {
+    if (!window.confirm(`Remove the ${field.label} definition? Existing product values are retained and are not deleted.`)) return;
+    await persistFields(productFields.filter((current) => current.id !== field.id), 'Product custom field definition removed. Existing product values were retained.');
+  };
+  return <SectionCard title="Product custom fields" description="Define tenant-specific product attributes. Every change is saved through the authorized organization configuration path; existing product values are kept in the canonical product custom-attributes column."><div className="space-y-3">{productFields.map((field) => <div key={field.id} className="rounded-lg border border-border p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-medium">{field.label}</p><p className="text-xs text-muted-foreground">{field.id} · {field.type.replace('_', ' ')} · order {field.order}</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" onClick={() => openEdit(field)}>Edit</Button><Button type="button" variant="outline" size="sm" disabled={isSaving} onClick={() => toggleActive(field)}>{field.active === false ? 'Activate' : 'Deactivate'}</Button><Button type="button" variant="ghost" size="sm" className="text-destructive" disabled={isSaving} onClick={() => removeField(field)}><Trash2 className="mr-1 h-4 w-4" />Delete</Button></div></div><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{field.required ? 'Required' : 'Optional'}</span><span>{field.active === false ? 'Inactive' : 'Active'}</span><span>{field.visible === false ? 'Hidden from product form' : 'Visible on product form'}</span>{field.options?.length ? <span>Options: {field.options.join(', ')}</span> : null}</div></div>)}{!productFields.length && <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">No custom product fields are configured for this organization.</p>}<Button type="button" variant="outline" onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Add product custom field</Button></div><Dialog open={Boolean(editor)} onOpenChange={(open) => { if (!open) { setEditor(null); setFieldError(''); } }}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle>{editor?.mode === 'edit' ? 'Edit product custom field' : 'Add product custom field'}</DialogTitle><DialogDescription>Configuration is stored only for the active organization and is applied to product create and edit forms.</DialogDescription></DialogHeader>{editor && <div className="grid gap-4 py-2"><div className="grid gap-3 sm:grid-cols-2"><div><Label>Field name</Label><Input value={editor.field.id} onChange={(event) => setEditorValue({ id: event.target.value })} placeholder="supplier_code" maxLength={72} /></div><div><Label>Label</Label><Input value={editor.field.label} onChange={(event) => setEditorValue({ label: event.target.value })} placeholder="Supplier Code" maxLength={80} /></div></div><div className="grid gap-3 sm:grid-cols-2"><div><Label>Field type</Label><Select value={editor.field.type} onValueChange={(type) => setEditorValue({ type, options: ['select', 'multiselect'].includes(type) ? editor.field.options : [] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{CUSTOM_FIELD_TYPES.map((type) => <SelectItem key={type} value={type}>{type.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div><div><Label>Display order</Label><Input type="number" min="0" value={editor.field.order} onChange={(event) => setEditorValue({ order: event.target.value })} /></div></div>{['select', 'multiselect'].includes(editor.field.type) && <div><Label>Options (one per line)</Label><Textarea value={(editor.field.options || []).join('\n')} onChange={(event) => setEditorValue({ options: event.target.value.split('\n') })} placeholder={'Preferred\nStandard\nPremium'} rows={4} /></div>}<div className="grid gap-3 sm:grid-cols-3"><label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"><span>Required</span><Switch checked={Boolean(editor.field.required)} onCheckedChange={(required) => setEditorValue({ required })} /></label><label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"><span>Active</span><Switch checked={editor.field.active !== false} onCheckedChange={(active) => setEditorValue({ active })} /></label><label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"><span>Visible</span><Switch checked={editor.field.visible !== false} onCheckedChange={(visible) => setEditorValue({ visible })} /></label></div>{fieldError && <Alert variant="destructive"><AlertTitle>Unable to save field</AlertTitle><AlertDescription>{fieldError}</AlertDescription></Alert>}</div>}<DialogFooter className="gap-2 sm:gap-0"><Button type="button" variant="outline" onClick={() => setEditor(null)}>Cancel</Button><Button type="button" disabled={isSaving} onClick={saveField}>{isSaving ? 'Saving…' : 'Save field'}</Button></DialogFooter></DialogContent></Dialog></SectionCard>;
 }
 
 function ProductFormEditor({ draft, setDraft }) {
+  const { savePatch, isSaving } = useWorkspaceCustomization();
   const settings = draft.forms.products;
   const hidden = new Set(settings.hidden_fields || []);
   const required = new Set(settings.required_fields || []);
-  const update = (patch) => setDraft((current) => mergeWorkspaceCustomization(current, { forms: { products: patch } }));
+  const update = async (patch) => {
+    const nextSettings = { ...settings, ...patch };
+    setDraft((current) => mergeWorkspaceCustomization(current, { forms: { products: nextSettings } }));
+    try {
+      await savePatch({ forms: { products: nextSettings } });
+      toast.success('Product form settings saved.');
+    } catch (saveError) {
+      console.error('Product form settings save failed', saveError);
+      toast.error(saveError?.message || 'Unable to save product form settings.');
+    }
+  };
   const setVisibility = (field, visible) => update({ hidden_fields: visible ? [...hidden].filter((value) => value !== field) : [...hidden, field] });
   const setRequired = (field, value) => update({ required_fields: value ? [...required, field] : [...required].filter((entry) => entry !== field) });
-  return (
-    <SectionCard title="Product form" description="Configure only supported optional product fields. The mandatory product name remains protected for data integrity.">
-      <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-sm"><thead><tr className="border-b text-left text-muted-foreground"><th className="pb-2 font-medium">Field</th><th className="pb-2 font-medium">Visible</th><th className="pb-2 font-medium">Required</th></tr></thead><tbody>{PRODUCT_FIELD_KEYS.map((field) => {
-        const isMandatory = field === 'name';
-        return <tr key={field} className="border-b last:border-0"><td className="py-2 capitalize">{field.replaceAll('_', ' ')}</td><td className="py-2"><Switch checked={isMandatory || !hidden.has(field)} disabled={isMandatory} onCheckedChange={(visible) => setVisibility(field, visible)} /></td><td className="py-2"><Switch checked={isMandatory || required.has(field)} disabled={isMandatory} onCheckedChange={(value) => setRequired(field, value)} /></td></tr>;
-      })}</tbody></table></div>
-    </SectionCard>
-  );
+  return <SectionCard title="Product form" description="Each switch is saved immediately for this organization. The mandatory product name remains protected for data integrity."><div className="overflow-x-auto"><table className="w-full min-w-[520px] text-sm"><thead><tr className="border-b text-left text-muted-foreground"><th className="pb-2 font-medium">Field</th><th className="pb-2 font-medium">Visible</th><th className="pb-2 font-medium">Required</th></tr></thead><tbody>{PRODUCT_FIELD_KEYS.map((field) => { const isMandatory = field === 'name'; return <tr key={field} className="border-b last:border-0"><td className="py-2 capitalize">{field.replaceAll('_', ' ')}</td><td className="py-2"><Switch checked={isMandatory || !hidden.has(field)} disabled={isMandatory || isSaving} onCheckedChange={(visible) => setVisibility(field, visible)} /></td><td className="py-2"><Switch checked={isMandatory || required.has(field)} disabled={isMandatory || isSaving} onCheckedChange={(value) => setRequired(field, value)} /></td></tr>; })}</tbody></table></div></SectionCard>;
 }
 
 function ProductTableEditor({ draft, setDraft }) {

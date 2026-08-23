@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import PageHeader from '@/components/shared/PageHeader';
-import ProductForm from '@/components/products/ProductForm';
+import ProductMasterForm from '@/components/products/ProductMasterForm';
 import EmptyState from '@/components/shared/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -110,21 +110,21 @@ export default function Products() {
       )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('add_product')}</DialogTitle>
           </DialogHeader>
-          <ProductForm onSubmit={handleSave} onCancel={() => setShowForm(false)} />
+          <ProductMasterForm onSubmit={handleSave} onCancel={() => setShowForm(false)} />
         </DialogContent>
       </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(open) => { if (!open) setEditing(null); }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('edit_product')}</DialogTitle>
           </DialogHeader>
           {editing && (
-            <ProductForm
+            <ProductMasterForm
               initial={editing}
               onSubmit={handleSave}
               onCancel={() => setEditing(null)}

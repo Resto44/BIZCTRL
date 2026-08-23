@@ -25,6 +25,9 @@ function CustomAttributeControl({ field, value, onChange }) {
   if (field.type === 'long_text') {
     return <div><>{label}</><Textarea value={value ?? ''} onChange={(event) => onChange(event.target.value)} required={field.required} placeholder={field.placeholder || undefined} rows={3} /></div>;
   }
+  if (field.type === 'select') {
+    return <div><>{label}</><Select value={value ?? '__none__'} onValueChange={(nextValue) => onChange(nextValue === '__none__' ? '' : nextValue)}><SelectTrigger><SelectValue placeholder={`Select ${field.label}`} /></SelectTrigger><SelectContent><SelectItem value="__none__">— Select —</SelectItem>{(field.options || []).map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select></div>;
+  }
   if (field.type === 'multiselect') {
     return <div><>{label}</><Input value={Array.isArray(value) ? value.join(', ') : value || ''} onChange={(event) => onChange(event.target.value.split(',').map((entry) => entry.trim()).filter(Boolean))} required={field.required} placeholder={field.options?.join(', ') || field.placeholder || undefined} /></div>;
   }
@@ -133,6 +136,11 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
       return;
     }
 
+    const customAttributes = { ...(form.custom_attributes || {}) };
+    productCustomFields.forEach((field) => {
+      if (field.type === 'boolean' && customAttributes[field.id] === undefined) customAttributes[field.id] = Boolean(field.default_value);
+    });
+
     onSubmit({
       name: form.name || form.name_en || form.name_ar,
       name_ar: form.name_ar || null,
@@ -160,7 +168,7 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
       status: form.status || 'active',
       is_active: form.status === 'active',
       restaurant_id: activeRestaurant?.id,
-      custom_attributes: form.custom_attributes || {},
+      custom_attributes: customAttributes,
     });
   };
 

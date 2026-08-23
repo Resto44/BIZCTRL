@@ -21,6 +21,7 @@ export const CUSTOM_FIELD_TYPES = Object.freeze([
   'date',
   'datetime',
   'boolean',
+  'select',
   'multiselect',
   'email',
   'phone',
@@ -110,6 +111,7 @@ function normalizeCustomField(field, index) {
       ? source.default_value
       : '',
     required: Boolean(source.required),
+    active: source.active !== false,
     visible: source.visible !== false,
     searchable: Boolean(source.searchable),
     sortable: Boolean(source.sortable),
@@ -245,7 +247,7 @@ export function isProductFieldRequired(config, fieldKey) {
 }
 
 export function getProductCustomFields(config) {
-  return safeArray(config?.fields?.products).filter((field) => field.visible !== false);
+  return safeArray(config?.fields?.products).filter((field) => field.active !== false && field.visible !== false);
 }
 
 export function getCustomizedNavigationGroups(groups, config) {
