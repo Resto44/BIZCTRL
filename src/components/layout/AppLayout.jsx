@@ -9,8 +9,9 @@
  *   - PWA install banner
  */
 import React, { useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+
 import ERPLayout from './ERPLayout';
+import OwnerWorkspaceTabs from './OwnerWorkspaceTabs';
 import NotificationPopups from '@/components/notifications/NotificationPopups.jsx';
 import { useAuth } from '@/lib/AuthContext';
 import { initAuditLogger } from '@/lib/auditLogger';
@@ -35,7 +36,7 @@ export default function AppLayout() {
       <RouteEnforcer />
       <div className="mx-auto w-full min-w-0 max-w-[1600px] px-4 py-4 lg:px-6">
         <SubscriptionStatusBanner />
-        <Outlet />
+        <OwnerWorkspaceTabs />
       </div>
       <NotificationPopups />
       <PWAInstallBanner />

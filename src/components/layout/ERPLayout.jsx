@@ -91,6 +91,7 @@ export default function ERPLayout({ children }) {
 
         {/* Page content */}
         <main
+          data-erp-page-viewport="true"
           className={cn(
             'flex-1 min-w-0 max-w-full overflow-y-auto',
             // Bottom padding on mobile accounts for BottomNav and iPhone safe-area.
