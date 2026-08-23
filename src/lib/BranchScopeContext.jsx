@@ -74,10 +74,16 @@ export function BranchScopeProvider({ children }) {
   const selectedBranchId = useMemo(() => {
     if (!restaurantId) return ALL_BRANCHES;
     if (managerBranchId) return managerBranchId;
-    return availableBranches.some((branch) => String(branch.id) === requestedBranchId)
-      ? requestedBranchId
+
+    // Persist first, then validate. The setter writes local storage in the same
+    // event as state, so this gives every mounted dashboard consumer one canonical
+    // UUID immediately even while a legacy parent rerender is still in flight.
+    const persistedId = normalizeBranchId(localStorage.getItem(key));
+    if (persistedId === ALL_BRANCHES) return ALL_BRANCHES;
+    return availableBranches.some((branch) => String(branch.id) === persistedId)
+      ? persistedId
       : ALL_BRANCHES;
-  }, [availableBranches, managerBranchId, requestedBranchId, restaurantId]);
+  }, [availableBranches, key, managerBranchId, requestedBranchId, restaurantId]);
 
   const selectedBranch = useMemo(
     () => availableBranches.find((branch) => String(branch.id) === selectedBranchId) || null,
