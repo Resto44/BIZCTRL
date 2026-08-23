@@ -21,6 +21,19 @@ describe('Owner AI Copilot contract', () => {
     expect(panel).toContain('overflow-y-auto overscroll-contain');
   });
 
+  it('keeps the mobile panel within the viewport without converting the Copilot page into a horizontal scroller', async () => {
+    const panel = await source('../src/components/dashboard/OwnerCopilotPanel.jsx');
+
+    expect(panel).toContain('fixed inset-0 z-[130] flex min-w-0 w-full max-w-full overflow-hidden box-border');
+    expect(panel).toContain('h-[100dvh] w-full min-w-0 max-w-full flex-col overflow-hidden');
+    expect(panel).toContain('flex-wrap items-center gap-1.5 overflow-visible');
+    expect(panel).toContain('md:flex-nowrap md:overflow-x-auto');
+    expect(panel).not.toContain('shrink-0 items-center gap-2 overflow-x-auto border-b');
+    expect(panel).toContain('w-full min-w-0 max-w-full shrink-0 border-t');
+    expect(panel).toContain('min-w-0 w-full max-h-28 min-h-10 flex-1');
+    expect(panel).toContain('[overflow-wrap:anywhere]');
+  });
+
   it('uses a server-side JWT-protected function and canonical tenant, subscription, branch, and route context', async () => {
     const [edge, panel] = await Promise.all([
       source('../supabase/functions/owner-copilot/index.ts'),

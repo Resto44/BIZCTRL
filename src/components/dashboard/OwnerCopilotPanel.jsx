@@ -275,10 +275,10 @@ export default function OwnerCopilotPanel({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[130] flex w-full max-w-full overflow-hidden" dir={dir} role="dialog" aria-modal="true" aria-label={copy.title}>
+    <div className="fixed inset-0 z-[130] flex min-w-0 w-full max-w-full overflow-hidden box-border" dir={dir} role="dialog" aria-modal="true" aria-label={copy.title}>
       <button type="button" className="hidden flex-1 bg-black/40 md:block" aria-label={copy.close} onClick={() => onOpenChange(false)} />
-      <section className="flex h-[100dvh] w-full min-w-0 max-w-full flex-col border-border bg-card shadow-2xl md:ms-auto md:max-w-xl md:border-s" aria-live="polite">
-        <header className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <section className="flex h-[100dvh] w-full min-w-0 max-w-full flex-col overflow-hidden border-border bg-card shadow-2xl box-border md:ms-auto md:max-w-xl md:border-s" aria-live="polite">
+        <header className="flex min-w-0 max-w-full shrink-0 items-center gap-2 overflow-hidden border-b border-border bg-card px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:gap-3 sm:px-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-cyan-500 text-white shadow-sm">
             <Sparkles className="h-5 w-5" />
           </div>
@@ -294,22 +294,22 @@ export default function OwnerCopilotPanel({
           </Button>
         </header>
 
-        <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-border px-3 py-2 [scrollbar-width:none]">
-          <Button variant="outline" size="sm" type="button" className="h-8 shrink-0 text-xs" onClick={() => setShowHistory((current) => !current)}>
+        <div className="flex min-w-0 max-w-full shrink-0 flex-wrap items-center gap-1.5 overflow-visible border-b border-border px-2 py-2 sm:gap-2 sm:px-3 md:flex-nowrap md:overflow-x-auto md:[scrollbar-width:none]">
+          <Button variant="outline" size="sm" type="button" className="h-auto min-h-8 max-w-full min-w-0 shrink whitespace-normal px-2 py-1 text-center text-[11px] leading-tight md:h-8 md:shrink-0 md:whitespace-nowrap md:px-3 md:py-0 md:text-xs" onClick={() => setShowHistory((current) => !current)}>
             <ChevronLeft className={`me-1 h-3.5 w-3.5 transition-transform ${showHistory ? 'rotate-[-90deg]' : 'rotate-0'}`} /> History
           </Button>
-          <Button variant="ghost" size="sm" type="button" className="h-8 shrink-0 text-xs" onClick={clearConversation} disabled={!messages.length}>
+          <Button variant="ghost" size="sm" type="button" className="h-auto min-h-8 max-w-full min-w-0 shrink whitespace-normal px-2 py-1 text-center text-[11px] leading-tight md:h-8 md:shrink-0 md:whitespace-nowrap md:px-3 md:py-0 md:text-xs" onClick={clearConversation} disabled={!messages.length}>
             <Trash2 className="me-1 h-3.5 w-3.5" /> {copy.clear}
           </Button>
           {QUICK_ACTIONS.map((action) => (
-            <Button key={action.path} variant="outline" size="sm" type="button" className="h-8 shrink-0 text-xs" onClick={() => leaveToAction(action.path)}>
+            <Button key={action.path} variant="outline" size="sm" type="button" className="h-auto min-h-8 max-w-full min-w-0 shrink whitespace-normal px-2 py-1 text-center text-[11px] leading-tight md:h-8 md:shrink-0 md:whitespace-nowrap md:px-3 md:py-0 md:text-xs" onClick={() => leaveToAction(action.path)}>
               {action.label}
             </Button>
           ))}
         </div>
 
         {showHistory && (
-          <div className="max-h-36 shrink-0 overflow-y-auto border-b border-border bg-muted/30 p-2">
+          <div className="max-h-36 min-w-0 max-w-full shrink-0 overflow-y-auto border-b border-border bg-muted/30 p-2">
             {history.length ? history.map((item) => (
               <button key={item.id} type="button" className="block w-full truncate rounded-md px-3 py-2 text-start text-xs font-medium text-foreground hover:bg-muted" onClick={() => loadConversation(item.id)}>
                 {item.title}
@@ -318,34 +318,34 @@ export default function OwnerCopilotPanel({
           </div>
         )}
 
-        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 pb-28">
+          <main className="min-h-0 min-w-0 max-w-full flex-1 overflow-y-auto overscroll-contain px-3 py-5 pb-28 sm:px-4">
           {!messages.length && (
-            <div className="mx-auto flex max-w-md flex-col items-center py-6 text-center">
+            <div className="mx-auto flex w-full min-w-0 max-w-md flex-col items-center py-6 text-center">
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300"><Bot className="h-7 w-7" /></div>
               <h3 className="text-lg font-black text-foreground">{copy.empty}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{copy.subtitle}</p>
               <div className="mt-5 flex w-full flex-wrap justify-center gap-2">
                 {suggestions.map((question) => (
-                  <button key={question} type="button" className="rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-muted" onClick={() => submit(question)}>
+                  <button key={question} type="button" className="max-w-full break-words rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-muted" onClick={() => submit(question)}>
                     {question}
                   </button>
                 ))}
               </div>
             </div>
           )}
-          <div className="mx-auto flex max-w-2xl flex-col gap-3">
+          <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-3">
             {messages.map((message) => (
-              <div key={message.id} className={message.role === 'user' ? 'ms-auto max-w-[88%]' : 'me-auto max-w-[92%]'}>
-                <div className={message.role === 'user' ? 'rounded-2xl rounded-se-sm bg-primary px-3 py-2 text-sm text-primary-foreground' : 'rounded-2xl rounded-ss-sm border border-border bg-muted/50 px-3 py-2 text-sm leading-6 text-foreground'}>
+              <div key={message.id} className={message.role === 'user' ? 'ms-auto min-w-0 max-w-[88%] sm:max-w-[92%]' : 'me-auto min-w-0 max-w-[92%] sm:max-w-[96%]'}>
+                <div className={message.role === 'user' ? 'min-w-0 break-words [overflow-wrap:anywhere] rounded-2xl rounded-se-sm bg-primary px-3 py-2 text-sm text-primary-foreground' : 'min-w-0 break-words [overflow-wrap:anywhere] rounded-2xl rounded-ss-sm border border-border bg-muted/50 px-3 py-2 text-sm leading-6 text-foreground'}>
                   {message.content}
                 </div>
                 {message.kind === 'action' && message.action && (
-                  <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+                  <div className="mt-2 min-w-0 max-w-full rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
                     <p className="font-bold">Create expense after confirmation</p>
-                    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-                      <dt className="text-amber-700 dark:text-amber-300">Amount</dt><dd>{currency}{Number(message.action.payload?.amount || 0).toLocaleString()}</dd>
-                      <dt className="text-amber-700 dark:text-amber-300">Branch</dt><dd>{message.action.payload?.branch_key}</dd>
-                      <dt className="text-amber-700 dark:text-amber-300">Description</dt><dd className="break-words">{message.action.payload?.description}</dd>
+                    <dl className="mt-2 grid min-w-0 grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-1">
+                      <dt className="text-amber-700 dark:text-amber-300">Amount</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{currency}{Number(message.action.payload?.amount || 0).toLocaleString()}</dd>
+                      <dt className="text-amber-700 dark:text-amber-300">Branch</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{message.action.payload?.branch_key}</dd>
+                      <dt className="text-amber-700 dark:text-amber-300">Description</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{message.action.payload?.description}</dd>
                     </dl>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button size="sm" type="button" variant="outline" onClick={() => decideAction(message.action.action_request_id, 'cancel')} disabled={processingActionId === message.action.action_request_id}>{copy.cancel}</Button>
@@ -357,15 +357,15 @@ export default function OwnerCopilotPanel({
                 )}
               </div>
             ))}
-            {loading && <div className="me-auto flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Thinking with authorized data…</div>}
-            {error && <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /> <span>{error}</span></div>}
+            {loading && <div className="me-auto flex min-w-0 max-w-full items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 shrink-0 animate-spin" /> <span className="min-w-0 break-words">Thinking with authorized data…</span></div>}
+            {error && <div className="flex min-w-0 max-w-full items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /> <span className="min-w-0 break-words [overflow-wrap:anywhere]">{error}</span></div>}
             <div ref={endRef} />
           </div>
         </main>
 
-        <form className="shrink-0 border-t border-border bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" onSubmit={(event) => { event.preventDefault(); submit(); }}>
-          <div className="flex items-end gap-2 rounded-2xl border border-input bg-background p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring">
-            <textarea value={input} onChange={(event) => setInput(event.target.value)} rows={1} maxLength={4000} className="max-h-28 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground" placeholder={copy.placeholder} aria-label={copy.placeholder} />
+        <form className="w-full min-w-0 max-w-full shrink-0 border-t border-border bg-card p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] box-border sm:p-3" onSubmit={(event) => { event.preventDefault(); submit(); }}>
+          <div className="flex min-w-0 max-w-full items-end gap-2 rounded-2xl border border-input bg-background p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring">
+            <textarea value={input} onChange={(event) => setInput(event.target.value)} rows={1} maxLength={4000} className="min-w-0 w-full max-h-28 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground" placeholder={copy.placeholder} aria-label={copy.placeholder} />
             <Button type="submit" size="icon" className="h-10 w-10 shrink-0 rounded-xl" disabled={!input.trim() || loading} aria-label={copy.send}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
