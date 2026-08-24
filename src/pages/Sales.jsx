@@ -41,6 +41,10 @@ const dailySalesTotal = (sale) =>
   Number(sale?.credit ?? 0) +
   Number(sale?.custom_sources_total ?? 0);
 
+// Drafts are work-in-progress records. Financial integrations are deliberately
+// deferred until the closing enters its explicit finalized lifecycle state.
+const shouldRunFinalizationSideEffects = (saleData) => saleData?.closing_state === 'finalized';
+
 export default function Sales() {
   const { t, currency, lang, dir, translateLiteral } = useLanguage();
   const { branches: tenantBranches, orgId, ownerFilter, activeRestaurant } = useTenant();
@@ -473,50 +477,41 @@ export default function Sales() {
       // 2. Wait for the returned Sale ID (Requirement 3)
       const saleId = sale.id;
 
-      // 3. Create sales_invoices using exactly that Sale ID (Requirement 4)
-      console.log('[Sales:createMut] 3. Creating sales_invoice...');
-      try {
-        const invoiceNum = data.invoice_number || await generateSalesInvoiceNumber(data.restaurant_id, data.date);
-        await createSalesInvoice({
-          invoiceNumber: invoiceNum,
-          saleId: saleId,
-          saleData: data,
-          restaurantId: data.restaurant_id,
-          createdBy: data.created_by || user?.email
-        });
-        console.log('[Sales:createMut] SUCCESS: sales_invoice created');
-      } catch (invErr) {
-        console.warn('[Sales:createMut] SKIPPED: Manual invoice creation failed:', invErr.message);
-      }
+      if (shouldRunFinalizationSideEffects(data)) {
+        // Finalization is the only lifecycle transition that creates financial
+        // integrations from this closing.
+        console.log('[Sales:createMut] 3. Creating sales_invoice...');
+        try {
+          const invoiceNum = data.invoice_number || await generateSalesInvoiceNumber(data.restaurant_id, data.date);
+          await createSalesInvoice({
+            invoiceNumber: invoiceNum,
+            saleId,
+            saleData: data,
+            restaurantId: data.restaurant_id,
+            createdBy: data.created_by || user?.email,
+          });
+          console.log('[Sales:createMut] SUCCESS: sales_invoice created');
+        } catch (invErr) {
+          console.warn('[Sales:createMut] SKIPPED: Manual invoice creation failed:', invErr.message);
+        }
 
-      // 4. Run secondary side-effects
-      console.log('[Sales:createMut] 4. Running side-effects...');
-      
-      console.log('[Sales:createMut] -> autoWalletTx...');
-      try { await autoWalletTx(data, saleId); console.log('[Sales:createMut] SUCCESS: autoWalletTx'); } catch (e) { console.error('[Sales:createMut] FAILED: autoWalletTx:', e.message); }
-      
-      console.log('[Sales:createMut] -> autoShortageOveageTx...');
-      try { await autoShortageOveageTx(data, saleId); console.log('[Sales:createMut] SUCCESS: autoShortageOveageTx'); } catch (e) { console.error('[Sales:createMut] FAILED: autoShortageOveageTx:', e.message); }
-      
-      console.log('[Sales:createMut] -> autoOwnerCapitalTx...');
-      try { await autoOwnerCapitalTx(data, saleId); console.log('[Sales:createMut] SUCCESS: autoOwnerCapitalTx'); } catch (e) { console.error('[Sales:createMut] FAILED: autoOwnerCapitalTx:', e.message); }
-      
-      console.log('[Sales:createMut] -> autoSettle...');
-      try { await autoSettle(data, saleId, proofUrl || null, ocr || null, null); console.log('[Sales:createMut] SUCCESS: autoSettle'); } catch (e) { console.warn('[Sales:createMut] SKIPPED: autoSettle:', e.message); }
-      
-      console.log('[Sales:createMut] -> autoSaveCreditDebts...');
-      try { await autoSaveCreditDebts(data, saleId); console.log('[Sales:createMut] SUCCESS: autoSaveCreditDebts'); } catch (e) { console.error('[Sales:createMut] FAILED: autoSaveCreditDebts:', e.message); }
-      
-      // 5. Finalize invoice (PDF generation etc) — SILENT BACKGROUND TASK
-      console.log('[Sales:createMut] 5. Finalizing invoice...');
-      autoGenerateInvoice(data, saleId);
-      
-      const total = dailySalesTotal(data);
-      try {
-        await notif.sale({ branch: data.branch, amount: total, action: 'create' });
-        console.log('[Sales:createMut] SUCCESS: notification sent');
-      } catch (e) {
-        console.warn('[Sales:createMut] SKIPPED: notification failed:', e.message);
+        console.log('[Sales:createMut] 4. Running finalized side-effects...');
+        try { await autoWalletTx(data, saleId); } catch (e) { console.error('[Sales:createMut] FAILED: autoWalletTx:', e.message); }
+        try { await autoShortageOveageTx(data, saleId); } catch (e) { console.error('[Sales:createMut] FAILED: autoShortageOveageTx:', e.message); }
+        try { await autoOwnerCapitalTx(data, saleId); } catch (e) { console.error('[Sales:createMut] FAILED: autoOwnerCapitalTx:', e.message); }
+        try { await autoSettle(data, saleId, proofUrl || null, ocr || null, null); } catch (e) { console.warn('[Sales:createMut] SKIPPED: autoSettle:', e.message); }
+        try { await autoSaveCreditDebts(data, saleId); } catch (e) { console.error('[Sales:createMut] FAILED: autoSaveCreditDebts:', e.message); }
+
+        // Finalize invoice (PDF generation etc) — silent background task.
+        autoGenerateInvoice(data, saleId);
+        const total = dailySalesTotal(data);
+        try {
+          await notif.sale({ branch: data.branch, amount: total, action: 'create' });
+        } catch (e) {
+          console.warn('[Sales:createMut] SKIPPED: notification failed:', e.message);
+        }
+      } else {
+        console.log('[Sales:createMut] Draft saved without finalized financial side-effects.');
       }
       
       console.log('[Sales:createMut] mutationFn COMPLETED');
@@ -557,18 +552,22 @@ export default function Sales() {
         throw new Error('Only the restaurant Owner or assigned Branch Manager can edit a Driver Sale.');
       }
       const sale = await base44.entities.DailySales.update(id, data);
-      await autoWalletTx(data, id, prev);
-      // FIX 5: Update treasury transaction for approved shortage/overage
-      await autoShortageOveageTx(data, id);
-      // Rule 6: Update Owner Capital Contribution treasury entry if purchases > sales
-      await autoOwnerCapitalTx(data, id);
-      try { await autoSettle(data, id, proofUrl || null, ocr || null, prev); } catch (e) { console.warn('autoSettle skipped:', e.message); }
-      // Save customer credit entries to Debt Management (single source of truth)
-      await autoSaveCreditDebts(data, id);
-      // Re-generate invoice on update (upsert by invoice_number) — SILENT BACKGROUND TASK
-      autoGenerateInvoice({ ...data, invoice_number: prev?.invoice_number }, id);
-      const total = (data.restaurant_cash || 0) + (data.restaurant_network || 0) + (data.credit || 0);
-      await notif.sale({ branch: data.branch, amount: total, action: 'update' });
+      if (shouldRunFinalizationSideEffects(data)) {
+        await autoWalletTx(data, id, prev);
+        // Update treasury transaction for approved shortage/overage.
+        await autoShortageOveageTx(data, id);
+        // Update Owner Capital Contribution treasury entry if purchases exceed sales.
+        await autoOwnerCapitalTx(data, id);
+        try { await autoSettle(data, id, proofUrl || null, ocr || null, prev); } catch (e) { console.warn('autoSettle skipped:', e.message); }
+        // Debt Management remains the single source of truth for finalized credit sales.
+        await autoSaveCreditDebts(data, id);
+        // Re-generate invoice on finalization/update — silent background task.
+        autoGenerateInvoice({ ...data, invoice_number: prev?.invoice_number }, id);
+        const total = (data.restaurant_cash || 0) + (data.restaurant_network || 0) + (data.credit || 0);
+        await notif.sale({ branch: data.branch, amount: total, action: 'update' });
+      } else {
+        console.log('[Sales:updateMut] Draft saved without finalized financial side-effects.');
+      }
       return sale;
     },
     onSuccess: () => {

@@ -89,4 +89,32 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('Retry ERP data load');
     expect(workspace).toContain('disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || !allValid}');
   });
+
+  it('persists Drafts without producing invoice, wallet, settlement, debt, or notification side effects before Finalize', async () => {
+    const sales = await source('../src/pages/Sales.jsx');
+
+    expect(sales).toContain("const shouldRunFinalizationSideEffects = (saleData) => saleData?.closing_state === 'finalized';");
+    expect((sales.match(/if \(shouldRunFinalizationSideEffects\(data\)\)/g) || []).length).toBe(2);
+    expect(sales).toContain('Draft saved without finalized financial side-effects.');
+
+    const createGuard = sales.indexOf('if (shouldRunFinalizationSideEffects(data))');
+    const createInvoice = sales.indexOf('await createSalesInvoice');
+    const createWallet = sales.indexOf('await autoWalletTx(data, saleId)');
+    const createSettlement = sales.indexOf('await autoSettle(data, saleId');
+    const createDebt = sales.indexOf('await autoSaveCreditDebts(data, saleId)');
+    expect(createGuard).toBeGreaterThan(-1);
+    expect(createInvoice).toBeGreaterThan(createGuard);
+    expect(createWallet).toBeGreaterThan(createGuard);
+    expect(createSettlement).toBeGreaterThan(createGuard);
+    expect(createDebt).toBeGreaterThan(createGuard);
+
+    const updateGuard = sales.indexOf('if (shouldRunFinalizationSideEffects(data))', createGuard + 1);
+    const updateWallet = sales.indexOf('await autoWalletTx(data, id, prev)');
+    const updateSettlement = sales.indexOf('await autoSettle(data, id');
+    const updateDebt = sales.indexOf('await autoSaveCreditDebts(data, id)');
+    expect(updateGuard).toBeGreaterThan(createGuard);
+    expect(updateWallet).toBeGreaterThan(updateGuard);
+    expect(updateSettlement).toBeGreaterThan(updateGuard);
+    expect(updateDebt).toBeGreaterThan(updateGuard);
+  });
 });
