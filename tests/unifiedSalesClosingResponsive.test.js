@@ -118,6 +118,16 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(updateDebt).toBeGreaterThan(updateGuard);
   });
 
+  it('keeps finalized invoice totals aligned with the canonical Other payment total', async () => {
+    const migration = await source('../src/supabase/20260824_sales_invoice_other_sales_alignment.sql');
+
+    expect(migration).toContain('ADD COLUMN IF NOT EXISTS other_sales NUMERIC NOT NULL DEFAULT 0');
+    expect(migration).toContain('v_other_sales   := COALESCE(NEW.custom_sources_total, 0);');
+    expect(migration).toContain('v_sales_total   := v_cash_sales + v_network_sales + v_credit_sales + v_other_sales;');
+    expect(migration).toContain('cash_sales, network_sales, credit_sales, other_sales, sales_total');
+    expect(migration).toContain('other_sales         = EXCLUDED.other_sales');
+  });
+
   it('enforces the same Draft boundary in database triggers so server-side invoice and cash effects wait for Finalize', async () => {
     const migration = await source('../src/supabase/20260824_draft_finalization_side_effect_guards.sql');
 
