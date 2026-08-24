@@ -29,7 +29,7 @@ describe('Daily Sales manager attribution', () => {
     expect(workspace).toContain('restaurant_cash: cashSales');
     expect(workspace).toContain('restaurant_network: networkTotal');
     expect(workspace).toContain('credit: creditTotal');
-    expect(workspace).toContain('custom_sources_total: customTotal');
+    expect(workspace).toContain('custom_sources_total: otherPaymentTotal');
     expect(salesPage).toContain("import { filterDailySalesRecords, toDailySalesCardRecord } from '@/lib/dailySalesPresentation';");
     expect(salesPage).toContain('sale={toDailySalesCardRecord(s)}');
     expect(salesPage).toContain("queryKey: ['sales', activeRestaurant?.id, selectedBranchId]");

@@ -4,70 +4,68 @@ import { readFile } from 'node:fs/promises';
 const source = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 describe('Quick Sales Closing workflow contract', () => {
-  it('renders every closing group in one continuous scrollable workspace without accordion interaction', async () => {
+  it('uses one compact, continuous mobile-first closing workflow instead of the former nine-step form', async () => {
     const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
 
+    expect(workspace).toContain('Daily Sales Closing');
+    expect(workspace).toContain("data-testid=\"quick-closing-auto-summary\"");
+    expect(workspace).toContain('Daily Closing Summary');
     expect(workspace).toContain('touch-pan-y overflow-y-auto overscroll-contain');
-    expect(workspace).toContain('grid grid-rows-[1fr] opacity-100');
-    expect(workspace).toContain('title="Sales Entry"');
-    expect(workspace).toContain('title="Cash Reconciliation"');
-    expect(workspace).toContain('title="Operating Result"');
-    expect(workspace).not.toContain('activeSection === key ? null : key');
+    expect(workspace).toContain('grid grid-cols-1 gap-3 lg:grid-cols-2');
+    expect(workspace).toContain('pb-[calc(env(safe-area-inset-bottom)+6.5rem)]');
+    expect(workspace).toContain('env(safe-area-inset-bottom)+0.75rem');
+    expect(workspace).not.toContain('100vw');
   });
 
-  it('keeps the primary fields and totals auto-calculated for fast entry', async () => {
+  it('loads existing sales, POS and cash-register data automatically in restaurant, branch and date scope', async () => {
     const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
 
-    expect(workspace).toContain('label="Cash Sales"');
-    expect(workspace).toContain('label="Card / Network Sales"');
-    expect(workspace).toContain('label="Other Payment"');
-    expect(workspace).toContain('label="Total Sales"');
-    expect(workspace).toContain('cashSales + networkTotal + creditTotal + customTotal');
+    expect(workspace).toContain("queryKey: ['quick_closing_automatic_sources'");
+    expect(workspace).toContain("from('daily_cash_settlements')");
+    expect(workspace).toContain("scoped('payments'");
+    expect(workspace).toContain("from('pos_reconciliation')");
+    expect(workspace).toContain(".eq('restaurant_id', activeRestaurant.id)");
+    expect(workspace).toContain(".eq('branch_id', selectedBranchId)");
+    expect(workspace).toContain(".eq('date', form.date)");
+    expect(workspace).toContain('Record sales at POS first.');
+    expect(workspace).toContain('Exceptional Cash Adjustment');
+  });
+
+  it('calculates total sales, cash reconciliation, purchases, expenses and operating result automatically', async () => {
+    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+
+    expect(workspace).toContain('cashSales + networkTotal + creditTotal + otherPaymentTotal');
     expect(workspace).toContain('actualCount - expectedCash');
     expect(workspace).toContain('totalSales - approvedPurchasesTotal - expensesTotal');
+    expect(workspace).toContain('expected_closing_cash');
+    expect(workspace).toContain('Actual Cash');
+    expect(workspace).toContain('Cash balanced.');
   });
 
-  it('loads existing purchases and expenses by secure restaurant and branch scope without duplicate entry', async () => {
+  it('uses accessible numeric inputs, stable currency presentation and a non-obstructive sticky action area', async () => {
     const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+
+    expect(workspace).toContain('inputMode="decimal"');
+    expect(workspace).toContain('dir="ltr"');
+    expect(workspace).toContain('tabular-nums');
+    expect(workspace).toContain('whitespace-nowrap');
+    expect(workspace).toContain('className="border-t border-border bg-background/95');
+    expect(workspace).toContain('Save Daily Closing');
+  });
+
+  it('preserves scoped purchase and expense loading, inline validation, and duplicate-closing protection', async () => {
+    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+    const sales = await source('../src/pages/Sales.jsx');
 
     expect(workspace).toContain("queryKey: ['approved_purchases_for_date'");
     expect(workspace).toContain("queryKey: ['closing_expenses_for_date'");
     expect(workspace).toContain(".from('expenses')");
-    expect(workspace).toContain(".eq('restaurant_id', activeRestaurant.id)");
-    expect(workspace).toContain('const expensesTotal = useMemo');
-    expect(workspace).toContain('Paid Purchases');
-    expect(workspace).toContain('Credit Purchases');
-  });
-
-  it('uses inline validation, safe mobile spacing and a sticky save action', async () => {
-    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
-
     expect(workspace).toContain("nextErrors.actualCash = 'Actual Cash is required.'");
-    expect(workspace).toContain("nextErrors.credit = 'Credit customer is required.'");
     expect(workspace).toContain('focusField(firstError)');
-    expect(workspace).toContain('pb-[calc(env(safe-area-inset-bottom)+6.5rem)]');
-    expect(workspace).toContain('h-full min-h-0 min-w-0 flex-col');
-    expect(workspace).toContain('[-webkit-overflow-scrolling:touch]');
-    expect(workspace).toContain('dir="ltr"');
-    expect(workspace).toContain("{currency}{'\\u00A0'}{");
-    expect(workspace).toContain('sticky bottom-0 z-20');
-    expect(workspace).not.toContain('100vw');
-
-    const sales = await source('../src/pages/Sales.jsx');
-    expect(sales).toContain('h-[calc(100dvh-1rem)] min-h-0');
-    expect(sales).toContain('flex min-h-0 min-w-0 flex-1 overflow-hidden');
-  });
-
-  it('keeps existing security and prevents a duplicate finalized closing before save', async () => {
-    const sales = await source('../src/pages/Sales.jsx');
-    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
-
+    expect(workspace).toContain('Closing already completed for this branch and shift.');
     expect(sales).toContain(".eq('restaurant_id', data.restaurant_id)");
     expect(sales).toContain(".eq('date', data.date)");
     expect(sales).toContain(".eq('shift', data.shift)");
     expect(sales).toContain('_alreadyExists: true');
-    expect(workspace).toContain('Closing already exists for this branch and shift.');
-    expect(workspace).toContain('Daily closing saved successfully.');
-    expect(workspace).toContain('Save Daily Closing');
   });
 });

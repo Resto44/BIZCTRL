@@ -196,6 +196,21 @@ const NumInput = memo(function NumInput({ id, label, value, onChange, required, 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MONEY — stable currency/number pairing for RTL and narrow screens
+// ─────────────────────────────────────────────────────────────────────────────
+const Money = memo(function Money({ currency, value, className = '', signed = false }) {
+  const amount = Number(value) || 0;
+  const sign = signed && amount > 0 ? '+' : amount < 0 ? '−' : '';
+  return (
+    <span className={`inline-flex items-baseline gap-1 whitespace-nowrap tabular-nums ${className}`} dir="ltr">
+      {sign && <span>{sign}</span>}
+      <span className="text-[0.78em] font-semibold tracking-wide opacity-75">{currency}</span>
+      <span>{Math.abs(amount).toLocaleString()}</span>
+    </span>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // KPI CARD — Large ERP style
 // ─────────────────────────────────────────────────────────────────────────────
 const KPICard = memo(function KPICard({ label, value, sublabel, icon: Icon, colorClass = 'text-primary', bgClass = 'bg-primary/10', trend, loading }) {
@@ -448,17 +463,6 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   const [inlineErrors, setInlineErrors] = useState({});
   const [savedClosing, setSavedClosing] = useState(null);
 
-  // ── Legacy section state is retained only for compatibility with existing markup.
-  // The redesigned workspace renders every group continuously without accordion clicks.
-
-  // All cards begin compact. Keeping their bodies mounted prevents input state,
-  // queries, and calculations from being lost when a Manager changes sections.
-  const [activeSection, setActiveSection] = useState(null);
-  const isSectionOpen = useCallback((key) => activeSection === key, [activeSection]);
-  const toggleSection = useCallback((key) => {
-    setActiveSection((current) => current === key ? null : key);
-  }, []);
-
   // ── Form meta state ───────────────────────────────────────────────────────
   const [form, setForm] = useState({
     date: initial?.date || format(new Date(), 'yyyy-MM-dd'),
@@ -606,22 +610,6 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
     customSources.reduce((s, src) => s + (Number(customSourceAmounts[src.id]) || 0), 0),
     [customSources, customSourceAmounts]
   );
-  const sectionNumbers = useMemo(() => {
-    const hasCustomSources = customSources.length > 0;
-    return {
-      shift: '1',
-      summary: '2',
-      pos: '3',
-      credit: '4',
-      custom: '5',
-      purchases: String(hasCustomSources ? 6 : 5),
-      reconciliation: String(hasCustomSources ? 7 : 6),
-      operating: String(hasCustomSources ? 8 : 7),
-      validation: String(hasCustomSources ? 9 : 8),
-      save: String(hasCustomSources ? 10 : 9),
-    };
-  }, [customSources.length]);
-
   // ── Employees ─────────────────────────────────────────────────────────────
   const { data: employeesData, isLoading: empLoading } = useQuery({
     queryKey: ['employees_cashiers', activeRestaurant?.id, ownerFilter?.created_by, ownerFilter?.branch, form.branch, selectedBranchId],
@@ -835,27 +823,20 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   // ── Approved Purchases ────────────────────────────────────────────────────
   // BUG FIX: Approved purchases query must work for both Owner (created_by) and
   // Manager (restaurant_id + branch). When isManager, scope by restaurant_id and branch.
-  const purchasesEnabled = isManager
-    ? !!activeRestaurant?.id && !!form.date
-    : !!ownerFilter?.created_by && !!form.date;
+  const purchasesEnabled = !!activeRestaurant?.id && !!form.date && !!form.branch;
 
   const { data: approvedPurchasesForDateData, isLoading: purchasesLoading } = useQuery({
     queryKey: ['approved_purchases_for_date', ownerFilter?.created_by, form.date, activeRestaurant?.id, form.branch],
     queryFn: async () => {
-      if (!form.date) return [];
+      if (!activeRestaurant?.id || !form.date || !form.branch) return [];
       let q = supabase
         .from('supplier_invoices')
         .select('id, total_amount, paid_amount, approval_status, date, supplier_name, branch')
+        .eq('restaurant_id', activeRestaurant.id)
         .eq('date', form.date)
         .in('approval_status', ['approved', 'auto_approved'])
         .limit(100);
-      if (isManager) {
-        q = q.eq('restaurant_id', activeRestaurant.id);
-        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
-      } else {
-        if (!ownerFilter?.created_by) return [];
-        q = q.eq('created_by', ownerFilter.created_by);
-      }
+      if (form.branch !== 'all') q = q.eq('branch', form.branch);
       const { data, error } = await q;
       if (error) return [];
       return asRecordArray(data);
@@ -869,20 +850,15 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   const { data: pendingPurchasesData, isLoading: pendingLoading } = useQuery({
     queryKey: ['pending_purchases_for_date', ownerFilter?.created_by, form.date, activeRestaurant?.id, form.branch],
     queryFn: async () => {
-      if (!form.date) return [];
+      if (!activeRestaurant?.id || !form.date || !form.branch) return [];
       let q = supabase
         .from('supplier_invoices')
         .select('id, total_amount, approval_status, date, supplier_name')
+        .eq('restaurant_id', activeRestaurant.id)
         .eq('date', form.date)
         .in('approval_status', ['pending'])
         .limit(50);
-      if (isManager) {
-        q = q.eq('restaurant_id', activeRestaurant.id);
-        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
-      } else {
-        if (!ownerFilter?.created_by) return [];
-        q = q.eq('created_by', ownerFilter.created_by);
-      }
+      if (form.branch !== 'all') q = q.eq('branch', form.branch);
       const { data, error } = await q;
       if (error) return [];
       return asRecordArray(data);
@@ -922,262 +898,146 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   });
   const expensesForDate = asRecordArray(expensesForDateData);
 
-  // ── Real daily_sales for Live Sales Summary ─────────────────────────────────
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-  const monthStartStr = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-
-  // BUG FIX: Live Sales Summary queries must work for both Owner (created_by) and
-  // Manager (branch-scoped). When isManager, use branch filter; otherwise use created_by.
-  const liveSalesEnabled = isManager ? !!activeRestaurant?.id && !!form.branch : !!ownerFilter?.created_by;
-
-  // Today's real sales from daily_sales (all branches or selected branch)
-  const { data: realTodaySalesData, isLoading: realTodayLoading } = useQuery({
-    queryKey: ['sales_today_live', ownerFilter?.created_by, todayStr, form.branch, activeRestaurant?.id],
+  // ── Automatic closing sources (cash register, POS and recorded payments) ──
+  // Every read is scoped by the active restaurant, branch and business date. The
+  // closing form uses these ERP records as its primary source; manual values are
+  // exceptional adjustments only, never a required re-entry step.
+  const automaticClosingEnabled = Boolean(activeRestaurant?.id && form.date && form.branch && !initial?.id);
+  const { data: automaticClosingData, isLoading: automaticClosingLoading } = useQuery({
+    queryKey: ['quick_closing_automatic_sources', activeRestaurant?.id, selectedBranchId, form.branch, form.date],
+    enabled: automaticClosingEnabled,
+    staleTime: 15000,
     queryFn: async () => {
-      let q = supabase
-        .from('daily_sales')
-        .select('restaurant_cash, restaurant_network, credit, cash, network, branch, sales_sources_json, custom_sources_total')
-        .eq('date', todayStr)
-        .limit(50);
-      if (isManager) {
-        q = q.eq('restaurant_id', activeRestaurant.id);
-        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
-      } else {
-        if (!ownerFilter?.created_by) return [];
-        q = q.eq('created_by', ownerFilter.created_by);
-        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
-      }
-      const { data, error } = await q;
-      if (error) return [];
-      return asRecordArray(data);
+      const nextDate = format(new Date(`${form.date}T12:00:00`), 'yyyy-MM-dd');
+      const nextDay = new Date(`${nextDate}T12:00:00`);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const endDate = format(nextDay, 'yyyy-MM-dd');
+      const allowAllBranches = form.branch === 'all' && !isManager;
+      const scoped = (table, columns, dateColumn, legacyBranchColumn = 'branch') => {
+        const base = () => supabase.from(table)
+          .select(columns)
+          .eq('restaurant_id', activeRestaurant.id)
+          .gte(dateColumn, `${form.date}T00:00:00`)
+          .lt(dateColumn, `${endDate}T00:00:00`)
+          .limit(200);
+        if (allowAllBranches) return [base()];
+        return [
+          selectedBranchId ? base().eq('branch_id', selectedBranchId) : Promise.resolve({ data: [], error: null }),
+          base().is('branch_id', null).eq(legacyBranchColumn, form.branch),
+        ];
+      };
+      const settlementBase = () => supabase.from('daily_cash_settlements')
+        .select('id, opening_cash, cash_sales, expected_closing_cash, cash_counted, status, branch, branch_id, created_date')
+        .eq('restaurant_id', activeRestaurant.id)
+        .eq('date', form.date)
+        .limit(10);
+      const posBase = () => supabase.from('pos_reconciliation')
+        .select('id, expected_amount, actual_amount, date, branch, branch_id, device_id')
+        .eq('restaurant_id', activeRestaurant.id)
+        .eq('date', form.date)
+        .limit(100);
+      const creditBase = () => supabase.from('debt_records')
+        .select('id, total_amount, date, branch, branch_id, party_name')
+        .eq('restaurant_id', activeRestaurant.id)
+        .eq('date', form.date)
+        .eq('type', 'receivable')
+        .eq('party_type', 'customer')
+        .limit(100);
+      const settlementQueries = allowAllBranches
+        ? [settlementBase()]
+        : [
+            selectedBranchId ? settlementBase().eq('branch_id', selectedBranchId) : Promise.resolve({ data: [], error: null }),
+            settlementBase().is('branch_id', null).eq('branch', form.branch),
+          ];
+      const posQueries = allowAllBranches
+        ? [posBase()]
+        : [
+            selectedBranchId ? posBase().eq('branch_id', selectedBranchId) : Promise.resolve({ data: [], error: null }),
+            posBase().is('branch_id', null).eq('branch', form.branch),
+          ];
+      const creditQueries = allowAllBranches
+        ? [creditBase()]
+        : [
+            selectedBranchId ? creditBase().eq('branch_id', selectedBranchId) : Promise.resolve({ data: [], error: null }),
+            creditBase().is('branch_id', null).eq('branch', form.branch),
+          ];
+      const [settlementResults, paymentResults, posResults, creditResults] = await Promise.all([
+        Promise.all(settlementQueries),
+        Promise.all(scoped('payments', 'id, amount, payment_method, status, created_date, branch, branch_id', 'created_date')),
+        Promise.all(posQueries),
+        Promise.all(creditQueries),
+      ]);
+      const merge = (...results) => asRecordArray(Array.from(new Map(results.flatMap((result) => asRecordArray(result?.data)).map((record) => [record.id, record])).values()));
+      return {
+        settlements: merge(...settlementResults),
+        payments: merge(...paymentResults),
+        pos: merge(...posResults),
+        credit: merge(...creditResults),
+      };
     },
-    staleTime: 10000,
-    enabled: liveSalesEnabled,
   });
-  const realTodaySales = asRecordArray(realTodaySalesData);
-
-  // Yesterday's real sales from daily_sales
-  const { data: realYesterdaySalesData } = useQuery({
-    queryKey: ['sales_yesterday_live', ownerFilter?.created_by, yesterdayStr, form.branch, activeRestaurant?.id],
-    queryFn: async () => {
-      let q = supabase
-        .from('daily_sales')
-        .select('restaurant_cash, restaurant_network, credit, cash, network, branch, sales_sources_json, custom_sources_total')
-        .eq('date', yesterdayStr)
-        .limit(50);
-      if (isManager) {
-        q = q.eq('restaurant_id', activeRestaurant.id);
-        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
-      } else {
-        if (!ownerFilter?.created_by) return [];
-        q = q.eq('created_by', ownerFilter.created_by);
-        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
-      }
-      const { data, error } = await q;
-      if (error) return [];
-      return asRecordArray(data);
-    },
-    staleTime: 60000,
-    enabled: liveSalesEnabled,
-  });
-  const realYesterdaySales = asRecordArray(realYesterdaySalesData);
-
-  // Month-to-date real sales from daily_sales
-  const { data: realMonthSalesData } = useQuery({
-    queryKey: ['sales_month_live', ownerFilter?.created_by, monthStartStr, form.branch, activeRestaurant?.id],
-    queryFn: async () => {
-      let q = supabase
-        .from('daily_sales')
-        .select('restaurant_cash, restaurant_network, credit, cash, network, branch, sales_sources_json, custom_sources_total')
-        .gte('date', monthStartStr)
-        .limit(500);
-      if (isManager) {
-        q = q.eq('restaurant_id', activeRestaurant.id);
-        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
-      } else {
-        if (!ownerFilter?.created_by) return [];
-        q = q.eq('created_by', ownerFilter.created_by);
-        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
-      }
-      const { data, error } = await q;
-      if (error) return [];
-      return asRecordArray(data);
-    },
-    staleTime: 30000,
-    enabled: liveSalesEnabled,
-  });
-  const realMonthSales = asRecordArray(realMonthSalesData);
-
-  // Yesterday's sales for growth comparison (legacy — kept for growthVsYesterday calc)
-  const { data: yesterdaySalesData } = useQuery({
-    queryKey: ['yesterday_sales', ownerFilter?.created_by, form.date, form.branch, activeRestaurant?.id],
-    queryFn: async () => {
-      if (!form.date) return [];
-      const yesterday = new Date(form.date);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yStr = format(yesterday, 'yyyy-MM-dd');
-      let q = supabase
-        .from('daily_sales')
-        .select('restaurant_cash, restaurant_network, credit, cash, network, branch')
-        .eq('date', yStr)
-        .limit(20);
-      if (isManager) {
-        q = q.eq('restaurant_id', activeRestaurant.id);
-        if (form.branch && form.branch !== 'all') q = q.eq('branch', form.branch);
-      } else {
-        if (!ownerFilter?.created_by) return [];
-        q = q.eq('created_by', ownerFilter.created_by);
-      }
-      const { data, error } = await q;
-      if (error) return [];
-      return asRecordArray(data);
-    },
-    staleTime: 60000,
-    enabled: isManager ? !!activeRestaurant?.id && !!form.date : !!ownerFilter?.created_by && !!form.date,
-  });
-  const yesterdaySales = asRecordArray(yesterdaySalesData);
-
-  // ── Daily Sales calculations (RULE-COMPLIANT — DO NOT MODIFY) ─────────────
-  // Driver Sales is maintained independently in Driver Management. Daily Sales
-  // records contain only counter cash, POS/network, customer credit, and other sources.
-  const counterCashSales = useMemo(() => Math.max(0, Number(cashSalesInput) || 0), [cashSalesInput]);
-  const cashSales = counterCashSales;
-  const counterNetworkTotal = useMemo(() => asRecordArray(posEntries).reduce((s, e) => s + (Number(e.amount) || 0), 0), [posEntries]);
-  const networkTotal = counterNetworkTotal;
-  const customerCreditTotal = useMemo(() => asRecordArray(creditEntries).reduce((s, e) => s + (Number(e.amount) || 0), 0), [creditEntries]);
-  const creditTotal = customerCreditTotal;
-  const totalSales = useMemo(() => cashSales + networkTotal + creditTotal + customTotal, [cashSales, networkTotal, creditTotal, customTotal]);
-
-  const opening      = useMemo(() => Number(openingCash) || 0, [openingCash]);
-  const actualCount  = useMemo(() => actualCashCount !== '' ? Number(actualCashCount) : null, [actualCashCount]);
-  const ownerContrib = useMemo(() => Number(ownerContributionInput) || 0, [ownerContributionInput]);
-
-  // Rule 3: Expected Cash = Opening Cash + Cash Sales
-  const expectedCash = useMemo(() => opening + cashSales, [opening, cashSales]);
-
-  // Rule 4: Cash Difference = Actual Cash - Expected Cash
-  const cashDifference = useMemo(() => actualCount !== null ? actualCount - expectedCash : null, [actualCount, expectedCash]);
-
-  const cashReconcStatus = useMemo(() => {
-    if (cashDifference === null) return null;
-    if (cashDifference === 0) return 'Balanced';
-    return cashDifference < 0 ? 'Shortage' : 'Overage';
-  }, [cashDifference]);
-
-  // Rule 10: Closing Cash = Actual Cash + Owner Capital Contribution
-  const closingCash = useMemo(() => actualCount !== null ? (actualCount + ownerContrib) : opening, [actualCount, ownerContrib, opening]);
-
-  // Rule 12: Remaining Difference = Closing Cash - Expected Cash
-  const remainingDifference = useMemo(() => actualCount !== null ? (closingCash - expectedCash) : null, [closingCash, expectedCash, actualCount]);
-
-  const cashShortageAmount = useMemo(() => cashDifference !== null ? Math.max(0, -cashDifference) : 0, [cashDifference]);
-  const cashOverageAmount  = useMemo(() => cashDifference !== null ? Math.max(0, cashDifference) : 0, [cashDifference]);
-
-  const differencePercentage = useMemo(() => {
-    if (expectedCash === 0 || cashDifference === null) return null;
-    return (Math.abs(cashDifference) / expectedCash) * 100;
-  }, [cashDifference, expectedCash]);
-
-  const riskLevel = useMemo(() => {
-    if (differencePercentage === null) return null;
-    if (differencePercentage > 10) return 'High';
-    if (differencePercentage > 5) return 'Medium';
-    return 'Low';
-  }, [differencePercentage]);
-
-  // Rule 8: Operating Result = Total Sales - Approved Purchases
-  const approvedPurchasesTotal = useMemo(() => approvedPurchasesForDate.reduce((s, p) => s + (Number(p.total_amount) || 0), 0), [approvedPurchasesForDate]);
-  const paidPurchasesTotal = useMemo(() => approvedPurchasesForDate.reduce((sum, purchase) => sum + Math.min(Number(purchase.paid_amount) || 0, Number(purchase.total_amount) || 0), 0), [approvedPurchasesForDate]);
-  const creditPurchasesTotal = useMemo(() => Math.max(0, approvedPurchasesTotal - paidPurchasesTotal), [approvedPurchasesTotal, paidPurchasesTotal]);
-  const expensesTotal = useMemo(() => expensesForDate.reduce((s, expense) => s + (Number(expense.amount) || 0), 0), [expensesForDate]);
-  const operatingResult = useMemo(() => totalSales - approvedPurchasesTotal - expensesTotal, [totalSales, approvedPurchasesTotal, expensesTotal]);
-  const operatingMarginPct = useMemo(() => totalSales > 0 ? (operatingResult / totalSales) * 100 : 0, [operatingResult, totalSales]);
-  const purchasesOwnerContrib = useMemo(() => Math.max(0, approvedPurchasesTotal - totalSales), [approvedPurchasesTotal, totalSales]);
-
-  // Net cash = closing cash - opening cash
-  const netCash = useMemo(() => closingCash - opening, [closingCash, opening]);
-
-  // Unique suppliers
-  const uniqueSuppliers = useMemo(() => {
-    const names = approvedPurchasesForDate.map(p => p.supplier_name).filter(Boolean);
-    return [...new Set(names)].length;
-  }, [approvedPurchasesForDate]);
-
-  const largestPurchase = useMemo(() => {
-    if (!approvedPurchasesForDate.length) return 0;
-    return Math.max(...approvedPurchasesForDate.map(p => Number(p.total_amount) || 0));
-  }, [approvedPurchasesForDate]);
-
-  // Yesterday's total for growth calc
-  const yesterdayTotal = useMemo(() => {
-    const branchSales = form.branch !== 'all'
-      ? yesterdaySales.filter(s => s.branch === form.branch)
-      : yesterdaySales;
-    return branchSales.reduce((s, sale) => {
-      const cash = Number(sale.restaurant_cash) || Number(sale.cash) || 0;
-      const net  = Number(sale.restaurant_network) || Number(sale.network) || 0;
-      const cred = Number(sale.credit) || 0;
-      return s + cash + net + cred;
-    }, 0);
-  }, [yesterdaySales, form.branch]);
-
-  const growthVsYesterday = useMemo(() => {
-    if (yesterdayTotal === 0 || totalSales === 0) return null;
-    return ((totalSales - yesterdayTotal) / yesterdayTotal) * 100;
-  }, [totalSales, yesterdayTotal]);
-
-  // ── Real daily_sales aggregation for Live Sales Summary ─────────────────────
-  // Helper: sum a field across an array of daily_sales records
-  const sumField = (arr, field1, field2) =>
-    asRecordArray(arr).reduce((s, r) => s + (Number(r[field1]) || (field2 ? Number(r[field2]) : 0) || 0), 0);
-
-  // Helper: sum custom sources from sales_sources_json + custom_sources_total fallback
-  const sumCustom = (arr) =>
-    asRecordArray(arr).reduce((s, r) => {
-      if (r.sales_sources_json) {
-        try {
-          const entries = asRecordArray(JSON.parse(r.sales_sources_json));
-          return s + entries.reduce((cs, e) => cs + (Number(e.amount) || 0), 0);
-        } catch { /* ignore */ }
-      }
-      return s + (Number(r.custom_sources_total) || 0);
-    }, 0);
-
-  const realSummary = useMemo(() => {
-    // TODAY
-    const todayCash    = sumField(realTodaySales, 'restaurant_cash', 'cash');
-    const todayNetwork = sumField(realTodaySales, 'restaurant_network', 'network');
-    const todayCredit  = sumField(realTodaySales, 'credit');
-    const todayCustom  = sumCustom(realTodaySales);
-    const todayTotal   = todayCash + todayNetwork + todayCredit + todayCustom;
-
-    // YESTERDAY
-    const yesterdayRealCash    = sumField(realYesterdaySales, 'restaurant_cash', 'cash');
-    const yesterdayRealNetwork = sumField(realYesterdaySales, 'restaurant_network', 'network');
-    const yesterdayRealCredit  = sumField(realYesterdaySales, 'credit');
-    const yesterdayRealCustom  = sumCustom(realYesterdaySales);
-    const yesterdayRealTotal   = yesterdayRealCash + yesterdayRealNetwork + yesterdayRealCredit + yesterdayRealCustom;
-
-    // MONTH-TO-DATE
-    const monthCash    = sumField(realMonthSales, 'restaurant_cash', 'cash');
-    const monthNetwork = sumField(realMonthSales, 'restaurant_network', 'network');
-    const monthCredit  = sumField(realMonthSales, 'credit');
-    const monthCustom  = sumCustom(realMonthSales);
-    const monthTotal   = monthCash + monthNetwork + monthCredit + monthCustom;
-
+  const automaticClosing = useMemo(() => {
+    if (initial?.id) return { cash: 0, network: 0, credit: 0, other: 0, expectedCash: null, openingCash: null, hasData: false, paymentCount: 0 };
+    const source = automaticClosingData || {};
+    const settlement = firstRecord(source.settlements);
+    const paymentTotals = asRecordArray(source.payments).reduce((totals, payment) => {
+      const status = String(payment.status || '').toLowerCase();
+      if (status && !['paid', 'completed', 'success', 'settled'].includes(status)) return totals;
+      const amount = Number(payment.amount) || 0;
+      const method = String(payment.payment_method || '').toLowerCase();
+      if (['cash', 'cash_on_delivery', 'cod'].includes(method)) totals.cash += amount;
+      else if (['card', 'network', 'pos', 'visa', 'mastercard', 'mada', 'digital'].includes(method)) totals.network += amount;
+      else if (['credit', 'customer_credit', 'on_account'].includes(method)) totals.credit += amount;
+      else totals.other += amount;
+      return totals;
+    }, { cash: 0, network: 0, credit: 0, other: 0 });
+    const posExpected = asRecordArray(source.pos).reduce((total, row) => total + (Number(row.expected_amount ?? row.actual_amount) || 0), 0);
+    const recordedCredit = asRecordArray(source.credit).reduce((total, row) => total + (Number(row.total_amount) || 0), 0);
+    const settlementCash = Number(settlement?.cash_sales) || 0;
+    const expectedCash = settlement?.expected_closing_cash == null ? null : Number(settlement.expected_closing_cash) || 0;
+    const openingCashValue = settlement?.opening_cash == null ? null : Number(settlement.opening_cash) || 0;
     return {
-      todayCash, todayNetwork, todayCredit, todayCustom, todayTotal,
-      yesterdayRealTotal,
-      monthTotal,
+      cash: paymentTotals.cash > 0 ? paymentTotals.cash : settlementCash,
+      network: paymentTotals.network > 0 ? paymentTotals.network : posExpected,
+      credit: paymentTotals.credit > 0 ? paymentTotals.credit : recordedCredit,
+      other: paymentTotals.other,
+      expectedCash,
+      openingCash: openingCashValue,
+      hasData: Boolean(settlement || asRecordArray(source.payments).length || asRecordArray(source.pos).length || asRecordArray(source.credit).length),
+      paymentCount: asRecordArray(source.payments).length,
     };
-  }, [realTodaySales, realYesterdaySales, realMonthSales]);
+  }, [automaticClosingData, initial?.id]);
 
-  // Average ticket (rough estimate: total / estimated transactions)
-  const avgTicket = useMemo(() => {
-    const txCount = creditEntries.filter(e => Number(e.amount) > 0).length + (cashSales > 0 ? 1 : 0) + posEntries.filter(e => Number(e.amount) > 0).length;
-    return txCount > 0 ? totalSales / txCount : 0;
-  }, [totalSales, creditEntries, cashSales, posEntries]);
+  // ── Closing calculations sourced from the selected ERP scope ──────────────
+  const manualCashSales = useMemo(() => Math.max(0, Number(cashSalesInput) || 0), [cashSalesInput]);
+  const manualNetworkTotal = useMemo(() => asRecordArray(posEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0), [posEntries]);
+  const manualCreditTotal = useMemo(() => asRecordArray(creditEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0), [creditEntries]);
+  const useAutomaticSales = Boolean(!initial?.id && automaticClosing.hasData);
+  const cashSales = useAutomaticSales ? automaticClosing.cash : manualCashSales;
+  const networkTotal = useAutomaticSales ? automaticClosing.network : manualNetworkTotal;
+  const creditTotal = useAutomaticSales ? automaticClosing.credit : manualCreditTotal;
+  const otherPaymentTotal = useAutomaticSales ? automaticClosing.other : customTotal;
+  const totalSales = useMemo(() => cashSales + networkTotal + creditTotal + otherPaymentTotal, [cashSales, networkTotal, creditTotal, otherPaymentTotal]);
+
+  useEffect(() => {
+    if (!initial?.id && automaticClosing.openingCash !== null) setOpeningCash(String(automaticClosing.openingCash));
+  }, [automaticClosing.openingCash, initial?.id]);
+
+  const opening = useMemo(() => Number(openingCash) || 0, [openingCash]);
+  const actualCount = useMemo(() => actualCashCount !== '' ? Number(actualCashCount) : null, [actualCashCount]);
+  const ownerContrib = useMemo(() => Number(ownerContributionInput) || 0, [ownerContributionInput]);
+  const expectedCash = useMemo(
+    () => useAutomaticSales && automaticClosing.expectedCash !== null ? automaticClosing.expectedCash : opening + cashSales,
+    [automaticClosing.expectedCash, cashSales, opening, useAutomaticSales],
+  );
+  const cashDifference = useMemo(() => actualCount !== null ? actualCount - expectedCash : null, [actualCount, expectedCash]);
+  const cashReconcStatus = useMemo(() => cashDifference === null ? null : cashDifference === 0 ? 'Balanced' : cashDifference < 0 ? 'Shortage' : 'Overage', [cashDifference]);
+  const closingCash = useMemo(() => actualCount !== null ? actualCount + ownerContrib : opening, [actualCount, ownerContrib, opening]);
+  const remainingDifference = useMemo(() => actualCount !== null ? closingCash - expectedCash : null, [actualCount, closingCash, expectedCash]);
+
+  const approvedPurchasesTotal = useMemo(() => approvedPurchasesForDate.reduce((sum, purchase) => sum + (Number(purchase.total_amount) || 0), 0), [approvedPurchasesForDate]);
+  const expensesTotal = useMemo(() => expensesForDate.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0), [expensesForDate]);
+  const operatingResult = useMemo(() => totalSales - approvedPurchasesTotal - expensesTotal, [totalSales, approvedPurchasesTotal, expensesTotal]);
 
   // Validation checks
   const validations = useMemo(() => [
@@ -1241,30 +1101,20 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
       message: actualCount === null ? 'Actual cash count required' : remainingDifference === 0 ? 'Balanced' : managerApproved ? 'Manager approved' : 'Needs approval',
     },
     {
+      key: 'cashNote',
+      label: 'Cash Difference Note',
+      passed: cashDifference === null || cashDifference === 0 || Boolean(cashNotes.trim()),
+      message: cashDifference === null || cashDifference === 0 ? 'Not required' : 'Required for a difference',
+    },
+    {
       key: 'requiredFields',
       label: 'Required Fields Complete',
       passed: !!form.date && !!form.branch,
       message: form.date || 'Date required',
     },
-  ], [form, cashierDisplayName, approvedPurchasesForDate, posEntries, creditEntries, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, managerApproved, currency]);
+  ], [form, cashierDisplayName, approvedPurchasesForDate, posEntries, creditEntries, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, cashDifference, cashNotes, managerApproved, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
-  const passedCount = useMemo(() => validations.filter(v => v.passed).length, [validations]);
-
-  // Records that will be created
-  const recordsToCreate = useMemo(() => {
-    const records = [
-      { key: 'daily_sales', label: 'Daily Sales Record', icon: BarChart3, always: true },
-      { key: 'cash_reconciliation', label: 'Cash Reconciliation', icon: Scale, always: true },
-      { key: 'network_sales', label: 'Network / POS Sales', icon: CreditCard, condition: networkTotal > 0 },
-      { key: 'customer_credit', label: 'Customer Credit Entries', icon: User, condition: creditTotal > 0 },
-      { key: 'treasury', label: 'Treasury Transactions', icon: Banknote, always: true },
-      { key: 'owner_contribution', label: 'Owner Contribution', icon: ShieldCheck, condition: ownerContrib > 0 || purchasesOwnerContrib > 0 },
-      { key: 'wallet_transaction', label: 'Wallet Transactions', icon: Activity, always: true },
-    ];
-    return records.filter(r => r.always || r.condition);
-  }, [networkTotal, creditTotal, ownerContrib, purchasesOwnerContrib]);
-
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1283,6 +1133,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
     if (!cashierDisplayName) nextErrors.cashier = 'Cashier is required.';
     if (actualCount === null) nextErrors.actualCash = 'Actual Cash is required.';
     if (remainingDifference !== 0 && remainingDifference !== null && !managerApproved) nextErrors.reconciliation = 'Cash difference must be reviewed before closing.';
+    if (cashDifference !== null && cashDifference !== 0 && !cashNotes.trim()) nextErrors.cashNotes = 'A reconciliation note is required for a cash difference.';
     if (invalidCredit) nextErrors.credit = 'Credit customer is required.';
     if (limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer}.`;
     if (Object.keys(nextErrors).length) {
@@ -1379,7 +1230,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
               included_in_revenue: src.included_in_revenue,
             }))
         ),
-        custom_sources_total: customTotal,
+        custom_sources_total: otherPaymentTotal,
 
         opening_cash: opening,
         // The live schema stores the actual count plus any owner injection as closing_cash.
@@ -1420,7 +1271,6 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
 
   return (
     <form onSubmit={handleSubmit} className="flex h-full min-h-0 min-w-0 flex-col">
-      {/* Sticky Summary */}
       <StickySummary
         totalSales={totalSales}
         operatingResult={operatingResult}
@@ -1430,909 +1280,155 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
       />
 
       <div className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
-        <div className="space-y-3 p-3 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:space-y-4 sm:p-4 sm:pb-8">
+        <div className="mx-auto w-full max-w-6xl space-y-3 p-3 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:space-y-4 sm:p-4 sm:pb-6">
           {savedClosing && (
-            <div role="status" className={`rounded-xl border p-4 ${savedClosing._alreadyExists ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'}`}>
+            <div role="status" className={`rounded-xl border p-3 ${savedClosing._alreadyExists ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'}`}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-sm font-bold">{savedClosing._alreadyExists ? 'Closing already exists for this branch and shift.' : 'Daily closing saved successfully.'}</p>
+                  <p className="text-sm font-bold">{savedClosing._alreadyExists ? 'Closing already completed for this branch and shift.' : 'Daily closing saved successfully.'}</p>
                   {savedClosing.id && <p className="mt-1 text-xs opacity-80">Closing ID: {savedClosing.id}</p>}
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex">
-                  <Button type="button" variant="outline" className="min-h-11" onClick={onCancel}>View Closing</Button>
+                  <Button type="button" variant="outline" className="min-h-11" onClick={onCancel}>Open Closing</Button>
                   <Button type="button" className="min-h-11 bg-emerald-600 hover:bg-emerald-700" onClick={() => onNewClosing?.()}>New Closing</Button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ═══════════════════════════════════════════════════════════════
-              SECTION 1 — SHIFT INFORMATION
-          ═══════════════════════════════════════════════════════════════ */}
-          <div className={`rounded-2xl border-2 ${SECTION_COLORS.shift.border} overflow-hidden bg-background shadow-sm`}>
-            <SectionHeader
-              icon={Building2}
-              title="Shift Information"
-              color="shift"
-              sectionNum={sectionNumbers.shift}
-              collapsible
-              collapsed={!isSectionOpen('shift')}
-              onToggle={() => toggleSection('shift')}
-              badge={
-                <Badge variant="outline" className="text-[10px] font-bold">
-                  {form.date} · {form.shift}
-                </Badge>
-              }
-            />
-            <AccordionBody open={isSectionOpen('shift')}>
-              <div className="p-4 space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">Date</Label>
-                  <Input
-                    id="quick-closing-date"
-                    type="date"
-                    value={form.date}
-                    onChange={e => set('date', e.target.value)}
-                    className="h-10 text-sm"
-                  />
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm">
+            <div className="border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white"><Store className="h-4 w-4" /></div>
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-black tracking-tight text-slate-900">Daily Sales Closing</h2>
+                  <p className="truncate text-[11px] text-muted-foreground">Review ERP data, enter the physical cash count, then save.</p>
                 </div>
-                <div id="quick-closing-branch">
-                  <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">Branch</Label>
-                  <BranchSelect value={form.branch} onChange={v => {
-                    set('branch', v);
-                    set('branch_id', '');
-                    // Clear credit entries when branch changes (to avoid showing customers from previous branch)
-                    setCreditEntries([]);
-                  }} />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div id="quick-closing-shift">
-                  <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">Shift</Label>
-                  <Select value={form.shift} onValueChange={v => set('shift', v)}>
-                    <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Morning">Morning</SelectItem>
-                      <SelectItem value="Evening">Evening</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div id="quick-closing-cashier">
-                  <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">
-                    Cashier
-                    {empLoading && <Loader2 className="w-3 h-3 inline ml-1 animate-spin" />}
-                  </Label>
-                  {empLoading ? (
-                    <Skeleton className="h-10 w-full" />
-                  ) : (
-                    <Select
-                      value={form.cashier_employee_id || form.cashier_id || ''}
-                      onValueChange={id => {
-                        const employee = cashiers.find((cashier) => cashier.id === id);
-                        if (employee) setForm((previous) => ({
-                          ...previous,
-                          cashier_employee_id: id,
-                          cashier_id: id,
-                          cashier_name: employee.full_name,
-                        }));
-                      }}
-                    >
-                      <SelectTrigger className="h-10 text-sm">
-                        <SelectValue placeholder="Select cashier..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {cashiers.map((cashier) => (
-                          <SelectItem key={cashier.id} value={cashier.id}>{cashier.full_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              </div>
-              {/* Shift status indicators */}
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-[10px] font-bold text-emerald-700 uppercase">Shift Open</span>
-                </div>
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${cashierDisplayName ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
-                  <User className={`w-3 h-3 ${cashierDisplayName ? 'text-emerald-600' : 'text-amber-600'}`} />
-                  <span className={`text-[10px] font-bold uppercase ${cashierDisplayName ? 'text-emerald-700' : 'text-amber-700'}`}>
-                    {cashierDisplayName || 'No Cashier'}
-                  </span>
-                </div>
-              </div>
-              </div>
-            </AccordionBody>
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border-2 border-indigo-200 bg-background shadow-sm">
-            <SectionHeader icon={DollarSign} title="Sales Entry" color="kpi" />
-            <div className="p-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <NumInput
-                  id="quick-closing-cashSales"
-                  label="Cash Sales"
-                  value={cashSalesInput}
-                  onChange={updateCashSales}
-                  prefix={currency}
-                  helpText="Counter cash"
-                />
-                <NumInput label="Card / Network Sales" value={networkTotal} readOnly prefix={currency} helpText="From POS entries below" />
-                <NumInput label="Other Payment" value={customTotal} readOnly prefix={currency} helpText={customSources.length ? 'From additional sales sources below' : 'No additional sources configured'} />
-                <NumInput label="Total Sales" value={totalSales} readOnly prefix={currency} helpText="Calculated automatically" />
               </div>
             </div>
-          </div>
-
-          {/* Live sales insight — historical data remains available without a separate page. */}
-          <div className={`rounded-2xl border-2 ${SECTION_COLORS.kpi.border} overflow-hidden bg-background shadow-sm`}>
-            <SectionHeader
-              icon={BarChart3}
-              title="Live Sales Summary"
-              color="kpi"
-              sectionNum={sectionNumbers.summary}
-              collapsible
-              collapsed={!isSectionOpen('summary')}
-              onToggle={() => toggleSection('summary')}
-              badge={
-                <Badge className="bg-indigo-600 text-white text-[10px] font-bold">
-                  {currency}{'\u00A0'}{realSummary.todayTotal.toLocaleString()}
-                </Badge>
-              }
-            />
-            <AccordionBody open={isSectionOpen('summary')}>
-            {realTodayLoading ? (
-              <div className="p-4 grid grid-cols-2 gap-3">
-                {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
+            <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-4">
+              <div>
+                <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Date</Label>
+                <Input id="quick-closing-date" type="date" value={form.date} onChange={e => set('date', e.target.value)} className="min-h-11 text-sm" />
               </div>
+              <div id="quick-closing-branch">
+                <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Branch</Label>
+                <BranchSelect value={form.branch} onChange={v => { set('branch', v); set('branch_id', ''); setCreditEntries([]); }} />
+              </div>
+              <div id="quick-closing-shift">
+                <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Shift</Label>
+                <Select value={form.shift} onValueChange={v => set('shift', v)}>
+                  <SelectTrigger className="min-h-11 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="Morning">Morning</SelectItem><SelectItem value="Evening">Evening</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div id="quick-closing-cashier" className="min-w-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Cashier</p>
+                <p className="mt-1 truncate text-sm font-bold text-emerald-900">{empLoading ? 'Loading…' : cashierDisplayName || 'No cashier'}</p>
+              </div>
+            </div>
+          </section>
+
+          <section data-testid="quick-closing-auto-summary" className="overflow-hidden rounded-2xl border border-indigo-200 bg-background shadow-sm">
+            <div className="flex items-center justify-between gap-3 border-b border-indigo-100 bg-indigo-50 px-3 py-3 sm:px-4">
+              <div className="flex min-w-0 items-center gap-2"><BarChart3 className="h-4 w-4 shrink-0 text-indigo-600" /><h2 className="truncate text-xs font-black uppercase tracking-wide text-indigo-950">Today&apos;s Sales</h2></div>
+              <Badge variant="outline" className="shrink-0 border-indigo-200 bg-white text-[10px] text-indigo-700">{automaticClosingLoading ? 'Loading ERP data' : useAutomaticSales ? 'Auto-loaded' : 'No source posted'}</Badge>
+            </div>
+            {automaticClosingLoading ? (
+              <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>
             ) : (
-              <div className="p-4 space-y-4">
-                {/* ── TODAY ───────────────────────────────────────────────────────────────────────────────────── */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Today</span>
-                    <span className="text-[10px] text-muted-foreground">{todayStr}</span>
-                  </div>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <KPICard label="Cash Sales"       value={`${currency}\u00A0${realSummary.todayCash.toLocaleString()}`}    icon={Banknote}    colorClass="text-emerald-600" bgClass="bg-emerald-100" sublabel="Counter cash" />
-                    <KPICard label="POS / Network"    value={`${currency}\u00A0${realSummary.todayNetwork.toLocaleString()}`} icon={CreditCard}  colorClass="text-violet-600" bgClass="bg-violet-100" sublabel="POS & digital" />
-                    <KPICard label="Customer Credit"  value={`${currency}\u00A0${realSummary.todayCredit.toLocaleString()}`}  icon={User}        colorClass="text-blue-600"   bgClass="bg-blue-100"   sublabel="Credit sales" />
-                    {realSummary.todayCustom > 0 && (
-                      <KPICard label="Custom Sources"  value={`${currency}\u00A0${realSummary.todayCustom.toLocaleString()}`}  icon={Star}        colorClass="text-amber-600"  bgClass="bg-amber-100"  sublabel="Other sources" />
-                    )}
-                    <KPICard label="Total Revenue"    value={`${currency}\u00A0${realSummary.todayTotal.toLocaleString()}`}   icon={DollarSign}  colorClass="text-indigo-600" bgClass="bg-indigo-100" sublabel={realSummary.todayCustom > 0 ? 'Cash+POS+Credit+Custom' : 'Cash+POS+Credit'} />
-                  </div>
+              <div className="p-3 sm:p-4">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3"><p className="text-[10px] font-bold uppercase text-emerald-800">Cash</p><Money currency={currency} value={cashSales} className="mt-1 text-lg font-black text-emerald-700" /></div>
+                  <div className="rounded-xl border border-violet-100 bg-violet-50 p-3"><p className="text-[10px] font-bold uppercase text-violet-800">Card / Network</p><Money currency={currency} value={networkTotal} className="mt-1 text-lg font-black text-violet-700" /></div>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-3"><p className="text-[10px] font-bold uppercase text-blue-800">Customer Credit</p><Money currency={currency} value={creditTotal} className="mt-1 text-lg font-black text-blue-700" /></div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase text-slate-700">Other</p><Money currency={currency} value={otherPaymentTotal} className="mt-1 text-lg font-black text-slate-800" /></div>
                 </div>
-
-                {/* ── YESTERDAY ─────────────────────────────────────────────────────────────────────────────────── */}
-                <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Yesterday</span>
-                    <span className="text-[10px] text-muted-foreground">{yesterdayStr}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-foreground">{currency}{'\u00A0'}{realSummary.yesterdayRealTotal.toLocaleString()}</span>
-                    {realSummary.yesterdayRealTotal > 0 && realSummary.todayTotal > 0 && (
-                      <span className={`text-xs font-bold ${
-                        realSummary.todayTotal >= realSummary.yesterdayRealTotal ? 'text-emerald-600' : 'text-red-500'
-                      }`}>
-                        {realSummary.todayTotal >= realSummary.yesterdayRealTotal ? '+' : ''}
-                        {(((realSummary.todayTotal - realSummary.yesterdayRealTotal) / realSummary.yesterdayRealTotal) * 100).toFixed(1)}% vs today
-                      </span>
-                    )}
-                  </div>
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/70 px-3 py-3">
+                  <span className="text-xs font-black uppercase tracking-wide text-indigo-900">Total Sales</span>
+                  <Money currency={currency} value={totalSales} className="text-xl font-black text-indigo-700" />
                 </div>
-
-                {/* ── MONTH ──────────────────────────────────────────────────────────────────────────────────────── */}
-                <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">Month Running Total</span>
-                    <span className="text-[10px] text-muted-foreground">{monthStartStr} → today</span>
+                {!useAutomaticSales && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-xs font-bold text-amber-900">No posted ERP sales were found for this branch, date and shift.</p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-amber-800">Record sales at POS first. Use this exceptional adjustment only when an offline sale cannot be posted before closing.</p>
+                    <div className="mt-3"><NumInput id="quick-closing-cashSales" label="Exceptional Cash Adjustment" value={cashSalesInput} onChange={updateCashSales} prefix={currency} helpText="Not required when the ERP has sales data" /></div>
                   </div>
-                  <span className="text-lg font-black text-indigo-700">{currency}{'\u00A0'}{realSummary.monthTotal.toLocaleString()}</span>
-                </div>
+                )}
               </div>
             )}
-            </AccordionBody>
-          </div>
+          </section>
 
-          {/* ═══════════════════════════════════════════════════════════════
-              SECTION 4 — POS SALES
-          ═══════════════════════════════════════════════════════════════ */}
-          <div className={`rounded-2xl border-2 ${SECTION_COLORS.pos.border} overflow-hidden bg-background shadow-sm`}>
-            <SectionHeader
-              icon={CreditCard}
-              title="POS Sales"
-              color="pos"
-              sectionNum={sectionNumbers.pos}
-              collapsible
-              collapsed={!isSectionOpen('pos')}
-              onToggle={() => toggleSection('pos')}
-              badge={
-                <Badge variant="outline" className="text-violet-700 border-violet-300 text-[10px] font-bold">
-                  {currency}{'\u00A0'}{networkTotal.toLocaleString()}
-                </Badge>
-              }
-            />
-            <AccordionBody open={isSectionOpen('pos')}>
-            <div className="p-4 space-y-3">
-              {posLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
+            <section className="overflow-hidden rounded-2xl border border-amber-200 bg-background shadow-sm">
+              <div className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-3 py-3 sm:px-4"><div className="flex items-center gap-2"><Scale className="h-4 w-4 text-amber-600" /><h2 className="text-xs font-black uppercase tracking-wide text-amber-950">Cash Reconciliation</h2></div>{cashReconcStatus && <StatusBadge status={cashReconcStatus} />}</div>
+              <div className="space-y-3 p-3 sm:p-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3"><p className="text-[10px] font-bold uppercase text-amber-800">Expected Cash</p><Money currency={currency} value={expectedCash} className="mt-1 text-lg font-black text-amber-800" /></div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase text-slate-700">Opening Cash</p><Money currency={currency} value={opening} className="mt-1 text-lg font-black text-slate-800" /></div>
                 </div>
-              ) : (
-                <>
-                  {posEntries.map((entry, idx) => (
-                    <div key={entry.id} className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">POS Device #{idx + 1}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-destructive hover:bg-destructive/10"
-                          onClick={() => removePos(entry.id)}
-                          disabled={posEntries.length === 1}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">POS Device</Label>
-                          <Select
-                            value={entry.device_id || '__manual__'}
-                            onValueChange={v => {
-                              if (v === '__manual__') {
-                                updatePos(entry.id, 'device_id', '');
-                                updatePos(entry.id, 'device_name', 'Manual Entry');
-                                updatePos(entry.id, 'provider', '');
-                                set('pos_device_id', '');
-                              } else {
-                                const d = posDevices.find(pd => pd.id === v);
-                                updatePos(entry.id, 'device_id', v);
-                                updatePos(entry.id, 'device_name', d?.account_name || d?.device_name || '');
-                                updatePos(entry.id, 'provider', d?.provider || d?.account_type || '');
-                                set('pos_device_id', v);
-                              }
-                            }}
-                          >
-                            <SelectTrigger className="h-9 text-xs">
-                              <SelectValue placeholder="Select device..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__manual__">Manual Entry</SelectItem>
-                              {posDevices.map(d => (
-                                <SelectItem key={d.id} value={d.id}>
-                                  {d.account_name || d.device_name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">Provider</Label>
-                          <Input
-                            value={entry.provider || ''}
-                            onChange={e => updatePos(entry.id, 'provider', e.target.value)}
-                            placeholder="e.g. Visa, Mastercard"
-                            className="h-9 text-xs"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <NumInput
-                          label="Amount"
-                          value={entry.amount}
-                          onChange={v => updatePos(entry.id, 'amount', v)}
-                          prefix={currency}
-                        />
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">Reference #</Label>
-                          <Input
-                            value={entry.reference || ''}
-                            onChange={e => updatePos(entry.id, 'reference', e.target.value)}
-                            placeholder="Ref number"
-                            className="h-10 text-xs"
-                          />
-                        </div>
-                      </div>
-                      {/* Status indicators */}
-                      <div className="flex gap-2">
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-                          Active
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
-                          {Number(entry.amount) > 0 ? 'Settlement Pending' : 'No Amount'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full h-9 border-dashed border-violet-300 text-violet-700 hover:bg-violet-50"
-                    onClick={addPos}
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1.5" /> Add POS Device
-                  </Button>
-                </>
-              )}
-            </div>
-            </AccordionBody>
-          </div>
-
-          {/* ═══════════════════════════════════════════════════════════════
-              SECTION 4 — CUSTOMER CREDIT
-          ═══════════════════════════════════════════════════════════════ */}
-          <div className={`rounded-2xl border-2 ${SECTION_COLORS.credit.border} overflow-hidden bg-background shadow-sm`}>
-            <SectionHeader
-              icon={User}
-              title="Customer Credit"
-              color="credit"
-              sectionNum={sectionNumbers.credit}
-              collapsible
-              collapsed={!isSectionOpen('credit')}
-              onToggle={() => toggleSection('credit')}
-              badge={
-                <Badge variant="outline" className="text-blue-700 border-blue-300 text-[10px] font-bold">
-                  {currency}{'\u00A0'}{creditTotal.toLocaleString()}
-                </Badge>
-              }
-            />
-            <AccordionBody open={isSectionOpen('credit')}>
-            <div className="p-4 space-y-3">
-              {custLoading ? (
-                <Skeleton className="h-20 w-full" />
-              ) : (
-                <>
-                  {creditEntries.map((entry, idx) => (
-                    <CustomerCreditEntry
-                      key={entry.id}
-                      entry={entry}
-                      idx={idx}
-                      onRemove={removeCredit}
-                      onUpdate={updateCredit}
-                      customers={customers}
-                      currency={currency}
-                    />
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full h-9 border-dashed border-blue-300 text-blue-700 hover:bg-blue-50"
-                    onClick={addCredit}
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Credit Customer
-                  </Button>
-                </>
-              )}
-            </div>
-            </AccordionBody>
-          </div>
-
-          {/* ═══════════════════════════════════════════════════════════════
-              SECTION 4.5 — CUSTOM SALES SOURCES (Dynamic)
-          ═══════════════════════════════════════════════════════════════ */}
-          {!sourcesLoading && customSources.length > 0 && (
-            <div className="rounded-2xl border-2 border-teal-200 overflow-hidden bg-background shadow-sm">
-              <SectionHeader
-                icon={ZapIcon}
-                title="Additional Sales Sources"
-                color="custom"
-                sectionNum={sectionNumbers.custom}
-                collapsible
-                collapsed={!isSectionOpen('custom')}
-                onToggle={() => toggleSection('custom')}
-                badge={<Badge variant="outline" className="text-teal-700 border-teal-300 text-[10px] font-bold">{currency}{'\u00A0'}{customTotal.toLocaleString()}</Badge>}
-              />
-              <AccordionBody open={isSectionOpen('custom')}>
-              <div className="p-4 space-y-3">
-                {customSources.map(src => {
-                  const SrcIcon = getSourceIcon(src.icon);
-                  return (
-                    <div key={src.id} className="rounded-xl border border-border bg-muted/20 p-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center bg-${src.color || 'slate'}-100`}>
-                          <SrcIcon className={`w-4 h-4 text-${src.color || 'slate'}-600`} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-foreground">{src.name_en}</p>
-                          {src.name_ar && <p className="text-[10px] text-muted-foreground" dir="rtl">{src.name_ar}</p>}
-                        </div>
-                        {src.requires_reference && (
-                          <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Ref Required</span>
-                        )}
-                      </div>
-                      <NumInput
-                        label={`${src.name_en} Amount`}
-                        value={customSourceAmounts[src.id] || ''}
-                        onChange={v => setCustomAmount(src.id, v)}
-                        prefix={currency}
-                        helpText={src.description || undefined}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-              </AccordionBody>
-            </div>
-          )}
-
-          {/* ═══════════════════════════════════════════════════════════════
-              SECTION 5 — PURCHASE SUMMARY (Auto-loaded)
-          ═══════════════════════════════════════════════════════════════ */}
-          <div className={`rounded-2xl border-2 ${SECTION_COLORS.purchases.border} overflow-hidden bg-background shadow-sm`}>
-            <SectionHeader
-              icon={ShoppingCart}
-              title="Purchase Summary"
-              color="purchases"
-              sectionNum={sectionNumbers.purchases}
-              collapsible
-              collapsed={!isSectionOpen('purchases')}
-              onToggle={() => toggleSection('purchases')}
-              badge={
-                purchasesLoading
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-600" />
-                  : <Badge variant="outline" className="text-orange-700 border-orange-300 text-[10px] font-bold">
-                      {currency}{'\u00A0'}{approvedPurchasesTotal.toLocaleString()}
-                    </Badge>
-              }
-            />
-            <AccordionBody open={isSectionOpen('purchases')}>
-              <div className="p-4 space-y-3">
-                {purchasesLoading || pendingLoading ? (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
-                        <p className="text-[10px] font-bold uppercase text-orange-800">Paid Purchases</p>
-                        <p className="mt-1 text-lg font-black text-orange-700">{currency}{'\u00A0'}{paidPurchasesTotal.toLocaleString()}</p>
-                      </div>
-                      <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
-                        <p className="text-[10px] font-bold uppercase text-orange-800">Credit Purchases</p>
-                        <p className="mt-1 text-lg font-black text-orange-700">{currency}{'\u00A0'}{creditPurchasesTotal.toLocaleString()}</p>
-                      </div>
-                      <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
-                        <p className="text-[10px] font-bold uppercase text-rose-800">Recorded Expenses</p>
-                        <p className="mt-1 text-lg font-black text-rose-700">{expensesLoading ? '…' : `${currency}\u00A0${expensesTotal.toLocaleString()}`}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <KPICard
-                        label="Approved Purchases"
-                        value={`${currency}\u00A0${approvedPurchasesTotal.toLocaleString()}`}
-                        icon={CheckCircle2}
-                        colorClass="text-emerald-600"
-                        bgClass="bg-emerald-100"
-                        sublabel={`${approvedPurchasesForDate.length} invoice(s)`}
-                      />
-                      <KPICard
-                        label="Pending Purchases"
-                        value={`${currency}\u00A0${pendingPurchases.reduce((s, p) => s + (Number(p.total_amount) || 0), 0).toLocaleString()}`}
-                        icon={Clock}
-                        colorClass="text-amber-600"
-                        bgClass="bg-amber-100"
-                        sublabel={`${pendingPurchases.length} pending`}
-                      />
-                      <KPICard
-                        label="Largest Purchase"
-                        value={largestPurchase > 0 ? `${currency}\u00A0${largestPurchase.toLocaleString()}` : '—'}
-                        icon={Package}
-                        colorClass="text-orange-600"
-                        bgClass="bg-orange-100"
-                        sublabel="Single invoice"
-                      />
-                      <KPICard
-                        label="Suppliers"
-                        value={String(uniqueSuppliers)}
-                        icon={Store}
-                        colorClass="text-rose-600"
-                        bgClass="bg-rose-100"
-                        sublabel="Unique today"
-                      />
-                    </div>
-                    {/* Operating Cost indicator */}
-                    {totalSales > 0 && (
-                      <div className="rounded-xl p-3 bg-orange-50 border border-orange-200">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-orange-800">Operating Cost Ratio</span>
-                          <span className="text-sm font-black text-orange-700">
-                            {totalSales > 0 ? ((approvedPurchasesTotal / totalSales) * 100).toFixed(1) : 0}%
-                          </span>
-                        </div>
-                        <div className="mt-2 h-1.5 bg-orange-200 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-orange-500 rounded-full transition-all"
-                            style={{ width: `${Math.min(100, totalSales > 0 ? (approvedPurchasesTotal / totalSales) * 100 : 0)}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                    {/* Approved invoices list */}
-                    {approvedPurchasesForDate.length > 0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-[10px] font-bold uppercase text-muted-foreground">Approved Invoices</p>
-                        {approvedPurchasesForDate.slice(0, 5).map(p => (
-                          <div key={p.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-background border border-border text-xs">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span className="font-medium">{p.supplier_name || 'Unknown Supplier'}</span>
-                            </div>
-                            <span className="font-bold text-orange-700">{currency}{'\u00A0'}{Number(p.total_amount).toLocaleString()}</span>
-                          </div>
-                        ))}
-                        {approvedPurchasesForDate.length > 5 && (
-                          <p className="text-[10px] text-muted-foreground text-center">
-                            +{approvedPurchasesForDate.length - 5} more invoices
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    {approvedPurchasesForDate.length === 0 && (
-                      <div className="flex items-center gap-2 px-3 py-3 rounded-xl bg-amber-50 border border-amber-200">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                        <p className="text-xs font-medium text-amber-800">
-                          No approved purchases found for {form.date}. Record purchases before closing.
-                        </p>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </AccordionBody>
-          </div>
-
-          {/* ═══════════════════════════════════════════════════════════════
-              SECTION 6 — CASH RECONCILIATION
-          ═══════════════════════════════════════════════════════════════ */}
-          <div className={`rounded-2xl border-2 ${SECTION_COLORS.reconcile.border} overflow-hidden bg-background shadow-sm`}>
-            <SectionHeader
-              icon={Scale}
-              title="Cash Reconciliation"
-              color="reconcile"
-              sectionNum={sectionNumbers.reconciliation}
-              collapsible
-              collapsed={!isSectionOpen('reconciliation')}
-              onToggle={() => toggleSection('reconciliation')}
-              badge={cashReconcStatus ? <StatusBadge status={cashReconcStatus} /> : undefined}
-            />
-            <AccordionBody open={isSectionOpen('reconciliation')}>
-            <div className="p-4 space-y-3">
-              {/* Cash Sales Input */}
-              <NumInput
-                label="Cash Sales"
-                value={cashSalesInput}
-                onChange={updateCashSales}
-                prefix={currency}
-                helpText="Actual cash revenue collected at counter"
-              />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <NumInput
-                  label="Opening Cash"
-                  value={openingCash}
-                  onChange={updateOpeningCash}
-                  prefix={currency}
-                  helpText="Auto-fetched from previous shift"
-                />
-                <NumInput
-                  label="Expected Cash"
-                  value={expectedCash}
-                  readOnly
-                  prefix={currency}
-                  helpText="Opening + Cash Sales"
-                />
-              </div>
-              <div id="quick-closing-reconciliation">
-                <NumInput
-                  id="quick-closing-actualCash"
-                  label="Actual Cash Count"
-                  value={actualCashCount}
-                  onChange={(value) => {
-                    setInlineErrors((current) => ({ ...current, actualCash: undefined, reconciliation: undefined }));
-                    updateActualCashCount(value);
-                  }}
-                  prefix={currency}
-                  helpText="Physical count in register"
-                  error={inlineErrors.actualCash || inlineErrors.reconciliation}
-                />
-              </div>
-
-              {/* Cash Difference */}
-              {cashDifference !== null && (
-                <div className={`rounded-xl p-3 border-2 ${
-                  cashReconcStatus === 'Shortage' ? 'bg-red-50 border-red-200' :
-                  cashReconcStatus === 'Overage'  ? 'bg-amber-50 border-amber-200' :
-                  'bg-emerald-50 border-emerald-200'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-wide">Cash Difference</p>
-                    <StatusBadge status={cashReconcStatus} />
-                  </div>
-                  <p className={`text-2xl font-black ${cashDifference < 0 ? 'text-red-600' : cashDifference > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                    {cashDifference >= 0 ? '+' : ''}{currency}{'\u00A0'}{Math.abs(cashDifference).toLocaleString()}
-                  </p>
-                  {differencePercentage !== null && (
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      {differencePercentage.toFixed(2)}% of expected cash
-                    </p>
-                  )}
+                <div id="quick-closing-reconciliation">
+                  <NumInput id="quick-closing-actualCash" label="Actual Cash" value={actualCashCount} onChange={(value) => { setInlineErrors((current) => ({ ...current, actualCash: undefined, reconciliation: undefined, cashNotes: undefined })); updateActualCashCount(value); }} prefix={currency} required helpText="Enter the physical count in the cash register" error={inlineErrors.actualCash || inlineErrors.reconciliation || inlineErrors.cashNotes} />
                 </div>
-              )}
-
-              {/* Owner Contribution — only on shortage */}
-              {cashReconcStatus === 'Shortage' && (
-                <NumInput
-                  label="Owner Capital Contribution"
-                  value={ownerContributionInput}
-                  onChange={updateOwnerContribution}
-                  prefix={currency}
-                  helpText="Owner paid to cover shortage — NOT classified as sales revenue"
-                />
-              )}
-
-              {/* Remaining Difference */}
-              {actualCount !== null && (
-                <div className={`rounded-xl p-3 border-2 ${remainingDifference === 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Remaining Difference</span>
-                    <span className={`text-lg font-black ${remainingDifference === 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                      {remainingDifference >= 0 ? '+' : ''}{currency}{'\u00A0'}{Math.abs(remainingDifference).toLocaleString()}
-                    </span>
-                  </div>
-                  {remainingDifference !== 0 && (
-                    <div className="mt-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={managerApproved ? 'default' : 'destructive'}
-                        className="w-full h-9 text-xs font-bold"
-                        onClick={() => setManagerApproved(!managerApproved)}
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />
-                        {managerApproved ? 'Manager Approved ✓' : 'Require Manager Approval'}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Summary row */}
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <div className="bg-muted/30 rounded-lg p-2.5 border border-border">
-                  <p className="text-[9px] font-bold uppercase text-muted-foreground">Closing Cash</p>
-                  <p className="text-sm font-black text-foreground">{currency}{'\u00A0'}{closingCash.toLocaleString()}</p>
-                  <p className="text-[9px] text-muted-foreground">For next shift opening</p>
-                </div>
-                <div className={`rounded-lg p-2.5 border ${riskLevel === 'High' ? 'bg-red-50 border-red-200' : riskLevel === 'Medium' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                  <p className="text-[9px] font-bold uppercase text-muted-foreground">Risk Indicator</p>
-                  <p className={`text-sm font-black ${riskLevel === 'High' ? 'text-red-700' : riskLevel === 'Medium' ? 'text-amber-700' : 'text-emerald-700'}`}>
-                    {riskLevel || '—'}
-                  </p>
-                  {differencePercentage !== null && (
-                    <p className="text-[9px] text-muted-foreground">{differencePercentage.toFixed(1)}% variance</p>
-                  )}
-                </div>
-              </div>
-            </div>
-            </AccordionBody>
-          </div>
-
-          {/* ═══════════════════════════════════════════════════════════════
-              SECTION 7 — OPERATING RESULT (NEVER DISAPPEARS)
-          ═══════════════════════════════════════════════════════════════ */}
-          <div className={`rounded-2xl border-2 ${SECTION_COLORS.operating.border} overflow-hidden bg-background shadow-sm`}>
-            <SectionHeader
-              icon={TrendingUp}
-              title="Operating Result"
-              color="operating"
-              sectionNum={sectionNumbers.operating}
-              collapsible
-              collapsed={!isSectionOpen('operating')}
-              onToggle={() => toggleSection('operating')}
-              badge={
-                <Badge className={`text-[10px] font-bold ${operatingResult >= 0 ? 'bg-emerald-600' : 'bg-red-600'} text-white`}>
-                  {operatingResult >= 0 ? '+' : ''}{currency}{'\u00A0'}{operatingResult.toLocaleString()}
-                </Badge>
-              }
-            />
-            <AccordionBody open={isSectionOpen('operating')}>
-            <div className="p-4 space-y-2">
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-blue-50 border border-blue-200">
-                  <span className="text-xs font-semibold text-blue-800">Sales Revenue</span>
-                  <span className="text-sm font-black text-blue-700">{currency}{'\u00A0'}{totalSales.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-orange-50 border border-orange-200">
-                  <span className="text-xs font-semibold text-orange-800">Approved Purchases</span>
-                  <span className="text-sm font-black text-orange-700">
-                    {purchasesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : `${currency}\u00A0${approvedPurchasesTotal.toLocaleString()}`}
-                  </span>
-                </div>
-                <Separator className="my-1" />
-                <div className={`flex justify-between items-center px-3 py-2.5 rounded-xl border-2 ${operatingResult >= 0 ? 'bg-emerald-50 border-emerald-300' : 'bg-red-50 border-red-300'}`}>
-                  <span className="text-xs font-bold uppercase text-muted-foreground tracking-wide">Gross Operating Result</span>
-                  <span className={`text-xl font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                    {operatingResult >= 0 ? '+' : ''}{currency}{'\u00A0'}{operatingResult.toLocaleString()}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-muted/30 border border-border">
-                    <span className="text-[10px] font-semibold text-muted-foreground">Operating Margin</span>
-                    <span className={`text-xs font-black ${operatingMarginPct >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                      {operatingMarginPct.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-muted/30 border border-border">
-                    <span className="text-[10px] font-semibold text-muted-foreground">Net Cash</span>
-                    <span className={`text-xs font-black ${netCash >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                      {netCash >= 0 ? '+' : ''}{currency}{'\u00A0'}{netCash.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-                {cashShortageAmount > 0 && (
-                  <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-red-50 border border-red-200">
-                    <span className="text-[10px] font-semibold text-red-800">Cash Shortage</span>
-                    <span className="text-xs font-black text-red-700">{currency}{'\u00A0'}{cashShortageAmount.toLocaleString()}</span>
+                {cashDifference !== null && (
+                  <div className={`rounded-xl border-2 p-3 ${cashDifference === 0 ? 'border-emerald-200 bg-emerald-50' : cashDifference < 0 ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+                    <div className="flex items-center justify-between gap-3"><span className="text-xs font-black uppercase tracking-wide text-foreground">Difference</span><Money currency={currency} value={cashDifference} signed className={`text-xl font-black ${cashDifference === 0 ? 'text-emerald-700' : cashDifference < 0 ? 'text-red-700' : 'text-amber-700'}`} /></div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{cashDifference === 0 ? 'Cash balanced.' : 'Review the difference and add a note before closing.'}</p>
                   </div>
                 )}
-                {ownerContrib > 0 && (
-                  <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-purple-50 border border-purple-200">
-                    <span className="text-[10px] font-semibold text-purple-800">Owner Contribution (Cash)</span>
-                    <span className="text-xs font-black text-purple-700">{currency}{'\u00A0'}{ownerContrib.toLocaleString()}</span>
-                  </div>
-                )}
-                {purchasesOwnerContrib > 0 && (
-                  <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-purple-50 border border-purple-200">
-                    <span className="text-[10px] font-semibold text-purple-800">Owner Contribution (Purchases Gap)</span>
-                    <span className="text-xs font-black text-purple-700">{currency}{'\u00A0'}{purchasesOwnerContrib.toLocaleString()}</span>
+                {cashDifference !== null && cashDifference !== 0 && (
+                  <div className="space-y-2">
+                    <Textarea id="quick-closing-cashNotes" value={cashNotes} onChange={e => { setCashNotes(e.target.value); setInlineErrors((current) => ({ ...current, cashNotes: undefined })); }} placeholder="Reconciliation note is required for a cash difference" className="min-h-20 resize-none text-sm" />
+                    <Button type="button" size="sm" variant={managerApproved ? 'default' : 'outline'} className="min-h-11 w-full" onClick={() => setManagerApproved(!managerApproved)}><ShieldCheck className="mr-1.5 h-4 w-4" />{managerApproved ? 'Manager approval recorded' : 'Confirm manager review'}</Button>
                   </div>
                 )}
               </div>
-              {/* Business rule reminder */}
-              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-muted/20 border border-border/50">
-                <Info className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <p className="text-[9px] text-muted-foreground leading-relaxed">
-                  Sales Revenue is never modified by cash shortage or owner contributions. Operating Result = Sales − Approved Purchases only.
-                </p>
+            </section>
+
+            <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-background shadow-sm">
+              <div className="flex items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50 px-3 py-3 sm:px-4"><div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-emerald-600" /><h2 className="text-xs font-black uppercase tracking-wide text-emerald-950">Operating Result</h2></div><Money currency={currency} value={operatingResult} signed className={`text-sm font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`} /></div>
+              <div className="space-y-2 p-3 sm:p-4">
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2 text-xs"><span className="font-semibold text-blue-900">Sales</span><Money currency={currency} value={totalSales} className="font-bold text-blue-700" /></div>
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-orange-50 px-3 py-2 text-xs"><span className="font-semibold text-orange-900">Purchases</span><Money currency={currency} value={approvedPurchasesTotal} className="font-bold text-orange-700" /></div>
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2 text-xs"><span className="font-semibold text-rose-900">Expenses</span><Money currency={currency} value={expensesTotal} className="font-bold text-rose-700" /></div>
+                <div className={`flex items-center justify-between gap-3 rounded-xl border-2 px-3 py-3 text-xs ${operatingResult >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}><span className="font-black uppercase tracking-wide text-foreground">Operating Result</span><Money currency={currency} value={operatingResult} signed className={`text-lg font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`} /></div>
+                <p className="pt-1 text-[11px] leading-relaxed text-muted-foreground">Automatically calculated as Total Sales − Purchases − Expenses.</p>
               </div>
+            </section>
+          </div>
+
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm">
+            <div className="border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4"><h2 className="text-xs font-black uppercase tracking-wide text-slate-900">Daily Closing Summary</h2></div>
+            <div className="p-3 sm:p-4">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Sales</span><Money currency={currency} value={totalSales} className="font-bold text-foreground" /></div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Purchases</span><Money currency={currency} value={approvedPurchasesTotal} className="font-bold text-foreground" /></div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Expenses</span><Money currency={currency} value={expensesTotal} className="font-bold text-foreground" /></div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Customer Credit</span><Money currency={currency} value={creditTotal} className="font-bold text-foreground" /></div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Expected Cash</span><Money currency={currency} value={expectedCash} className="font-bold text-foreground" /></div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Actual Cash</span>{actualCount === null ? <span className="font-bold text-muted-foreground">—</span> : <Money currency={currency} value={actualCount} className="font-bold text-foreground" />}</div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Difference</span>{cashDifference === null ? <span className="font-bold text-muted-foreground">—</span> : <Money currency={currency} value={cashDifference} signed className={`font-bold ${cashDifference === 0 ? 'text-emerald-700' : 'text-red-700'}`} />}</div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="font-bold text-foreground">Operating Result</span><Money currency={currency} value={operatingResult} signed className={`font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`} /></div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${useAutomaticSales ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{useAutomaticSales ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertTriangle className="h-4 w-4 shrink-0" />}<span>Sales {useAutomaticSales ? 'loaded from ERP' : 'source needs review'}</span></div>
+                <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${purchasesLoading || expensesLoading ? 'border-slate-200 bg-slate-50 text-slate-700' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{purchasesLoading || expensesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}<span>Purchases and expenses loaded</span></div>
+                <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${creditTotal >= 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}><CheckCircle2 className="h-4 w-4" /><span>Customer credit loaded</span></div>
+                <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${actualCount !== null && (remainingDifference === 0 || managerApproved) ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{actualCount !== null && (remainingDifference === 0 || managerApproved) ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}<span>{actualCount === null ? 'Actual cash is required' : remainingDifference === 0 ? 'Cash balanced' : 'Cash difference requires review'}</span></div>
+              </div>
+              {inlineErrors.duplicate && <div role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" /><p className="text-xs font-bold">{inlineErrors.duplicate}</p></div>}
+              {!allValid && <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" /><p className="text-xs font-bold text-red-800">{validations.filter(v => !v.passed).map(v => v.label).join(', ')}</p></div>}
             </div>
-            </AccordionBody>
-          </div>
+          </section>
+        </div>
+      </div>
 
-          {/* ═══════════════════════════════════════════════════════════════
-              SECTION 8 — VALIDATION CENTER
-          ═══════════════════════════════════════════════════════════════ */}
-          <div className={`rounded-2xl border-2 ${SECTION_COLORS.validation.border} overflow-hidden bg-background shadow-sm`}>
-            <SectionHeader
-              icon={CheckSquare}
-              title="Validation Center"
-              color="validation"
-              sectionNum={sectionNumbers.validation}
-              collapsible
-              collapsed={!isSectionOpen('validation')}
-              onToggle={() => toggleSection('validation')}
-              badge={
-                <Badge className={`text-[10px] font-bold ${allValid ? 'bg-emerald-600' : 'bg-red-500'} text-white`}>
-                  {passedCount}/{validations.length}
-                </Badge>
-              }
-            />
-            <AccordionBody open={isSectionOpen('validation')}>
-              <div className="p-4 space-y-2">
-                {validations.map(v => (
-                  <ValidationRow key={v.key} label={v.label} passed={v.passed} message={v.message} />
-                ))}
-                {allValid && (
-                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-50 border-2 border-emerald-300 mt-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span className="text-xs font-bold text-emerald-800">All validations passed — ready to close shift</span>
-                  </div>
-                )}
-              </div>
-            </AccordionBody>
-          </div>
-
-          {/* ═══════════════════════════════════════════════════════════════
-              SECTION 9 — SAVE PANEL
-          ═══════════════════════════════════════════════════════════════ */}
-          <div className={`rounded-2xl border-2 ${SECTION_COLORS.save.border} overflow-hidden bg-background shadow-sm`}>
-            <SectionHeader
-              icon={Database}
-              title="Save Panel"
-              color="save"
-              sectionNum={sectionNumbers.save}
-              collapsible
-              collapsed={!isSectionOpen('save')}
-              onToggle={() => toggleSection('save')}
-            />
-            <AccordionBody open={isSectionOpen('save')}>
-            <div className="p-4 space-y-3">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-xs font-bold uppercase tracking-wide text-emerald-900">Final Review</p>
-                  <Badge className={operatingResult >= 0 ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}>{operatingResult >= 0 ? '+' : ''}{currency}{'\u00A0'}{operatingResult.toLocaleString()}</Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
-                  <span className="text-muted-foreground">Sales <strong className="ml-1 text-foreground">{currency}{'\u00A0'}{totalSales.toLocaleString()}</strong></span>
-                  <span className="text-muted-foreground">Purchases <strong className="ml-1 text-foreground">{currency}{'\u00A0'}{approvedPurchasesTotal.toLocaleString()}</strong></span>
-                  <span className="text-muted-foreground">Expenses <strong className="ml-1 text-foreground">{currency}{'\u00A0'}{expensesTotal.toLocaleString()}</strong></span>
-                  <span className="text-muted-foreground">Credit <strong className="ml-1 text-foreground">{currency}{'\u00A0'}{creditTotal.toLocaleString()}</strong></span>
-                  <span className="text-muted-foreground">Expected <strong className="ml-1 text-foreground">{currency}{'\u00A0'}{expectedCash.toLocaleString()}</strong></span>
-                  <span className="text-muted-foreground">Actual <strong className="ml-1 text-foreground">{actualCount === null ? '—' : `${currency}\u00A0${actualCount.toLocaleString()}`}</strong></span>
-                  <span className="col-span-2 text-muted-foreground">Difference <strong className={cashDifference === 0 ? 'ml-1 text-emerald-700' : 'ml-1 text-red-700'}>{cashDifference === null ? '—' : `${cashDifference >= 0 ? '+' : ''}${currency}${cashDifference.toLocaleString()}`}</strong></span>
-                </div>
-              </div>
-              <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-wide">Records that will be created:</p>
-              <div className="space-y-1.5">
-                {recordsToCreate.map(r => (
-                  <div key={r.key} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-green-50 border border-green-200">
-                    <r.icon className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
-                    <span className="text-xs font-medium text-green-800">{r.label}</span>
-                    <span className="ml-auto text-[9px] font-bold text-green-600 uppercase">{r.key}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Error display */}
-              {inlineErrors.duplicate && (
-                <div role="alert" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-900">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                  <p className="text-xs font-bold">{inlineErrors.duplicate}</p>
-                </div>
-              )}
-              {!allValid && (
-                <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-red-50 border border-red-200">
-                  <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-bold text-red-800">Cannot save — fix validation errors first</p>
-                    <p className="text-[10px] text-red-600 mt-0.5">
-                      {validations.filter(v => !v.passed).map(v => v.label).join(', ')}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Action buttons */}
-              <div className="sticky bottom-0 z-20 -mx-4 grid grid-cols-2 gap-3 border-t border-border bg-background/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-12 font-bold"
-                  onClick={onCancel}
-                  disabled={isSubmitting}
-                >
-                  <X className="w-4 h-4 mr-1.5" /> Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className={`h-12 font-bold ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`}
-                  disabled={isSubmitting || purchasesLoading || !allValid}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-1.5" /> Save Daily Closing
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-            </AccordionBody>
-          </div>
-
+      <div className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
+        <div className="mx-auto grid w-full max-w-6xl grid-cols-3 gap-2 sm:flex sm:justify-end">
+          <Button type="button" variant="outline" className="col-span-1 min-h-12 font-bold sm:w-32" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button>
+          <Button type="submit" className={`col-span-2 min-h-12 font-black sm:w-64 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} disabled={isSubmitting || purchasesLoading || expensesLoading || automaticClosingLoading || !allValid}>
+            {isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Save Daily Closing</>}
+          </Button>
         </div>
       </div>
     </form>
