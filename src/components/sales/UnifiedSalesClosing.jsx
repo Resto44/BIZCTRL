@@ -453,7 +453,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const { config: closingConfig, fields: configuredClosingFields, paymentMethods: configuredPaymentMethods } = useSalesClosingCustomization();
   const branches = asRecordArray(tenantBranches);
   const canUseAdvancedClosing = isManager || [ROLES.OWNER, ROLES.GENERAL_MANAGER].includes(role);
-  const [closingView, setClosingView] = useState(() => canUseAdvancedClosing ? 'advanced' : 'quick');
+  const [closingView, setClosingView] = useState('quick');
   const isQuickClosing = closingView === 'quick';
   const assignedManagerBranch = useMemo(() => {
     if (!isManager) return null;
@@ -654,7 +654,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     updateCalculatedInput(setCustomClosingFieldValues, (previous) => ({ ...previous, [fieldId]: value }));
   }, [updateCalculatedInput]);
   // ── Employees ─────────────────────────────────────────────────────────────
-  const { data: employeesData, isLoading: empLoading } = useQuery({
+  const { data: employeesData, isLoading: empLoading, isError: empError } = useQuery({
     queryKey: ['employees_cashiers', activeRestaurant?.id, ownerFilter?.created_by, ownerFilter?.branch, form.branch, selectedBranchId],
     queryFn: async () => {
       if (isManager && !activeRestaurant?.id) return [];
@@ -1438,7 +1438,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               </div>
               <div id="quick-closing-cashier" className={`min-w-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 ${closingFieldVisibilityClass('cashier')}`}>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">{closingFieldLabel('cashier', 'Cashier')}</p>
-                <p className="mt-1 truncate text-sm font-bold text-emerald-900">{empLoading ? 'Loading…' : cashierDisplayName || 'No cashier'}</p>
+                <p className="mt-1 truncate text-sm font-bold text-emerald-900">{cashierDisplayName || (empLoading ? 'Loading…' : empError ? 'Unable to load cashier' : 'No cashier')}</p>
               </div>
             </div>
           </section>

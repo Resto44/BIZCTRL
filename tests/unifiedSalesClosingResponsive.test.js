@@ -17,6 +17,13 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).not.toContain('100vw');
   });
 
+  it('defaults every role to the streamlined Quick Closing view and does not mask the authenticated operator behind a pending employee query', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).toContain("const [closingView, setClosingView] = useState('quick');");
+    expect(workspace).toContain("cashierDisplayName || (empLoading ? 'Loading…' : empError ? 'Unable to load cashier' : 'No cashier')");
+  });
+
   it('loads existing sales, POS and cash-register data automatically in restaurant, branch and date scope', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
