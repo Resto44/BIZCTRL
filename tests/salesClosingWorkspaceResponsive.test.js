@@ -7,7 +7,7 @@ describe('Quick Sales Closing workflow contract', () => {
   it('renders every closing group in one continuous scrollable workspace without accordion interaction', async () => {
     const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
 
-    expect(workspace).toContain('overflow-y-auto overscroll-contain');
+    expect(workspace).toContain('touch-pan-y overflow-y-auto overscroll-contain');
     expect(workspace).toContain('grid grid-rows-[1fr] opacity-100');
     expect(workspace).toContain('title="Sales Entry"');
     expect(workspace).toContain('title="Cash Reconciliation"');
@@ -46,8 +46,16 @@ describe('Quick Sales Closing workflow contract', () => {
     expect(workspace).toContain("nextErrors.credit = 'Credit customer is required.'");
     expect(workspace).toContain('focusField(firstError)');
     expect(workspace).toContain('pb-[calc(env(safe-area-inset-bottom)+6.5rem)]');
+    expect(workspace).toContain('h-full min-h-0 min-w-0 flex-col');
+    expect(workspace).toContain('[-webkit-overflow-scrolling:touch]');
+    expect(workspace).toContain('dir="ltr"');
+    expect(workspace).toContain("{currency}{'\\u00A0'}{");
     expect(workspace).toContain('sticky bottom-0 z-20');
     expect(workspace).not.toContain('100vw');
+
+    const sales = await source('../src/pages/Sales.jsx');
+    expect(sales).toContain('h-[calc(100dvh-1rem)] min-h-0');
+    expect(sales).toContain('flex min-h-0 min-w-0 flex-1 overflow-hidden');
   });
 
   it('keeps existing security and prevents a duplicate finalized closing before save', async () => {

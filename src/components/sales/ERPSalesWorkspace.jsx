@@ -172,11 +172,12 @@ const NumInput = memo(function NumInput({ id, label, value, onChange, required, 
       {helpText && <p className="text-[9px] text-muted-foreground mb-1 leading-tight">{helpText}</p>}
       <div className="relative">
         {prefix && (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium pointer-events-none">{prefix}</span>
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 whitespace-nowrap text-xs font-semibold tracking-wide text-muted-foreground">{prefix}</span>
         )}
         <Input
           id={id}
           type="number"
+          dir="ltr"
           inputMode="decimal"
           step="0.01"
           value={value}
@@ -184,7 +185,7 @@ const NumInput = memo(function NumInput({ id, label, value, onChange, required, 
           required={required}
           readOnly={readOnly}
           placeholder="0.00"
-          className={`h-10 ${prefix ? 'pl-8' : ''} text-sm font-medium transition-colors
+          className={`h-10 ${prefix ? 'pl-14' : ''} text-left text-sm font-medium tabular-nums transition-colors
             ${readOnly ? 'bg-muted/50 cursor-default text-muted-foreground' : 'bg-background'}
             ${error ? 'border-destructive ring-1 ring-destructive/30' : ''}`}
         />
@@ -338,7 +339,7 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
                     {c.phone && <p className="text-[10px] text-muted-foreground">{c.phone}</p>}
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-bold text-red-600">{currency}{Number(c.outstanding_balance || 0).toLocaleString()}</p>
+                    <p className="text-[10px] font-bold text-red-600">{currency}{'\u00A0'}{Number(c.outstanding_balance || 0).toLocaleString()}</p>
                     <p className="text-[9px] text-muted-foreground uppercase">Debt</p>
                   </div>
                 </div>
@@ -353,15 +354,15 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <div className="bg-background rounded-lg p-2 border border-border">
             <p className="text-[9px] text-muted-foreground uppercase font-bold">Current Debt</p>
-            <p className="text-sm font-bold text-red-600">{currency}{currentDebt.toLocaleString()}</p>
+            <p className="text-sm font-bold text-red-600">{currency}{'\u00A0'}{currentDebt.toLocaleString()}</p>
           </div>
           <div className="bg-background rounded-lg p-2 border border-border">
             <p className="text-[9px] text-muted-foreground uppercase font-bold">Credit Limit</p>
-            <p className="text-sm font-bold text-blue-600">{currency}{creditLimit.toLocaleString()}</p>
+            <p className="text-sm font-bold text-blue-600">{currency}{'\u00A0'}{creditLimit.toLocaleString()}</p>
           </div>
           <div className="bg-background rounded-lg p-2 border border-border">
             <p className="text-[9px] text-muted-foreground uppercase font-bold">Available Credit</p>
-            <p className="text-sm font-bold text-emerald-600">{currency}{availableCredit.toLocaleString()}</p>
+            <p className="text-sm font-bold text-emerald-600">{currency}{'\u00A0'}{availableCredit.toLocaleString()}</p>
           </div>
           <div className="bg-background rounded-lg p-2 border border-border">
             <p className="text-[9px] text-muted-foreground uppercase font-bold">Credit Score</p>
@@ -382,7 +383,7 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
         <div className={`rounded-lg p-2 border text-xs font-medium ${limitExceeded ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
           <div className="flex justify-between">
             <span>Remaining Credit After Sale</span>
-            <span className="font-bold">{currency}{remainingCredit.toLocaleString()}</span>
+            <span className="font-bold">{currency}{'\u00A0'}{remainingCredit.toLocaleString()}</span>
           </div>
         </div>
       )}
@@ -405,13 +406,13 @@ const StickySummary = memo(function StickySummary({ totalSales, operatingResult,
           <div className="flex items-center gap-1.5">
             <DollarSign className="w-3.5 h-3.5 text-blue-600" />
             <span className="text-muted-foreground">Revenue</span>
-            <span className="font-black text-blue-700">{currency}{totalSales.toLocaleString()}</span>
+            <span className="font-black text-blue-700">{currency}{'\u00A0'}{totalSales.toLocaleString()}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
             <span className="text-muted-foreground">Result</span>
             <span className={`font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-              {operatingResult >= 0 ? '+' : ''}{currency}{operatingResult.toLocaleString()}
+              {operatingResult >= 0 ? '+' : ''}{currency}{'\u00A0'}{operatingResult.toLocaleString()}
             </span>
           </div>
           {cashStatus && <StatusBadge status={cashStatus} />}
@@ -1208,19 +1209,19 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
       key: 'pos',
       label: 'POS Totals Valid',
       passed: posEntries.every(e => !e.device_id || Number(e.amount) >= 0),
-      message: `${currency}${networkTotal.toLocaleString()}`,
+      message: `${currency}\u00A0${networkTotal.toLocaleString()}`,
     },
     {
       key: 'credit',
       label: 'Credit Totals Valid',
       passed: creditEntries.every(e => !e.customer || (Number(e.amount) >= 0 && e.customer)),
-      message: `${currency}${creditTotal.toLocaleString()}`,
+      message: `${currency}\u00A0${creditTotal.toLocaleString()}`,
     },
     {
       key: 'cash',
       label: 'Cash Totals Valid',
       passed: cashSales >= 0,
-      message: `${currency}${cashSales.toLocaleString()}`,
+      message: `${currency}\u00A0${cashSales.toLocaleString()}`,
     },
     {
       key: 'creditLimit',
@@ -1418,7 +1419,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   // Save returns immediately to Daily Sales via onSubmit callback.
 
   return (
-    <form onSubmit={handleSubmit} className="flex min-h-0 min-w-0 flex-col">
+    <form onSubmit={handleSubmit} className="flex h-full min-h-0 min-w-0 flex-col">
       {/* Sticky Summary */}
       <StickySummary
         totalSales={totalSales}
@@ -1428,7 +1429,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
         isSubmitting={isSubmitting}
       />
 
-      <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain">
+      <div className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
         <div className="space-y-3 p-3 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:space-y-4 sm:p-4 sm:pb-8">
           {savedClosing && (
             <div role="status" className={`rounded-xl border p-4 ${savedClosing._alreadyExists ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'}`}>
@@ -1577,7 +1578,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
               onToggle={() => toggleSection('summary')}
               badge={
                 <Badge className="bg-indigo-600 text-white text-[10px] font-bold">
-                  {currency}{realSummary.todayTotal.toLocaleString()}
+                  {currency}{'\u00A0'}{realSummary.todayTotal.toLocaleString()}
                 </Badge>
               }
             />
@@ -1596,13 +1597,13 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                     <span className="text-[10px] text-muted-foreground">{todayStr}</span>
                   </div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <KPICard label="Cash Sales"       value={`${currency}${realSummary.todayCash.toLocaleString()}`}    icon={Banknote}    colorClass="text-emerald-600" bgClass="bg-emerald-100" sublabel="Counter cash" />
-                    <KPICard label="POS / Network"    value={`${currency}${realSummary.todayNetwork.toLocaleString()}`} icon={CreditCard}  colorClass="text-violet-600" bgClass="bg-violet-100" sublabel="POS & digital" />
-                    <KPICard label="Customer Credit"  value={`${currency}${realSummary.todayCredit.toLocaleString()}`}  icon={User}        colorClass="text-blue-600"   bgClass="bg-blue-100"   sublabel="Credit sales" />
+                    <KPICard label="Cash Sales"       value={`${currency}\u00A0${realSummary.todayCash.toLocaleString()}`}    icon={Banknote}    colorClass="text-emerald-600" bgClass="bg-emerald-100" sublabel="Counter cash" />
+                    <KPICard label="POS / Network"    value={`${currency}\u00A0${realSummary.todayNetwork.toLocaleString()}`} icon={CreditCard}  colorClass="text-violet-600" bgClass="bg-violet-100" sublabel="POS & digital" />
+                    <KPICard label="Customer Credit"  value={`${currency}\u00A0${realSummary.todayCredit.toLocaleString()}`}  icon={User}        colorClass="text-blue-600"   bgClass="bg-blue-100"   sublabel="Credit sales" />
                     {realSummary.todayCustom > 0 && (
-                      <KPICard label="Custom Sources"  value={`${currency}${realSummary.todayCustom.toLocaleString()}`}  icon={Star}        colorClass="text-amber-600"  bgClass="bg-amber-100"  sublabel="Other sources" />
+                      <KPICard label="Custom Sources"  value={`${currency}\u00A0${realSummary.todayCustom.toLocaleString()}`}  icon={Star}        colorClass="text-amber-600"  bgClass="bg-amber-100"  sublabel="Other sources" />
                     )}
-                    <KPICard label="Total Revenue"    value={`${currency}${realSummary.todayTotal.toLocaleString()}`}   icon={DollarSign}  colorClass="text-indigo-600" bgClass="bg-indigo-100" sublabel={realSummary.todayCustom > 0 ? 'Cash+POS+Credit+Custom' : 'Cash+POS+Credit'} />
+                    <KPICard label="Total Revenue"    value={`${currency}\u00A0${realSummary.todayTotal.toLocaleString()}`}   icon={DollarSign}  colorClass="text-indigo-600" bgClass="bg-indigo-100" sublabel={realSummary.todayCustom > 0 ? 'Cash+POS+Credit+Custom' : 'Cash+POS+Credit'} />
                   </div>
                 </div>
 
@@ -1613,7 +1614,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                     <span className="text-[10px] text-muted-foreground">{yesterdayStr}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-foreground">{currency}{realSummary.yesterdayRealTotal.toLocaleString()}</span>
+                    <span className="text-sm font-bold text-foreground">{currency}{'\u00A0'}{realSummary.yesterdayRealTotal.toLocaleString()}</span>
                     {realSummary.yesterdayRealTotal > 0 && realSummary.todayTotal > 0 && (
                       <span className={`text-xs font-bold ${
                         realSummary.todayTotal >= realSummary.yesterdayRealTotal ? 'text-emerald-600' : 'text-red-500'
@@ -1631,7 +1632,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                     <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">Month Running Total</span>
                     <span className="text-[10px] text-muted-foreground">{monthStartStr} → today</span>
                   </div>
-                  <span className="text-lg font-black text-indigo-700">{currency}{realSummary.monthTotal.toLocaleString()}</span>
+                  <span className="text-lg font-black text-indigo-700">{currency}{'\u00A0'}{realSummary.monthTotal.toLocaleString()}</span>
                 </div>
               </div>
             )}
@@ -1652,7 +1653,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
               onToggle={() => toggleSection('pos')}
               badge={
                 <Badge variant="outline" className="text-violet-700 border-violet-300 text-[10px] font-bold">
-                  {currency}{networkTotal.toLocaleString()}
+                  {currency}{'\u00A0'}{networkTotal.toLocaleString()}
                 </Badge>
               }
             />
@@ -1780,7 +1781,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
               onToggle={() => toggleSection('credit')}
               badge={
                 <Badge variant="outline" className="text-blue-700 border-blue-300 text-[10px] font-bold">
-                  {currency}{creditTotal.toLocaleString()}
+                  {currency}{'\u00A0'}{creditTotal.toLocaleString()}
                 </Badge>
               }
             />
@@ -1829,7 +1830,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                 collapsible
                 collapsed={!isSectionOpen('custom')}
                 onToggle={() => toggleSection('custom')}
-                badge={<Badge variant="outline" className="text-teal-700 border-teal-300 text-[10px] font-bold">{currency}{customTotal.toLocaleString()}</Badge>}
+                badge={<Badge variant="outline" className="text-teal-700 border-teal-300 text-[10px] font-bold">{currency}{'\u00A0'}{customTotal.toLocaleString()}</Badge>}
               />
               <AccordionBody open={isSectionOpen('custom')}>
               <div className="p-4 space-y-3">
@@ -1880,7 +1881,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                 purchasesLoading
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-600" />
                   : <Badge variant="outline" className="text-orange-700 border-orange-300 text-[10px] font-bold">
-                      {currency}{approvedPurchasesTotal.toLocaleString()}
+                      {currency}{'\u00A0'}{approvedPurchasesTotal.toLocaleString()}
                     </Badge>
               }
             />
@@ -1895,21 +1896,21 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                       <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
                         <p className="text-[10px] font-bold uppercase text-orange-800">Paid Purchases</p>
-                        <p className="mt-1 text-lg font-black text-orange-700">{currency}{paidPurchasesTotal.toLocaleString()}</p>
+                        <p className="mt-1 text-lg font-black text-orange-700">{currency}{'\u00A0'}{paidPurchasesTotal.toLocaleString()}</p>
                       </div>
                       <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
                         <p className="text-[10px] font-bold uppercase text-orange-800">Credit Purchases</p>
-                        <p className="mt-1 text-lg font-black text-orange-700">{currency}{creditPurchasesTotal.toLocaleString()}</p>
+                        <p className="mt-1 text-lg font-black text-orange-700">{currency}{'\u00A0'}{creditPurchasesTotal.toLocaleString()}</p>
                       </div>
                       <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
                         <p className="text-[10px] font-bold uppercase text-rose-800">Recorded Expenses</p>
-                        <p className="mt-1 text-lg font-black text-rose-700">{expensesLoading ? '…' : `${currency}${expensesTotal.toLocaleString()}`}</p>
+                        <p className="mt-1 text-lg font-black text-rose-700">{expensesLoading ? '…' : `${currency}\u00A0${expensesTotal.toLocaleString()}`}</p>
                       </div>
                     </div>
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <KPICard
                         label="Approved Purchases"
-                        value={`${currency}${approvedPurchasesTotal.toLocaleString()}`}
+                        value={`${currency}\u00A0${approvedPurchasesTotal.toLocaleString()}`}
                         icon={CheckCircle2}
                         colorClass="text-emerald-600"
                         bgClass="bg-emerald-100"
@@ -1917,7 +1918,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                       />
                       <KPICard
                         label="Pending Purchases"
-                        value={`${currency}${pendingPurchases.reduce((s, p) => s + (Number(p.total_amount) || 0), 0).toLocaleString()}`}
+                        value={`${currency}\u00A0${pendingPurchases.reduce((s, p) => s + (Number(p.total_amount) || 0), 0).toLocaleString()}`}
                         icon={Clock}
                         colorClass="text-amber-600"
                         bgClass="bg-amber-100"
@@ -1925,7 +1926,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                       />
                       <KPICard
                         label="Largest Purchase"
-                        value={largestPurchase > 0 ? `${currency}${largestPurchase.toLocaleString()}` : '—'}
+                        value={largestPurchase > 0 ? `${currency}\u00A0${largestPurchase.toLocaleString()}` : '—'}
                         icon={Package}
                         colorClass="text-orange-600"
                         bgClass="bg-orange-100"
@@ -1967,7 +1968,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                               <span className="font-medium">{p.supplier_name || 'Unknown Supplier'}</span>
                             </div>
-                            <span className="font-bold text-orange-700">{currency}{Number(p.total_amount).toLocaleString()}</span>
+                            <span className="font-bold text-orange-700">{currency}{'\u00A0'}{Number(p.total_amount).toLocaleString()}</span>
                           </div>
                         ))}
                         {approvedPurchasesForDate.length > 5 && (
@@ -2058,7 +2059,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                     <StatusBadge status={cashReconcStatus} />
                   </div>
                   <p className={`text-2xl font-black ${cashDifference < 0 ? 'text-red-600' : cashDifference > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                    {cashDifference >= 0 ? '+' : ''}{currency}{Math.abs(cashDifference).toLocaleString()}
+                    {cashDifference >= 0 ? '+' : ''}{currency}{'\u00A0'}{Math.abs(cashDifference).toLocaleString()}
                   </p>
                   {differencePercentage !== null && (
                     <p className="text-[10px] text-muted-foreground mt-1">
@@ -2085,7 +2086,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Remaining Difference</span>
                     <span className={`text-lg font-black ${remainingDifference === 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                      {remainingDifference >= 0 ? '+' : ''}{currency}{Math.abs(remainingDifference).toLocaleString()}
+                      {remainingDifference >= 0 ? '+' : ''}{currency}{'\u00A0'}{Math.abs(remainingDifference).toLocaleString()}
                     </span>
                   </div>
                   {remainingDifference !== 0 && (
@@ -2109,7 +2110,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div className="bg-muted/30 rounded-lg p-2.5 border border-border">
                   <p className="text-[9px] font-bold uppercase text-muted-foreground">Closing Cash</p>
-                  <p className="text-sm font-black text-foreground">{currency}{closingCash.toLocaleString()}</p>
+                  <p className="text-sm font-black text-foreground">{currency}{'\u00A0'}{closingCash.toLocaleString()}</p>
                   <p className="text-[9px] text-muted-foreground">For next shift opening</p>
                 </div>
                 <div className={`rounded-lg p-2.5 border ${riskLevel === 'High' ? 'bg-red-50 border-red-200' : riskLevel === 'Medium' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
@@ -2140,7 +2141,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
               onToggle={() => toggleSection('operating')}
               badge={
                 <Badge className={`text-[10px] font-bold ${operatingResult >= 0 ? 'bg-emerald-600' : 'bg-red-600'} text-white`}>
-                  {operatingResult >= 0 ? '+' : ''}{currency}{operatingResult.toLocaleString()}
+                  {operatingResult >= 0 ? '+' : ''}{currency}{'\u00A0'}{operatingResult.toLocaleString()}
                 </Badge>
               }
             />
@@ -2149,19 +2150,19 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-blue-50 border border-blue-200">
                   <span className="text-xs font-semibold text-blue-800">Sales Revenue</span>
-                  <span className="text-sm font-black text-blue-700">{currency}{totalSales.toLocaleString()}</span>
+                  <span className="text-sm font-black text-blue-700">{currency}{'\u00A0'}{totalSales.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-orange-50 border border-orange-200">
                   <span className="text-xs font-semibold text-orange-800">Approved Purchases</span>
                   <span className="text-sm font-black text-orange-700">
-                    {purchasesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : `${currency}${approvedPurchasesTotal.toLocaleString()}`}
+                    {purchasesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : `${currency}\u00A0${approvedPurchasesTotal.toLocaleString()}`}
                   </span>
                 </div>
                 <Separator className="my-1" />
                 <div className={`flex justify-between items-center px-3 py-2.5 rounded-xl border-2 ${operatingResult >= 0 ? 'bg-emerald-50 border-emerald-300' : 'bg-red-50 border-red-300'}`}>
                   <span className="text-xs font-bold uppercase text-muted-foreground tracking-wide">Gross Operating Result</span>
                   <span className={`text-xl font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                    {operatingResult >= 0 ? '+' : ''}{currency}{operatingResult.toLocaleString()}
+                    {operatingResult >= 0 ? '+' : ''}{currency}{'\u00A0'}{operatingResult.toLocaleString()}
                   </span>
                 </div>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -2174,26 +2175,26 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                   <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-muted/30 border border-border">
                     <span className="text-[10px] font-semibold text-muted-foreground">Net Cash</span>
                     <span className={`text-xs font-black ${netCash >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                      {netCash >= 0 ? '+' : ''}{currency}{netCash.toLocaleString()}
+                      {netCash >= 0 ? '+' : ''}{currency}{'\u00A0'}{netCash.toLocaleString()}
                     </span>
                   </div>
                 </div>
                 {cashShortageAmount > 0 && (
                   <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-red-50 border border-red-200">
                     <span className="text-[10px] font-semibold text-red-800">Cash Shortage</span>
-                    <span className="text-xs font-black text-red-700">{currency}{cashShortageAmount.toLocaleString()}</span>
+                    <span className="text-xs font-black text-red-700">{currency}{'\u00A0'}{cashShortageAmount.toLocaleString()}</span>
                   </div>
                 )}
                 {ownerContrib > 0 && (
                   <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-purple-50 border border-purple-200">
                     <span className="text-[10px] font-semibold text-purple-800">Owner Contribution (Cash)</span>
-                    <span className="text-xs font-black text-purple-700">{currency}{ownerContrib.toLocaleString()}</span>
+                    <span className="text-xs font-black text-purple-700">{currency}{'\u00A0'}{ownerContrib.toLocaleString()}</span>
                   </div>
                 )}
                 {purchasesOwnerContrib > 0 && (
                   <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-purple-50 border border-purple-200">
                     <span className="text-[10px] font-semibold text-purple-800">Owner Contribution (Purchases Gap)</span>
-                    <span className="text-xs font-black text-purple-700">{currency}{purchasesOwnerContrib.toLocaleString()}</span>
+                    <span className="text-xs font-black text-purple-700">{currency}{'\u00A0'}{purchasesOwnerContrib.toLocaleString()}</span>
                   </div>
                 )}
               </div>
@@ -2259,15 +2260,15 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-xs font-bold uppercase tracking-wide text-emerald-900">Final Review</p>
-                  <Badge className={operatingResult >= 0 ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}>{operatingResult >= 0 ? '+' : ''}{currency}{operatingResult.toLocaleString()}</Badge>
+                  <Badge className={operatingResult >= 0 ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}>{operatingResult >= 0 ? '+' : ''}{currency}{'\u00A0'}{operatingResult.toLocaleString()}</Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
-                  <span className="text-muted-foreground">Sales <strong className="ml-1 text-foreground">{currency}{totalSales.toLocaleString()}</strong></span>
-                  <span className="text-muted-foreground">Purchases <strong className="ml-1 text-foreground">{currency}{approvedPurchasesTotal.toLocaleString()}</strong></span>
-                  <span className="text-muted-foreground">Expenses <strong className="ml-1 text-foreground">{currency}{expensesTotal.toLocaleString()}</strong></span>
-                  <span className="text-muted-foreground">Credit <strong className="ml-1 text-foreground">{currency}{creditTotal.toLocaleString()}</strong></span>
-                  <span className="text-muted-foreground">Expected <strong className="ml-1 text-foreground">{currency}{expectedCash.toLocaleString()}</strong></span>
-                  <span className="text-muted-foreground">Actual <strong className="ml-1 text-foreground">{actualCount === null ? '—' : `${currency}${actualCount.toLocaleString()}`}</strong></span>
+                  <span className="text-muted-foreground">Sales <strong className="ml-1 text-foreground">{currency}{'\u00A0'}{totalSales.toLocaleString()}</strong></span>
+                  <span className="text-muted-foreground">Purchases <strong className="ml-1 text-foreground">{currency}{'\u00A0'}{approvedPurchasesTotal.toLocaleString()}</strong></span>
+                  <span className="text-muted-foreground">Expenses <strong className="ml-1 text-foreground">{currency}{'\u00A0'}{expensesTotal.toLocaleString()}</strong></span>
+                  <span className="text-muted-foreground">Credit <strong className="ml-1 text-foreground">{currency}{'\u00A0'}{creditTotal.toLocaleString()}</strong></span>
+                  <span className="text-muted-foreground">Expected <strong className="ml-1 text-foreground">{currency}{'\u00A0'}{expectedCash.toLocaleString()}</strong></span>
+                  <span className="text-muted-foreground">Actual <strong className="ml-1 text-foreground">{actualCount === null ? '—' : `${currency}\u00A0${actualCount.toLocaleString()}`}</strong></span>
                   <span className="col-span-2 text-muted-foreground">Difference <strong className={cashDifference === 0 ? 'ml-1 text-emerald-700' : 'ml-1 text-red-700'}>{cashDifference === null ? '—' : `${cashDifference >= 0 ? '+' : ''}${currency}${cashDifference.toLocaleString()}`}</strong></span>
                 </div>
               </div>
