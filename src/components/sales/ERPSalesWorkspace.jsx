@@ -20,7 +20,7 @@
  *     Shift cannot close until Remaining Difference = 0 or Manager Approval.
  * 13. Sales, Cash Reconciliation, Purchases and Operating Result are independent.
  */
-import React, { useState, useMemo, useEffect, useCallback, memo } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useCallback, memo } from 'react';
 import { flushSync } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -1014,7 +1014,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   const [automaticClosingSnapshot, setAutomaticClosingSnapshot] = useState(() => ({
     cash: 0, network: 0, credit: 0, other: 0, expectedCash: null, openingCash: null, hasData: false, paymentCount: 0,
   }));
-  useEffect(() => {
+  useLayoutEffect(() => {
     setAutomaticClosingSnapshot((previous) => {
       const next = automaticClosing;
       const unchanged = previous.cash === next.cash && previous.network === next.network && previous.credit === next.credit && previous.other === next.other && previous.expectedCash === next.expectedCash && previous.openingCash === next.openingCash && previous.hasData === next.hasData && previous.paymentCount === next.paymentCount;
