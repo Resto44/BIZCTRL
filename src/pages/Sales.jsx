@@ -549,8 +549,6 @@ export default function Sales() {
       qc.invalidateQueries({ queryKey: ['reports'] });
       qc.invalidateQueries({ queryKey: ['driver-sales'] });
       qc.invalidateQueries({ queryKey: ['driver-performance'] });
-      setShowForm(false);
-      setEditing(null); // Clear editing state just in case
     },
   });
 
@@ -597,8 +595,6 @@ export default function Sales() {
       qc.invalidateQueries({ queryKey: ['reports'] });
       qc.invalidateQueries({ queryKey: ['driver-sales'] });
       qc.invalidateQueries({ queryKey: ['driver-performance'] });
-      setEditing(null);
-      setShowForm(false); // Ensure form closes on update too
     },
   });
 
@@ -668,18 +664,32 @@ export default function Sales() {
   }, [selectedIds.size, filtered]);
 
   const handleSave = async (data, proofUrl, ocr) => {
-    // Ensure restaurant_id is included for correct scoping in Cash Register Center
-    if (activeRestaurant?.id) {
-      data.restaurant_id = activeRestaurant.id;
-    }
-    // Bug fix: always create a NEW record unless explicitly editing an existing one.
-    // Previous behaviour found any record for the same date+branch and overwrote it,
-    // which destroyed history.  Now every submission creates its own record.
+    // Ensure restaurant_id is included for correct scoping in Cash Register Center.
+    if (activeRestaurant?.id) data.restaurant_id = activeRestaurant.id;
+
     if (editing) {
-      await updateMut.mutateAsync({ id: editing.id, data, prev: editing, proofUrl, ocr });
-    } else {
-      await createMut.mutateAsync({ data, proofUrl, ocr });
+      return updateMut.mutateAsync({ id: editing.id, data, prev: editing, proofUrl, ocr });
     }
+
+    // A finalized closing is unique per restaurant, branch, date and shift. The
+    // application checks both canonical and legacy branch rows before creating
+    // side effects; the database constraint is the final concurrency safeguard.
+    const baseQuery = () => supabase
+      .from('daily_sales')
+      .select('*')
+      .eq('restaurant_id', data.restaurant_id)
+      .eq('date', data.date)
+      .eq('shift', data.shift)
+      .limit(1);
+    const [canonical, legacy] = await Promise.all([
+      data.branch_id ? baseQuery().eq('branch_id', data.branch_id) : Promise.resolve({ data: [], error: null }),
+      baseQuery().is('branch_id', null).eq('branch', data.branch),
+    ]);
+    if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+    const existing = firstRecord([...(canonical.data || []), ...(legacy.data || [])]);
+    if (existing) return { ...existing, _alreadyExists: true };
+
+    return createMut.mutateAsync({ data, proofUrl, ocr });
   };
 
   const handleExport = ({ format: fmt, from, to, branch }) => {
@@ -835,7 +845,11 @@ export default function Sales() {
             </DialogTitle>
           </DialogHeader>
           <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            <ERPSalesWorkspace onSubmit={handleSave} onCancel={() => setShowForm(false)} />
+            <ERPSalesWorkspace
+              onSubmit={handleSave}
+              onCancel={() => setShowForm(false)}
+              onNewClosing={() => { setShowForm(false); setTimeout(() => setShowForm(true), 0); }}
+            />
           </div>
         </DialogContent>
       </Dialog>
@@ -849,7 +863,12 @@ export default function Sales() {
             </DialogTitle>
           </DialogHeader>
           <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            {editing && <ERPSalesWorkspace initial={editing} onSubmit={handleSave} onCancel={() => setEditing(null)} />}
+            {editing && <ERPSalesWorkspace
+              initial={editing}
+              onSubmit={handleSave}
+              onCancel={() => setEditing(null)}
+              onNewClosing={() => { setEditing(null); setTimeout(() => setShowForm(true), 0); }}
+            />}
           </div>
         </DialogContent>
       </Dialog>

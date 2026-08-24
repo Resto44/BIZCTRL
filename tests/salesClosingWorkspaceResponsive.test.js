@@ -3,47 +3,63 @@ import { readFile } from 'node:fs/promises';
 
 const source = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
-describe('Sales closing workspace responsive and validation contract', () => {
-  it('uses a viewport-bounded, scroll-safe workspace dialog on mobile and desktop', async () => {
-    const sales = await source('../src/pages/Sales.jsx');
-    const dialogShell = 'h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-h-[calc(100dvh-1rem)] max-w-3xl flex-col gap-0 overflow-hidden';
-
-    expect(sales.match(new RegExp(dialogShell.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(2);
-    expect(sales).toContain('sm:max-h-[calc(100dvh-3rem)] sm:w-full sm:rounded-lg');
-    expect(sales).toContain('min-h-0 min-w-0 flex-1 overflow-hidden');
-    expect(sales).not.toContain('100vw');
-  });
-
-  it('keeps section numbering unique whether optional custom sales sources exist or not', async () => {
+describe('Quick Sales Closing workflow contract', () => {
+  it('renders every closing group in one continuous scrollable workspace without accordion interaction', async () => {
     const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
 
-    expect(workspace).toContain("pos: '3'");
-    expect(workspace).toContain("credit: '4'");
-    expect(workspace).toContain("custom: '5'");
-    expect(workspace).toContain('purchases: String(hasCustomSources ? 6 : 5)');
-    expect(workspace).toContain('sectionNum={sectionNumbers.pos}');
-    expect(workspace).toContain('sectionNum={sectionNumbers.credit}');
-    expect(workspace).toContain('sectionNum={sectionNumbers.save}');
-    expect(workspace).not.toContain('sectionNum="4½"');
+    expect(workspace).toContain('overflow-y-auto overscroll-contain');
+    expect(workspace).toContain('grid grid-rows-[1fr] opacity-100');
+    expect(workspace).toContain('title="Sales Entry"');
+    expect(workspace).toContain('title="Cash Reconciliation"');
+    expect(workspace).toContain('title="Operating Result"');
+    expect(workspace).not.toContain('activeSection === key ? null : key');
   });
 
-  it('requires an actual cash count and derives the displayed cashier from the selected cashier record', async () => {
+  it('keeps the primary fields and totals auto-calculated for fast entry', async () => {
     const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
 
-    expect(workspace).toContain('const defaultCashier = firstRecord(cashiers);');
-    expect(workspace).toContain('const cashierDisplayName = form.cashier_name || selectedCashier?.full_name || defaultCashier?.full_name');
-    expect(workspace).toContain('passed: actualCount !== null && (remainingDifference === 0 || managerApproved)');
-    expect(workspace).toContain("toast.error('Actual cash count is required before closing the shift.');");
-    expect(workspace).toContain('disabled={isSubmitting || purchasesLoading || !allValid}');
+    expect(workspace).toContain('label="Cash Sales"');
+    expect(workspace).toContain('label="Card / Network Sales"');
+    expect(workspace).toContain('label="Other Payment"');
+    expect(workspace).toContain('label="Total Sales"');
+    expect(workspace).toContain('cashSales + networkTotal + creditTotal + customTotal');
+    expect(workspace).toContain('actualCount - expectedCash');
+    expect(workspace).toContain('totalSales - approvedPurchasesTotal - expensesTotal');
   });
 
-  it('keeps headers, badges, summaries and validation rows shrinkable on narrow viewports', async () => {
+  it('loads existing purchases and expenses by secure restaurant and branch scope without duplicate entry', async () => {
     const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
 
-    expect(workspace).toContain('flex w-full min-w-0 items-center justify-between gap-2');
-    expect(workspace).toContain('max-w-[7.5rem] overflow-hidden text-ellipsis whitespace-nowrap');
-    expect(workspace).toContain('max-w-[8rem] shrink-0 truncate text-right');
-    expect(workspace).toContain('pb-[calc(env(safe-area-inset-bottom)+1.5rem)]');
+    expect(workspace).toContain("queryKey: ['approved_purchases_for_date'");
+    expect(workspace).toContain("queryKey: ['closing_expenses_for_date'");
+    expect(workspace).toContain(".from('expenses')");
+    expect(workspace).toContain(".eq('restaurant_id', activeRestaurant.id)");
+    expect(workspace).toContain('const expensesTotal = useMemo');
+    expect(workspace).toContain('Paid Purchases');
+    expect(workspace).toContain('Credit Purchases');
+  });
+
+  it('uses inline validation, safe mobile spacing and a sticky save action', async () => {
+    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+
+    expect(workspace).toContain("nextErrors.actualCash = 'Actual Cash is required.'");
+    expect(workspace).toContain("nextErrors.credit = 'Credit customer is required.'");
+    expect(workspace).toContain('focusField(firstError)');
+    expect(workspace).toContain('pb-[calc(env(safe-area-inset-bottom)+6.5rem)]');
+    expect(workspace).toContain('sticky bottom-0 z-20');
     expect(workspace).not.toContain('100vw');
+  });
+
+  it('keeps existing security and prevents a duplicate finalized closing before save', async () => {
+    const sales = await source('../src/pages/Sales.jsx');
+    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+
+    expect(sales).toContain(".eq('restaurant_id', data.restaurant_id)");
+    expect(sales).toContain(".eq('date', data.date)");
+    expect(sales).toContain(".eq('shift', data.shift)");
+    expect(sales).toContain('_alreadyExists: true');
+    expect(workspace).toContain('Closing already exists for this branch and shift.');
+    expect(workspace).toContain('Daily closing saved successfully.');
+    expect(workspace).toContain('Save Daily Closing');
   });
 });

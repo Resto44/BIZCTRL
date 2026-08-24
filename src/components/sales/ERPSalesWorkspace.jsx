@@ -120,7 +120,7 @@ const SectionHeader = memo(function SectionHeader({
   const contents = (
     <>
       <span className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2.5">
-        {sectionNum && (
+        {false && sectionNum && (
           <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold bg-white/70 border border-border/50 ${c.icon}`}>
             {sectionNum}
           </span>
@@ -130,14 +130,14 @@ const SectionHeader = memo(function SectionHeader({
       </span>
       <span className="ml-2 flex shrink-0 items-center gap-1.5 sm:gap-2">
         {badge && <span className="max-w-[7.5rem] overflow-hidden text-ellipsis whitespace-nowrap sm:max-w-none">{badge}</span>}
-        {collapsible && (
+        {false && collapsible && (
           collapsed ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 text-muted-foreground" />
         )}
       </span>
     </>
   );
 
-  if (collapsible) {
+  if (false) {
     return (
       <button
         type="button"
@@ -155,8 +155,8 @@ const SectionHeader = memo(function SectionHeader({
 
 const AccordionBody = memo(function AccordionBody({ open, children }) {
   return (
-    <div className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
-      <div className="min-h-0 overflow-hidden">{children}</div>
+    <div className="grid grid-rows-[1fr] opacity-100">
+      <div className="min-h-0 overflow-visible">{children}</div>
     </div>
   );
 });
@@ -164,7 +164,7 @@ const AccordionBody = memo(function AccordionBody({ open, children }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // NUMERIC INPUT — ERP style
 // ─────────────────────────────────────────────────────────────────────────────
-const NumInput = memo(function NumInput({ label, value, onChange, required, prefix, helpText, readOnly, error }) {
+const NumInput = memo(function NumInput({ id, label, value, onChange, required, prefix, helpText, readOnly, error }) {
   return (
     <div>
       <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block tracking-wide">{label}</Label>
@@ -174,6 +174,7 @@ const NumInput = memo(function NumInput({ label, value, onChange, required, pref
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium pointer-events-none">{prefix}</span>
         )}
         <Input
+          id={id}
           type="number"
           inputMode="decimal"
           step="0.01"
@@ -428,7 +429,7 @@ const StickySummary = memo(function StickySummary({ totalSales, operatingResult,
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
+export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewClosing }) {
   const { currency } = useLanguage();
   const { user } = useAuth();
   const { ownerFilter, branches: tenantBranches, managerBranch, activeRestaurant, isManager } = useTenant();
@@ -442,8 +443,12 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     ) || null;
   }, [branches, isManager, managerBranch, user?.branch_id]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inlineErrors, setInlineErrors] = useState({});
+  const [savedClosing, setSavedClosing] = useState(null);
 
-  // ── Exclusive accordion state ──────────────────────────────────────────────
+  // ── Legacy section state is retained only for compatibility with existing markup.
+  // The redesigned workspace renders every group continuously without accordion clicks.
+
   // All cards begin compact. Keeping their bodies mounted prevents input state,
   // queries, and calculations from being lost when a Manager changes sections.
   const [activeSection, setActiveSection] = useState(null);
@@ -465,7 +470,40 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     sales_notes: initial?.sales_notes || '',
     ...initial,
   });
-  const set = useCallback((field, value) => setForm(prev => ({ ...prev, [field]: value })), []);
+  const set = useCallback((field, value) => {
+    setInlineErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+    setForm(prev => ({ ...prev, [field]: value }));
+  }, []);
+  const focusField = useCallback((field) => {
+    requestAnimationFrame(() => document.getElementById(`quick-closing-${field}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }, []);
+
+  // Remember the last safe branch and shift for a new closing. Editing an
+  // existing closing always preserves the record values instead.
+  useEffect(() => {
+    if (initial?.id || typeof window === 'undefined' || !branches.length) return;
+    try {
+      const stored = JSON.parse(window.localStorage.getItem('quick-sales-closing-preferences') || '{}');
+      const matchingBranch = branches.find((branch) => branch.key === stored.branch || branch.branch_key === stored.branch);
+      if (!matchingBranch) return;
+      setForm((previous) => ({
+        ...previous,
+        branch: matchingBranch.key || matchingBranch.branch_key || previous.branch,
+        branch_id: matchingBranch.id || previous.branch_id,
+        shift: stored.shift === 'Evening' ? 'Evening' : previous.shift,
+      }));
+    } catch { /* local preference is optional */ }
+  }, [branches, initial?.id]);
+
+  useEffect(() => {
+    if (initial?.id || typeof window === 'undefined' || !form.branch) return;
+    window.localStorage.setItem('quick-sales-closing-preferences', JSON.stringify({ branch: form.branch, shift: form.shift }));
+  }, [form.branch, form.shift, initial?.id]);
 
   // Tenant branches load after the workspace mounts. Persist the Branch Manager's
   // assigned branch key and UUID as soon as that record is available.
@@ -538,7 +576,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   const updateCredit = (id, field, value) => setCreditEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
 
   // ── Dynamic Sales Sources ───────────────────────────────────────────────────────────────
-  const { customSources: customSourcesData, isLoading: sourcesLoading } = useSalesSources({ branchKey: form.branch });
+  const { customSources: customSourcesData, isLoading: sourcesLoading } = useSalesSources({ branchId: selectedBranchId });
   const customSources = asRecordArray(customSourcesData);
   // Amounts keyed by source.id
   const [customSourceAmounts, setCustomSourceAmounts] = useState(() => {
@@ -796,7 +834,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       if (!form.date) return [];
       let q = supabase
         .from('supplier_invoices')
-        .select('id, total_amount, approval_status, date, supplier_name, branch')
+        .select('id, total_amount, paid_amount, approval_status, date, supplier_name, branch')
         .eq('date', form.date)
         .in('approval_status', ['approved', 'auto_approved'])
         .limit(100);
@@ -842,6 +880,36 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     enabled: purchasesEnabled,
   });
   const pendingPurchases = asRecordArray(pendingPurchasesData);
+
+  // ── Recorded expenses for the selected restaurant, branch and closing date ──
+  const expensesEnabled = !!activeRestaurant?.id && !!form.date;
+  const { data: expensesForDateData, isLoading: expensesLoading } = useQuery({
+    queryKey: ['closing_expenses_for_date', activeRestaurant?.id, form.date, form.branch, selectedBranchId],
+    queryFn: async () => {
+      if (!activeRestaurant?.id || !form.date) return [];
+      const baseQuery = () => supabase
+        .from('expenses')
+        .select('id, amount, date, branch_id, branch_key, status, description')
+        .eq('restaurant_id', activeRestaurant.id)
+        .eq('date', form.date)
+        .limit(500);
+      if (!form.branch || form.branch === 'all') {
+        const { data, error } = await baseQuery();
+        if (error) throw error;
+        return asRecordArray(data);
+      }
+      const [canonical, legacy] = await Promise.all([
+        selectedBranchId ? baseQuery().eq('branch_id', selectedBranchId) : Promise.resolve({ data: [], error: null }),
+        baseQuery().is('branch_id', null).eq('branch_key', form.branch),
+      ]);
+      if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+      return asRecordArray(Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+        .map((record) => [record.id, record])).values()));
+    },
+    staleTime: 30000,
+    enabled: expensesEnabled,
+  });
+  const expensesForDate = asRecordArray(expensesForDateData);
 
   // ── Real daily_sales for Live Sales Summary ─────────────────────────────────
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -1009,7 +1077,10 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
 
   // Rule 8: Operating Result = Total Sales - Approved Purchases
   const approvedPurchasesTotal = useMemo(() => approvedPurchasesForDate.reduce((s, p) => s + (Number(p.total_amount) || 0), 0), [approvedPurchasesForDate]);
-  const operatingResult = useMemo(() => totalSales - approvedPurchasesTotal, [totalSales, approvedPurchasesTotal]);
+  const paidPurchasesTotal = useMemo(() => approvedPurchasesForDate.reduce((sum, purchase) => sum + Math.min(Number(purchase.paid_amount) || 0, Number(purchase.total_amount) || 0), 0), [approvedPurchasesForDate]);
+  const creditPurchasesTotal = useMemo(() => Math.max(0, approvedPurchasesTotal - paidPurchasesTotal), [approvedPurchasesTotal, paidPurchasesTotal]);
+  const expensesTotal = useMemo(() => expensesForDate.reduce((s, expense) => s + (Number(expense.amount) || 0), 0), [expensesForDate]);
+  const operatingResult = useMemo(() => totalSales - approvedPurchasesTotal - expensesTotal, [totalSales, approvedPurchasesTotal, expensesTotal]);
   const operatingMarginPct = useMemo(() => totalSales > 0 ? (operatingResult / totalSales) * 100 : 0, [operatingResult, totalSales]);
   const purchasesOwnerContrib = useMemo(() => Math.max(0, approvedPurchasesTotal - totalSales), [approvedPurchasesTotal, totalSales]);
 
@@ -1187,35 +1258,31 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!approvedPurchasesForDate.length) {
-      toast.warning("No approved purchases found for this date. Proceeding without purchase data.");
-    }
-
-    if (actualCount === null) {
-      toast.error('Actual cash count is required before closing the shift.');
-      return;
-    }
-
-    if (remainingDifference !== 0 && remainingDifference !== null && !managerApproved) {
-      toast.error("Cash difference must be balanced or manager approval must be provided.");
-      return;
-    }
-
-    const invalidCredit = creditEntries.find(en => Number(en.amount) > 0 && !en.customer);
-    if (invalidCredit) {
-      toast.error('Please select a customer for all credit entries.');
-      return;
-    }
-
-    const limitExceededEntry = creditEntries.find(en => {
-      const limit = Number(en.credit_limit) || 0;
-      const debt = Number(en.current_debt) || 0;
-      const amt = Number(en.amount) || 0;
-      return limit > 0 && (debt + amt) > limit;
+    const invalidCredit = creditEntries.find((entry) => Number(entry.amount) > 0 && !entry.customer);
+    const limitExceededEntry = creditEntries.find((entry) => {
+      const limit = Number(entry.credit_limit) || 0;
+      const debt = Number(entry.current_debt) || 0;
+      const amount = Number(entry.amount) || 0;
+      return limit > 0 && (debt + amount) > limit;
     });
-    if (limitExceededEntry) {
-      toast.error(`Credit limit exceeded for customer: ${limitExceededEntry.customer}`);
+    const nextErrors = {};
+    if (!form.date) nextErrors.date = 'Date is required.';
+    if (!form.branch) nextErrors.branch = 'Branch is required.';
+    if (!form.shift) nextErrors.shift = 'Shift is required.';
+    if (!cashierDisplayName) nextErrors.cashier = 'Cashier is required.';
+    if (actualCount === null) nextErrors.actualCash = 'Actual Cash is required.';
+    if (remainingDifference !== 0 && remainingDifference !== null && !managerApproved) nextErrors.reconciliation = 'Cash difference must be reviewed before closing.';
+    if (invalidCredit) nextErrors.credit = 'Credit customer is required.';
+    if (limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer}.`;
+    if (Object.keys(nextErrors).length) {
+      setInlineErrors(nextErrors);
+      const firstError = Object.keys(nextErrors)[0];
+      focusField(firstError);
       return;
+    }
+    setInlineErrors({});
+    if (!approvedPurchasesForDate.length) {
+      toast.warning('No approved purchases found for this date. Proceeding without purchase data.');
     }
 
     const selectedBranch = branches.find((branch) =>
@@ -1319,11 +1386,18 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       };
 
       console.log('[ERPSalesWorkspace] Calling onSubmit(payload)...');
-      await onSubmit(payload);
+      const saved = await onSubmit(payload);
+      setSavedClosing(saved || { id: initial?.id || null, status: 'saved' });
       console.log('[ERPSalesWorkspace] onSubmit(payload) SUCCESS');
 
     } catch (err) {
-      toast.error(`Save failed: ${err?.message || 'Unknown error'}`);
+      const duplicateClosing = String(err?.message || '').includes('CLOSING_ALREADY_EXISTS');
+      if (duplicateClosing) {
+        setInlineErrors({ duplicate: 'Closing already exists for this branch and shift.' });
+        toast.error('Closing already exists for this branch and shift.');
+      } else {
+        toast.error(`Save failed: ${err?.message || 'Unknown error'}`);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -1345,7 +1419,21 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       />
 
       <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="space-y-3 p-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:space-y-4 sm:p-4 sm:pb-6">
+        <div className="space-y-3 p-3 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:space-y-4 sm:p-4 sm:pb-8">
+          {savedClosing && (
+            <div role="status" className={`rounded-xl border p-4 ${savedClosing._alreadyExists ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'}`}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold">{savedClosing._alreadyExists ? 'Closing already exists for this branch and shift.' : 'Daily closing saved successfully.'}</p>
+                  {savedClosing.id && <p className="mt-1 text-xs opacity-80">Closing ID: {savedClosing.id}</p>}
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:flex">
+                  <Button type="button" variant="outline" className="min-h-11" onClick={onCancel}>View Closing</Button>
+                  <Button type="button" className="min-h-11 bg-emerald-600 hover:bg-emerald-700" onClick={() => onNewClosing?.()}>New Closing</Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ═══════════════════════════════════════════════════════════════
               SECTION 1 — SHIFT INFORMATION
@@ -1371,13 +1459,14 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 <div>
                   <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">Date</Label>
                   <Input
+                    id="quick-closing-date"
                     type="date"
                     value={form.date}
                     onChange={e => set('date', e.target.value)}
                     className="h-10 text-sm"
                   />
                 </div>
-                <div>
+                <div id="quick-closing-branch">
                   <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">Branch</Label>
                   <BranchSelect value={form.branch} onChange={v => {
                     set('branch', v);
@@ -1388,7 +1477,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
+                <div id="quick-closing-shift">
                   <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">Shift</Label>
                   <Select value={form.shift} onValueChange={v => set('shift', v)}>
                     <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
@@ -1398,7 +1487,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+                <div id="quick-closing-cashier">
                   <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">
                     Cashier
                     {empLoading && <Loader2 className="w-3 h-3 inline ml-1 animate-spin" />}
@@ -1447,9 +1536,26 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
             </AccordionBody>
           </div>
 
-          {/* ═══════════════════════════════════════════════════════════════
-              SECTION 2 — LIVE SALES SUMMARY (Real daily_sales data)
-          ═══════════════════════════════════════════════════════════════ */}
+          <div className="overflow-hidden rounded-2xl border-2 border-indigo-200 bg-background shadow-sm">
+            <SectionHeader icon={DollarSign} title="Sales Entry" color="kpi" />
+            <div className="p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <NumInput
+                  id="quick-closing-cashSales"
+                  label="Cash Sales"
+                  value={cashSalesInput}
+                  onChange={setCashSalesInput}
+                  prefix={currency}
+                  helpText="Counter cash"
+                />
+                <NumInput label="Card / Network Sales" value={networkTotal} readOnly prefix={currency} helpText="From POS entries below" />
+                <NumInput label="Other Payment" value={customTotal} readOnly prefix={currency} helpText={customSources.length ? 'From additional sales sources below' : 'No additional sources configured'} />
+                <NumInput label="Total Sales" value={totalSales} readOnly prefix={currency} helpText="Calculated automatically" />
+              </div>
+            </div>
+          </div>
+
+          {/* Live sales insight — historical data remains available without a separate page. */}
           <div className={`rounded-2xl border-2 ${SECTION_COLORS.kpi.border} overflow-hidden bg-background shadow-sm`}>
             <SectionHeader
               icon={BarChart3}
@@ -1776,7 +1882,21 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+                        <p className="text-[10px] font-bold uppercase text-orange-800">Paid Purchases</p>
+                        <p className="mt-1 text-lg font-black text-orange-700">{currency}{paidPurchasesTotal.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+                        <p className="text-[10px] font-bold uppercase text-orange-800">Credit Purchases</p>
+                        <p className="mt-1 text-lg font-black text-orange-700">{currency}{creditPurchasesTotal.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                        <p className="text-[10px] font-bold uppercase text-rose-800">Recorded Expenses</p>
+                        <p className="mt-1 text-lg font-black text-rose-700">{expensesLoading ? '…' : `${currency}${expensesTotal.toLocaleString()}`}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <KPICard
                         label="Approved Purchases"
                         value={`${currency}${approvedPurchasesTotal.toLocaleString()}`}
@@ -1901,13 +2021,20 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                   helpText="Opening + Cash Sales"
                 />
               </div>
-              <NumInput
-                label="Actual Cash Count"
-                value={actualCashCount}
-                onChange={setActualCashCount}
-                prefix={currency}
-                helpText="Physical count in register"
-              />
+              <div id="quick-closing-reconciliation">
+                <NumInput
+                  id="quick-closing-actualCash"
+                  label="Actual Cash Count"
+                  value={actualCashCount}
+                  onChange={(value) => {
+                    setInlineErrors((current) => ({ ...current, actualCash: undefined, reconciliation: undefined }));
+                    setActualCashCount(value);
+                  }}
+                  prefix={currency}
+                  helpText="Physical count in register"
+                  error={inlineErrors.actualCash || inlineErrors.reconciliation}
+                />
+              </div>
 
               {/* Cash Difference */}
               {cashDifference !== null && (
@@ -2119,6 +2246,21 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
             />
             <AccordionBody open={isSectionOpen('save')}>
             <div className="p-4 space-y-3">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold uppercase tracking-wide text-emerald-900">Final Review</p>
+                  <Badge className={operatingResult >= 0 ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}>{operatingResult >= 0 ? '+' : ''}{currency}{operatingResult.toLocaleString()}</Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
+                  <span className="text-muted-foreground">Sales <strong className="ml-1 text-foreground">{currency}{totalSales.toLocaleString()}</strong></span>
+                  <span className="text-muted-foreground">Purchases <strong className="ml-1 text-foreground">{currency}{approvedPurchasesTotal.toLocaleString()}</strong></span>
+                  <span className="text-muted-foreground">Expenses <strong className="ml-1 text-foreground">{currency}{expensesTotal.toLocaleString()}</strong></span>
+                  <span className="text-muted-foreground">Credit <strong className="ml-1 text-foreground">{currency}{creditTotal.toLocaleString()}</strong></span>
+                  <span className="text-muted-foreground">Expected <strong className="ml-1 text-foreground">{currency}{expectedCash.toLocaleString()}</strong></span>
+                  <span className="text-muted-foreground">Actual <strong className="ml-1 text-foreground">{actualCount === null ? '—' : `${currency}${actualCount.toLocaleString()}`}</strong></span>
+                  <span className="col-span-2 text-muted-foreground">Difference <strong className={cashDifference === 0 ? 'ml-1 text-emerald-700' : 'ml-1 text-red-700'}>{cashDifference === null ? '—' : `${cashDifference >= 0 ? '+' : ''}${currency}${cashDifference.toLocaleString()}`}</strong></span>
+                </div>
+              </div>
               <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-wide">Records that will be created:</p>
               <div className="space-y-1.5">
                 {recordsToCreate.map(r => (
@@ -2131,6 +2273,12 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               </div>
 
               {/* Error display */}
+              {inlineErrors.duplicate && (
+                <div role="alert" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-900">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <p className="text-xs font-bold">{inlineErrors.duplicate}</p>
+                </div>
+              )}
               {!allValid && (
                 <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-red-50 border border-red-200">
                   <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
@@ -2144,7 +2292,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               )}
 
               {/* Action buttons */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className="sticky bottom-0 z-20 -mx-4 grid grid-cols-2 gap-3 border-t border-border bg-background/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur">
                 <Button
                   type="button"
                   variant="outline"
@@ -2165,7 +2313,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                     </>
                   ) : (
                     <>
-                      <Save className="w-4 h-4 mr-1.5" /> Close Shift
+                      <Save className="w-4 h-4 mr-1.5" /> Save Daily Closing
                     </>
                   )}
                 </Button>
