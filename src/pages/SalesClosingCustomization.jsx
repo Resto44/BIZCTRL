@@ -21,6 +21,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 
 const asArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
+// Preserves a confirmed Owner source mutation across any route/provider remount
+// while the query catches up. Entries are keyed by restaurant and never persisted.
+const sourceDisplayOverridesByRestaurant = new Map();
 
 function SectionCard({ title, description, children }) {
   return <Card className="p-4 sm:p-5"><div className="mb-4"><h2 className="text-base font-semibold">{title}</h2>{description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}</div>{children}</Card>;
@@ -97,7 +100,12 @@ export default function SalesClosingCustomization() {
   const [sourceEditor, setSourceEditor] = useState(null);
   // A successful source write is authoritative for this Owner session. Retain the
   // submitted representation in the rendered list until a later page load reads it.
-  const [sourceDisplayOverrides, setSourceDisplayOverrides] = useState({});
+  const [sourceDisplayOverrides, setSourceDisplayOverrides] = useState(() => sourceDisplayOverridesByRestaurant.get(restaurantId) || {});
+  const updateSourceDisplayOverrides = (updater) => setSourceDisplayOverrides((current) => {
+    const next = typeof updater === 'function' ? updater(current) : updater;
+    if (restaurantId) sourceDisplayOverridesByRestaurant.set(restaurantId, next);
+    return next;
+  });
   useEffect(() => setConfigDraft(normalizeSalesClosingConfig(config)), [config]);
 
   const sourceQuery = useQuery({
@@ -113,17 +121,18 @@ export default function SalesClosingCustomization() {
   const activeSourcesKey = ['sales_sources_active', restaurantId];
   const sortSources = (items) => asArray(items).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   const sources = useMemo(() => {
+    const effectiveOverrides = sourceDisplayOverridesByRestaurant.get(restaurantId) || sourceDisplayOverrides;
     const seen = new Set();
     const merged = asArray(sourceQuery.data).flatMap((item) => {
       seen.add(item.id);
-      const override = sourceDisplayOverrides[item.id];
+      const override = effectiveOverrides[item.id];
       return override === false ? [] : [{ ...item, ...(override || {}) }];
     });
-    Object.values(sourceDisplayOverrides).forEach((override) => {
+    Object.values(effectiveOverrides).forEach((override) => {
       if (override && !seen.has(override.id)) merged.push(override);
     });
     return sortSources(merged);
-  }, [sourceDisplayOverrides, sourceQuery.data]);
+  }, [restaurantId, sourceDisplayOverrides, sourceQuery.data]);
   const mergeSourceCache = (savedSource) => {
     if (!savedSource?.id) return;
     const merge = (items) => {
@@ -154,7 +163,7 @@ export default function SalesClosingCustomization() {
   const requestSaveSource = (source) => {
     // Keep an edited row visually in sync as soon as the Owner confirms Save.
     // If the write fails, onError removes this optimistic display patch.
-    if (source?.id) setSourceDisplayOverrides((current) => ({ ...current, [source.id]: source }));
+    if (source?.id) updateSourceDisplayOverrides((current) => ({ ...current, [source.id]: source }));
     saveSource.mutate(source);
   };
 
@@ -170,13 +179,13 @@ export default function SalesClosingCustomization() {
       // submitted patch is the same successful write, so prefer it for immediate UI.
       const immediateSource = { ...savedSource, ...source, id: savedSource?.id || source.id };
       mergeSourceCache(immediateSource);
-      setSourceDisplayOverrides((current) => ({ ...current, [immediateSource.id]: immediateSource }));
+      updateSourceDisplayOverrides((current) => ({ ...current, [immediateSource.id]: immediateSource }));
       setSourceEditor(null);
       await invalidate();
       toast.success('Sales source saved.');
     },
     onError: (mutationError, source) => {
-      if (source?.id) setSourceDisplayOverrides((current) => {
+      if (source?.id) updateSourceDisplayOverrides((current) => {
         const next = { ...current };
         delete next[source.id];
         return next;
@@ -189,7 +198,7 @@ export default function SalesClosingCustomization() {
     mutationFn: async (source) => { const { error: mutationError } = await supabase.from('sales_sources').delete().eq('id', source.id); if (mutationError) throw mutationError; },
     onSuccess: async (_, source) => {
       removeSourceFromCache(source.id);
-      setSourceDisplayOverrides((current) => ({ ...current, [source.id]: false }));
+      updateSourceDisplayOverrides((current) => ({ ...current, [source.id]: false }));
       await invalidate();
       toast.success('Sales source deleted.');
     },
