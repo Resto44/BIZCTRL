@@ -68,14 +68,29 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const expectedCash = expectedCashBase + customSourcePaymentTotals.cash;');
   });
 
-  it('updates Owner source mutation caches immediately and then refreshes canonical source queries', async () => {
+  it('keeps a successful Owner source mutation visible in every active branch cache until explicit Reload', async () => {
     const customization = await source('../src/pages/SalesClosingCustomization.jsx');
 
     expect(customization).toContain("const sourceQueryKey = ['sales-closing-sources', restaurantId]");
     expect(customization).toContain("const activeSourcesKey = ['sales_sources_active', restaurantId]");
     expect(customization).toContain('queryClient.setQueryData(sourceQueryKey, merge);');
-    expect(customization).toContain('queryClient.setQueryData(activeSourcesKey, merge);');
-    expect(customization).toContain('sourceQuery.refetch()');
+    expect(customization).toContain('queryClient.setQueriesData({ queryKey: activeSourcesKey }, merge);');
+    expect(customization).toContain("const invalidate = async ({ refetchSources = false } = {}) =>");
+    expect(customization).toContain("refetchType: 'none'");
+    expect(customization).toContain('onClick={() => invalidate({ refetchSources: true })}');
+  });
+
+  it('consumes saved calculation, reconciliation, and responsive-summary settings in the canonical workflow', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).toContain('const automaticTotalsEnabled = closingConfig?.calculations?.automatic_totals !== false;');
+    expect(workspace).toContain('const requiresCashReconciliation = closingConfig?.validation_rules?.require_cash_reconciliation !== false;');
+    expect(workspace).toContain('const summaryVisibilityClass = !showMobileSummary && !showDesktopSummary');
+    expect(workspace).toContain('const automaticClosingEnabled = Boolean(automaticTotalsEnabled');
+    expect(workspace).toContain('const useAutomaticSales = Boolean(automaticTotalsEnabled');
+    expect(workspace).toContain('!requiresCashReconciliation || (actualCount !== null');
+    expect(workspace).toContain('requiresCashReconciliation && actualCount === null');
+    expect(workspace).toContain('className={summaryVisibilityClass}');
   });
 
   it('renders configured identity fields in their saved order while retaining the canonical controls', async () => {

@@ -426,9 +426,9 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
 // ─────────────────────────────────────────────────────────────────────────────
 // STICKY SUMMARY BAR
 // ─────────────────────────────────────────────────────────────────────────────
-const StickySummary = memo(function StickySummary({ totalSales, operatingResult, cashStatus, currency, isSubmitting }) {
+const StickySummary = memo(function StickySummary({ totalSales, operatingResult, cashStatus, currency, isSubmitting, className = '' }) {
   return (
-    <div className="sticky top-0 z-30 border-b border-border bg-background/95 shadow-sm backdrop-blur-sm">
+    <div className={`sticky top-0 z-30 border-b border-border bg-background/95 shadow-sm backdrop-blur-sm ${className}`}>
       <div className="flex min-w-0 items-center justify-between gap-2 px-3 py-2 sm:px-4">
         <div className="flex shrink-0 items-center gap-1">
           <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -469,6 +469,17 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const { role } = useRole();
   const { ownerFilter, branches: tenantBranches, managerBranch, activeRestaurant, isManager } = useTenant();
   const { config: closingConfig, fields: configuredClosingFields, paymentMethods: configuredPaymentMethods } = useSalesClosingCustomization();
+  const automaticTotalsEnabled = closingConfig?.calculations?.automatic_totals !== false;
+  const requiresCashReconciliation = closingConfig?.validation_rules?.require_cash_reconciliation !== false;
+  const showMobileSummary = closingConfig?.layout?.mobile_summary !== false;
+  const showDesktopSummary = closingConfig?.layout?.desktop_summary !== false;
+  const summaryVisibilityClass = !showMobileSummary && !showDesktopSummary
+    ? 'hidden'
+    : !showMobileSummary
+      ? 'hidden sm:block'
+      : !showDesktopSummary
+        ? 'sm:hidden'
+        : '';
   const branches = asRecordArray(tenantBranches);
   const canUseAdvancedClosing = isManager || [ROLES.OWNER, ROLES.GENERAL_MANAGER].includes(role);
   const [closingView, setClosingView] = useState('quick');
@@ -976,7 +987,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Every read is scoped by the active restaurant, branch and business date. The
   // closing form uses these ERP records as its primary source; manual values are
   // exceptional adjustments only, never a required re-entry step.
-  const automaticClosingEnabled = Boolean(activeRestaurant?.id && form.date && form.branch && !initial?.id);
+  const automaticClosingEnabled = Boolean(automaticTotalsEnabled && activeRestaurant?.id && form.date && form.branch && !initial?.id);
   const {
     data: automaticClosingData,
     isLoading: automaticClosingLoading,
@@ -1115,9 +1126,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     });
   }, [automaticClosing, automaticClosingScope]);
   const snapshotMatchesScope = automaticClosingSnapshot.scope === automaticClosingScope;
-  const useAutomaticSales = Boolean(!initial?.id && snapshotMatchesScope && automaticClosingSnapshot.hasData);
-  const autoSourceLoading = automaticClosingLoading && !useAutomaticSales;
-  const automaticClosingUnavailable = automaticClosingIsError && !useAutomaticSales;
+  const useAutomaticSales = Boolean(automaticTotalsEnabled && !initial?.id && snapshotMatchesScope && automaticClosingSnapshot.hasData);
+  const autoSourceLoading = automaticTotalsEnabled && automaticClosingLoading && !useAutomaticSales;
+  const automaticClosingUnavailable = automaticTotalsEnabled && automaticClosingIsError && !useAutomaticSales;
 
   // ── Closing calculations sourced from the selected ERP scope ──────────────
   const manualCashSales = Math.max(0, Number(cashSalesInput) || 0);
@@ -1219,14 +1230,14 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     {
       key: 'cashBalance',
       label: 'Cash Reconciled',
-      passed: actualCount !== null && (remainingDifference === 0 || managerApproved),
-      message: actualCount === null ? 'Actual cash count required' : remainingDifference === 0 ? 'Balanced' : managerApproved ? 'Manager approved' : 'Needs approval',
+      passed: !requiresCashReconciliation || (actualCount !== null && (remainingDifference === 0 || managerApproved)),
+      message: !requiresCashReconciliation ? 'Optional by configuration' : actualCount === null ? 'Actual cash count required' : remainingDifference === 0 ? 'Balanced' : managerApproved ? 'Manager approved' : 'Needs approval',
     },
     {
       key: 'cashNote',
       label: 'Cash Difference Note',
-      passed: cashDifference === null || cashDifference === 0 || Boolean(cashNotes.trim()),
-      message: cashDifference === null || cashDifference === 0 ? 'Not required' : 'Required for a difference',
+      passed: !requiresCashReconciliation || cashDifference === null || cashDifference === 0 || Boolean(cashNotes.trim()),
+      message: !requiresCashReconciliation || cashDifference === null || cashDifference === 0 ? 'Not required' : 'Required for a difference',
     },
     {
       key: 'requiredFields',
@@ -1234,7 +1245,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       passed: !!form.date && !!form.branch && customClosingFields.every((field) => !field.is_required || String(customClosingFieldValues[field.id] ?? '').trim()),
       message: form.date || 'Date required',
     },
-  ], [form, automaticClosingUnavailable, useAutomaticSales, cashierDisplayName, approvedPurchasesForDate, posEntries, creditEntries, customClosingFields, customClosingFieldValues, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, cashDifference, cashNotes, managerApproved, currency]);
+  ], [form, automaticClosingUnavailable, useAutomaticSales, cashierDisplayName, approvedPurchasesForDate, posEntries, creditEntries, customClosingFields, customClosingFieldValues, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, cashDifference, cashNotes, managerApproved, requiresCashReconciliation, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -1258,9 +1269,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (!form.branch) nextErrors.branch = 'Branch is required.';
     if (!form.shift) nextErrors.shift = 'Shift is required.';
     if (!cashierDisplayName) nextErrors.cashier = 'Cashier is required.';
-    if (!savingDraft && actualCount === null) nextErrors.actualCash = 'Actual Cash is required.';
-    if (!savingDraft && remainingDifference !== 0 && remainingDifference !== null && !managerApproved) nextErrors.reconciliation = 'Cash difference must be reviewed before closing.';
-    if (!savingDraft && cashDifference !== null && cashDifference !== 0 && !cashNotes.trim()) nextErrors.cashNotes = 'A reconciliation note is required for a cash difference.';
+    if (!savingDraft && requiresCashReconciliation && actualCount === null) nextErrors.actualCash = 'Actual Cash is required.';
+    if (!savingDraft && requiresCashReconciliation && remainingDifference !== 0 && remainingDifference !== null && !managerApproved) nextErrors.reconciliation = 'Cash difference must be reviewed before closing.';
+    if (!savingDraft && requiresCashReconciliation && cashDifference !== null && cashDifference !== 0 && !cashNotes.trim()) nextErrors.cashNotes = 'A reconciliation note is required for a cash difference.';
     if (invalidCredit) nextErrors.credit = 'Credit customer is required.';
     if (limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer}.`;
     customClosingFields.forEach((field) => {
@@ -1426,6 +1437,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         cashStatus={cashReconcStatus}
         currency={currency}
         isSubmitting={isSubmitting}
+        className={summaryVisibilityClass}
       />
 
       <div className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
@@ -1562,7 +1574,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </section>
           </div>
 
-          <section key={`closing-summary-${totalSales}-${approvedPurchasesTotal}-${expensesTotal}-${expectedCash}-${cashDifference ?? 'pending'}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm">
+          <section key={`closing-summary-${totalSales}-${approvedPurchasesTotal}-${expensesTotal}-${expectedCash}-${cashDifference ?? 'pending'}`} className={`${summaryVisibilityClass} overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm`}>
             <div className="border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4"><h2 className="text-xs font-black uppercase tracking-wide text-slate-900">Daily Closing Summary</h2></div>
             <div className="p-3 sm:p-4">
               <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
