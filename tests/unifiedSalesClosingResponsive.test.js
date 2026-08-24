@@ -76,6 +76,9 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(customization).toContain('previous.map((item) => item.id === savedSource.id ? { ...item, ...savedSource } : item)');
     expect(customization).toContain('onSuccess: async (savedSource, source) =>');
     expect(customization).toContain('const [sourceDisplayOverrides, setSourceDisplayOverrides] = useState({});');
+    expect(customization).toContain('const requestSaveSource = (source) => {');
+    expect(customization).toContain('if (source?.id) setSourceDisplayOverrides((current) => ({ ...current, [source.id]: source }));');
+    expect(customization).toContain('onSave={requestSaveSource}');
     expect(customization).toContain('const immediateSource = { ...savedSource, ...source, id: savedSource?.id || source.id };');
     expect(customization).toContain('setSourceDisplayOverrides((current) => ({ ...current, [immediateSource.id]: immediateSource }));');
     expect(customization).toContain('return override === false ? [] : [{ ...item, ...(override || {}) }];');
