@@ -73,6 +73,9 @@ describe('Unified Sales Closing workflow contract', () => {
 
     expect(customization).toContain("const sourceQueryKey = ['sales-closing-sources', restaurantId]");
     expect(customization).toContain("const activeSourcesKey = ['sales_sources_active', restaurantId]");
+    expect(customization).toContain('previous.map((item) => item.id === savedSource.id ? { ...item, ...savedSource } : item)');
+    expect(customization).toContain('onSuccess: async (savedSource, source) =>');
+    expect(customization).toContain('mergeSourceCache({ ...savedSource, ...source, id: savedSource?.id || source.id });');
     expect(customization).toContain('queryClient.setQueryData(sourceQueryKey, merge);');
     expect(customization).toContain('queryClient.setQueriesData({ queryKey: activeSourcesKey }, merge);');
     expect(customization).toContain("const invalidate = async ({ refetchSources = false } = {}) =>");

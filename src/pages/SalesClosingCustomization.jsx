@@ -112,10 +112,11 @@ export default function SalesClosingCustomization() {
   const sortSources = (items) => asArray(items).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   const mergeSourceCache = (savedSource) => {
     if (!savedSource?.id) return;
-    const merge = (items) => sortSources([
-      ...asArray(items).filter((item) => item.id !== savedSource.id),
-      savedSource,
-    ]);
+    const merge = (items) => {
+      const previous = asArray(items);
+      const exists = previous.some((item) => item.id === savedSource.id);
+      return sortSources(previous.map((item) => item.id === savedSource.id ? { ...item, ...savedSource } : item).concat(exists ? [] : [savedSource]));
+    };
     queryClient.setQueryData(sourceQueryKey, merge);
     queryClient.setQueriesData({ queryKey: activeSourcesKey }, merge);
   };
@@ -143,7 +144,14 @@ export default function SalesClosingCustomization() {
       if (source.id) { const { data, error: mutationError } = await supabase.from('sales_sources').update(payload).eq('id', source.id).select().single(); if (mutationError) throw mutationError; return data; }
       const { data, error: mutationError } = await supabase.from('sales_sources').insert(payload).select().single(); if (mutationError) throw mutationError; return data;
     },
-    onSuccess: async (savedSource) => { mergeSourceCache(savedSource); setSourceEditor(null); await invalidate(); toast.success('Sales source saved.'); },
+    onSuccess: async (savedSource, source) => {
+      // PostgREST's returned representation can lag a trigger-backed write. The
+      // submitted patch is the same successful write, so prefer it for immediate UI.
+      mergeSourceCache({ ...savedSource, ...source, id: savedSource?.id || source.id });
+      setSourceEditor(null);
+      await invalidate();
+      toast.success('Sales source saved.');
+    },
     onError: (mutationError) => toast.error(mutationError.message || 'Unable to save sales source.'),
   });
 
