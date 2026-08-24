@@ -117,4 +117,18 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(updateSettlement).toBeGreaterThan(updateGuard);
     expect(updateDebt).toBeGreaterThan(updateGuard);
   });
+
+  it('enforces the same Draft boundary in database triggers so server-side invoice and cash effects wait for Finalize', async () => {
+    const migration = await source('../src/supabase/20260824_draft_finalization_side_effect_guards.sql');
+
+    expect(migration).toContain("WHEN (COALESCE(NEW.closing_state, 'finalized') = 'finalized')");
+    expect(migration).toContain('EXECUTE FUNCTION public.fn_daily_sales_generate_invoice_number();');
+    expect(migration).toContain('EXECUTE FUNCTION public.fn_daily_sales_sync_invoice();');
+    expect(migration).toContain('EXECUTE FUNCTION public.trg_auto_cash_movement_and_recalculate();');
+    expect(migration).toContain("AND OLD.closing_state = 'finalized'");
+    expect(migration).toContain("AND NEW.closing_state = 'draft' THEN");
+    expect(migration).toContain('DAILY_SALES_CLOSING_FINALIZATION_REVERT_DENIED');
+    expect(migration).toContain("NULLIF(OLD.restaurant_id, '')::uuid");
+    expect(migration).toContain("NULLIF(NEW.restaurant_id, '')::uuid");
+  });
 });
