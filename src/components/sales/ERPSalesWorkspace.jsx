@@ -21,6 +21,7 @@
  * 13. Sales, Cash Reconciliation, Purchases and Operating Result are independent.
  */
 import React, { useState, useMemo, useEffect, useCallback, memo } from 'react';
+import { flushSync } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
@@ -543,6 +544,15 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   });
   const [ownerContributionInput, setOwnerContributionInput] = useState(initial?.owner_cash_injection ?? '');
   const [cashNotes, setCashNotes] = useState(initial?.cash_notes || '');
+  // Commit finance totals, review cards, and the sticky action with the numeric
+  // change that produced them, so cashiers never see a stale closing summary.
+  const updateCalculatedInput = useCallback((setter, value) => {
+    flushSync(() => setter(value));
+  }, []);
+  const updateCashSales = useCallback((value) => updateCalculatedInput(setCashSalesInput, value), [updateCalculatedInput]);
+  const updateOpeningCash = useCallback((value) => updateCalculatedInput(setOpeningCash, value), [updateCalculatedInput]);
+  const updateActualCashCount = useCallback((value) => updateCalculatedInput(setActualCashCount, value), [updateCalculatedInput]);
+  const updateOwnerContribution = useCallback((value) => updateCalculatedInput(setOwnerContributionInput, value), [updateCalculatedInput]);
   const [managerApproved, setManagerApproved] = useState(initial?.manager_approval || false);
 
   // ── POS entries ───────────────────────────────────────────────────────────
@@ -571,9 +581,9 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
 
   const addPos = () => setPosEntries(prev => [...prev, { id: Date.now(), device_id: '', device_name: '', amount: '', notes: '' }]);
   const removePos = (id) => setPosEntries(prev => prev.filter(e => e.id !== id));
-  const updatePos = (id, field, value) => setPosEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
+  const updatePos = (id, field, value) => updateCalculatedInput(setPosEntries, prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
   const removeCredit = (id) => setCreditEntries(prev => prev.filter(e => e.id !== id));
-  const updateCredit = (id, field, value) => setCreditEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
+  const updateCredit = (id, field, value) => updateCalculatedInput(setCreditEntries, prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
 
   // ── Dynamic Sales Sources ───────────────────────────────────────────────────────────────
   const { customSources: customSourcesData, isLoading: sourcesLoading } = useSalesSources({ branchId: selectedBranchId });
@@ -590,7 +600,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
     }
     return {};
   });
-  const setCustomAmount = (sourceId, val) => setCustomSourceAmounts(prev => ({ ...prev, [sourceId]: val }));
+  const setCustomAmount = (sourceId, val) => updateCalculatedInput(setCustomSourceAmounts, prev => ({ ...prev, [sourceId]: val }));
   const customTotal = useMemo(() =>
     customSources.reduce((s, src) => s + (Number(customSourceAmounts[src.id]) || 0), 0),
     [customSources, customSourceAmounts]
@@ -1544,7 +1554,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                   id="quick-closing-cashSales"
                   label="Cash Sales"
                   value={cashSalesInput}
-                  onChange={setCashSalesInput}
+                  onChange={updateCashSales}
                   prefix={currency}
                   helpText="Counter cash"
                 />
@@ -2001,7 +2011,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
               <NumInput
                 label="Cash Sales"
                 value={cashSalesInput}
-                onChange={setCashSalesInput}
+                onChange={updateCashSales}
                 prefix={currency}
                 helpText="Actual cash revenue collected at counter"
               />
@@ -2009,7 +2019,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                 <NumInput
                   label="Opening Cash"
                   value={openingCash}
-                  onChange={setOpeningCash}
+                  onChange={updateOpeningCash}
                   prefix={currency}
                   helpText="Auto-fetched from previous shift"
                 />
@@ -2028,7 +2038,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                   value={actualCashCount}
                   onChange={(value) => {
                     setInlineErrors((current) => ({ ...current, actualCash: undefined, reconciliation: undefined }));
-                    setActualCashCount(value);
+                    updateActualCashCount(value);
                   }}
                   prefix={currency}
                   helpText="Physical count in register"
@@ -2063,7 +2073,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
                 <NumInput
                   label="Owner Capital Contribution"
                   value={ownerContributionInput}
-                  onChange={setOwnerContributionInput}
+                  onChange={updateOwnerContribution}
                   prefix={currency}
                   helpText="Owner paid to cover shortage — NOT classified as sales revenue"
                 />
