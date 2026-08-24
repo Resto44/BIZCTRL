@@ -198,7 +198,7 @@ const NumInput = memo(function NumInput({ id, label, value, onChange, required, 
 // ─────────────────────────────────────────────────────────────────────────────
 // MONEY — stable currency/number pairing for RTL and narrow screens
 // ─────────────────────────────────────────────────────────────────────────────
-const Money = memo(function Money({ currency, value, className = '', signed = false }) {
+function Money({ currency, value, className = '', signed = false }) {
   const amount = Number(value) || 0;
   const sign = signed && amount > 0 ? '+' : amount < 0 ? '−' : '';
   return (
@@ -208,7 +208,7 @@ const Money = memo(function Money({ currency, value, className = '', signed = fa
       <span>{Math.abs(amount).toLocaleString()}</span>
     </span>
   );
-});
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KPI CARD — Large ERP style
