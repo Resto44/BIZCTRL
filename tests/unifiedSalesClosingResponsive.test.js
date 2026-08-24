@@ -86,6 +86,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(customization).toContain('onSave={requestSaveSource}');
     expect(customization).toContain('const immediateSource = { ...savedSource, ...source, id: savedSource?.id || source.id };');
     expect(customization).toContain('mergeSourceCache(immediateSource);');
+    expect(customization).toContain('const { id: fieldId, ...fieldPayload } = field;');
+    expect(customization).toContain("if (fieldId) { const { data, error: mutationError } = await supabase.from('sales_closing_fields').update(payload).eq('id', fieldId)");
     expect(customization).toContain('key={`${field.id}-${field.label_en}-${field.sort_order}-${field.is_active}-${field.is_required}-${field.visible_mobile}-${field.visible_desktop}`}');
     expect(customization).toContain('key={`${source.id}-${source.name_en}-${source.default_payment_method}-${source.sort_order}`}');
     expect(customization).toContain('key={`${method.id}-${method.name_en}-${method.sort_order}-${method.is_active}`}');

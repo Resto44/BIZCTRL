@@ -191,8 +191,9 @@ export default function SalesClosingCustomization() {
   const saveField = useMutation({
     mutationFn: async (field) => {
       if (!restaurantId) throw new Error('Select an active restaurant before saving a field.');
-      const payload = { ...field, restaurant_id: restaurantId };
-      if (field.id) { const { data, error: mutationError } = await supabase.from('sales_closing_fields').update(payload).eq('id', field.id).select().single(); if (mutationError) throw mutationError; return data; }
+      const { id: fieldId, ...fieldPayload } = field;
+      const payload = { ...fieldPayload, restaurant_id: restaurantId };
+      if (fieldId) { const { data, error: mutationError } = await supabase.from('sales_closing_fields').update(payload).eq('id', fieldId).select().single(); if (mutationError) throw mutationError; return data; }
       const { data, error: mutationError } = await supabase.from('sales_closing_fields').insert(payload).select().single(); if (mutationError) throw mutationError; return data;
     },
     onSuccess: async () => { setFieldEditor(null); await reload(); toast.success('Sales Closing field saved.'); },
