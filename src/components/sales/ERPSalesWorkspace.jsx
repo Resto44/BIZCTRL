@@ -1024,35 +1024,34 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   const autoSourceLoading = automaticClosingLoading && !automaticClosingSnapshot.hasData;
 
   // ── Closing calculations sourced from the selected ERP scope ──────────────
-  const manualCashSales = useMemo(() => Math.max(0, Number(cashSalesInput) || 0), [cashSalesInput]);
-  const manualNetworkTotal = useMemo(() => asRecordArray(posEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0), [posEntries]);
-  const manualCreditTotal = useMemo(() => asRecordArray(creditEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0), [creditEntries]);
+  const manualCashSales = Math.max(0, Number(cashSalesInput) || 0);
+  const manualNetworkTotal = asRecordArray(posEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+  const manualCreditTotal = asRecordArray(creditEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
   const useAutomaticSales = Boolean(!initial?.id && automaticClosingSnapshot.hasData);
   const cashSales = useAutomaticSales ? automaticClosingSnapshot.cash : manualCashSales;
   const networkTotal = useAutomaticSales ? automaticClosingSnapshot.network : manualNetworkTotal;
   const creditTotal = useAutomaticSales ? automaticClosingSnapshot.credit : manualCreditTotal;
   const otherPaymentTotal = useAutomaticSales ? automaticClosingSnapshot.other : customTotal;
-  const totalSales = useMemo(() => cashSales + networkTotal + creditTotal + otherPaymentTotal, [cashSales, networkTotal, creditTotal, otherPaymentTotal]);
+  const totalSales = cashSales + networkTotal + creditTotal + otherPaymentTotal;
 
   useEffect(() => {
     if (!initial?.id && automaticClosingSnapshot.openingCash !== null) setOpeningCash(String(automaticClosingSnapshot.openingCash));
   }, [automaticClosingSnapshot.openingCash, initial?.id]);
 
-  const opening = useMemo(() => Number(openingCash) || 0, [openingCash]);
-  const actualCount = useMemo(() => actualCashCount !== '' ? Number(actualCashCount) : null, [actualCashCount]);
-  const ownerContrib = useMemo(() => Number(ownerContributionInput) || 0, [ownerContributionInput]);
-  const expectedCash = useMemo(
-    () => useAutomaticSales && automaticClosingSnapshot.expectedCash !== null ? automaticClosingSnapshot.expectedCash : opening + cashSales,
-    [automaticClosingSnapshot.expectedCash, cashSales, opening, useAutomaticSales],
-  );
-  const cashDifference = useMemo(() => actualCount !== null ? actualCount - expectedCash : null, [actualCount, expectedCash]);
-  const cashReconcStatus = useMemo(() => cashDifference === null ? null : cashDifference === 0 ? 'Balanced' : cashDifference < 0 ? 'Shortage' : 'Overage', [cashDifference]);
-  const closingCash = useMemo(() => actualCount !== null ? actualCount + ownerContrib : opening, [actualCount, ownerContrib, opening]);
-  const remainingDifference = useMemo(() => actualCount !== null ? closingCash - expectedCash : null, [actualCount, closingCash, expectedCash]);
+  const opening = Number(openingCash) || 0;
+  const actualCount = actualCashCount !== '' ? Number(actualCashCount) : null;
+  const ownerContrib = Number(ownerContributionInput) || 0;
+  const expectedCash = useAutomaticSales && automaticClosingSnapshot.expectedCash !== null
+    ? automaticClosingSnapshot.expectedCash
+    : opening + cashSales;
+  const cashDifference = actualCount !== null ? actualCount - expectedCash : null;
+  const cashReconcStatus = cashDifference === null ? null : cashDifference === 0 ? 'Balanced' : cashDifference < 0 ? 'Shortage' : 'Overage';
+  const closingCash = actualCount !== null ? actualCount + ownerContrib : opening;
+  const remainingDifference = actualCount !== null ? closingCash - expectedCash : null;
 
-  const approvedPurchasesTotal = useMemo(() => approvedPurchasesForDate.reduce((sum, purchase) => sum + (Number(purchase.total_amount) || 0), 0), [approvedPurchasesForDate]);
-  const expensesTotal = useMemo(() => expensesForDate.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0), [expensesForDate]);
-  const operatingResult = useMemo(() => totalSales - approvedPurchasesTotal - expensesTotal, [totalSales, approvedPurchasesTotal, expensesTotal]);
+  const approvedPurchasesTotal = approvedPurchasesForDate.reduce((sum, purchase) => sum + (Number(purchase.total_amount) || 0), 0);
+  const expensesTotal = expensesForDate.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
+  const operatingResult = totalSales - approvedPurchasesTotal - expensesTotal;
 
   // Validation checks
   const validations = useMemo(() => [
