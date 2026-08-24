@@ -95,6 +95,9 @@ export default function SalesClosingCustomization() {
   const [fieldEditor, setFieldEditor] = useState(null);
   const [paymentEditor, setPaymentEditor] = useState(null);
   const [sourceEditor, setSourceEditor] = useState(null);
+  // A successful source write is authoritative for this Owner session. Retain the
+  // submitted representation in the rendered list until a later page load reads it.
+  const [sourceDisplayOverrides, setSourceDisplayOverrides] = useState({});
   useEffect(() => setConfigDraft(normalizeSalesClosingConfig(config)), [config]);
 
   const sourceQuery = useQuery({
@@ -106,10 +109,21 @@ export default function SalesClosingCustomization() {
       return asArray(data);
     },
   });
-  const sources = useMemo(() => asArray(sourceQuery.data).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)), [sourceQuery.data]);
   const sourceQueryKey = ['sales-closing-sources', restaurantId];
   const activeSourcesKey = ['sales_sources_active', restaurantId];
   const sortSources = (items) => asArray(items).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const sources = useMemo(() => {
+    const seen = new Set();
+    const merged = asArray(sourceQuery.data).flatMap((item) => {
+      seen.add(item.id);
+      const override = sourceDisplayOverrides[item.id];
+      return override === false ? [] : [{ ...item, ...(override || {}) }];
+    });
+    Object.values(sourceDisplayOverrides).forEach((override) => {
+      if (override && !seen.has(override.id)) merged.push(override);
+    });
+    return sortSources(merged);
+  }, [sourceDisplayOverrides, sourceQuery.data]);
   const mergeSourceCache = (savedSource) => {
     if (!savedSource?.id) return;
     const merge = (items) => {
@@ -147,7 +161,9 @@ export default function SalesClosingCustomization() {
     onSuccess: async (savedSource, source) => {
       // PostgREST's returned representation can lag a trigger-backed write. The
       // submitted patch is the same successful write, so prefer it for immediate UI.
-      mergeSourceCache({ ...savedSource, ...source, id: savedSource?.id || source.id });
+      const immediateSource = { ...savedSource, ...source, id: savedSource?.id || source.id };
+      mergeSourceCache(immediateSource);
+      setSourceDisplayOverrides((current) => ({ ...current, [immediateSource.id]: immediateSource }));
       setSourceEditor(null);
       await invalidate();
       toast.success('Sales source saved.');
@@ -157,7 +173,12 @@ export default function SalesClosingCustomization() {
 
   const deleteSource = useMutation({
     mutationFn: async (source) => { const { error: mutationError } = await supabase.from('sales_sources').delete().eq('id', source.id); if (mutationError) throw mutationError; },
-    onSuccess: async (_, source) => { removeSourceFromCache(source.id); await invalidate(); toast.success('Sales source deleted.'); },
+    onSuccess: async (_, source) => {
+      removeSourceFromCache(source.id);
+      setSourceDisplayOverrides((current) => ({ ...current, [source.id]: false }));
+      await invalidate();
+      toast.success('Sales source deleted.');
+    },
     onError: (mutationError) => toast.error(mutationError.message === 'SALES_SOURCE_IN_USE' ? 'This source is used by a historical closing and can only be deactivated.' : (mutationError.message || 'Unable to delete sales source.')),
   });
 
