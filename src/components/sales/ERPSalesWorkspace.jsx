@@ -606,9 +606,17 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   });
   const employees = asRecordArray(employeesData);
   const cashiers = useMemo(() => {
-    if (!isManager || !user?.id) return employees;
-    if (employees.some((employee) => employee.id === user.id)) return employees;
-    return [{ id: user.id, full_name: user.full_name || user.email || 'Branch Manager' }, ...employees];
+    const candidates = !isManager || !user?.id
+      ? employees
+      : employees.some((employee) => employee.id === user.id)
+        ? employees
+        : [{ id: user.id, full_name: user.full_name || user.email || 'Branch Manager' }, ...employees];
+    const seen = new Set();
+    return candidates.filter((cashier) => {
+      if (!cashier?.id || seen.has(String(cashier.id))) return false;
+      seen.add(String(cashier.id));
+      return true;
+    });
   }, [employees, isManager, user?.email, user?.full_name, user?.id]);
   const selectedCashier = useMemo(() => {
     const selectedId = form.cashier_employee_id || form.cashier_id;
