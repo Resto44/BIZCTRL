@@ -622,7 +622,8 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     const selectedId = form.cashier_employee_id || form.cashier_id;
     return cashiers.find((cashier) => String(cashier.id) === String(selectedId)) || null;
   }, [cashiers, form.cashier_employee_id, form.cashier_id]);
-  const cashierDisplayName = form.cashier_name || selectedCashier?.full_name || '';
+  const soleCashier = cashiers.length === 1 ? firstRecord(cashiers) : null;
+  const cashierDisplayName = form.cashier_name || selectedCashier?.full_name || soleCashier?.full_name || user?.full_name || user?.email || '';
 
   // Keep the cashier name and ID synchronized. This also repairs a stale cashier
   // identifier and auto-selects the sole cashier available to an Owner.
@@ -1223,7 +1224,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       branch.branch_key === form.branch,
     );
     const branchId = selectedBranch?.id || selectedBranchId || null;
-    const cashierId = form.cashier_id || form.cashier_employee_id || user?.id || null;
+    const cashierId = form.cashier_id || form.cashier_employee_id || soleCashier?.id || user?.id || null;
     const customerId = form.customer_id || creditEntries.find((entry) => entry.customer_id)?.customer_id || defaultCustomer?.id || null;
     const posDeviceId = form.pos_device_id || posEntries.find((entry) => entry.device_id)?.device_id || null;
     const createdBy = user?.email || ownerFilter?.created_by || '';
