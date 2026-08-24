@@ -616,22 +616,23 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   }, [cashiers, form.cashier_employee_id, form.cashier_id]);
   const cashierDisplayName = form.cashier_name || selectedCashier?.full_name || '';
 
-  // Branch Managers close their own shift unless an assigned cashier exists first.
+  // Keep the cashier name and ID synchronized. This also repairs a stale cashier
+  // identifier and auto-selects the sole cashier available to an Owner.
   useEffect(() => {
-    const cashier = firstRecord(cashiers);
-    if (!cashier?.id || form.cashier_employee_id || form.cashier_id) return;
-    setForm((previous) => ({
-      ...previous,
-      cashier_name: cashier.full_name || user?.full_name || user?.email || '',
-      cashier_employee_id: cashier.id,
-      cashier_id: cashier.id,
-    }));
-  }, [cashiers, form.cashier_employee_id, form.cashier_id, user?.email, user?.full_name]);
+    if (initial?.id || !cashiers.length) return;
+    const selectedId = form.cashier_employee_id || form.cashier_id;
+    const selected = cashiers.find((cashier) => String(cashier.id) === String(selectedId));
 
-  // Owners retain manual choice when multiple cashiers exist, but a single available
-  // cashier must not leave the form in a contradictory "selected / required" state.
-  useEffect(() => {
-    if (initial?.id || isManager || cashiers.length !== 1 || form.cashier_employee_id || form.cashier_id) return;
+    if (selected?.id) {
+      const name = selected.full_name || user?.full_name || user?.email || '';
+      if (form.cashier_name === name) return;
+      setForm((previous) => ({ ...previous, cashier_name: name }));
+      return;
+    }
+
+    // A Branch Manager may be assigned automatically. Owners retain manual choice
+    // when multiple cashiers exist, while a sole available cashier is unambiguous.
+    if (!isManager && cashiers.length !== 1) return;
     const cashier = firstRecord(cashiers);
     if (!cashier?.id) return;
     setForm((previous) => ({
@@ -640,7 +641,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       cashier_employee_id: cashier.id,
       cashier_id: cashier.id,
     }));
-  }, [cashiers, form.cashier_employee_id, form.cashier_id, initial?.id, isManager, user?.email, user?.full_name]);
+  }, [cashiers, form.cashier_employee_id, form.cashier_id, form.cashier_name, initial?.id, isManager, user?.email, user?.full_name]);
 
   // Rule 9: Auto-populate Opening Cash from previous shift's Closing Cash
   // BUG FIX: also support manager context (uses restaurant_id + branch, not created_by)
