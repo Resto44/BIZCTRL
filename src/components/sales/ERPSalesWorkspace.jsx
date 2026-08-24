@@ -1286,6 +1286,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   return (
     <form onSubmit={handleSubmit} className="flex h-full min-h-0 min-w-0 flex-col">
       <StickySummary
+        key={`sticky-${totalSales}-${operatingResult}-${cashReconcStatus || 'pending'}`}
         totalSales={totalSales}
         operatingResult={operatingResult}
         cashStatus={cashReconcStatus}
@@ -1343,7 +1344,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
             </div>
           </section>
 
-          <section data-testid="quick-closing-auto-summary" className="overflow-hidden rounded-2xl border border-indigo-200 bg-background shadow-sm">
+          <section key={`automatic-summary-${useAutomaticSales}-${autoSourceLoading}-${totalSales}`} data-testid="quick-closing-auto-summary" className="overflow-hidden rounded-2xl border border-indigo-200 bg-background shadow-sm">
             <div className="flex items-center justify-between gap-3 border-b border-indigo-100 bg-indigo-50 px-3 py-3 sm:px-4">
               <div className="flex min-w-0 items-center gap-2"><BarChart3 className="h-4 w-4 shrink-0 text-indigo-600" /><h2 className="truncate text-xs font-black uppercase tracking-wide text-indigo-950">Today&apos;s Sales</h2></div>
               <Badge variant="outline" className="shrink-0 border-indigo-200 bg-white text-[10px] text-indigo-700">{autoSourceLoading ? 'Loading ERP data' : useAutomaticSales ? 'Auto-loaded' : 'No source posted'}</Badge>
@@ -1374,7 +1375,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
           </section>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
-            <section className="overflow-hidden rounded-2xl border border-amber-200 bg-background shadow-sm">
+            <section key={`cash-reconciliation-${expectedCash}-${cashDifference ?? 'pending'}`} className="overflow-hidden rounded-2xl border border-amber-200 bg-background shadow-sm">
               <div className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-3 py-3 sm:px-4"><div className="flex items-center gap-2"><Scale className="h-4 w-4 text-amber-600" /><h2 className="text-xs font-black uppercase tracking-wide text-amber-950">Cash Reconciliation</h2></div>{cashReconcStatus && <StatusBadge status={cashReconcStatus} />}</div>
               <div className="space-y-3 p-3 sm:p-4">
                 <div className="grid grid-cols-2 gap-2">
@@ -1399,25 +1400,25 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-background shadow-sm">
+            <section key={`operating-result-${totalSales}-${approvedPurchasesTotal}-${expensesTotal}`} className="overflow-hidden rounded-2xl border border-emerald-200 bg-background shadow-sm">
               <div className="flex items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50 px-3 py-3 sm:px-4"><div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-emerald-600" /><h2 className="text-xs font-black uppercase tracking-wide text-emerald-950">Operating Result</h2></div><Money key={`money-operating-${operatingResult}`} currency={currency} value={operatingResult} signed className={`text-sm font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`} /></div>
               <div className="space-y-2 p-3 sm:p-4">
                 <div className="flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2 text-xs"><span className="font-semibold text-blue-900">Sales</span><Money key={`money-total-${totalSales}`} currency={currency} value={totalSales} className="font-bold text-blue-700" /></div>
-                <div className="flex items-center justify-between gap-3 rounded-lg bg-orange-50 px-3 py-2 text-xs"><span className="font-semibold text-orange-900">Purchases</span><Money currency={currency} value={approvedPurchasesTotal} className="font-bold text-orange-700" /></div>
-                <div className="flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2 text-xs"><span className="font-semibold text-rose-900">Expenses</span><Money currency={currency} value={expensesTotal} className="font-bold text-rose-700" /></div>
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-orange-50 px-3 py-2 text-xs"><span className="font-semibold text-orange-900">Purchases</span><Money key={`money-purchases-${approvedPurchasesTotal}`} currency={currency} value={approvedPurchasesTotal} className="font-bold text-orange-700" /></div>
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2 text-xs"><span className="font-semibold text-rose-900">Expenses</span><Money key={`money-expenses-${expensesTotal}`} currency={currency} value={expensesTotal} className="font-bold text-rose-700" /></div>
                 <div className={`flex items-center justify-between gap-3 rounded-xl border-2 px-3 py-3 text-xs ${operatingResult >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}><span className="font-black uppercase tracking-wide text-foreground">Operating Result</span><Money key={`money-operating-${operatingResult}`} currency={currency} value={operatingResult} signed className={`text-lg font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`} /></div>
                 <p className="pt-1 text-[11px] leading-relaxed text-muted-foreground">Automatically calculated as Total Sales − Purchases − Expenses.</p>
               </div>
             </section>
           </div>
 
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm">
+          <section key={`closing-summary-${totalSales}-${approvedPurchasesTotal}-${expensesTotal}-${expectedCash}-${cashDifference ?? 'pending'}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm">
             <div className="border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4"><h2 className="text-xs font-black uppercase tracking-wide text-slate-900">Daily Closing Summary</h2></div>
             <div className="p-3 sm:p-4">
               <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Sales</span><Money key={`money-total-${totalSales}`} currency={currency} value={totalSales} className="font-bold text-foreground" /></div>
-                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Purchases</span><Money currency={currency} value={approvedPurchasesTotal} className="font-bold text-foreground" /></div>
-                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Expenses</span><Money currency={currency} value={expensesTotal} className="font-bold text-foreground" /></div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Purchases</span><Money key={`money-purchases-${approvedPurchasesTotal}`} currency={currency} value={approvedPurchasesTotal} className="font-bold text-foreground" /></div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Expenses</span><Money key={`money-expenses-${expensesTotal}`} currency={currency} value={expensesTotal} className="font-bold text-foreground" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Customer Credit</span><Money key={`money-credit-${creditTotal}`} currency={currency} value={creditTotal} className="font-bold text-foreground" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Expected Cash</span><Money key={`money-expected-${expectedCash}`} currency={currency} value={expectedCash} className="font-bold text-foreground" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Actual Cash</span>{actualCount === null ? <span className="font-bold text-muted-foreground">—</span> : <Money key={`money-actual-${actualCount}`} currency={currency} value={actualCount} className="font-bold text-foreground" />}</div>
