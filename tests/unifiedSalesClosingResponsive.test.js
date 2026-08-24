@@ -76,7 +76,10 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(customization).toContain('previous.map((item) => item.id === savedSource.id ? { ...item, ...savedSource } : item)');
     expect(customization).toContain('onSuccess: async (savedSource, source) =>');
     expect(customization).toContain('const [sources, setSources] = useState(() => sortSources(sourceQuery.data));');
-    expect(customization).toContain('useEffect(() => setSources(sortSources(sourceQuery.data)), [sourceQuery.data]);');
+    expect(customization).toContain('const pendingSourcePatchesRef = useRef(new Map());');
+    expect(customization).toContain('const patchHasReachedServer = patch === false');
+    expect(customization).toContain('if (!patchHasReachedServer) return;');
+    expect(customization).toContain('pendingSourcePatchesRef.current.set(savedSource.id, savedSource);');
     expect(customization).toContain('setSources(merge);');
     expect(customization).toContain('setSources(without);');
     expect(customization).toContain('const requestSaveSource = (source) => saveSource.mutate(source);');

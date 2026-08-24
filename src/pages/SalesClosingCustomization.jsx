@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ArrowDown, ArrowUp, ChevronRight, Eye, EyeOff, Loader2, Plus, Save, Settings2, ShieldCheck, Trash2 } from 'lucide-react';
@@ -113,7 +113,19 @@ export default function SalesClosingCustomization() {
   // current across consumers, and this state makes the Owner's successful mutation
   // visible in the same render cycle rather than waiting on a subsequent query read.
   const [sources, setSources] = useState(() => sortSources(sourceQuery.data));
-  useEffect(() => setSources(sortSources(sourceQuery.data)), [sourceQuery.data]);
+  const pendingSourcePatchesRef = useRef(new Map());
+  useEffect(() => {
+    const nextSources = sortSources(sourceQuery.data);
+    for (const [sourceId, patch] of pendingSourcePatchesRef.current.entries()) {
+      const serverSource = nextSources.find((source) => source.id === sourceId);
+      const patchHasReachedServer = patch === false
+        ? !serverSource
+        : Boolean(serverSource) && Object.entries(patch).every(([key, value]) => serverSource[key] === value);
+      if (!patchHasReachedServer) return;
+      pendingSourcePatchesRef.current.delete(sourceId);
+    }
+    setSources(nextSources);
+  }, [sourceQuery.data]);
   const mergeSourceCache = (savedSource) => {
     if (!savedSource?.id) return;
     const merge = (items) => {
@@ -121,12 +133,14 @@ export default function SalesClosingCustomization() {
       const exists = previous.some((item) => item.id === savedSource.id);
       return sortSources(previous.map((item) => item.id === savedSource.id ? { ...item, ...savedSource } : item).concat(exists ? [] : [savedSource]));
     };
+    pendingSourcePatchesRef.current.set(savedSource.id, savedSource);
     setSources(merge);
     queryClient.setQueryData(sourceQueryKey, merge);
     queryClient.setQueriesData({ queryKey: activeSourcesKey }, merge);
   };
   const removeSourceFromCache = (sourceId) => {
     const without = (items) => asArray(items).filter((item) => item.id !== sourceId);
+    pendingSourcePatchesRef.current.set(sourceId, false);
     setSources(without);
     queryClient.setQueryData(sourceQueryKey, without);
     queryClient.setQueriesData({ queryKey: activeSourcesKey }, without);
