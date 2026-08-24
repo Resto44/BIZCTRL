@@ -107,12 +107,32 @@ export default function SalesClosingCustomization() {
     },
   });
   const sources = useMemo(() => asArray(sourceQuery.data).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)), [sourceQuery.data]);
-  const invalidate = () => Promise.all([
-    queryClient.invalidateQueries({ queryKey: ['sales-closing-sources', restaurantId] }),
-    queryClient.invalidateQueries({ queryKey: ['sales_sources'] }),
-    queryClient.invalidateQueries({ queryKey: ['sales_sources_active'] }),
-    reload(),
-  ]);
+  const sourceQueryKey = ['sales-closing-sources', restaurantId];
+  const activeSourcesKey = ['sales_sources_active', restaurantId];
+  const sortSources = (items) => asArray(items).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const mergeSourceCache = (savedSource) => {
+    if (!savedSource?.id) return;
+    const merge = (items) => sortSources([
+      ...asArray(items).filter((item) => item.id !== savedSource.id),
+      savedSource,
+    ]);
+    queryClient.setQueryData(sourceQueryKey, merge);
+    queryClient.setQueryData(activeSourcesKey, merge);
+  };
+  const removeSourceFromCache = (sourceId) => {
+    const without = (items) => asArray(items).filter((item) => item.id !== sourceId);
+    queryClient.setQueryData(sourceQueryKey, without);
+    queryClient.setQueryData(activeSourcesKey, without);
+  };
+  const invalidate = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: sourceQueryKey }),
+      queryClient.invalidateQueries({ queryKey: ['sales_sources'] }),
+      queryClient.invalidateQueries({ queryKey: activeSourcesKey }),
+      sourceQuery.refetch(),
+      reload(),
+    ]);
+  };
 
   const saveSource = useMutation({
     mutationFn: async (source) => {
@@ -121,13 +141,13 @@ export default function SalesClosingCustomization() {
       if (source.id) { const { data, error: mutationError } = await supabase.from('sales_sources').update(payload).eq('id', source.id).select().single(); if (mutationError) throw mutationError; return data; }
       const { data, error: mutationError } = await supabase.from('sales_sources').insert(payload).select().single(); if (mutationError) throw mutationError; return data;
     },
-    onSuccess: async () => { setSourceEditor(null); await invalidate(); toast.success('Sales source saved.'); },
+    onSuccess: async (savedSource) => { mergeSourceCache(savedSource); setSourceEditor(null); await invalidate(); toast.success('Sales source saved.'); },
     onError: (mutationError) => toast.error(mutationError.message || 'Unable to save sales source.'),
   });
 
   const deleteSource = useMutation({
     mutationFn: async (source) => { const { error: mutationError } = await supabase.from('sales_sources').delete().eq('id', source.id); if (mutationError) throw mutationError; },
-    onSuccess: async () => { await invalidate(); toast.success('Sales source deleted.'); },
+    onSuccess: async (_, source) => { removeSourceFromCache(source.id); await invalidate(); toast.success('Sales source deleted.'); },
     onError: (mutationError) => toast.error(mutationError.message === 'SALES_SOURCE_IN_USE' ? 'This source is used by a historical closing and can only be deactivated.' : (mutationError.message || 'Unable to delete sales source.')),
   });
 

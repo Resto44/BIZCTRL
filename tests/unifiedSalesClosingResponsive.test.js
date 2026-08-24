@@ -27,7 +27,7 @@ describe('Unified Sales Closing workflow contract', () => {
   it('loads existing sales, POS and cash-register data automatically in restaurant, branch and date scope', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
-    expect(workspace).toContain("queryKey: ['quick_closing_automatic_sources'");
+    expect(workspace).toContain('queryKey: [\'quick_closing_automatic_sources\'');
     expect(workspace).toContain("from('daily_cash_settlements')");
     expect(workspace).toContain("scoped('payments'");
     expect(workspace).toContain("from('pos_reconciliation')");
@@ -47,6 +47,44 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('expected_closing_cash');
     expect(workspace).toContain('Actual Cash');
     expect(workspace).toContain('Cash balanced.');
+  });
+
+  it('keeps global sales sources visible under a selected branch and maps configured source methods into canonical totals', async () => {
+    const sourceHook = await source('../src/hooks/useSalesSources.js');
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(sourceHook).toContain("queryKey: ['sales_sources_active', activeRestaurantId, effectiveBranchId || 'all']");
+    expect(sourceHook).toContain("base44.entities.SalesSource.filter({ restaurant_id: activeRestaurantId }, 'sort_order', 200)");
+    expect(sourceHook).toContain('if (s.is_global || !s.branch_id) return true;');
+    expect(workspace).toContain('paymentBucketForCode(source.default_payment_method)');
+    expect(workspace).toContain('const customSourcePaymentTotals = useMemo(() =>');
+    expect(workspace).toContain('const cashSales = baseCashSales + customSourcePaymentTotals.cash;');
+    expect(workspace).toContain('const networkTotal = baseNetworkTotal + customSourcePaymentTotals.network;');
+    expect(workspace).toContain('const creditTotal = baseCreditTotal + customSourcePaymentTotals.credit;');
+    expect(workspace).toContain('const otherPaymentTotal = baseOtherPaymentTotal + customSourcePaymentTotals.other;');
+    expect(workspace).toContain('default_payment_method: src.default_payment_method || \'other\'');
+    expect(workspace).toContain('payment_bucket: paymentBucketForCode(src.default_payment_method)');
+  });
+
+  it('updates Owner source mutation caches immediately and then refreshes canonical source queries', async () => {
+    const customization = await source('../src/pages/SalesClosingCustomization.jsx');
+
+    expect(customization).toContain("const sourceQueryKey = ['sales-closing-sources', restaurantId]");
+    expect(customization).toContain("const activeSourcesKey = ['sales_sources_active', restaurantId]");
+    expect(customization).toContain('queryClient.setQueryData(sourceQueryKey, merge);');
+    expect(customization).toContain('queryClient.setQueryData(activeSourcesKey, merge);');
+    expect(customization).toContain('sourceQuery.refetch()');
+  });
+
+  it('renders configured identity fields in their saved order while retaining the canonical controls', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).toContain('const IDENTITY_FIELD_DEFAULTS = [');
+    expect(workspace).toContain('const configuredIdentityFields = useMemo(() => IDENTITY_FIELD_DEFAULTS');
+    expect(workspace).toContain("configuredIdentityFields.map((field) => {");
+    expect(workspace).toContain("if (fieldKey === 'branch')");
+    expect(workspace).toContain("if (fieldKey === 'date')");
+    expect(workspace).toContain("if (fieldKey === 'shift')");
   });
 
   it('uses accessible numeric inputs, stable currency presentation and a non-obstructive sticky action area', async () => {

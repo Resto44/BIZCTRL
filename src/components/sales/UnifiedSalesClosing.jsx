@@ -79,6 +79,24 @@ const matchesBranch = (record, branchKey, branchId) => {
   );
 };
 
+// Payment-method configuration is consumed through every sales source's existing
+// default_payment_method. Keep the accounting classification in one place so
+// sources, totals, cash reconciliation, and the persisted closing agree.
+const paymentBucketForCode = (value) => {
+  const code = String(value || '').trim().toLowerCase();
+  if (['cash', 'cash_on_delivery', 'cod'].includes(code)) return 'cash';
+  if (['credit', 'customer_credit', 'on_account'].includes(code)) return 'credit';
+  if (['card', 'network', 'pos', 'visa', 'mastercard', 'mada', 'digital'].includes(code)) return 'network';
+  return 'other';
+};
+
+const IDENTITY_FIELD_DEFAULTS = [
+  { field_key: 'branch', fallback: 'Branch', sort_order: 0 },
+  { field_key: 'cashier', fallback: 'Cashier', sort_order: 10 },
+  { field_key: 'date', fallback: 'Date', sort_order: 30 },
+  { field_key: 'shift', fallback: 'Shift', sort_order: 40 },
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS — Material 3 / ERP
 // ─────────────────────────────────────────────────────────────────────────────
@@ -617,9 +635,18 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     return {};
   });
   const setCustomAmount = (sourceId, val) => updateCalculatedInput(setCustomSourceAmounts, prev => ({ ...prev, [sourceId]: val }));
-  const customTotal = useMemo(() =>
-    customSources.reduce((s, src) => s + (Number(customSourceAmounts[src.id]) || 0), 0),
+  const customSourcePaymentTotals = useMemo(() =>
+    customSources.reduce((totals, source) => {
+      if (source.included_in_revenue === false) return totals;
+      const amount = Math.max(0, Number(customSourceAmounts[source.id]) || 0);
+      totals[paymentBucketForCode(source.default_payment_method)] += amount;
+      return totals;
+    }, { cash: 0, network: 0, credit: 0, other: 0 }),
     [customSources, customSourceAmounts]
+  );
+  const customTotal = useMemo(() =>
+    customSourcePaymentTotals.cash + customSourcePaymentTotals.network + customSourcePaymentTotals.credit + customSourcePaymentTotals.other,
+    [customSourcePaymentTotals]
   );
   const customClosingFields = useMemo(() => configuredClosingFields.filter((field) => !field.is_system && field.is_active !== false), [configuredClosingFields]);
   const configuredClosingFieldByKey = useMemo(() => new Map(configuredClosingFields.map((field) => [field.field_key, field])), [configuredClosingFields]);
@@ -638,6 +665,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     return 'hidden';
   }, [configuredClosingFieldByKey]);
   const isConfiguredClosingFieldShown = useCallback((fieldKey) => closingFieldVisibilityClass(fieldKey) !== 'hidden', [closingFieldVisibilityClass]);
+  const configuredIdentityFields = useMemo(() => IDENTITY_FIELD_DEFAULTS
+    .map((fallback) => ({ ...fallback, ...(configuredClosingFieldByKey.get(fallback.field_key) || {}) }))
+    .filter((field) => field.is_active !== false)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)), [configuredClosingFieldByKey]);
   const [customClosingFieldValues, setCustomClosingFieldValues] = useState(() => {
     const values = {};
     asRecordArray(initial?.sales_closing_custom_fields).forEach((entry) => {
@@ -1092,10 +1123,14 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const manualCashSales = Math.max(0, Number(cashSalesInput) || 0);
   const manualNetworkTotal = asRecordArray(posEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
   const manualCreditTotal = asRecordArray(creditEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
-  const cashSales = useAutomaticSales ? automaticClosingSnapshot.cash : manualCashSales;
-  const networkTotal = useAutomaticSales ? automaticClosingSnapshot.network : manualNetworkTotal;
-  const creditTotal = useAutomaticSales ? automaticClosingSnapshot.credit : manualCreditTotal;
-  const otherPaymentTotal = useAutomaticSales ? automaticClosingSnapshot.other + customTotal : customTotal;
+  const baseCashSales = useAutomaticSales ? automaticClosingSnapshot.cash : manualCashSales;
+  const baseNetworkTotal = useAutomaticSales ? automaticClosingSnapshot.network : manualNetworkTotal;
+  const baseCreditTotal = useAutomaticSales ? automaticClosingSnapshot.credit : manualCreditTotal;
+  const baseOtherPaymentTotal = useAutomaticSales ? automaticClosingSnapshot.other : 0;
+  const cashSales = baseCashSales + customSourcePaymentTotals.cash;
+  const networkTotal = baseNetworkTotal + customSourcePaymentTotals.network;
+  const creditTotal = baseCreditTotal + customSourcePaymentTotals.credit;
+  const otherPaymentTotal = baseOtherPaymentTotal + customSourcePaymentTotals.other;
   const totalSales = cashSales + networkTotal + creditTotal + otherPaymentTotal;
 
   useEffect(() => {
@@ -1325,6 +1360,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               name_en: src.name_en,
               name_ar: src.name_ar,
               amount: Number(customSourceAmounts[src.id]) || 0,
+              default_payment_method: src.default_payment_method || 'other',
+              payment_bucket: paymentBucketForCode(src.default_payment_method),
               included_in_revenue: src.included_in_revenue,
             }))
         ),
@@ -1421,25 +1458,14 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               </div>
             </div>
             <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-4">
-              <div className={closingFieldVisibilityClass('date')}>
-                <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingFieldLabel('date', 'Date')}</Label>
-                <Input id="quick-closing-date" type="date" value={form.date} onChange={e => set('date', e.target.value)} className="min-h-11 text-sm" />
-              </div>
-              <div id="quick-closing-branch" className={closingFieldVisibilityClass('branch')}>
-                <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingFieldLabel('branch', 'Branch')}</Label>
-                <BranchSelect value={form.branch} onChange={v => { set('branch', v); set('branch_id', ''); setCreditEntries([]); }} />
-              </div>
-              <div id="quick-closing-shift" className={closingFieldVisibilityClass('shift')}>
-                <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingFieldLabel('shift', 'Shift')}</Label>
-                <Select value={form.shift} onValueChange={v => set('shift', v)}>
-                  <SelectTrigger className="min-h-11 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="Morning">Morning</SelectItem><SelectItem value="Evening">Evening</SelectItem></SelectContent>
-                </Select>
-              </div>
-              <div id="quick-closing-cashier" className={`min-w-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 ${closingFieldVisibilityClass('cashier')}`}>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">{closingFieldLabel('cashier', 'Cashier')}</p>
-                <p className="mt-1 truncate text-sm font-bold text-emerald-900">{cashierDisplayName || (empLoading ? 'Loading…' : empError ? 'Unable to load cashier' : 'No cashier')}</p>
-              </div>
+              {configuredIdentityFields.map((field) => {
+                const fieldKey = field.field_key;
+                const label = closingFieldLabel(fieldKey, field.fallback);
+                if (fieldKey === 'date') return <div key={fieldKey} className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><Input id="quick-closing-date" type="date" value={form.date} onChange={e => set('date', e.target.value)} className="min-h-11 text-sm" /></div>;
+                if (fieldKey === 'branch') return <div key={fieldKey} id="quick-closing-branch" className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><BranchSelect value={form.branch} onChange={v => { set('branch', v); set('branch_id', ''); setCreditEntries([]); }} /></div>;
+                if (fieldKey === 'shift') return <div key={fieldKey} id="quick-closing-shift" className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><Select value={form.shift} onValueChange={v => set('shift', v)}><SelectTrigger className="min-h-11 text-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Morning">Morning</SelectItem><SelectItem value="Evening">Evening</SelectItem></SelectContent></Select></div>;
+                return <div key={fieldKey} id="quick-closing-cashier" className={`min-w-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 ${closingFieldVisibilityClass(fieldKey)}`}><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">{label}</p><p className="mt-1 truncate text-sm font-bold text-emerald-900">{cashierDisplayName || (empLoading ? 'Loading…' : empError ? 'Unable to load cashier' : 'No cashier')}</p></div>;
+              })}
             </div>
           </section>
 

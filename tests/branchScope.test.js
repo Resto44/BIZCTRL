@@ -79,7 +79,8 @@ describe('central branch UUID scope contract', () => {
 
     expect(hook).toContain('useSalesSources({ branchId } = {})');
     expect(hook).toContain("['sales_sources_active', activeRestaurantId, effectiveBranchId || 'all']");
-    expect(hook).toContain('filters.branch_id = effectiveBranchId');
+    expect(hook).toContain("base44.entities.SalesSource.filter({ restaurant_id: activeRestaurantId }, 'sort_order', 200)");
+    expect(hook).toContain('if (s.is_global || !s.branch_id) return true;');
     expect(hook).toContain('String(s.branch_id) === String(effectiveBranchId)');
   });
 

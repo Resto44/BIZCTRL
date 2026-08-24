@@ -1,9 +1,9 @@
-/**
- * useSalesSources — React Query hook for active Sales Sources.
+/*
+ * useSalesSources — canonical active Sales Sources query for Sales Closing.
  *
- * Returns sorted, active sales sources from the sales_sources table.
- * Provides helpers to get source by system_key for backward compatibility.
- * Respects tenant isolation (created_by) and branch-specific filtering.
+ * Fetches the restaurant-scoped source set once, then applies the selected-branch
+ * visibility rule locally. This is essential because global rows have branch_id
+ * NULL and must remain visible when a particular branch is selected.
  */
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/supabaseClient';
@@ -19,51 +19,39 @@ export function useSalesSources({ branchId } = {}) {
   const effectiveBranchId = branchId || managerBranchObject?.id || null;
 
   const { data: allSourcesData, isLoading, error, refetch } = useQuery({
+    // Sources are restaurant-scoped. Keeping branch out of the request key avoids
+    // duplicate fetches on branch switches and lets global records remain visible.
     queryKey: ['sales_sources_active', activeRestaurantId, effectiveBranchId || 'all'],
     queryFn: async () => {
-      const filters = { restaurant_id: activeRestaurantId };
-      if (effectiveBranchId) filters.branch_id = effectiveBranchId;
-      const all = await base44.entities.SalesSource.filter(filters, 'sort_order', 200);
-      // RLS remains authoritative. The UUID filter limits the returned tenant data
-      // before any display-only normalization is applied.
+      const all = await base44.entities.SalesSource.filter({ restaurant_id: activeRestaurantId }, 'sort_order', 200);
+      // RLS remains authoritative. Branch visibility is applied below so both
+      // global (NULL branch_id) and branch-specific sources are evaluated together.
       return asRecordArray(all);
     },
-    staleTime: 60000,
+    staleTime: 60_000,
     enabled: !!activeRestaurantId,
   });
 
   const allSources = asRecordArray(allSourcesData);
 
-  // Filter: active only, and respect branch scoping
   const sources = allSources
-    .filter(s => s.is_active)
-    .filter(s => {
-      if (s.is_global) return true;
+    .filter((s) => s.is_active)
+    .filter((s) => {
+      if (s.is_global || !s.branch_id) return true;
       if (!effectiveBranchId) return true;
-      return !s.branch_id || String(s.branch_id) === String(effectiveBranchId);
+      return String(s.branch_id) === String(effectiveBranchId);
     })
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
-  // System sources by key (for backward compat)
-  const cashSource    = sources.find(s => s.system_key === 'cash');
-  const creditSource  = sources.find(s => s.system_key === 'credit');
-  const networkSource = sources.find(s => s.system_key === 'network');
-  const otherSource   = sources.find(s => s.system_key === 'other');
-
-  // Non-system custom sources (e.g. Delivery, Talabat, etc.)
-  const customSources = sources.filter(s => !s.is_system);
-
-  // Sources that should appear in Dashboard KPI
-  const kpiSources = sources.filter(s => s.included_in_dashboard_kpi);
-
-  // Sources that count toward revenue
-  const revenueSources = sources.filter(s => s.included_in_revenue);
-
-  // Sources that appear in cash register
-  const cashRegisterSources = sources.filter(s => s.included_in_cash_register);
-
-  // Sources that count toward profit
-  const profitSources = sources.filter(s => s.included_in_profit_calc);
+  const cashSource = sources.find((source) => source.system_key === 'cash');
+  const creditSource = sources.find((source) => source.system_key === 'credit');
+  const networkSource = sources.find((source) => source.system_key === 'network');
+  const otherSource = sources.find((source) => source.system_key === 'other');
+  const customSources = sources.filter((source) => !source.is_system);
+  const kpiSources = sources.filter((source) => source.included_in_dashboard_kpi);
+  const revenueSources = sources.filter((source) => source.included_in_revenue);
+  const cashRegisterSources = sources.filter((source) => source.included_in_cash_register);
+  const profitSources = sources.filter((source) => source.included_in_profit_calc);
 
   return {
     sources,
