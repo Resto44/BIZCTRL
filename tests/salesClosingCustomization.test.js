@@ -4,17 +4,24 @@ import { readFile } from 'node:fs/promises';
 const source = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 describe('Sales Closing Customization runtime contract', () => {
-  it('registers a guarded, reachable owner route and visible owner navigation entries', async () => {
+  it('registers one guarded canonical closing route, a customization route, and visible owner navigation entries', async () => {
     const app = await source('../src/App.jsx');
     const settings = await source('../src/pages/SettingsPage.jsx');
     const dashboard = await source('../src/pages/OwnerDashboard.jsx');
+    const sales = await source('../src/pages/Sales.jsx');
 
     expect(app).toContain("const SalesClosingCustomization = lazy(() => import('@/pages/SalesClosingCustomization'));");
+    expect(app).toContain('path="/sales"');
     expect(app).toContain('path="/sales-closing-customization"');
+    expect(app).toContain('path="/sales-sources" element={<Navigate to="/sales-closing-customization" replace />}');
     expect(app).toContain('permission="manageSettings"');
     expect(settings).toContain("path: '/sales-closing-customization'");
     expect(settings).toContain("label: 'Sales Closing Customization'");
     expect(dashboard).toContain("navigate('/sales-closing-customization')");
+    expect(sales).toContain("import UnifiedSalesClosing from '@/components/sales/UnifiedSalesClosing';");
+    expect(sales).toContain('aria-label="Sales Closing"');
+    expect(sales).not.toContain('<Dialog open={showForm}');
+    expect(sales).not.toContain('Enterprise Sales Closing Workspace');
   });
 
   it('keeps configuration tenant-scoped and reloads persisted Supabase state', async () => {
@@ -36,7 +43,7 @@ describe('Sales Closing Customization runtime contract', () => {
 
   it('protects historical closing data while allowing future configuration changes', async () => {
     const migration = await source('../src/supabase/20260824_sales_closing_customization.sql');
-    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
     expect(migration).toContain('erp_prevent_used_sales_source_delete');
     expect(migration).toContain("RAISE EXCEPTION 'SALES_SOURCE_IN_USE'");
@@ -47,7 +54,7 @@ describe('Sales Closing Customization runtime contract', () => {
   });
 
   it('renders dynamic fields, active sources, payment methods, responsive visibility, and required-field validation in new closings', async () => {
-    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
     const page = await source('../src/pages/SalesClosingCustomization.jsx');
 
     expect(workspace).toContain('useSalesClosingCustomization()');
@@ -56,6 +63,12 @@ describe('Sales Closing Customization runtime contract', () => {
     expect(workspace).toContain("field.visible_desktop === false ? 'sm:hidden'");
     expect(workspace).toContain('nextErrors[`custom_${field.id}`]');
     expect(workspace).toContain('Owner-configured fields apply to this new closing.');
+    expect(workspace).toContain('Quick Closing');
+    expect(workspace).toContain('Advanced Closing');
+    expect(workspace).toContain("closing_state: requestedClosingState");
+    expect(workspace).toContain('Save Draft');
+    expect(workspace).toContain('Finalize Closing');
+    expect(workspace).toContain('closing_audit:');
     expect(page).toContain('Manage Sales Sources');
     expect(page).toContain('Manage Payment Methods');
     expect(page).toContain('Preview Sales Closing');

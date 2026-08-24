@@ -95,7 +95,6 @@ const RestaurantManager   = lazy(() => import('@/pages/RestaurantManager'));
 const EnterpriseCategoryManager = lazy(() => import('@/components/categories/CategoryManager'));
 const ApprovalPolicy      = lazy(() => import('@/pages/ApprovalPolicy'));
 const OwnerApprovalCenter = lazy(() => import('@/pages/OwnerApprovalCenter'));
-const SalesSources        = lazy(() => import('@/pages/SalesSources'));
 const SalesClosingCustomization = lazy(() => import('@/pages/SalesClosingCustomization'));
 const TelegramSettings    = lazy(() => import('@/pages/TelegramSettings'));
 const Billing             = lazy(() => import('@/pages/Billing'));
@@ -319,7 +318,7 @@ const SubscribedRoutes = () => {
 
         <Route path="/approval-policy" element={<RoleGuard permission="viewBrandSettings"><ApprovalPolicy /></RoleGuard>} />
         <Route path="/approval-center" element={<Navigate to="/erp-approval-center" replace />} />
-        <Route path="/sales-sources" element={<RoleGuard permission="viewBrandSettings"><SalesSources /></RoleGuard>} />
+        <Route path="/sales-sources" element={<Navigate to="/sales-closing-customization" replace />} />
         <Route path="/sales-closing-customization" element={<RoleGuard permission="manageSettings"><SalesClosingCustomization /></RoleGuard>} />
         <Route path="/telegram-settings" element={<RoleGuard permission="viewBrandSettings"><TelegramSettings /></RoleGuard>} />
         <Route path="/billing" element={<RoleGuard permission="viewBilling"><SubscriptionErrorBoundary><Billing /></SubscriptionErrorBoundary></RoleGuard>} />

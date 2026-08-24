@@ -1,7 +1,7 @@
 /**
- * ERPSalesWorkspace — Enterprise ERP Sales Closing Workspace
+ * UnifiedSalesClosing — Canonical ERP Sales Closing module
  *
- * Architecture: 9-section full-workflow redesign.
+ * Architecture: single-page, role-aware ERP closing workflow.
  * Design: Material 3 / Enterprise ERP, responsive, mobile-first.
  *
  * Finalized Accounting Rules (PRESERVED — DO NOT MODIFY):
@@ -28,24 +28,22 @@ import { supabase } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
+import { useRole, ROLES } from '@/lib/RoleContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format, startOfMonth, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import {
-  Store, CreditCard, Trash2, Plus, Search,
+  Store, Trash2, Search,
   TrendingDown, TrendingUp, CheckCircle2, XCircle,
-  AlertCircle, ShieldCheck, User, Info,
-  Scale, Banknote, DollarSign, BarChart3,
-  ShoppingCart, Users, Clock, Building2,
-  Activity, Zap, Target, Package,
-  AlertTriangle, CheckSquare, Database,
-  ArrowUpRight, ArrowDownRight, Minus,
-  ChevronDown, ChevronUp, Eye, EyeOff,
+  AlertCircle, ShieldCheck,
+  Scale, DollarSign, BarChart3,
+  AlertTriangle,
+  ArrowUpRight, ArrowDownRight,
+  ChevronDown, ChevronUp,
   Loader2, RefreshCw, Save, X,
 } from 'lucide-react';
 import BranchSelect from '@/components/shared/BranchSelect';
@@ -447,12 +445,16 @@ const StickySummary = memo(function StickySummary({ totalSales, operatingResult,
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewClosing }) {
+export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing }) {
   const { currency } = useLanguage();
   const { user } = useAuth();
+  const { role } = useRole();
   const { ownerFilter, branches: tenantBranches, managerBranch, activeRestaurant, isManager } = useTenant();
   const { config: closingConfig, fields: configuredClosingFields, paymentMethods: configuredPaymentMethods } = useSalesClosingCustomization();
   const branches = asRecordArray(tenantBranches);
+  const canUseAdvancedClosing = isManager || [ROLES.OWNER, ROLES.GENERAL_MANAGER].includes(role);
+  const [closingView, setClosingView] = useState(() => canUseAdvancedClosing ? 'advanced' : 'quick');
+  const isQuickClosing = closingView === 'quick';
   const assignedManagerBranch = useMemo(() => {
     if (!isManager) return null;
     return branches.find((branch) =>
@@ -464,6 +466,13 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inlineErrors, setInlineErrors] = useState({});
   const [savedClosing, setSavedClosing] = useState(null);
+  const [requestedClosingState, setRequestedClosingState] = useState(initial?.closing_state || 'finalized');
+  const isLocked = initial?.closing_state === 'locked';
+  const canLockClosing = [ROLES.OWNER, ROLES.GENERAL_MANAGER].includes(role);
+
+  useEffect(() => {
+    if (!canUseAdvancedClosing) setClosingView('quick');
+  }, [canUseAdvancedClosing]);
 
   // ── Form meta state ───────────────────────────────────────────────────────
   const [form, setForm] = useState({
@@ -804,7 +813,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
       if (!isManager && activeRestaurant?.id) query = query.eq('restaurant_id', activeRestaurant.id);
       const { data, error } = await query.order('name');
       if (error) {
-        console.error('[ERPSalesWorkspace] Customer fetch error:', error);
+        console.error('[UnifiedSalesClosing] Customer fetch error:', error);
         return [];
       }
       return asRecordArray(data);
@@ -1193,6 +1202,11 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLocked) {
+      toast.error('This closing is locked. Use an authorized correction workflow before changing it.');
+      return;
+    }
+    const savingDraft = requestedClosingState === 'draft';
 
     const invalidCredit = creditEntries.find((entry) => Number(entry.amount) > 0 && !entry.customer);
     const limitExceededEntry = creditEntries.find((entry) => {
@@ -1206,13 +1220,13 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
     if (!form.branch) nextErrors.branch = 'Branch is required.';
     if (!form.shift) nextErrors.shift = 'Shift is required.';
     if (!cashierDisplayName) nextErrors.cashier = 'Cashier is required.';
-    if (actualCount === null) nextErrors.actualCash = 'Actual Cash is required.';
-    if (remainingDifference !== 0 && remainingDifference !== null && !managerApproved) nextErrors.reconciliation = 'Cash difference must be reviewed before closing.';
-    if (cashDifference !== null && cashDifference !== 0 && !cashNotes.trim()) nextErrors.cashNotes = 'A reconciliation note is required for a cash difference.';
+    if (!savingDraft && actualCount === null) nextErrors.actualCash = 'Actual Cash is required.';
+    if (!savingDraft && remainingDifference !== 0 && remainingDifference !== null && !managerApproved) nextErrors.reconciliation = 'Cash difference must be reviewed before closing.';
+    if (!savingDraft && cashDifference !== null && cashDifference !== 0 && !cashNotes.trim()) nextErrors.cashNotes = 'A reconciliation note is required for a cash difference.';
     if (invalidCredit) nextErrors.credit = 'Credit customer is required.';
     if (limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer}.`;
     customClosingFields.forEach((field) => {
-      if (field.is_required && !String(customClosingFieldValues[field.id] ?? '').trim()) nextErrors[`custom_${field.id}`] = `${field.label_en} is required.`;
+      if (!savingDraft && field.is_required && !String(customClosingFieldValues[field.id] ?? '').trim()) nextErrors[`custom_${field.id}`] = `${field.label_en} is required.`;
     });
     if (Object.keys(nextErrors).length) {
       setInlineErrors(nextErrors);
@@ -1237,41 +1251,41 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
     const createdBy = user?.email || ownerFilter?.created_by || '';
     const tenantId = activeRestaurant?.id || user?.organization_id || user?.restaurant_id || '';
 
-    console.log('[ERPSalesWorkspace] handleSubmit started');
-    console.log('[ERPSalesWorkspace] isManager:', isManager);
-    console.log('[ERPSalesWorkspace] cashierId:', cashierId);
-    console.log('[ERPSalesWorkspace] customerId:', customerId);
-    console.log('[ERPSalesWorkspace] posDeviceId:', posDeviceId);
-    console.log('[ERPSalesWorkspace] activeRestaurant:', activeRestaurant?.id);
-    console.log('[ERPSalesWorkspace] branchId:', branchId);
-    console.log('[ERPSalesWorkspace] createdBy:', createdBy);
+    console.log('[UnifiedSalesClosing] handleSubmit started');
+    console.log('[UnifiedSalesClosing] isManager:', isManager);
+    console.log('[UnifiedSalesClosing] cashierId:', cashierId);
+    console.log('[UnifiedSalesClosing] customerId:', customerId);
+    console.log('[UnifiedSalesClosing] posDeviceId:', posDeviceId);
+    console.log('[UnifiedSalesClosing] activeRestaurant:', activeRestaurant?.id);
+    console.log('[UnifiedSalesClosing] branchId:', branchId);
+    console.log('[UnifiedSalesClosing] createdBy:', createdBy);
 
     if (!activeRestaurant?.id || !branchId || !createdBy) {
-      console.log('[ERPSalesWorkspace] FAILED: Missing core IDs');
+      console.log('[UnifiedSalesClosing] FAILED: Missing core IDs');
       toast.error('An active business, branch, and authenticated user are required to close sales.');
       return;
     }
 
     if (isManager && (custLoading || posLoading)) {
-      console.log('[ERPSalesWorkspace] FAILED: Data still loading');
+      console.log('[UnifiedSalesClosing] FAILED: Data still loading');
       toast.error('Required data is still loading, please wait...');
       return;
     }
 
     // Cashier is always required for all roles
     if (!cashierId) {
-      console.log('[ERPSalesWorkspace] FAILED: No cashier ID');
+      console.log('[UnifiedSalesClosing] FAILED: No cashier ID');
       toast.error('A cashier must be assigned to close sales.');
       return;
     }
 
     // Note: customerId and posDeviceId are allowed to be null if none exist in the branch.
     // The DB should handle nulls or use its own defaults.
-    console.log('[ERPSalesWorkspace] Proceeding with save...');
+    console.log('[UnifiedSalesClosing] Proceeding with save...');
 
     setIsSubmitting(true);
     try {
-      console.log('[ERPSalesWorkspace] Building payload...');
+      console.log('[UnifiedSalesClosing] Building payload...');
       const payload = {
         date: form.date,
         branch: selectedBranch?.key || selectedBranch?.branch_key || form.branch,
@@ -1279,6 +1293,12 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
         cashier_name: cashierDisplayName,
         cashier_employee_id: form.cashier_employee_id,
         sales_notes: form.sales_notes,
+        closing_state: requestedClosingState,
+        finalized_at: requestedClosingState === 'finalized' ? new Date().toISOString() : initial?.finalized_at || null,
+        finalized_by: requestedClosingState === 'finalized' ? (user?.email || '') : initial?.finalized_by || '',
+        locked_at: requestedClosingState === 'locked' ? new Date().toISOString() : initial?.locked_at || null,
+        locked_by: requestedClosingState === 'locked' ? (user?.email || '') : initial?.locked_by || '',
+        closing_audit: [...asRecordArray(initial?.closing_audit), { action: requestedClosingState === 'draft' ? 'draft_saved' : requestedClosingState === 'locked' ? 'closing_locked' : 'closing_finalized', at: new Date().toISOString(), by: user?.email || '', branch_id: branchId }],
         branch_id: branchId,
         // `tenant_id` carries the active organization scope on legacy sales tables.
         tenant_id: tenantId,
@@ -1335,10 +1355,10 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
         restaurant_id: activeRestaurant?.id || null,
       };
 
-      console.log('[ERPSalesWorkspace] Calling onSubmit(payload)...');
+      console.log('[UnifiedSalesClosing] Calling onSubmit(payload)...');
       const saved = await onSubmit(payload);
       setSavedClosing(saved || { id: initial?.id || null, status: 'saved' });
-      console.log('[ERPSalesWorkspace] onSubmit(payload) SUCCESS');
+      console.log('[UnifiedSalesClosing] onSubmit(payload) SUCCESS');
 
     } catch (err) {
       const duplicateClosing = String(err?.message || '').includes('CLOSING_ALREADY_EXISTS');
@@ -1370,6 +1390,11 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
 
       <div className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
         <div className="mx-auto w-full max-w-6xl space-y-3 p-3 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:space-y-4 sm:p-4 sm:pb-6">
+          <section className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between" aria-label="Closing mode">
+            <div><p className="text-xs font-black uppercase tracking-wide text-slate-900">{isQuickClosing ? 'Quick Closing' : 'Advanced Closing'}</p><p className="text-[11px] text-muted-foreground">{isQuickClosing ? 'Complete the essential cash, payment, and reconciliation fields on one screen.' : 'Review source detail, purchases, expenses, and operating results before saving.'}</p></div>
+            {canUseAdvancedClosing && <div className="grid grid-cols-2 gap-1 rounded-lg border bg-background p-1"><Button type="button" size="sm" variant={isQuickClosing ? 'default' : 'ghost'} className="min-h-9" onClick={() => setClosingView('quick')}>Quick</Button><Button type="button" size="sm" variant={!isQuickClosing ? 'default' : 'ghost'} className="min-h-9" onClick={() => setClosingView('advanced')}>Advanced</Button></div>}
+          </section>
+          {isLocked && <div role="status" className="rounded-xl border border-slate-300 bg-slate-100 p-3 text-sm font-bold text-slate-800">This closing is locked. Financial values cannot be changed from this screen.</div>}
           {savedClosing && (
             <div role="status" className={`rounded-xl border p-3 ${savedClosing._alreadyExists ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'}`}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1496,7 +1521,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
               </div>
             </section>
 
-            <section key={`operating-result-${totalSales}-${approvedPurchasesTotal}-${expensesTotal}`} className="overflow-hidden rounded-2xl border border-emerald-200 bg-background shadow-sm">
+            <section key={`operating-result-${totalSales}-${approvedPurchasesTotal}-${expensesTotal}`} className={`${isQuickClosing ? 'hidden' : ''} overflow-hidden rounded-2xl border border-emerald-200 bg-background shadow-sm`}>
               <div className="flex items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50 px-3 py-3 sm:px-4"><div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-emerald-600" /><h2 className="text-xs font-black uppercase tracking-wide text-emerald-950">Operating Result</h2></div><Money key={`money-operating-${operatingResult}`} currency={currency} value={operatingResult} signed className={`text-sm font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`} /></div>
               <div className="space-y-2 p-3 sm:p-4">
                 <div className="flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2 text-xs"><span className="font-semibold text-blue-900">Sales</span><Money key={`money-total-${totalSales}`} currency={currency} value={totalSales} className="font-bold text-blue-700" /></div>
@@ -1535,11 +1560,11 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
       </div>
 
       <div className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-3 gap-2 sm:flex sm:justify-end">
-          <Button type="button" variant="outline" className="col-span-1 min-h-12 font-bold sm:w-32" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button>
-          <Button type="submit" className={`col-span-2 min-h-12 font-black sm:w-64 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || !allValid}>
-            {isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Save Daily Closing</>}
-          </Button>
+        <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-2 sm:flex sm:justify-end">
+          <Button type="button" variant="outline" className="min-h-12 font-bold sm:w-32" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button>
+          {!isLocked && <Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button>}
+          {!isLocked && <Button type="submit" className={`min-h-12 font-black sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button>}
+          {!isLocked && initial?.id && canLockClosing && <Button type="submit" variant="secondary" className="min-h-12 font-bold sm:w-32" onClick={() => flushSync(() => setRequestedClosingState('locked'))} disabled={isSubmitting || !allValid}>Lock</Button>}
         </div>
       </div>
     </form>

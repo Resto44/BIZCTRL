@@ -268,7 +268,7 @@ export function computePaymentAnalytics(sales, revenueSources = []) {
    * A UUID is detected as a string matching the UUID v4 pattern.
    */
   function resolveSourceLabel(entry, srcConfig) {
-    // 1. Prefer multilingual names embedded in the JSON entry (written by ERPSalesWorkspace)
+    // 1. Prefer multilingual names embedded in the JSON entry (written by UnifiedSalesClosing)
     if (entry.name_ar && entry.name_ar.trim()) return entry.name_ar.trim();
     if (entry.name_en && entry.name_en.trim()) return entry.name_en.trim();
     // 2. Fall back to revenueSources config

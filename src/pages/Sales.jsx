@@ -5,12 +5,11 @@ import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import PageHeader from '@/components/shared/PageHeader';
 // SalesForm removed to enforce single ERP workspace entry point
-import ERPSalesWorkspace from '@/components/sales/ERPSalesWorkspace';
+import UnifiedSalesClosing from '@/components/sales/UnifiedSalesClosing';
 import SalesListItem from '@/components/sales/SalesListItem';
 import EmptyState from '@/components/shared/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Plus, Download, SlidersHorizontal, BarChart3, Trash2, CheckSquare, Square } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { downloadCSV, downloadPDF, buildSalesCSV, buildSalesPDF } from '@/lib/exportUtils';
 import ExportDialog from '@/components/shared/ExportDialog';
@@ -60,7 +59,7 @@ export default function Sales() {
   const canManageDriverSales = role === ROLES.OWNER || isBranchManager;
   const isDriverSale = (sale) => Boolean(sale?.driver_id || sale?.drivers_json);
   const { autoSettle } = useNetworkSettlement({ orgId, user, currency });
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(true);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -687,6 +686,12 @@ export default function Sales() {
     ]);
     if (canonical.error || legacy.error) throw canonical.error || legacy.error;
     const existing = firstRecord([...(canonical.data || []), ...(legacy.data || [])]);
+    if (existing?.closing_state === 'draft') {
+      return updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });
+    }
+    if (existing?.closing_state === 'locked') {
+      throw new Error('This closing is locked and requires an authorized correction workflow.');
+    }
     if (existing) return { ...existing, _alreadyExists: true };
 
     return createMut.mutateAsync({ data, proofUrl, ocr });
@@ -721,7 +726,7 @@ export default function Sales() {
   return (
     <div className="max-w-full overflow-x-hidden">
       <PageHeader
-        title={t('daily_sales')}
+        title="Sales Closing"
         action={
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <Button size="sm" variant="outline" onClick={() => setShowExport(true)} className="flex-1 sm:flex-none">
@@ -733,9 +738,9 @@ export default function Sales() {
               onClick={() => setShowFinancialPanel(v => !v)}
               className="flex-1 sm:flex-none"
             >
-              <BarChart3 className="w-4 h-4 mr-1" /> Summary
+              <BarChart3 className="w-4 h-4 mr-1" /> History Summary
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setShowFilters(v => !v)} className="relative flex-none">
+            <Button size="sm" variant="outline" onClick={() => setShowFilters(v => !v)} className="relative flex-none" aria-label="Filter closing history">
               <SlidersHorizontal className="w-4 h-4" />
               {activeFilterCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
@@ -744,11 +749,23 @@ export default function Sales() {
               )}
             </Button>
             <Button size="sm" onClick={() => { setShowForm(true); setEditing(null); }} className="w-full sm:w-auto">
-              <Plus className="w-4 h-4 mr-1" />{t('add_sales')}
+              <Plus className="w-4 h-4 mr-1" />New Closing
             </Button>
           </div>
         }
       />
+
+      {(showForm || editing) && (
+        <section aria-label="Sales Closing" className="mb-4 overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
+          <UnifiedSalesClosing
+            key={editing?.id || 'new-closing'}
+            initial={editing || undefined}
+            onSubmit={handleSave}
+            onCancel={() => { setEditing(null); setShowForm(false); }}
+            onNewClosing={() => { setEditing(null); setShowForm(true); }}
+          />
+        </section>
+      )}
 
       {/* Financial Panel — toggled by Summary button */}
       {showFinancialPanel && (
@@ -796,9 +813,7 @@ export default function Sales() {
               )}
             </div>
           )}
-          {!canDelete && filtered.length > 0 && (
-            <p className="text-xs text-muted-foreground mb-2">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</p>
-          )}
+          <div className="mb-2 flex items-center justify-between gap-3"><h2 className="text-sm font-black uppercase tracking-wide text-foreground">Closing History</h2>{!canDelete && filtered.length > 0 && <p className="text-xs text-muted-foreground">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</p>}</div>
           {isLoading ? (
             <p className="text-center text-muted-foreground text-sm py-8">{t('loading')}</p>
           ) : filtered.length === 0 ? (
@@ -834,44 +849,6 @@ export default function Sales() {
           )}
         </div>
       </div>
-
-            {/* Add Sale Dialog — Enterprise ERP Sales Closing Workspace */}
-      <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="flex h-[calc(100dvh-1rem)] min-h-0 w-[calc(100%-1rem)] max-h-[calc(100dvh-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-xl p-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:w-full sm:rounded-lg">
-          <DialogHeader className="flex-shrink-0 border-b border-border px-3 pb-2 pt-3 pr-12 sm:px-4 sm:pb-2 sm:pt-4 sm:pr-12">
-            <DialogTitle className="flex min-w-0 items-center gap-2 text-base font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="truncate">Enterprise Sales Closing Workspace</span>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-            <ERPSalesWorkspace
-              onSubmit={handleSave}
-              onCancel={() => setShowForm(false)}
-              onNewClosing={() => { setShowForm(false); setTimeout(() => setShowForm(true), 0); }}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
-      {/* Edit Sale Dialog — Enterprise ERP Sales Closing Workspace */}
-      <Dialog open={!!editing} onOpenChange={(open) => { if (!open) setEditing(null); }}>
-        <DialogContent className="flex h-[calc(100dvh-1rem)] min-h-0 w-[calc(100%-1rem)] max-h-[calc(100dvh-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-xl p-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:w-full sm:rounded-lg">
-          <DialogHeader className="flex-shrink-0 border-b border-border px-3 pb-2 pt-3 pr-12 sm:px-4 sm:pb-2 sm:pt-4 sm:pr-12">
-            <DialogTitle className="flex min-w-0 items-center gap-2 text-base font-bold">
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
-              <span className="truncate">Edit Sales Closing Workspace</span>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-            {editing && <ERPSalesWorkspace
-              initial={editing}
-              onSubmit={handleSave}
-              onCancel={() => setEditing(null)}
-              onNewClosing={() => { setEditing(null); setTimeout(() => setShowForm(true), 0); }}
-            />}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Single Delete Confirmation */}
       <AlertDialog open={!!deleting} onOpenChange={(open) => { if (!open) setDeleting(null); }}>

@@ -3,9 +3,9 @@ import { readFile } from 'node:fs/promises';
 
 const source = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
-describe('Quick Sales Closing workflow contract', () => {
+describe('Unified Sales Closing workflow contract', () => {
   it('uses one compact, continuous mobile-first closing workflow instead of the former nine-step form', async () => {
-    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
     expect(workspace).toContain('Daily Sales Closing');
     expect(workspace).toContain("data-testid=\"quick-closing-auto-summary\"");
@@ -18,7 +18,7 @@ describe('Quick Sales Closing workflow contract', () => {
   });
 
   it('loads existing sales, POS and cash-register data automatically in restaurant, branch and date scope', async () => {
-    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
     expect(workspace).toContain("queryKey: ['quick_closing_automatic_sources'");
     expect(workspace).toContain("from('daily_cash_settlements')");
@@ -32,7 +32,7 @@ describe('Quick Sales Closing workflow contract', () => {
   });
 
   it('calculates total sales, cash reconciliation, purchases, expenses and operating result automatically', async () => {
-    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
     expect(workspace).toContain('cashSales + networkTotal + creditTotal + otherPaymentTotal');
     expect(workspace).toContain('actualCount - expectedCash');
@@ -43,18 +43,19 @@ describe('Quick Sales Closing workflow contract', () => {
   });
 
   it('uses accessible numeric inputs, stable currency presentation and a non-obstructive sticky action area', async () => {
-    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
     expect(workspace).toContain('inputMode="decimal"');
     expect(workspace).toContain('dir="ltr"');
     expect(workspace).toContain('tabular-nums');
     expect(workspace).toContain('whitespace-nowrap');
     expect(workspace).toContain('className="border-t border-border bg-background/95');
-    expect(workspace).toContain('Save Daily Closing');
+    expect(workspace).toContain('Save Draft');
+    expect(workspace).toContain('Finalize Closing');
   });
 
   it('preserves scoped purchase and expense loading, inline validation, and duplicate-closing protection', async () => {
-    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
     const sales = await source('../src/pages/Sales.jsx');
 
     expect(workspace).toContain("queryKey: ['approved_purchases_for_date'");
@@ -70,7 +71,7 @@ describe('Quick Sales Closing workflow contract', () => {
   });
 
   it('clears automatic totals when the closing scope changes and blocks a save when ERP source reads fail', async () => {
-    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
     expect(workspace).toContain('const automaticClosingScope = [');
     expect(workspace).toContain('previous.scope !== automaticClosingScope');

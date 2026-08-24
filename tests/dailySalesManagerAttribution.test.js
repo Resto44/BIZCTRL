@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { filterDailySalesRecords, toDailySalesCardRecord } from '../src/lib/dailySalesPresentation.js';
 
 const cardPath = new URL('../src/components/sales/SalesListItem.jsx', import.meta.url);
-const workspacePath = new URL('../src/components/sales/ERPSalesWorkspace.jsx', import.meta.url);
+const workspacePath = new URL('../src/components/sales/UnifiedSalesClosing.jsx', import.meta.url);
 const salesPagePath = new URL('../src/pages/Sales.jsx', import.meta.url);
 const schemaPath = new URL('../src/supabase/schema.sql', import.meta.url);
 const migrationPath = new URL('../src/supabase/20260815_daily_sales_manager_attribution.sql', import.meta.url);

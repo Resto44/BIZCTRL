@@ -11,7 +11,7 @@ import { useRole, ROLES } from '@/lib/RoleContext';
 import LogoutButton from '@/components/layout/LogoutButton';
 import {
   Globe, Moon, DollarSign, Bell, Building2, CreditCard,
-  GitBranch, UtensilsCrossed, Shield, Truck, Package, Send, Users, Banknote, Settings2
+  GitBranch, UtensilsCrossed, Shield, Truck, Package, Send, Users, Settings2
 } from 'lucide-react';
 
 // Settings contains ONLY configuration — no operational actions
@@ -25,7 +25,6 @@ const SECTIONS = [
       { path: '/brand',             icon: Building2,       label: 'Brand & Settings' },
       { path: '/categories',        icon: Package,         label: 'Categories' },
       { path: '/approval-policy',   icon: Shield,          label: 'Approval Policy' },
-      { path: '/sales-sources',                 icon: Banknote,  label: 'Sales Sources' },
       { path: '/sales-closing-customization',   icon: Settings2, label: 'Sales Closing Customization' },
     ],
   },
