@@ -9,9 +9,10 @@ import {
   Banknote,
   Sparkles,
   Building2,
+  Settings2,
 } from 'lucide-react';
 
-export default function QuickActionsDock({ onOpenCopilot, onAddBranch }) {
+export default function QuickActionsDock({ onOpenCopilot, onAddBranch, onCustomizeSalesClosing }) {
   const { t } = useLanguage();
   const location = useLocation();
 
@@ -27,6 +28,7 @@ export default function QuickActionsDock({ onOpenCopilot, onAddBranch }) {
     { to: '/cash-register', label: t('cash_register') || 'Cash Register', icon: Banknote, color: 'bg-indigo-500' },
     { to: '/expenses', label: t('add_expense') || 'Add Expense', icon: Wallet, color: 'bg-amber-500' },
     ...(onAddBranch ? [{ id: 'add-branch', label: 'Add Branch', subtitle: 'Create a branch for this restaurant.', icon: Building2, color: 'bg-violet-500', onClick: onAddBranch }] : []),
+    ...(onCustomizeSalesClosing ? [{ id: 'sales-closing-customization', label: 'Customize Closing', subtitle: 'Configure sales-closing sources and fields.', icon: Settings2, color: 'bg-slate-700', onClick: onCustomizeSalesClosing }] : []),
     { to: '/debts', label: t('receive_debt') || 'Receive Debt', icon: ArrowDownLeft, color: 'bg-cyan-500' },
     { to: '/suppliers', label: t('supplier_payment') || 'Supplier Payment', icon: Truck, color: 'bg-orange-500' },
     ...(onOpenCopilot ? [{ id: 'ai-copilot', label: 'AI Copilot', subtitle: 'Ask anything about your business or BizCTRL.', icon: Sparkles, color: 'bg-gradient-to-br from-violet-600 to-cyan-500', onClick: onOpenCopilot }] : []),

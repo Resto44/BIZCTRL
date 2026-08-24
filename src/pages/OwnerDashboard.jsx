@@ -2390,6 +2390,7 @@ function OwnerDashboardContent() {
       <QuickActionsDock
         onOpenCopilot={() => setCopilotOpen(true)}
         onAddBranch={role === 'owner' ? () => setQuickAddBranchOpen(true) : undefined}
+        onCustomizeSalesClosing={role === 'owner' ? () => navigate('/sales-closing-customization') : undefined}
       />
       <QuickAddBranchDialog open={isQuickAddBranchOpen} onOpenChange={setQuickAddBranchOpen} />
       </div>

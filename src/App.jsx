@@ -13,6 +13,7 @@ import ERPRoleGuard from '@/components/rbac/ERPRoleGuard';
 import { TenantProvider, useTenant } from '@/lib/TenantContext';
 import { BranchScopeProvider } from '@/lib/BranchScopeContext';
 import { WorkspaceCustomizationProvider } from '@/lib/WorkspaceCustomizationContext';
+import { SalesClosingCustomizationProvider } from '@/lib/SalesClosingCustomizationContext';
 import { BusinessModeProvider } from '@/lib/BusinessModeContext';
 import { NotificationProvider } from '@/lib/NotificationContext';
 import { useRole, ROLES, ROLE_HOME, NON_OWNER_ROLES } from '@/lib/RoleContext';
@@ -95,6 +96,7 @@ const EnterpriseCategoryManager = lazy(() => import('@/components/categories/Cat
 const ApprovalPolicy      = lazy(() => import('@/pages/ApprovalPolicy'));
 const OwnerApprovalCenter = lazy(() => import('@/pages/OwnerApprovalCenter'));
 const SalesSources        = lazy(() => import('@/pages/SalesSources'));
+const SalesClosingCustomization = lazy(() => import('@/pages/SalesClosingCustomization'));
 const TelegramSettings    = lazy(() => import('@/pages/TelegramSettings'));
 const Billing             = lazy(() => import('@/pages/Billing'));
 const Support             = lazy(() => import('@/pages/Support'));
@@ -318,6 +320,7 @@ const SubscribedRoutes = () => {
         <Route path="/approval-policy" element={<RoleGuard permission="viewBrandSettings"><ApprovalPolicy /></RoleGuard>} />
         <Route path="/approval-center" element={<Navigate to="/erp-approval-center" replace />} />
         <Route path="/sales-sources" element={<RoleGuard permission="viewBrandSettings"><SalesSources /></RoleGuard>} />
+        <Route path="/sales-closing-customization" element={<RoleGuard permission="manageSettings"><SalesClosingCustomization /></RoleGuard>} />
         <Route path="/telegram-settings" element={<RoleGuard permission="viewBrandSettings"><TelegramSettings /></RoleGuard>} />
         <Route path="/billing" element={<RoleGuard permission="viewBilling"><SubscriptionErrorBoundary><Billing /></SubscriptionErrorBoundary></RoleGuard>} />
         <Route path="/notifications" element={<RoleGuard permission="viewAlerts"><NotificationCenter /></RoleGuard>} />
@@ -547,12 +550,14 @@ const AuthenticatedApp = () => {
         <BranchScopeProvider>
           <SubscriptionProvider>
             <WorkspaceCustomizationProvider>
-              <BusinessModeProvider>
-                <NotificationProvider>
-                  <RoleHomeRedirect />
-                  <SubscribedRoutes />
-                </NotificationProvider>
-              </BusinessModeProvider>
+              <SalesClosingCustomizationProvider>
+                <BusinessModeProvider>
+                  <NotificationProvider>
+                    <RoleHomeRedirect />
+                    <SubscribedRoutes />
+                  </NotificationProvider>
+                </BusinessModeProvider>
+              </SalesClosingCustomizationProvider>
             </WorkspaceCustomizationProvider>
           </SubscriptionProvider>
         </BranchScopeProvider>
