@@ -903,7 +903,12 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   // closing form uses these ERP records as its primary source; manual values are
   // exceptional adjustments only, never a required re-entry step.
   const automaticClosingEnabled = Boolean(activeRestaurant?.id && form.date && form.branch && !initial?.id);
-  const { data: automaticClosingData, isLoading: automaticClosingLoading } = useQuery({
+  const {
+    data: automaticClosingData,
+    isLoading: automaticClosingLoading,
+    isError: automaticClosingIsError,
+    refetch: refetchAutomaticClosing,
+  } = useQuery({
     queryKey: ['quick_closing_automatic_sources', activeRestaurant?.id, selectedBranchId, form.branch, form.date],
     enabled: automaticClosingEnabled,
     staleTime: 15000,
@@ -967,6 +972,10 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
         Promise.all(posQueries),
         Promise.all(creditQueries),
       ]);
+      const queryError = [settlementResults, paymentResults, posResults, creditResults]
+        .flat()
+        .find((result) => result?.error)?.error;
+      if (queryError) throw queryError;
       const merge = (...results) => asRecordArray(Array.from(new Map(results.flatMap((result) => asRecordArray(result?.data)).map((record) => [record.id, record])).values()));
       return {
         settlements: merge(...settlementResults),
@@ -1011,23 +1020,35 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
   // Query results can arrive in separate React commits while branch resolution is
   // still stabilising. Keep one immutable snapshot for every visual calculation
   // so the sales cards, reconciliation and final review never show mixed totals.
+  // The scope marker prevents a previous branch or date's totals from surviving
+  // into a new closing while its query is still loading.
+  const automaticClosingScope = [
+    initial?.id || 'new',
+    activeRestaurant?.id || '',
+    selectedBranchId || form.branch || '',
+    form.date || '',
+  ].join(':');
   const [automaticClosingSnapshot, setAutomaticClosingSnapshot] = useState(() => ({
+    scope: null,
     cash: 0, network: 0, credit: 0, other: 0, expectedCash: null, openingCash: null, hasData: false, paymentCount: 0,
   }));
   useLayoutEffect(() => {
     setAutomaticClosingSnapshot((previous) => {
-      const next = automaticClosing;
+      const next = { ...automaticClosing, scope: automaticClosingScope };
+      if (previous.scope !== automaticClosingScope) return next;
       const unchanged = previous.cash === next.cash && previous.network === next.network && previous.credit === next.credit && previous.other === next.other && previous.expectedCash === next.expectedCash && previous.openingCash === next.openingCash && previous.hasData === next.hasData && previous.paymentCount === next.paymentCount;
       return unchanged ? previous : next;
     });
-  }, [automaticClosing]);
-  const autoSourceLoading = automaticClosingLoading && !automaticClosingSnapshot.hasData;
+  }, [automaticClosing, automaticClosingScope]);
+  const snapshotMatchesScope = automaticClosingSnapshot.scope === automaticClosingScope;
+  const useAutomaticSales = Boolean(!initial?.id && snapshotMatchesScope && automaticClosingSnapshot.hasData);
+  const autoSourceLoading = automaticClosingLoading && !useAutomaticSales;
+  const automaticClosingUnavailable = automaticClosingIsError && !useAutomaticSales;
 
   // ── Closing calculations sourced from the selected ERP scope ──────────────
   const manualCashSales = Math.max(0, Number(cashSalesInput) || 0);
   const manualNetworkTotal = asRecordArray(posEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
   const manualCreditTotal = asRecordArray(creditEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
-  const useAutomaticSales = Boolean(!initial?.id && automaticClosingSnapshot.hasData);
   const cashSales = useAutomaticSales ? automaticClosingSnapshot.cash : manualCashSales;
   const networkTotal = useAutomaticSales ? automaticClosingSnapshot.network : manualNetworkTotal;
   const creditTotal = useAutomaticSales ? automaticClosingSnapshot.credit : manualCreditTotal;
@@ -1055,6 +1076,12 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
 
   // Validation checks
   const validations = useMemo(() => [
+    {
+      key: 'erpData',
+      label: 'ERP Sales Data Available',
+      passed: !automaticClosingUnavailable,
+      message: automaticClosingUnavailable ? 'Retry required' : (useAutomaticSales ? 'Loaded' : 'No posted sales'),
+    },
     {
       key: 'cashier',
       label: 'Cashier Selected',
@@ -1126,7 +1153,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
       passed: !!form.date && !!form.branch,
       message: form.date || 'Date required',
     },
-  ], [form, cashierDisplayName, approvedPurchasesForDate, posEntries, creditEntries, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, cashDifference, cashNotes, managerApproved, currency]);
+  ], [form, automaticClosingUnavailable, useAutomaticSales, cashierDisplayName, approvedPurchasesForDate, posEntries, creditEntries, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, cashDifference, cashNotes, managerApproved, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -1349,7 +1376,15 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
               <div className="flex min-w-0 items-center gap-2"><BarChart3 className="h-4 w-4 shrink-0 text-indigo-600" /><h2 className="truncate text-xs font-black uppercase tracking-wide text-indigo-950">Today&apos;s Sales</h2></div>
               <Badge variant="outline" className="shrink-0 border-indigo-200 bg-white text-[10px] text-indigo-700">{autoSourceLoading ? 'Loading ERP data' : useAutomaticSales ? 'Auto-loaded' : 'No source posted'}</Badge>
             </div>
-            {autoSourceLoading ? (
+            {automaticClosingUnavailable ? (
+              <div role="alert" className="m-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900 sm:m-4">
+                <p className="font-bold">Unable to load ERP sales data.</p>
+                <p className="mt-1 text-xs leading-relaxed">Check the branch and date, then retry before saving this closing.</p>
+                <Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-300 bg-white" onClick={() => refetchAutomaticClosing()}>
+                  <RefreshCw className="mr-1.5 h-4 w-4" />Retry ERP data load
+                </Button>
+              </div>
+            ) : autoSourceLoading ? (
               <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>
             ) : (
               <div className="p-3 sm:p-4">
@@ -1441,7 +1476,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
       <div className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
         <div className="mx-auto grid w-full max-w-6xl grid-cols-3 gap-2 sm:flex sm:justify-end">
           <Button type="button" variant="outline" className="col-span-1 min-h-12 font-bold sm:w-32" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button>
-          <Button type="submit" className={`col-span-2 min-h-12 font-black sm:w-64 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || !allValid}>
+          <Button type="submit" className={`col-span-2 min-h-12 font-black sm:w-64 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || !allValid}>
             {isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Save Daily Closing</>}
           </Button>
         </div>

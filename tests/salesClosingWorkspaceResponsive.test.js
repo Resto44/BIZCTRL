@@ -68,4 +68,17 @@ describe('Quick Sales Closing workflow contract', () => {
     expect(sales).toContain(".eq('shift', data.shift)");
     expect(sales).toContain('_alreadyExists: true');
   });
+
+  it('clears automatic totals when the closing scope changes and blocks a save when ERP source reads fail', async () => {
+    const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
+
+    expect(workspace).toContain('const automaticClosingScope = [');
+    expect(workspace).toContain('previous.scope !== automaticClosingScope');
+    expect(workspace).toContain('const snapshotMatchesScope = automaticClosingSnapshot.scope === automaticClosingScope');
+    expect(workspace).toContain('const queryError = [settlementResults, paymentResults, posResults, creditResults]');
+    expect(workspace).toContain('if (queryError) throw queryError;');
+    expect(workspace).toContain('automaticClosingUnavailable');
+    expect(workspace).toContain('Retry ERP data load');
+    expect(workspace).toContain('disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || !allValid}');
+  });
 });
