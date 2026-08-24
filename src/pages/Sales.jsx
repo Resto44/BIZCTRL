@@ -827,28 +827,28 @@ export default function Sales() {
 
             {/* Add Sale Dialog — Enterprise ERP Sales Closing Workspace */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-xl w-full max-h-[92vh] p-0 overflow-hidden flex flex-col">
-          <DialogHeader className="px-4 pt-4 pb-2 border-b border-border flex-shrink-0">
-            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+        <DialogContent className="flex h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-h-[calc(100dvh-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-xl p-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:w-full sm:rounded-lg">
+          <DialogHeader className="flex-shrink-0 border-b border-border px-3 pb-2 pt-3 pr-12 sm:px-4 sm:pb-2 sm:pt-4 sm:pr-12">
+            <DialogTitle className="flex min-w-0 items-center gap-2 text-base font-bold">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Enterprise Sales Closing Workspace
+              <span className="truncate">Enterprise Sales Closing Workspace</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto">
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
             <ERPSalesWorkspace onSubmit={handleSave} onCancel={() => setShowForm(false)} />
           </div>
         </DialogContent>
       </Dialog>
       {/* Edit Sale Dialog — Enterprise ERP Sales Closing Workspace */}
       <Dialog open={!!editing} onOpenChange={(open) => { if (!open) setEditing(null); }}>
-        <DialogContent className="max-w-xl w-full max-h-[92vh] p-0 overflow-hidden flex flex-col">
-          <DialogHeader className="px-4 pt-4 pb-2 border-b border-border flex-shrink-0">
-            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+        <DialogContent className="flex h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-h-[calc(100dvh-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-xl p-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:w-full sm:rounded-lg">
+          <DialogHeader className="flex-shrink-0 border-b border-border px-3 pb-2 pt-3 pr-12 sm:px-4 sm:pb-2 sm:pt-4 sm:pr-12">
+            <DialogTitle className="flex min-w-0 items-center gap-2 text-base font-bold">
               <span className="w-2 h-2 rounded-full bg-blue-500" />
-              Edit Sales Closing Workspace
+              <span className="truncate">Edit Sales Closing Workspace</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto">
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
             {editing && <ERPSalesWorkspace initial={editing} onSubmit={handleSave} onCancel={() => setEditing(null)} />}
           </div>
         </DialogContent>

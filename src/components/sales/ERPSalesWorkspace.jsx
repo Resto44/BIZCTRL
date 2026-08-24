@@ -119,17 +119,17 @@ const SectionHeader = memo(function SectionHeader({
   const c = SECTION_COLORS[color] || SECTION_COLORS.shift;
   const contents = (
     <>
-      <span className="flex min-w-0 items-center gap-2.5">
+      <span className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2.5">
         {sectionNum && (
           <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold bg-white/70 border border-border/50 ${c.icon}`}>
             {sectionNum}
           </span>
         )}
         <Icon className={`h-4 w-4 shrink-0 ${c.icon}`} />
-        <span className="truncate text-left text-xs font-bold uppercase tracking-wider text-foreground/80">{title}</span>
+        <span className="min-w-0 truncate text-left text-xs font-bold uppercase tracking-wider text-foreground/80">{title}</span>
       </span>
-      <span className="flex shrink-0 items-center gap-2">
-        {badge}
+      <span className="ml-2 flex shrink-0 items-center gap-1.5 sm:gap-2">
+        {badge && <span className="max-w-[7.5rem] overflow-hidden text-ellipsis whitespace-nowrap sm:max-w-none">{badge}</span>}
         {collapsible && (
           collapsed ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 text-muted-foreground" />
         )}
@@ -141,7 +141,7 @@ const SectionHeader = memo(function SectionHeader({
     return (
       <button
         type="button"
-        className={`flex w-full items-center justify-between px-4 py-3 ${c.header} border-b border-border/60 text-left transition-colors hover:bg-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50`}
+        className={`flex w-full min-w-0 items-center justify-between gap-2 px-3 py-3 sm:px-4 ${c.header} border-b border-border/60 text-left transition-colors hover:bg-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50`}
         onClick={onToggle}
         aria-expanded={!collapsed}
       >
@@ -150,7 +150,7 @@ const SectionHeader = memo(function SectionHeader({
     );
   }
 
-  return <div className={`flex items-center justify-between px-4 py-3 ${c.header} border-b border-border/60`}>{contents}</div>;
+  return <div className={`flex min-w-0 items-center justify-between gap-2 px-3 py-3 sm:px-4 ${c.header} border-b border-border/60`}>{contents}</div>;
 });
 
 const AccordionBody = memo(function AccordionBody({ open, children }) {
@@ -240,15 +240,15 @@ const StatusBadge = memo(function StatusBadge({ status }) {
 // ─────────────────────────────────────────────────────────────────────────────
 const ValidationRow = memo(function ValidationRow({ label, passed, message }) {
   return (
-    <div className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-medium
+    <div className={`flex min-w-0 items-start justify-between gap-2 px-3 py-2 rounded-lg border text-xs font-medium
       ${passed ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         {passed
           ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
           : <XCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
-        <span>{label}</span>
+        <span className="min-w-0 leading-snug">{label}</span>
       </div>
-      {message && <span className="text-[10px] opacity-70 ml-2 truncate max-w-[120px]">{message}</span>}
+      {message && <span className="max-w-[8rem] shrink-0 truncate text-right text-[10px] leading-snug opacity-70 sm:max-w-[12rem]">{message}</span>}
     </div>
   );
 });
@@ -393,13 +393,13 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
 // ─────────────────────────────────────────────────────────────────────────────
 const StickySummary = memo(function StickySummary({ totalSales, operatingResult, cashStatus, currency, isSubmitting }) {
   return (
-    <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border shadow-sm">
-      <div className="flex flex-col gap-2 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Live</span>
+    <div className="sticky top-0 z-30 border-b border-border bg-background/95 shadow-sm backdrop-blur-sm">
+      <div className="flex min-w-0 items-center justify-between gap-2 px-3 py-2 sm:px-4">
+        <div className="flex shrink-0 items-center gap-1">
+          <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Live</span>
         </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+        <div className="flex min-w-0 flex-wrap justify-end gap-x-3 gap-y-1 text-xs sm:gap-x-4">
           <div className="flex items-center gap-1.5">
             <DollarSign className="w-3.5 h-3.5 text-blue-600" />
             <span className="text-muted-foreground">Revenue</span>
@@ -442,7 +442,6 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     ) || null;
   }, [branches, isManager, managerBranch, user?.branch_id]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // ── Exclusive accordion state ──────────────────────────────────────────────
   // All cards begin compact. Keeping their bodies mounted prevents input state,
@@ -558,6 +557,21 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     customSources.reduce((s, src) => s + (Number(customSourceAmounts[src.id]) || 0), 0),
     [customSources, customSourceAmounts]
   );
+  const sectionNumbers = useMemo(() => {
+    const hasCustomSources = customSources.length > 0;
+    return {
+      shift: '1',
+      summary: '2',
+      pos: '3',
+      credit: '4',
+      custom: '5',
+      purchases: String(hasCustomSources ? 6 : 5),
+      reconciliation: String(hasCustomSources ? 7 : 6),
+      operating: String(hasCustomSources ? 8 : 7),
+      validation: String(hasCustomSources ? 9 : 8),
+      save: String(hasCustomSources ? 10 : 9),
+    };
+  }, [customSources.length]);
 
   // ── Employees ─────────────────────────────────────────────────────────────
   const { data: employeesData, isLoading: empLoading } = useQuery({
@@ -596,6 +610,11 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     if (employees.some((employee) => employee.id === user.id)) return employees;
     return [{ id: user.id, full_name: user.full_name || user.email || 'Branch Manager' }, ...employees];
   }, [employees, isManager, user?.email, user?.full_name, user?.id]);
+  const selectedCashier = useMemo(() => {
+    const selectedId = form.cashier_employee_id || form.cashier_id;
+    return cashiers.find((cashier) => String(cashier.id) === String(selectedId)) || null;
+  }, [cashiers, form.cashier_employee_id, form.cashier_id]);
+  const cashierDisplayName = form.cashier_name || selectedCashier?.full_name || '';
 
   // Branch Managers close their own shift unless an assigned cashier exists first.
   useEffect(() => {
@@ -1059,8 +1078,8 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     {
       key: 'cashier',
       label: 'Cashier Selected',
-      passed: !!form.cashier_name,
-      message: form.cashier_name || 'Required',
+      passed: !!cashierDisplayName,
+      message: cashierDisplayName || 'Required',
     },
     {
       key: 'branch',
@@ -1112,8 +1131,8 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     {
       key: 'cashBalance',
       label: 'Cash Reconciled',
-      passed: remainingDifference === 0 || remainingDifference === null || managerApproved,
-      message: remainingDifference === 0 ? 'Balanced' : remainingDifference !== null ? (managerApproved ? 'Manager approved' : 'Needs approval') : 'Pending count',
+      passed: actualCount !== null && (remainingDifference === 0 || managerApproved),
+      message: actualCount === null ? 'Actual cash count required' : remainingDifference === 0 ? 'Balanced' : managerApproved ? 'Manager approved' : 'Needs approval',
     },
     {
       key: 'requiredFields',
@@ -1121,7 +1140,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       passed: !!form.date && !!form.branch,
       message: form.date || 'Date required',
     },
-  ], [form, approvedPurchasesForDate, posEntries, creditEntries, cashSales, networkTotal, creditTotal, remainingDifference, managerApproved, currency]);
+  ], [form, cashierDisplayName, approvedPurchasesForDate, posEntries, creditEntries, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, managerApproved, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   const passedCount = useMemo(() => validations.filter(v => v.passed).length, [validations]);
@@ -1146,6 +1165,11 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
 
     if (!approvedPurchasesForDate.length) {
       toast.warning("No approved purchases found for this date. Proceeding without purchase data.");
+    }
+
+    if (actualCount === null) {
+      toast.error('Actual cash count is required before closing the shift.');
+      return;
     }
 
     if (remainingDifference !== 0 && remainingDifference !== null && !managerApproved) {
@@ -1221,7 +1245,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         date: form.date,
         branch: selectedBranch?.key || selectedBranch?.branch_key || form.branch,
         shift: form.shift,
-        cashier_name: form.cashier_name,
+        cashier_name: cashierDisplayName,
         cashier_employee_id: form.cashier_employee_id,
         sales_notes: form.sales_notes,
         branch_id: branchId,
@@ -1273,7 +1297,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
       console.log('[ERPSalesWorkspace] Calling onSubmit(payload)...');
       await onSubmit(payload);
       console.log('[ERPSalesWorkspace] onSubmit(payload) SUCCESS');
-      setSaveSuccess(true);
+
     } catch (err) {
       toast.error(`Save failed: ${err?.message || 'Unknown error'}`);
     } finally {
@@ -1286,7 +1310,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   // Save returns immediately to Daily Sales via onSubmit callback.
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+    <form onSubmit={handleSubmit} className="flex min-h-0 min-w-0 flex-col">
       {/* Sticky Summary */}
       <StickySummary
         totalSales={totalSales}
@@ -1296,8 +1320,8 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
         isSubmitting={isSubmitting}
       />
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="space-y-4 p-4 pb-6">
+      <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="space-y-3 p-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:space-y-4 sm:p-4 sm:pb-6">
 
           {/* ═══════════════════════════════════════════════════════════════
               SECTION 1 — SHIFT INFORMATION
@@ -1307,7 +1331,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               icon={Building2}
               title="Shift Information"
               color="shift"
-              sectionNum="1"
+              sectionNum={sectionNumbers.shift}
               collapsible
               collapsed={!isSectionOpen('shift')}
               onToggle={() => toggleSection('shift')}
@@ -1391,7 +1415,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${form.cashier_name ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
                   <User className={`w-3 h-3 ${form.cashier_name ? 'text-emerald-600' : 'text-amber-600'}`} />
                   <span className={`text-[10px] font-bold uppercase ${form.cashier_name ? 'text-emerald-700' : 'text-amber-700'}`}>
-                    {form.cashier_name || 'No Cashier'}
+                    {cashierDisplayName || 'No Cashier'}
                   </span>
                 </div>
               </div>
@@ -1407,7 +1431,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               icon={BarChart3}
               title="Live Sales Summary"
               color="kpi"
-              sectionNum="2"
+              sectionNum={sectionNumbers.summary}
               collapsible
               collapsed={!isSectionOpen('summary')}
               onToggle={() => toggleSection('summary')}
@@ -1482,7 +1506,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               icon={CreditCard}
               title="POS Sales"
               color="pos"
-              sectionNum="4"
+              sectionNum={sectionNumbers.pos}
               collapsible
               collapsed={!isSectionOpen('pos')}
               onToggle={() => toggleSection('pos')}
@@ -1610,7 +1634,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               icon={User}
               title="Customer Credit"
               color="credit"
-              sectionNum="4"
+              sectionNum={sectionNumbers.credit}
               collapsible
               collapsed={!isSectionOpen('credit')}
               onToggle={() => toggleSection('credit')}
@@ -1661,7 +1685,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 icon={ZapIcon}
                 title="Additional Sales Sources"
                 color="custom"
-                sectionNum="4½"
+                sectionNum={sectionNumbers.custom}
                 collapsible
                 collapsed={!isSectionOpen('custom')}
                 onToggle={() => toggleSection('custom')}
@@ -1708,7 +1732,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               icon={ShoppingCart}
               title="Purchase Summary"
               color="purchases"
-              sectionNum="5"
+              sectionNum={sectionNumbers.purchases}
               collapsible
               collapsed={!isSectionOpen('purchases')}
               onToggle={() => toggleSection('purchases')}
@@ -1821,7 +1845,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               icon={Scale}
               title="Cash Reconciliation"
               color="reconcile"
-              sectionNum="6"
+              sectionNum={sectionNumbers.reconciliation}
               collapsible
               collapsed={!isSectionOpen('reconciliation')}
               onToggle={() => toggleSection('reconciliation')}
@@ -1949,7 +1973,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               icon={TrendingUp}
               title="Operating Result"
               color="operating"
-              sectionNum="7"
+              sectionNum={sectionNumbers.operating}
               collapsible
               collapsed={!isSectionOpen('operating')}
               onToggle={() => toggleSection('operating')}
@@ -2031,7 +2055,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               icon={CheckSquare}
               title="Validation Center"
               color="validation"
-              sectionNum="8"
+              sectionNum={sectionNumbers.validation}
               collapsible
               collapsed={!isSectionOpen('validation')}
               onToggle={() => toggleSection('validation')}
@@ -2064,7 +2088,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
               icon={Database}
               title="Save Panel"
               color="save"
-              sectionNum="9"
+              sectionNum={sectionNumbers.save}
               collapsible
               collapsed={!isSectionOpen('save')}
               onToggle={() => toggleSection('save')}
@@ -2109,7 +2133,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                 <Button
                   type="submit"
                   className={`h-12 font-bold ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`}
-                  disabled={isSubmitting || purchasesLoading || (remainingDifference !== 0 && remainingDifference !== null && !managerApproved)}
+                  disabled={isSubmitting || purchasesLoading || !allValid}
                 >
                   {isSubmitting ? (
                     <>
