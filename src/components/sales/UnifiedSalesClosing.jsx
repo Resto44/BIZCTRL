@@ -1140,9 +1140,12 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const opening = Number(openingCash) || 0;
   const actualCount = actualCashCount !== '' ? Number(actualCashCount) : null;
   const ownerContrib = Number(ownerContributionInput) || 0;
-  const expectedCash = useAutomaticSales && automaticClosingSnapshot.expectedCash !== null
+  const expectedCashBase = useAutomaticSales && automaticClosingSnapshot.expectedCash !== null
     ? automaticClosingSnapshot.expectedCash
-    : opening + cashSales;
+    : opening + baseCashSales;
+  // Automatic settlement expected cash does not include newly entered configured
+  // source amounts, so add only the cash-classified source contribution once.
+  const expectedCash = expectedCashBase + customSourcePaymentTotals.cash;
   const cashDifference = actualCount !== null ? actualCount - expectedCash : null;
   const cashReconcStatus = cashDifference === null ? null : cashDifference === 0 ? 'Balanced' : cashDifference < 0 ? 'Shortage' : 'Overage';
   const closingCash = actualCount !== null ? actualCount + ownerContrib : opening;

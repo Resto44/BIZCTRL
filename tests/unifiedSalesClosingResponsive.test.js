@@ -64,6 +64,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const otherPaymentTotal = baseOtherPaymentTotal + customSourcePaymentTotals.other;');
     expect(workspace).toContain('default_payment_method: src.default_payment_method || \'other\'');
     expect(workspace).toContain('payment_bucket: paymentBucketForCode(src.default_payment_method)');
+    expect(workspace).toContain('const expectedCashBase = useAutomaticSales && automaticClosingSnapshot.expectedCash !== null');
+    expect(workspace).toContain('const expectedCash = expectedCashBase + customSourcePaymentTotals.cash;');
   });
 
   it('updates Owner source mutation caches immediately and then refreshes canonical source queries', async () => {
