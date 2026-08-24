@@ -153,13 +153,13 @@ const SectionHeader = memo(function SectionHeader({
   return <div className={`flex min-w-0 items-center justify-between gap-2 px-3 py-3 sm:px-4 ${c.header} border-b border-border/60`}>{contents}</div>;
 });
 
-const AccordionBody = memo(function AccordionBody({ open, children }) {
+const AccordionBody = function AccordionBody({ children }) {
   return (
     <div className="grid grid-rows-[1fr] opacity-100">
       <div className="min-h-0 overflow-visible">{children}</div>
     </div>
   );
-});
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NUMERIC INPUT — ERP style
