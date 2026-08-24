@@ -1008,27 +1008,42 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
     };
   }, [automaticClosingData, initial?.id]);
 
+  // Query results can arrive in separate React commits while branch resolution is
+  // still stabilising. Keep one immutable snapshot for every visual calculation
+  // so the sales cards, reconciliation and final review never show mixed totals.
+  const [automaticClosingSnapshot, setAutomaticClosingSnapshot] = useState(() => ({
+    cash: 0, network: 0, credit: 0, other: 0, expectedCash: null, openingCash: null, hasData: false, paymentCount: 0,
+  }));
+  useEffect(() => {
+    setAutomaticClosingSnapshot((previous) => {
+      const next = automaticClosing;
+      const unchanged = previous.cash === next.cash && previous.network === next.network && previous.credit === next.credit && previous.other === next.other && previous.expectedCash === next.expectedCash && previous.openingCash === next.openingCash && previous.hasData === next.hasData && previous.paymentCount === next.paymentCount;
+      return unchanged ? previous : next;
+    });
+  }, [automaticClosing]);
+  const autoSourceLoading = automaticClosingLoading && !automaticClosingSnapshot.hasData;
+
   // ── Closing calculations sourced from the selected ERP scope ──────────────
   const manualCashSales = useMemo(() => Math.max(0, Number(cashSalesInput) || 0), [cashSalesInput]);
   const manualNetworkTotal = useMemo(() => asRecordArray(posEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0), [posEntries]);
   const manualCreditTotal = useMemo(() => asRecordArray(creditEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0), [creditEntries]);
-  const useAutomaticSales = Boolean(!initial?.id && automaticClosing.hasData);
-  const cashSales = useAutomaticSales ? automaticClosing.cash : manualCashSales;
-  const networkTotal = useAutomaticSales ? automaticClosing.network : manualNetworkTotal;
-  const creditTotal = useAutomaticSales ? automaticClosing.credit : manualCreditTotal;
-  const otherPaymentTotal = useAutomaticSales ? automaticClosing.other : customTotal;
+  const useAutomaticSales = Boolean(!initial?.id && automaticClosingSnapshot.hasData);
+  const cashSales = useAutomaticSales ? automaticClosingSnapshot.cash : manualCashSales;
+  const networkTotal = useAutomaticSales ? automaticClosingSnapshot.network : manualNetworkTotal;
+  const creditTotal = useAutomaticSales ? automaticClosingSnapshot.credit : manualCreditTotal;
+  const otherPaymentTotal = useAutomaticSales ? automaticClosingSnapshot.other : customTotal;
   const totalSales = useMemo(() => cashSales + networkTotal + creditTotal + otherPaymentTotal, [cashSales, networkTotal, creditTotal, otherPaymentTotal]);
 
   useEffect(() => {
-    if (!initial?.id && automaticClosing.openingCash !== null) setOpeningCash(String(automaticClosing.openingCash));
-  }, [automaticClosing.openingCash, initial?.id]);
+    if (!initial?.id && automaticClosingSnapshot.openingCash !== null) setOpeningCash(String(automaticClosingSnapshot.openingCash));
+  }, [automaticClosingSnapshot.openingCash, initial?.id]);
 
   const opening = useMemo(() => Number(openingCash) || 0, [openingCash]);
   const actualCount = useMemo(() => actualCashCount !== '' ? Number(actualCashCount) : null, [actualCashCount]);
   const ownerContrib = useMemo(() => Number(ownerContributionInput) || 0, [ownerContributionInput]);
   const expectedCash = useMemo(
-    () => useAutomaticSales && automaticClosing.expectedCash !== null ? automaticClosing.expectedCash : opening + cashSales,
-    [automaticClosing.expectedCash, cashSales, opening, useAutomaticSales],
+    () => useAutomaticSales && automaticClosingSnapshot.expectedCash !== null ? automaticClosingSnapshot.expectedCash : opening + cashSales,
+    [automaticClosingSnapshot.expectedCash, cashSales, opening, useAutomaticSales],
   );
   const cashDifference = useMemo(() => actualCount !== null ? actualCount - expectedCash : null, [actualCount, expectedCash]);
   const cashReconcStatus = useMemo(() => cashDifference === null ? null : cashDifference === 0 ? 'Balanced' : cashDifference < 0 ? 'Shortage' : 'Overage', [cashDifference]);
@@ -1332,9 +1347,9 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
           <section data-testid="quick-closing-auto-summary" className="overflow-hidden rounded-2xl border border-indigo-200 bg-background shadow-sm">
             <div className="flex items-center justify-between gap-3 border-b border-indigo-100 bg-indigo-50 px-3 py-3 sm:px-4">
               <div className="flex min-w-0 items-center gap-2"><BarChart3 className="h-4 w-4 shrink-0 text-indigo-600" /><h2 className="truncate text-xs font-black uppercase tracking-wide text-indigo-950">Today&apos;s Sales</h2></div>
-              <Badge variant="outline" className="shrink-0 border-indigo-200 bg-white text-[10px] text-indigo-700">{automaticClosingLoading ? 'Loading ERP data' : useAutomaticSales ? 'Auto-loaded' : 'No source posted'}</Badge>
+              <Badge variant="outline" className="shrink-0 border-indigo-200 bg-white text-[10px] text-indigo-700">{autoSourceLoading ? 'Loading ERP data' : useAutomaticSales ? 'Auto-loaded' : 'No source posted'}</Badge>
             </div>
-            {automaticClosingLoading ? (
+            {autoSourceLoading ? (
               <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>
             ) : (
               <div className="p-3 sm:p-4">
@@ -1426,7 +1441,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel, onNewCl
       <div className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
         <div className="mx-auto grid w-full max-w-6xl grid-cols-3 gap-2 sm:flex sm:justify-end">
           <Button type="button" variant="outline" className="col-span-1 min-h-12 font-bold sm:w-32" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button>
-          <Button type="submit" className={`col-span-2 min-h-12 font-black sm:w-64 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} disabled={isSubmitting || purchasesLoading || expensesLoading || automaticClosingLoading || !allValid}>
+          <Button type="submit" className={`col-span-2 min-h-12 font-black sm:w-64 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || !allValid}>
             {isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Save Daily Closing</>}
           </Button>
         </div>
