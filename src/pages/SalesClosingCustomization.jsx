@@ -232,6 +232,10 @@ export default function SalesClosingCustomization() {
     if (firstError) return toast.error(firstError.message);
     const { error: secondError } = await supabase.from(table).update({ sort_order: current.sort_order }).eq('id', other.id);
     if (secondError) return toast.error(secondError.message);
+    if (resource === 'source') {
+      mergeSourceCache({ ...current, sort_order: other.sort_order });
+      mergeSourceCache({ ...other, sort_order: current.sort_order });
+    }
     await invalidate();
   };
 

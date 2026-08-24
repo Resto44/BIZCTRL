@@ -89,6 +89,9 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(customization).toContain('key={`${source.id}-${source.name_en}-${source.default_payment_method}-${source.sort_order}`}');
     expect(customization).toContain('queryClient.setQueryData(sourceQueryKey, merge);');
     expect(customization).toContain('queryClient.setQueriesData({ queryKey: activeSourcesKey }, merge);');
+    expect(customization).toContain("if (resource === 'source') {");
+    expect(customization).toContain('mergeSourceCache({ ...current, sort_order: other.sort_order });');
+    expect(customization).toContain('mergeSourceCache({ ...other, sort_order: current.sort_order });');
     expect(customization).toContain("const invalidate = async ({ refetchSources = false } = {}) =>");
     expect(customization).toContain("refetchType: 'none'");
     expect(customization).toContain('onClick={() => invalidate({ refetchSources: true })}');
