@@ -31,6 +31,7 @@ describe('Sales closing workspace responsive and validation contract', () => {
     const workspace = await source('../src/components/sales/ERPSalesWorkspace.jsx');
 
     expect(workspace).toContain('const cashierDisplayName = form.cashier_name || selectedCashier?.full_name || \'\';');
+    expect(workspace).toContain('cashiers.length !== 1');
     expect(workspace).toContain('passed: actualCount !== null && (remainingDifference === 0 || managerApproved)');
     expect(workspace).toContain("toast.error('Actual cash count is required before closing the shift.');");
     expect(workspace).toContain('disabled={isSubmitting || purchasesLoading || !allValid}');

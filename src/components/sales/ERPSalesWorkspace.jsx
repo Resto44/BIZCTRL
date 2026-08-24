@@ -628,6 +628,20 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     }));
   }, [cashiers, form.cashier_employee_id, form.cashier_id, user?.email, user?.full_name]);
 
+  // Owners retain manual choice when multiple cashiers exist, but a single available
+  // cashier must not leave the form in a contradictory "selected / required" state.
+  useEffect(() => {
+    if (initial?.id || isManager || cashiers.length !== 1 || form.cashier_employee_id || form.cashier_id) return;
+    const cashier = firstRecord(cashiers);
+    if (!cashier?.id) return;
+    setForm((previous) => ({
+      ...previous,
+      cashier_name: cashier.full_name || user?.full_name || user?.email || '',
+      cashier_employee_id: cashier.id,
+      cashier_id: cashier.id,
+    }));
+  }, [cashiers, form.cashier_employee_id, form.cashier_id, initial?.id, isManager, user?.email, user?.full_name]);
+
   // Rule 9: Auto-populate Opening Cash from previous shift's Closing Cash
   // BUG FIX: also support manager context (uses restaurant_id + branch, not created_by)
   useEffect(() => {
