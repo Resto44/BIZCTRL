@@ -606,11 +606,12 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
   });
   const employees = asRecordArray(employeesData);
   const cashiers = useMemo(() => {
-    const candidates = !isManager || !user?.id
-      ? employees
-      : employees.some((employee) => employee.id === user.id)
-        ? employees
-        : [{ id: user.id, full_name: user.full_name || user.email || 'Branch Manager' }, ...employees];
+    const currentOperator = user?.id
+      ? { id: user.id, full_name: user.full_name || user.email || (isManager ? 'Branch Manager' : 'Owner') }
+      : null;
+    const candidates = currentOperator && !employees.some((employee) => employee.id === currentOperator.id)
+      ? [currentOperator, ...employees]
+      : employees;
     const seen = new Set();
     return candidates.filter((cashier) => {
       if (!cashier?.id || seen.has(String(cashier.id))) return false;
@@ -623,7 +624,7 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
     return cashiers.find((cashier) => String(cashier.id) === String(selectedId)) || null;
   }, [cashiers, form.cashier_employee_id, form.cashier_id]);
   const defaultCashier = firstRecord(cashiers);
-  const cashierDisplayName = form.cashier_name || selectedCashier?.full_name || defaultCashier?.full_name || '';
+  const cashierDisplayName = form.cashier_name || selectedCashier?.full_name || defaultCashier?.full_name || user?.full_name || user?.email || '';
 
   // Keep the cashier name and ID synchronized. This also repairs a stale cashier
   // identifier and auto-selects the sole cashier available to an Owner.
@@ -1435,9 +1436,9 @@ export default function ERPSalesWorkspace({ initial, onSubmit, onCancel }) {
                   <div className="w-2 h-2 rounded-full bg-emerald-500" />
                   <span className="text-[10px] font-bold text-emerald-700 uppercase">Shift Open</span>
                 </div>
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${form.cashier_name ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
-                  <User className={`w-3 h-3 ${form.cashier_name ? 'text-emerald-600' : 'text-amber-600'}`} />
-                  <span className={`text-[10px] font-bold uppercase ${form.cashier_name ? 'text-emerald-700' : 'text-amber-700'}`}>
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${cashierDisplayName ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                  <User className={`w-3 h-3 ${cashierDisplayName ? 'text-emerald-600' : 'text-amber-600'}`} />
+                  <span className={`text-[10px] font-bold uppercase ${cashierDisplayName ? 'text-emerald-700' : 'text-amber-700'}`}>
                     {cashierDisplayName || 'No Cashier'}
                   </span>
                 </div>
