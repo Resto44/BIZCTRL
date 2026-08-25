@@ -43,6 +43,10 @@ const dailySalesTotal = (sale) =>
 
 const sameScopeValue = (left, right) => String(left || '').trim() === String(right || '').trim();
 const salesClosingCashierId = (record) => record?.cashier_id || record?.cashier_employee_id || record?.manager_user_id || null;
+const salesClosingLifecycleState = (record) => {
+  const state = String(record?.closing_state || 'draft').trim().toLowerCase();
+  return ['draft', 'finalized', 'locked'].includes(state) ? state : 'draft';
+};
 const matchesSalesClosingSession = (record, session) => {
   if (!record || !session) return false;
   const branchMatches = session.branch_id
@@ -170,20 +174,26 @@ export default function Sales() {
     setIsOpeningNewClosing(true);
     try {
       const existing = await findExistingClosingSession(session);
-      if (existing?.closing_state === 'draft') {
+      const existingState = salesClosingLifecycleState(existing);
+      if (existingState === 'draft') {
+        if (existing) {
+          setNewClosingDefaults(null);
+          setEditing(existing);
+          setShowForm(true);
+          toast.info('Draft already exists for this branch, date, shift, and cashier. Resumed the existing draft closing.');
+          return;
+        }
+      } else if (existing) {
+        // The unique business-period index correctly blocks a second normal
+        // closing. Open the actual protected historical record so the operator
+        // sees its true finalized/locked state and the correction action rather
+        // than treating the attempted New Closing itself as locked.
         setNewClosingDefaults(null);
         setEditing(existing);
         setShowForm(true);
-        toast.info('Resumed the existing draft closing for this branch, date, shift, and cashier.');
-        return;
-      }
-      if (existing) {
-        setNewClosingDefaults(null);
-        setEditing(null);
-        setShowForm(false);
-        toast.info(existing.closing_state === 'locked'
-          ? 'A locked closing already exists for this branch, date, shift, and cashier. Open it from history to request an authorized correction.'
-          : 'A finalized closing already exists for this branch, date, shift, and cashier. Open it from history to request an authorized correction.');
+        toast.info(existingState === 'locked'
+          ? 'Closing already locked for this branch, date, shift, and cashier. The historical closing is open for an authorized correction request.'
+          : 'Closing already finalized for this branch, date, shift, and cashier. The historical closing is open for an authorized correction request.');
         return;
       }
       // Opening is deliberately in-memory until Save Draft or Finalize. This
@@ -802,13 +812,14 @@ export default function Sales() {
     const existing = Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
       .map((record) => [record.id, record])).values())
       .find((record) => matchesSalesClosingSession(record, session)) || null;
-    if (existing?.closing_state === 'draft') {
+    const existingState = salesClosingLifecycleState(existing);
+    if (existing && existingState === 'draft') {
       return updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });
     }
-    if (existing?.closing_state === 'locked' || existing?.closing_state === 'finalized') {
-      throw new Error(existing.closing_state === 'locked'
-        ? 'This closing is locked. Open it from history to request an authorized correction.'
-        : 'This closing is finalized. Open it from history to request an authorized correction.');
+    if (existing && (existingState === 'locked' || existingState === 'finalized')) {
+      throw new Error(existingState === 'locked'
+        ? 'This business period is already locked. Open the historical closing to request an authorized correction.'
+        : 'This business period is already finalized. Open the historical closing to request an authorized correction.');
     }
     if (existing) return { ...existing, _alreadyExists: true };
 

@@ -228,13 +228,18 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(migration).toContain('Prevents duplicate Sales Closing sessions by restaurant, branch, date, shift, and cashier');
   });
 
-  it('keeps Draft persistence on the same closing ID while New Closing never reopens finalized or locked history as editable', async () => {
+  it('resumes drafts and opens the actual protected history record when New Closing resolves an existing business period', async () => {
     const sales = await source('../src/pages/Sales.jsx');
 
-    expect(sales).toContain("if (existing?.closing_state === 'draft') {");
+    expect(sales).toContain('const salesClosingLifecycleState = (record) => {');
+    expect(sales).toContain("const existingState = salesClosingLifecycleState(existing);");
+    expect(sales).toContain("if (existingState === 'draft') {");
+    expect(sales).toContain('Draft already exists for this branch, date, shift, and cashier. Resumed the existing draft closing.');
+    expect(sales).toContain('setEditing(existing);');
+    expect(sales).toContain('setShowForm(true);');
+    expect(sales).toContain('The historical closing is open for an authorized correction request.');
+    expect(sales).not.toContain('A locked closing already exists for this branch, date, shift, and cashier. Open it from history');
     expect(sales).toContain('return updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });');
-    expect(sales).toContain("if (existing?.closing_state === 'locked' || existing?.closing_state === 'finalized') {");
-    expect(sales).toContain('Open it from history to request an authorized correction.');
     expect(sales).toContain("if (editing.closing_state === 'locked' || editing.closing_state === 'finalized') {");
     expect(sales).toContain('Request an authorized correction before changing it.');
   });
