@@ -207,7 +207,7 @@ const AccordionBody = function AccordionBody({ children }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // NUMERIC INPUT — ERP style
 // ─────────────────────────────────────────────────────────────────────────────
-const NumInput = memo(function NumInput({ id, label, value, onChange, required, prefix, helpText, readOnly, error }) {
+export const NumInput = memo(function NumInput({ id, label, value, onChange, required, prefix, helpText, readOnly, error }) {
   return (
     <div>
       <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block tracking-wide">{label}</Label>
@@ -737,10 +737,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   });
   const [ownerContributionInput, setOwnerContributionInput] = useState(initial?.owner_cash_injection ?? '');
   const [cashNotes, setCashNotes] = useState(initial?.cash_notes || '');
-  // Commit finance totals, review cards, and the sticky action with the numeric
-  // change that produced them, so cashiers never see a stale closing summary.
+  // Keep raw numeric editing values in their own stable state. React batches
+  // the related calculations normally; synchronously replacing a keyed parent
+  // during a keystroke can dismiss mobile keyboards.
   const updateCalculatedInput = useCallback((setter, value) => {
-    flushSync(() => setter(value));
+    setter(value);
   }, []);
   const updateCashSales = useCallback((value) => updateCalculatedInput(setCashSalesInput, value), [updateCalculatedInput]);
   const updateOpeningCash = useCallback((value) => updateCalculatedInput(setOpeningCash, value), [updateCalculatedInput]);
@@ -1603,7 +1604,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   return (
     <form onSubmit={handleSubmit} className="flex h-full min-h-0 min-w-0 flex-col">
       <StickySummary
-        key={`sticky-${totalSales}-${operatingResult}-${cashReconcStatus || 'pending'}`}
         totalSales={totalSales}
         operatingResult={operatingResult}
         cashStatus={cashReconcStatus}
@@ -1655,7 +1655,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
           </section>
 
-          <section key={`automatic-summary-${useAutomaticSales}-${autoSourceLoading}-${totalSales}`} data-testid="quick-closing-auto-summary" className="overflow-hidden rounded-2xl border border-indigo-200 bg-background shadow-sm">
+          <section data-testid="quick-closing-auto-summary" className="overflow-hidden rounded-2xl border border-indigo-200 bg-background shadow-sm">
             <div className="flex items-center justify-between gap-3 border-b border-indigo-100 bg-indigo-50 px-3 py-3 sm:px-4">
               <div className="flex min-w-0 items-center gap-2"><BarChart3 className="h-4 w-4 shrink-0 text-indigo-600" /><h2 className="truncate text-xs font-black uppercase tracking-wide text-indigo-950">Today&apos;s Sales</h2></div>
               <Badge variant="outline" className="shrink-0 border-indigo-200 bg-white text-[10px] text-indigo-700">{autoSourceLoading ? 'Loading ERP data' : useAutomaticSales ? 'Auto-loaded' : 'No source posted'}</Badge>
@@ -1708,7 +1708,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           )}
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
-            <section key={`cash-reconciliation-${expectedCash}-${cashDifference ?? 'pending'}`} className="overflow-hidden rounded-2xl border border-amber-200 bg-background shadow-sm">
+            {/* This subtree must retain its identity while Actual Cash updates Difference. */}
+            <section className="overflow-hidden rounded-2xl border border-amber-200 bg-background shadow-sm">
               <div className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-3 py-3 sm:px-4"><div className="flex items-center gap-2"><Scale className="h-4 w-4 text-amber-600" /><h2 className="text-xs font-black uppercase tracking-wide text-amber-950">Cash Reconciliation</h2></div>{cashReconcStatus && <StatusBadge status={cashReconcStatus} />}</div>
               <div className="space-y-3 p-3 sm:p-4">
                 <div className="grid grid-cols-2 gap-2">
@@ -1733,7 +1734,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               </div>
             </section>
 
-            <section key={`operating-result-${totalSales}-${approvedPurchasesTotal}-${expensesTotal}`} className={`${isQuickClosing ? 'hidden' : ''} overflow-hidden rounded-2xl border border-emerald-200 bg-background shadow-sm`}>
+            <section className={`${isQuickClosing ? 'hidden' : ''} overflow-hidden rounded-2xl border border-emerald-200 bg-background shadow-sm`}>
               <div className="flex items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50 px-3 py-3 sm:px-4"><div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-emerald-600" /><h2 className="text-xs font-black uppercase tracking-wide text-emerald-950">Operating Result</h2></div><Money key={`money-operating-${operatingResult}`} currency={currency} value={operatingResult} signed className={`text-sm font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`} /></div>
               <div className="space-y-2 p-3 sm:p-4">
                 <div className="flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2 text-xs"><span className="font-semibold text-blue-900">Sales</span><Money key={`money-total-${totalSales}`} currency={currency} value={totalSales} className="font-bold text-blue-700" /></div>
@@ -1745,7 +1746,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </section>
           </div>
 
-          <section key={`closing-summary-${totalSales}-${approvedPurchasesTotal}-${expensesTotal}-${expectedCash}-${cashDifference ?? 'pending'}`} className={`${summaryVisibilityClass} overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm`}>
+          <section className={`${summaryVisibilityClass} overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm`}>
             <div className="border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4"><h2 className="text-xs font-black uppercase tracking-wide text-slate-900">Daily Closing Summary</h2></div>
             <div className="p-3 sm:p-4">
               <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
