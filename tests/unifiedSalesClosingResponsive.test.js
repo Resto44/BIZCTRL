@@ -245,17 +245,31 @@ describe('Unified Sales Closing workflow contract', () => {
 
 
 describe('Sales source daily and historical balance contract', () => {
-  it('derives prior source balances from earlier completed closings in the active tenant and branch scope', async () => {
-    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+  it('derives all prior source balances in one stable-ID aggregate that excludes drafts and the current closing date', async () => {
+    const [workspace, migration] = await Promise.all([
+      source('../src/components/sales/UnifiedSalesClosing.jsx'),
+      source('../src/supabase/20260825_sales_source_previous_balances.sql'),
+    ]);
 
-    expect(workspace).toContain("queryKey: ['sales-source-history', activeRestaurant?.id, selectedBranchId, form.branch, form.date]");
-    expect(workspace).toContain("from('daily_sales')");
-    expect(workspace).toContain(".eq('restaurant_id', activeRestaurant.id)");
-    expect(workspace).toContain(".lt('date', form.date)");
-    expect(workspace).toContain("record.closing_state !== 'draft'");
-    expect(workspace).toContain('const historicalSourceAmounts = useMemo(() =>');
-    expect(workspace).toContain('const customSourceSummaries = useMemo(() =>');
+    expect(workspace).toContain("queryKey: ['sales-source-previous-balances', activeRestaurant?.id, selectedBranchId, form.branch, form.date, initial?.id]");
+    expect(workspace).toContain("supabase.rpc('get_sales_source_previous_balances'");
+    expect(workspace).toContain('p_restaurant_id: activeRestaurant.id');
+    expect(workspace).toContain('p_branch_id: selectedBranchId || null');
+    expect(workspace).toContain('p_branch_key: form.branch || null');
+    expect(workspace).toContain('p_before_date: form.date');
+    expect(workspace).toContain('p_current_closing_id: initial?.id || null');
+    expect(workspace).toContain('row.previous_amount');
+    expect(workspace).toContain('historicalSourceAmounts[source.id] ?? 0');
     expect(workspace).toContain('total: previous + today');
+
+    expect(migration).toContain('CREATE OR REPLACE FUNCTION public.get_sales_source_previous_balances');
+    expect(migration).toContain('closing.restaurant_id = p_restaurant_id');
+    expect(migration).toContain("closing.date < p_before_date");
+    expect(migration).toContain("COALESCE(closing.closing_state, 'finalized') <> 'draft'");
+    expect(migration).toContain('closing.branch_id = p_branch_id');
+    expect(migration).toContain("entry.entry ->> 'source_id'");
+    expect(migration).toContain('GROUP BY source_id');
+    expect(migration).toContain('jsonb_typeof(p_snapshot) = \'string\'');
   });
 
   it('renders Today as the only editable source amount and keeps Previous and Total derived and read-only', async () => {

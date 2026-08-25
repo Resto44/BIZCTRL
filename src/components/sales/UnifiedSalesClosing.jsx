@@ -692,25 +692,22 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     return branch?.id || form.branch_id || null;
   }, [branches, form.branch, form.branch_id]);
 
-  // Previous source balances are calculated from earlier, completed daily closings.
-  // The current closing is intentionally excluded: only its daily entry is posted today.
-  const { data: sourceHistoryData, isLoading: sourceHistoryLoading, isError: sourceHistoryUnavailable } = useQuery({
-    queryKey: ['sales-source-history', activeRestaurant?.id, selectedBranchId, form.branch, form.date],
+  // Previous source balances are calculated once in the database from immutable,
+  // earlier completed closing snapshots. The aggregate is scoped by tenant, branch
+  // and stable source UUID; it intentionally excludes the current date and drafts.
+  const { data: sourcePreviousBalanceRows, isLoading: sourceHistoryLoading, isError: sourceHistoryUnavailable } = useQuery({
+    queryKey: ['sales-source-previous-balances', activeRestaurant?.id, selectedBranchId, form.branch, form.date, initial?.id],
     enabled: Boolean(activeRestaurant?.id && form.date && (selectedBranchId || form.branch)),
     queryFn: async () => {
-      const baseQuery = () => supabase.from('daily_sales')
-        .select('id, date, branch, branch_id, closing_state, sales_sources_json')
-        .eq('restaurant_id', activeRestaurant.id)
-        .lt('date', form.date)
-        .order('date', { ascending: true })
-        .limit(2000);
-      const [canonical, legacy] = await Promise.all([
-        selectedBranchId ? baseQuery().eq('branch_id', selectedBranchId) : Promise.resolve({ data: [], error: null }),
-        form.branch ? baseQuery().is('branch_id', null).eq('branch', form.branch) : Promise.resolve({ data: [], error: null }),
-      ]);
-      if (canonical.error || legacy.error) throw canonical.error || legacy.error;
-      return asRecordArray(Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
-        .map((record) => [record.id, record])).values()));
+      const { data, error } = await supabase.rpc('get_sales_source_previous_balances', {
+        p_restaurant_id: activeRestaurant.id,
+        p_branch_id: selectedBranchId || null,
+        p_branch_key: form.branch || null,
+        p_before_date: form.date,
+        p_current_closing_id: initial?.id || null,
+      });
+      if (error) throw error;
+      return asRecordArray(data);
     },
     staleTime: 30000,
   });
@@ -781,17 +778,12 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // ── Dynamic Sales Sources ───────────────────────────────────────────────────────────────
   const { customSources: customSourcesData, isLoading: sourcesLoading } = useSalesSources({ branchId: selectedBranchId });
   const customSources = asRecordArray(customSourcesData);
-  const historicalSourceAmounts = useMemo(() => asRecordArray(sourceHistoryData)
-    .filter((record) => record.id !== initial?.id && record.closing_state !== 'draft')
-    .reduce((balances, record) => {
-      parseSalesSourceEntries(record).forEach((entry) => {
-        const sourceKey = entry.source_id || entry.source_key;
-        if (!sourceKey) return;
-        const dailyAmount = Math.max(0, Number(entry.amount ?? entry.today_amount) || 0);
-        balances[sourceKey] = (balances[sourceKey] || 0) + dailyAmount;
-      });
+  const historicalSourceAmounts = useMemo(() => asRecordArray(sourcePreviousBalanceRows)
+    .reduce((balances, row) => {
+      if (!row?.source_id) return balances;
+      balances[row.source_id] = Math.max(0, Number(row.previous_amount) || 0);
       return balances;
-    }, {}), [initial?.id, sourceHistoryData]);
+    }, {}), [sourcePreviousBalanceRows]);
   // Amounts keyed by source.id
   const [customSourceAmounts, setCustomSourceAmounts] = useState(() => {
     const map = {};
@@ -803,7 +795,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const setCustomAmount = (sourceId, val) => updateCalculatedInput(setCustomSourceAmounts, prev => ({ ...prev, [sourceId]: val }));
   const customSourceSummaries = useMemo(() => customSources.map((source) => {
     const today = Math.max(0, Number(customSourceAmounts[source.id]) || 0);
-    const previous = Math.max(0, Number(historicalSourceAmounts[source.id] ?? historicalSourceAmounts[source.system_key] ?? 0) || 0);
+    const previous = Math.max(0, Number(historicalSourceAmounts[source.id] ?? 0) || 0);
     return { source, sourceLabel: sourceNameForLanguage(source), today, previous, total: previous + today };
   }), [customSources, customSourceAmounts, historicalSourceAmounts, sourceNameForLanguage]);
   const customSourcePaymentTotals = useMemo(() =>
