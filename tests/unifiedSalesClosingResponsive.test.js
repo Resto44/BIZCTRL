@@ -228,6 +228,50 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(migration).toContain('Prevents duplicate Sales Closing sessions by restaurant, branch, date, shift, and cashier');
   });
 
+  it('keeps Draft persistence on the same closing ID while New Closing never reopens finalized or locked history as editable', async () => {
+    const sales = await source('../src/pages/Sales.jsx');
+
+    expect(sales).toContain("if (existing?.closing_state === 'draft') {");
+    expect(sales).toContain('return updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });');
+    expect(sales).toContain("if (existing?.closing_state === 'locked' || existing?.closing_state === 'finalized') {");
+    expect(sales).toContain('Open it from history to request an authorized correction.');
+    expect(sales).toContain("if (editing.closing_state === 'locked' || editing.closing_state === 'finalized') {");
+    expect(sales).toContain('Request an authorized correction before changing it.');
+  });
+
+  it('renders protected finalized and locked records read-only and replaces ordinary save controls with an authorized correction request', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).toContain("const isFinalized = initial?.closing_state === 'finalized';");
+    expect(workspace).toContain("const isLocked = initial?.closing_state === 'locked';");
+    expect(workspace).toContain('const isProtectedClosing = Boolean(initial?.id && (isFinalized || isLocked));');
+    expect(workspace).toContain('aria-readonly={isProtectedClosing}');
+    expect(workspace).toContain('pointer-events-none select-none opacity-80');
+    expect(workspace).toContain("{isLocked ? 'Closing Locked' : 'Closing Finalized'}");
+    expect(workspace).toContain('Request Correction');
+    expect(workspace).toContain('onRequestCorrection?.(initial)');
+    expect(workspace).toContain('isProtectedClosing ? <Button');
+  });
+
+  it('uses the existing DailySales audit field for correction requests and keeps server-side finalized and locked history immutable', async () => {
+    const [sales, migration] = await Promise.all([
+      source('../src/pages/Sales.jsx'),
+      source('../src/supabase/20260825_daily_sales_protected_correction_requests.sql'),
+    ]);
+
+    expect(sales).toContain("action: 'correction_requested'");
+    expect(sales).toContain('base44.entities.DailySales.update(closing.id, {');
+    expect(sales).toContain('closing_audit: [...audit, event]');
+    expect(sales).toContain('lifecycle trigger is the authority that accepts or rejects the request.');
+
+    expect(migration).toContain("OLD.closing_state IN ('finalized', 'locked')");
+    expect(migration).toContain('erp_can_manage_workspace_customization(v_restaurant_id)');
+    expect(migration).toContain("(v_new_audit -> (jsonb_array_length(v_new_audit) - 1) ->> 'action') = 'correction_requested'");
+    expect(migration).toContain("to_jsonb(NEW) - ARRAY['closing_audit', 'updated_date']");
+    expect(migration).toContain('DAILY_SALES_CLOSING_PROTECTED');
+    expect(migration).toContain('DAILY_SALES_CLOSING_FINALIZATION_REVERT_DENIED');
+  });
+
   it('enforces the same Draft boundary in database triggers so server-side invoice and cash effects wait for Finalize', async () => {
     const migration = await source('../src/supabase/20260824_draft_finalization_side_effect_guards.sql');
 

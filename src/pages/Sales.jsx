@@ -170,11 +170,20 @@ export default function Sales() {
     setIsOpeningNewClosing(true);
     try {
       const existing = await findExistingClosingSession(session);
-      if (existing) {
+      if (existing?.closing_state === 'draft') {
         setNewClosingDefaults(null);
         setEditing(existing);
         setShowForm(true);
-        toast.info(existing.closing_state === 'draft' ? 'Resumed the existing draft closing for this branch, date, shift, and cashier.' : 'Opened the existing closing for this branch, date, shift, and cashier.');
+        toast.info('Resumed the existing draft closing for this branch, date, shift, and cashier.');
+        return;
+      }
+      if (existing) {
+        setNewClosingDefaults(null);
+        setEditing(null);
+        setShowForm(false);
+        toast.info(existing.closing_state === 'locked'
+          ? 'A locked closing already exists for this branch, date, shift, and cashier. Open it from history to request an authorized correction.'
+          : 'A finalized closing already exists for this branch, date, shift, and cashier. Open it from history to request an authorized correction.');
         return;
       }
       // Opening is deliberately in-memory until Save Draft or Finalize. This
@@ -759,6 +768,11 @@ export default function Sales() {
     if (activeRestaurant?.id) data.restaurant_id = activeRestaurant.id;
 
     if (editing) {
+      if (editing.closing_state === 'locked' || editing.closing_state === 'finalized') {
+        throw new Error(editing.closing_state === 'locked'
+          ? 'This closing is locked. Request an authorized correction before changing it.'
+          : 'This closing is finalized. Request an authorized correction before changing it.');
+      }
       return updateMut.mutateAsync({ id: editing.id, data, prev: editing, proofUrl, ocr });
     }
 
@@ -791,12 +805,46 @@ export default function Sales() {
     if (existing?.closing_state === 'draft') {
       return updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });
     }
-    if (existing?.closing_state === 'locked') {
-      throw new Error('This closing is locked and requires an authorized correction workflow.');
+    if (existing?.closing_state === 'locked' || existing?.closing_state === 'finalized') {
+      throw new Error(existing.closing_state === 'locked'
+        ? 'This closing is locked. Open it from history to request an authorized correction.'
+        : 'This closing is finalized. Open it from history to request an authorized correction.');
     }
     if (existing) return { ...existing, _alreadyExists: true };
 
     return createMut.mutateAsync({ data, proofUrl, ocr });
+  };
+
+  const handleRequestCorrection = async (closing) => {
+    if (!closing?.id || !['finalized', 'locked'].includes(closing.closing_state)) {
+      toast.error('Only finalized or locked closings can use the correction workflow.');
+      return;
+    }
+    if (![ROLES.OWNER, ROLES.GENERAL_MANAGER].includes(role)) {
+      toast.error('An Owner or General Manager must request a correction for this protected closing.');
+      return;
+    }
+    const audit = Array.isArray(closing.closing_audit) ? closing.closing_audit : [];
+    const event = {
+      action: 'correction_requested',
+      requested_at: new Date().toISOString(),
+      requested_by: user?.email || null,
+      closing_state: closing.closing_state,
+    };
+    try {
+      // This remains a normal, tenant-scoped DailySales update. The database
+      // lifecycle trigger is the authority that accepts or rejects the request.
+      await base44.entities.DailySales.update(closing.id, {
+        closing_audit: [...audit, event],
+      });
+      setEditing((current) => current?.id === closing.id
+        ? { ...current, closing_audit: [...audit, event] }
+        : current);
+      invalidateSalesQueries();
+      toast.success('Authorized correction request recorded. Financial values remain protected until the approved correction workflow is completed.');
+    } catch (error) {
+      toast.error(`Unable to record correction request: ${error?.message || 'Server authorization denied.'}`);
+    }
   };
 
   const handleExport = ({ format: fmt, from, to, branch }) => {
@@ -865,6 +913,7 @@ export default function Sales() {
             onSubmit={handleSave}
             onCancel={() => { setEditing(null); setNewClosingDefaults(null); setShowForm(false); }}
             onNewClosing={openNewClosing}
+            onRequestCorrection={handleRequestCorrection}
             onSessionContextChange={updateClosingSessionContext}
             isOpeningNewClosing={isOpeningNewClosing}
           />
