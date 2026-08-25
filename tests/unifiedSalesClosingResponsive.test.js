@@ -255,6 +255,18 @@ describe('Sales source daily and historical balance contract', () => {
     expect(workspace).toContain('Remove their saved daily snapshot before the live source');
     expect(workspace).toContain('const cashSales = baseCashSales + customSourcePaymentTotals.cash;');
   });
+
+  it('keeps each Today input mounted and focused while its raw amount string changes', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).toContain('key={source.id}');
+    expect(workspace).not.toContain('key={`${source.id}-${previous}-${today}-${lang}`}');
+    expect(workspace).toContain("todayInput={customSourceAmounts[source.id] ?? ''}");
+    expect(workspace).toContain('value={todayInput}');
+    expect(workspace).toContain("onChange={onChange}");
+    expect(workspace).toContain('const [customSourceAmounts, setCustomSourceAmounts] = useState(() => {');
+    expect(workspace).toContain("inputMode=\"decimal\"");
+  });
 });
 
 
@@ -291,7 +303,7 @@ describe('Sales Closing localization runtime contract', () => {
     expect(workspace).toContain("if (lang === 'en') return source.name_en || source.name_ar || '';");
     expect(workspace).toContain('return source.name_ar || source.name_en || \'\';');
     expect(workspace).toContain('data-i18n-skip="true"');
-    expect(workspace).toContain('key={`${source.id}-${previous}-${today}-${lang}`}');
+    expect(workspace).toContain('key={source.id}');
     expect(dialogs).toContain("const { lang, t } = useLanguage();");
     expect(dialogs).toContain('localizedDataName(method, lang)');
     expect(languageContext).toContain("localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);");
