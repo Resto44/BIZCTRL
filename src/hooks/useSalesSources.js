@@ -1,64 +1,63 @@
 /*
- * useSalesSources — canonical active Sales Sources query for Sales Closing.
+ * useSalesSources — canonical active Sales Sources query for Sales Closing,
+ * dashboards, history, and management views.
  *
- * Fetches the restaurant-scoped source set once, then applies the selected-branch
- * visibility rule locally. This is essential because global rows have branch_id
- * NULL and must remain visible when a particular branch is selected.
+ * The SalesClosingCustomizationProvider is the single restaurant-scoped source
+ * cache. Reusing it here prevents parallel Sales Source queries and ensures a
+ * management edit is visible to every consuming ERP workflow immediately.
  */
-import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/supabaseClient';
+import { useMemo } from 'react';
 import { useTenant } from '@/lib/TenantContext';
+import { useSalesClosingCustomization } from '@/lib/SalesClosingCustomizationContext';
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 
-export function useSalesSources({ branchId } = {}) {
-  const { activeRestaurant, managerBranchObject } = useTenant();
-  const activeRestaurantId = activeRestaurant?.id ? String(activeRestaurant.id) : null;
+const branchMatchesSource = (source, branchId, branchKey) => {
+  if (source?.is_global || (!source?.branch_id && !asRecordArray(source?.branch_ids).length)) return true;
+  if (!branchId && !branchKey) return true;
 
-  // Determine effective canonical branch UUID: explicit scope > manager assignment.
+  const canonicalIds = asRecordArray(source?.branch_ids).map(String);
+  return canonicalIds.includes(String(branchId))
+    || (source?.branch_id && String(source.branch_id) === String(branchId))
+    || (source?.branch_id && branchKey && String(source.branch_id) === String(branchKey));
+};
+
+export function useSalesSources({ branchId, branchKey, includeInactive = false } = {}) {
+  const { managerBranchObject } = useTenant();
+  const {
+    sources: allSourcesData,
+    isLoading,
+    error,
+    reload,
+  } = useSalesClosingCustomization();
+
+  // The canonical branch UUID and legacy key are both supported while the ERP
+  // finishes its existing legacy branch-key migration.
   const effectiveBranchId = branchId || managerBranchObject?.id || null;
+  const effectiveBranchKey = branchKey || managerBranchObject?.key || managerBranchObject?.branch_key || null;
 
-  const { data: allSourcesData, isLoading, error, refetch } = useQuery({
-    // Sources are restaurant-scoped. Keeping branch out of the request key avoids
-    // duplicate fetches on branch switches and lets global records remain visible.
-    queryKey: ['sales_sources_active', activeRestaurantId, effectiveBranchId || 'all'],
-    queryFn: async () => {
-      const all = await base44.entities.SalesSource.filter({ restaurant_id: activeRestaurantId }, 'sort_order', 200);
-      // RLS remains authoritative. Branch visibility is applied below so both
-      // global (NULL branch_id) and branch-specific sources are evaluated together.
-      return asRecordArray(all);
-    },
-    staleTime: 60_000,
-    enabled: !!activeRestaurantId,
-  });
+  const allSources = useMemo(() => asRecordArray(allSourcesData)
+    .filter((source) => includeInactive || source.is_active !== false)
+    .filter((source) => branchMatchesSource(source, effectiveBranchId, effectiveBranchKey))
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)), [allSourcesData, effectiveBranchId, effectiveBranchKey, includeInactive]);
 
-  const allSources = asRecordArray(allSourcesData);
-
-  const sources = allSources
-    .filter((s) => s.is_active)
-    .filter((s) => {
-      if (s.is_global || !s.branch_id) return true;
-      if (!effectiveBranchId) return true;
-      return String(s.branch_id) === String(effectiveBranchId);
-    })
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-
-  const cashSource = sources.find((source) => source.system_key === 'cash');
-  const creditSource = sources.find((source) => source.system_key === 'credit');
-  const networkSource = sources.find((source) => source.system_key === 'network');
-  const otherSource = sources.find((source) => source.system_key === 'other');
-  const customSources = sources.filter((source) => !source.is_system);
-  const kpiSources = sources.filter((source) => source.included_in_dashboard_kpi);
-  const revenueSources = sources.filter((source) => source.included_in_revenue);
-  const cashRegisterSources = sources.filter((source) => source.included_in_cash_register);
-  const profitSources = sources.filter((source) => source.included_in_profit_calc);
+  const activeSources = useMemo(() => allSources.filter((source) => source.is_active !== false), [allSources]);
+  const cashSource = activeSources.find((source) => source.system_key === 'cash');
+  const creditSource = activeSources.find((source) => source.system_key === 'credit');
+  const networkSource = activeSources.find((source) => source.system_key === 'network');
+  const otherSource = activeSources.find((source) => source.system_key === 'other');
+  const customSources = activeSources.filter((source) => !source.is_system);
+  const kpiSources = activeSources.filter((source) => source.included_in_dashboard_kpi !== false);
+  const revenueSources = activeSources.filter((source) => source.included_in_revenue !== false);
+  const cashRegisterSources = activeSources.filter((source) => source.included_in_cash_register !== false);
+  const profitSources = activeSources.filter((source) => source.included_in_profit_calc !== false);
 
   return {
-    sources,
+    sources: activeSources,
     allSources,
     isLoading,
     error,
-    refetch,
+    refetch: reload,
     cashSource,
     creditSource,
     networkSource,
@@ -70,3 +69,5 @@ export function useSalesSources({ branchId } = {}) {
     profitSources,
   };
 }
+
+export { branchMatchesSource };

@@ -81,7 +81,7 @@ export function SalesClosingCustomizationProvider({ children }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('sales_sources')
-        .select('id, name_en, name_ar, description, sort_order, is_active, is_system, is_global, branch_id, default_payment_method, icon, color, included_in_revenue, included_in_cash_register, included_in_dashboard_kpi, included_in_profit_calc, system_key, updated_date')
+        .select('id, name_en, name_ar, name_fa, description, category, sort_order, is_active, is_system, is_global, branch_id, branch_ids, default_payment_method, icon, color, included_in_revenue, included_in_cash_register, included_in_dashboard_kpi, included_in_profit_calc, requires_customer, requires_pos_device, requires_reference, requires_wallet, system_key, created_by, created_date, updated_date, archived_at, archived_by')
         .eq('restaurant_id', restaurantId)
         .order('sort_order');
       if (error) throw error;
@@ -154,7 +154,20 @@ export function SalesClosingCustomizationProvider({ children }) {
   const saveSourceMutation = useMutation({
     mutationFn: async (source) => {
       if (!restaurantId) throw new Error('Select an active restaurant before saving a sales source.');
-      const payload = { ...source, restaurant_id: restaurantId, is_global: source.is_global !== false, branch_id: source.is_global === false ? source.branch_id || null : null };
+      const branchIds = Array.from(new Set(asArray(source.branch_ids).map(String).filter(Boolean)));
+      const isGlobal = source.is_global !== false;
+      const payload = {
+        ...source,
+        restaurant_id: restaurantId,
+        is_global: isGlobal,
+        branch_ids: isGlobal ? [] : branchIds,
+        // Keep legacy branch_id unchanged when present. New branch availability is
+        // carried by branch_ids so historical branch-key snapshots remain valid.
+        branch_id: isGlobal ? null : source.branch_id || null,
+        category: String(source.category || 'other'),
+        archived_at: source.is_active === false ? source.archived_at || new Date().toISOString() : null,
+        archived_by: source.is_active === false ? source.archived_by || null : null,
+      };
       if (source.id) {
         const { data, error } = await supabase.from('sales_sources').update(payload).eq('id', source.id).select().single();
         if (error) throw error;

@@ -352,6 +352,9 @@ export default function Sales() {
             total_amount: newTotal,
             remaining_amount: newRemaining,
             status: newStatus,
+            // Keep the existing debt record authoritative while retaining an
+            // optional immutable Sales Source relationship for analysis.
+            source_id: debtRecord.source_id || entry.source_id || null,
           });
           
           // Record the transaction in DebtPayment
@@ -367,6 +370,7 @@ export default function Sales() {
             restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
             branch_id: saleData.branch_id || null,
             branch: saleData.branch || '',
+            source_id: entry.source_id || debtRecord.source_id || null,
           });
         } else {
           // Create new DebtRecord
@@ -385,6 +389,7 @@ export default function Sales() {
             notes: entry.notes || '',
             restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
             branch_id: saleData.branch_id || null,
+            source_id: entry.source_id || null,
           });
           
           await base44.entities.DebtPayment.create({
@@ -398,6 +403,7 @@ export default function Sales() {
             restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
             branch_id: saleData.branch_id || null,
             branch: saleData.branch || '',
+            source_id: entry.source_id || null,
           });
         }
 

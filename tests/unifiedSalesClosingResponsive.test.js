@@ -50,13 +50,18 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('Cash balanced.');
   });
 
-  it('keeps global sales sources visible under a selected branch and maps configured source methods into canonical totals', async () => {
-    const sourceHook = await source('../src/hooks/useSalesSources.js');
-    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+  it('keeps globally available and multi-branch Sales Sources visible under a selected branch while mapping only Today amounts into canonical totals', async () => {
+    const [sourceHook, workspace, context] = await Promise.all([
+      source('../src/hooks/useSalesSources.js'),
+      source('../src/components/sales/UnifiedSalesClosing.jsx'),
+      source('../src/lib/SalesClosingCustomizationContext.jsx'),
+    ]);
 
-    expect(sourceHook).toContain("queryKey: ['sales_sources_active', activeRestaurantId, effectiveBranchId || 'all']");
-    expect(sourceHook).toContain("base44.entities.SalesSource.filter({ restaurant_id: activeRestaurantId }, 'sort_order', 200)");
-    expect(sourceHook).toContain('if (s.is_global || !s.branch_id) return true;');
+    expect(sourceHook).toContain('useSalesClosingCustomization()');
+    expect(sourceHook).toContain('source?.is_global || (!source?.branch_id && !asRecordArray(source?.branch_ids).length)');
+    expect(sourceHook).toContain('canonicalIds.includes(String(branchId))');
+    expect(sourceHook).toContain('String(source.branch_id) === String(branchId)');
+    expect(context).toContain("const sourceQueryKey = useMemo(() => ['sales_sources_active', restaurantId]");
     expect(workspace).toContain('paymentBucketForCode(source.default_payment_method)');
     expect(workspace).toContain('const customSourcePaymentTotals = useMemo(() =>');
     expect(workspace).toContain('const cashSales = baseCashSales + customSourcePaymentTotals.cash;');
@@ -300,8 +305,9 @@ describe('Sales Closing localization runtime contract', () => {
     const languageContext = await source('../src/lib/LanguageContext.jsx');
 
     expect(workspace).toContain("const { currency, lang, t } = useLanguage();");
-    expect(workspace).toContain("if (lang === 'en') return source.name_en || source.name_ar || '';");
-    expect(workspace).toContain('return source.name_ar || source.name_en || \'\';');
+    expect(workspace).toContain("if (lang === 'en') return source.name_en || source.name_ar || source.name_fa || '';");
+    expect(workspace).toContain("if (lang === 'fa') return source.name_fa || source.name_ar || source.name_en || '';");
+    expect(workspace).toContain("return source.name_ar || source.name_en || source.name_fa || '';");
     expect(workspace).toContain('data-i18n-skip="true"');
     expect(workspace).toContain('key={source.id}');
     expect(dialogs).toContain("const { lang, t } = useLanguage();");

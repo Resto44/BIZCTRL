@@ -4,20 +4,24 @@ import { readFile } from 'node:fs/promises';
 const source = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 describe('Sales Closing Customization runtime contract', () => {
-  it('registers one guarded canonical closing route, a customization route, and visible owner navigation entries', async () => {
-    const app = await source('../src/App.jsx');
-    const settings = await source('../src/pages/SettingsPage.jsx');
-    const dashboard = await source('../src/pages/OwnerDashboard.jsx');
-    const sales = await source('../src/pages/Sales.jsx');
+  it('registers one guarded canonical closing route, a separate centralized Sales Source Management route, and discoverable sales navigation', async () => {
+    const [app, sidebar, management, sales] = await Promise.all([
+      source('../src/App.jsx'),
+      source('../src/components/layout/ERPSidebar.jsx'),
+      source('../src/pages/SalesSourceManagement.jsx'),
+      source('../src/pages/Sales.jsx'),
+    ]);
 
     expect(app).toContain("const SalesClosingCustomization = lazy(() => import('@/pages/SalesClosingCustomization'));");
+    expect(app).toContain("const SalesSourceManagement = lazy(() => import('@/pages/SalesSourceManagement'));");
     expect(app).toContain('path="/sales"');
     expect(app).toContain('path="/sales-closing-customization"');
-    expect(app).toContain('path="/sales-sources" element={<Navigate to="/sales-closing-customization" replace />}');
-    expect(app).toContain('permission="manageSettings"');
-    expect(settings).toContain("path: '/sales-closing-customization'");
-    expect(settings).toContain("label: 'Sales Closing Customization'");
-    expect(dashboard).toContain("navigate('/sales-closing-customization')");
+    expect(app).toContain('path="/sales-sources" element={<RoleGuard permission="viewSales"><SalesSourceManagement /></RoleGuard>}');
+    expect(app).toContain('path="/sales-source-management" element={<RoleGuard permission="viewSales"><SalesSourceManagement /></RoleGuard>}');
+    expect(sidebar).toContain("path: '/sales-sources'");
+    expect(sidebar).toContain("label: 'Sales Source Management'");
+    expect(management).toContain('useSalesSourceManagement');
+    expect(management).toContain('<SalesSourceDialog');
     expect(sales).toContain("import UnifiedSalesClosing from '@/components/sales/UnifiedSalesClosing';");
     expect(sales).toContain('aria-label="Sales Closing"');
     expect(sales).not.toContain('<Dialog open={showForm}');

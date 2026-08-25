@@ -74,14 +74,19 @@ describe('central branch UUID scope contract', () => {
     }
   });
 
-  it('uses canonical branch UUIDs in sales source cache scope and comparisons', async () => {
+  it('uses canonical branch UUIDs while reusing the centralized Sales Source configuration cache', async () => {
     const hook = await source('../src/hooks/useSalesSources.js');
+    const context = await source('../src/lib/SalesClosingCustomizationContext.jsx');
 
-    expect(hook).toContain('useSalesSources({ branchId } = {})');
-    expect(hook).toContain("['sales_sources_active', activeRestaurantId, effectiveBranchId || 'all']");
-    expect(hook).toContain("base44.entities.SalesSource.filter({ restaurant_id: activeRestaurantId }, 'sort_order', 200)");
-    expect(hook).toContain('if (s.is_global || !s.branch_id) return true;');
-    expect(hook).toContain('String(s.branch_id) === String(effectiveBranchId)');
+    expect(hook).toContain('useSalesSources({ branchId, branchKey, includeInactive = false } = {})');
+    expect(hook).toContain('useSalesClosingCustomization()');
+    expect(hook).toContain('const canonicalIds = asRecordArray(source?.branch_ids).map(String);');
+    expect(hook).toContain('canonicalIds.includes(String(branchId))');
+    expect(hook).toContain('String(source.branch_id) === String(branchId)');
+    expect(hook).toContain('source?.is_global || (!source?.branch_id && !asRecordArray(source?.branch_ids).length)');
+    expect(hook).toContain('includeInactive || source.is_active !== false');
+    expect(context).toContain("const sourceQueryKey = useMemo(() => ['sales_sources_active', restaurantId]");
+    expect(context).toContain("from('sales_sources')");
   });
 
   it('sends a canonical branch UUID to Copilot and verifies it against the resolved tenant before tools run', async () => {

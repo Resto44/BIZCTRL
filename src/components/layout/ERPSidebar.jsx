@@ -49,8 +49,9 @@ export const ERP_NAV_GROUPS = [
     key: 'operations',
     label: 'Operations',
     items: [
-      { path: '/sales',          label: 'Sales',          icon: ShoppingCart, permission: 'viewSales' },
-      { path: '/sales/invoices', label: 'Sales Invoices', icon: Receipt,      permission: 'viewSales' },
+      { path: '/sales',          label: 'Sales',                    icon: ShoppingCart, permission: 'viewSales' },
+      { path: '/sales-sources',  label: 'Sales Source Management', icon: Banknote,     permission: 'viewSales' },
+      { path: '/sales/invoices', label: 'Sales Invoices',           icon: Receipt,      permission: 'viewSales' },
       { path: '/cash-register',  label: 'Cash Register',  icon: Banknote,     permission: 'viewSales' },
       { path: '/purchases',      label: 'Purchases',      icon: Package,      permission: 'viewPurchases' },
       { path: '/purchase-orders',label: 'Purchase Orders',icon: ClipboardList,permission: 'viewPurchases' },

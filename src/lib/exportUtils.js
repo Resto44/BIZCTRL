@@ -135,40 +135,54 @@ function triggerDownload(blob, filename) {
 
 // ─── Sales export builders ────────────────────────────────────────────────────
 
+function salesSourceDailyTotal(record) {
+  if (Number(record?.custom_sources_total) > 0) return Number(record.custom_sources_total);
+  const raw = record?.sales_sources_json;
+  try {
+    const entries = Array.isArray(raw) ? raw : JSON.parse(raw || '[]');
+    return Array.isArray(entries) ? entries.reduce((sum, entry) => sum + (Number(entry?.amount) || 0), 0) : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export function buildSalesCSV(data, t, currency, branches) {
   const getBranchLabel = (key) => branches.find(b => b.key === key)?.label || key;
-  const headers = [t('date'), t('branch'), t('cash'), t('network'), t('credit'), t('total_sales')];
+  const sourceLabel = t('salesClosing.sources.title') || 'Sales Sources';
+  const headers = [t('date'), t('branch'), t('cash'), t('network'), t('credit'), sourceLabel, t('total_sales')];
   const rows = data.map(s => {
     const sCash = Number(s.restaurant_cash ?? s.cash ?? 0);
     const sNet = Number(s.restaurant_network ?? s.network ?? 0);
-    const total = sCash + sNet + (Number(s.credit) || 0);
-    return [s.date, getBranchLabel(s.branch), sCash, sNet, Number(s.credit) || 0, total];
+    const credit = Number(s.credit) || 0;
+    const sources = salesSourceDailyTotal(s);
+    const total = sCash + sNet + credit + sources;
+    return [s.date, getBranchLabel(s.branch), sCash, sNet, credit, sources, total];
   });
-  const totals = rows.reduce((acc, r) => [
-    '', '',
-    acc[2] + Number(r[2]),
-    acc[3] + Number(r[3]),
-    acc[4] + Number(r[4]),
-    acc[5] + Number(r[5]),
-  ], ['', '', 0, 0, 0, 0]);
-  rows.push(['', t('total_sales'), totals[2], totals[3], totals[4], totals[5]]);
+  const totals = rows.reduce((acc, row) => acc.map((value, index) => index < 2 ? value : value + Number(row[index] || 0)), ['', '', 0, 0, 0, 0, 0]);
+  rows.push(['', t('total_sales'), totals[2], totals[3], totals[4], totals[5], totals[6]]);
   return { headers, rows };
 }
 
 export function buildSalesPDF(data, t, currency, branches, subtitle) {
   const getBranchLabel = (key) => branches.find(b => b.key === key)?.label || key;
-  const headers = [t('date'), t('branch'), t('cash'), t('network'), t('credit'), t('total_sales')];
+  const sourceLabel = t('salesClosing.sources.title') || 'Sales Sources';
+  const headers = [t('date'), t('branch'), t('cash'), t('network'), t('credit'), sourceLabel, t('total_sales')];
   const rows = data.map(s => {
     const sCash = Number(s.restaurant_cash ?? s.cash ?? 0);
     const sNet = Number(s.restaurant_network ?? s.network ?? 0);
-    const total = sCash + sNet + (Number(s.credit) || 0);
-    return [s.date, getBranchLabel(s.branch), `${currency}${sCash.toLocaleString()}`, `${currency}${sNet.toLocaleString()}`, `${currency}${(Number(s.credit) || 0).toLocaleString()}`, `${currency}${total.toLocaleString()}`];
+    const credit = Number(s.credit) || 0;
+    const sources = salesSourceDailyTotal(s);
+    const total = sCash + sNet + credit + sources;
+    return [s.date, getBranchLabel(s.branch), `${currency}${sCash.toLocaleString()}`, `${currency}${sNet.toLocaleString()}`, `${currency}${credit.toLocaleString()}`, `${currency}${sources.toLocaleString()}`, `${currency}${total.toLocaleString()}`];
   });
-  const totalCash = data.reduce((sum, record) => sum + Number(record.restaurant_cash ?? record.cash ?? 0), 0);
-  const totalNet = data.reduce((sum, record) => sum + Number(record.restaurant_network ?? record.network ?? 0), 0);
-  const totalCredit = data.reduce((sum, record) => sum + (Number(record.credit) || 0), 0);
-  const grandTotal = totalCash + totalNet + totalCredit;
-  const totalsRow = [t('total_sales'), '', `${currency}${totalCash.toLocaleString()}`, `${currency}${totalNet.toLocaleString()}`, `${currency}${totalCredit.toLocaleString()}`, `${currency}${grandTotal.toLocaleString()}`];
+  const totals = data.reduce((summary, record) => ({
+    cash: summary.cash + Number(record.restaurant_cash ?? record.cash ?? 0),
+    network: summary.network + Number(record.restaurant_network ?? record.network ?? 0),
+    credit: summary.credit + (Number(record.credit) || 0),
+    sources: summary.sources + salesSourceDailyTotal(record),
+  }), { cash: 0, network: 0, credit: 0, sources: 0 });
+  const grandTotal = totals.cash + totals.network + totals.credit + totals.sources;
+  const totalsRow = [t('total_sales'), '', `${currency}${totals.cash.toLocaleString()}`, `${currency}${totals.network.toLocaleString()}`, `${currency}${totals.credit.toLocaleString()}`, `${currency}${totals.sources.toLocaleString()}`, `${currency}${grandTotal.toLocaleString()}`];
   return { headers, rows, totalsRow, subtitle };
 }
 

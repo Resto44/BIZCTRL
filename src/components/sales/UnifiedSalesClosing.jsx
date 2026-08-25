@@ -564,8 +564,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     additionalFields: t('salesClosing.workspace.additionalFields'),
   }), [t]);
   const sourceNameForLanguage = useCallback((source) => {
-    if (lang === 'en') return source.name_en || source.name_ar || '';
-    return source.name_ar || source.name_en || '';
+    if (lang === 'en') return source.name_en || source.name_ar || source.name_fa || '';
+    if (lang === 'fa') return source.name_fa || source.name_ar || source.name_en || '';
+    return source.name_ar || source.name_en || source.name_fa || '';
   }, [lang]);
   const closingFieldNameForLanguage = useCallback((field, fallback = '') => {
     if (lang === 'en') return field?.label_en || field?.label_ar || fallback;
@@ -1774,7 +1775,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         </div>
       </div>
       <SalesClosingFieldDialog editor={fieldEditor} onClose={() => setFieldEditor(null)} onSave={saveInlineClosingField} isSaving={isSavingClosingField} />
-      <SalesSourceDialog editor={sourceEditor} onClose={() => setSourceEditor(null)} onSave={saveInlineSalesSource} isSaving={isSavingSalesSource} paymentMethods={configuredPaymentMethods} />
+      <SalesSourceDialog editor={sourceEditor} onClose={() => setSourceEditor(null)} onSave={saveInlineSalesSource} isSaving={isSavingSalesSource} paymentMethods={configuredPaymentMethods} branches={branches} />
     </form>
   );
 }
