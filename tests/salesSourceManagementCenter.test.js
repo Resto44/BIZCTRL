@@ -51,7 +51,8 @@ describe('Sales Source Management Center contract', () => {
 
     expect(migration).toContain('CREATE OR REPLACE FUNCTION public.get_sales_source_history');
     expect(migration).toContain("COALESCE(closing.closing_state, 'finalized') <> 'draft'");
-    expect(migration).toContain("jsonb_array_elements(COALESCE(closing.sales_sources_json, '[]'::JSONB))");
+    expect(migration).toContain('jsonb_array_elements(');
+    expect(migration).toContain("jsonb_typeof(COALESCE(closing.sales_sources_json, '[]'::JSONB)) = 'array'");
     expect(migration).toContain('LIMIT LEAST(GREATEST(COALESCE(p_limit, 100), 1), 500)');
     expect(migration).toContain('OFFSET GREATEST(COALESCE(p_offset, 0), 0)');
     expect(migration).toContain('CREATE OR REPLACE FUNCTION public.get_sales_source_dashboard');
@@ -60,6 +61,14 @@ describe('Sales Source Management Center contract', () => {
     expect(hook).toContain("supabase.rpc('get_sales_source_dashboard'");
     expect(hook).toContain('p_limit: SALES_SOURCE_HISTORY_PAGE_SIZE');
     expect(hook).toContain('p_offset: page * SALES_SOURCE_HISTORY_PAGE_SIZE');
+  });
+
+  it('guards legacy scalar source snapshots so one malformed historical record cannot break source history or dashboard reads', async () => {
+    const guardMigration = await source('../src/supabase/20260825_sales_source_history_scalar_guard.sql');
+
+    expect(guardMigration).toContain('CREATE OR REPLACE FUNCTION public.get_sales_source_history');
+    expect(guardMigration).toContain("jsonb_typeof(COALESCE(closing.sales_sources_json, '[]'::JSONB)) = 'array'");
+    expect(guardMigration).toContain("ELSE '[]'::JSONB");
   });
 
   it('provides management, dashboard, history, analytics, reconciliation, branch, search, filter, sort, and export experiences in one page', async () => {

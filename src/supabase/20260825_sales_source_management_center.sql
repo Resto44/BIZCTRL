@@ -191,7 +191,13 @@ AS $$
       'sales_closing_source'::TEXT AS transaction_type,
       closing.created_date AS created_at
     FROM scoped_closings AS closing
-    CROSS JOIN LATERAL jsonb_array_elements(COALESCE(closing.sales_sources_json, '[]'::JSONB)) AS entry
+    CROSS JOIN LATERAL jsonb_array_elements(
+      CASE
+        WHEN jsonb_typeof(COALESCE(closing.sales_sources_json, '[]'::JSONB)) = 'array'
+          THEN COALESCE(closing.sales_sources_json, '[]'::JSONB)
+        ELSE '[]'::JSONB
+      END
+    ) AS entry
     WHERE NULLIF(entry ->> 'source_id', '') IS NOT NULL
   ),
   custom_bucket_totals AS (
