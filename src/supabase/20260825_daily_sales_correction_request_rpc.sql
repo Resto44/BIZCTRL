@@ -64,6 +64,11 @@ BEGIN
   ORDER BY CASE WHEN lower(m.role) = 'owner' THEN 0 ELSE 1 END, m.updated_at DESC
   LIMIT 1;
 
+  -- A transaction-local marker is set only inside this SECURITY DEFINER RPC.
+  -- The lifecycle trigger still validates the exact append-only audit shape;
+  -- ordinary direct protected-row updates never carry this marker.
+  PERFORM set_config('app.daily_sales_correction_request_id', v_closing.id::text, true);
+
   UPDATE public.daily_sales
   SET closing_audit = v_audit || jsonb_build_array(jsonb_build_object(
     'action', 'correction_requested',

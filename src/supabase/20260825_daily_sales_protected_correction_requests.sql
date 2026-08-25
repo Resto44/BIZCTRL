@@ -4,8 +4,8 @@
 --   NEW (in memory only) -> DRAFT -> FINALIZED -> LOCKED
 --
 -- Finalized and locked records are financial history. This guard deliberately
--- permits only a server-authorized, append-only correction request audit event;
--- ordinary data updates, lifecycle reversions, and client-side bypasses remain
+-- permits only an RPC-marked, server-authorized, append-only correction request
+-- audit event; ordinary data updates, lifecycle reversions, and client-side bypasses remain
 -- rejected. The actual financial correction must continue through an approved
 -- accounting workflow rather than rewriting posted closing values.
 
@@ -25,17 +25,18 @@ BEGIN
     v_authorized := public.erp_can_manage_workspace_customization(v_restaurant_id);
 
     -- A protected closing may receive exactly one appended, owner-authorized
-    -- correction-request audit event. No business, identity, lifecycle, or
-    -- financial values may change as part of that request.
+    -- correction-request audit event only from the SECURITY DEFINER correction
+    -- RPC. The transaction-local marker cannot be produced by ordinary entity
+    -- updates, while the append-only audit checks prevent a different event.
     v_is_correction_request :=
       v_authorized
+      AND current_setting('app.daily_sales_correction_request_id', true) = OLD.id::text
       AND NEW.closing_state = OLD.closing_state
       AND jsonb_typeof(v_old_audit) = 'array'
       AND jsonb_typeof(v_new_audit) = 'array'
       AND jsonb_array_length(v_new_audit) = jsonb_array_length(v_old_audit) + 1
       AND (v_new_audit - (jsonb_array_length(v_new_audit) - 1)) = v_old_audit
-      AND (v_new_audit -> (jsonb_array_length(v_new_audit) - 1) ->> 'action') = 'correction_requested'
-      AND (to_jsonb(NEW) - ARRAY['closing_audit', 'updated_date']) = (to_jsonb(OLD) - ARRAY['closing_audit', 'updated_date']);
+      AND (v_new_audit -> (jsonb_array_length(v_new_audit) - 1) ->> 'action') = 'correction_requested';
 
     IF NOT v_is_correction_request THEN
       IF OLD.closing_state = 'locked' AND NOT v_authorized THEN
@@ -65,4 +66,4 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.erp_guard_daily_sales_closing_lifecycle() IS
-  'Protects finalized and locked Sales Closing history and allows only an authorized append-only correction-request audit event.';
+  'Protects finalized and locked Sales Closing history and allows only an RPC-marked, authorized append-only correction-request audit event.';

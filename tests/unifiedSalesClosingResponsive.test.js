@@ -267,7 +267,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(lifecycleMigration).toContain("OLD.closing_state IN ('finalized', 'locked')");
     expect(lifecycleMigration).toContain('erp_can_manage_workspace_customization(v_restaurant_id)');
     expect(lifecycleMigration).toContain("(v_new_audit -> (jsonb_array_length(v_new_audit) - 1) ->> 'action') = 'correction_requested'");
-    expect(lifecycleMigration).toContain("to_jsonb(NEW) - ARRAY['closing_audit', 'updated_date']");
+    expect(lifecycleMigration).toContain("current_setting('app.daily_sales_correction_request_id', true) = OLD.id::text");
     expect(lifecycleMigration).toContain('DAILY_SALES_CLOSING_PROTECTED');
     expect(lifecycleMigration).toContain('DAILY_SALES_CLOSING_FINALIZATION_REVERT_DENIED');
 
@@ -277,6 +277,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(rpcMigration).toContain('erp_can_manage_workspace_customization(v_restaurant_id)');
     expect(rpcMigration).toContain('m.restaurant_id = v_restaurant_id');
     expect(rpcMigration).toContain("'action', 'correction_requested'");
+    expect(rpcMigration).toContain("set_config('app.daily_sales_correction_request_id', v_closing.id::text, true)");
     expect(rpcMigration).toContain('GRANT EXECUTE ON FUNCTION public.request_daily_sales_closing_correction(uuid) TO authenticated');
   });
 
