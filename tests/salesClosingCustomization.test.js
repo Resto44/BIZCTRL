@@ -62,7 +62,7 @@ describe('Sales Closing Customization runtime contract', () => {
     expect(workspace).toContain("field.visible_mobile === false ? 'hidden sm:block'");
     expect(workspace).toContain("field.visible_desktop === false ? 'sm:hidden'");
     expect(workspace).toContain('nextErrors[`custom_${field.id}`]');
-    expect(workspace).toContain('Owner-configured fields apply to this new closing.');
+    expect(workspace).toContain("description: t('salesClosing.workspace.description')");
     expect(workspace).toContain('Quick Closing');
     expect(workspace).toContain('Advanced Closing');
     expect(workspace).toContain("closing_state: requestedClosingState");
@@ -86,8 +86,8 @@ describe('Sales Closing in-workspace runtime customization contract', () => {
 
     expect(workspace).toContain("from '@/components/sales/SalesClosingCustomizationDialogs'");
     expect(page).toContain("from '@/components/sales/SalesClosingCustomizationDialogs'");
-    expect(dialogs).toContain('Description (optional)');
-    expect(dialogs).toContain('Help text (optional)');
+    expect(dialogs).toContain("t('salesClosing.dialog.descriptionOptional')");
+    expect(dialogs).toContain("t('salesClosing.dialog.helpTextOptional')");
   });
 
   it('adds sources and fields in place, updates the canonical cache, and links to the existing customization route', async () => {
@@ -97,9 +97,9 @@ describe('Sales Closing in-workspace runtime customization contract', () => {
     expect(context).toContain('saveSalesSource');
     expect(context).toContain('saveClosingField');
     expect(context).toContain("queryClient.setQueriesData({ queryKey: ['sales_sources_active', restaurantId] }");
-    expect(workspace).toContain('+ Add Sales Source');
-    expect(workspace).toContain('+ Add Closing Field');
-    expect(workspace).toContain('Customize Sales Closing');
+    expect(workspace).toContain('salesClosingWorkspaceCopy.addSource');
+    expect(workspace).toContain('salesClosingWorkspaceCopy.addField');
+    expect(workspace).toContain('salesClosingWorkspaceCopy.customize');
     expect(workspace).toContain("navigate('/sales-closing-customization')");
     expect(workspace).toContain('Sales source saved and is ready to use.');
     expect(workspace).toContain('Closing field saved and is ready to use.');

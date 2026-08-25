@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
+import translations from '../src/lib/i18n';
 
 const source = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
@@ -226,11 +227,10 @@ describe('Sales source daily and historical balance contract', () => {
   it('renders Today as the only editable source amount and keeps Previous and Total derived and read-only', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
-    expect(workspace).toContain('label="اکنون / Today"');
-    expect(workspace).toContain('سابق / Previous');
-    expect(workspace).toContain('مجموع / Total');
-    expect(workspace).toContain('Editable daily sales only — included in today’s ERP total.');
-    expect(workspace).toContain('Only اکنون / Today is included in today’s ERP sales total.');
+    expect(workspace).toContain("today: t('salesClosing.sources.today')");
+    expect(workspace).toContain("previous: t('salesClosing.sources.previous')");
+    expect(workspace).toContain("total: t('salesClosing.sources.total')");
+    expect(workspace).toContain('label={copy.today}');
     expect(workspace).toContain('isHistoryLoading={sourceHistoryLoading}');
   });
 
@@ -243,5 +243,56 @@ describe('Sales source daily and historical balance contract', () => {
     expect(workspace).toContain('.map(({ source, today }) => ({');
     expect(workspace).toContain('amount: today');
     expect(workspace).toContain('cumulative values are derived from earlier closing records at runtime.');
+  });
+});
+
+
+describe('Sales Closing localization runtime contract', () => {
+  it('defines complete English, Arabic, and Persian source-card and workspace translations', async () => {
+    const keys = [
+      'salesClosing.sources.title',
+      'salesClosing.sources.today',
+      'salesClosing.sources.previous',
+      'salesClosing.sources.total',
+      'salesClosing.sources.todayIncluded',
+      'salesClosing.sources.dailyEditable',
+      'salesClosing.workspace.addSource',
+      'salesClosing.workspace.addField',
+      'salesClosing.workspace.customize',
+    ];
+
+    keys.forEach((key) => {
+      expect(translations.en[key]).toBeTruthy();
+      expect(translations.ar[key]).toBeTruthy();
+      expect(translations.fa[key]).toBeTruthy();
+    });
+    expect(translations.en['salesClosing.sources.today']).toBe('Today');
+    expect(translations.ar['salesClosing.sources.today']).toBe('اليوم');
+    expect(translations.fa['salesClosing.sources.today']).toBe('امروز');
+  });
+
+  it('recomputes source presentation from the active language without translating owner-created source data', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+    const dialogs = await source('../src/components/sales/SalesClosingCustomizationDialogs.jsx');
+    const languageContext = await source('../src/lib/LanguageContext.jsx');
+
+    expect(workspace).toContain("const { currency, lang, t } = useLanguage();");
+    expect(workspace).toContain("if (lang === 'en') return source.name_en || source.name_ar || '';");
+    expect(workspace).toContain('return source.name_ar || source.name_en || \'\';');
+    expect(workspace).toContain('data-i18n-skip="true"');
+    expect(workspace).toContain('key={`${source.id}-${previous}-${today}-${lang}`}');
+    expect(dialogs).toContain("const { lang, t } = useLanguage();");
+    expect(dialogs).toContain('localizedDataName(method, lang)');
+    expect(languageContext).toContain("localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);");
+  });
+
+  it('removes the source card’s mixed-language hardcoding in favor of translation keys', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).not.toContain('اکنون / Today');
+    expect(workspace).not.toContain('سابق / Previous');
+    expect(workspace).not.toContain('مجموع / Total');
+    expect(workspace).toContain("t('salesClosing.sources.todayIncluded')");
+    expect(workspace).toContain("t('salesClosing.workspace.liveConfiguration')");
   });
 });

@@ -239,33 +239,32 @@ function Money({ currency, value, className = '', signed = false }) {
   );
 }
 
-const SalesSourceDailyHistoryCard = memo(function SalesSourceDailyHistoryCard({ source, today, previous, currency, onChange, isHistoryLoading, isHistoryUnavailable }) {
+const SalesSourceDailyHistoryCard = memo(function SalesSourceDailyHistoryCard({ source, sourceLabel, today, previous, currency, onChange, isHistoryLoading, isHistoryUnavailable, copy }) {
   const total = previous + today;
   return (
-    <div className="rounded-xl border border-blue-200 bg-background p-3 shadow-sm">
+    <div className="rounded-xl border border-blue-200 bg-background p-3 shadow-sm" data-i18n-skip="true">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-blue-950">{source.name_ar || source.name_en}</p>
-          {source.name_ar && source.name_en && <p className="truncate text-[10px] text-muted-foreground">{source.name_en}</p>}
+          <p className="truncate text-sm font-bold text-blue-950" data-i18n-skip="true">{sourceLabel}</p>
         </div>
-        <Badge variant="outline" className="shrink-0 border-blue-200 bg-blue-50 text-[10px] text-blue-700">Daily source</Badge>
+        <Badge variant="outline" className="shrink-0 border-blue-200 bg-blue-50 text-[10px] text-blue-700">{copy.dailySource}</Badge>
       </div>
       <NumInput
         id={`quick-closing-source-${source.id}`}
-        label="اکنون / Today"
+        label={copy.today}
         value={today || ''}
         onChange={onChange}
         prefix={currency}
-        helpText={source.description || 'Editable daily sales only — included in today’s ERP total.'}
+        helpText={copy.dailyEditable}
       />
       <div className="mt-3 space-y-2 border-t border-blue-100 pt-3">
         <div className="flex items-center justify-between gap-3 text-sm">
-          <div><p className="font-medium">سابق / Previous</p><p className="text-[10px] text-muted-foreground">Historical accumulated closings</p></div>
-          {isHistoryLoading ? <span className="text-xs text-muted-foreground">Loading…</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">Unavailable</span> : <Money currency={currency} value={previous} className="font-semibold text-muted-foreground" />}
+          <div><p className="font-medium">{copy.previous}</p><p className="text-[10px] text-muted-foreground">{copy.previousHelp}</p></div>
+          {isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={previous} className="font-semibold text-muted-foreground" />}
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-blue-100 pt-2 text-sm">
-          <div><p className="font-bold text-blue-950">مجموع / Total</p><p className="text-[10px] text-muted-foreground">Previous + Today · read only</p></div>
-          {isHistoryLoading ? <span className="text-xs text-muted-foreground">Loading…</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">Unavailable</span> : <Money currency={currency} value={total} className="font-black text-blue-800" />}
+          <div><p className="font-bold text-blue-950">{copy.total}</p><p className="text-[10px] text-muted-foreground">{copy.totalHelp}</p></div>
+          {isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={total} className="font-black text-blue-800" />}
         </div>
       </div>
     </div>
@@ -509,7 +508,7 @@ const StickySummary = memo(function StickySummary({ totalSales, operatingResult,
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing }) {
-  const { currency } = useLanguage();
+  const { currency, lang, t } = useLanguage();
   const { user } = useAuth();
   const { role } = useRole();
   const { ownerFilter, branches: tenantBranches, managerBranch, activeRestaurant, isManager } = useTenant();
@@ -528,6 +527,38 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const requiresCashReconciliation = closingConfig?.validation_rules?.require_cash_reconciliation !== false;
   const showMobileSummary = closingConfig?.layout?.mobile_summary !== false;
   const showDesktopSummary = closingConfig?.layout?.desktop_summary !== false;
+  const salesSourceCopy = useMemo(() => ({
+    title: t('salesClosing.sources.title'),
+    today: t('salesClosing.sources.today'),
+    previous: t('salesClosing.sources.previous'),
+    total: t('salesClosing.sources.total'),
+    todayIncluded: t('salesClosing.sources.todayIncluded'),
+    todayTotal: t('salesClosing.sources.todayTotal'),
+    dailyEditable: t('salesClosing.sources.dailyEditable'),
+    previousHelp: t('salesClosing.sources.previousHelp'),
+    totalHelp: t('salesClosing.sources.totalHelp'),
+    dailySource: t('salesClosing.sources.dailySource'),
+    loadingHistory: t('salesClosing.sources.loadingHistory'),
+    historyUnavailable: t('salesClosing.sources.historyUnavailable'),
+  }), [t]);
+  const salesClosingWorkspaceCopy = useMemo(() => ({
+    title: t('salesClosing.workspace.title'),
+    description: t('salesClosing.workspace.description'),
+    liveConfiguration: t('salesClosing.workspace.liveConfiguration'),
+    addSource: t('salesClosing.workspace.addSource'),
+    addField: t('salesClosing.workspace.addField'),
+    customize: t('salesClosing.workspace.customize'),
+    paymentMethods: t('salesClosing.workspace.paymentMethods'),
+    additionalFields: t('salesClosing.workspace.additionalFields'),
+  }), [t]);
+  const sourceNameForLanguage = useCallback((source) => {
+    if (lang === 'en') return source.name_en || source.name_ar || '';
+    return source.name_ar || source.name_en || '';
+  }, [lang]);
+  const closingFieldNameForLanguage = useCallback((field, fallback = '') => {
+    if (lang === 'en') return field?.label_en || field?.label_ar || fallback;
+    return field?.label_ar || field?.label_en || fallback;
+  }, [lang]);
   const summaryVisibilityClass = !showMobileSummary && !showDesktopSummary
     ? 'hidden'
     : !showMobileSummary
@@ -754,8 +785,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const customSourceSummaries = useMemo(() => customSources.map((source) => {
     const today = Math.max(0, Number(customSourceAmounts[source.id]) || 0);
     const previous = Math.max(0, Number(historicalSourceAmounts[source.id] ?? historicalSourceAmounts[source.system_key] ?? 0) || 0);
-    return { source, today, previous, total: previous + today };
-  }), [customSources, customSourceAmounts, historicalSourceAmounts]);
+    return { source, sourceLabel: sourceNameForLanguage(source), today, previous, total: previous + today };
+  }), [customSources, customSourceAmounts, historicalSourceAmounts, sourceNameForLanguage]);
   const customSourcePaymentTotals = useMemo(() =>
     customSourceSummaries.reduce((totals, { source, today }) => {
       if (source.included_in_revenue === false) return totals;
@@ -772,8 +803,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const configuredClosingFieldByKey = useMemo(() => new Map(configuredClosingFields.map((field) => [field.field_key, field])), [configuredClosingFields]);
   const closingFieldLabel = useCallback((fieldKey, fallback) => {
     const field = configuredClosingFieldByKey.get(fieldKey);
-    return field?.label_ar || field?.label_en || fallback;
-  }, [configuredClosingFieldByKey]);
+    return closingFieldNameForLanguage(field, fallback);
+  }, [closingFieldNameForLanguage, configuredClosingFieldByKey]);
   const closingFieldVisibilityClass = useCallback((fieldKey) => {
     const field = configuredClosingFieldByKey.get(fieldKey);
     if (!field || field.is_active !== false) {
@@ -1639,15 +1670,15 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           </section>
 
           {showCustomizationCard && (
-            <section className="overflow-hidden rounded-2xl border border-blue-200 bg-background shadow-sm">
+            <section className="overflow-hidden rounded-2xl border border-blue-200 bg-background shadow-sm" data-i18n-skip="true">
               <div className="flex flex-col gap-2 border-b border-blue-100 bg-blue-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-                <div className="flex min-w-0 items-center gap-2"><PlusCircle className="h-4 w-4 shrink-0 text-blue-600" /><div><h2 className="truncate text-xs font-black uppercase tracking-wide text-blue-950">Sales Sources & Closing Fields</h2><p className="text-[11px] text-blue-800">Owner-configured fields apply to this new closing.</p></div></div>
-                <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="w-fit border-blue-200 bg-white text-[10px] text-blue-700">Live configuration</Badge>{canCustomize && <><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setSourceEditor({ mode: 'create', source: newSalesClosingSource(customSources.length * 10 + 10) })}>+ Add Sales Source</Button><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setFieldEditor({ mode: 'create', field: newSalesClosingCustomField(configuredClosingFields.length * 10 + 10) })}>+ Add Closing Field</Button><Button type="button" size="sm" className="min-h-10" onClick={() => navigate('/sales-closing-customization')}>Customize Sales Closing</Button></>}</div>
+                <div className="flex min-w-0 items-center gap-2"><PlusCircle className="h-4 w-4 shrink-0 text-blue-600" /><div><h2 className="truncate text-xs font-black uppercase tracking-wide text-blue-950">{salesClosingWorkspaceCopy.title}</h2><p className="text-[11px] text-blue-800">{salesClosingWorkspaceCopy.description}</p></div></div>
+                <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="w-fit border-blue-200 bg-white text-[10px] text-blue-700">{salesClosingWorkspaceCopy.liveConfiguration}</Badge>{canCustomize && <><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setSourceEditor({ mode: 'create', source: newSalesClosingSource(customSources.length * 10 + 10) })}>+ {salesClosingWorkspaceCopy.addSource}</Button><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setFieldEditor({ mode: 'create', field: newSalesClosingCustomField(configuredClosingFields.length * 10 + 10) })}>+ {salesClosingWorkspaceCopy.addField}</Button><Button type="button" size="sm" className="min-h-10" onClick={() => navigate('/sales-closing-customization')}>{salesClosingWorkspaceCopy.customize}</Button></>}</div>
               </div>
               <div className="space-y-4 p-3 sm:p-4">
-                {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div><div className="mb-2 flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-foreground">Sales Sources</p><p className="mt-0.5 text-[10px] text-muted-foreground">Only اکنون / Today is included in today’s ERP sales total.</p></div><div className="text-right"><p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">Today’s Source Sales</p><Money currency={currency} value={customTotal} className="text-sm font-black text-blue-700" /></div></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{customSourceSummaries.map(({ source, today, previous }) => <SalesSourceDailyHistoryCard key={`${source.id}-${previous}-${today}`} source={source} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} isHistoryLoading={sourceHistoryLoading} isHistoryUnavailable={sourceHistoryUnavailable} />)}</div></div>}
-                {isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false) && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-800">Available Payment Methods</p><div className="mt-2 flex flex-wrap gap-2">{configuredPaymentMethods.filter((method) => method.is_active !== false).map((method) => <Badge key={method.id} variant="outline" className="bg-background">{method.name_ar || method.name_en}</Badge>)}</div></div>}
-                {customClosingFields.length > 0 && <div><p className="mb-2 text-xs font-bold uppercase tracking-wide text-foreground">Additional Closing Fields</p><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{customClosingFields.map((field) => { const visibilityClass = field.visible_mobile === false ? 'hidden sm:block' : field.visible_desktop === false ? 'sm:hidden' : ''; const value = customClosingFieldValues[field.id] ?? ''; const error = inlineErrors[`custom_${field.id}`]; const inputId = `quick-closing-custom_${field.id}`; return <div key={field.id} id={`quick-closing-custom_${field.id}`} className={visibilityClass}>{field.field_type === 'long_text' || field.field_type === 'notes' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Textarea id={inputId} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} className="min-h-20 resize-none text-sm" />{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'dropdown' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Select value={value} onValueChange={(next) => updateCustomClosingField(field.id, next)}><SelectTrigger id={inputId} className="min-h-11 text-sm"><SelectValue placeholder={`Select ${field.label_en}`} /></SelectTrigger><SelectContent>{field.options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'checkbox' ? <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-input px-3 py-2 text-sm"><span>{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</span><input id={inputId} type="checkbox" checked={Boolean(value)} onChange={(event) => updateCustomClosingField(field.id, event.target.checked)} className="h-4 w-4 accent-primary" /></label> : <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Input id={inputId} type={field.field_type === 'currency' || field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : field.field_type === 'time' ? 'time' : 'text'} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} inputMode={field.field_type === 'currency' || field.field_type === 'number' ? 'decimal' : undefined} className="min-h-11 text-sm" />{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div>}{field.help_text && <p className="mt-1 text-[10px] leading-snug text-muted-foreground">{field.help_text}</p>}</div>; })}</div></div>}
+                {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div><div className="mb-2 flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-foreground">{salesSourceCopy.title}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{salesSourceCopy.todayIncluded}</p></div><div className="text-right"><p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">{salesSourceCopy.todayTotal}</p><Money currency={currency} value={customTotal} className="text-sm font-black text-blue-700" /></div></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{customSourceSummaries.map(({ source, sourceLabel, today, previous }) => <SalesSourceDailyHistoryCard key={`${source.id}-${previous}-${today}-${lang}`} source={source} sourceLabel={sourceLabel} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} isHistoryLoading={sourceHistoryLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} />)}</div></div>}
+                {isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false) && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-800">{salesClosingWorkspaceCopy.paymentMethods}</p><div className="mt-2 flex flex-wrap gap-2">{configuredPaymentMethods.filter((method) => method.is_active !== false).map((method) => <Badge key={method.id} variant="outline" className="bg-background" data-i18n-skip="true">{sourceNameForLanguage(method)}</Badge>)}</div></div>}
+                {customClosingFields.length > 0 && <div><p className="mb-2 text-xs font-bold uppercase tracking-wide text-foreground">{salesClosingWorkspaceCopy.additionalFields}</p><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{customClosingFields.map((field) => { const visibilityClass = field.visible_mobile === false ? 'hidden sm:block' : field.visible_desktop === false ? 'sm:hidden' : ''; const value = customClosingFieldValues[field.id] ?? ''; const error = inlineErrors[`custom_${field.id}`]; const inputId = `quick-closing-custom_${field.id}`; return <div key={field.id} id={`quick-closing-custom_${field.id}`} className={visibilityClass}>{field.field_type === 'long_text' || field.field_type === 'notes' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingFieldNameForLanguage(field)}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Textarea id={inputId} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} className="min-h-20 resize-none text-sm" />{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'dropdown' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingFieldNameForLanguage(field)}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Select value={value} onValueChange={(next) => updateCustomClosingField(field.id, next)}><SelectTrigger id={inputId} className="min-h-11 text-sm"><SelectValue placeholder={closingFieldNameForLanguage(field)} /></SelectTrigger><SelectContent>{field.options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'checkbox' ? <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-input px-3 py-2 text-sm"><span>{closingFieldNameForLanguage(field)}{field.is_required && <span className="ml-1 text-destructive">*</span>}</span><input id={inputId} type="checkbox" checked={Boolean(value)} onChange={(event) => updateCustomClosingField(field.id, event.target.checked)} className="h-4 w-4 accent-primary" /></label> : <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingFieldNameForLanguage(field)}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Input id={inputId} type={field.field_type === 'currency' || field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : field.field_type === 'time' ? 'time' : 'text'} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} inputMode={field.field_type === 'currency' || field.field_type === 'number' ? 'decimal' : undefined} className="min-h-11 text-sm" />{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div>}{field.help_text && <p className="mt-1 text-[10px] leading-snug text-muted-foreground">{field.help_text}</p>}</div>; })}</div></div>}
               </div>
             </section>
           )}
