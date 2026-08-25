@@ -519,7 +519,7 @@ const StickySummary = memo(function StickySummary({ totalSales, operatingResult,
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing, onRequestCorrection, onSessionContextChange, isOpeningNewClosing = false }) {
+export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing, onSessionContextChange, isOpeningNewClosing = false }) {
   const { currency, lang, t } = useLanguage();
   const { user } = useAuth();
   const { role } = useRole();
@@ -596,15 +596,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inlineErrors, setInlineErrors] = useState({});
   const [savedClosing, setSavedClosing] = useState(null);
-  // An in-memory New session and every persisted Draft are editable. Historical
-  // lifecycle states are protected before any normal Save Draft/Finalize action
-  // can reach the backend guard.
-  const [requestedClosingState, setRequestedClosingState] = useState(initial?.closing_state || 'draft');
-  const isFinalized = initial?.closing_state === 'finalized';
-  const isLocked = initial?.closing_state === 'locked';
-  const isProtectedClosing = Boolean(initial?.id && (isFinalized || isLocked));
-  const canLockClosing = [ROLES.OWNER, ROLES.GENERAL_MANAGER].includes(role);
-  const canRequestCorrection = canLockClosing;
+  // Every persisted closing remains editable. Save Draft and Finalize choose
+  // the normal lifecycle state but never reserve a business period for correction.
+  const [requestedClosingState, setRequestedClosingState] = useState(
+    initial?.closing_state === 'finalized' ? 'finalized' : 'draft',
+  );
 
   useEffect(() => {
     if (!canUseAdvancedClosing) setClosingView('quick');
@@ -1426,12 +1422,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isProtectedClosing) {
-      toast.error(isLocked
-        ? 'This closing is locked. Request an authorized correction before changing it.'
-        : 'This closing is finalized. Request an authorized correction before changing it.');
-      return;
-    }
     const savingDraft = requestedClosingState === 'draft';
 
     const invalidCredit = creditEntries.find((entry) => Number(entry.amount) > 0 && !entry.customer);
@@ -1522,9 +1512,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         closing_state: requestedClosingState,
         finalized_at: requestedClosingState === 'finalized' ? new Date().toISOString() : initial?.finalized_at || null,
         finalized_by: requestedClosingState === 'finalized' ? (user?.email || '') : initial?.finalized_by || '',
-        locked_at: requestedClosingState === 'locked' ? new Date().toISOString() : initial?.locked_at || null,
-        locked_by: requestedClosingState === 'locked' ? (user?.email || '') : initial?.locked_by || '',
-        closing_audit: [...asRecordArray(initial?.closing_audit), { action: requestedClosingState === 'draft' ? 'draft_saved' : requestedClosingState === 'locked' ? 'closing_locked' : 'closing_finalized', at: new Date().toISOString(), by: user?.email || '', branch_id: branchId }],
+        closing_audit: [...asRecordArray(initial?.closing_audit), { action: requestedClosingState === 'draft' ? 'draft_saved' : 'closing_finalized', at: new Date().toISOString(), by: user?.email || '', branch_id: branchId }],
         branch_id: branchId,
         // `tenant_id` carries the active organization scope on legacy sales tables.
         tenant_id: tenantId,
@@ -1620,13 +1608,12 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         className={summaryVisibilityClass}
       />
 
-      <div aria-readonly={isProtectedClosing} className={`min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] ${isProtectedClosing ? 'pointer-events-none select-none opacity-80' : ''}`}>
+      <div className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
         <div className="mx-auto w-full max-w-6xl space-y-3 p-3 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:space-y-4 sm:p-4 sm:pb-6">
           <section className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between" aria-label="Closing mode">
             <div><p className="text-xs font-black uppercase tracking-wide text-slate-900">{isQuickClosing ? 'Quick Closing' : 'Advanced Closing'}</p><p className="text-[11px] text-muted-foreground">{isQuickClosing ? 'Complete the essential cash, payment, and reconciliation fields on one screen.' : 'Review source detail, purchases, expenses, and operating results before saving.'}</p></div>
             {canUseAdvancedClosing && <div className="grid grid-cols-2 gap-1 rounded-lg border bg-background p-1" role="group" aria-label="Closing mode"><Button type="button" size="sm" variant={isQuickClosing ? 'default' : 'ghost'} className="min-h-9" aria-pressed={isQuickClosing} aria-label="Switch to Quick Closing" onClick={() => setClosingView('quick')}>Quick</Button><Button type="button" size="sm" variant={!isQuickClosing ? 'default' : 'ghost'} className="min-h-9" aria-pressed={!isQuickClosing} aria-label="Switch to Advanced Closing" onClick={() => setClosingView('advanced')}>Advanced</Button></div>}
           </section>
-          {isProtectedClosing && <div role="status" className={`rounded-xl border p-3 text-sm ${isLocked ? 'border-slate-300 bg-slate-100 text-slate-800' : 'border-amber-300 bg-amber-50 text-amber-900'}`}><p className="font-bold">{isLocked ? 'Closing Locked' : 'Closing Finalized'}</p><p className="mt-1 text-xs font-medium">{isLocked ? 'This closing has been locked and cannot be edited normally.' : 'This finalized closing has posted financial records and cannot be edited normally.'}</p></div>}
           {savedClosing && (
             <div role="status" className={`rounded-xl border p-3 ${savedClosing._alreadyExists ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'}`}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1783,7 +1770,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       <div className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
         <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-2 sm:flex sm:justify-end">
           <Button type="button" variant="outline" className="min-h-12 font-bold sm:w-32" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button>
-          {isProtectedClosing ? <Button type="button" variant="secondary" className="col-span-1 min-h-12 font-bold sm:w-52" onClick={() => onRequestCorrection?.(initial)} disabled={isSubmitting || !canRequestCorrection}><ShieldCheck className="mr-1.5 h-4 w-4" />{canRequestCorrection ? 'Request Correction' : 'Correction Requires Authorization'}</Button> : <><Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button><Button type="submit" className={`min-h-12 font-black sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button>{initial?.id && canLockClosing && <Button type="submit" variant="secondary" className="min-h-12 font-bold sm:w-32" onClick={() => flushSync(() => setRequestedClosingState('locked'))} disabled={isSubmitting || !allValid}>Lock</Button>}</>}
+          <Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button><Button type="submit" className={`min-h-12 font-black sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button>
         </div>
       </div>
       <SalesClosingFieldDialog editor={fieldEditor} onClose={() => setFieldEditor(null)} onSave={saveInlineClosingField} isSaving={isSavingClosingField} />

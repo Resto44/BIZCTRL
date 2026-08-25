@@ -43,10 +43,6 @@ const dailySalesTotal = (sale) =>
 
 const sameScopeValue = (left, right) => String(left || '').trim() === String(right || '').trim();
 const salesClosingCashierId = (record) => record?.cashier_id || record?.cashier_employee_id || record?.manager_user_id || null;
-const salesClosingLifecycleState = (record) => {
-  const state = String(record?.closing_state || 'draft').trim().toLowerCase();
-  return ['draft', 'finalized', 'locked'].includes(state) ? state : 'draft';
-};
 const matchesSalesClosingSession = (record, session) => {
   if (!record || !session) return false;
   const branchMatches = session.branch_id
@@ -174,26 +170,13 @@ export default function Sales() {
     setIsOpeningNewClosing(true);
     try {
       const existing = await findExistingClosingSession(session);
-      const existingState = salesClosingLifecycleState(existing);
-      if (existingState === 'draft') {
-        if (existing) {
-          setNewClosingDefaults(null);
-          setEditing(existing);
-          setShowForm(true);
-          toast.info('Draft already exists for this branch, date, shift, and cashier. Resumed the existing draft closing.');
-          return;
-        }
-      } else if (existing) {
-        // The unique business-period index correctly blocks a second normal
-        // closing. Open the actual protected historical record so the operator
-        // sees its true finalized/locked state and the correction action rather
-        // than treating the attempted New Closing itself as locked.
+      if (existing) {
         setNewClosingDefaults(null);
         setEditing(existing);
         setShowForm(true);
-        toast.info(existingState === 'locked'
-          ? 'Closing already locked for this branch, date, shift, and cashier. The historical closing is open for an authorized correction request.'
-          : 'Closing already finalized for this branch, date, shift, and cashier. The historical closing is open for an authorized correction request.');
+        toast.info(existing.closing_state === 'draft'
+          ? 'Draft already exists for this branch, date, shift, and cashier. Resumed the existing draft closing.'
+          : 'Existing closing opened for normal editing. Save Draft or Finalize Closing when ready.');
         return;
       }
       // Opening is deliberately in-memory until Save Draft or Finalize. This
@@ -778,11 +761,6 @@ export default function Sales() {
     if (activeRestaurant?.id) data.restaurant_id = activeRestaurant.id;
 
     if (editing) {
-      if (editing.closing_state === 'locked' || editing.closing_state === 'finalized') {
-        throw new Error(editing.closing_state === 'locked'
-          ? 'This closing is locked. Request an authorized correction before changing it.'
-          : 'This closing is finalized. Request an authorized correction before changing it.');
-      }
       return updateMut.mutateAsync({ id: editing.id, data, prev: editing, proofUrl, ocr });
     }
 
@@ -812,45 +790,13 @@ export default function Sales() {
     const existing = Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
       .map((record) => [record.id, record])).values())
       .find((record) => matchesSalesClosingSession(record, session)) || null;
-    const existingState = salesClosingLifecycleState(existing);
-    if (existing && existingState === 'draft') {
+    if (existing) {
       return updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });
     }
-    if (existing && (existingState === 'locked' || existingState === 'finalized')) {
-      throw new Error(existingState === 'locked'
-        ? 'This business period is already locked. Open the historical closing to request an authorized correction.'
-        : 'This business period is already finalized. Open the historical closing to request an authorized correction.');
-    }
-    if (existing) return { ...existing, _alreadyExists: true };
 
     return createMut.mutateAsync({ data, proofUrl, ocr });
   };
 
-  const handleRequestCorrection = async (closing) => {
-    if (!closing?.id || !['finalized', 'locked'].includes(closing.closing_state)) {
-      toast.error('Only finalized or locked closings can use the correction workflow.');
-      return;
-    }
-    if (![ROLES.OWNER, ROLES.GENERAL_MANAGER].includes(role)) {
-      toast.error('An Owner or General Manager must request a correction for this protected closing.');
-      return;
-    }
-    try {
-      // The correction request is intentionally a server-authorized RPC rather
-      // than a direct row update. The function validates the authenticated
-      // Owner/General Manager, appends the immutable audit event, and leaves all
-      // financial, identity, and lifecycle fields untouched.
-      const { data, error } = await supabase.rpc('request_daily_sales_closing_correction', {
-        p_closing_id: closing.id,
-      });
-      if (error) throw error;
-      setEditing((current) => current?.id === closing.id ? (data || current) : current);
-      invalidateSalesQueries();
-      toast.success('Authorized correction request recorded. Financial values remain protected until the approved correction workflow is completed.');
-    } catch (error) {
-      toast.error(`Unable to record correction request: ${error?.message || 'Server authorization denied.'}`);
-    }
-  };
 
   const handleExport = ({ format: fmt, from, to, branch }) => {
     const data = sales.filter(s => {
@@ -918,7 +864,6 @@ export default function Sales() {
             onSubmit={handleSave}
             onCancel={() => { setEditing(null); setNewClosingDefaults(null); setShowForm(false); }}
             onNewClosing={openNewClosing}
-            onRequestCorrection={handleRequestCorrection}
             onSessionContextChange={updateClosingSessionContext}
             isOpeningNewClosing={isOpeningNewClosing}
           />

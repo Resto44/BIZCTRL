@@ -145,7 +145,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(sales).toContain(".eq('restaurant_id', data.restaurant_id)");
     expect(sales).toContain(".eq('date', session.date)");
     expect(sales).toContain(".eq('shift', session.shift)");
-    expect(sales).toContain('_alreadyExists: true');
+    expect(sales).toContain('return updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });');
   });
 
   it('clears automatic totals when the closing scope changes and blocks a save when ERP source reads fail', async () => {
@@ -228,62 +228,44 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(migration).toContain('Prevents duplicate Sales Closing sessions by restaurant, branch, date, shift, and cashier');
   });
 
-  it('resumes drafts and opens the actual protected history record when New Closing resolves an existing business period', async () => {
+  it('resumes the matching Draft and opens every existing closing through the normal editable workflow', async () => {
     const sales = await source('../src/pages/Sales.jsx');
 
-    expect(sales).toContain('const salesClosingLifecycleState = (record) => {');
-    expect(sales).toContain("const existingState = salesClosingLifecycleState(existing);");
-    expect(sales).toContain("if (existingState === 'draft') {");
+    expect(sales).toContain('const findExistingClosingSession = useCallback(async (session) => {');
+    expect(sales).toContain('if (existing) {');
     expect(sales).toContain('Draft already exists for this branch, date, shift, and cashier. Resumed the existing draft closing.');
+    expect(sales).toContain('Existing closing opened for normal editing. Save Draft or Finalize Closing when ready.');
     expect(sales).toContain('setEditing(existing);');
-    expect(sales).toContain('setShowForm(true);');
-    expect(sales).toContain('The historical closing is open for an authorized correction request.');
-    expect(sales).not.toContain('A locked closing already exists for this branch, date, shift, and cashier. Open it from history');
     expect(sales).toContain('return updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });');
-    expect(sales).toContain("if (editing.closing_state === 'locked' || editing.closing_state === 'finalized') {");
-    expect(sales).toContain('Request an authorized correction before changing it.');
+    expect(sales).not.toContain('business period is already locked');
+    expect(sales).not.toContain('authorized correction');
   });
 
-  it('renders protected finalized and locked records read-only and replaces ordinary save controls with an authorized correction request', async () => {
+  it('renders editable Save Draft and Finalize controls for Draft, Finalized, and legacy locked records', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
-    expect(workspace).toContain("const isFinalized = initial?.closing_state === 'finalized';");
-    expect(workspace).toContain("const isLocked = initial?.closing_state === 'locked';");
-    expect(workspace).toContain('const isProtectedClosing = Boolean(initial?.id && (isFinalized || isLocked));');
-    expect(workspace).toContain('aria-readonly={isProtectedClosing}');
-    expect(workspace).toContain('pointer-events-none select-none opacity-80');
-    expect(workspace).toContain("{isLocked ? 'Closing Locked' : 'Closing Finalized'}");
-    expect(workspace).toContain('Request Correction');
-    expect(workspace).toContain('onRequestCorrection?.(initial)');
-    expect(workspace).toContain('isProtectedClosing ? <Button');
+    expect(workspace).toContain('Save Draft');
+    expect(workspace).toContain('Finalize Closing');
+    expect(workspace).toContain("setRequestedClosingState('draft')");
+    expect(workspace).toContain("setRequestedClosingState('finalized')");
+    expect(workspace).not.toContain('isProtectedClosing');
+    expect(workspace).not.toContain('Request Correction');
+    expect(workspace).not.toContain('pointer-events-none select-none opacity-80');
+    expect(workspace).not.toContain("setRequestedClosingState('locked')");
   });
 
-  it('uses a server-authorized correction RPC while keeping direct finalized and locked history updates immutable', async () => {
-    const [sales, lifecycleMigration, rpcMigration] = await Promise.all([
-      source('../src/pages/Sales.jsx'),
-      source('../src/supabase/20260825_daily_sales_protected_correction_requests.sql'),
-      source('../src/supabase/20260825_daily_sales_correction_request_rpc.sql'),
+  it('removes lock enforcement and correction-only RPC access at the database boundary while retaining the session uniqueness index', async () => {
+    const [migration, sessionMigration] = await Promise.all([
+      source('../src/supabase/20260825_remove_sales_closing_locks.sql'),
+      source('../src/supabase/20260825_daily_sales_closing_session_idempotency.sql'),
     ]);
 
-    expect(sales).toContain("supabase.rpc('request_daily_sales_closing_correction'");
-    expect(sales).not.toContain('base44.entities.DailySales.update(closing.id, {');
-    expect(sales).toContain('The correction request is intentionally a server-authorized RPC');
-
-    expect(lifecycleMigration).toContain("OLD.closing_state IN ('finalized', 'locked')");
-    expect(lifecycleMigration).toContain('erp_can_manage_workspace_customization(v_restaurant_id)');
-    expect(lifecycleMigration).toContain("(v_new_audit -> (jsonb_array_length(v_new_audit) - 1) ->> 'action') = 'correction_requested'");
-    expect(lifecycleMigration).toContain("current_setting('app.daily_sales_correction_request_id', true) = OLD.id::text");
-    expect(lifecycleMigration).toContain('DAILY_SALES_CLOSING_PROTECTED');
-    expect(lifecycleMigration).toContain('DAILY_SALES_CLOSING_FINALIZATION_REVERT_DENIED');
-
-    expect(rpcMigration).toContain('CREATE OR REPLACE FUNCTION public.request_daily_sales_closing_correction');
-    expect(rpcMigration).toContain('SECURITY DEFINER');
-    expect(rpcMigration).toContain("v_restaurant_id := NULLIF(v_closing.restaurant_id, '')::uuid");
-    expect(rpcMigration).toContain('erp_can_manage_workspace_customization(v_restaurant_id)');
-    expect(rpcMigration).toContain('m.restaurant_id = v_restaurant_id');
-    expect(rpcMigration).toContain("'action', 'correction_requested'");
-    expect(rpcMigration).toContain("set_config('app.daily_sales_correction_request_id', v_closing.id::text, true)");
-    expect(rpcMigration).toContain('GRANT EXECUTE ON FUNCTION public.request_daily_sales_closing_correction(uuid) TO authenticated');
+    expect(migration).toContain('DROP TRIGGER IF EXISTS erp_guard_daily_sales_closing_lifecycle ON public.daily_sales');
+    expect(migration).toContain('DROP FUNCTION IF EXISTS public.request_daily_sales_closing_correction(uuid)');
+    expect(migration).toContain('cashier_id');
+    expect(migration).not.toContain('DAILY_SALES_CLOSING_LOCKED');
+    expect(sessionMigration).toContain('CREATE UNIQUE INDEX IF NOT EXISTS daily_sales_unique_closing_session_idx');
+    expect(sessionMigration).toContain("COALESCE(cashier_id::text, 'legacy:' || lower(btrim(cashier_name)))");
   });
 
   it('enforces the same Draft boundary in database triggers so server-side invoice and cash effects wait for Finalize', async () => {
@@ -293,11 +275,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(migration).toContain('EXECUTE FUNCTION public.fn_daily_sales_generate_invoice_number();');
     expect(migration).toContain('EXECUTE FUNCTION public.fn_daily_sales_sync_invoice();');
     expect(migration).toContain('EXECUTE FUNCTION public.trg_auto_cash_movement_and_recalculate();');
-    expect(migration).toContain("AND OLD.closing_state = 'finalized'");
-    expect(migration).toContain("AND NEW.closing_state = 'draft' THEN");
-    expect(migration).toContain('DAILY_SALES_CLOSING_FINALIZATION_REVERT_DENIED');
-    expect(migration).toContain("NULLIF(OLD.restaurant_id, '')::uuid");
-    expect(migration).toContain("NULLIF(NEW.restaurant_id, '')::uuid");
+    expect(migration).toContain("WHEN (COALESCE(NEW.closing_state, 'finalized') = 'finalized')");
   });
 });
 
