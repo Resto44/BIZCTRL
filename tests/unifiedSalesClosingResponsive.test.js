@@ -253,23 +253,29 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('isProtectedClosing ? <Button');
   });
 
-  it('uses the existing DailySales audit field for correction requests and keeps server-side finalized and locked history immutable', async () => {
-    const [sales, migration] = await Promise.all([
+  it('uses a server-authorized correction RPC while keeping direct finalized and locked history updates immutable', async () => {
+    const [sales, lifecycleMigration, rpcMigration] = await Promise.all([
       source('../src/pages/Sales.jsx'),
       source('../src/supabase/20260825_daily_sales_protected_correction_requests.sql'),
+      source('../src/supabase/20260825_daily_sales_correction_request_rpc.sql'),
     ]);
 
-    expect(sales).toContain("action: 'correction_requested'");
-    expect(sales).toContain('base44.entities.DailySales.update(closing.id, {');
-    expect(sales).toContain('closing_audit: [...audit, event]');
-    expect(sales).toContain('lifecycle trigger is the authority that accepts or rejects the request.');
+    expect(sales).toContain("supabase.rpc('request_daily_sales_closing_correction'");
+    expect(sales).not.toContain('base44.entities.DailySales.update(closing.id, {');
+    expect(sales).toContain('The correction request is intentionally a server-authorized RPC');
 
-    expect(migration).toContain("OLD.closing_state IN ('finalized', 'locked')");
-    expect(migration).toContain('erp_can_manage_workspace_customization(v_restaurant_id)');
-    expect(migration).toContain("(v_new_audit -> (jsonb_array_length(v_new_audit) - 1) ->> 'action') = 'correction_requested'");
-    expect(migration).toContain("to_jsonb(NEW) - ARRAY['closing_audit', 'updated_date']");
-    expect(migration).toContain('DAILY_SALES_CLOSING_PROTECTED');
-    expect(migration).toContain('DAILY_SALES_CLOSING_FINALIZATION_REVERT_DENIED');
+    expect(lifecycleMigration).toContain("OLD.closing_state IN ('finalized', 'locked')");
+    expect(lifecycleMigration).toContain('erp_can_manage_workspace_customization(v_restaurant_id)');
+    expect(lifecycleMigration).toContain("(v_new_audit -> (jsonb_array_length(v_new_audit) - 1) ->> 'action') = 'correction_requested'");
+    expect(lifecycleMigration).toContain("to_jsonb(NEW) - ARRAY['closing_audit', 'updated_date']");
+    expect(lifecycleMigration).toContain('DAILY_SALES_CLOSING_PROTECTED');
+    expect(lifecycleMigration).toContain('DAILY_SALES_CLOSING_FINALIZATION_REVERT_DENIED');
+
+    expect(rpcMigration).toContain('CREATE OR REPLACE FUNCTION public.request_daily_sales_closing_correction');
+    expect(rpcMigration).toContain('SECURITY DEFINER');
+    expect(rpcMigration).toContain('erp_can_manage_workspace_customization(v_closing.restaurant_id)');
+    expect(rpcMigration).toContain("'action', 'correction_requested'");
+    expect(rpcMigration).toContain('GRANT EXECUTE ON FUNCTION public.request_daily_sales_closing_correction(uuid) TO authenticated');
   });
 
   it('enforces the same Draft boundary in database triggers so server-side invoice and cash effects wait for Finalize', async () => {

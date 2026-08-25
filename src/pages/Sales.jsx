@@ -824,22 +824,16 @@ export default function Sales() {
       toast.error('An Owner or General Manager must request a correction for this protected closing.');
       return;
     }
-    const audit = Array.isArray(closing.closing_audit) ? closing.closing_audit : [];
-    const event = {
-      action: 'correction_requested',
-      requested_at: new Date().toISOString(),
-      requested_by: user?.email || null,
-      closing_state: closing.closing_state,
-    };
     try {
-      // This remains a normal, tenant-scoped DailySales update. The database
-      // lifecycle trigger is the authority that accepts or rejects the request.
-      await base44.entities.DailySales.update(closing.id, {
-        closing_audit: [...audit, event],
+      // The correction request is intentionally a server-authorized RPC rather
+      // than a direct row update. The function validates the authenticated
+      // Owner/General Manager, appends the immutable audit event, and leaves all
+      // financial, identity, and lifecycle fields untouched.
+      const { data, error } = await supabase.rpc('request_daily_sales_closing_correction', {
+        p_closing_id: closing.id,
       });
-      setEditing((current) => current?.id === closing.id
-        ? { ...current, closing_audit: [...audit, event] }
-        : current);
+      if (error) throw error;
+      setEditing((current) => current?.id === closing.id ? (data || current) : current);
       invalidateSalesQueries();
       toast.success('Authorized correction request recorded. Financial values remain protected until the approved correction workflow is completed.');
     } catch (error) {
