@@ -122,10 +122,14 @@ describe('Unified Sales Closing workflow contract', () => {
   });
 
   it('uses accessible numeric inputs, stable currency presentation and a non-obstructive sticky action area', async () => {
-    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+    const [workspace, numericInput] = await Promise.all([
+      source('../src/components/sales/UnifiedSalesClosing.jsx'),
+      source('../src/components/sales/ClosingNumericInput.jsx'),
+    ]);
 
-    expect(workspace).toContain('inputMode="decimal"');
-    expect(workspace).toContain('dir="ltr"');
+    expect(numericInput).toContain('inputMode="decimal"');
+    expect(numericInput).toContain('dir="ltr"');
+    expect(workspace).toContain("import ClosingNumericInput from '@/components/sales/ClosingNumericInput';");
     expect(workspace).toContain('tabular-nums');
     expect(workspace).toContain('whitespace-nowrap');
     expect(workspace).toContain('className="border-t border-border bg-background/95');
@@ -143,10 +147,9 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain("nextErrors.actualCash = 'Actual Cash is required.'");
     expect(workspace).toContain('focusField(firstError)');
     expect(workspace).toContain('Closing already completed for this branch and shift.');
-    expect(sales).toContain(".eq('restaurant_id', data.restaurant_id)");
-    expect(sales).toContain(".eq('date', session.date)");
-    expect(sales).toContain(".eq('shift', session.shift)");
-    expect(sales).toContain('return updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });');
+    expect(sales).toContain("import { saveClosingSession } from '@/lib/closing/ClosingRepository';");
+    expect(sales).toContain('const saved = await saveClosingSession({ payload, closingId: editing?.id || null });');
+    expect(sales).toContain('await runClosingFinalizationSideEffects(payload, saved, editing, proofUrl, ocr);');
   });
 
   it('clears automatic totals when the closing scope changes and blocks a save when ERP source reads fail', async () => {
@@ -237,7 +240,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(sales).toContain('Draft already exists for this branch, date, shift, and cashier. Resumed the existing draft closing.');
     expect(sales).toContain('Existing closing opened for normal editing. Save Draft or Finalize Closing when ready.');
     expect(sales).toContain('setEditing(existing);');
-    expect(sales).toContain('return updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });');
+    expect(sales).toContain("import { saveClosingSession } from '@/lib/closing/ClosingRepository';");
+    expect(sales).toContain('const saved = await saveClosingSession({ payload, closingId: editing?.id || null });');
     expect(sales).not.toContain('business period is already locked');
     expect(sales).not.toContain('authorized correction');
   });
@@ -350,7 +354,8 @@ describe('Sales source daily and historical balance contract', () => {
     expect(workspace).toContain('value={todayInput}');
     expect(workspace).toContain("onChange={onChange}");
     expect(workspace).toContain('const [customSourceAmounts, setCustomSourceAmounts] = useState(() => {');
-    expect(workspace).toContain("inputMode=\"decimal\"");
+    expect(workspace).toContain("import ClosingNumericInput from '@/components/sales/ClosingNumericInput';");
+    expect(workspace).toContain('export const NumInput = ClosingNumericInput;');
   });
 });
 

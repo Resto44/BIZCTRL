@@ -32,6 +32,7 @@ import {
   generateAndUploadPDF,
 } from '@/lib/salesInvoiceService';
 import { filterDailySalesRecords, toDailySalesCardRecord } from '@/lib/dailySalesPresentation';
+import { saveClosingSession } from '@/lib/closing/ClosingRepository';
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const firstRecord = (value) => asRecordArray(value).at(0) || null;
@@ -756,45 +757,58 @@ export default function Sales() {
     }
   }, [selectedIds.size, filtered]);
 
+  const runClosingFinalizationSideEffects = useCallback(async (saleData, savedClosing, previousClosing, proofUrl, ocr) => {
+    // The database has already committed the finalization. Run legacy downstream
+    // integrations only for the one successful state transition, never for an
+    // idempotent retry or an ordinary draft save.
+    if (!savedClosing?._finalizedTransition || savedClosing?._idempotent) return;
+
+    try {
+      const invoiceNum = saleData.invoice_number || await generateSalesInvoiceNumber(saleData.restaurant_id, saleData.date);
+      await createSalesInvoice({
+        invoiceNumber: invoiceNum,
+        saleId: savedClosing.id,
+        saleData: savedClosing,
+        restaurantId: saleData.restaurant_id,
+        createdBy: saleData.created_by || user?.email,
+      });
+    } catch (error) {
+      console.warn('[Sales] Closing invoice creation failed after finalization:', error?.message || error);
+    }
+
+    const sideEffects = [
+      autoWalletTx(savedClosing, savedClosing.id, previousClosing),
+      autoShortageOveageTx(savedClosing, savedClosing.id),
+      autoOwnerCapitalTx(savedClosing, savedClosing.id),
+      autoSettle(savedClosing, savedClosing.id, proofUrl || null, ocr || null, previousClosing),
+      autoSaveCreditDebts(savedClosing, savedClosing.id),
+    ];
+    const outcomes = await Promise.allSettled(sideEffects);
+    outcomes.forEach((outcome) => {
+      if (outcome.status === 'rejected') console.warn('[Sales] Closing finalization side effect failed:', outcome.reason?.message || outcome.reason);
+    });
+
+    autoGenerateInvoice(savedClosing, savedClosing.id);
+    try {
+      await notif.sale({ branch: savedClosing.branch, amount: dailySalesTotal(savedClosing), action: previousClosing ? 'update' : 'create' });
+    } catch (error) {
+      console.warn('[Sales] Closing finalization notification failed:', error?.message || error);
+    }
+  }, [autoSettle, notif, user?.email]);
+
   const handleSave = async (data, proofUrl, ocr) => {
-    // Ensure restaurant_id is included for correct scoping in Cash Register Center.
-    if (activeRestaurant?.id) data.restaurant_id = activeRestaurant.id;
-
-    if (editing) {
-      return updateMut.mutateAsync({ id: editing.id, data, prev: editing, proofUrl, ocr });
-    }
-
-    // A finalized closing is unique per restaurant, branch, date and shift. The
-    // application checks both canonical and legacy branch rows before creating
-    // side effects; the database constraint is the final concurrency safeguard.
-    const session = {
-      date: data.date,
-      branch: data.branch,
-      branch_id: data.branch_id || null,
-      shift: data.shift,
-      cashier_id: data.cashier_id || data.cashier_employee_id || null,
-      cashier_name: data.cashier_name || '',
+    const payload = {
+      ...data,
+      restaurant_id: activeRestaurant?.id || data.restaurant_id,
+      // The transactional server path uses this explicit raw count. `closing_cash`
+      // remains a legacy derived field and is never trusted as an input.
+      actual_cash: data.actual_cash ?? data.actualCash ?? null,
     };
-    const baseQuery = () => supabase
-      .from('daily_sales')
-      .select('*')
-      .eq('restaurant_id', data.restaurant_id)
-      .eq('date', session.date)
-      .eq('shift', session.shift)
-      .limit(50);
-    const [canonical, legacy] = await Promise.all([
-      data.branch_id ? baseQuery().eq('branch_id', data.branch_id) : Promise.resolve({ data: [], error: null }),
-      baseQuery().is('branch_id', null).eq('branch', data.branch),
-    ]);
-    if (canonical.error || legacy.error) throw canonical.error || legacy.error;
-    const existing = Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
-      .map((record) => [record.id, record])).values())
-      .find((record) => matchesSalesClosingSession(record, session)) || null;
-    if (existing) {
-      return updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });
-    }
-
-    return createMut.mutateAsync({ data, proofUrl, ocr });
+    const saved = await saveClosingSession({ payload, closingId: editing?.id || null });
+    await runClosingFinalizationSideEffects(payload, saved, editing, proofUrl, ocr);
+    setEditing(saved);
+    invalidateSalesQueries();
+    return saved;
   };
 
 
