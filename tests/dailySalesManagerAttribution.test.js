@@ -73,6 +73,27 @@ describe('Daily Sales manager attribution', () => {
     expect(sql).toContain('Driver-specific information remains available only in Driver Management and');
   });
 
+  it('does not count a saved source snapshot again after its amount is classified into a canonical payment bucket', async () => {
+    const card = await readFile(cardPath, 'utf8');
+    const sourceClassifiedCashSale = {
+      id: 'source-classified-cash',
+      date: '2026-10-01',
+      branch: 'north',
+      restaurant_cash: 250,
+      restaurant_network: 0,
+      credit: 0,
+      custom_sources_total: 0,
+      sales_sources_json: JSON.stringify([{ source_id: 'cash-source', amount: 250, payment_bucket: 'cash' }]),
+    };
+
+    expect(filterDailySalesRecords([sourceClassifiedCashSale], { branch: 'north', from: '', to: '', minTotal: '250', maxTotal: '250' }))
+      .toHaveLength(1);
+    expect(filterDailySalesRecords([sourceClassifiedCashSale], { branch: 'north', from: '', to: '', minTotal: '251', maxTotal: '' }))
+      .toHaveLength(0);
+    expect(card).toContain('const customSourcesTotal = Math.max(0, Number(sale.custom_sources_total) || 0);');
+    expect(card).not.toContain('JSON.parse(sale.sales_sources_json)');
+  });
+
   it('filters historical records by branch and renders each manager without driver attribution', () => {
     const sales = [
       { id: 'manager-one-history', date: '2026-08-12', branch: 'north', restaurant_cash: 100, restaurant_network: 20, credit: 5, custom_sources_total: 0, manager_name: 'Manager One', driver_name: 'Hidden Driver' },

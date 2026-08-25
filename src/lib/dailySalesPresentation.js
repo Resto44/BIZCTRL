@@ -16,16 +16,11 @@ export const toDailySalesCardRecord = (sale) => ({
   created_by: sale.created_by,
 });
 
-const customSourceTotal = (sale) => {
-  if (Number(sale.custom_sources_total) > 0) return Number(sale.custom_sources_total);
-  if (!sale.sales_sources_json) return 0;
-  try {
-    const entries = JSON.parse(sale.sales_sources_json);
-    return Array.isArray(entries) ? entries.reduce((sum, entry) => sum + (Number(entry?.amount) || 0), 0) : 0;
-  } catch {
-    return 0;
-  }
-};
+// Source snapshots explain the saved payment buckets; they are not an extra
+// revenue bucket. Cash, network, and credit source amounts are already folded
+// into their canonical columns, while only an explicit other bucket belongs in
+// custom_sources_total.
+const customSourceTotal = (sale) => Math.max(0, Number(sale?.custom_sources_total) || 0);
 
 export const filterDailySalesRecords = (sales, filters) => sales.filter((sale) => {
   if (!sale?.date) return false;

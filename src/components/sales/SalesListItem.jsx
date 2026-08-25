@@ -23,21 +23,10 @@ export default function SalesListItem({ sale, record = sale, onEdit, onDelete, s
   const rNet  = Number(sale.restaurant_network ?? sale.network ?? 0);
   const credit = Number(sale.credit) || 0;
 
-  // Include additional sales sources in the grand total
-  const customSourcesTotal = (() => {
-    // Prefer the pre-computed column when available
-    if (Number(sale.custom_sources_total) > 0) return Number(sale.custom_sources_total);
-    // Otherwise parse the JSON snapshot
-    if (sale.sales_sources_json) {
-      try {
-        const entries = JSON.parse(sale.sales_sources_json);
-        if (Array.isArray(entries)) {
-          return entries.reduce((s, e) => s + (Number(e?.amount) || 0), 0);
-        }
-      } catch { /* ignore */ }
-    }
-    return 0;
-  })();
+  // Source snapshots describe the amounts already classified into cash,
+  // network, credit, or the explicit Other bucket on this saved closing. Never
+  // add the snapshot again to the record total.
+  const customSourcesTotal = Math.max(0, Number(sale.custom_sources_total) || 0);
 
   const total = rCash + rNet + credit + customSourcesTotal;
   const branchLabel = branches.find(b => b.key === sale.branch)?.label || sale.branch;
