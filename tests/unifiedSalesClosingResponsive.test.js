@@ -147,7 +147,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain("nextErrors.actualCash = 'Actual Cash is required.'");
     expect(workspace).toContain('focusField(firstError)');
     expect(workspace).toContain('Closing already completed for this branch and shift.');
-    expect(sales).toContain("import { saveClosingSession } from '@/lib/closing/ClosingRepository';");
+    expect(sales).toContain("import { closingSaveErrorMessage, requestClosingCorrection, saveClosingSession } from '@/lib/closing/ClosingRepository';");
     expect(sales).toContain('const saved = await saveClosingSession({ payload, closingId: editing?.id || null });');
     expect(sales).toContain('await runClosingFinalizationSideEffects(payload, saved, editing, proofUrl, ocr);');
   });
@@ -165,32 +165,15 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || !allValid}');
   });
 
-  it('persists Drafts without producing invoice, wallet, settlement, debt, or notification side effects before Finalize', async () => {
+  it('runs financial side effects only for the one committed finalized transition, never for a draft save', async () => {
     const sales = await source('../src/pages/Sales.jsx');
 
-    expect(sales).toContain("const shouldRunFinalizationSideEffects = (saleData) => saleData?.closing_state === 'finalized';");
-    expect((sales.match(/if \(shouldRunFinalizationSideEffects\(data\)\)/g) || []).length).toBe(2);
-    expect(sales).toContain('Draft saved without finalized financial side-effects.');
-
-    const createGuard = sales.indexOf('if (shouldRunFinalizationSideEffects(data))');
-    const createInvoice = sales.indexOf('await createSalesInvoice');
-    const createWallet = sales.indexOf('await autoWalletTx(data, saleId)');
-    const createSettlement = sales.indexOf('await autoSettle(data, saleId');
-    const createDebt = sales.indexOf('await autoSaveCreditDebts(data, saleId)');
-    expect(createGuard).toBeGreaterThan(-1);
-    expect(createInvoice).toBeGreaterThan(createGuard);
-    expect(createWallet).toBeGreaterThan(createGuard);
-    expect(createSettlement).toBeGreaterThan(createGuard);
-    expect(createDebt).toBeGreaterThan(createGuard);
-
-    const updateGuard = sales.indexOf('if (shouldRunFinalizationSideEffects(data))', createGuard + 1);
-    const updateWallet = sales.indexOf('await autoWalletTx(data, id, prev)');
-    const updateSettlement = sales.indexOf('await autoSettle(data, id');
-    const updateDebt = sales.indexOf('await autoSaveCreditDebts(data, id)');
-    expect(updateGuard).toBeGreaterThan(createGuard);
-    expect(updateWallet).toBeGreaterThan(updateGuard);
-    expect(updateSettlement).toBeGreaterThan(updateGuard);
-    expect(updateDebt).toBeGreaterThan(updateGuard);
+    expect(sales).toContain('if (!savedClosing?._finalizedTransition || savedClosing?._idempotent) return;');
+    const guard = sales.indexOf('if (!savedClosing?._finalizedTransition || savedClosing?._idempotent) return;');
+    expect(sales.indexOf('await createSalesInvoice')).toBeGreaterThan(guard);
+    expect(sales.indexOf('autoWalletTx(savedClosing, savedClosing.id, previousClosing)')).toBeGreaterThan(guard);
+    expect(sales.indexOf('autoSettle(savedClosing, savedClosing.id, proofUrl || null, ocr || null, previousClosing)')).toBeGreaterThan(guard);
+    expect(sales.indexOf('autoSaveCreditDebts(savedClosing, savedClosing.id)')).toBeGreaterThan(guard);
   });
 
   it('keeps finalized invoice totals aligned with the canonical Other payment total', async () => {
@@ -207,7 +190,7 @@ describe('Unified Sales Closing workflow contract', () => {
     const [workspace, sales, migration] = await Promise.all([
       source('../src/components/sales/UnifiedSalesClosing.jsx'),
       source('../src/pages/Sales.jsx'),
-      source('../src/supabase/20260825_daily_sales_closing_session_idempotency.sql'),
+      source('../src/supabase/20260827_sales_closing_draft_lifecycle.sql'),
     ]);
 
     expect(workspace).toContain("const [closingView, setClosingView] = useState('quick');");
@@ -226,51 +209,49 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(sales).toContain('matchesSalesClosingSession(record, session)');
     expect(sales).toContain('disabled={isOpeningNewClosing}');
 
-    expect(migration).toContain('CREATE UNIQUE INDEX IF NOT EXISTS daily_sales_unique_closing_session_idx');
+    expect(migration).toContain('CREATE UNIQUE INDEX daily_sales_unique_closing_session_idx');
     expect(migration).toContain("COALESCE(branch_id::text, 'legacy:' || lower(btrim(branch)))");
     expect(migration).toContain("COALESCE(cashier_id::text, 'legacy:' || lower(btrim(cashier_name)))");
-    expect(migration).toContain('Prevents duplicate Sales Closing sessions by restaurant, branch, date, shift, and cashier');
+    expect(migration).toContain("WHERE closing_state IN ('draft', 'ready')");
   });
 
-  it('resumes the matching Draft and opens every existing closing through the normal editable workflow', async () => {
+  it('resumes only the matching active Draft while historical Closing rows stay in review and correction workflow', async () => {
     const sales = await source('../src/pages/Sales.jsx');
 
     expect(sales).toContain('const findExistingClosingSession = useCallback(async (session) => {');
-    expect(sales).toContain('if (existing) {');
+    expect(sales).toContain("if (existing && ['draft', 'ready'].includes(existing.closing_state || 'draft')) {");
     expect(sales).toContain('Draft already exists for this branch, date, shift, and cashier. Resumed the existing draft closing.');
-    expect(sales).toContain('Existing closing opened for normal editing. Save Draft or Finalize Closing when ready.');
+    expect(sales).toContain('const handleRequestCorrection = async () => {');
+    expect(sales).toContain('Correction request submitted for authorized review.');
     expect(sales).toContain('setEditing(existing);');
-    expect(sales).toContain("import { saveClosingSession } from '@/lib/closing/ClosingRepository';");
+    expect(sales).toContain("import { closingSaveErrorMessage, requestClosingCorrection, saveClosingSession } from '@/lib/closing/ClosingRepository';");
     expect(sales).toContain('const saved = await saveClosingSession({ payload, closingId: editing?.id || null });');
     expect(sales).not.toContain('business period is already locked');
-    expect(sales).not.toContain('authorized correction');
+    expect(sales).toContain('authorized correction');
   });
 
-  it('renders editable Save Draft and Finalize controls for Draft, Finalized, and legacy locked records', async () => {
+  it('renders Save Draft and Finalize for active drafts and a correction action for protected history', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
     expect(workspace).toContain('Save Draft');
     expect(workspace).toContain('Finalize Closing');
     expect(workspace).toContain("setRequestedClosingState('draft')");
     expect(workspace).toContain("setRequestedClosingState('finalized')");
-    expect(workspace).not.toContain('isProtectedClosing');
-    expect(workspace).not.toContain('Request Correction');
+    expect(workspace).toContain('isProtectedClosing');
+    expect(workspace).toContain('Request Correction');
+    expect(workspace).toContain('Historical financial values are protected.');
     expect(workspace).not.toContain('pointer-events-none select-none opacity-80');
     expect(workspace).not.toContain("setRequestedClosingState('locked')");
   });
 
-  it('removes lock enforcement and correction-only RPC access at the database boundary while retaining the session uniqueness index', async () => {
-    const [migration, sessionMigration] = await Promise.all([
-      source('../src/supabase/20260825_remove_sales_closing_locks.sql'),
-      source('../src/supabase/20260825_daily_sales_closing_session_idempotency.sql'),
-    ]);
+  it('keeps one authoritative server-side draft and correction lifecycle at the database boundary', async () => {
+    const migration = await source('../src/supabase/20260827_sales_closing_draft_lifecycle.sql');
 
-    expect(migration).toContain('DROP TRIGGER IF EXISTS erp_guard_daily_sales_closing_lifecycle ON public.daily_sales');
-    expect(migration).toContain('DROP FUNCTION IF EXISTS public.request_daily_sales_closing_correction(uuid)');
-    expect(migration).toContain('cashier_id');
-    expect(migration).not.toContain('DAILY_SALES_CLOSING_LOCKED');
-    expect(sessionMigration).toContain('CREATE UNIQUE INDEX IF NOT EXISTS daily_sales_unique_closing_session_idx');
-    expect(sessionMigration).toContain("COALESCE(cashier_id::text, 'legacy:' || lower(btrim(cashier_name)))");
+    expect(migration).toContain('CREATE OR REPLACE FUNCTION public.erp_guard_sales_closing_history()');
+    expect(migration).toContain("'requires_correction', true");
+    expect(migration).toContain("'lifecycle_action', 'correction_required'");
+    expect(migration).toContain('CREATE OR REPLACE FUNCTION public.erp_prevent_duplicate_daily_closing()');
+    expect(migration).toContain("WHERE existing_closing.closing_state IN ('draft', 'ready')");
   });
 
   it('enforces the same Draft boundary in database triggers so server-side invoice and cash effects wait for Finalize', async () => {

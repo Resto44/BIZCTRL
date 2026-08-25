@@ -1,5 +1,6 @@
 export const toDailySalesCardRecord = (sale) => ({
   id: sale.id,
+  closing_state: sale.closing_state || 'finalized',
   date: sale.date,
   branch: sale.branch,
   branch_id: sale.branch_id,

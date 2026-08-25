@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -32,7 +32,7 @@ import {
   generateAndUploadPDF,
 } from '@/lib/salesInvoiceService';
 import { filterDailySalesRecords, toDailySalesCardRecord } from '@/lib/dailySalesPresentation';
-import { saveClosingSession } from '@/lib/closing/ClosingRepository';
+import { closingSaveErrorMessage, requestClosingCorrection, saveClosingSession } from '@/lib/closing/ClosingRepository';
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const firstRecord = (value) => asRecordArray(value).at(0) || null;
@@ -58,10 +58,6 @@ const matchesSalesClosingSession = (record, session) => {
     && sameScopeValue(record.shift, session.shift)
     && cashierMatches;
 };
-
-// Drafts are work-in-progress records. Financial integrations are deliberately
-// deferred until the closing enters its explicit finalized lifecycle state.
-const shouldRunFinalizationSideEffects = (saleData) => saleData?.closing_state === 'finalized';
 
 export default function Sales() {
   const { t, currency, lang, dir, translateLiteral } = useLanguage();
@@ -171,13 +167,11 @@ export default function Sales() {
     setIsOpeningNewClosing(true);
     try {
       const existing = await findExistingClosingSession(session);
-      if (existing) {
+      if (existing && ['draft', 'ready'].includes(existing.closing_state || 'draft')) {
         setNewClosingDefaults(null);
         setEditing(existing);
         setShowForm(true);
-        toast.info(existing.closing_state === 'draft'
-          ? 'Draft already exists for this branch, date, shift, and cashier. Resumed the existing draft closing.'
-          : 'Existing closing opened for normal editing. Save Draft or Finalize Closing when ready.');
+        toast.info('Draft already exists for this branch, date, shift, and cashier. Resumed the existing draft closing.');
         return;
       }
       // Opening is deliberately in-memory until Save Draft or Finalize. This
@@ -554,190 +548,9 @@ export default function Sales() {
     }
   };
 
-  const createMut = useMutation({
-    mutationFn: async ({ data, proofUrl, ocr }) => {
-      console.log('[Sales:createMut] mutationFn started');
-      if (isDriverSale(data) && !canManageDriverSales) {
-        throw new Error('Only the restaurant Owner or assigned Branch Manager can create a Driver Sale.');
-      }
-      // ── TRANSACTION-LIKE WORKFLOW (Requirement 5) ──
-      // 1. Insert parent Sale record first (Requirement 2)
-      console.log('[Sales:createMut] 1. Inserting daily_sales...');
-      const sale = await base44.entities.DailySales.create(data);
-      if (!sale?.id) {
-        console.error('[Sales:createMut] FAILED: No sale ID returned');
-        throw new Error('Failed to create sale record');
-      }
-      console.log('[Sales:createMut] SUCCESS: daily_sales created, ID:', sale.id);
-
-      // 2. Wait for the returned Sale ID (Requirement 3)
-      const saleId = sale.id;
-
-      if (shouldRunFinalizationSideEffects(data)) {
-        // Finalization is the only lifecycle transition that creates financial
-        // integrations from this closing.
-        console.log('[Sales:createMut] 3. Creating sales_invoice...');
-        try {
-          const invoiceNum = data.invoice_number || await generateSalesInvoiceNumber(data.restaurant_id, data.date);
-          await createSalesInvoice({
-            invoiceNumber: invoiceNum,
-            saleId,
-            saleData: data,
-            restaurantId: data.restaurant_id,
-            createdBy: data.created_by || user?.email,
-          });
-          console.log('[Sales:createMut] SUCCESS: sales_invoice created');
-        } catch (invErr) {
-          console.warn('[Sales:createMut] SKIPPED: Manual invoice creation failed:', invErr.message);
-        }
-
-        console.log('[Sales:createMut] 4. Running finalized side-effects...');
-        try { await autoWalletTx(data, saleId); } catch (e) { console.error('[Sales:createMut] FAILED: autoWalletTx:', e.message); }
-        try { await autoShortageOveageTx(data, saleId); } catch (e) { console.error('[Sales:createMut] FAILED: autoShortageOveageTx:', e.message); }
-        try { await autoOwnerCapitalTx(data, saleId); } catch (e) { console.error('[Sales:createMut] FAILED: autoOwnerCapitalTx:', e.message); }
-        try { await autoSettle(data, saleId, proofUrl || null, ocr || null, null); } catch (e) { console.warn('[Sales:createMut] SKIPPED: autoSettle:', e.message); }
-        try { await autoSaveCreditDebts(data, saleId); } catch (e) { console.error('[Sales:createMut] FAILED: autoSaveCreditDebts:', e.message); }
-
-        // Finalize invoice (PDF generation etc) — silent background task.
-        autoGenerateInvoice(data, saleId);
-        const total = dailySalesTotal(data);
-        try {
-          await notif.sale({ branch: data.branch, amount: total, action: 'create' });
-        } catch (e) {
-          console.warn('[Sales:createMut] SKIPPED: notification failed:', e.message);
-        }
-      } else {
-        console.log('[Sales:createMut] Draft saved without finalized financial side-effects.');
-      }
-      
-      console.log('[Sales:createMut] mutationFn COMPLETED');
-      return sale;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sales'] });
-      qc.invalidateQueries({ queryKey: ['sales_cash'] });
-      qc.invalidateQueries({ queryKey: ['sales_daily'] });
-      qc.invalidateQueries({ queryKey: ['sales_today'] });
-      qc.invalidateQueries({ queryKey: ['sales_month'] });
-      qc.invalidateQueries({ queryKey: ['sales_yesterday'] });
-      qc.invalidateQueries({ queryKey: ['sales_week'] });
-      qc.invalidateQueries({ queryKey: ['sales_prev_week'] });
-      qc.invalidateQueries({ queryKey: ['sales_prev_month'] });
-      // Live Sales Summary keys
-      qc.invalidateQueries({ queryKey: ['sales_today_live'] });
-      qc.invalidateQueries({ queryKey: ['sales_yesterday_live'] });
-      qc.invalidateQueries({ queryKey: ['sales_month_live'] });
-      // Dashboard keys
-      qc.invalidateQueries({ queryKey: ['supplier_invoices_dash'] });
-      qc.invalidateQueries({ queryKey: ['debts_customer_dash'] });
-      qc.invalidateQueries({ queryKey: ['settlements_all'] });
-      qc.invalidateQueries({ queryKey: ['settlements_mgr'] });
-      qc.invalidateQueries({ queryKey: ['wallet_transactions'] });
-      qc.invalidateQueries({ queryKey: ['wallet_transactions_dash'] });
-      qc.invalidateQueries({ queryKey: ['sales_sources'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
-      qc.invalidateQueries({ queryKey: ['reports'] });
-      qc.invalidateQueries({ queryKey: ['driver-sales'] });
-      qc.invalidateQueries({ queryKey: ['driver-performance'] });
-    },
-  });
-
-  const updateMut = useMutation({
-    mutationFn: async ({ id, data, prev, proofUrl, ocr }) => {
-      if ((isDriverSale(prev) || isDriverSale(data)) && !canManageDriverSales) {
-        throw new Error('Only the restaurant Owner or assigned Branch Manager can edit a Driver Sale.');
-      }
-      const sale = await base44.entities.DailySales.update(id, data);
-      if (shouldRunFinalizationSideEffects(data)) {
-        await autoWalletTx(data, id, prev);
-        // Update treasury transaction for approved shortage/overage.
-        await autoShortageOveageTx(data, id);
-        // Update Owner Capital Contribution treasury entry if purchases exceed sales.
-        await autoOwnerCapitalTx(data, id);
-        try { await autoSettle(data, id, proofUrl || null, ocr || null, prev); } catch (e) { console.warn('autoSettle skipped:', e.message); }
-        // Debt Management remains the single source of truth for finalized credit sales.
-        await autoSaveCreditDebts(data, id);
-        // Re-generate invoice on finalization/update — silent background task.
-        autoGenerateInvoice({ ...data, invoice_number: prev?.invoice_number }, id);
-        const total = (data.restaurant_cash || 0) + (data.restaurant_network || 0) + (data.credit || 0);
-        await notif.sale({ branch: data.branch, amount: total, action: 'update' });
-      } else {
-        console.log('[Sales:updateMut] Draft saved without finalized financial side-effects.');
-      }
-      return sale;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sales'] });
-      qc.invalidateQueries({ queryKey: ['sales_cash'] });
-      qc.invalidateQueries({ queryKey: ['sales_daily'] });
-      qc.invalidateQueries({ queryKey: ['sales_today'] });
-      qc.invalidateQueries({ queryKey: ['sales_month'] });
-      qc.invalidateQueries({ queryKey: ['sales_yesterday'] });
-      qc.invalidateQueries({ queryKey: ['sales_week'] });
-      // Live Sales Summary keys
-      qc.invalidateQueries({ queryKey: ['sales_today_live'] });
-      qc.invalidateQueries({ queryKey: ['sales_yesterday_live'] });
-      qc.invalidateQueries({ queryKey: ['sales_month_live'] });
-      // Dashboard keys
-      qc.invalidateQueries({ queryKey: ['supplier_invoices_dash'] });
-      qc.invalidateQueries({ queryKey: ['debts_customer_dash'] });
-      qc.invalidateQueries({ queryKey: ['settlements_all'] });
-      qc.invalidateQueries({ queryKey: ['settlements_mgr'] });
-      qc.invalidateQueries({ queryKey: ['wallet_transactions_dash'] });
-      qc.invalidateQueries({ queryKey: ['sales_sources'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
-      qc.invalidateQueries({ queryKey: ['reports'] });
-      qc.invalidateQueries({ queryKey: ['driver-sales'] });
-      qc.invalidateQueries({ queryKey: ['driver-performance'] });
-    },
-  });
-
-  const invalidateSalesQueries = useCallback(() => {
-    qc.invalidateQueries({ queryKey: ['sales'] });
-    qc.invalidateQueries({ queryKey: ['sales_today'] });
-    qc.invalidateQueries({ queryKey: ['sales_month'] });
-    qc.invalidateQueries({ queryKey: ['sales_yesterday'] });
-    qc.invalidateQueries({ queryKey: ['sales_week'] });
-    qc.invalidateQueries({ queryKey: ['sales_today_live'] });
-    qc.invalidateQueries({ queryKey: ['sales_yesterday_live'] });
-    qc.invalidateQueries({ queryKey: ['sales_month_live'] });
-    qc.invalidateQueries({ queryKey: ['sales_sources'] });
-    qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
-    qc.invalidateQueries({ queryKey: ['reports'] });
-    qc.invalidateQueries({ queryKey: ['wallet_transactions'] });
-    qc.invalidateQueries({ queryKey: ['supplier_invoices_dash'] });
-    qc.invalidateQueries({ queryKey: ['driver-sales'] });
-    qc.invalidateQueries({ queryKey: ['driver-performance'] });
-  }, [qc]);
-
-  const deleteMut = useMutation({
-    mutationFn: async (sale) => {
-      if (isDriverSale(sale) && !canManageDriverSales) {
-        throw new Error('Only the restaurant Owner or assigned Branch Manager can delete a Driver Sale.');
-      }
-      await base44.entities.DailySales.delete(sale.id);
-      await notif.sale({ branch: sale.branch, action: 'delete' });
-    },
-    onSuccess: () => {
-      invalidateSalesQueries();
-      setDeleting(null);
-    },
-  });
-
-  const bulkDeleteMut = useMutation({
-    mutationFn: async (ids) => {
-      const selectedSales = sales.filter((sale) => ids.includes(sale.id));
-      if (selectedSales.some(isDriverSale) && !canManageDriverSales) {
-        throw new Error('Only the restaurant Owner or assigned Branch Manager can delete Driver Sales.');
-      }
-      await Promise.all(ids.map(id => base44.entities.DailySales.delete(id)));
-    },
-    onSuccess: () => {
-      invalidateSalesQueries();
-      setSelectedIds(new Set());
-      setBulkDeleting(false);
-    },
-  });
+  // All Sales Closing persistence is intentionally routed through
+  // saveClosingSession() below. Direct entity mutations are forbidden because
+  // they bypass the canonical server lifecycle and audit transaction.
 
   const filtered = useMemo(() => filterDailySalesRecords(sales, filters), [sales, filters]);
 
@@ -796,6 +609,20 @@ export default function Sales() {
     }
   }, [autoSettle, notif, user?.email]);
 
+  const handleRequestCorrection = async () => {
+    if (!editing?.id) return;
+    const reason = window.prompt('Enter the reason for this correction request.');
+    if (!reason?.trim()) return;
+    try {
+      await requestClosingCorrection({ closingId: editing.id, reason: reason.trim() });
+      setEditing((current) => current ? { ...current, closing_state: 'correction_requested' } : current);
+      invalidateSalesQueries();
+      toast.success('Correction request submitted for authorized review.');
+    } catch (error) {
+      toast.error(closingSaveErrorMessage(error));
+    }
+  };
+
   const handleSave = async (data, proofUrl, ocr) => {
     const payload = {
       ...data,
@@ -804,11 +631,22 @@ export default function Sales() {
       // remains a legacy derived field and is never trusted as an input.
       actual_cash: data.actual_cash ?? data.actualCash ?? null,
     };
-    const saved = await saveClosingSession({ payload, closingId: editing?.id || null });
-    await runClosingFinalizationSideEffects(payload, saved, editing, proofUrl, ocr);
-    setEditing(saved);
-    invalidateSalesQueries();
-    return saved;
+    try {
+      const saved = await saveClosingSession({ payload, closingId: editing?.id || null });
+      if (saved._requiresCorrection) {
+        const error = new Error('This finalized closing requires an authorized correction.');
+        error.code = 'SALES_CLOSING_CORRECTION_REQUIRED';
+        error.userMessage = error.message;
+        throw error;
+      }
+      await runClosingFinalizationSideEffects(payload, saved, editing, proofUrl, ocr);
+      setEditing(saved);
+      invalidateSalesQueries();
+      return saved;
+    } catch (error) {
+      error.userMessage = error.userMessage || closingSaveErrorMessage(error);
+      throw error;
+    }
   };
 
 
@@ -878,6 +716,7 @@ export default function Sales() {
             onSubmit={handleSave}
             onCancel={() => { setEditing(null); setNewClosingDefaults(null); setShowForm(false); }}
             onNewClosing={openNewClosing}
+            onRequestCorrection={handleRequestCorrection}
             onSessionContextChange={updateClosingSessionContext}
             isOpeningNewClosing={isOpeningNewClosing}
           />
