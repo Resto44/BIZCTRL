@@ -71,6 +71,15 @@ function getSourceIcon(iconName) {
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const firstRecord = (value) => asRecordArray(value).at(0) || null;
+const parseSalesSourceEntries = (record) => {
+  const rawEntries = record?.sales_sources_json;
+  if (Array.isArray(rawEntries)) return asRecordArray(rawEntries);
+  try {
+    return asRecordArray(JSON.parse(rawEntries || '[]'));
+  } catch {
+    return [];
+  }
+};
 const matchesBranch = (record, branchKey, branchId) => {
   if (!branchKey && !branchId) return true;
   const recordBranchId = record?.branch_id;
@@ -229,6 +238,39 @@ function Money({ currency, value, className = '', signed = false }) {
     </span>
   );
 }
+
+const SalesSourceDailyHistoryCard = memo(function SalesSourceDailyHistoryCard({ source, today, previous, currency, onChange, isHistoryLoading, isHistoryUnavailable }) {
+  const total = previous + today;
+  return (
+    <div className="rounded-xl border border-blue-200 bg-background p-3 shadow-sm">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-blue-950">{source.name_ar || source.name_en}</p>
+          {source.name_ar && source.name_en && <p className="truncate text-[10px] text-muted-foreground">{source.name_en}</p>}
+        </div>
+        <Badge variant="outline" className="shrink-0 border-blue-200 bg-blue-50 text-[10px] text-blue-700">Daily source</Badge>
+      </div>
+      <NumInput
+        id={`quick-closing-source-${source.id}`}
+        label="اکنون / Today"
+        value={today || ''}
+        onChange={onChange}
+        prefix={currency}
+        helpText={source.description || 'Editable daily sales only — included in today’s ERP total.'}
+      />
+      <div className="mt-3 space-y-2 border-t border-blue-100 pt-3">
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <div><p className="font-medium">سابق / Previous</p><p className="text-[10px] text-muted-foreground">Historical accumulated closings</p></div>
+          {isHistoryLoading ? <span className="text-xs text-muted-foreground">Loading…</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">Unavailable</span> : <Money currency={currency} value={previous} className="font-semibold text-muted-foreground" />}
+        </div>
+        <div className="flex items-center justify-between gap-3 border-t border-blue-100 pt-2 text-sm">
+          <div><p className="font-bold text-blue-950">مجموع / Total</p><p className="text-[10px] text-muted-foreground">Previous + Today · read only</p></div>
+          {isHistoryLoading ? <span className="text-xs text-muted-foreground">Loading…</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">Unavailable</span> : <Money currency={currency} value={total} className="font-black text-blue-800" />}
+        </div>
+      </div>
+    </div>
+  );
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KPI CARD — Large ERP style
@@ -606,6 +648,29 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     return branch?.id || form.branch_id || null;
   }, [branches, form.branch, form.branch_id]);
 
+  // Previous source balances are calculated from earlier, completed daily closings.
+  // The current closing is intentionally excluded: only its daily entry is posted today.
+  const { data: sourceHistoryData, isLoading: sourceHistoryLoading, isError: sourceHistoryUnavailable } = useQuery({
+    queryKey: ['sales-source-history', activeRestaurant?.id, selectedBranchId, form.branch, form.date],
+    enabled: Boolean(activeRestaurant?.id && form.date && (selectedBranchId || form.branch)),
+    queryFn: async () => {
+      const baseQuery = () => supabase.from('daily_sales')
+        .select('id, date, branch, branch_id, closing_state, sales_sources_json')
+        .eq('restaurant_id', activeRestaurant.id)
+        .lt('date', form.date)
+        .order('date', { ascending: true })
+        .limit(2000);
+      const [canonical, legacy] = await Promise.all([
+        selectedBranchId ? baseQuery().eq('branch_id', selectedBranchId) : Promise.resolve({ data: [], error: null }),
+        form.branch ? baseQuery().is('branch_id', null).eq('branch', form.branch) : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+      return asRecordArray(Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+        .map((record) => [record.id, record])).values()));
+    },
+    staleTime: 30000,
+  });
+
   // ── Sales Revenue inputs ──────────────────────────────────────────────────
   const [cashSalesInput, setCashSalesInput] = useState(() => {
     const storedCash = initial?.restaurant_cash !== undefined
@@ -666,27 +731,38 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // ── Dynamic Sales Sources ───────────────────────────────────────────────────────────────
   const { customSources: customSourcesData, isLoading: sourcesLoading } = useSalesSources({ branchId: selectedBranchId });
   const customSources = asRecordArray(customSourcesData);
+  const historicalSourceAmounts = useMemo(() => asRecordArray(sourceHistoryData)
+    .filter((record) => record.id !== initial?.id && record.closing_state !== 'draft')
+    .reduce((balances, record) => {
+      parseSalesSourceEntries(record).forEach((entry) => {
+        const sourceKey = entry.source_id || entry.source_key;
+        if (!sourceKey) return;
+        const dailyAmount = Math.max(0, Number(entry.amount ?? entry.today_amount) || 0);
+        balances[sourceKey] = (balances[sourceKey] || 0) + dailyAmount;
+      });
+      return balances;
+    }, {}), [initial?.id, sourceHistoryData]);
   // Amounts keyed by source.id
   const [customSourceAmounts, setCustomSourceAmounts] = useState(() => {
-    if (initial?.sales_sources_json) {
-      try {
-        const parsed = asRecordArray(JSON.parse(initial.sales_sources_json));
-        const map = {};
-        parsed.forEach(e => { map[e.source_id] = String(e.amount || ''); });
-        return map;
-      } catch { /* ignore */ }
-    }
-    return {};
+    const map = {};
+    parseSalesSourceEntries(initial).forEach((entry) => {
+      if (entry?.source_id) map[entry.source_id] = String(entry.amount ?? entry.today_amount ?? '');
+    });
+    return map;
   });
   const setCustomAmount = (sourceId, val) => updateCalculatedInput(setCustomSourceAmounts, prev => ({ ...prev, [sourceId]: val }));
+  const customSourceSummaries = useMemo(() => customSources.map((source) => {
+    const today = Math.max(0, Number(customSourceAmounts[source.id]) || 0);
+    const previous = Math.max(0, Number(historicalSourceAmounts[source.id] ?? historicalSourceAmounts[source.system_key] ?? 0) || 0);
+    return { source, today, previous, total: previous + today };
+  }), [customSources, customSourceAmounts, historicalSourceAmounts]);
   const customSourcePaymentTotals = useMemo(() =>
-    customSources.reduce((totals, source) => {
+    customSourceSummaries.reduce((totals, { source, today }) => {
       if (source.included_in_revenue === false) return totals;
-      const amount = Math.max(0, Number(customSourceAmounts[source.id]) || 0);
-      totals[paymentBucketForCode(source.default_payment_method)] += amount;
+      totals[paymentBucketForCode(source.default_payment_method)] += today;
       return totals;
     }, { cash: 0, network: 0, credit: 0, other: 0 }),
-    [customSources, customSourceAmounts]
+    [customSourceSummaries]
   );
   const customTotal = useMemo(() =>
     customSourcePaymentTotals.cash + customSourcePaymentTotals.network + customSourcePaymentTotals.credit + customSourcePaymentTotals.other,
@@ -1401,19 +1477,20 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         credit: creditTotal,
         pos_entries_json: JSON.stringify(posEntries.map(({ id, ...rest }) => rest)),
         credit_entries_json: JSON.stringify(creditEntries.map(({ id, ...rest }) => rest)),
-        // Dynamic Sales Sources — full snapshot for reporting
+        // Dynamic Sales Sources — persist the daily amount only. Historical and
+        // cumulative values are derived from earlier closing records at runtime.
         sales_sources_json: JSON.stringify(
-          customSources
-            .filter(src => Number(customSourceAmounts[src.id]) > 0)
-            .map(src => ({
-              source_id: src.id,
-              source_key: src.system_key || src.id,
-              name_en: src.name_en,
-              name_ar: src.name_ar,
-              amount: Number(customSourceAmounts[src.id]) || 0,
-              default_payment_method: src.default_payment_method || 'other',
-              payment_bucket: paymentBucketForCode(src.default_payment_method),
-              included_in_revenue: src.included_in_revenue,
+          customSourceSummaries
+            .filter(({ today }) => today > 0)
+            .map(({ source, today }) => ({
+              source_id: source.id,
+              source_key: source.system_key || source.id,
+              name_en: source.name_en,
+              name_ar: source.name_ar,
+              amount: today,
+              default_payment_method: source.default_payment_method || 'other',
+              payment_bucket: paymentBucketForCode(source.default_payment_method),
+              included_in_revenue: source.included_in_revenue,
             }))
         ),
         custom_sources_total: otherPaymentTotal,
@@ -1568,7 +1645,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="w-fit border-blue-200 bg-white text-[10px] text-blue-700">Live configuration</Badge>{canCustomize && <><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setSourceEditor({ mode: 'create', source: newSalesClosingSource(customSources.length * 10 + 10) })}>+ Add Sales Source</Button><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setFieldEditor({ mode: 'create', field: newSalesClosingCustomField(configuredClosingFields.length * 10 + 10) })}>+ Add Closing Field</Button><Button type="button" size="sm" className="min-h-10" onClick={() => navigate('/sales-closing-customization')}>Customize Sales Closing</Button></>}</div>
               </div>
               <div className="space-y-4 p-3 sm:p-4">
-                {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div><div className="mb-2 flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-wide text-foreground">Sales Sources</p><Money currency={currency} value={customTotal} className="text-sm font-black text-blue-700" /></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">{customSources.map((source) => <NumInput key={source.id} id={`quick-closing-source-${source.id}`} label={source.name_ar || source.name_en} value={customSourceAmounts[source.id] || ''} onChange={(value) => setCustomAmount(source.id, value)} prefix={currency} helpText={source.description || (source.name_ar ? source.name_en : undefined)} />)}</div></div>}
+                {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div><div className="mb-2 flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-foreground">Sales Sources</p><p className="mt-0.5 text-[10px] text-muted-foreground">Only اکنون / Today is included in today’s ERP sales total.</p></div><div className="text-right"><p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">Today’s Source Sales</p><Money currency={currency} value={customTotal} className="text-sm font-black text-blue-700" /></div></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{customSourceSummaries.map(({ source, today, previous }) => <SalesSourceDailyHistoryCard key={`${source.id}-${previous}-${today}`} source={source} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} isHistoryLoading={sourceHistoryLoading} isHistoryUnavailable={sourceHistoryUnavailable} />)}</div></div>}
                 {isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false) && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-800">Available Payment Methods</p><div className="mt-2 flex flex-wrap gap-2">{configuredPaymentMethods.filter((method) => method.is_active !== false).map((method) => <Badge key={method.id} variant="outline" className="bg-background">{method.name_ar || method.name_en}</Badge>)}</div></div>}
                 {customClosingFields.length > 0 && <div><p className="mb-2 text-xs font-bold uppercase tracking-wide text-foreground">Additional Closing Fields</p><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{customClosingFields.map((field) => { const visibilityClass = field.visible_mobile === false ? 'hidden sm:block' : field.visible_desktop === false ? 'sm:hidden' : ''; const value = customClosingFieldValues[field.id] ?? ''; const error = inlineErrors[`custom_${field.id}`]; const inputId = `quick-closing-custom_${field.id}`; return <div key={field.id} id={`quick-closing-custom_${field.id}`} className={visibilityClass}>{field.field_type === 'long_text' || field.field_type === 'notes' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Textarea id={inputId} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} className="min-h-20 resize-none text-sm" />{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'dropdown' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Select value={value} onValueChange={(next) => updateCustomClosingField(field.id, next)}><SelectTrigger id={inputId} className="min-h-11 text-sm"><SelectValue placeholder={`Select ${field.label_en}`} /></SelectTrigger><SelectContent>{field.options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'checkbox' ? <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-input px-3 py-2 text-sm"><span>{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</span><input id={inputId} type="checkbox" checked={Boolean(value)} onChange={(event) => updateCustomClosingField(field.id, event.target.checked)} className="h-4 w-4 accent-primary" /></label> : <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Input id={inputId} type={field.field_type === 'currency' || field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : field.field_type === 'time' ? 'time' : 'text'} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} inputMode={field.field_type === 'currency' || field.field_type === 'number' ? 'decimal' : undefined} className="min-h-11 text-sm" />{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div>}{field.help_text && <p className="mt-1 text-[10px] leading-snug text-muted-foreground">{field.help_text}</p>}</div>; })}</div></div>}
               </div>

@@ -62,8 +62,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const networkTotal = baseNetworkTotal + customSourcePaymentTotals.network;');
     expect(workspace).toContain('const creditTotal = baseCreditTotal + customSourcePaymentTotals.credit;');
     expect(workspace).toContain('const otherPaymentTotal = baseOtherPaymentTotal + customSourcePaymentTotals.other;');
-    expect(workspace).toContain('default_payment_method: src.default_payment_method || \'other\'');
-    expect(workspace).toContain('payment_bucket: paymentBucketForCode(src.default_payment_method)');
+    expect(workspace).toContain('default_payment_method: source.default_payment_method || \'other\'');
+    expect(workspace).toContain('payment_bucket: paymentBucketForCode(source.default_payment_method)');
     expect(workspace).toContain('const expectedCashBase = useAutomaticSales && automaticClosingSnapshot.expectedCash !== null');
     expect(workspace).toContain('const expectedCash = expectedCashBase + customSourcePaymentTotals.cash;');
   });
@@ -205,5 +205,43 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(migration).toContain('DAILY_SALES_CLOSING_FINALIZATION_REVERT_DENIED');
     expect(migration).toContain("NULLIF(OLD.restaurant_id, '')::uuid");
     expect(migration).toContain("NULLIF(NEW.restaurant_id, '')::uuid");
+  });
+});
+
+
+describe('Sales source daily and historical balance contract', () => {
+  it('derives prior source balances from earlier completed closings in the active tenant and branch scope', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).toContain("queryKey: ['sales-source-history', activeRestaurant?.id, selectedBranchId, form.branch, form.date]");
+    expect(workspace).toContain("from('daily_sales')");
+    expect(workspace).toContain(".eq('restaurant_id', activeRestaurant.id)");
+    expect(workspace).toContain(".lt('date', form.date)");
+    expect(workspace).toContain("record.closing_state !== 'draft'");
+    expect(workspace).toContain('const historicalSourceAmounts = useMemo(() =>');
+    expect(workspace).toContain('const customSourceSummaries = useMemo(() =>');
+    expect(workspace).toContain('total: previous + today');
+  });
+
+  it('renders Today as the only editable source amount and keeps Previous and Total derived and read-only', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).toContain('label="اکنون / Today"');
+    expect(workspace).toContain('سابق / Previous');
+    expect(workspace).toContain('مجموع / Total');
+    expect(workspace).toContain('Editable daily sales only — included in today’s ERP total.');
+    expect(workspace).toContain('Only اکنون / Today is included in today’s ERP sales total.');
+    expect(workspace).toContain('isHistoryLoading={sourceHistoryLoading}');
+  });
+
+  it('uses only the current daily amount in all today-total and persistence calculations', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).toContain('customSourceSummaries.reduce((totals, { source, today }) =>');
+    expect(workspace).toContain('totals[paymentBucketForCode(source.default_payment_method)] += today;');
+    expect(workspace).toContain('.filter(({ today }) => today > 0)');
+    expect(workspace).toContain('.map(({ source, today }) => ({');
+    expect(workspace).toContain('amount: today');
+    expect(workspace).toContain('cumulative values are derived from earlier closing records at runtime.');
   });
 });
