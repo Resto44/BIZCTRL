@@ -68,37 +68,26 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const expectedCash = expectedCashBase + customSourcePaymentTotals.cash;');
   });
 
-  it('keeps a successful Owner source mutation visible in every active branch cache until explicit Reload', async () => {
+  it('keeps a successful Owner source mutation visible in every active branch cache until explicit reload', async () => {
+    const context = await source('../src/lib/SalesClosingCustomizationContext.jsx');
     const customization = await source('../src/pages/SalesClosingCustomization.jsx');
 
-    expect(customization).toContain("const sourceQueryKey = ['sales-closing-sources', restaurantId]");
-    expect(customization).toContain("const activeSourcesKey = ['sales_sources_active', restaurantId]");
-    expect(customization).toContain('previous.map((item) => item.id === savedSource.id ? { ...item, ...savedSource } : item)');
-    expect(customization).toContain('onSuccess: async (savedSource, source) =>');
-    expect(customization).toContain('const [sources, setSources] = useState(() => sortSources(sourceQuery.data));');
-    expect(customization).toContain('const pendingSourcePatchesRef = useRef(new Map());');
-    expect(customization).toContain('const patchHasReachedServer = patch === false');
-    expect(customization).toContain('if (!patchHasReachedServer) return;');
-    expect(customization).toContain('pendingSourcePatchesRef.current.set(savedSource.id, savedSource);');
-    expect(customization).toContain('setSources(merge);');
-    expect(customization).toContain('setSources(without);');
-    expect(customization).toContain('const requestSaveSource = (source) => saveSource.mutate(source);');
-    expect(customization).toContain('onSave={requestSaveSource}');
-    expect(customization).toContain('const immediateSource = { ...savedSource, ...source, id: savedSource?.id || source.id };');
-    expect(customization).toContain('mergeSourceCache(immediateSource);');
-    expect(customization).toContain('const { id: fieldId, ...fieldPayload } = field;');
-    expect(customization).toContain("if (fieldId) { const { data, error: mutationError } = await supabase.from('sales_closing_fields').update(payload).eq('id', fieldId)");
-    expect(customization).toContain('key={`${field.id}-${field.label_en}-${field.sort_order}-${field.is_active}-${field.is_required}-${field.visible_mobile}-${field.visible_desktop}`}');
-    expect(customization).toContain('key={`${source.id}-${source.name_en}-${source.default_payment_method}-${source.sort_order}`}');
-    expect(customization).toContain('key={`${method.id}-${method.name_en}-${method.sort_order}-${method.is_active}`}');
-    expect(customization).toContain('queryClient.setQueryData(sourceQueryKey, merge);');
-    expect(customization).toContain('queryClient.setQueriesData({ queryKey: activeSourcesKey }, merge);');
+    expect(context).toContain("const sourceQueryKey = useMemo(() => ['sales_sources_active', restaurantId]");
+    expect(context).toContain('const sourcePatchesRef = useRef(new Map());');
+    expect(context).toContain('previous.map((item) => item.id === savedSource.id ? { ...item, ...savedSource } : item)');
+    expect(context).toContain('sourcePatchesRef.current.set(savedSource.id, savedSource);');
+    expect(context).toContain("queryClient.setQueriesData({ queryKey: ['sales_sources_active', restaurantId] }, merge);");
+    expect(context).toContain("queryClient.invalidateQueries({ queryKey: sourceQueryKey, refetchType: 'none' });");
+    expect(context).toContain('saveSalesSource: (source) => saveSourceMutation.mutateAsync(source)');
+    expect(context).toContain('deleteSalesSource: (source) => deleteSourceMutation.mutateAsync(source)');
+    expect(context).toContain('const { id: fieldId, ...fieldPayload } = field;');
+    expect(context).toContain("if (fieldId) {");
+    expect(customization).toContain('onSave={saveSource}');
+    expect(customization).toContain('onSave={(field) => saveField(field)}');
     expect(customization).toContain("if (resource === 'source') {");
-    expect(customization).toContain('mergeSourceCache({ ...current, sort_order: other.sort_order });');
-    expect(customization).toContain('mergeSourceCache({ ...other, sort_order: current.sort_order });');
-    expect(customization).toContain("const invalidate = async ({ refetchSources = false } = {}) =>");
-    expect(customization).toContain("refetchType: 'none'");
-    expect(customization).toContain('onClick={() => invalidate({ refetchSources: true })}');
+    expect(customization).toContain('await saveSalesSource({ ...current, sort_order: other.sort_order });');
+    expect(customization).toContain('await saveSalesSource({ ...other, sort_order: current.sort_order });');
+    expect(customization).toContain('onClick={reload}');
   });
 
   it('consumes saved calculation, reconciliation, and responsive-summary settings in the canonical workflow', async () => {

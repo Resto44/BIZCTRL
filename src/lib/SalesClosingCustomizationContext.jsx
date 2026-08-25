@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useRole } from '@/lib/RoleContext';
@@ -13,12 +13,21 @@ import {
 const SalesClosingCustomizationContext = createContext({
   config: DEFAULT_SALES_CLOSING_CONFIG,
   fields: [],
+  sources: [],
   paymentMethods: [],
   isLoading: false,
   isSaving: false,
   error: null,
   canCustomize: false,
   saveConfig: async () => {},
+  saveSalesSource: async () => {},
+  deleteSalesSource: async () => {},
+  saveClosingField: async () => {},
+  deleteClosingField: async () => {},
+  isSavingSalesSource: false,
+  isDeletingSalesSource: false,
+  isSavingClosingField: false,
+  isDeletingClosingField: false,
   reload: async () => {},
 });
 
@@ -55,7 +64,24 @@ export function SalesClosingCustomizationProvider({ children }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('sales_closing_fields')
-        .select('id, field_key, label_en, label_ar, field_type, options, sort_order, is_active, is_required, visible_mobile, visible_desktop, is_system, updated_at')
+        .select('id, field_key, label_en, label_ar, help_text, field_type, options, sort_order, is_active, is_required, visible_mobile, visible_desktop, is_system, updated_at')
+        .eq('restaurant_id', restaurantId)
+        .order('sort_order');
+      if (error) throw error;
+      return asArray(data);
+    },
+  });
+
+  const sourceQueryKey = useMemo(() => ['sales_sources_active', restaurantId], [restaurantId]);
+  const sourcePatchesRef = useRef(new Map());
+  const sourceQuery = useQuery({
+    queryKey: sourceQueryKey,
+    enabled: Boolean(restaurantId),
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sales_sources')
+        .select('id, name_en, name_ar, description, sort_order, is_active, is_system, is_global, branch_id, default_payment_method, icon, color, included_in_revenue, included_in_cash_register, included_in_dashboard_kpi, included_in_profit_calc, system_key, updated_date')
         .eq('restaurant_id', restaurantId)
         .order('sort_order');
       if (error) throw error;
@@ -85,10 +111,10 @@ export function SalesClosingCustomizationProvider({ children }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_closing_config', filter: `restaurant_id=eq.${restaurantId}` }, () => queryClient.invalidateQueries({ queryKey: configKey }))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_closing_fields', filter: `restaurant_id=eq.${restaurantId}` }, () => queryClient.invalidateQueries({ queryKey: fieldsKey }))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_methods', filter: `restaurant_id=eq.${restaurantId}` }, () => queryClient.invalidateQueries({ queryKey: paymentMethodsKey }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_sources', filter: `restaurant_id=eq.${restaurantId}` }, () => queryClient.invalidateQueries({ queryKey: ['sales_sources'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_sources', filter: `restaurant_id=eq.${restaurantId}` }, () => queryClient.invalidateQueries({ queryKey: sourceQueryKey }))
       .subscribe();
     return () => supabase.removeChannel(channel);
-  }, [configKey, fieldsKey, paymentMethodsKey, queryClient, restaurantId]);
+  }, [configKey, fieldsKey, paymentMethodsKey, queryClient, restaurantId, sourceQueryKey]);
 
   const saveMutation = useMutation({
     mutationFn: async (nextConfig) => {
@@ -105,7 +131,90 @@ export function SalesClosingCustomizationProvider({ children }) {
     onSuccess: (data) => queryClient.setQueryData(configKey, data),
   });
 
+  const sortSources = useCallback((items) => asArray(items).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)), []);
+  const mergeSourceCache = useCallback((savedSource) => {
+    if (!savedSource?.id) return;
+    const merge = (items) => {
+      const previous = asArray(items);
+      const exists = previous.some((item) => item.id === savedSource.id);
+      return sortSources(previous.map((item) => item.id === savedSource.id ? { ...item, ...savedSource } : item).concat(exists ? [] : [savedSource]));
+    };
+    sourcePatchesRef.current.set(savedSource.id, savedSource);
+    queryClient.setQueriesData({ queryKey: ['sales_sources_active', restaurantId] }, merge);
+  }, [queryClient, restaurantId, sortSources]);
+
+  useEffect(() => {
+    const nextSources = sortSources(sourceQuery.data);
+    for (const [sourceId, patch] of sourcePatchesRef.current.entries()) {
+      const serverSource = nextSources.find((source) => source.id === sourceId);
+      if (serverSource && Object.entries(patch).every(([key, value]) => serverSource[key] === value)) sourcePatchesRef.current.delete(sourceId);
+    }
+  }, [sourceQuery.data, sortSources]);
+
+  const saveSourceMutation = useMutation({
+    mutationFn: async (source) => {
+      if (!restaurantId) throw new Error('Select an active restaurant before saving a sales source.');
+      const payload = { ...source, restaurant_id: restaurantId, is_global: source.is_global !== false, branch_id: source.is_global === false ? source.branch_id || null : null };
+      if (source.id) {
+        const { data, error } = await supabase.from('sales_sources').update(payload).eq('id', source.id).select().single();
+        if (error) throw error;
+        return data;
+      }
+      const { data, error } = await supabase.from('sales_sources').insert(payload).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (savedSource, source) => {
+      mergeSourceCache({ ...savedSource, ...source, id: savedSource?.id || source.id });
+      queryClient.invalidateQueries({ queryKey: sourceQueryKey, refetchType: 'none' });
+    },
+  });
+
+  const deleteSourceMutation = useMutation({
+    mutationFn: async (source) => {
+      const { error } = await supabase.from('sales_sources').delete().eq('id', source.id);
+      if (error) throw error;
+    },
+    onSuccess: (_, source) => {
+      sourcePatchesRef.current.set(source.id, false);
+      queryClient.setQueriesData({ queryKey: ['sales_sources_active', restaurantId] }, (items) => asArray(items).filter((item) => item.id !== source.id));
+      queryClient.invalidateQueries({ queryKey: sourceQueryKey, refetchType: 'none' });
+    },
+  });
+
+  const saveFieldMutation = useMutation({
+    mutationFn: async (field) => {
+      if (!restaurantId) throw new Error('Select an active restaurant before saving a field.');
+      const { id: fieldId, ...fieldPayload } = field;
+      const payload = { ...fieldPayload, restaurant_id: restaurantId };
+      if (fieldId) {
+        const { data, error } = await supabase.from('sales_closing_fields').update(payload).eq('id', fieldId).select().single();
+        if (error) throw error;
+        return data;
+      }
+      const { data, error } = await supabase.from('sales_closing_fields').insert(payload).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (savedField) => {
+      queryClient.setQueryData(fieldsKey, (items) => sortSalesClosingFields([...asArray(items).filter((item) => item.id !== savedField.id), savedField]));
+      queryClient.invalidateQueries({ queryKey: fieldsKey, refetchType: 'none' });
+    },
+  });
+
+  const deleteFieldMutation = useMutation({
+    mutationFn: async (field) => {
+      const { error } = await supabase.from('sales_closing_fields').delete().eq('id', field.id);
+      if (error) throw error;
+    },
+    onSuccess: (_, field) => {
+      queryClient.setQueryData(fieldsKey, (items) => asArray(items).filter((item) => item.id !== field.id));
+      queryClient.invalidateQueries({ queryKey: fieldsKey, refetchType: 'none' });
+    },
+  });
+
   const config = useMemo(() => normalizeSalesClosingConfig(configQuery.data?.settings), [configQuery.data]);
+  const sources = useMemo(() => sortSources(sourceQuery.data), [sourceQuery.data, sortSources]);
   const fields = useMemo(() => sortSalesClosingFields(asArray(fieldsQuery.data).map(normalizeSalesClosingField)), [fieldsQuery.data]);
   const paymentMethods = useMemo(() => asArray(paymentMethodsQuery.data).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)), [paymentMethodsQuery.data]);
   const canCustomize = role === 'owner' || can?.manageDashboardCustomization === true;
@@ -114,22 +223,31 @@ export function SalesClosingCustomizationProvider({ children }) {
       queryClient.invalidateQueries({ queryKey: configKey }),
       queryClient.invalidateQueries({ queryKey: fieldsKey }),
       queryClient.invalidateQueries({ queryKey: paymentMethodsKey }),
-      queryClient.invalidateQueries({ queryKey: ['sales_sources'] }),
+      queryClient.invalidateQueries({ queryKey: sourceQueryKey }),
     ]);
-    await Promise.all([configQuery.refetch(), fieldsQuery.refetch(), paymentMethodsQuery.refetch()]);
-  }, [configKey, configQuery, fieldsKey, fieldsQuery, paymentMethodsKey, paymentMethodsQuery, queryClient]);
+    await Promise.all([configQuery.refetch(), fieldsQuery.refetch(), paymentMethodsQuery.refetch(), sourceQuery.refetch()]);
+  }, [configKey, configQuery, fieldsKey, fieldsQuery, paymentMethodsKey, paymentMethodsQuery, queryClient, sourceQuery, sourceQueryKey]);
 
   const value = useMemo(() => ({
     config,
+    sources,
     fields,
     paymentMethods,
-    isLoading: configQuery.isLoading || fieldsQuery.isLoading || paymentMethodsQuery.isLoading,
+    isLoading: configQuery.isLoading || sourceQuery.isLoading || fieldsQuery.isLoading || paymentMethodsQuery.isLoading,
     isSaving: saveMutation.isPending,
-    error: configQuery.error || fieldsQuery.error || paymentMethodsQuery.error || saveMutation.error || null,
+    error: configQuery.error || sourceQuery.error || fieldsQuery.error || paymentMethodsQuery.error || saveMutation.error || null,
     canCustomize,
     saveConfig: (nextConfig) => saveMutation.mutateAsync(nextConfig),
+    saveSalesSource: (source) => saveSourceMutation.mutateAsync(source),
+    deleteSalesSource: (source) => deleteSourceMutation.mutateAsync(source),
+    saveClosingField: (field) => saveFieldMutation.mutateAsync(field),
+    deleteClosingField: (field) => deleteFieldMutation.mutateAsync(field),
+    isSavingSalesSource: saveSourceMutation.isPending,
+    isDeletingSalesSource: deleteSourceMutation.isPending,
+    isSavingClosingField: saveFieldMutation.isPending,
+    isDeletingClosingField: deleteFieldMutation.isPending,
     reload,
-  }), [canCustomize, config, configQuery.error, configQuery.isLoading, fields, fieldsQuery.error, fieldsQuery.isLoading, paymentMethods, paymentMethodsQuery.error, paymentMethodsQuery.isLoading, reload, saveMutation.error, saveMutation.isPending, saveMutation.mutateAsync]);
+  }), [canCustomize, config, configQuery.error, configQuery.isLoading, deleteFieldMutation.isPending, deleteFieldMutation.mutateAsync, deleteSourceMutation.isPending, deleteSourceMutation.mutateAsync, fields, fieldsQuery.error, fieldsQuery.isLoading, paymentMethods, paymentMethodsQuery.error, paymentMethodsQuery.isLoading, reload, saveFieldMutation.isPending, saveFieldMutation.mutateAsync, saveMutation.error, saveMutation.isPending, saveMutation.mutateAsync, saveSourceMutation.isPending, saveSourceMutation.mutateAsync, sourceQuery.error, sourceQuery.isLoading, sources]);
 
   return <SalesClosingCustomizationContext.Provider value={value}>{children}</SalesClosingCustomizationContext.Provider>;
 }

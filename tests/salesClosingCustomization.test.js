@@ -33,7 +33,7 @@ describe('Sales Closing Customization runtime contract', () => {
     expect(context).toContain("from('payment_methods')");
     expect(context).toContain("filter: `restaurant_id=eq.${restaurantId}`");
     expect(context).toContain("onConflict: 'restaurant_id'");
-    expect(context).toContain('await Promise.all([configQuery.refetch(), fieldsQuery.refetch(), paymentMethodsQuery.refetch()]);');
+    expect(context).toContain('await Promise.all([configQuery.refetch(), fieldsQuery.refetch(), paymentMethodsQuery.refetch(), sourceQuery.refetch()]);');
     expect(migration).toContain('CREATE TABLE IF NOT EXISTS public.payment_methods');
     expect(migration).toContain('CREATE TABLE IF NOT EXISTS public.sales_closing_fields');
     expect(migration).toContain('CREATE TABLE IF NOT EXISTS public.sales_closing_config');
@@ -74,5 +74,46 @@ describe('Sales Closing Customization runtime contract', () => {
     expect(page).toContain('Preview Sales Closing');
     expect(page).toContain('Sales Closing configuration saved successfully.');
     expect(page).toContain('pb-28');
+  });
+});
+
+
+describe('Sales Closing in-workspace runtime customization contract', () => {
+  it('reuses the shared source and field dialogs from both canonical entry points', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+    const page = await source('../src/pages/SalesClosingCustomization.jsx');
+    const dialogs = await source('../src/components/sales/SalesClosingCustomizationDialogs.jsx');
+
+    expect(workspace).toContain("from '@/components/sales/SalesClosingCustomizationDialogs'");
+    expect(page).toContain("from '@/components/sales/SalesClosingCustomizationDialogs'");
+    expect(dialogs).toContain('Description (optional)');
+    expect(dialogs).toContain('Help text (optional)');
+  });
+
+  it('adds sources and fields in place, updates the canonical cache, and links to the existing customization route', async () => {
+    const context = await source('../src/lib/SalesClosingCustomizationContext.jsx');
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(context).toContain('saveSalesSource');
+    expect(context).toContain('saveClosingField');
+    expect(context).toContain("queryClient.setQueriesData({ queryKey: ['sales_sources_active', restaurantId] }");
+    expect(workspace).toContain('+ Add Sales Source');
+    expect(workspace).toContain('+ Add Closing Field');
+    expect(workspace).toContain('Customize Sales Closing');
+    expect(workspace).toContain("navigate('/sales-closing-customization')");
+    expect(workspace).toContain('Sales source saved and is ready to use.');
+    expect(workspace).toContain('Closing field saved and is ready to use.');
+  });
+
+  it('persists and renders optional field help text without changing historical closing snapshots', async () => {
+    const migration = await source('../src/supabase/20260825_sales_closing_field_help_text.sql');
+    const context = await source('../src/lib/SalesClosingCustomizationContext.jsx');
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(migration).toContain('ADD COLUMN IF NOT EXISTS help_text text');
+    expect(context).toContain('label_ar, help_text, field_type');
+    expect(workspace).toContain('field.help_text');
+    expect(workspace).toContain('sales_sources_json: JSON.stringify');
+    expect(workspace).toContain('field_id: field.id');
   });
 });

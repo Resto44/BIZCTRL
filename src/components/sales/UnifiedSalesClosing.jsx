@@ -23,6 +23,7 @@
 import React, { useState, useMemo, useEffect, useLayoutEffect, useCallback, memo } from 'react';
 import { flushSync } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
@@ -50,6 +51,8 @@ import BranchSelect from '@/components/shared/BranchSelect';
 import { toast } from 'sonner';
 import { useSalesSources } from '@/hooks/useSalesSources';
 import { useSalesClosingCustomization } from '@/lib/SalesClosingCustomizationContext';
+import { newSalesClosingCustomField } from '@/lib/salesClosingCustomization';
+import { SalesClosingFieldDialog, SalesSourceDialog, newSalesClosingSource } from '@/components/sales/SalesClosingCustomizationDialogs';
 import { Banknote as BanknoteIcon, CreditCard as CreditCardIcon, UserCheck, PlusCircle, ShoppingBag, Truck, Star, Globe, Smartphone, UtensilsCrossed, Package as PackageIcon, DollarSign as DollarSignIcon, Gift, Users as UsersIcon, Building2 as Building2Icon, Zap as ZapIcon, Activity as ActivityIcon, BarChart3 as BarChart3Icon, Shield } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -468,7 +471,17 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const { user } = useAuth();
   const { role } = useRole();
   const { ownerFilter, branches: tenantBranches, managerBranch, activeRestaurant, isManager } = useTenant();
-  const { config: closingConfig, fields: configuredClosingFields, paymentMethods: configuredPaymentMethods } = useSalesClosingCustomization();
+  const navigate = useNavigate();
+  const {
+    config: closingConfig,
+    fields: configuredClosingFields,
+    paymentMethods: configuredPaymentMethods,
+    canCustomize,
+    saveSalesSource,
+    saveClosingField,
+    isSavingSalesSource,
+    isSavingClosingField,
+  } = useSalesClosingCustomization();
   const automaticTotalsEnabled = closingConfig?.calculations?.automatic_totals !== false;
   const requiresCashReconciliation = closingConfig?.validation_rules?.require_cash_reconciliation !== false;
   const showMobileSummary = closingConfig?.layout?.mobile_summary !== false;
@@ -483,6 +496,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const branches = asRecordArray(tenantBranches);
   const canUseAdvancedClosing = isManager || [ROLES.OWNER, ROLES.GENERAL_MANAGER].includes(role);
   const [closingView, setClosingView] = useState('quick');
+  const [sourceEditor, setSourceEditor] = useState(null);
+  const [fieldEditor, setFieldEditor] = useState(null);
   const isQuickClosing = closingView === 'quick';
   const assignedManagerBranch = useMemo(() => {
     if (!isManager) return null;
@@ -516,6 +531,24 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     sales_notes: initial?.sales_notes || '',
     ...initial,
   });
+  const saveInlineSalesSource = useCallback(async (source) => {
+    try {
+      await saveSalesSource(source);
+      setSourceEditor(null);
+      toast.success('Sales source saved and is ready to use.');
+    } catch (error) {
+      toast.error(error?.message || 'Unable to save the sales source.');
+    }
+  }, [saveSalesSource]);
+  const saveInlineClosingField = useCallback(async (field) => {
+    try {
+      await saveClosingField(field);
+      setFieldEditor(null);
+      toast.success('Closing field saved and is ready to use.');
+    } catch (error) {
+      toast.error(error?.message || 'Unable to save the closing field.');
+    }
+  }, [saveClosingField]);
   const set = useCallback((field, value) => {
     setInlineErrors((current) => {
       if (!current[field]) return current;
@@ -695,6 +728,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     });
     updateCalculatedInput(setCustomClosingFieldValues, (previous) => ({ ...previous, [fieldId]: value }));
   }, [updateCalculatedInput]);
+  const hasCustomClosingFieldValue = useCallback((field) => {
+    const value = customClosingFieldValues[field.id];
+    return field.field_type === 'checkbox' ? value === true : String(value ?? '').trim().length > 0;
+  }, [customClosingFieldValues]);
   // ── Employees ─────────────────────────────────────────────────────────────
   const { data: employeesData, isLoading: empLoading, isError: empError } = useQuery({
     queryKey: ['employees_cashiers', activeRestaurant?.id, ownerFilter?.created_by, ownerFilter?.branch, form.branch, selectedBranchId],
@@ -1242,10 +1279,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     {
       key: 'requiredFields',
       label: 'Required Fields Complete',
-      passed: !!form.date && !!form.branch && customClosingFields.every((field) => !field.is_required || String(customClosingFieldValues[field.id] ?? '').trim()),
+      passed: !!form.date && !!form.branch && customClosingFields.every((field) => !field.is_required || hasCustomClosingFieldValue(field)),
       message: form.date || 'Date required',
     },
-  ], [form, automaticClosingUnavailable, useAutomaticSales, cashierDisplayName, approvedPurchasesForDate, posEntries, creditEntries, customClosingFields, customClosingFieldValues, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, cashDifference, cashNotes, managerApproved, requiresCashReconciliation, currency]);
+  ], [form, automaticClosingUnavailable, useAutomaticSales, cashierDisplayName, approvedPurchasesForDate, posEntries, creditEntries, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, cashDifference, cashNotes, managerApproved, requiresCashReconciliation, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -1275,7 +1312,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (invalidCredit) nextErrors.credit = 'Credit customer is required.';
     if (limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer}.`;
     customClosingFields.forEach((field) => {
-      if (!savingDraft && field.is_required && !String(customClosingFieldValues[field.id] ?? '').trim()) nextErrors[`custom_${field.id}`] = `${field.label_en} is required.`;
+      if (!savingDraft && field.is_required && !hasCustomClosingFieldValue(field)) nextErrors[`custom_${field.id}`] = `${field.label_en} is required.`;
     });
     if (Object.keys(nextErrors).length) {
       setInlineErrors(nextErrors);
@@ -1428,6 +1465,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Requirement: Remove blocking success state.
   // Save returns immediately to Daily Sales via onSubmit callback.
 
+  const showCustomizationCard = canCustomize || (isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0) || customClosingFields.length > 0 || (isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false));
+
   return (
     <form onSubmit={handleSubmit} className="flex h-full min-h-0 min-w-0 flex-col">
       <StickySummary
@@ -1522,16 +1561,16 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             )}
           </section>
 
-          {((isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0) || customClosingFields.length > 0 || (isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false))) && (
+          {showCustomizationCard && (
             <section className="overflow-hidden rounded-2xl border border-blue-200 bg-background shadow-sm">
               <div className="flex flex-col gap-2 border-b border-blue-100 bg-blue-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
                 <div className="flex min-w-0 items-center gap-2"><PlusCircle className="h-4 w-4 shrink-0 text-blue-600" /><div><h2 className="truncate text-xs font-black uppercase tracking-wide text-blue-950">Sales Sources & Closing Fields</h2><p className="text-[11px] text-blue-800">Owner-configured fields apply to this new closing.</p></div></div>
-                <Badge variant="outline" className="w-fit border-blue-200 bg-white text-[10px] text-blue-700">Live configuration</Badge>
+                <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="w-fit border-blue-200 bg-white text-[10px] text-blue-700">Live configuration</Badge>{canCustomize && <><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setSourceEditor({ mode: 'create', source: newSalesClosingSource(customSources.length * 10 + 10) })}>+ Add Sales Source</Button><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setFieldEditor({ mode: 'create', field: newSalesClosingCustomField(configuredClosingFields.length * 10 + 10) })}>+ Add Closing Field</Button><Button type="button" size="sm" className="min-h-10" onClick={() => navigate('/sales-closing-customization')}>Customize Sales Closing</Button></>}</div>
               </div>
               <div className="space-y-4 p-3 sm:p-4">
-                {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div><div className="mb-2 flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-wide text-foreground">Sales Sources</p><Money currency={currency} value={customTotal} className="text-sm font-black text-blue-700" /></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">{customSources.map((source) => <NumInput key={source.id} id={`quick-closing-source-${source.id}`} label={source.name_ar || source.name_en} value={customSourceAmounts[source.id] || ''} onChange={(value) => setCustomAmount(source.id, value)} prefix={currency} helpText={source.name_ar ? source.name_en : undefined} />)}</div></div>}
+                {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div><div className="mb-2 flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-wide text-foreground">Sales Sources</p><Money currency={currency} value={customTotal} className="text-sm font-black text-blue-700" /></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">{customSources.map((source) => <NumInput key={source.id} id={`quick-closing-source-${source.id}`} label={source.name_ar || source.name_en} value={customSourceAmounts[source.id] || ''} onChange={(value) => setCustomAmount(source.id, value)} prefix={currency} helpText={source.description || (source.name_ar ? source.name_en : undefined)} />)}</div></div>}
                 {isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false) && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-800">Available Payment Methods</p><div className="mt-2 flex flex-wrap gap-2">{configuredPaymentMethods.filter((method) => method.is_active !== false).map((method) => <Badge key={method.id} variant="outline" className="bg-background">{method.name_ar || method.name_en}</Badge>)}</div></div>}
-                {customClosingFields.length > 0 && <div><p className="mb-2 text-xs font-bold uppercase tracking-wide text-foreground">Additional Closing Fields</p><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{customClosingFields.map((field) => { const visibilityClass = field.visible_mobile === false ? 'hidden sm:block' : field.visible_desktop === false ? 'sm:hidden' : ''; const value = customClosingFieldValues[field.id] ?? ''; const error = inlineErrors[`custom_${field.id}`]; const inputId = `quick-closing-custom_${field.id}`; return <div key={field.id} id={`quick-closing-custom_${field.id}`} className={visibilityClass}>{field.field_type === 'long_text' || field.field_type === 'notes' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Textarea id={inputId} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} className="min-h-20 resize-none text-sm" />{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'dropdown' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Select value={value} onValueChange={(next) => updateCustomClosingField(field.id, next)}><SelectTrigger id={inputId} className="min-h-11 text-sm"><SelectValue placeholder={`Select ${field.label_en}`} /></SelectTrigger><SelectContent>{field.options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'checkbox' ? <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-input px-3 py-2 text-sm"><span>{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</span><input id={inputId} type="checkbox" checked={Boolean(value)} onChange={(event) => updateCustomClosingField(field.id, event.target.checked)} className="h-4 w-4 accent-primary" /></label> : <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Input id={inputId} type={field.field_type === 'currency' || field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : field.field_type === 'time' ? 'time' : 'text'} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} inputMode={field.field_type === 'currency' || field.field_type === 'number' ? 'decimal' : undefined} className="min-h-11 text-sm" />{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div>}</div>; })}</div></div>}
+                {customClosingFields.length > 0 && <div><p className="mb-2 text-xs font-bold uppercase tracking-wide text-foreground">Additional Closing Fields</p><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{customClosingFields.map((field) => { const visibilityClass = field.visible_mobile === false ? 'hidden sm:block' : field.visible_desktop === false ? 'sm:hidden' : ''; const value = customClosingFieldValues[field.id] ?? ''; const error = inlineErrors[`custom_${field.id}`]; const inputId = `quick-closing-custom_${field.id}`; return <div key={field.id} id={`quick-closing-custom_${field.id}`} className={visibilityClass}>{field.field_type === 'long_text' || field.field_type === 'notes' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Textarea id={inputId} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} className="min-h-20 resize-none text-sm" />{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'dropdown' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Select value={value} onValueChange={(next) => updateCustomClosingField(field.id, next)}><SelectTrigger id={inputId} className="min-h-11 text-sm"><SelectValue placeholder={`Select ${field.label_en}`} /></SelectTrigger><SelectContent>{field.options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'checkbox' ? <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-input px-3 py-2 text-sm"><span>{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</span><input id={inputId} type="checkbox" checked={Boolean(value)} onChange={(event) => updateCustomClosingField(field.id, event.target.checked)} className="h-4 w-4 accent-primary" /></label> : <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{field.label_ar || field.label_en}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Input id={inputId} type={field.field_type === 'currency' || field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : field.field_type === 'time' ? 'time' : 'text'} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} inputMode={field.field_type === 'currency' || field.field_type === 'number' ? 'decimal' : undefined} className="min-h-11 text-sm" />{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div>}{field.help_text && <p className="mt-1 text-[10px] leading-snug text-muted-foreground">{field.help_text}</p>}</div>; })}</div></div>}
               </div>
             </section>
           )}
@@ -1608,6 +1647,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           {!isLocked && initial?.id && canLockClosing && <Button type="submit" variant="secondary" className="min-h-12 font-bold sm:w-32" onClick={() => flushSync(() => setRequestedClosingState('locked'))} disabled={isSubmitting || !allValid}>Lock</Button>}
         </div>
       </div>
+      <SalesClosingFieldDialog editor={fieldEditor} onClose={() => setFieldEditor(null)} onSave={saveInlineClosingField} isSaving={isSavingClosingField} />
+      <SalesSourceDialog editor={sourceEditor} onClose={() => setSourceEditor(null)} onSave={saveInlineSalesSource} isSaving={isSavingSalesSource} paymentMethods={configuredPaymentMethods} />
     </form>
   );
 }
