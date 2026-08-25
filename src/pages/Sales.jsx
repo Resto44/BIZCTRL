@@ -9,7 +9,7 @@ import UnifiedSalesClosing from '@/components/sales/UnifiedSalesClosing';
 import SalesListItem from '@/components/sales/SalesListItem';
 import EmptyState from '@/components/shared/EmptyState';
 import { Button } from '@/components/ui/button';
-import { Plus, Download, SlidersHorizontal, BarChart3, Trash2, CheckSquare, Square } from 'lucide-react';
+import { Plus, Download, SlidersHorizontal, BarChart3, Trash2, CheckSquare, Square, Loader2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { downloadCSV, downloadPDF, buildSalesCSV, buildSalesPDF } from '@/lib/exportUtils';
 import ExportDialog from '@/components/shared/ExportDialog';
@@ -41,6 +41,23 @@ const dailySalesTotal = (sale) =>
   Number(sale?.credit ?? 0) +
   Number(sale?.custom_sources_total ?? 0);
 
+const sameScopeValue = (left, right) => String(left || '').trim() === String(right || '').trim();
+const salesClosingCashierId = (record) => record?.cashier_id || record?.cashier_employee_id || record?.manager_user_id || null;
+const matchesSalesClosingSession = (record, session) => {
+  if (!record || !session) return false;
+  const branchMatches = session.branch_id
+    ? sameScopeValue(record.branch_id, session.branch_id)
+    : sameScopeValue(record.branch, session.branch);
+  const recordCashierId = salesClosingCashierId(record);
+  const cashierMatches = session.cashier_id
+    ? (recordCashierId ? sameScopeValue(recordCashierId, session.cashier_id) : sameScopeValue(record.cashier_name, session.cashier_name))
+    : sameScopeValue(record.cashier_name, session.cashier_name);
+  return branchMatches
+    && sameScopeValue(record.date, session.date)
+    && sameScopeValue(record.shift, session.shift)
+    && cashierMatches;
+};
+
 // Drafts are work-in-progress records. Financial integrations are deliberately
 // deferred until the closing enters its explicit finalized lifecycle state.
 const shouldRunFinalizationSideEffects = (saleData) => saleData?.closing_state === 'finalized';
@@ -65,6 +82,10 @@ export default function Sales() {
   const { autoSettle } = useNetworkSettlement({ orgId, user, currency });
   const [showForm, setShowForm] = useState(true);
   const [editing, setEditing] = useState(null);
+  const [newClosingDefaults, setNewClosingDefaults] = useState(null);
+  const [newClosingInstance, setNewClosingInstance] = useState(0);
+  const [sessionContext, setSessionContext] = useState(null);
+  const [isOpeningNewClosing, setIsOpeningNewClosing] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -112,6 +133,72 @@ export default function Sales() {
     enabled: Boolean(activeRestaurant?.id),
   });
   const sales = asRecordArray(salesData);
+
+  const updateClosingSessionContext = useCallback((nextContext) => {
+    setSessionContext((current) => {
+      const next = nextContext || null;
+      if (current && next && ['date', 'branch', 'branch_id', 'shift', 'cashier_id', 'cashier_name'].every((key) => sameScopeValue(current[key], next[key]))) return current;
+      return next;
+    });
+  }, []);
+
+  const findExistingClosingSession = useCallback(async (session) => {
+    if (!activeRestaurant?.id || !session?.date || !session?.branch || !session?.shift) return null;
+    const baseQuery = () => supabase.from('daily_sales')
+      .select('*')
+      .eq('restaurant_id', activeRestaurant.id)
+      .eq('date', session.date)
+      .eq('shift', session.shift)
+      .limit(50);
+    const [canonical, legacy] = await Promise.all([
+      session.branch_id ? baseQuery().eq('branch_id', session.branch_id) : Promise.resolve({ data: [], error: null }),
+      baseQuery().is('branch_id', null).eq('branch', session.branch),
+    ]);
+    if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+    const candidates = Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+      .map((record) => [record.id, record])).values());
+    return candidates.find((record) => matchesSalesClosingSession(record, session)) || null;
+  }, [activeRestaurant?.id]);
+
+  const openNewClosing = useCallback(async () => {
+    if (isOpeningNewClosing) return;
+    const session = sessionContext;
+    if (!session?.date || !session?.branch || !session?.shift || (!session?.cashier_id && !session?.cashier_name)) {
+      toast.error('Select a branch, shift, and cashier before opening a closing session.');
+      return;
+    }
+    setIsOpeningNewClosing(true);
+    try {
+      const existing = await findExistingClosingSession(session);
+      if (existing) {
+        setNewClosingDefaults(null);
+        setEditing(existing);
+        setShowForm(true);
+        toast.info(existing.closing_state === 'draft' ? 'Resumed the existing draft closing for this branch, date, shift, and cashier.' : 'Opened the existing closing for this branch, date, shift, and cashier.');
+        return;
+      }
+      // Opening is deliberately in-memory until Save Draft or Finalize. This
+      // prevents accidental blank database records while the database uniqueness
+      // constraint and save path protect the same key against concurrent creates.
+      setEditing(null);
+      setNewClosingDefaults({
+        date: session.date,
+        branch: session.branch,
+        branch_id: session.branch_id || null,
+        shift: session.shift,
+        cashier_id: session.cashier_id || null,
+        cashier_employee_id: session.cashier_id || null,
+        cashier_name: session.cashier_name || '',
+      });
+      setNewClosingInstance((value) => value + 1);
+      setShowForm(true);
+      toast.success('New closing session opened. No record is created until you save it.');
+    } catch (error) {
+      toast.error(`Unable to open a closing session: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setIsOpeningNewClosing(false);
+    }
+  }, [findExistingClosingSession, isOpeningNewClosing, sessionContext]);
 
   // Only create wallet transactions for COUNTER (restaurant) sales.
   const autoWalletTx = async (saleData, saleId, prevSale = null) => {
@@ -678,19 +765,29 @@ export default function Sales() {
     // A finalized closing is unique per restaurant, branch, date and shift. The
     // application checks both canonical and legacy branch rows before creating
     // side effects; the database constraint is the final concurrency safeguard.
+    const session = {
+      date: data.date,
+      branch: data.branch,
+      branch_id: data.branch_id || null,
+      shift: data.shift,
+      cashier_id: data.cashier_id || data.cashier_employee_id || null,
+      cashier_name: data.cashier_name || '',
+    };
     const baseQuery = () => supabase
       .from('daily_sales')
       .select('*')
       .eq('restaurant_id', data.restaurant_id)
-      .eq('date', data.date)
-      .eq('shift', data.shift)
-      .limit(1);
+      .eq('date', session.date)
+      .eq('shift', session.shift)
+      .limit(50);
     const [canonical, legacy] = await Promise.all([
       data.branch_id ? baseQuery().eq('branch_id', data.branch_id) : Promise.resolve({ data: [], error: null }),
       baseQuery().is('branch_id', null).eq('branch', data.branch),
     ]);
     if (canonical.error || legacy.error) throw canonical.error || legacy.error;
-    const existing = firstRecord([...(canonical.data || []), ...(legacy.data || [])]);
+    const existing = Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+      .map((record) => [record.id, record])).values())
+      .find((record) => matchesSalesClosingSession(record, session)) || null;
     if (existing?.closing_state === 'draft') {
       return updateMut.mutateAsync({ id: existing.id, data, prev: existing, proofUrl, ocr });
     }
@@ -753,8 +850,8 @@ export default function Sales() {
                 </span>
               )}
             </Button>
-            <Button size="sm" onClick={() => { setShowForm(true); setEditing(null); }} className="w-full sm:w-auto">
-              <Plus className="w-4 h-4 mr-1" />New Closing
+            <Button size="sm" onClick={openNewClosing} disabled={isOpeningNewClosing} aria-busy={isOpeningNewClosing} className="w-full sm:w-auto">
+              {isOpeningNewClosing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}{isOpeningNewClosing ? 'Opening…' : 'New Closing'}
             </Button>
           </div>
         }
@@ -763,11 +860,13 @@ export default function Sales() {
       {(showForm || editing) && (
         <section aria-label="Sales Closing" className="mb-4 overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
           <UnifiedSalesClosing
-            key={editing?.id || 'new-closing'}
-            initial={editing || undefined}
+            key={editing?.id || `new-closing-${newClosingInstance}`}
+            initial={editing || newClosingDefaults || undefined}
             onSubmit={handleSave}
-            onCancel={() => { setEditing(null); setShowForm(false); }}
-            onNewClosing={() => { setEditing(null); setShowForm(true); }}
+            onCancel={() => { setEditing(null); setNewClosingDefaults(null); setShowForm(false); }}
+            onNewClosing={openNewClosing}
+            onSessionContextChange={updateClosingSessionContext}
+            isOpeningNewClosing={isOpeningNewClosing}
           />
         </section>
       )}
@@ -842,6 +941,7 @@ export default function Sales() {
                       toast.error('Driver Sales can only be edited by the restaurant Owner or assigned Branch Manager.');
                       return;
                     }
+                    setNewClosingDefaults(null);
                     setEditing(sale);
                     setShowForm(false);
                   }}

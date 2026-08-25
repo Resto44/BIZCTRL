@@ -519,7 +519,7 @@ const StickySummary = memo(function StickySummary({ totalSales, operatingResult,
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing }) {
+export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing, onSessionContextChange, isOpeningNewClosing = false }) {
   const { currency, lang, t } = useLanguage();
   const { user } = useAuth();
   const { role } = useRole();
@@ -910,6 +910,20 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   }, [cashiers, form.cashier_employee_id, form.cashier_id]);
   const defaultCashier = firstRecord(cashiers);
   const cashierDisplayName = form.cashier_name || selectedCashier?.full_name || defaultCashier?.full_name || user?.full_name || user?.email || '';
+
+  // Keep the outer New Closing action on the same stable business key as this
+  // single canonical workspace. The callback is observational only: it neither
+  // persists a draft nor resets any form state while the operator is typing.
+  useEffect(() => {
+    onSessionContextChange?.({
+      date: form.date,
+      branch: form.branch,
+      branch_id: selectedBranchId,
+      shift: form.shift,
+      cashier_id: form.cashier_id || form.cashier_employee_id || defaultCashier?.id || user?.id || null,
+      cashier_name: cashierDisplayName,
+    });
+  }, [cashierDisplayName, defaultCashier?.id, form.branch, form.cashier_employee_id, form.cashier_id, form.date, form.shift, onSessionContextChange, selectedBranchId, user?.id]);
 
   // Keep the cashier name and ID synchronized. This also repairs a stale cashier
   // identifier and auto-selects the sole cashier available to an Owner.
@@ -1610,7 +1624,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         <div className="mx-auto w-full max-w-6xl space-y-3 p-3 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:space-y-4 sm:p-4 sm:pb-6">
           <section className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between" aria-label="Closing mode">
             <div><p className="text-xs font-black uppercase tracking-wide text-slate-900">{isQuickClosing ? 'Quick Closing' : 'Advanced Closing'}</p><p className="text-[11px] text-muted-foreground">{isQuickClosing ? 'Complete the essential cash, payment, and reconciliation fields on one screen.' : 'Review source detail, purchases, expenses, and operating results before saving.'}</p></div>
-            {canUseAdvancedClosing && <div className="grid grid-cols-2 gap-1 rounded-lg border bg-background p-1"><Button type="button" size="sm" variant={isQuickClosing ? 'default' : 'ghost'} className="min-h-9" onClick={() => setClosingView('quick')}>Quick</Button><Button type="button" size="sm" variant={!isQuickClosing ? 'default' : 'ghost'} className="min-h-9" onClick={() => setClosingView('advanced')}>Advanced</Button></div>}
+            {canUseAdvancedClosing && <div className="grid grid-cols-2 gap-1 rounded-lg border bg-background p-1" role="group" aria-label="Closing mode"><Button type="button" size="sm" variant={isQuickClosing ? 'default' : 'ghost'} className="min-h-9" aria-pressed={isQuickClosing} aria-label="Switch to Quick Closing" onClick={() => setClosingView('quick')}>Quick</Button><Button type="button" size="sm" variant={!isQuickClosing ? 'default' : 'ghost'} className="min-h-9" aria-pressed={!isQuickClosing} aria-label="Switch to Advanced Closing" onClick={() => setClosingView('advanced')}>Advanced</Button></div>}
           </section>
           {isLocked && <div role="status" className="rounded-xl border border-slate-300 bg-slate-100 p-3 text-sm font-bold text-slate-800">This closing is locked. Financial values cannot be changed from this screen.</div>}
           {savedClosing && (
@@ -1622,7 +1636,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex">
                   <Button type="button" variant="outline" className="min-h-11" onClick={onCancel}>Open Closing</Button>
-                  <Button type="button" className="min-h-11 bg-emerald-600 hover:bg-emerald-700" onClick={() => onNewClosing?.()}>New Closing</Button>
+                  <Button type="button" className="min-h-11 bg-emerald-600 hover:bg-emerald-700" onClick={() => onNewClosing?.()} disabled={isOpeningNewClosing} aria-busy={isOpeningNewClosing}>{isOpeningNewClosing ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Opening…</> : 'New Closing'}</Button>
                 </div>
               </div>
             </div>

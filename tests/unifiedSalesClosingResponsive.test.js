@@ -143,8 +143,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('focusField(firstError)');
     expect(workspace).toContain('Closing already completed for this branch and shift.');
     expect(sales).toContain(".eq('restaurant_id', data.restaurant_id)");
-    expect(sales).toContain(".eq('date', data.date)");
-    expect(sales).toContain(".eq('shift', data.shift)");
+    expect(sales).toContain(".eq('date', session.date)");
+    expect(sales).toContain(".eq('shift', session.shift)");
     expect(sales).toContain('_alreadyExists: true');
   });
 
@@ -197,6 +197,35 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(migration).toContain('v_sales_total   := v_cash_sales + v_network_sales + v_credit_sales + v_other_sales;');
     expect(migration).toContain('cash_sales, network_sales, credit_sales, other_sales, sales_total');
     expect(migration).toContain('other_sales         = EXCLUDED.other_sales');
+  });
+
+  it('keeps Quick and Advanced as in-place presentation modes of the same closing session and makes New Closing idempotent by its business key', async () => {
+    const [workspace, sales, migration] = await Promise.all([
+      source('../src/components/sales/UnifiedSalesClosing.jsx'),
+      source('../src/pages/Sales.jsx'),
+      source('../src/supabase/20260825_daily_sales_closing_session_idempotency.sql'),
+    ]);
+
+    expect(workspace).toContain("const [closingView, setClosingView] = useState('quick');");
+    expect(workspace).toContain('aria-pressed={isQuickClosing}');
+    expect(workspace).toContain('aria-pressed={!isQuickClosing}');
+    expect(workspace).toContain('onSessionContextChange?.({');
+    expect(workspace).toContain('isOpeningNewClosing = false');
+    expect(workspace).not.toContain("key={editing?.id || 'new-closing'}");
+
+    expect(sales).toContain('const matchesSalesClosingSession = (record, session) => {');
+    expect(sales).toContain('const findExistingClosingSession = useCallback(async (session) => {');
+    expect(sales).toContain('const openNewClosing = useCallback(async () => {');
+    expect(sales).toContain('Resumed the existing draft closing');
+    expect(sales).toContain('No record is created until you save it.');
+    expect(sales).toContain('key={editing?.id || `new-closing-${newClosingInstance}`}');
+    expect(sales).toContain('matchesSalesClosingSession(record, session)');
+    expect(sales).toContain('disabled={isOpeningNewClosing}');
+
+    expect(migration).toContain('CREATE UNIQUE INDEX IF NOT EXISTS daily_sales_unique_closing_session_idx');
+    expect(migration).toContain("COALESCE(branch_id::text, 'legacy:' || lower(btrim(branch)))");
+    expect(migration).toContain("COALESCE(cashier_id::text, 'legacy:' || lower(btrim(cashier_name)))");
+    expect(migration).toContain('Prevents duplicate Sales Closing sessions by restaurant, branch, date, shift, and cashier');
   });
 
   it('enforces the same Draft boundary in database triggers so server-side invoice and cash effects wait for Finalize', async () => {
