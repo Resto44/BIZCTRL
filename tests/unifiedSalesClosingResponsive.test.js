@@ -273,7 +273,9 @@ describe('Unified Sales Closing workflow contract', () => {
 
     expect(rpcMigration).toContain('CREATE OR REPLACE FUNCTION public.request_daily_sales_closing_correction');
     expect(rpcMigration).toContain('SECURITY DEFINER');
-    expect(rpcMigration).toContain('erp_can_manage_workspace_customization(v_closing.restaurant_id)');
+    expect(rpcMigration).toContain("v_restaurant_id := NULLIF(v_closing.restaurant_id, '')::uuid");
+    expect(rpcMigration).toContain('erp_can_manage_workspace_customization(v_restaurant_id)');
+    expect(rpcMigration).toContain('m.restaurant_id = v_restaurant_id');
     expect(rpcMigration).toContain("'action', 'correction_requested'");
     expect(rpcMigration).toContain('GRANT EXECUTE ON FUNCTION public.request_daily_sales_closing_correction(uuid) TO authenticated');
   });
