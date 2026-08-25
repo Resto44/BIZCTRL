@@ -68,8 +68,9 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const networkTotal = baseNetworkTotal + customSourcePaymentTotals.network;');
     expect(workspace).toContain('const creditTotal = baseCreditTotal + customSourcePaymentTotals.credit;');
     expect(workspace).toContain('const otherPaymentTotal = baseOtherPaymentTotal + customSourcePaymentTotals.other;');
-    expect(workspace).toContain('default_payment_method: source.default_payment_method || \'other\'');
-    expect(workspace).toContain('payment_bucket: paymentBucketForCode(source.default_payment_method)');
+    expect(workspace).toContain('buildSalesSourceClosingSnapshots(customSourceSummaries');
+    expect(workspace).toContain('payment_bucket: paymentBucketForCode(snapshot.default_payment_method)');
+    expect(workspace).toContain('salesSourceTodayTotal(customSourceSummaries)');
     expect(workspace).toContain('const expectedCashBase = useAutomaticSales && automaticClosingSnapshot.expectedCash !== null');
     expect(workspace).toContain('const expectedCash = expectedCashBase + customSourcePaymentTotals.cash;');
   });
@@ -323,10 +324,10 @@ describe('Sales source daily and historical balance contract', () => {
 
     expect(workspace).toContain('customSourceSummaries.reduce((totals, { source, today }) =>');
     expect(workspace).toContain('totals[paymentBucketForCode(source.default_payment_method)] += today;');
-    expect(workspace).toContain('.filter(({ today }) => today > 0)');
-    expect(workspace).toContain('.map(({ source, today }) => ({');
-    expect(workspace).toContain('amount: today');
-    expect(workspace).toContain('cumulative values are derived from earlier closing records at runtime.');
+    expect(workspace).toContain('buildSalesSourceClosingSnapshots(customSourceSummaries');
+    expect(workspace).toContain('Today values. Historical Previous values remain display/audit context.');
+    expect(workspace).toContain('`amount` / `today_amount` are the only');
+    expect(workspace).toContain('never added to current-period accounting.');
   });
 
   it('does not double-count saved cash-classified source amounts when a closing is reopened for review or finalization', async () => {

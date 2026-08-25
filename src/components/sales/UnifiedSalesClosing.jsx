@@ -52,6 +52,7 @@ import { toast } from 'sonner';
 import { useSalesSources } from '@/hooks/useSalesSources';
 import { useSalesClosingCustomization } from '@/lib/SalesClosingCustomizationContext';
 import { newSalesClosingCustomField } from '@/lib/salesClosingCustomization';
+import { buildSalesSourceClosingSnapshots, salesSourceTodayTotal } from '@/lib/salesSourceClosingLifecycle';
 import { SalesClosingFieldDialog, SalesSourceDialog, newSalesClosingSource } from '@/components/sales/SalesClosingCustomizationDialogs';
 import { Banknote as BanknoteIcon, CreditCard as CreditCardIcon, UserCheck, PlusCircle, ShoppingBag, Truck, Star, Globe, Smartphone, UtensilsCrossed, Package as PackageIcon, DollarSign as DollarSignIcon, Gift, Users as UsersIcon, Building2 as Building2Icon, Zap as ZapIcon, Activity as ActivityIcon, BarChart3 as BarChart3Icon, Shield } from 'lucide-react';
 
@@ -808,10 +809,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     }, { cash: 0, network: 0, credit: 0, other: 0 }),
     [customSourceSummaries]
   );
-  const customTotal = useMemo(() =>
-    customSourcePaymentTotals.cash + customSourcePaymentTotals.network + customSourcePaymentTotals.credit + customSourcePaymentTotals.other,
-    [customSourcePaymentTotals]
-  );
+  // The Sales Sources section and every revenue calculation use only current
+  // Today values. Historical Previous values remain display/audit context.
+  const customTotal = useMemo(() => salesSourceTodayTotal(customSourceSummaries), [customSourceSummaries]);
   const customClosingFields = useMemo(() => configuredClosingFields.filter((field) => !field.is_system && field.is_active !== false), [configuredClosingFields]);
   const configuredClosingFieldByKey = useMemo(() => new Map(configuredClosingFields.map((field) => [field.field_key, field])), [configuredClosingFields]);
   const closingFieldLabel = useCallback((fieldKey, fallback) => {
@@ -1529,21 +1529,21 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         credit: creditTotal,
         pos_entries_json: JSON.stringify(posEntries.map(({ id, ...rest }) => rest)),
         credit_entries_json: JSON.stringify(creditEntries.map(({ id, ...rest }) => rest)),
-        // Dynamic Sales Sources — persist the daily amount only. Historical and
-        // cumulative values are derived from earlier closing records at runtime.
+        // Dynamic Sales Sources — `amount` / `today_amount` are the only
+        // revenue inputs. Previous and Total are immutable historical context
+        // retained for History and never added to current-period accounting.
         sales_sources_json: JSON.stringify(
-          customSourceSummaries
-            .filter(({ today }) => today > 0)
-            .map(({ source, today }) => ({
-              source_id: source.id,
-              source_key: source.system_key || source.id,
-              name_en: source.name_en,
-              name_ar: source.name_ar,
-              amount: today,
-              default_payment_method: source.default_payment_method || 'other',
-              payment_bucket: paymentBucketForCode(source.default_payment_method),
-              included_in_revenue: source.included_in_revenue,
-            }))
+          buildSalesSourceClosingSnapshots(customSourceSummaries, {
+            branchId,
+            branch: selectedBranch?.key || selectedBranch?.branch_key || form.branch,
+            date: form.date,
+            shift: form.shift,
+            cashierId,
+            cashierName: cashierDisplayName,
+          }).map((snapshot) => ({
+            ...snapshot,
+            payment_bucket: paymentBucketForCode(snapshot.default_payment_method),
+          }))
         ),
         custom_sources_total: otherPaymentTotal,
         sales_closing_custom_fields: customClosingFields

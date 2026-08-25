@@ -115,7 +115,13 @@ export default function SalesListItem({ sale, record = sale, onEdit, onDelete, s
 
       {(hasOperatingResult || sourceSnapshots.length > 0) && <div className="mb-2 space-y-1.5 rounded-lg border border-border/70 bg-muted/20 px-2 py-1.5 text-[10px]">
         {hasOperatingResult && <div className="flex items-center justify-between gap-2"><span className="text-muted-foreground">Operating result</span><span className={`font-bold tabular-nums ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{operatingResult >= 0 ? '+' : '−'}{currency}{Math.abs(operatingResult).toLocaleString()}</span></div>}
-        {sourceSnapshots.map((source) => <div key={source.source_id || source.source_key || source.name_en} className="flex items-center justify-between gap-2"><span className="min-w-0 truncate text-muted-foreground" data-i18n-skip="true">{source.name_en || source.name_ar || source.source_key || 'Sales source'}</span><span className="shrink-0 font-medium tabular-nums text-foreground">{currency}{Math.max(0, Number(source.amount ?? source.today_amount) || 0).toLocaleString()}</span></div>)}
+        {sourceSnapshots.map((source) => {
+          const todayAmount = Math.max(0, Number(source.amount ?? source.today_amount) || 0);
+          const hasHistoricalContext = source.previous_amount !== null && source.previous_amount !== undefined && source.total_amount !== null && source.total_amount !== undefined;
+          const previousAmount = Math.max(0, Number(source.previous_amount) || 0);
+          const totalAmount = hasHistoricalContext ? Math.max(0, Number(source.total_amount) || 0) : todayAmount;
+          return <div key={source.source_id || source.source_key || source.name_en} className="flex items-center justify-between gap-2"><span className="min-w-0 truncate text-muted-foreground" data-i18n-skip="true">{source.name_en || source.name_ar || source.source_key || 'Sales source'}</span><span className="shrink-0 text-right font-medium tabular-nums text-foreground">{t('salesClosing.sources.today')} {currency}{todayAmount.toLocaleString()}{hasHistoricalContext && <> · {t('salesClosing.sources.previous')} {currency}{previousAmount.toLocaleString()} · {t('salesClosing.sources.total')} {currency}{totalAmount.toLocaleString()}</>}</span></div>;
+        })}
       </div>}
 
       <div className="mt-2 flex items-center justify-between">
