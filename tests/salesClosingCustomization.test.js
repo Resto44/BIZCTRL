@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
+import { normalizeSalesClosingField, salesClosingFieldKey } from '../src/lib/salesClosingCustomization';
 
 const source = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 describe('Sales Closing Customization runtime contract', () => {
+  it('derives a stable valid field key from the required English label when an operator leaves the optional key blank', () => {
+    expect(salesClosingFieldKey('Delivery Reference #')).toBe('delivery_reference');
+    expect(normalizeSalesClosingField({ label_en: 'Delivery Reference #' }).field_key).toBe('delivery_reference');
+    expect(normalizeSalesClosingField({ field_key: 'Legacy Key', label_en: 'New Label' }).field_key).toBe('legacy_key');
+  });
+
   it('registers one guarded canonical closing route, a separate centralized Sales Source Management route, and discoverable sales navigation', async () => {
     const [app, sidebar, management, sales] = await Promise.all([
       source('../src/App.jsx'),
@@ -43,6 +50,27 @@ describe('Sales Closing Customization runtime contract', () => {
     expect(migration).toContain('CREATE TABLE IF NOT EXISTS public.sales_closing_config');
     expect(migration).toContain('ENABLE ROW LEVEL SECURITY');
     expect(migration).toContain('erp_can_manage_workspace_customization(restaurant_id)');
+  });
+
+  it('preserves exact saved history snapshots and writes future operating results without recalculating historical records', async () => {
+    const [workspace, presentation, card, migration] = await Promise.all([
+      source('../src/components/sales/UnifiedSalesClosing.jsx'),
+      source('../src/lib/dailySalesPresentation.js'),
+      source('../src/components/sales/SalesListItem.jsx'),
+      source('../src/supabase/20260825_daily_sales_closing_results.sql'),
+    ]);
+
+    expect(workspace).toContain('expenses_total: expensesTotal');
+    expect(workspace).toContain('operating_result: operatingResult');
+    expect(presentation).toContain('cashier_name: sale.cashier_name');
+    expect(presentation).toContain('shift: sale.shift');
+    expect(presentation).toContain('operating_result: sale.operating_result');
+    expect(card).toContain('parseSalesSourceSnapshots');
+    expect(card).toContain('Cashier:');
+    expect(card).toContain('Shift:');
+    expect(card).toContain('Operating result');
+    expect(migration).toContain('ADD COLUMN IF NOT EXISTS expenses_total NUMERIC');
+    expect(migration).toContain('ADD COLUMN IF NOT EXISTS operating_result NUMERIC');
   });
 
   it('protects historical closing data while allowing future configuration changes', async () => {

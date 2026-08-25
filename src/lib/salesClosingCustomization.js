@@ -28,12 +28,25 @@ export function normalizeSalesClosingConfig(value) {
   };
 }
 
+export function salesClosingFieldKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64);
+}
+
 export function normalizeSalesClosingField(field, index = 0) {
   const type = SALES_CLOSING_FIELD_TYPES.includes(field?.field_type) ? field.field_type : 'text';
+  const label_en = String(field?.label_en || '').trim();
   return {
     id: field?.id || '',
-    field_key: String(field?.field_key || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'),
-    label_en: String(field?.label_en || '').trim(),
+    // New custom fields derive a durable key from their required English label.
+    // Explicit keys retain precedence so editing a saved field never changes its
+    // historical identity or causes a uniqueness conflict.
+    field_key: salesClosingFieldKey(field?.field_key) || salesClosingFieldKey(label_en),
+    label_en,
     label_ar: String(field?.label_ar || '').trim(),
     help_text: String(field?.help_text || '').trim(),
     field_type: type,

@@ -1568,6 +1568,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         manager_approved_by: managerApproved ? (user?.email || '') : '',
 
         approved_purchases_total: approvedPurchasesTotal,
+        // Preserve the exact calculation context for History. Existing records
+        // remain untouched; these values are written only with future saves.
+        expenses_total: expensesTotal,
+        operating_result: operatingResult,
 
         restaurant_id: activeRestaurant?.id || null,
       };

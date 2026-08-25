@@ -14,6 +14,16 @@ const SETTLE_BADGE = {
   rejected: { label: 'Rejected', icon: null, cls: 'text-red-600 bg-red-50' },
 };
 
+const parseSalesSourceSnapshots = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+};
+
 export default function SalesListItem({ sale, record = sale, onEdit, onDelete, selected = false, onToggleSelect = null }) {
   const { t, currency } = useLanguage();
   const { branches } = useTenant();
@@ -31,6 +41,10 @@ export default function SalesListItem({ sale, record = sale, onEdit, onDelete, s
   const total = rCash + rNet + credit + customSourcesTotal;
   const branchLabel = branches.find(b => b.key === sale.branch)?.label || sale.branch;
   const managerName = sale.manager_name || sale.manager_email || sale.created_by || '—';
+  const cashierName = sale.cashier_name || managerName;
+  const sourceSnapshots = parseSalesSourceSnapshots(sale.sales_sources_json);
+  const hasOperatingResult = sale.operating_result !== null && sale.operating_result !== undefined && Number.isFinite(Number(sale.operating_result));
+  const operatingResult = hasOperatingResult ? Number(sale.operating_result) : 0;
   const hasNetwork = rNet > 0;
 
   const { data: settlements = [] } = useQuery({
@@ -66,10 +80,10 @@ export default function SalesListItem({ sale, record = sale, onEdit, onDelete, s
         </div>
       </div>
 
-      <div className="mb-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        <UserRound className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-        <span className="shrink-0 font-medium text-foreground">Manager:</span>
-        <span className="truncate font-medium text-foreground">{managerName}</span>
+      <div className="mb-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <span className="flex min-w-0 items-center gap-1.5"><UserRound className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /><span className="shrink-0 font-medium text-foreground">Cashier:</span><span className="truncate font-medium text-foreground">{cashierName}</span></span>
+        {cashierName !== managerName && <span className="min-w-0 truncate"><span className="font-medium text-foreground">Manager:</span> {managerName}</span>}
+        {sale.shift && <span className="shrink-0"><span className="font-medium text-foreground">Shift:</span> {sale.shift}</span>}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-secondary/40 rounded-lg px-2 py-1.5 mb-2">
@@ -98,6 +112,11 @@ export default function SalesListItem({ sale, record = sale, onEdit, onDelete, s
           </span>
         </div>
       </div>
+
+      {(hasOperatingResult || sourceSnapshots.length > 0) && <div className="mb-2 space-y-1.5 rounded-lg border border-border/70 bg-muted/20 px-2 py-1.5 text-[10px]">
+        {hasOperatingResult && <div className="flex items-center justify-between gap-2"><span className="text-muted-foreground">Operating result</span><span className={`font-bold tabular-nums ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{operatingResult >= 0 ? '+' : '−'}{currency}{Math.abs(operatingResult).toLocaleString()}</span></div>}
+        {sourceSnapshots.map((source) => <div key={source.source_id || source.source_key || source.name_en} className="flex items-center justify-between gap-2"><span className="min-w-0 truncate text-muted-foreground" data-i18n-skip="true">{source.name_en || source.name_ar || source.source_key || 'Sales source'}</span><span className="shrink-0 font-medium tabular-nums text-foreground">{currency}{Math.max(0, Number(source.amount ?? source.today_amount) || 0).toLocaleString()}</span></div>)}
+      </div>}
 
       <div className="mt-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
