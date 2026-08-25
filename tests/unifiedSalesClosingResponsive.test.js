@@ -244,6 +244,17 @@ describe('Sales source daily and historical balance contract', () => {
     expect(workspace).toContain('amount: today');
     expect(workspace).toContain('cumulative values are derived from earlier closing records at runtime.');
   });
+
+  it('does not double-count saved cash-classified source amounts when a closing is reopened for review or finalization', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).toContain('const salesSourceAmountForBucket = (record, bucket) => parseSalesSourceEntries(record)');
+    expect(workspace).toContain('entry?.payment_bucket || paymentBucketForCode(entry?.default_payment_method)');
+    expect(workspace).toContain("salesSourceAmountForBucket(initial, 'cash')");
+    expect(workspace).toContain('const baseCash = initial?.id');
+    expect(workspace).toContain('Remove their saved daily snapshot before the live source');
+    expect(workspace).toContain('const cashSales = baseCashSales + customSourcePaymentTotals.cash;');
+  });
 });
 
 

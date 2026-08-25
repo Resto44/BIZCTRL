@@ -102,6 +102,18 @@ const paymentBucketForCode = (value) => {
   return 'other';
 };
 
+// A saved closing stores source entries as daily snapshots. When that closing is
+// reopened, its aggregate cash field already includes any cash-classified source
+// amounts. Reconstruct the snapshot bucket total from the saved record rather
+// than current source configuration, which may have changed since the close.
+const salesSourceAmountForBucket = (record, bucket) => parseSalesSourceEntries(record)
+  .reduce((total, entry) => {
+    if (entry?.included_in_revenue === false) return total;
+    const entryBucket = entry?.payment_bucket || paymentBucketForCode(entry?.default_payment_method);
+    if (entryBucket !== bucket) return total;
+    return total + Math.max(0, Number(entry?.amount ?? entry?.today_amount) || 0);
+  }, 0);
+
 const IDENTITY_FIELD_DEFAULTS = [
   { field_key: 'branch', fallback: 'Branch', sort_order: 0 },
   { field_key: 'cashier', fallback: 'Cashier', sort_order: 10 },
@@ -707,7 +719,13 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     const storedCash = initial?.restaurant_cash !== undefined
       ? Number(initial.restaurant_cash)
       : Number(initial?.cash);
-    return Number.isFinite(storedCash) && storedCash ? String(storedCash) : '';
+    // `restaurant_cash` on an existing closing already contains cash-classified
+    // source entries. Remove their saved daily snapshot before the live source
+    // cards add those amounts back into the current calculation.
+    const baseCash = initial?.id
+      ? storedCash - salesSourceAmountForBucket(initial, 'cash')
+      : storedCash;
+    return Number.isFinite(baseCash) && baseCash ? String(Math.max(0, baseCash)) : '';
   });
 
   // ── Cash Reconciliation inputs ────────────────────────────────────────────
