@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
-  calcLineTotal, calcInvoiceTotals, computeApprovalStatus,
+  calcLineTotal, calcInvoiceTotals, computeApprovalStatus, normalizePurchaseLine,
   createPurchaseInvoice, updatePurchaseInvoice, addInvoicePayment
 } from '@/lib/procurementEngine';
 import OcrScanDialog from './OcrScanDialog';
@@ -224,7 +224,7 @@ function PurchaseInvoiceItemRow({
         <div className="min-w-0">
           <Label className="text-[10px] text-muted-foreground">Line Total</Label>
           <div className="h-8 flex items-center px-2 rounded-md bg-primary/5 border border-border text-xs font-semibold text-primary truncate">
-            {(item.line_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {calcLineTotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         </div>
       </div>
@@ -255,7 +255,9 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
   });
 
   const [items, setItems] = useState(
-    invoice?.items?.length ? invoice.items.map(i => ({ ...i, _id: Math.random().toString(36).slice(2) })) : [emptyItem()]
+    invoice?.items?.length
+      ? invoice.items.map(i => ({ ...normalizePurchaseLine(i), _id: Math.random().toString(36).slice(2) }))
+      : [emptyItem()]
   );
 
   const [additionalCosts, setAdditionalCosts] = useState(
@@ -359,8 +361,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
         updated.product_name = '';
       }
       
-      updated.line_total = calcLineTotal(updated);
-      return updated;
+      return normalizePurchaseLine(updated);
     }));
   }, []);
 
@@ -440,10 +441,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
     savingRef.current = true;
     setSaving(true);
     try {
-      const cleanItems = items.map(({ _id, ...i }) => ({
-        ...i,
-        line_total: calcLineTotal(i),
-      }));
+      const cleanItems = items.map(({ _id, ...i }) => normalizePurchaseLine(i));
       const cleanCosts = additionalCosts.map(({ _id, ...c }) => c);
 
       // Resolve branch_id UUID from branch key string

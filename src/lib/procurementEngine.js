@@ -29,24 +29,79 @@ export function computeApprovalStatus(totalAmount) {
   return totalAmount < AUTO_APPROVE_THRESHOLD ? 'auto_approved' : 'pending';
 }
 
-// ── Line item calculations ─────────────────────────────────────────────────
-export function calcLineTotal({ quantity = 0, unit_cost = 0, discount = 0, tax = 0 }) {
-  const base = quantity * unit_cost;
-  const afterDiscount = base - (discount || 0);
-  const taxAmount = afterDiscount * ((tax || 0) / 100);
-  return Math.max(0, afterDiscount + taxAmount);
+// ── Canonical purchase calculations ─────────────────────────────────────────
+// Money is persisted as numeric in Postgres and displayed at two decimals.  Keep
+// the same precision at every client boundary so a stale or binary float value
+// cannot become an accounting value downstream.
+const MONEY_DECIMALS = 2;
+const MONEY_FACTOR = 10 ** MONEY_DECIMALS;
+
+function asFiniteNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+export function roundMoney(value) {
+  return Math.round((asFiniteNumber(value) + Number.EPSILON) * MONEY_FACTOR) / MONEY_FACTOR;
+}
+
+export function calcPurchaseLine({ quantity = 0, unit_cost = 0, discount = 0, tax = 0 } = {}) {
+  const normalizedQuantity = Math.max(0, asFiniteNumber(quantity));
+  const normalizedUnitCost = Math.max(0, asFiniteNumber(unit_cost));
+  const normalizedDiscount = Math.max(0, asFiniteNumber(discount));
+  const normalizedTax = Math.min(100, Math.max(0, asFiniteNumber(tax)));
+  const baseLineAmount = roundMoney(normalizedQuantity * normalizedUnitCost);
+  const discountAmount = roundMoney(Math.min(normalizedDiscount, baseLineAmount));
+  const discountedAmount = roundMoney(baseLineAmount - discountAmount);
+  const taxAmount = roundMoney(discountedAmount * (normalizedTax / 100));
+  const lineTotal = roundMoney(discountedAmount + taxAmount);
+
+  return {
+    quantity: normalizedQuantity,
+    unitCost: normalizedUnitCost,
+    discountAmount,
+    taxRate: normalizedTax,
+    baseLineAmount,
+    discountedAmount,
+    taxAmount,
+    lineTotal,
+  };
+}
+
+export function calcLineTotal(line) {
+  return calcPurchaseLine(line).lineTotal;
+}
+
+export function normalizePurchaseLine(line = {}) {
+  const calculated = calcPurchaseLine(line);
+  return {
+    ...line,
+    quantity: calculated.quantity,
+    unit_cost: calculated.unitCost,
+    discount: calculated.discountAmount,
+    tax: calculated.taxRate,
+    line_total: calculated.lineTotal,
+  };
+}
+
+export function normalizePurchaseLines(items = []) {
+  return (Array.isArray(items) ? items : []).map(normalizePurchaseLine);
 }
 
 export function calcInvoiceTotals(items = [], additionalCosts = []) {
-  const subtotal = items.reduce((sum, item) => sum + (item.line_total || calcLineTotal(item)), 0);
-  const taxAmount = items.reduce((sum, item) => {
-    const base = (item.quantity || 0) * (item.unit_cost || 0) - (item.discount || 0);
-    return sum + base * ((item.tax || 0) / 100);
-  }, 0);
-  const discountAmount = items.reduce((sum, item) => sum + (item.discount || 0), 0);
-  const additionalTotal = additionalCosts.reduce((sum, c) => sum + (c.amount || 0), 0);
-  const grandTotal = subtotal + additionalTotal;
-  return { subtotal, taxAmount, discountAmount, additionalTotal, grandTotal };
+  // Never trust line_total from component state or persisted JSON. Recalculate
+  // every line from quantity, unit cost, discount, and tax in the one canonical
+  // function so UI, save, payment validation, and inventory agree.
+  const lines = normalizePurchaseLines(items);
+  const subtotal = roundMoney(lines.reduce((sum, item) => sum + item.line_total, 0));
+  const taxAmount = roundMoney(lines.reduce((sum, item) => sum + calcPurchaseLine(item).taxAmount, 0));
+  const discountAmount = roundMoney(lines.reduce((sum, item) => sum + calcPurchaseLine(item).discountAmount, 0));
+  const additionalTotal = roundMoney((Array.isArray(additionalCosts) ? additionalCosts : []).reduce(
+    (sum, cost) => sum + Math.max(0, asFiniteNumber(cost?.amount)),
+    0,
+  ));
+  const grandTotal = roundMoney(subtotal + additionalTotal);
+  return { subtotal, taxAmount, discountAmount, additionalTotal, grandTotal, lines };
 }
 
 function assertValidInvoiceLines(items = [], additionalCosts = []) {
@@ -196,19 +251,21 @@ export async function approveInvoice(invoiceId, createdBy) {
 
 // ── Process Approved Invoice: Inventory + Debt Record ─────────────────────
 export async function processApprovedInvoice(invoice, createdBy) {
-  const items = invoice.items || [];
+  const items = normalizePurchaseLines(invoice.items || []);
   const additionalCosts = invoice.additional_costs || [];
   const { grandTotal } = calcInvoiceTotals(items, additionalCosts);
+  const inventoryLines = distributeAdditionalCosts(items, additionalCosts);
 
-  // 1. Update inventory for each line item
-  for (const item of items) {
+  // 1. Update inventory for each line item. Additional document-level costs are
+  // allocated once, proportionally, through the existing inventory-cost model.
+  for (const item of inventoryLines) {
     if (!item.product_id) continue;
     await updateInventoryOnPurchase({
       productId:    item.product_id,
       productName:  item.product_name,
       branch:       invoice.branch,
       quantity:     item.quantity || 0,
-      unitCost:     item.unit_cost || 0,
+      unitCost:     item.effective_unit_cost ?? item.unit_cost ?? 0,
       unit:         item.unit,
       createdBy,
       supplierId:   invoice.supplier_id,
@@ -295,19 +352,24 @@ export async function updateInventoryOnPurchase({
     .single();
 
   if (existing) {
-    // Update: recalculate average cost
-    const oldQty = existing.quantity || 0;
-    const oldCost = existing.average_cost || existing.last_purchase_price || 0;
-    const newQty = oldQty + quantity;
-    const newAvgCost = newQty > 0 ? ((oldQty * oldCost) + (quantity * unitCost)) / newQty : unitCost;
-    const newTotalValue = newQty * newAvgCost;
+    // Update: recalculate average cost using the same rounded monetary values
+    // used by the invoice calculation flow.
+    const oldQty = Math.max(0, asFiniteNumber(existing.quantity));
+    const oldCost = Math.max(0, asFiniteNumber(existing.average_cost ?? existing.last_purchase_price));
+    const purchaseQuantity = Math.max(0, asFiniteNumber(quantity));
+    const purchaseUnitCost = Math.max(0, asFiniteNumber(unitCost));
+    const newQty = oldQty + purchaseQuantity;
+    const newAvgCost = newQty > 0
+      ? roundMoney(((oldQty * oldCost) + (purchaseQuantity * purchaseUnitCost)) / newQty)
+      : purchaseUnitCost;
+    const newTotalValue = roundMoney(newQty * newAvgCost);
 
     const { error } = await supabase
       .from('inventory')
       .update({
         quantity: newQty,
         average_cost: newAvgCost,
-        last_purchase_price: unitCost,
+        last_purchase_price: purchaseUnitCost,
         total_value: newTotalValue,
         last_updated: new Date().toISOString(),
         updated_date: new Date().toISOString(),
@@ -316,18 +378,20 @@ export async function updateInventoryOnPurchase({
 
     if (error) console.error('[procurementEngine] inventory update error:', error.message);
   } else {
-    // Create new inventory record
+    // Create new inventory record from the normalized purchase quantity and cost.
+    const purchaseQuantity = Math.max(0, asFiniteNumber(quantity));
+    const purchaseUnitCost = Math.max(0, asFiniteNumber(unitCost));
     const { error } = await supabase
       .from('inventory')
       .insert({
         product_id: productId,
         product_name: productName,
         branch,
-        quantity,
+        quantity: purchaseQuantity,
         opening_stock: 0,
-        average_cost: unitCost,
-        last_purchase_price: unitCost,
-        total_value: quantity * unitCost,
+        average_cost: purchaseUnitCost,
+        last_purchase_price: purchaseUnitCost,
+        total_value: roundMoney(purchaseQuantity * purchaseUnitCost),
         unit: unit || '',
         date: new Date().toISOString().split('T')[0],
         created_by: createdBy,
@@ -430,18 +494,18 @@ export async function addInvoicePayment({
 
   if (fetchError) throw new Error(`Invoice fetch failed: ${fetchError.message}`);
 
-  const paymentAmount = Number(amount);
+  const paymentAmount = roundMoney(amount);
   if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
     throw new Error('Payment amount must be greater than zero.');
   }
 
-  const newPaidAmount = Number(invoice.paid_amount || 0) + paymentAmount;
-  const totalAmount = Number(invoice.total_amount || 0);
+  const newPaidAmount = roundMoney(asFiniteNumber(invoice.paid_amount) + paymentAmount);
+  const totalAmount = roundMoney(invoice.total_amount);
   if (newPaidAmount > totalAmount + 0.005) {
     throw new Error('Payment amount cannot exceed the outstanding invoice balance.');
   }
 
-  const remaining = totalAmount - newPaidAmount;
+  const remaining = roundMoney(totalAmount - newPaidAmount);
   const newStatus = computeInvoiceStatus(totalAmount, newPaidAmount);
   const paymentDate = date || new Date().toISOString().split('T')[0];
   const isCash = !paymentMethod || paymentMethod === 'cash';
@@ -619,19 +683,28 @@ export function computeProcurementKPIs(invoices = [], payments = []) {
 
 // ── Distribute Additional Costs Proportionally ────────────────────────────
 export function distributeAdditionalCosts(items = [], additionalCosts = []) {
-  const totalAdditional = additionalCosts.reduce((s, c) => s + (c.amount || 0), 0);
-  if (totalAdditional === 0 || items.length === 0) return items;
+  const normalizedItems = normalizePurchaseLines(items);
+  const totalAdditional = roundMoney((Array.isArray(additionalCosts) ? additionalCosts : []).reduce(
+    (sum, cost) => sum + Math.max(0, asFiniteNumber(cost?.amount)),
+    0,
+  ));
+  if (totalAdditional === 0 || normalizedItems.length === 0) return normalizedItems;
 
-  const subtotal = items.reduce((s, i) => s + (i.line_total || 0), 0);
-  if (subtotal === 0) return items;
+  const subtotal = roundMoney(normalizedItems.reduce((sum, item) => sum + item.line_total, 0));
+  if (subtotal === 0) return normalizedItems;
 
-  return items.map(item => {
-    const share = (item.line_total || 0) / subtotal;
-    const allocatedCost = totalAdditional * share;
+  let allocated = 0;
+  return normalizedItems.map((item, index) => {
+    // Assign any rounding remainder to the last line so allocated costs always
+    // reconcile exactly to the document-level additional-cost total.
+    const allocatedCost = index === normalizedItems.length - 1
+      ? roundMoney(totalAdditional - allocated)
+      : roundMoney(totalAdditional * (item.line_total / subtotal));
+    allocated = roundMoney(allocated + allocatedCost);
     return {
       ...item,
       allocated_additional_cost: allocatedCost,
-      effective_unit_cost: ((item.line_total || 0) + allocatedCost) / (item.quantity || 1),
+      effective_unit_cost: roundMoney((item.line_total + allocatedCost) / item.quantity),
     };
   });
 }
