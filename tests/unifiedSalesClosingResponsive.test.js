@@ -171,14 +171,15 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
   });
 
-  it('runs financial side effects only for the one committed finalized transition, never for a draft save', async () => {
+  it('runs only non-accounting downstream side effects after the one committed finalized transition', async () => {
     const sales = await source('../src/pages/Sales.jsx');
 
     expect(sales).toContain('if (!savedClosing?._finalizedTransition || savedClosing?._idempotent) return;');
     const guard = sales.indexOf('if (!savedClosing?._finalizedTransition || savedClosing?._idempotent) return;');
     expect(sales.indexOf('await createSalesInvoice')).toBeGreaterThan(guard);
-    expect(sales.indexOf('autoWalletTx(savedClosing, savedClosing.id, previousClosing)')).toBeGreaterThan(guard);
-    expect(sales.indexOf('autoSettle(savedClosing, savedClosing.id, proofUrl || null, ocr || null, previousClosing)')).toBeGreaterThan(guard);
+    expect(sales).toContain('Wallet-first settlement is part of the canonical finalization transaction.');
+    expect(sales).not.toContain('autoWalletTx(savedClosing, savedClosing.id, previousClosing)');
+    expect(sales).not.toContain('autoSettle(savedClosing, savedClosing.id, proofUrl || null, ocr || null, previousClosing)');
     expect(sales.indexOf('autoSaveCreditDebts(savedClosing, savedClosing.id)')).toBeGreaterThan(guard);
   });
 

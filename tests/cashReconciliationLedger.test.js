@@ -3,7 +3,9 @@ import {
   PAYMENT_METHODS,
   cashReconciliationSnapshot,
   dailyClosingDefaults,
+  dailyFixedExpenseAllocation,
   paymentBuckets,
+  walletFirstSettlementAllocation,
 } from '../src/lib/closing/CashReconciliationLedger';
 import { buildSalesSourceClosingSnapshots } from '../src/lib/salesSourceClosingLifecycle';
 
@@ -29,6 +31,8 @@ describe('ERP cash reconciliation ledger', () => {
     expect(result.difference).toBe(-150);
     expect(result.shortage).toBe(150);
     expect(result.ownerSettlementRequired).toBe(150);
+    expect(result.branchWalletApplied).toBe(0);
+    expect(result.ownerPaymentRequired).toBe(150);
     expect(result.overage).toBe(0);
   });
 
@@ -56,6 +60,53 @@ describe('ERP cash reconciliation ledger', () => {
     expect(result.revenueToday).toBe(2000);
     expect(result.expectedCash).toBe(1500);
     expect(result.difference).toBe(0);
+  });
+
+  it('allocates a shortage to the Branch Wallet before owner funding', () => {
+    expect(walletFirstSettlementAllocation({ requiredFunding: 166.67, branchWalletAvailable: 500 })).toMatchObject({
+      branchWalletApplied: 166.67,
+      ownerPaymentRequired: 0,
+      walletRemaining: 333.33,
+      totalCovered: 166.67,
+      settlementStatus: 'Paid from Branch Wallet',
+    });
+    expect(walletFirstSettlementAllocation({ requiredFunding: 166.67, branchWalletAvailable: 100 })).toMatchObject({
+      branchWalletApplied: 100,
+      ownerPaymentRequired: 66.67,
+      walletRemaining: 0,
+      totalCovered: 166.67,
+      settlementStatus: 'Partially paid from Branch Wallet',
+    });
+    expect(walletFirstSettlementAllocation({ requiredFunding: 166.67, branchWalletAvailable: 0 })).toMatchObject({
+      branchWalletApplied: 0,
+      ownerPaymentRequired: 166.67,
+      walletRemaining: 0,
+      totalCovered: 166.67,
+      settlementStatus: 'Owner payment required',
+    });
+    expect(walletFirstSettlementAllocation({ requiredFunding: 0, branchWalletAvailable: 500 })).toMatchObject({
+      branchWalletApplied: 0,
+      ownerPaymentRequired: 0,
+      totalCovered: 0,
+      settlementStatus: 'No funding required',
+    });
+  });
+
+  it('allocates fixed monthly expenses per configured business day without making funding revenue', () => {
+    const fixedToday = dailyFixedExpenseAllocation([{ monthly_amount: 2000, allocation_days: 30, is_fixed: true }]);
+    expect(fixedToday).toBe(66.67);
+    const result = cashReconciliationSnapshot({
+      currentCashSales: 150,
+      purchases: 200,
+      expenses: fixedToday,
+      otherOperatingCosts: 50,
+      actualCash: 0,
+      branchWalletAvailable: 200,
+    });
+    expect(result.operatingResult).toBe(-166.67);
+    expect(result.branchWalletApplied).toBe(150);
+    expect(result.ownerPaymentRequired).toBe(0);
+    expect(result.operatingResult).toBe(-166.67);
   });
 
   it('keeps an overage separate from revenue and owner settlement', () => {

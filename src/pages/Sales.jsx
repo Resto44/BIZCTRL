@@ -602,9 +602,10 @@ export default function Sales() {
       console.warn('[Sales] Closing invoice creation failed after finalization:', error?.message || error);
     }
 
+    // Wallet-first settlement is part of the canonical finalization transaction.
+    // Do not create legacy wallet / daily-settlement rows after commit: those
+    // asynchronous writes can double-charge a shortage or bypass branch-wallet priority.
     const sideEffects = [
-      autoWalletTx(savedClosing, savedClosing.id, previousClosing),
-      autoSettle(savedClosing, savedClosing.id, proofUrl || null, ocr || null, previousClosing),
       autoSaveCreditDebts(savedClosing, savedClosing.id),
     ];
     const outcomes = await Promise.allSettled(sideEffects);

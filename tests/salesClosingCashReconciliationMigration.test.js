@@ -7,6 +7,7 @@ const migration = read('src/supabase/20260827_sales_closing_erp_cash_reconciliat
 const workspace = read('src/components/sales/UnifiedSalesClosing.jsx');
 const salesPage = read('src/pages/Sales.jsx');
 const settlementLedgerFix = read('src/supabase/20260827_fix_sales_closing_owner_settlement_ledger.sql');
+const walletFirstMigration = read('src/supabase/20260827_sales_closing_wallet_first_settlement.sql');
 
 describe('Sales Closing ERP cash reconciliation migration contract', () => {
   it('uses the existing canonical cash ledger with exact Closing scope fields', () => {
@@ -38,6 +39,30 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
     expect(salesPage).toContain('recordClosingOwnerPayment');
     expect(workspace).toContain('Record Owner Payment');
     expect(workspace).toContain('never sales revenue');
+  });
+
+  it('allocates shortage funding to Branch Wallet before owner funding in one server transaction', () => {
+    expect(walletFirstMigration).toContain('erp_apply_sales_closing_wallet_settlement');
+    expect(walletFirstMigration).toContain("v_wallet_applied := LEAST");
+    expect(walletFirstMigration).toContain("transaction_type = 'closing_settlement'");
+    expect(walletFirstMigration).toContain('owner_settlement_required = v_owner_required');
+    expect(walletFirstMigration).toContain('pg_advisory_xact_lock');
+    expect(walletFirstMigration).toContain('uq_wallet_transactions_closing_settlement');
+    expect(salesPage).not.toContain('autoWalletTx(savedClosing, savedClosing.id, previousClosing)');
+    expect(salesPage).not.toContain('autoSettle(savedClosing, savedClosing.id, proofUrl || null, ocr || null, previousClosing)');
+    expect(workspace).toContain('Branch Wallet');
+    expect(workspace).toContain('Branch Wallet Applied');
+  });
+
+  it('recomputes fixed and variable daily costs server-side and snapshots settlement allocation immutably', () => {
+    expect(walletFirstMigration).toContain('erp_sales_closing_expense_context');
+    expect(walletFirstMigration).toContain('fixed_expenses_total = v_fixed_expenses');
+    expect(walletFirstMigration).toContain('variable_expenses_total = v_variable_expenses');
+    expect(walletFirstMigration).toContain('sales_closing_settlement_snapshots');
+    expect(walletFirstMigration).toContain('SALES_CLOSING_SETTLEMENT_SNAPSHOT_IMMUTABLE');
+    expect(workspace).toContain('Fixed Expense Today');
+    expect(workspace).toContain('Variable Expenses');
+    expect(workspace).toContain('Funding never changes this result');
   });
 
   it('persists immutable ledger/reconciliation snapshots and retains normal finalized edit behavior', () => {
@@ -78,7 +103,7 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
     expect(workspace).toContain('ownerSettlementResolved');
     expect(workspace).toContain('ownerSettlementStatusLabel');
     expect(workspace).toContain('ownerSettlementPaymentTarget');
-    expect(workspace).toContain('Math.max(ownerSettlementRequired, reconciliation.shortage)');
+    expect(workspace).toContain('Math.max(ownerSettlementRequired, reconciliation.ownerPaymentRequired)');
     expect(workspace).toContain('ownerSettlementPaymentApplied >= ownerSettlementPaymentTarget');
     expect(workspace).toContain('ownerSettlementRemaining');
     expect(workspace).toContain('reconciliation.shortage > 0 && ownerSettlementRemaining === 0');

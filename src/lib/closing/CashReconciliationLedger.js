@@ -3,6 +3,8 @@ const amount = (value) => {
   return Number.isFinite(numeric) ? numeric : 0;
 };
 
+const money = (value) => Math.round(Math.max(0, amount(value)) * 100) / 100;
+
 export const PAYMENT_METHODS = Object.freeze({
   CASH: 'cash',
   CARD: 'card',
@@ -25,7 +27,7 @@ export const paymentMethodForCode = (value) => {
 
 export const paymentBuckets = (entries = []) => entries.reduce((totals, entry) => {
   const method = paymentMethodForCode(entry?.payment_method || entry?.payment_bucket || entry?.default_payment_method);
-  const value = Math.max(0, amount(entry?.today_amount ?? entry?.amount));
+  const value = money(entry?.today_amount ?? entry?.amount);
   totals[method] += value;
   return totals;
 }, {
@@ -39,11 +41,43 @@ export const paymentBuckets = (entries = []) => entries.reduce((totals, entry) =
 
 export const ledgerTotals = (movements = []) => movements.reduce((totals, movement) => {
   if (movement?.is_reversed) return totals;
-  const value = Math.max(0, amount(movement?.amount));
+  const value = money(movement?.amount);
   if (String(movement?.direction || '').toLowerCase() === 'out') totals.cashOut += value;
   else totals.cashIn += value;
   return totals;
 }, { cashIn: 0, cashOut: 0 });
+
+/** Allocate a cash-shortage funding requirement without treating funding as revenue. */
+export const walletFirstSettlementAllocation = ({ requiredFunding = 0, branchWalletAvailable = 0 } = {}) => {
+  const required = money(requiredFunding);
+  const walletAvailable = money(branchWalletAvailable);
+  const walletApplied = Math.min(required, walletAvailable);
+  const ownerPaymentRequired = money(required - walletApplied);
+  const walletRemaining = money(walletAvailable - walletApplied);
+  return {
+    requiredFunding: required,
+    branchWalletAvailable: walletAvailable,
+    branchWalletApplied: walletApplied,
+    ownerPaymentRequired,
+    walletRemaining,
+    totalCovered: money(walletApplied + ownerPaymentRequired),
+    settlementStatus: required === 0
+      ? 'No funding required'
+      : ownerPaymentRequired === 0
+        ? 'Paid from Branch Wallet'
+        : walletApplied > 0
+          ? 'Partially paid from Branch Wallet'
+          : 'Owner payment required',
+  };
+};
+
+/** Fixed monthly cost allocated deterministically to the configured business-day count. */
+export const dailyFixedExpenseAllocation = (fixedExpenses = []) => money(fixedExpenses.reduce((total, expense) => {
+  if (expense?.is_active === false || expense?.is_fixed === false) return total;
+  const monthlyAmount = money(expense?.monthly_amount ?? expense?.amount);
+  const allocationDays = Math.max(1, Math.trunc(amount(expense?.allocation_days ?? expense?.business_days ?? 30)) || 30);
+  return total + (monthlyAmount / allocationDays);
+}, 0));
 
 /**
  * The only physical-cash formula. Revenue and physical cash remain independent.
@@ -60,25 +94,27 @@ export const cashReconciliationSnapshot = ({
   purchases = 0,
   expenses = 0,
   otherOperatingCosts = 0,
+  branchWalletAvailable = 0,
 } = {}) => {
   const ledger = ledgerTotals(ledgerMovements);
   const payments = paymentBuckets(revenueEntries);
-  const explicitCredit = Math.max(0, amount(customerCredit));
-  const cashSales = Math.max(0, amount(currentCashSales)) + payments.cash;
+  const explicitCredit = money(customerCredit);
+  const cashSales = money(currentCashSales) + payments.cash;
   const cardSales = payments.card;
   const bankTransferSales = payments.bank_transfer;
   const onlineSales = payments.online;
   const walletSales = payments.wallet;
   const creditSales = payments.credit + explicitCredit;
   const revenueToday = cashSales + cardSales + bankTransferSales + onlineSales + walletSales + creditSales;
-  const opening = Math.max(0, amount(openingCash));
-  const expectedCash = opening + ledger.cashIn + cashSales - ledger.cashOut;
-  const actual = actualCash === '' || actualCash === null || actualCash === undefined ? null : Math.max(0, amount(actualCash));
-  const difference = actual === null ? null : actual - expectedCash;
+  const opening = money(openingCash);
+  const expectedCash = money(opening + ledger.cashIn + cashSales - ledger.cashOut);
+  const actual = actualCash === '' || actualCash === null || actualCash === undefined ? null : money(actualCash);
+  const difference = actual === null ? null : Math.round((actual - expectedCash) * 100) / 100;
   const shortage = difference !== null && difference < 0 ? Math.abs(difference) : 0;
   const overage = difference !== null && difference > 0 ? difference : 0;
-  const cashFundingRequired = Math.max(0, ledger.cashOut - (opening + ledger.cashIn + cashSales));
-  const operatingResult = revenueToday - Math.max(0, amount(purchases)) - Math.max(0, amount(expenses)) - Math.max(0, amount(otherOperatingCosts));
+  const cashFundingRequired = money(ledger.cashOut - (opening + ledger.cashIn + cashSales));
+  const settlement = walletFirstSettlementAllocation({ requiredFunding: shortage, branchWalletAvailable });
+  const operatingResult = Math.round((revenueToday - money(purchases) - money(expenses) - money(otherOperatingCosts)) * 100) / 100;
 
   return {
     openingCash: opening,
@@ -97,10 +133,11 @@ export const cashReconciliationSnapshot = ({
     difference,
     shortage,
     overage,
-    ownerSettlementRequired: shortage,
+    ownerSettlementRequired: settlement.ownerPaymentRequired,
     cashFundingRequired,
     operatingResult,
     varianceStatus: difference === null ? 'pending' : difference === 0 ? 'balanced' : difference < 0 ? 'shortage' : 'overage',
+    ...settlement,
   };
 };
 
