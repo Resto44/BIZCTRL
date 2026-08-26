@@ -26,7 +26,7 @@ describe('Daily Sales manager attribution', () => {
       readFile(salesPagePath, 'utf8'),
     ]);
     expect(card).toContain('const total = rCash + rNet + credit + customSourcesTotal;');
-    expect(workspace).toContain('restaurant_cash: cashSales');
+    expect(workspace).toContain('restaurant_cash: baseCashSales');
     expect(workspace).toContain('restaurant_network: networkTotal');
     expect(workspace).toContain('credit: creditTotal');
     expect(workspace).toContain('custom_sources_total: otherPaymentTotal');

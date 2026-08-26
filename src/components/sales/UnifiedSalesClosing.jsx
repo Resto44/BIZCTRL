@@ -1501,8 +1501,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         tenant_id: tenantId,
         // `created_by` is the authenticated user mapping required by downstream RLS checks.
         created_by: createdBy,
-        restaurant_cash: cashSales,
-        cash: cashSales,
+        // Cash-classified source snapshots are added by the transactional RPC.
+        // Send only the base ERP/manual cash here so each Today amount is
+        // recognized exactly once rather than being added again server-side.
+        restaurant_cash: baseCashSales,
+        cash: baseCashSales,
         restaurant_network: networkTotal,
         network: networkTotal,
         restaurant_network_account_id: posDeviceId || '',

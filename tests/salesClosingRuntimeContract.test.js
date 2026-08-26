@@ -42,6 +42,7 @@ describe('Sales Closing runtime persistence contract', () => {
     expect(repository).toContain("'erp_save_sales_closing_draft'");
     expect(repository).toContain("'erp_finalize_sales_closing'");
     expect(workspace).toContain('sales_sources_json: buildSalesSourceClosingSnapshots');
+    expect(workspace).toContain('restaurant_cash: baseCashSales');
     expect(workspace).toContain('closing-runtime-error-reference');
     expect(salesPage).toContain('const invalidateSalesQueries = useCallback');
     expect(salesPage).toContain("['sales']");
