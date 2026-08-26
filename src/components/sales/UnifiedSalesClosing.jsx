@@ -452,7 +452,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     isSavingSalesSource,
     isSavingClosingField,
   } = useSalesClosingCustomization();
-  const automaticTotalsEnabled = closingConfig?.calculations?.automatic_totals !== false;
+  // The legacy automatic sources do not carry the Closing's full shift/cashier
+  // identity. They must never seed a new Closing with historical branch/day
+  // amounts. Current-period sales remain the explicit Today inputs until an
+  // ERP feed with branch + date + shift + cashier scope is available.
+  const automaticTotalsEnabled = false;
   const requiresCashReconciliation = closingConfig?.validation_rules?.require_cash_reconciliation !== false;
   const showMobileSummary = closingConfig?.layout?.mobile_summary !== false;
   const showDesktopSummary = closingConfig?.layout?.desktop_summary !== false;
@@ -1121,11 +1125,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           base().is('branch_id', null).eq(legacyBranchColumn, form.branch),
         ];
       };
-      const settlementBase = () => supabase.from('daily_cash_settlements')
-        .select('id, opening_cash, cash_sales, expected_closing_cash, cash_counted, status, branch, branch_id, created_date')
-        .eq('restaurant_id', activeRestaurant.id)
-        .eq('date', form.date)
-        .limit(10);
       const posBase = () => supabase.from('pos_reconciliation')
         .select('id, expected_amount, actual_amount, date, branch, branch_id, device_id')
         .eq('restaurant_id', activeRestaurant.id)
@@ -1138,12 +1137,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         .eq('type', 'receivable')
         .eq('party_type', 'customer')
         .limit(100);
-      const settlementQueries = allowAllBranches
-        ? [settlementBase()]
-        : [
-            selectedBranchId ? settlementBase().eq('branch_id', selectedBranchId) : Promise.resolve({ data: [], error: null }),
-            settlementBase().is('branch_id', null).eq('branch', form.branch),
-          ];
       const posQueries = allowAllBranches
         ? [posBase()]
         : [
@@ -1156,19 +1149,17 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             selectedBranchId ? creditBase().eq('branch_id', selectedBranchId) : Promise.resolve({ data: [], error: null }),
             creditBase().is('branch_id', null).eq('branch', form.branch),
           ];
-      const [settlementResults, paymentResults, posResults, creditResults] = await Promise.all([
-        Promise.all(settlementQueries),
+      const [paymentResults, posResults, creditResults] = await Promise.all([
         Promise.all(scoped('payments', 'id, amount, payment_method, status, created_date, branch, branch_id', 'created_date')),
         Promise.all(posQueries),
         Promise.all(creditQueries),
       ]);
-      const queryError = [settlementResults, paymentResults, posResults, creditResults]
+      const queryError = [paymentResults, posResults, creditResults]
         .flat()
         .find((result) => result?.error)?.error;
       if (queryError) throw queryError;
       const merge = (...results) => asRecordArray(Array.from(new Map(results.flatMap((result) => asRecordArray(result?.data)).map((record) => [record.id, record])).values()));
       return {
-        settlements: merge(...settlementResults),
         payments: merge(...paymentResults),
         pos: merge(...posResults),
         credit: merge(...creditResults),
@@ -1178,7 +1169,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const automaticClosing = useMemo(() => {
     if (initial?.id) return { cash: 0, network: 0, credit: 0, other: 0, expectedCash: null, openingCash: null, hasData: false, paymentCount: 0 };
     const source = automaticClosingData || {};
-    const settlement = firstRecord(source.settlements);
     const paymentTotals = asRecordArray(source.payments).reduce((totals, payment) => {
       const status = String(payment.status || '').toLowerCase();
       if (status && !['paid', 'completed', 'success', 'settled'].includes(status)) return totals;
@@ -1190,19 +1180,14 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       else totals.other += amount;
       return totals;
     }, { cash: 0, network: 0, credit: 0, other: 0 });
-    const posExpected = asRecordArray(source.pos).reduce((total, row) => total + (Number(row.expected_amount ?? row.actual_amount) || 0), 0);
-    const recordedCredit = asRecordArray(source.credit).reduce((total, row) => total + (Number(row.total_amount) || 0), 0);
-    const settlementCash = Number(settlement?.cash_sales) || 0;
-    const expectedCash = settlement?.expected_closing_cash == null ? null : Number(settlement.expected_closing_cash) || 0;
-    const openingCashValue = settlement?.opening_cash == null ? null : Number(settlement.opening_cash) || 0;
     return {
-      cash: paymentTotals.cash > 0 ? paymentTotals.cash : settlementCash,
-      network: paymentTotals.network > 0 ? paymentTotals.network : posExpected,
-      credit: paymentTotals.credit > 0 ? paymentTotals.credit : recordedCredit,
+      cash: paymentTotals.cash,
+      network: paymentTotals.network,
+      credit: paymentTotals.credit,
       other: paymentTotals.other,
-      expectedCash,
-      openingCash: openingCashValue,
-      hasData: Boolean(settlement || asRecordArray(source.payments).length || asRecordArray(source.pos).length || asRecordArray(source.credit).length),
+      expectedCash: null,
+      openingCash: null,
+      hasData: Boolean(asRecordArray(source.payments).length || asRecordArray(source.pos).length || asRecordArray(source.credit).length),
       paymentCount: asRecordArray(source.payments).length,
     };
   }, [automaticClosingData, initial?.id]);

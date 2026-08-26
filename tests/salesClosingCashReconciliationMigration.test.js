@@ -8,6 +8,7 @@ const workspace = read('src/components/sales/UnifiedSalesClosing.jsx');
 const salesPage = read('src/pages/Sales.jsx');
 const settlementLedgerFix = read('src/supabase/20260827_fix_sales_closing_owner_settlement_ledger.sql');
 const walletFirstMigration = read('src/supabase/20260827_sales_closing_wallet_first_settlement.sql');
+const openingCashSourceFix = read('src/supabase/20260827_fix_sales_closing_opening_cash_source.sql');
 
 describe('Sales Closing ERP cash reconciliation migration contract', () => {
   it('uses the existing canonical cash ledger with exact Closing scope fields', () => {
@@ -39,6 +40,23 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
     expect(salesPage).toContain('recordClosingOwnerPayment');
     expect(workspace).toContain('Record Owner Payment');
     expect(workspace).toContain('never sales revenue');
+  });
+
+  it('never imports legacy daily settlement cash sales into a new Closing', () => {
+    expect(workspace).toContain('const automaticTotalsEnabled = false;');
+    expect(workspace).not.toContain("supabase.from('daily_cash_settlements')");
+    expect(workspace).not.toContain('settlementCash');
+    expect(workspace).not.toContain('settlement?.cash_sales');
+    expect(salesPage).toContain('dailyClosingDefaults');
+  });
+
+  it('uses only the immediately previous finalized Actual Cash under the same cashier and shift identity for Opening Cash', () => {
+    expect(openingCashSourceFix).toContain('COALESCE(previous_closing.actual_cash, 0)');
+    expect(openingCashSourceFix).toContain('COALESCE(previous_closing.cashier_id, previous_closing.cashier_employee_id) = p_cashier_id');
+    expect(openingCashSourceFix).not.toContain('+ COALESCE((SELECT shortage.');
+    expect(openingCashSourceFix).toContain("position('owner_payment_amount' IN COALESCE(v_definition, '')) > 0");
+    expect(openingCashSourceFix).toContain("position('wallet_payment_amount' IN COALESCE(v_definition, '')) > 0");
+    expect(openingCashSourceFix).toContain("previous_closing.closing_state = 'finalized'");
   });
 
   it('allocates shortage funding to Branch Wallet before owner funding in one server transaction', () => {

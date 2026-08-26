@@ -25,11 +25,11 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain("cashierDisplayName || (empLoading ? 'Loading…' : empError ? 'Unable to load cashier' : 'No cashier')");
   });
 
-  it('loads existing sales, POS and cash-register data automatically in restaurant, branch and date scope', async () => {
+  it('keeps legacy settlement rollups out of automatic sales while retaining supported query scope safeguards', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
     expect(workspace).toContain('queryKey: [\'quick_closing_automatic_sources\'');
-    expect(workspace).toContain("from('daily_cash_settlements')");
+    expect(workspace).not.toContain("from('daily_cash_settlements')");
     expect(workspace).toContain("scoped('payments'");
     expect(workspace).toContain("from('pos_reconciliation')");
     expect(workspace).toContain(".eq('restaurant_id', activeRestaurant.id)");
@@ -46,7 +46,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
     expect(workspace).toContain('const cashDifference = reconciliation.difference;');
     expect(workspace).toContain('totalSales - approvedPurchasesTotal - expensesTotal');
-    expect(workspace).toContain('expected_closing_cash');
+    expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
     expect(workspace).toContain('Actual Cash');
     expect(workspace).toContain('Cash balanced.');
   });
@@ -104,7 +104,8 @@ describe('Unified Sales Closing workflow contract', () => {
   it('consumes saved calculation, reconciliation, and responsive-summary settings in the canonical workflow', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
-    expect(workspace).toContain('const automaticTotalsEnabled = closingConfig?.calculations?.automatic_totals !== false;');
+    expect(workspace).toContain('const automaticTotalsEnabled = false;');
+    expect(workspace).toContain('do not carry the Closing\'s full shift/cashier');
     expect(workspace).toContain('const requiresCashReconciliation = closingConfig?.validation_rules?.require_cash_reconciliation !== false;');
     expect(workspace).toContain('const summaryVisibilityClass = !showMobileSummary && !showDesktopSummary');
     expect(workspace).toContain('const automaticClosingEnabled = Boolean(automaticTotalsEnabled');
@@ -163,7 +164,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const automaticClosingScope = [');
     expect(workspace).toContain('previous.scope !== automaticClosingScope');
     expect(workspace).toContain('const snapshotMatchesScope = automaticClosingSnapshot.scope === automaticClosingScope');
-    expect(workspace).toContain('const queryError = [settlementResults, paymentResults, posResults, creditResults]');
+    expect(workspace).toContain('const queryError = [paymentResults, posResults, creditResults]');
+    expect(workspace).not.toContain("supabase.from('daily_cash_settlements')");
     expect(workspace).toContain('if (queryError) throw queryError;');
     expect(workspace).toContain('automaticClosingUnavailable');
     expect(workspace).toContain('Retry ERP data load');
