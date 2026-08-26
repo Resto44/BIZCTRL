@@ -51,6 +51,14 @@ describe('Sales Closing editable-finalized lifecycle regression', () => {
     expect(history).not.toContain('request correction');
   });
 
+  it('derives reopened Closing versions from immutable history rather than a mutable current-row counter', async () => {
+    const migration = await source('src/supabase/20260827_fix_sales_closing_finalized_version_sequence.sql');
+
+    expect(migration).toContain('SELECT COALESCE(MAX(version_row.version), 0)');
+    expect(migration).toContain("IF v_requested_state = 'finalized' THEN\n      v_closing_version := v_closing_version + 1;");
+    expect(migration).toContain('SALES_CLOSING_VERSION_SEQUENCE_UNEXPECTED_VERSION');
+  });
+
   it('uses only Today values from the reported screen as ERP revenue', () => {
     const result = calculateSalesSources([
       { id: 'delivery', today: '350', previous: '250' },
