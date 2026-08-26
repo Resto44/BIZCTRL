@@ -623,7 +623,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     queryClient.cancelQueries({ queryKey: ['sales-source-previous-balances'] });
     queryClient.cancelQueries({ queryKey: ['customers_form'] });
     queryClient.cancelQueries({ queryKey: ['approved_purchases_for_date'] });
-    queryClient.cancelQueries({ queryKey: ['closing_expenses_for_date'] });
     queryClient.cancelQueries({ queryKey: ['sales-closing-cash-ledger-context'] });
     setSavedClosing(null);
     setRuntimeError(null);
@@ -1075,35 +1074,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   });
   const pendingPurchases = asRecordArray(pendingPurchasesData);
 
-  // ── Recorded expenses for the selected restaurant, branch and closing date ──
-  const expensesEnabled = !!activeRestaurant?.id && !!form.date;
-  const { data: expensesForDateData, isLoading: expensesLoading } = useQuery({
-    queryKey: ['closing_expenses_for_date', activeRestaurant?.id, form.date, form.branch, selectedBranchId],
-    queryFn: async () => {
-      if (!activeRestaurant?.id || !form.date) return [];
-      const baseQuery = () => supabase
-        .from('expenses')
-        .select('id, amount, date, branch_id, branch_key, status, description')
-        .eq('restaurant_id', activeRestaurant.id)
-        .eq('date', form.date)
-        .limit(500);
-      if (!form.branch || form.branch === 'all') {
-        const { data, error } = await baseQuery();
-        if (error) throw error;
-        return asRecordArray(data);
-      }
-      const [canonical, legacy] = await Promise.all([
-        selectedBranchId ? baseQuery().eq('branch_id', selectedBranchId) : Promise.resolve({ data: [], error: null }),
-        baseQuery().is('branch_id', null).eq('branch_key', form.branch),
-      ]);
-      if (canonical.error || legacy.error) throw canonical.error || legacy.error;
-      return asRecordArray(Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
-        .map((record) => [record.id, record])).values()));
-    },
-    staleTime: 30000,
-    enabled: expensesEnabled,
-  });
-  const expensesForDate = asRecordArray(expensesForDateData);
+  // Fixed and variable expenses are supplied only by the canonical server cash
+  // context. The RPC scopes the source rows by restaurant, branch UUID/key and
+  // Closing date, so no restaurant-wide browser read can leak an expense into a
+  // newly selected branch while a response is still in flight.
 
   // ── Automatic closing sources (cash register, POS and recorded payments) ──
   // Every read is scoped by the active restaurant, branch and business date. The
@@ -1285,14 +1259,13 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const actualCount = actualCashCount !== '' ? Number(actualCashCount) : null;
   const ownerContrib = 0;
   const approvedPurchasesTotal = approvedPurchasesForDate.reduce((sum, purchase) => sum + (Number(purchase.total_amount) || 0), 0);
-  // The server context is canonical for the daily fixed allocation and excludes
-  // fixed monthly categories from variable expenses. Fallbacks keep an unsaved
-  // Closing usable while the context is loading.
+  // The server context is canonical for both daily fixed allocation and dated
+  // variable expenses. Accounting expenses stay separate from purchases, and
+  // neither changes Expected Cash unless the ERP cash ledger contains Cash OUT.
   const fixedExpensesToday = Math.max(0, Number(cashLedgerContext.fixed_expense_today) || 0);
-  const variableExpensesToday = cashLedgerContext.variable_expenses_today === undefined
-    ? expensesForDate.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
-    : Math.max(0, Number(cashLedgerContext.variable_expenses_today) || 0);
-  const expensesTotal = fixedExpensesToday + variableExpensesToday;
+  const variableExpensesToday = Math.max(0, Number(cashLedgerContext.variable_expenses_today) || 0);
+  const operatingExpensesTotal = fixedExpensesToday + variableExpensesToday;
+  const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;
   const branchWalletAvailable = Math.max(0, Number(cashLedgerContext.branch_wallet_available) || 0);
   const isCurrentClosingOwnerSettlementMovement = (movement) => (
     movement?.movement_type === 'owner_injection'
@@ -1307,8 +1280,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     currentCashSales: baseCashSales,
     revenueEntries: customSourceSummaries.map(({ source, today }) => ({ amount: today, payment_method: source.default_payment_method })),
     actualCash: actualCount,
-    purchases: approvedPurchasesTotal,
-    expenses: expensesTotal,
     branchWalletAvailable,
   });
   const branchWalletApplied = Math.max(0, Number(activeOwnerSettlement?.wallet_payment_amount ?? reconciliation.branchWalletApplied) || 0);
@@ -1328,7 +1299,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const cashReconcStatus = cashDifference === null ? null : cashDifference === 0 ? 'Balanced' : cashDifference < 0 ? 'Shortage' : 'Overage';
   const closingCash = actualCount !== null ? actualCount : opening;
   const remainingDifference = cashDifference;
-  const operatingResult = totalSales - approvedPurchasesTotal - expensesTotal;
+  const operatingResult = totalSales - totalDailyExpenses;
 
   // Validation checks
   const validations = useMemo(() => [
@@ -1588,7 +1559,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         // Fixed allocation and wallet funding are server-recomputed on finalization.
         fixed_expenses_total: fixedExpensesToday,
         variable_expenses_total: variableExpensesToday,
-        expenses_total: expensesTotal,
+        expenses_total: operatingExpensesTotal,
         operating_result: operatingResult,
 
         restaurant_id: activeRestaurant?.id || null,
@@ -1788,7 +1759,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               <div className="space-y-2 p-3 sm:p-4">
                 <div className="flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2 text-xs"><span className="font-semibold text-blue-900">Sales</span><Money key={`money-total-${totalSales}`} currency={currency} value={totalSales} className="font-bold text-blue-700" /></div>
                 <div className="flex items-center justify-between gap-3 rounded-lg bg-orange-50 px-3 py-2 text-xs"><span className="font-semibold text-orange-900">Purchases</span><Money key={`money-purchases-${approvedPurchasesTotal}`} currency={currency} value={approvedPurchasesTotal} className="font-bold text-orange-700" /></div>
-                <div className="flex items-center justify-between gap-3 rounded-lg bg-sky-50 px-3 py-2 text-xs"><span className="font-semibold text-sky-900">Fixed Expense Today</span><Money key={`money-fixed-expenses-${fixedExpensesToday}`} currency={currency} value={fixedExpensesToday} className="font-bold text-sky-700" /></div><div className="flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2 text-xs"><span className="font-semibold text-rose-900">Variable Expenses</span><Money key={`money-variable-expenses-${variableExpensesToday}`} currency={currency} value={variableExpensesToday} className="font-bold text-rose-700" /></div><div className="flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2 text-xs"><span className="font-semibold text-rose-900">Total Daily Expenses</span><Money key={`money-expenses-${expensesTotal}`} currency={currency} value={expensesTotal} className="font-bold text-rose-700" /></div>
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-sky-50 px-3 py-2 text-xs"><span className="font-semibold text-sky-900">Fixed Expense Today</span><Money key={`money-fixed-expenses-${fixedExpensesToday}`} currency={currency} value={fixedExpensesToday} className="font-bold text-sky-700" /></div><div className="flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2 text-xs"><span className="font-semibold text-rose-900">Variable Expenses</span><Money key={`money-variable-expenses-${variableExpensesToday}`} currency={currency} value={variableExpensesToday} className="font-bold text-rose-700" /></div><div className="flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2 text-xs"><span className="font-semibold text-rose-900">Total Daily Expenses</span><Money key={`money-total-daily-expenses-${totalDailyExpenses}`} currency={currency} value={totalDailyExpenses} className="font-bold text-rose-700" /></div>
                 <div className={`flex items-center justify-between gap-3 rounded-xl border-2 px-3 py-3 text-xs ${operatingResult >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}><span className="font-black uppercase tracking-wide text-foreground">Operating Result</span><Money key={`money-operating-${operatingResult}`} currency={currency} value={operatingResult} signed className={`text-lg font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`} /></div>
                 <p className="pt-1 text-[11px] leading-relaxed text-muted-foreground">Automatically calculated as Daily Sales − Purchases − Fixed Expense Today − Variable Expenses. Funding never changes this result.</p>
               </div>
@@ -1803,7 +1774,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Cash Sales</span><Money key={`money-summary-cash-sales-${cashSales}`} currency={currency} value={cashSales} className="font-bold text-emerald-700" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Card / Non-Cash</span><Money key={`money-summary-non-cash-${networkTotal}`} currency={currency} value={networkTotal} className="font-bold text-violet-700" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Purchases</span><Money key={`money-purchases-${approvedPurchasesTotal}`} currency={currency} value={approvedPurchasesTotal} className="font-bold text-foreground" /></div>
-                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Fixed Expense Today</span><Money key={`money-fixed-expenses-${fixedExpensesToday}`} currency={currency} value={fixedExpensesToday} className="font-bold text-foreground" /></div><div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Variable Expenses</span><Money key={`money-variable-expenses-${variableExpensesToday}`} currency={currency} value={variableExpensesToday} className="font-bold text-foreground" /></div><div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Total Daily Expenses</span><Money key={`money-expenses-${expensesTotal}`} currency={currency} value={expensesTotal} className="font-bold text-foreground" /></div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Fixed Expense Today</span><Money key={`money-fixed-expenses-${fixedExpensesToday}`} currency={currency} value={fixedExpensesToday} className="font-bold text-foreground" /></div><div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Variable Expenses</span><Money key={`money-variable-expenses-${variableExpensesToday}`} currency={currency} value={variableExpensesToday} className="font-bold text-foreground" /></div><div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Total Daily Expenses</span><Money key={`money-total-daily-expenses-${totalDailyExpenses}`} currency={currency} value={totalDailyExpenses} className="font-bold text-foreground" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Customer Credit</span><Money key={`money-credit-${creditTotal}`} currency={currency} value={creditTotal} className="font-bold text-foreground" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Expected Cash</span><Money key={`money-expected-${expectedCash}`} currency={currency} value={expectedCash} className="font-bold text-foreground" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Actual Cash</span>{actualCount === null ? <span className="font-bold text-muted-foreground">—</span> : <Money key={`money-actual-${actualCount}`} currency={currency} value={actualCount} className="font-bold text-foreground" />}</div>
@@ -1813,7 +1784,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               </div>
               <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${useAutomaticSales ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{useAutomaticSales ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertTriangle className="h-4 w-4 shrink-0" />}<span>Sales {useAutomaticSales ? 'loaded from ERP' : 'source needs review'}</span></div>
-                <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${purchasesLoading || expensesLoading ? 'border-slate-200 bg-slate-50 text-slate-700' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{purchasesLoading || expensesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}<span>Purchases and expenses loaded</span></div>
+                <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${purchasesLoading || cashLedgerLoading ? 'border-slate-200 bg-slate-50 text-slate-700' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{purchasesLoading || cashLedgerLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}<span>Purchases and expenses loaded</span></div>
                 <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${creditTotal >= 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}><CheckCircle2 className="h-4 w-4" /><span>Customer credit loaded</span></div>
                 <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${actualCount !== null && (remainingDifference === 0 || managerApproved) ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{actualCount !== null && (remainingDifference === 0 || managerApproved) ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}<span>{actualCount === null ? 'Actual cash is required' : remainingDifference === 0 ? 'Cash balanced' : 'Cash difference requires review'}</span></div>
               </div>
@@ -1827,7 +1798,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       <div className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
         <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-2 sm:flex sm:justify-end">
           <Button type="button" variant="outline" className="min-h-12 font-bold sm:w-32" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button>
-          <><Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerLoading || cashLedgerUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button><Button type="submit" className={`min-h-12 font-black sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerLoading || cashLedgerUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button></>
+          <><Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerLoading || cashLedgerUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button><Button type="submit" className={`min-h-12 font-black sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerLoading || cashLedgerUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button></>
         </div>
       </div>
       <SalesClosingFieldDialog editor={fieldEditor} onClose={() => setFieldEditor(null)} onSave={saveInlineClosingField} isSaving={isSavingClosingField} />

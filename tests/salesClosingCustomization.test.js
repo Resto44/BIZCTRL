@@ -60,7 +60,8 @@ describe('Sales Closing Customization runtime contract', () => {
       source('../src/supabase/20260825_daily_sales_closing_results.sql'),
     ]);
 
-    expect(workspace).toContain('expenses_total: expensesTotal');
+    expect(workspace).toContain('expenses_total: operatingExpensesTotal');
+    expect(workspace).toContain('const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;');
     expect(workspace).toContain('operating_result: operatingResult');
     expect(presentation).toContain('cashier_name: sale.cashier_name');
     expect(presentation).toContain('shift: sale.shift');

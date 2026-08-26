@@ -34,6 +34,9 @@ describe('ERP cash reconciliation ledger', () => {
     expect(result.branchWalletApplied).toBe(0);
     expect(result.ownerPaymentRequired).toBe(150);
     expect(result.overage).toBe(0);
+    // The accounting expense is recognized in Operating Result only. Expected
+    // physical cash changes solely through the Cash OUT ledger movement above.
+    expect(result.expectedCash).toBe(1400);
   });
 
   it('never adds card, bank, online, wallet, customer credit, or Previous values to physical cash', () => {
@@ -94,7 +97,9 @@ describe('ERP cash reconciliation ledger', () => {
 
   it('allocates fixed monthly expenses per configured business day without making funding revenue', () => {
     const fixedToday = dailyFixedExpenseAllocation([{ monthly_amount: 2000, allocation_days: 30, is_fixed: true }]);
+    const legacyFixedToday = dailyFixedExpenseAllocation([{ monthly_amount: 0, amount: 3500, allocation_days: 30, is_fixed: true }]);
     expect(fixedToday).toBe(66.67);
+    expect(legacyFixedToday).toBe(116.67);
     const result = cashReconciliationSnapshot({
       currentCashSales: 150,
       purchases: 200,

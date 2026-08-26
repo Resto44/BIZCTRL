@@ -74,7 +74,10 @@ export const walletFirstSettlementAllocation = ({ requiredFunding = 0, branchWal
 /** Fixed monthly cost allocated deterministically to the configured business-day count. */
 export const dailyFixedExpenseAllocation = (fixedExpenses = []) => money(fixedExpenses.reduce((total, expense) => {
   if (expense?.is_active === false || expense?.is_fixed === false) return total;
-  const monthlyAmount = money(expense?.monthly_amount ?? expense?.amount);
+  // Legacy fixed rows store the monthly value on the expense itself while newer
+  // configuration may store it on the category. A zero configuration is not a
+  // value to prefer over a real monthly source record.
+  const monthlyAmount = money(expense?.monthly_amount) || money(expense?.amount);
   const allocationDays = Math.max(1, Math.trunc(amount(expense?.allocation_days ?? expense?.business_days ?? 30)) || 30);
   return total + (monthlyAmount / allocationDays);
 }, 0));

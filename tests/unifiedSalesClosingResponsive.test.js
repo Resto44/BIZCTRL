@@ -45,7 +45,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('cashSales + networkTotal + creditTotal + otherPaymentTotal');
     expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
     expect(workspace).toContain('const cashDifference = reconciliation.difference;');
-    expect(workspace).toContain('totalSales - approvedPurchasesTotal - expensesTotal');
+    expect(workspace).toContain('const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;');
+    expect(workspace).toContain('const operatingResult = totalSales - totalDailyExpenses;');
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
     expect(workspace).toContain('Actual Cash');
     expect(workspace).toContain('Cash balanced.');
@@ -149,8 +150,9 @@ describe('Unified Sales Closing workflow contract', () => {
     const sales = await source('../src/pages/Sales.jsx');
 
     expect(workspace).toContain("queryKey: ['approved_purchases_for_date'");
-    expect(workspace).toContain("queryKey: ['closing_expenses_for_date'");
-    expect(workspace).toContain(".from('expenses')");
+    expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
+    expect(workspace).toContain('Fixed and variable expenses are supplied only by the canonical server cash');
+    expect(workspace).not.toContain(".from('expenses')");
     expect(workspace).toContain("nextErrors.actualCash = 'Actual Cash is required.'");
     expect(workspace).toContain('focusField(firstError)');
     expect(workspace).toContain('Closing already completed for this branch and shift.');
