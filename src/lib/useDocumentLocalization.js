@@ -10,6 +10,30 @@ function preserveWhitespace(source, translated) {
   return `${leading}${translated}${trailing}`;
 }
 
+// React may replace a text node in place when a dynamic value changes. Preserve
+// the original source only while the node still contains its expected localized
+// value; otherwise adopt the newly rendered value as the source before applying
+// localization. This keeps reactive totals from being reset to their first value.
+export function resolveTextNodeSource({ textSources, node, current, lang, translateLiteral }) {
+  const cachedSource = textSources.get(node);
+  if (cachedSource === undefined) {
+    textSources.set(node, current);
+    return current;
+  }
+
+  const expectedLocalizedValue = preserveWhitespace(
+    cachedSource,
+    lang === 'en' ? cachedSource : translateLiteral(cachedSource),
+  );
+
+  if (current !== expectedLocalizedValue) {
+    textSources.set(node, current);
+    return current;
+  }
+
+  return cachedSource;
+}
+
 function canTranslateTextNode(node) {
   const parent = node.parentElement;
   if (!parent) return false;
@@ -36,8 +60,13 @@ export function useDocumentLocalization({ lang, translateLiteral }) {
     const localizeTextNode = (node) => {
       if (!node || node.nodeType !== TEXT_NODE || !canTranslateTextNode(node)) return;
       const current = node.nodeValue || '';
-      if (!textSources.current.has(node)) textSources.current.set(node, current);
-      const source = textSources.current.get(node);
+      const source = resolveTextNodeSource({
+        textSources: textSources.current,
+        node,
+        current,
+        lang,
+        translateLiteral,
+      });
       const translated = lang === 'en' ? source : translateLiteral(source);
       const next = preserveWhitespace(source, translated);
       if (node.nodeValue !== next) node.nodeValue = next;
