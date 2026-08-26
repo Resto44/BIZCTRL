@@ -32,9 +32,10 @@ describe('Sales Closing runtime persistence contract', () => {
   });
 
   it('uses explicit server operations for draft and finalization and exposes diagnostic references in the workspace', async () => {
-    const [repository, workspace, migration] = await Promise.all([
+    const [repository, workspace, salesPage, migration] = await Promise.all([
       source('src/lib/closing/ClosingRepository.js'),
       source('src/components/sales/UnifiedSalesClosing.jsx'),
+      source('src/pages/Sales.jsx'),
       source('src/supabase/20260826_sales_closing_explicit_operations.sql'),
     ]);
 
@@ -42,6 +43,8 @@ describe('Sales Closing runtime persistence contract', () => {
     expect(repository).toContain("'erp_finalize_sales_closing'");
     expect(workspace).toContain('sales_sources_json: buildSalesSourceClosingSnapshots');
     expect(workspace).toContain('closing-runtime-error-reference');
+    expect(salesPage).toContain('const invalidateSalesQueries = useCallback');
+    expect(salesPage).toContain("['sales']");
     expect(migration).toContain('CREATE OR REPLACE FUNCTION public.erp_save_sales_closing_draft');
     expect(migration).toContain('CREATE OR REPLACE FUNCTION public.erp_finalize_sales_closing');
   });

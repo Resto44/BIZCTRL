@@ -131,6 +131,19 @@ export default function Sales() {
   });
   const sales = asRecordArray(salesData);
 
+  // A successful Closing must refresh authoritative server state before the
+  // workspace reports completion. This routine was missing at runtime, causing
+  // a ReferenceError after the transactional RPC had already committed.
+  const invalidateSalesQueries = useCallback(() => {
+    [
+      ['sales'],
+      ['daily_sales'],
+      ['quick_closing_automatic_sources'],
+      ['daily_sales_history'],
+      ['sales_dashboard'],
+    ].forEach((queryKey) => qc.invalidateQueries({ queryKey }));
+  }, [qc]);
+
   const updateClosingSessionContext = useCallback((nextContext) => {
     setSessionContext((current) => {
       const next = nextContext || null;
