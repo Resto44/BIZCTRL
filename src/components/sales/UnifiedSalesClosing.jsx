@@ -1289,9 +1289,16 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const ownerContrib = 0;
   const approvedPurchasesTotal = approvedPurchasesForDate.reduce((sum, purchase) => sum + (Number(purchase.total_amount) || 0), 0);
   const expensesTotal = expensesForDate.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
+  const isCurrentClosingOwnerSettlementMovement = (movement) => (
+    movement?.movement_type === 'owner_injection'
+    && movement?.source_module === 'OwnerCashInjection'
+    && movement?.source_document_id === currentClosingId
+  );
   const reconciliation = cashReconciliationSnapshot({
     openingCash: opening,
-    ledgerMovements: asRecordArray(cashLedgerContext.movements).filter((movement) => movement?.movement_type !== 'owner_settlement_payment'),
+    ledgerMovements: asRecordArray(cashLedgerContext.movements).filter(
+      (movement) => !isCurrentClosingOwnerSettlementMovement(movement),
+    ),
     currentCashSales: baseCashSales,
     revenueEntries: customSourceSummaries.map(({ source, today }) => ({ amount: today, payment_method: source.default_payment_method })),
     actualCash: actualCount,
