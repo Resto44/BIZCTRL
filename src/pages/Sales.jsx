@@ -32,7 +32,7 @@ import {
   generateAndUploadPDF,
 } from '@/lib/salesInvoiceService';
 import { filterDailySalesRecords, toDailySalesCardRecord } from '@/lib/dailySalesPresentation';
-import { closingSaveErrorMessage, requestClosingCorrection, saveClosingSession } from '@/lib/closing/ClosingRepository';
+import { closingSaveErrorMessage, saveClosingSession } from '@/lib/closing/ClosingRepository';
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const firstRecord = (value) => asRecordArray(value).at(0) || null;
@@ -610,20 +610,6 @@ export default function Sales() {
     }
   }, [autoSettle, notif, user?.email]);
 
-  const handleRequestCorrection = async () => {
-    if (!editing?.id) return;
-    const reason = window.prompt('Enter the reason for this correction request.');
-    if (!reason?.trim()) return;
-    try {
-      await requestClosingCorrection({ closingId: editing.id, reason: reason.trim() });
-      setEditing((current) => current ? { ...current, closing_state: 'correction_requested' } : current);
-      invalidateSalesQueries();
-      toast.success('Correction request submitted for authorized review.');
-    } catch (error) {
-      toast.error(closingSaveErrorMessage(error));
-    }
-  };
-
   const handleSave = async (data, proofUrl, ocr) => {
     const payload = {
       ...data,
@@ -634,12 +620,6 @@ export default function Sales() {
     };
     try {
       const saved = await saveClosingSession({ payload, closingId: editing?.id || null });
-      if (saved._requiresCorrection) {
-        const error = new Error('This finalized closing requires an authorized correction.');
-        error.code = 'SALES_CLOSING_CORRECTION_REQUIRED';
-        error.userMessage = error.message;
-        throw error;
-      }
       await runClosingFinalizationSideEffects(payload, saved, editing, proofUrl, ocr);
       setEditing(saved);
       invalidateSalesQueries();
@@ -717,7 +697,6 @@ export default function Sales() {
             onSubmit={handleSave}
             onCancel={() => { setEditing(null); setNewClosingDefaults(null); setShowForm(false); }}
             onNewClosing={openNewClosing}
-            onRequestCorrection={handleRequestCorrection}
             onSessionContextChange={updateClosingSessionContext}
             isOpeningNewClosing={isOpeningNewClosing}
           />

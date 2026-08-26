@@ -46,9 +46,6 @@ const BUSINESS_MESSAGES = {
   SALES_CLOSING_CREDIT_CUSTOMER_INVALID: 'One or more selected credit customers are no longer active or do not belong to this branch.',
   SALES_CLOSING_CREDIT_LIMIT_EXCEEDED: 'Credit limit exceeded. Correct the Today Credit amount or perform an authorized manager override.',
   SALES_CLOSING_CREDIT_OVERRIDE_DENIED: 'Only an authorized manager or owner can approve a credit-limit override.',
-  SALES_CLOSING_HISTORY_IMMUTABLE: 'This finalized Closing requires an authorized correction.',
-  SALES_CLOSING_CORRECTION_REQUIRED: 'This finalized Closing requires an authorized correction.',
-  SALES_CLOSING_PROTECTED_RECORD: 'This finalized Closing requires an authorized correction.',
   CLOSING_ALREADY_EXISTS: 'An active draft Closing already exists for this branch, date, shift, and cashier.',
 };
 
@@ -103,8 +100,6 @@ export async function saveClosingSession({ payload, closingId = null, requestId 
       ...data.closing,
       _idempotent: Boolean(data.idempotent),
       _finalizedTransition: Boolean(data.finalized_transition),
-      _requiresCorrection: Boolean(data.requires_correction),
-      _lifecycleAction: data.lifecycle_action || 'saved',
       _requestId: requestId,
     };
   } catch (error) {
@@ -114,17 +109,6 @@ export async function saveClosingSession({ payload, closingId = null, requestId 
   }
 }
 
-export async function requestClosingCorrection({ closingId, reason, fields = [], oldValues = {}, newValues = {} }) {
-  const { data, error } = await supabase.rpc('erp_request_sales_closing_correction', {
-    p_closing_id: closingId,
-    p_reason: reason,
-    p_fields: fields,
-    p_old_values: oldValues,
-    p_new_values: newValues,
-  });
-  if (error) throw error;
-  return data;
-}
 
 export function closingSaveErrorMessage(error) {
   if (error?.userMessage) return error.userMessage;
@@ -135,7 +119,6 @@ export function closingSaveErrorMessage(error) {
 
 export const closingRepository = {
   saveClosingSession,
-  requestClosingCorrection,
   closingSaveErrorMessage,
   closingErrorDetails,
 };

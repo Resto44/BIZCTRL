@@ -49,17 +49,16 @@ export default function SalesListItem({ sale, record = sale, onEdit, onDelete, s
   const closingState = sale.closing_state || record?.closing_state || 'finalized';
   const closingStateLabel = {
     draft: 'Draft',
+    ready: 'Ready',
     finalized: 'Finalized',
-    correction_requested: 'Correction Requested',
-    corrected: 'Corrected',
-    locked: 'Finalized',
+    cancelled: 'Cancelled',
   }[closingState] || 'Draft';
   const closingStateClass = closingState === 'draft'
     ? 'bg-amber-50 text-amber-800'
-    : closingState === 'correction_requested'
-      ? 'bg-violet-50 text-violet-800'
-      : closingState === 'corrected'
-        ? 'bg-blue-50 text-blue-800'
+    : closingState === 'ready'
+      ? 'bg-blue-50 text-blue-800'
+      : closingState === 'cancelled'
+        ? 'bg-slate-100 text-slate-700'
         : 'bg-emerald-50 text-emerald-800';
 
   const { data: settlements = [] } = useQuery({
@@ -85,7 +84,7 @@ export default function SalesListItem({ sale, record = sale, onEdit, onDelete, s
           <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${closingStateClass}`}>{closingStateLabel}</span>
         </div>
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={closingState === 'draft' ? 'Edit draft Closing' : 'View Closing and request correction'} onClick={() => onEdit(record)}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Edit Closing" onClick={() => onEdit(record)}>
             <Pencil className="w-3.5 h-3.5" />
           </Button>
           {onDelete && (

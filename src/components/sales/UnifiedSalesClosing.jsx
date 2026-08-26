@@ -441,7 +441,7 @@ const StickySummary = memo(function StickySummary({ totalSales, operatingResult,
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing, onRequestCorrection, onSessionContextChange, isOpeningNewClosing = false }) {
+export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing, onSessionContextChange, isOpeningNewClosing = false }) {
   const { currency, lang, t } = useLanguage();
   const { user } = useAuth();
   const { role } = useRole();
@@ -520,10 +520,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const [inlineErrors, setInlineErrors] = useState({});
   const [runtimeError, setRuntimeError] = useState(null);
   const [savedClosing, setSavedClosing] = useState(null);
-  const closingLifecycleState = initial?.closing_state || (initial?.id ? 'finalized' : 'draft');
-  const isProtectedClosing = ['finalized', 'correction_requested', 'corrected', 'locked'].includes(closingLifecycleState);
   const [requestedClosingState, setRequestedClosingState] = useState(
-    closingLifecycleState === 'finalized' ? 'finalized' : 'draft',
+    initial?.closing_state === 'finalized' ? 'finalized' : 'draft',
   );
 
   useEffect(() => {
@@ -1365,10 +1363,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isProtectedClosing) {
-      onRequestCorrection?.();
-      return;
-    }
     const savingDraft = requestedClosingState === 'draft';
 
     const invalidCredit = creditEntries.find(creditEntryRequiresCustomer);
@@ -1584,7 +1578,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       />
 
       <div className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
-        {isProtectedClosing && <div role="status" className="mx-3 mt-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-sm text-violet-900 sm:mx-4"><p className="font-bold">{closingLifecycleState === 'correction_requested' ? 'Correction requested' : 'Finalized Closing'}</p><p className="mt-1 text-xs">Historical financial values are protected. Review this Closing and submit an authorized correction request when a change is needed.</p></div>}
         <div className="mx-auto w-full max-w-6xl space-y-3 p-3 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:space-y-4 sm:p-4 sm:pb-6">
           <section className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between" aria-label="Closing mode">
             <div><p className="text-xs font-black uppercase tracking-wide text-slate-900">{isQuickClosing ? 'Quick Closing' : 'Advanced Closing'}</p><p className="text-[11px] text-muted-foreground">{isQuickClosing ? 'Complete the essential cash, payment, and reconciliation fields on one screen.' : 'Review source detail, purchases, expenses, and operating results before saving.'}</p></div>
@@ -1677,10 +1670,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           <section className="overflow-hidden rounded-2xl border border-blue-200 bg-background shadow-sm" data-testid="customer-credit-card">
             <div className="flex flex-col gap-2 border-b border-blue-100 bg-blue-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
               <div className="min-w-0"><h2 className="text-xs font-black uppercase tracking-wide text-blue-950">Customer Credit</h2><p className="mt-0.5 text-[11px] text-blue-800">Select active customers from Customer Master. Previous balances are reference-only and never count as today&apos;s sales.</p></div>
-              {!isProtectedClosing && <Button type="button" size="sm" className="min-h-10 shrink-0" onClick={addCredit} disabled={custLoading}><PlusCircle className="mr-1.5 h-4 w-4" />Add Customer</Button>}
+              <Button type="button" size="sm" className="min-h-10 shrink-0" onClick={addCredit} disabled={custLoading}><PlusCircle className="mr-1.5 h-4 w-4" />Add Customer</Button>
             </div>
             <div className="space-y-3 p-3 sm:p-4">
-              {custLoading ? <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-muted-foreground">Loading Customer Master…</div> : creditEntries.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-muted-foreground">No customer credit has been added to this Closing.</div> : <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{creditEntries.map((entry, index) => <CustomerCreditEntry key={entry.id} entry={entry} idx={index} onRemove={removeCredit} onUpdate={updateCredit} customers={customers} currency={currency} canOverride={canManageCreditOverride} disabled={isProtectedClosing} />)}</div>}
+              {custLoading ? <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-muted-foreground">Loading Customer Master…</div> : creditEntries.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-muted-foreground">No customer credit has been added to this Closing.</div> : <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{creditEntries.map((entry, index) => <CustomerCreditEntry key={entry.id} entry={entry} idx={index} onRemove={removeCredit} onUpdate={updateCredit} customers={customers} currency={currency} canOverride={canManageCreditOverride} disabled={false} />)}</div>}
               <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-3"><span className="text-xs font-black uppercase tracking-wide text-blue-950">Customer Credit Today Total</span><Money key={`customer-credit-today-total-${manualCreditTotal}`} currency={currency} value={manualCreditTotal} className="text-lg font-black text-blue-700" /></div>
               {inlineErrors.credit && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}
             </div>
@@ -1768,7 +1761,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       <div className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
         <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-2 sm:flex sm:justify-end">
           <Button type="button" variant="outline" className="min-h-12 font-bold sm:w-32" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button>
-          {isProtectedClosing ? <Button type="button" className="min-h-12 font-black sm:w-60 bg-violet-600 hover:bg-violet-700" onClick={() => onRequestCorrection?.()} disabled={isSubmitting || closingLifecycleState === 'correction_requested'}>{closingLifecycleState === 'correction_requested' ? 'Correction Requested' : 'Request Correction'}</Button> : <><Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button><Button type="submit" className={`min-h-12 font-black sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button></>}
+          <><Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button><Button type="submit" className={`min-h-12 font-black sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button></>
         </div>
       </div>
       <SalesClosingFieldDialog editor={fieldEditor} onClose={() => setFieldEditor(null)} onSave={saveInlineClosingField} isSaving={isSavingClosingField} />
