@@ -52,7 +52,7 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
 
   it('uses only the immediately previous finalized Actual Cash under the same cashier and shift identity for Opening Cash', () => {
     expect(openingCashSourceFix).toContain('COALESCE(previous_closing.actual_cash, 0)');
-    expect(openingCashSourceFix).toContain('COALESCE(previous_closing.cashier_id, previous_closing.cashier_employee_id) = p_cashier_id');
+    expect(openingCashSourceFix).toContain('COALESCE(previous_closing.cashier_id::text, previous_closing.cashier_employee_id) = p_cashier_id::text');
     expect(openingCashSourceFix).not.toContain('+ COALESCE((SELECT shortage.');
     expect(openingCashSourceFix).toContain("position('owner_payment_amount' IN COALESCE(v_definition, '')) > 0");
     expect(openingCashSourceFix).toContain("position('wallet_payment_amount' IN COALESCE(v_definition, '')) > 0");

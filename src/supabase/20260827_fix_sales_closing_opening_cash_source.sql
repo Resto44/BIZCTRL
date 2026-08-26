@@ -27,7 +27,7 @@ AS $function$
       AND previous_closing.closing_state = 'finalized'
       AND (
         p_cashier_id IS NULL
-        OR COALESCE(previous_closing.cashier_id, previous_closing.cashier_employee_id) = p_cashier_id
+        OR COALESCE(previous_closing.cashier_id::text, previous_closing.cashier_employee_id) = p_cashier_id::text
       )
       AND (
         previous_closing.date < p_date
@@ -59,7 +59,7 @@ BEGIN
   IF position('COALESCE(previous_closing.actual_cash, 0)' IN COALESCE(v_definition, '')) = 0
      OR position('owner_payment_amount' IN COALESCE(v_definition, '')) > 0
      OR position('wallet_payment_amount' IN COALESCE(v_definition, '')) > 0
-     OR position('COALESCE(previous_closing.cashier_id, previous_closing.cashier_employee_id) = p_cashier_id' IN COALESCE(v_definition, '')) = 0 THEN
+     OR position('COALESCE(previous_closing.cashier_id::text, previous_closing.cashier_employee_id) = p_cashier_id::text' IN COALESCE(v_definition, '')) = 0 THEN
     RAISE EXCEPTION 'SALES_CLOSING_OPENING_CASH_SOURCE_VERIFICATION_FAILED';
   END IF;
 END;
