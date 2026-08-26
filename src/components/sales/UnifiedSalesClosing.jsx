@@ -1262,15 +1262,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     ? cashLedgerContext.owner_settlement
     : null;
   const ownerSettlementPaymentApplied = Math.max(0, Number(activeOwnerSettlement?.owner_payment_amount) || 0);
-  const ownerSettlementRequired = Math.max(0, Number(activeOwnerSettlement?.owner_settlement_required) || 0);
-  const ownerSettlementResolved = Boolean(activeOwnerSettlement) && (
-    String(activeOwnerSettlement.status || '').toLowerCase() === 'resolved'
-    || (ownerSettlementRequired > 0 && ownerSettlementPaymentApplied >= ownerSettlementRequired)
-  );
-  const ownerSettlementStatusLabel = ownerSettlementResolved
-    ? 'Resolved'
-    : (activeOwnerSettlement?.status || 'PENDING');
-
   // ── Closing calculations sourced from the selected ERP scope ──────────────
   const manualCashSales = Math.max(0, Number(cashSalesInput) || 0);
   const manualNetworkTotal = asRecordArray(posEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
@@ -1313,6 +1304,15 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     purchases: approvedPurchasesTotal,
     expenses: expensesTotal,
   });
+  const ownerSettlementRequired = Math.max(0, Number(activeOwnerSettlement?.owner_settlement_required) || 0);
+  const ownerSettlementPaymentTarget = Math.max(ownerSettlementRequired, reconciliation.shortage);
+  const ownerSettlementResolved = Boolean(activeOwnerSettlement) && (
+    String(activeOwnerSettlement.status || '').toLowerCase() === 'resolved'
+    || (ownerSettlementPaymentTarget > 0 && ownerSettlementPaymentApplied >= ownerSettlementPaymentTarget)
+  );
+  const ownerSettlementStatusLabel = ownerSettlementResolved
+    ? 'Resolved'
+    : (activeOwnerSettlement?.status || 'PENDING');
   const expectedCash = reconciliation.expectedCash;
   const cashDifference = reconciliation.difference;
   const cashReconcStatus = cashDifference === null ? null : cashDifference === 0 ? 'Balanced' : cashDifference < 0 ? 'Shortage' : 'Overage';
