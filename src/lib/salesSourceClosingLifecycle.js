@@ -63,14 +63,16 @@ export const buildSalesSourceClosingSnapshots = (summaries, scope = {}) => recor
       shift: scope.shift || null,
       cashier_id: scope.cashierId || null,
       cashier_name: scope.cashierName || null,
-      driver_entries: entries.map((entry) => ({
-        ...entry,
-        sales_source_id: source.id,
-        subcategory: source.subcategory || entry.subcategory || 'Drivers',
-        date: scope.date || entry.date || null,
-        branch_id: scope.branchId || entry.branch_id || null,
-        branch: scope.branch || entry.branch || null,
-        shift: scope.shift || entry.shift || null,
-      })),
+      ...(source.allows_driver_entries === true ? {
+        driver_entries: entries.map((entry) => ({
+          ...entry,
+          sales_source_id: source.id,
+          subcategory: source.subcategory || entry.subcategory || 'Drivers',
+          date: scope.date || entry.date || null,
+          branch_id: scope.branchId || entry.branch_id || null,
+          branch: scope.branch || entry.branch || null,
+          shift: scope.shift || entry.shift || null,
+        })),
+      } : {}),
     };
   });

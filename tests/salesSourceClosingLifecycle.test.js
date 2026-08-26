@@ -70,3 +70,15 @@ describe('Sales Source Closing lifecycle', () => {
     expect(snapshot.amount).toBe(150);
   });
 });
+
+
+describe('ordinary Sales Source save payload compatibility', () => {
+  it('does not attach an empty driver_entries array to a standard source snapshot', () => {
+    const snapshot = buildSalesSourceClosingSnapshots([
+      { source: hungerStation, previous: 100, today: 25, total: 125 },
+    ], { branch: 'A', date: '2026-08-27', shift: 'Morning', cashierId: 'cashier-a' })[0];
+
+    expect(snapshot).toMatchObject({ source_id: hungerStation.id, amount: 25, previous_amount: 100, total_amount: 125 });
+    expect(snapshot).not.toHaveProperty('driver_entries');
+  });
+});
