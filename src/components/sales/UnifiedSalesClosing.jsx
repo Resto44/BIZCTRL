@@ -337,7 +337,7 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
   const { todayCredit, availableCredit, newCreditBalance, remainingCreditLimit: remainingCredit, exceededBy, limitExceeded } = customerCreditSnapshot({
     previousCredit,
     creditLimit,
-    todayCredit: entry.amount,
+    todayCredit: entry.today_credit ?? entry.amount,
   });
 
   const selectCustomer = (customerId) => {
@@ -382,7 +382,7 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
               <CreditMetric label="Available Credit" value={availableCredit} currency={currency} tone="text-emerald-600" />
             </div>
           </div>
-          <NumInput id={`quick-closing-credit-${entry.id}`} label="Today Credit" value={entry.amount || ''} onChange={(value) => onUpdate(entry.id, 'amount', value)} prefix={currency} disabled={disabled} error={limitExceeded ? 'Credit limit exceeded.' : undefined} />
+          <NumInput id={`quick-closing-credit-${entry.id}`} label="Today Credit" value={entry.amount || ''} onChange={(value) => onUpdate(entry.id, 'today_credit', value)} prefix={currency} disabled={disabled} error={limitExceeded ? 'Credit limit exceeded.' : undefined} />
           <div className={`grid grid-cols-1 gap-2 rounded-lg border p-3 text-sm sm:grid-cols-2 ${limitExceeded ? 'border-red-200 bg-red-50 text-red-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
             <CreditMetric label="New Credit Balance" value={newCreditBalance} currency={currency} tone={limitExceeded ? 'text-red-700' : 'text-emerald-700'} />
             <CreditMetric label="Remaining Credit Limit" value={remainingCredit} currency={currency} tone={limitExceeded ? 'text-red-700' : 'text-emerald-700'} />
@@ -711,7 +711,23 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const removeCredit = (id) => setCreditEntries((previous) => previous.filter((entry) => entry.id !== id));
   const updateCredit = (id, fieldOrPatch, value) => updateCalculatedInput(setCreditEntries, (previous) => previous.map((entry) => {
     if (entry.id !== id) return entry;
-    return typeof fieldOrPatch === 'object' ? { ...entry, ...fieldOrPatch } : { ...entry, [fieldOrPatch]: value };
+    const next = typeof fieldOrPatch === 'object' ? { ...entry, ...fieldOrPatch } : { ...entry, [fieldOrPatch]: value };
+    if (fieldOrPatch === 'today_credit') {
+      const snapshot = customerCreditSnapshot({
+        previousCredit: next.previous_credit ?? next.current_debt,
+        creditLimit: next.credit_limit,
+        todayCredit: value,
+      });
+      return {
+        ...next,
+        amount: value,
+        today_credit: value,
+        available_credit: snapshot.availableCredit,
+        new_credit_balance: snapshot.newCreditBalance,
+        remaining_credit_limit: snapshot.remainingCreditLimit,
+      };
+    }
+    return next;
   }));
 
   // ── Dynamic Sales Sources ───────────────────────────────────────────────────────────────
@@ -1225,7 +1241,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // ── Closing calculations sourced from the selected ERP scope ──────────────
   const manualCashSales = Math.max(0, Number(cashSalesInput) || 0);
   const manualNetworkTotal = asRecordArray(posEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
-  const manualCreditTotal = asRecordArray(creditEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+  const manualCreditTotal = asRecordArray(creditEntries).reduce((sum, entry) => sum + (Number(entry.today_credit ?? entry.amount) || 0), 0);
   const baseCashSales = useAutomaticSales ? automaticClosingSnapshot.cash : manualCashSales;
   const baseNetworkTotal = useAutomaticSales ? automaticClosingSnapshot.network : manualNetworkTotal;
   // Customer Credit rows are entered directly against Customer Master and must
@@ -1302,7 +1318,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     {
       key: 'credit',
       label: 'Credit Totals Valid',
-      passed: creditEntries.every((entry) => Number(entry.amount) <= 0 || Boolean(entry.customer_id)),
+      passed: creditEntries.every((entry) => Number(entry.today_credit ?? entry.amount) <= 0 || Boolean(entry.customer_id)),
       message: `${currency}\u00A0${manualCreditTotal.toLocaleString()} today`,
     },
     {
@@ -1317,7 +1333,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       passed: !creditEntries.some((entry) => {
         const limit = Number(entry.credit_limit) || 0;
         const previous = Number(entry.previous_credit ?? entry.current_debt) || 0;
-        const amount = Number(entry.amount) || 0;
+        const amount = Number(entry.today_credit ?? entry.amount) || 0;
         return amount > Math.max(0, limit - previous) && !entry.manager_override;
       }),
       message: 'All within limits or explicitly overridden',
@@ -1464,7 +1480,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           const customer = customers.find((candidate) => String(candidate.id) === String(rest.customer_id));
           const previousCredit = Number(customer?.outstanding_balance ?? rest.previous_credit ?? rest.current_debt) || 0;
           const creditLimit = Number(customer?.credit_limit ?? rest.credit_limit) || 0;
-          const todayCredit = Math.max(0, Number(rest.amount) || 0);
+          const todayCredit = Math.max(0, Number(rest.today_credit ?? rest.amount) || 0);
           return {
             ...rest,
             client_row_id: id,
