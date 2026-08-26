@@ -21,7 +21,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
-import { format } from 'date-fns';
+import { addDays, format } from 'date-fns';
 import CustomerCollections from '@/components/sales/CustomerCollections';
 import DailySummary from '@/components/sales/DailySummary';
 import CashRegister from '@/components/sales/CashRegister';
@@ -32,7 +32,8 @@ import {
   generateAndUploadPDF,
 } from '@/lib/salesInvoiceService';
 import { filterDailySalesRecords, toDailySalesCardRecord } from '@/lib/dailySalesPresentation';
-import { closingSaveErrorMessage, saveClosingSession } from '@/lib/closing/ClosingRepository';
+import { closingSaveErrorMessage, recordClosingOwnerPayment, saveClosingSession } from '@/lib/closing/ClosingRepository';
+import { dailyClosingDefaults } from '@/lib/closing/CashReconciliationLedger';
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const firstRecord = (value) => asRecordArray(value).at(0) || null;
@@ -184,22 +185,33 @@ export default function Sales() {
         setNewClosingDefaults(null);
         setEditing(existing);
         setShowForm(true);
-        toast.info('Draft already exists for this branch, date, shift, and cashier. Resumed the existing draft closing.');
+        toast.info('Draft already exists for this business day, branch, shift, and cashier. Resumed the daily Closing.');
         return;
       }
-      // Opening is deliberately in-memory until Save Draft or Finalize. This
-      // prevents accidental blank database records while the database uniqueness
-      // constraint and save path protect the same key against concurrent creates.
+      // A finalized Closing remains editable from History. The New Closing action
+      // deliberately opens the next business day with no copied daily amounts.
+      const nextSession = existing?.closing_state === 'finalized'
+        ? { ...session, date: format(addDays(new Date(`${session.date}T12:00:00`), 1), 'yyyy-MM-dd') }
+        : session;
+      const nextExisting = nextSession.date === session.date ? null : await findExistingClosingSession(nextSession);
+      if (nextExisting && ['draft', 'ready'].includes(nextExisting.closing_state || 'draft')) {
+        setNewClosingDefaults(null);
+        setEditing(nextExisting);
+        setShowForm(true);
+        toast.info('Draft already exists for the next business day. Resumed the daily Closing.');
+        return;
+      }
+      // Opening is in-memory until Save Draft or Finalize. The helper deliberately
+      // resets all daily sales, credit, payment, cash, expense, and reconciliation inputs.
       setEditing(null);
-      setNewClosingDefaults({
-        date: session.date,
-        branch: session.branch,
-        branch_id: session.branch_id || null,
-        shift: session.shift,
-        cashier_id: session.cashier_id || null,
-        cashier_employee_id: session.cashier_id || null,
-        cashier_name: session.cashier_name || '',
-      });
+      setNewClosingDefaults(dailyClosingDefaults({
+        date: nextSession.date,
+        branch: nextSession.branch,
+        branchId: nextSession.branch_id || null,
+        shift: nextSession.shift,
+        cashierId: nextSession.cashier_id || null,
+        cashierName: nextSession.cashier_name || '',
+      }));
       setNewClosingInstance((value) => value + 1);
       setShowForm(true);
       toast.success('New closing session opened. No record is created until you save it.');
@@ -592,8 +604,6 @@ export default function Sales() {
 
     const sideEffects = [
       autoWalletTx(savedClosing, savedClosing.id, previousClosing),
-      autoShortageOveageTx(savedClosing, savedClosing.id),
-      autoOwnerCapitalTx(savedClosing, savedClosing.id),
       autoSettle(savedClosing, savedClosing.id, proofUrl || null, ocr || null, previousClosing),
       autoSaveCreditDebts(savedClosing, savedClosing.id),
     ];
@@ -630,6 +640,14 @@ export default function Sales() {
     }
   };
 
+
+  const handleOwnerSettlementPayment = useCallback(async (closingId) => {
+    const payment = await recordClosingOwnerPayment({ closingId });
+    invalidateSalesQueries();
+    qc.invalidateQueries({ queryKey: ['sales-closing-cash-ledger-context'] });
+    qc.invalidateQueries({ queryKey: ['cash_movements'] });
+    return payment;
+  }, [invalidateSalesQueries, qc]);
 
   const handleExport = ({ format: fmt, from, to, branch }) => {
     const data = sales.filter(s => {
@@ -698,6 +716,7 @@ export default function Sales() {
             onCancel={() => { setEditing(null); setNewClosingDefaults(null); setShowForm(false); }}
             onNewClosing={openNewClosing}
             onSessionContextChange={updateClosingSessionContext}
+            onRecordOwnerPayment={handleOwnerSettlementPayment}
             isOpeningNewClosing={isOpeningNewClosing}
           />
         </section>

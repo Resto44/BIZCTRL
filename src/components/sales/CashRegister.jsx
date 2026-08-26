@@ -2,8 +2,8 @@
  * CashRegister — READ ONLY cash reconciliation panel.
  *
  * Displays reconciliation data saved by SalesForm.
- * Cash Sales are read from `restaurant_cash` (the actual revenue field).
- * Expected Cash = Opening Cash + Cash Sales.
+ * Revenue is displayed separately from the persisted ledger-backed Expected Cash.
+ * This panel never recomputes Expected Cash from revenue.
  * Shortage/Overage = Actual Count − Expected.
  * These figures do NOT affect Sales Total.
  */
@@ -15,7 +15,7 @@ import { useTenant } from '@/lib/TenantContext';
 import { format } from 'date-fns';
 import {
   Banknote, CheckCircle2, TrendingDown, TrendingUp, Lock,
-  Clock, User, ShieldCheck, AlertCircle, SunMedium, Moon, Scale
+  Clock, User, ShieldCheck, SunMedium, Moon, Scale
 } from 'lucide-react';
 
 const LABELS = {
@@ -131,13 +131,11 @@ function ReconcRow({ label, value, currency, valueColor }) {
 }
 
 function ShiftCard({ sale, currency, lbl }) {
-  // Cash Sales = actual revenue (restaurant_cash field, NOT closing-opening diff)
-  const cashSalesRevenue = Number(sale.restaurant_cash || sale.cash || 0);
-  const opening          = Number(sale.opening_cash || 0);
-  // Expected Cash = Opening + Cash Sales Revenue
-  const expectedCash     = Number(sale.expected_cash) || (opening + cashSalesRevenue);
-  // Actual Cash Count (physical count)
-  const actualCash       = Number(sale.actual_cash_count || sale.closing_cash || 0);
+  const cashSalesRevenue = Number(sale.restaurant_cash ?? sale.cash ?? 0);
+  const opening          = Number(sale.opening_cash ?? 0);
+  // Expected Cash is the server-persisted, ledger-derived snapshot only.
+  const expectedCash     = Number(sale.expected_cash ?? 0);
+  const actualCash       = Number(sale.actual_cash ?? 0);
   // Cash Difference = Actual − Expected
   const cashDiff         = actualCash - expectedCash;
   const cashShortage     = Number(sale.cash_shortage_amount) || Math.max(0, -cashDiff);
@@ -253,7 +251,7 @@ export default function CashRegister({ date, branch }) {
       const cashSalesRevenue = Number(sale.restaurant_cash || sale.cash || 0);
       return {
         totalCashSales: acc.totalCashSales + cashSalesRevenue,
-        latestActual: Number(sale.actual_cash_count || sale.closing_cash || 0),
+        latestActual: Number(sale.actual_cash ?? 0),
       };
     }, { totalCashSales: 0, latestActual: 0 });
   }, [filteredSales]);

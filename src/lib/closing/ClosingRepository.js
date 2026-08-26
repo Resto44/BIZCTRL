@@ -41,6 +41,9 @@ const BUSINESS_MESSAGES = {
   SALES_CLOSING_ACTUAL_CASH_REQUIRED: 'Actual cash is required before finalizing this Closing.',
   SALES_CLOSING_VARIANCE_NOTE_REQUIRED: 'Add a cash variance note before finalizing this Closing.',
   SALES_CLOSING_MANAGER_APPROVAL_REQUIRED: 'Manager approval is required for this cash variance.',
+  SALES_CLOSING_FINALIZED_REQUIRED: 'Finalize the Closing before recording an owner settlement payment.',
+  SALES_CLOSING_OWNER_SETTLEMENT_DENIED: 'Only an authorized manager or owner can record this owner settlement payment.',
+  SALES_CLOSING_OWNER_SETTLEMENT_NOT_REQUIRED: 'No unpaid owner settlement is required for this Closing.',
   SALES_CLOSING_PAYLOAD_INVALID: 'The Closing details could not be processed. Review the entered sales sources and customer credit entries, then try again.',
   SALES_CLOSING_CREDIT_CUSTOMER_REQUIRED: 'Select an active Customer Master customer for every Today Credit amount.',
   SALES_CLOSING_CREDIT_CUSTOMER_INVALID: 'One or more selected credit customers are no longer active or do not belong to this branch.',
@@ -110,6 +113,22 @@ export async function saveClosingSession({ payload, closingId = null, requestId 
 }
 
 
+/** Posts an owner settlement only after a finalized shortage has created a payable. */
+export async function recordClosingOwnerPayment({ closingId, requestId = newRequestId() }) {
+  try {
+    const { data, error } = await supabase.rpc('erp_record_sales_closing_owner_payment', {
+      p_closing_id: closingId,
+      p_request_id: requestId,
+    });
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    const structuredError = createClosingSaveError(error, requestId);
+    console.error('[ClosingRepository] Owner settlement payment failed', closingErrorDetails(structuredError));
+    throw structuredError;
+  }
+}
+
 export function closingSaveErrorMessage(error) {
   if (error?.userMessage) return error.userMessage;
   const code = resolveClosingErrorCode(error);
@@ -119,6 +138,7 @@ export function closingSaveErrorMessage(error) {
 
 export const closingRepository = {
   saveClosingSession,
+  recordClosingOwnerPayment,
   closingSaveErrorMessage,
   closingErrorDetails,
 };

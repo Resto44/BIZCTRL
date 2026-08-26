@@ -43,7 +43,8 @@ describe('Unified Sales Closing workflow contract', () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
     expect(workspace).toContain('cashSales + networkTotal + creditTotal + otherPaymentTotal');
-    expect(workspace).toContain('actualCount - expectedCash');
+    expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
+    expect(workspace).toContain('const cashDifference = reconciliation.difference;');
     expect(workspace).toContain('totalSales - approvedPurchasesTotal - expensesTotal');
     expect(workspace).toContain('expected_closing_cash');
     expect(workspace).toContain('Actual Cash');
@@ -65,14 +66,17 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('paymentBucketForCode(source.default_payment_method)');
     expect(workspace).toContain('const customSourcePaymentTotals = useMemo(() =>');
     expect(workspace).toContain('const cashSales = baseCashSales + customSourcePaymentTotals.cash;');
-    expect(workspace).toContain('const networkTotal = baseNetworkTotal + customSourcePaymentTotals.network;');
+    expect(workspace).toContain('const cardTotal = baseNetworkTotal + customSourcePaymentTotals.card;');
+    expect(workspace).toContain('const bankTransferTotal = customSourcePaymentTotals.bank_transfer;');
+    expect(workspace).toContain('const onlineTotal = customSourcePaymentTotals.online;');
+    expect(workspace).toContain('const walletTotal = customSourcePaymentTotals.wallet;');
     expect(workspace).toContain('const creditTotal = baseCreditTotal + customSourcePaymentTotals.credit;');
-    expect(workspace).toContain('const otherPaymentTotal = baseOtherPaymentTotal + customSourcePaymentTotals.other;');
     expect(workspace).toContain('buildSalesSourceClosingSnapshots(customSourceSummaries');
     expect(workspace).toContain('payment_bucket: paymentBucketForCode(snapshot.default_payment_method)');
     expect(workspace).toContain('salesSourceTodayTotal(customSourceSummaries)');
-    expect(workspace).toContain('const expectedCashBase = useAutomaticSales && automaticClosingSnapshot.expectedCash !== null');
-    expect(workspace).toContain('const expectedCash = expectedCashBase + customSourcePaymentTotals.cash;');
+    expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
+    expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
+    expect(workspace).toContain('const expectedCash = reconciliation.expectedCash;');
   });
 
   it('keeps a successful Owner source mutation visible in every active branch cache until explicit reload', async () => {
@@ -105,7 +109,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const summaryVisibilityClass = !showMobileSummary && !showDesktopSummary');
     expect(workspace).toContain('const automaticClosingEnabled = Boolean(automaticTotalsEnabled');
     expect(workspace).toContain('const useAutomaticSales = Boolean(automaticTotalsEnabled');
-    expect(workspace).toContain('!requiresCashReconciliation || (actualCount !== null');
+    expect(workspace).toContain('!requiresCashReconciliation || actualCount !== null');
+    expect(workspace).toContain('Variance will be recorded separately');
     expect(workspace).toContain('requiresCashReconciliation && actualCount === null');
     expect(workspace).toContain('className={summaryVisibilityClass}');
   });
@@ -147,7 +152,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain("nextErrors.actualCash = 'Actual Cash is required.'");
     expect(workspace).toContain('focusField(firstError)');
     expect(workspace).toContain('Closing already completed for this branch and shift.');
-    expect(sales).toContain("import { closingSaveErrorMessage, saveClosingSession } from '@/lib/closing/ClosingRepository';");
+    expect(sales).toContain("import { closingSaveErrorMessage, recordClosingOwnerPayment, saveClosingSession } from '@/lib/closing/ClosingRepository';");
     expect(sales).toContain('const saved = await saveClosingSession({ payload, closingId: editing?.id || null });');
     expect(sales).toContain('await runClosingFinalizationSideEffects(payload, saved, editing, proofUrl, ocr);');
   });
@@ -162,7 +167,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('if (queryError) throw queryError;');
     expect(workspace).toContain('automaticClosingUnavailable');
     expect(workspace).toContain('Retry ERP data load');
-    expect(workspace).toContain('disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || !allValid}');
+    expect(workspace).toContain('cashLedgerLoading || cashLedgerUnavailable || !allValid');
+    expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
   });
 
   it('runs financial side effects only for the one committed finalized transition, never for a draft save', async () => {
@@ -203,7 +209,9 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(sales).toContain('const matchesSalesClosingSession = (record, session) => {');
     expect(sales).toContain('const findExistingClosingSession = useCallback(async (session) => {');
     expect(sales).toContain('const openNewClosing = useCallback(async () => {');
-    expect(sales).toContain('Resumed the existing draft closing');
+    expect(sales).toContain('Resumed the daily Closing.');
+    expect(sales).toContain('dailyClosingDefaults({');
+    expect(sales).toContain("existing?.closing_state === 'finalized'");
     expect(sales).toContain('No record is created until you save it.');
     expect(sales).toContain('key={editing?.id || `new-closing-${newClosingInstance}`}');
     expect(sales).toContain('matchesSalesClosingSession(record, session)');
@@ -220,9 +228,10 @@ describe('Unified Sales Closing workflow contract', () => {
 
     expect(sales).toContain('const findExistingClosingSession = useCallback(async (session) => {');
     expect(sales).toContain("if (existing && ['draft', 'ready'].includes(existing.closing_state || 'draft')) {");
-    expect(sales).toContain('Draft already exists for this branch, date, shift, and cashier. Resumed the existing draft closing.');
+    expect(sales).toContain('Draft already exists for this business day, branch, shift, and cashier. Resumed the daily Closing.');
+    expect(sales).toContain('const nextSession = existing?.closing_state === \'finalized\'');
     expect(sales).toContain('setEditing(existing);');
-    expect(sales).toContain("import { closingSaveErrorMessage, saveClosingSession } from '@/lib/closing/ClosingRepository';");
+    expect(sales).toContain("import { closingSaveErrorMessage, recordClosingOwnerPayment, saveClosingSession } from '@/lib/closing/ClosingRepository';");
     expect(sales).toContain('const saved = await saveClosingSession({ payload, closingId: editing?.id || null });');
     expect(sales).not.toContain('handleRequestCorrection');
     expect(sales).not.toContain('authorized correction');

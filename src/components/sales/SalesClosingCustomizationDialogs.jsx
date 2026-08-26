@@ -26,6 +26,7 @@ export function newSalesClosingSource(order = 10) {
     name_fa: '',
     description: '',
     category: 'other',
+    subcategory: '',
     sort_order: order,
     is_active: true,
     is_global: true,
@@ -127,6 +128,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
       name_fa: String(draft.name_fa || '').trim() || null,
       description: String(draft.description || '').trim() || null,
       category: String(draft.category || 'other'),
+      subcategory: String(draft.subcategory || '').trim() || null,
       default_payment_method: String(draft.default_payment_method || 'cash'),
       branch_ids: draft.is_global === false ? Array.from(new Set(asArray(draft.branch_ids).map(String).filter(Boolean))) : [],
     };
@@ -156,6 +158,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('salesSourceManagement.configuration')}</p>
             <div className="grid gap-3 sm:grid-cols-3">
               <div><Label>{t('salesSourceManagement.category')}</Label><Select value={draft.category || 'other'} onValueChange={(category) => set({ category })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SOURCE_CATEGORIES.map((category) => <SelectItem key={category} value={category}>{t(`salesSourceManagement.category.${category}`)}</SelectItem>)}</SelectContent></Select></div>
+              <div><Label>Optional Subcategory</Label><Input value={draft.subcategory || ''} onChange={(event) => set({ subcategory: event.target.value })} placeholder="e.g. Delivery platform" maxLength={120} /></div>
               <div><Label>{t('salesClosing.dialog.defaultPayment')}</Label><Select value={draft.default_payment_method || 'cash'} onValueChange={(default_payment_method) => set({ default_payment_method })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{paymentMethods.filter((method) => method.is_active !== false).map((method) => <SelectItem key={method.id} value={method.code}>{localizedDataName(method, lang)}</SelectItem>)}</SelectContent></Select></div>
               <div><Label>{t('salesClosing.dialog.displayOrder')}</Label><Input type="number" min="0" value={draft.sort_order ?? 0} onChange={(event) => set({ sort_order: Number(event.target.value) || 0 })} /></div>
             </div>

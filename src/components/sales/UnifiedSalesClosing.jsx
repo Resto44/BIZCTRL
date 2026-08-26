@@ -57,6 +57,7 @@ import { SalesClosingFieldDialog, SalesSourceDialog, newSalesClosingSource } fro
 import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { customerCreditSnapshot, creditEntryRequiresCustomer } from '@/lib/closing/CustomerCreditCalculations';
+import { cashReconciliationSnapshot, paymentMethodForCode } from '@/lib/closing/CashReconciliationLedger';
 import { Banknote as BanknoteIcon, CreditCard as CreditCardIcon, UserCheck, PlusCircle, ShoppingBag, Truck, Star, Globe, Smartphone, UtensilsCrossed, Package as PackageIcon, DollarSign as DollarSignIcon, Gift, Users as UsersIcon, Building2 as Building2Icon, Zap as ZapIcon, Activity as ActivityIcon, BarChart3 as BarChart3Icon, Shield } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -102,13 +103,7 @@ const matchesBranch = (record, branchKey, branchId) => {
 // Payment-method configuration is consumed through every sales source's existing
 // default_payment_method. Keep the accounting classification in one place so
 // sources, totals, cash reconciliation, and the persisted closing agree.
-const paymentBucketForCode = (value) => {
-  const code = String(value || '').trim().toLowerCase();
-  if (['cash', 'cash_on_delivery', 'cod'].includes(code)) return 'cash';
-  if (['credit', 'customer_credit', 'on_account'].includes(code)) return 'credit';
-  if (['card', 'network', 'pos', 'visa', 'mastercard', 'mada', 'digital'].includes(code)) return 'network';
-  return 'other';
-};
+const paymentBucketForCode = (value) => paymentMethodForCode(value);
 
 // A saved closing stores source entries as daily snapshots. When that closing is
 // reopened, its aggregate cash field already includes any cash-classified source
@@ -441,7 +436,7 @@ const StickySummary = memo(function StickySummary({ totalSales, operatingResult,
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing, onSessionContextChange, isOpeningNewClosing = false }) {
+export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing, onSessionContextChange, onRecordOwnerPayment, isOpeningNewClosing = false }) {
   const { currency, lang, t } = useLanguage();
   const { user } = useAuth();
   const { role } = useRole();
@@ -520,6 +515,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const [inlineErrors, setInlineErrors] = useState({});
   const [runtimeError, setRuntimeError] = useState(null);
   const [savedClosing, setSavedClosing] = useState(null);
+  const [isRecordingOwnerPayment, setIsRecordingOwnerPayment] = useState(false);
   const [requestedClosingState, setRequestedClosingState] = useState(
     initial?.closing_state === 'finalized' ? 'finalized' : 'draft',
   );
@@ -759,7 +755,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       if (source.included_in_revenue === false) return totals;
       totals[paymentBucketForCode(source.default_payment_method)] += today;
       return totals;
-    }, { cash: 0, network: 0, credit: 0, other: 0 }),
+    }, { cash: 0, card: 0, bank_transfer: 0, online: 0, wallet: 0, credit: 0 }),
     [customSourceSummaries]
   );
   // The Sales Sources section and every revenue calculation use only current
@@ -1239,52 +1235,83 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const autoSourceLoading = automaticTotalsEnabled && automaticClosingLoading && !useAutomaticSales;
   const automaticClosingUnavailable = automaticTotalsEnabled && automaticClosingIsError && !useAutomaticSales;
 
+  // The canonical server context is the only source of opening cash and posted
+  // physical-cash movements. It is scoped by restaurant, branch, date, shift and
+  // cashier, so unrelated shifts or prior days cannot change this Closing.
+  const currentClosingId = savedClosing?.id || initial?.id || null;
+  const { data: cashLedgerContextData, isLoading: cashLedgerLoading, isError: cashLedgerUnavailable, refetch: refetchCashLedger } = useQuery({
+    queryKey: ['sales-closing-cash-ledger-context', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift, form.cashier_id || form.cashier_employee_id, currentClosingId],
+    enabled: Boolean(activeRestaurant?.id && selectedBranchId && form.date && form.shift && (form.cashier_id || form.cashier_employee_id || defaultCashier?.id)),
+    staleTime: 15000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('erp_sales_closing_cash_context', {
+        p_restaurant_id: activeRestaurant.id,
+        p_branch_id: selectedBranchId,
+        p_branch: form.branch,
+        p_date: form.date,
+        p_shift: form.shift,
+        p_cashier_id: form.cashier_id || form.cashier_employee_id || defaultCashier?.id || null,
+        p_closing_id: currentClosingId,
+      });
+      if (error) throw error;
+      return data || {};
+    },
+  });
+  const cashLedgerContext = cashLedgerContextData || {};
+  const activeOwnerSettlement = currentClosingId && cashLedgerContext.owner_settlement?.closing_id === currentClosingId
+    ? cashLedgerContext.owner_settlement
+    : null;
+  const ownerSettlementPaymentApplied = Math.max(0, Number(activeOwnerSettlement?.owner_payment_amount) || 0);
+
   // ── Closing calculations sourced from the selected ERP scope ──────────────
   const manualCashSales = Math.max(0, Number(cashSalesInput) || 0);
   const manualNetworkTotal = asRecordArray(posEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
   const manualCreditTotal = asRecordArray(creditEntries).reduce((sum, entry) => sum + (Number(entry.today_credit ?? entry.amount) || 0), 0);
   const baseCashSales = useAutomaticSales ? automaticClosingSnapshot.cash : manualCashSales;
   const baseNetworkTotal = useAutomaticSales ? automaticClosingSnapshot.network : manualNetworkTotal;
-  // Customer Credit rows are entered directly against Customer Master and must
-  // always contribute their Today amount to the Closing, even when unrelated
-  // automatic ERP payments are present for the same business session.
   const baseCreditTotal = (useAutomaticSales ? automaticClosingSnapshot.credit : 0) + manualCreditTotal;
-  const baseOtherPaymentTotal = useAutomaticSales ? automaticClosingSnapshot.other : 0;
   const cashSales = baseCashSales + customSourcePaymentTotals.cash;
-  const networkTotal = baseNetworkTotal + customSourcePaymentTotals.network;
+  const cardTotal = baseNetworkTotal + customSourcePaymentTotals.card;
+  const bankTransferTotal = customSourcePaymentTotals.bank_transfer;
+  const onlineTotal = customSourcePaymentTotals.online;
+  const walletTotal = customSourcePaymentTotals.wallet;
   const creditTotal = baseCreditTotal + customSourcePaymentTotals.credit;
-  const otherPaymentTotal = baseOtherPaymentTotal + customSourcePaymentTotals.other;
+  const otherPaymentTotal = useAutomaticSales ? automaticClosingSnapshot.other : 0;
+  const networkTotal = cardTotal + bankTransferTotal + onlineTotal + walletTotal;
   const totalSales = cashSales + networkTotal + creditTotal + otherPaymentTotal;
 
   useEffect(() => {
-    if (!initial?.id && automaticClosingSnapshot.openingCash !== null) setOpeningCash(String(automaticClosingSnapshot.openingCash));
-  }, [automaticClosingSnapshot.openingCash, initial?.id]);
+    if (!initial?.id && cashLedgerContext.opening_cash !== undefined && cashLedgerContext.opening_cash !== null) setOpeningCash(String(cashLedgerContext.opening_cash));
+  }, [cashLedgerContext.opening_cash, initial?.id]);
 
-  const opening = Number(openingCash) || 0;
+  const opening = Number(cashLedgerContext.opening_cash ?? openingCash) || 0;
   const actualCount = actualCashCount !== '' ? Number(actualCashCount) : null;
-  const ownerContrib = Number(ownerContributionInput) || 0;
-  const expectedCashBase = useAutomaticSales && automaticClosingSnapshot.expectedCash !== null
-    ? automaticClosingSnapshot.expectedCash
-    : opening + baseCashSales;
-  // Automatic settlement expected cash does not include newly entered configured
-  // source amounts, so add only the cash-classified source contribution once.
-  const expectedCash = expectedCashBase + customSourcePaymentTotals.cash;
-  const cashDifference = actualCount !== null ? actualCount - expectedCash : null;
-  const cashReconcStatus = cashDifference === null ? null : cashDifference === 0 ? 'Balanced' : cashDifference < 0 ? 'Shortage' : 'Overage';
-  const closingCash = actualCount !== null ? actualCount + ownerContrib : opening;
-  const remainingDifference = actualCount !== null ? closingCash - expectedCash : null;
-
+  const ownerContrib = 0;
   const approvedPurchasesTotal = approvedPurchasesForDate.reduce((sum, purchase) => sum + (Number(purchase.total_amount) || 0), 0);
   const expensesTotal = expensesForDate.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
+  const reconciliation = cashReconciliationSnapshot({
+    openingCash: opening,
+    ledgerMovements: asRecordArray(cashLedgerContext.movements).filter((movement) => movement?.movement_type !== 'owner_settlement_payment'),
+    currentCashSales: baseCashSales,
+    revenueEntries: customSourceSummaries.map(({ source, today }) => ({ amount: today, payment_method: source.default_payment_method })),
+    actualCash: actualCount,
+    purchases: approvedPurchasesTotal,
+    expenses: expensesTotal,
+  });
+  const expectedCash = reconciliation.expectedCash;
+  const cashDifference = reconciliation.difference;
+  const cashReconcStatus = cashDifference === null ? null : cashDifference === 0 ? 'Balanced' : cashDifference < 0 ? 'Shortage' : 'Overage';
+  const closingCash = actualCount !== null ? actualCount : opening;
+  const remainingDifference = cashDifference;
   const operatingResult = totalSales - approvedPurchasesTotal - expensesTotal;
 
   // Validation checks
   const validations = useMemo(() => [
     {
       key: 'erpData',
-      label: 'ERP Sales Data Available',
-      passed: !automaticClosingUnavailable,
-      message: automaticClosingUnavailable ? 'Retry required' : (useAutomaticSales ? 'Loaded' : 'No posted sales'),
+      label: 'ERP Sales and Cash Ledger Available',
+      passed: !automaticClosingUnavailable && !cashLedgerUnavailable,
+      message: automaticClosingUnavailable || cashLedgerUnavailable ? 'Retry required' : (useAutomaticSales ? 'Ledger-scoped sales loaded' : 'No posted sales'),
     },
     {
       key: 'cashier',
@@ -1341,9 +1368,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     },
     {
       key: 'cashBalance',
-      label: 'Cash Reconciled',
-      passed: !requiresCashReconciliation || (actualCount !== null && (remainingDifference === 0 || managerApproved)),
-      message: !requiresCashReconciliation ? 'Optional by configuration' : actualCount === null ? 'Actual cash count required' : remainingDifference === 0 ? 'Balanced' : managerApproved ? 'Manager approved' : 'Needs approval',
+      label: 'Actual Cash Count Recorded',
+      passed: !requiresCashReconciliation || actualCount !== null,
+      message: !requiresCashReconciliation ? 'Optional by configuration' : actualCount === null ? 'Actual cash count required' : remainingDifference === 0 ? 'Balanced' : 'Variance will be recorded separately',
     },
     {
       key: 'cashNote',
@@ -1357,7 +1384,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       passed: !!form.date && !!form.branch && customClosingFields.every((field) => !field.is_required || hasCustomClosingFieldValue(field)),
       message: form.date || 'Date required',
     },
-  ], [form, automaticClosingUnavailable, useAutomaticSales, cashierDisplayName, approvedPurchasesForDate, posEntries, creditEntries, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, cashDifference, cashNotes, managerApproved, requiresCashReconciliation, currency]);
+  ], [form, automaticClosingUnavailable, cashLedgerUnavailable, useAutomaticSales, cashierDisplayName, approvedPurchasesForDate, posEntries, creditEntries, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, cashDifference, cashNotes, managerApproved, requiresCashReconciliation, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -1378,7 +1405,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (!form.shift) nextErrors.shift = 'Shift is required.';
     if (!cashierDisplayName) nextErrors.cashier = 'Cashier is required.';
     if (!savingDraft && requiresCashReconciliation && actualCount === null) nextErrors.actualCash = 'Actual Cash is required.';
-    if (!savingDraft && requiresCashReconciliation && remainingDifference !== 0 && remainingDifference !== null && !managerApproved) nextErrors.reconciliation = 'Cash difference must be reviewed before closing.';
     if (!savingDraft && requiresCashReconciliation && cashDifference !== null && cashDifference !== 0 && !cashNotes.trim()) nextErrors.cashNotes = 'A reconciliation note is required for a cash difference.';
     if (invalidCredit) nextErrors.credit = 'Select an active Customer Master customer for every Today Credit amount.';
     if (!savingDraft && limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer_name_snapshot || limitExceededEntry.customer}. Correct the amount or perform an authorized manager override.`;
@@ -1544,6 +1570,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       console.log('[UnifiedSalesClosing] Calling onSubmit(payload)...');
       const saved = await onSubmit(payload);
       setSavedClosing(saved || { id: initial?.id || null, status: 'saved' });
+      await refetchCashLedger();
       console.log('[UnifiedSalesClosing] onSubmit(payload) SUCCESS');
 
     } catch (err) {
@@ -1557,6 +1584,21 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       toast.error(userMessage);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const recordOwnerPayment = async () => {
+    const closingId = savedClosing?.id || initial?.id;
+    if (!closingId || !onRecordOwnerPayment) return;
+    setIsRecordingOwnerPayment(true);
+    try {
+      await onRecordOwnerPayment(closingId);
+      await refetchCashLedger();
+      toast.success('Owner payment was posted to the ERP cash ledger.');
+    } catch (error) {
+      toast.error(error?.userMessage || error?.message || 'Unable to record the owner payment.');
+    } finally {
+      setIsRecordingOwnerPayment(false);
     }
   };
 
@@ -1698,10 +1740,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             <section className="overflow-hidden rounded-2xl border border-amber-200 bg-background shadow-sm">
               <div className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-3 py-3 sm:px-4"><div className="flex items-center gap-2"><Scale className="h-4 w-4 text-amber-600" /><h2 className="text-xs font-black uppercase tracking-wide text-amber-950">Cash Reconciliation</h2></div>{cashReconcStatus && <StatusBadge status={cashReconcStatus} />}</div>
               <div className="space-y-3 p-3 sm:p-4">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3"><p className="text-[10px] font-bold uppercase text-amber-800">Expected Cash</p><Money key={`money-expected-${expectedCash}`} currency={currency} value={expectedCash} className="mt-1 text-lg font-black text-amber-800" /></div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase text-slate-700">Opening Cash</p><Money key={`money-opening-${opening}`} currency={currency} value={opening} className="mt-1 text-lg font-black text-slate-800" /></div>
-                </div>
+                {cashLedgerUnavailable ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-900"><p className="font-black">ERP cash ledger is unavailable.</p><Button type="button" size="sm" variant="outline" className="mt-2 min-h-10" onClick={() => refetchCashLedger()}><RefreshCw className="mr-1.5 h-4 w-4" />Retry ledger load</Button></div> : <><div className="grid grid-cols-2 gap-2"><div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3"><p className="text-[10px] font-bold uppercase text-amber-800">Expected Cash</p><Money key={`money-expected-${expectedCash}`} currency={currency} value={expectedCash} className="mt-1 text-lg font-black text-amber-800" /></div><div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase text-slate-700">Opening Cash</p><Money key={`money-opening-${opening}`} currency={currency} value={opening} className="mt-1 text-lg font-black text-slate-800" /></div></div><div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs"><div><p className="font-bold text-muted-foreground">Cash Sales</p><Money key={`money-ledger-cash-sales-${cashSales}`} currency={currency} value={cashSales} className="mt-1 font-black text-emerald-700" /></div><div><p className="font-bold text-muted-foreground">ERP Cash IN</p><Money key={`money-ledger-cash-in-${reconciliation.cashIn}`} currency={currency} value={reconciliation.cashIn} className="mt-1 font-black text-emerald-700" /></div><div><p className="font-bold text-muted-foreground">ERP Cash OUT</p><Money key={`money-ledger-cash-out-${reconciliation.cashOut}`} currency={currency} value={reconciliation.cashOut} className="mt-1 font-black text-red-700" /></div></div></>}
                 <div id="quick-closing-reconciliation">
                   <NumInput id="quick-closing-actualCash" label="Actual Cash" value={actualCashCount} onChange={(value) => { setInlineErrors((current) => ({ ...current, actualCash: undefined, reconciliation: undefined, cashNotes: undefined })); updateActualCashCount(value); }} prefix={currency} required helpText="Enter the physical count in the cash register" error={inlineErrors.actualCash || inlineErrors.reconciliation || inlineErrors.cashNotes} />
                 </div>
@@ -1711,12 +1750,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                     <p className="mt-1 text-[11px] text-muted-foreground">{cashDifference === 0 ? 'Cash balanced.' : 'Review the difference and add a note before closing.'}</p>
                   </div>
                 )}
-                {cashDifference !== null && cashDifference !== 0 && (
-                  <div className="space-y-2">
-                    <Textarea id="quick-closing-cashNotes" value={cashNotes} onChange={e => { setCashNotes(e.target.value); setInlineErrors((current) => ({ ...current, cashNotes: undefined })); }} placeholder="Reconciliation note is required for a cash difference" className="min-h-20 resize-none text-sm" />
-                    <Button type="button" size="sm" variant={managerApproved ? 'default' : 'outline'} className="min-h-11 w-full" onClick={() => setManagerApproved(!managerApproved)}><ShieldCheck className="mr-1.5 h-4 w-4" />{managerApproved ? 'Manager approval recorded' : 'Confirm manager review'}</Button>
-                  </div>
-                )}
+                {cashDifference !== null && cashDifference !== 0 && <div className="space-y-2"><Textarea id="quick-closing-cashNotes" value={cashNotes} onChange={e => { setCashNotes(e.target.value); setInlineErrors((current) => ({ ...current, cashNotes: undefined })); }} placeholder="Reconciliation note is required for a cash difference" className="min-h-20 resize-none text-sm" /><Button type="button" size="sm" variant={managerApproved ? 'default' : 'outline'} className="min-h-11 w-full" onClick={() => setManagerApproved(!managerApproved)}><ShieldCheck className="mr-1.5 h-4 w-4" />{managerApproved ? 'Manager review recorded' : 'Record manager review (optional)'}</Button></div>}
+                {reconciliation.shortage > 0 && <div className="rounded-xl border-2 border-red-300 bg-red-50 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase text-red-950">Owner Payment Required</p><p className="mt-1 text-[11px] text-red-800">Cash shortage is a separate owner-settlement payable, never sales revenue.</p></div><Money key={`money-owner-payable-${reconciliation.shortage}-${ownerSettlementPaymentApplied}`} currency={currency} value={Math.max(0, reconciliation.shortage - ownerSettlementPaymentApplied)} className="text-lg font-black text-red-700" /></div><div className="mt-3 flex items-center justify-between gap-2"><Badge variant="outline" className={String(activeOwnerSettlement?.status || 'Pending').toLowerCase() === 'resolved' ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-red-300 bg-white text-red-800'}>{activeOwnerSettlement?.status || 'PENDING'}</Badge><Button type="button" size="sm" className="min-h-10" disabled={!(currentClosingId && onRecordOwnerPayment) || isRecordingOwnerPayment || String(activeOwnerSettlement?.status || '').toLowerCase() === 'resolved'} onClick={recordOwnerPayment}>{isRecordingOwnerPayment ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <BanknoteIcon className="mr-1.5 h-4 w-4" />}Record Owner Payment</Button></div></div>}
+                {reconciliation.overage > 0 && <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950"><p className="font-black">Cash Overage</p><p className="mt-1">{currency} {reconciliation.overage.toLocaleString()} is recorded separately and is not added to sales.</p></div>}
               </div>
             </section>
 
@@ -1736,13 +1772,16 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             <div className="border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4"><h2 className="text-xs font-black uppercase tracking-wide text-slate-900">Daily Closing Summary</h2></div>
             <div className="p-3 sm:p-4">
               <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Sales</span><Money key={`money-total-${totalSales}`} currency={currency} value={totalSales} className="font-bold text-foreground" /></div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Daily Sales</span><Money key={`money-total-${totalSales}`} currency={currency} value={totalSales} className="font-bold text-foreground" /></div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Cash Sales</span><Money key={`money-summary-cash-sales-${cashSales}`} currency={currency} value={cashSales} className="font-bold text-emerald-700" /></div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Card / Non-Cash</span><Money key={`money-summary-non-cash-${networkTotal}`} currency={currency} value={networkTotal} className="font-bold text-violet-700" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Purchases</span><Money key={`money-purchases-${approvedPurchasesTotal}`} currency={currency} value={approvedPurchasesTotal} className="font-bold text-foreground" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Expenses</span><Money key={`money-expenses-${expensesTotal}`} currency={currency} value={expensesTotal} className="font-bold text-foreground" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Customer Credit</span><Money key={`money-credit-${creditTotal}`} currency={currency} value={creditTotal} className="font-bold text-foreground" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Expected Cash</span><Money key={`money-expected-${expectedCash}`} currency={currency} value={expectedCash} className="font-bold text-foreground" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Actual Cash</span>{actualCount === null ? <span className="font-bold text-muted-foreground">—</span> : <Money key={`money-actual-${actualCount}`} currency={currency} value={actualCount} className="font-bold text-foreground" />}</div>
-                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Difference</span>{cashDifference === null ? <span className="font-bold text-muted-foreground">—</span> : <Money key={`money-difference-${cashDifference}`} currency={currency} value={cashDifference} signed className={`font-bold ${cashDifference === 0 ? 'text-emerald-700' : 'text-red-700'}`} />}</div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Shortage / Overage</span>{cashDifference === null ? <span className="font-bold text-muted-foreground">—</span> : <Money key={`money-difference-${cashDifference}`} currency={currency} value={cashDifference} signed className={`font-bold ${cashDifference === 0 ? 'text-emerald-700' : 'text-red-700'}`} />}</div>
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Owner Settlement</span><Money key={`money-summary-owner-settlement-${reconciliation.ownerSettlementRequired}`} currency={currency} value={reconciliation.ownerSettlementRequired} className="font-bold text-red-700" /></div>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="font-bold text-foreground">Operating Result</span><Money key={`money-operating-${operatingResult}`} currency={currency} value={operatingResult} signed className={`font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`} /></div>
               </div>
               <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -1761,7 +1800,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       <div className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
         <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-2 sm:flex sm:justify-end">
           <Button type="button" variant="outline" className="min-h-12 font-bold sm:w-32" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button>
-          <><Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button><Button type="submit" className={`min-h-12 font-black sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button></>
+          <><Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerLoading || cashLedgerUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button><Button type="submit" className={`min-h-12 font-black sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || expensesLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerLoading || cashLedgerUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button></>
         </div>
       </div>
       <SalesClosingFieldDialog editor={fieldEditor} onClose={() => setFieldEditor(null)} onSave={saveInlineClosingField} isSaving={isSavingClosingField} />

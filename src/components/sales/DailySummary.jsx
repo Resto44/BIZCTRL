@@ -4,7 +4,7 @@
  * Accounting rules:
  *  - Total Sales = Cash + Network + Credit  (NEVER affected by reconciliation)
  *  - Purchases   = Only APPROVED supplier invoices for the date
- *  - Operating Result = Total Sales − Approved Purchases
+ *  - Operating Result = Total Sales − Approved Purchases − Operating Expenses
  *  - Cash Reconciliation fields are shown separately (no impact on sales)
  */
 import React, { useMemo } from 'react';
@@ -32,6 +32,7 @@ const LABELS = {
     customer_collections: 'Customer Collections',
     purchases: 'Purchases (Approved)',
     approved_purchases: 'Approved Invoices',
+    expenses: 'Operating Expenses',
     operating_result: 'Operating Result',
     supplier_payments: 'Supplier Payments',
     supplier_debt_balance: 'Supplier Debt Balance',
@@ -168,6 +169,14 @@ export default function DailySummary({ date, branch }) {
   const dayCollections = filterBranch(collections);
   const dayApproved   = filterBranch(approvedInvoices);
 
+  const { data: expenses = [] } = useQuery({
+    queryKey: ['expenses_daily_summary', ownerFilter, todayStr],
+    queryFn: () => base44.entities.Expense.filter({ ...(ownerFilter || {}), date: todayStr }, '-date', 200),
+    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    staleTime: 15000,
+  });
+  const dayExpenses = filterBranch(expenses);
+
   const metrics = useMemo(() => {
     // ── Sales (source of truth — never affected by reconciliation) ────────────
     const cashSales    = daySales.reduce((s, r) => s + (Number(r.restaurant_cash) || Number(r.cash) || 0), 0);
@@ -186,8 +195,10 @@ export default function DailySummary({ date, branch }) {
     // ── Purchases (APPROVED only) ─────────────────────────────────────────────
     const approvedPurchases = dayApproved.reduce((s, inv) => s + (Number(inv.total_amount) || 0), 0);
 
-    // ── Operating Result ──────────────────────────────────────────────────────
-    const operatingResult = totalSales - approvedPurchases;
+    const operatingExpenses = dayExpenses.reduce((s, expense) => s + (Number(expense.amount) || 0), 0);
+
+    // ── Operating Result — independent from cash reconciliation ───────────────
+    const operatingResult = totalSales - approvedPurchases - operatingExpenses;
 
     // ── Balances ──────────────────────────────────────────────────────────────
     const supplierDebtBalance = allInvoices
@@ -202,11 +213,11 @@ export default function DailySummary({ date, branch }) {
       cashSales, networkSales, creditSales, totalSales,
       cashShortage, cashOverage, ownerCashContrib,
       customerCollections,
-      approvedPurchases,
+      approvedPurchases, operatingExpenses,
       operatingResult,
       supplierDebtBalance, customerDebtBalance,
     };
-  }, [daySales, dayCollections, dayApproved, allInvoices, customerDebts, todayStr]);
+  }, [daySales, dayCollections, dayApproved, dayExpenses, allInvoices, customerDebts, todayStr]);
 
   return (
     <div className="space-y-3">
@@ -251,6 +262,9 @@ export default function DailySummary({ date, branch }) {
 
       {/* Card D: Operating Result */}
       <SectionCard icon={DollarSign} title={lbl.operating_result} color={metrics.operatingResult >= 0 ? 'bg-emerald-50' : 'bg-red-50'}>
+        <SummaryRow label={lbl.total_sales} value={metrics.totalSales} currency={currency} indent color="text-blue-700" />
+        <SummaryRow label={lbl.approved_purchases} value={metrics.approvedPurchases} currency={currency} indent color="text-orange-700" />
+        <SummaryRow label={lbl.expenses || 'Operating Expenses'} value={metrics.operatingExpenses} currency={currency} indent color="text-red-700" />
         <SummaryRow
           label={lbl.operating_result}
           value={metrics.operatingResult}
