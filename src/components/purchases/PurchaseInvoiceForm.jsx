@@ -107,6 +107,14 @@ function PurchaseInvoiceItemRow({
   // Calling hook here is safe because it's the top level of this component
   const { products: categoryProducts = [] } = usePurchaseProductsByCategory(item.category_id, supplierId, item.subcategory_id);
 
+  // Mobile number keyboards can emit input before change. Use the same canonical
+  // state update for both events so quantity, cost, discount, and tax always
+  // reach the calculation path immediately.
+  const updateNumericItem = (field, event) => {
+    const parsed = Number.parseFloat(event.currentTarget.value);
+    updateItem(item._id, field, Number.isFinite(parsed) ? parsed : 0);
+  };
+
   return (
     <div className="rounded-lg border border-border p-3 space-y-2 bg-secondary/20 overflow-hidden">
       <div className="flex items-center justify-between gap-2">
@@ -201,12 +209,18 @@ function PurchaseInvoiceItemRow({
         <div className="min-w-0">
           <Label className="text-[10px] text-muted-foreground">Quantity</Label>
           <Input type="number" min="0" step="0.001" value={item.quantity}
-            onChange={e => updateItem(item._id, 'quantity', parseFloat(e.target.value) || 0)} className="h-8 text-xs w-full min-w-0" />
+            onInput={e => updateNumericItem('quantity', e)}
+            onChange={e => updateNumericItem('quantity', e)}
+            onBlur={e => updateNumericItem('quantity', e)}
+            className="h-8 text-xs w-full min-w-0" />
         </div>
         <div className="min-w-0">
           <Label className="text-[10px] text-muted-foreground">Unit Cost</Label>
           <Input type="number" min="0" step="0.01" value={item.unit_cost}
-            onChange={e => updateItem(item._id, 'unit_cost', parseFloat(e.target.value) || 0)} className="h-8 text-xs w-full min-w-0" />
+            onInput={e => updateNumericItem('unit_cost', e)}
+            onChange={e => updateNumericItem('unit_cost', e)}
+            onBlur={e => updateNumericItem('unit_cost', e)}
+            className="h-8 text-xs w-full min-w-0" />
         </div>
       </div>
 
@@ -214,12 +228,18 @@ function PurchaseInvoiceItemRow({
         <div className="min-w-0">
           <Label className="text-[10px] text-muted-foreground">Discount</Label>
           <Input type="number" min="0" step="0.01" value={item.discount}
-            onChange={e => updateItem(item._id, 'discount', parseFloat(e.target.value) || 0)} className="h-8 text-xs w-full min-w-0" />
+            onInput={e => updateNumericItem('discount', e)}
+            onChange={e => updateNumericItem('discount', e)}
+            onBlur={e => updateNumericItem('discount', e)}
+            className="h-8 text-xs w-full min-w-0" />
         </div>
         <div className="min-w-0">
           <Label className="text-[10px] text-muted-foreground">Tax %</Label>
           <Input type="number" min="0" max="100" step="0.1" value={item.tax}
-            onChange={e => updateItem(item._id, 'tax', parseFloat(e.target.value) || 0)} className="h-8 text-xs w-full min-w-0" />
+            onInput={e => updateNumericItem('tax', e)}
+            onChange={e => updateNumericItem('tax', e)}
+            onBlur={e => updateNumericItem('tax', e)}
+            className="h-8 text-xs w-full min-w-0" />
         </div>
         <div className="min-w-0">
           <Label className="text-[10px] text-muted-foreground">Line Total</Label>

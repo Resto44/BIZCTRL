@@ -91,6 +91,10 @@ describe('canonical purchase calculation flow', () => {
     expect(form).toContain('{calcLineTotal(item).toLocaleString');
     expect(form).toContain('return normalizePurchaseLine(updated);');
     expect(form).toContain('const cleanItems = items.map(({ _id, ...i }) => normalizePurchaseLine(i));');
+    expect(form).toContain("onInput={e => updateNumericItem('quantity', e)}");
+    expect(form).toContain("onInput={e => updateNumericItem('unit_cost', e)}");
+    expect(form).toContain("onInput={e => updateNumericItem('discount', e)}");
+    expect(form).toContain("onInput={e => updateNumericItem('tax', e)}");
   });
 
   it('enforces totals from JSON line data in the database before saving or paying an invoice', async () => {
