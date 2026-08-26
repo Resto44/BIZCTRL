@@ -145,7 +145,7 @@ describe('Sales Closing in-workspace runtime customization contract', () => {
     expect(migration).toContain('ADD COLUMN IF NOT EXISTS help_text text');
     expect(context).toContain('label_ar, help_text, field_type');
     expect(workspace).toContain('field.help_text');
-    expect(workspace).toContain('sales_sources_json: JSON.stringify');
+    expect(workspace).toContain('sales_sources_json: buildSalesSourceClosingSnapshots');
     expect(workspace).toContain('field_id: field.id');
   });
 });

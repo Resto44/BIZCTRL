@@ -5,16 +5,74 @@ function newRequestId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function normalizeClosingPayload(payload, requestId) {
+function normalizeJsonArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string' || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : value;
+  } catch {
+    // Preserve malformed legacy values so the server returns its typed
+    // SALES_CLOSING_PAYLOAD_INVALID response instead of silently dropping data.
+    return value;
+  }
+}
+
+export function normalizeClosingPayload(payload, requestId) {
   const actualCash = payload.actual_cash ?? payload.actualCash ?? null;
   return {
     ...payload,
     request_id: requestId,
     business_date: payload.business_date || payload.date,
     actual_cash: actualCash === '' ? null : actualCash,
-    payment_reconciliation_json: Array.isArray(payload.payment_reconciliation_json)
-      ? payload.payment_reconciliation_json
-      : [],
+    // The transactional RPC consumes JSON arrays. Older callers may still carry
+    // serialized values, so normalize them at the one persistence boundary.
+    sales_sources_json: normalizeJsonArray(payload.sales_sources_json),
+    payment_reconciliation_json: normalizeJsonArray(payload.payment_reconciliation_json),
+  };
+}
+
+const BUSINESS_MESSAGES = {
+  SALES_CLOSING_AUTH_REQUIRED: 'Your session has expired. Sign in again before saving the Closing.',
+  SALES_CLOSING_SCOPE_REQUIRED: 'Select the business, branch, date, shift, and cashier before saving the Closing.',
+  SALES_CLOSING_PERMISSION_DENIED: 'You do not have permission to change this Closing.',
+  SALES_CLOSING_STATE_INVALID: 'This Closing cannot be saved in its current state.',
+  SALES_CLOSING_ACTUAL_CASH_REQUIRED: 'Actual cash is required before finalizing this Closing.',
+  SALES_CLOSING_VARIANCE_NOTE_REQUIRED: 'Add a cash variance note before finalizing this Closing.',
+  SALES_CLOSING_MANAGER_APPROVAL_REQUIRED: 'Manager approval is required for this cash variance.',
+  SALES_CLOSING_PAYLOAD_INVALID: 'The Closing details could not be processed. Review the entered sales sources and try again.',
+  SALES_CLOSING_HISTORY_IMMUTABLE: 'This finalized Closing requires an authorized correction.',
+  SALES_CLOSING_CORRECTION_REQUIRED: 'This finalized Closing requires an authorized correction.',
+  SALES_CLOSING_PROTECTED_RECORD: 'This finalized Closing requires an authorized correction.',
+  CLOSING_ALREADY_EXISTS: 'An active draft Closing already exists for this branch, date, shift, and cashier.',
+};
+
+function resolveClosingErrorCode(error) {
+  const technicalMessage = String(error?.message || '');
+  const knownCode = Object.keys(BUSINESS_MESSAGES).find((code) => technicalMessage.includes(code));
+  return knownCode || error?.code || 'CLOSING_SAVE_FAILED';
+}
+
+export function createClosingSaveError(error, requestId) {
+  const code = resolveClosingErrorCode(error);
+  const structuredError = new Error(error?.message || 'Sales Closing save failed.');
+  structuredError.name = 'ClosingSaveError';
+  structuredError.code = code;
+  structuredError.details = error?.details || error?.hint || error?.message || null;
+  structuredError.request_id = requestId;
+  structuredError.requestId = requestId;
+  structuredError.userMessage = BUSINESS_MESSAGES[code]
+    || 'The Closing service could not complete this request. Please retry using the reference shown below.';
+  return structuredError;
+}
+
+export function closingErrorDetails(error) {
+  if (!error) return null;
+  return {
+    code: error.code || 'CLOSING_SAVE_FAILED',
+    message: error.message || 'Sales Closing save failed.',
+    details: error.details || null,
+    request_id: error.request_id || error.requestId || null,
   };
 }
 
@@ -24,21 +82,31 @@ function normalizeClosingPayload(payload, requestId) {
  * records, and treats the request ID as an idempotency key.
  */
 export async function saveClosingSession({ payload, closingId = null, requestId = newRequestId() }) {
-  const { data, error } = await supabase.rpc('erp_save_sales_closing', {
-    p_payload: normalizeClosingPayload(payload, requestId),
-    p_closing_id: closingId,
-    p_request_id: requestId,
-  });
-  if (error) throw error;
-  if (!data?.closing) throw new Error('The closing server did not return a saved record.');
-  return {
-    ...data.closing,
-    _idempotent: Boolean(data.idempotent),
-    _finalizedTransition: Boolean(data.finalized_transition),
-    _requiresCorrection: Boolean(data.requires_correction),
-    _lifecycleAction: data.lifecycle_action || 'saved',
-    _requestId: requestId,
-  };
+  const normalizedPayload = normalizeClosingPayload(payload, requestId);
+  try {
+    const rpcName = normalizedPayload.closing_state === 'finalized'
+      ? 'erp_finalize_sales_closing'
+      : 'erp_save_sales_closing_draft';
+    const { data, error } = await supabase.rpc(rpcName, {
+      p_payload: normalizedPayload,
+      p_closing_id: closingId,
+      p_request_id: requestId,
+    });
+    if (error) throw error;
+    if (!data?.closing) throw new Error('The closing server did not return a saved record.');
+    return {
+      ...data.closing,
+      _idempotent: Boolean(data.idempotent),
+      _finalizedTransition: Boolean(data.finalized_transition),
+      _requiresCorrection: Boolean(data.requires_correction),
+      _lifecycleAction: data.lifecycle_action || 'saved',
+      _requestId: requestId,
+    };
+  } catch (error) {
+    const structuredError = createClosingSaveError(error, requestId);
+    console.error('[ClosingRepository] Sales Closing save failed', closingErrorDetails(structuredError));
+    throw structuredError;
+  }
 }
 
 export async function requestClosingCorrection({ closingId, reason, fields = [], oldValues = {}, newValues = {} }) {
@@ -54,21 +122,17 @@ export async function requestClosingCorrection({ closingId, reason, fields = [],
 }
 
 export function closingSaveErrorMessage(error) {
-  const code = String(error?.code || error?.message || '');
-  if (code.includes('SALES_CLOSING_HISTORY_IMMUTABLE') || code.includes('SALES_CLOSING_CORRECTION_REQUIRED')) {
-    return 'This finalized closing requires an authorized correction.';
-  }
-  if (code.includes('SALES_CLOSING_PERMISSION_DENIED')) return 'You do not have permission to change this Closing.';
-  if (code.includes('SALES_CLOSING_ACTUAL_CASH_REQUIRED')) return 'Actual cash is required before finalizing this Closing.';
-  if (code.includes('SALES_CLOSING_VARIANCE_NOTE_REQUIRED')) return 'Add a cash variance note before finalizing this Closing.';
-  if (code.includes('SALES_CLOSING_MANAGER_APPROVAL_REQUIRED')) return 'Manager approval is required for this cash variance.';
-  return 'The Closing could not be saved. Please review the form and try again.';
+  if (error?.userMessage) return error.userMessage;
+  const code = resolveClosingErrorCode(error);
+  return BUSINESS_MESSAGES[code]
+    || 'The Closing service could not complete this request. Please retry using the reference shown below.';
 }
 
 export const closingRepository = {
   saveClosingSession,
   requestClosingCorrection,
   closingSaveErrorMessage,
+  closingErrorDetails,
 };
 
 export default closingRepository;

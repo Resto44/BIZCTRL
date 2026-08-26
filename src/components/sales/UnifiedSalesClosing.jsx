@@ -55,6 +55,7 @@ import { newSalesClosingCustomField } from '@/lib/salesClosingCustomization';
 import { buildSalesSourceClosingSnapshots, salesSourceTodayTotal } from '@/lib/salesSourceClosingLifecycle';
 import { SalesClosingFieldDialog, SalesSourceDialog, newSalesClosingSource } from '@/components/sales/SalesClosingCustomizationDialogs';
 import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
+import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { Banknote as BanknoteIcon, CreditCard as CreditCardIcon, UserCheck, PlusCircle, ShoppingBag, Truck, Star, Globe, Smartphone, UtensilsCrossed, Package as PackageIcon, DollarSign as DollarSignIcon, Gift, Users as UsersIcon, Building2 as Building2Icon, Zap as ZapIcon, Activity as ActivityIcon, BarChart3 as BarChart3Icon, Shield } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -571,6 +572,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   }, [branches, isManager, managerBranch, user?.branch_id]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inlineErrors, setInlineErrors] = useState({});
+  const [runtimeError, setRuntimeError] = useState(null);
   const [savedClosing, setSavedClosing] = useState(null);
   const closingLifecycleState = initial?.closing_state || (initial?.id ? 'finalized' : 'draft');
   const isProtectedClosing = ['finalized', 'correction_requested', 'corrected', 'locked'].includes(closingLifecycleState);
@@ -1431,6 +1433,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       return;
     }
     setInlineErrors({});
+    setRuntimeError(null);
     if (!approvedPurchasesForDate.length) {
       toast.warning('No approved purchases found for this date. Proceeding without purchase data.');
     }
@@ -1512,19 +1515,19 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         // Dynamic Sales Sources — `amount` / `today_amount` are the only
         // revenue inputs. Previous and Total are immutable historical context
         // retained for History and never added to current-period accounting.
-        sales_sources_json: JSON.stringify(
-          buildSalesSourceClosingSnapshots(customSourceSummaries, {
-            branchId,
-            branch: selectedBranch?.key || selectedBranch?.branch_key || form.branch,
-            date: form.date,
-            shift: form.shift,
-            cashierId,
-            cashierName: cashierDisplayName,
-          }).map((snapshot) => ({
-            ...snapshot,
-            payment_bucket: paymentBucketForCode(snapshot.default_payment_method),
-          }))
-        ),
+        // The RPC requires a JSON array. Sending a JSON-encoded string makes
+        // Postgres see a scalar and reject the finalization payload.
+        sales_sources_json: buildSalesSourceClosingSnapshots(customSourceSummaries, {
+          branchId,
+          branch: selectedBranch?.key || selectedBranch?.branch_key || form.branch,
+          date: form.date,
+          shift: form.shift,
+          cashierId,
+          cashierName: cashierDisplayName,
+        }).map((snapshot) => ({
+          ...snapshot,
+          payment_bucket: paymentBucketForCode(snapshot.default_payment_method),
+        })),
         custom_sources_total: otherPaymentTotal,
         sales_closing_custom_fields: customClosingFields
           .filter((field) => customClosingFieldValues[field.id] !== undefined && customClosingFieldValues[field.id] !== '')
@@ -1564,13 +1567,14 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       console.log('[UnifiedSalesClosing] onSubmit(payload) SUCCESS');
 
     } catch (err) {
-      const duplicateClosing = String(err?.message || '').includes('CLOSING_ALREADY_EXISTS');
-      if (duplicateClosing) {
-        setInlineErrors({ duplicate: 'Closing already exists for this branch and shift.' });
-        toast.error('Closing already exists for this branch and shift.');
-      } else {
-        toast.error(err?.userMessage || 'The Closing could not be saved. Please review the form and try again.');
+      const details = closingErrorDetails(err);
+      const userMessage = err?.userMessage || 'The Closing service could not complete this request. Please retry using the reference shown below.';
+      console.error('[UnifiedSalesClosing] Sales Closing request failed', details);
+      setRuntimeError({ ...details, userMessage });
+      if (details?.code === 'CLOSING_ALREADY_EXISTS') {
+        setInlineErrors({ duplicate: userMessage });
       }
+      toast.error(userMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -1600,6 +1604,15 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             <div><p className="text-xs font-black uppercase tracking-wide text-slate-900">{isQuickClosing ? 'Quick Closing' : 'Advanced Closing'}</p><p className="text-[11px] text-muted-foreground">{isQuickClosing ? 'Complete the essential cash, payment, and reconciliation fields on one screen.' : 'Review source detail, purchases, expenses, and operating results before saving.'}</p></div>
             {canUseAdvancedClosing && <div className="grid grid-cols-2 gap-1 rounded-lg border bg-background p-1" role="group" aria-label="Closing mode"><Button type="button" size="sm" variant={isQuickClosing ? 'default' : 'ghost'} className="min-h-9" aria-pressed={isQuickClosing} aria-label="Switch to Quick Closing" onClick={() => setClosingView('quick')}>Quick</Button><Button type="button" size="sm" variant={!isQuickClosing ? 'default' : 'ghost'} className="min-h-9" aria-pressed={!isQuickClosing} aria-label="Switch to Advanced Closing" onClick={() => setClosingView('advanced')}>Advanced</Button></div>}
           </section>
+          {runtimeError && (
+            <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-red-950">
+              <p className="text-sm font-bold">Save failed</p>
+              <p className="mt-1 text-xs">{runtimeError.userMessage}</p>
+              {(import.meta.env.DEV || new URLSearchParams(window.location.search).has('closing_diagnostics')) && (
+                <p className="mt-2 text-[11px] font-medium" data-testid="closing-runtime-error-reference">Error: {runtimeError.code} · Request ID: {runtimeError.request_id || 'unavailable'}</p>
+              )}
+            </div>
+          )}
           {savedClosing && (
             <div role="status" className={`rounded-xl border p-3 ${savedClosing._alreadyExists ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'}`}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
