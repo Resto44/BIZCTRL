@@ -1262,6 +1262,14 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     ? cashLedgerContext.owner_settlement
     : null;
   const ownerSettlementPaymentApplied = Math.max(0, Number(activeOwnerSettlement?.owner_payment_amount) || 0);
+  const ownerSettlementRequired = Math.max(0, Number(activeOwnerSettlement?.owner_settlement_required) || 0);
+  const ownerSettlementResolved = Boolean(activeOwnerSettlement) && (
+    String(activeOwnerSettlement.status || '').toLowerCase() === 'resolved'
+    || (ownerSettlementRequired > 0 && ownerSettlementPaymentApplied >= ownerSettlementRequired)
+  );
+  const ownerSettlementStatusLabel = ownerSettlementResolved
+    ? 'Resolved'
+    : (activeOwnerSettlement?.status || 'PENDING');
 
   // ── Closing calculations sourced from the selected ERP scope ──────────────
   const manualCashSales = Math.max(0, Number(cashSalesInput) || 0);
@@ -1758,7 +1766,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                   </div>
                 )}
                 {cashDifference !== null && cashDifference !== 0 && <div className="space-y-2"><Textarea id="quick-closing-cashNotes" value={cashNotes} onChange={e => { setCashNotes(e.target.value); setInlineErrors((current) => ({ ...current, cashNotes: undefined })); }} placeholder="Reconciliation note is required for a cash difference" className="min-h-20 resize-none text-sm" /><Button type="button" size="sm" variant={managerApproved ? 'default' : 'outline'} className="min-h-11 w-full" onClick={() => setManagerApproved(!managerApproved)}><ShieldCheck className="mr-1.5 h-4 w-4" />{managerApproved ? 'Manager review recorded' : 'Record manager review (optional)'}</Button></div>}
-                {reconciliation.shortage > 0 && <div className="rounded-xl border-2 border-red-300 bg-red-50 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase text-red-950">Owner Payment Required</p><p className="mt-1 text-[11px] text-red-800">Cash shortage is a separate owner-settlement payable, never sales revenue.</p></div><Money key={`money-owner-payable-${reconciliation.shortage}-${ownerSettlementPaymentApplied}`} currency={currency} value={Math.max(0, reconciliation.shortage - ownerSettlementPaymentApplied)} className="text-lg font-black text-red-700" /></div><div className="mt-3 flex items-center justify-between gap-2"><Badge variant="outline" className={String(activeOwnerSettlement?.status || 'Pending').toLowerCase() === 'resolved' ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-red-300 bg-white text-red-800'}>{activeOwnerSettlement?.status || 'PENDING'}</Badge><Button type="button" size="sm" className="min-h-10" disabled={!(currentClosingId && onRecordOwnerPayment) || isRecordingOwnerPayment || String(activeOwnerSettlement?.status || '').toLowerCase() === 'resolved'} onClick={recordOwnerPayment}>{isRecordingOwnerPayment ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <BanknoteIcon className="mr-1.5 h-4 w-4" />}Record Owner Payment</Button></div></div>}
+                {reconciliation.shortage > 0 && <div className="rounded-xl border-2 border-red-300 bg-red-50 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase text-red-950">Owner Payment Required</p><p className="mt-1 text-[11px] text-red-800">Cash shortage is a separate owner-settlement payable, never sales revenue.</p></div><Money key={`money-owner-payable-${reconciliation.shortage}-${ownerSettlementPaymentApplied}`} currency={currency} value={Math.max(0, reconciliation.shortage - ownerSettlementPaymentApplied)} className="text-lg font-black text-red-700" /></div><div className="mt-3 flex items-center justify-between gap-2"><Badge variant="outline" className={ownerSettlementResolved ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-red-300 bg-white text-red-800'}>{ownerSettlementStatusLabel}</Badge><Button type="button" size="sm" className="min-h-10" disabled={!(currentClosingId && onRecordOwnerPayment) || isRecordingOwnerPayment || ownerSettlementResolved} onClick={recordOwnerPayment}>{isRecordingOwnerPayment ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <BanknoteIcon className="mr-1.5 h-4 w-4" />}Record Owner Payment</Button></div></div>}
                 {reconciliation.overage > 0 && <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950"><p className="font-black">Cash Overage</p><p className="mt-1">{currency} {reconciliation.overage.toLocaleString()} is recorded separately and is not added to sales.</p></div>}
               </div>
             </section>

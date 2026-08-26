@@ -75,5 +75,8 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
     expect(workspace).toContain('ownerSettlementPaymentApplied');
     expect(workspace).toContain('isCurrentClosingOwnerSettlementMovement');
     expect(workspace).toContain("movement?.source_module === 'OwnerCashInjection'");
+    expect(workspace).toContain('ownerSettlementResolved');
+    expect(workspace).toContain('ownerSettlementStatusLabel');
+    expect(workspace).toContain('ownerSettlementPaymentApplied >= ownerSettlementRequired');
   });
 });
