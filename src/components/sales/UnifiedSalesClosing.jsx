@@ -334,6 +334,7 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
   const customerName = selectedCustomer?.customer_name || selectedCustomer?.name || entry.customer_name_snapshot || entry.customer || '';
   const previousCredit = Number(selectedCustomer?.outstanding_balance ?? entry.previous_credit ?? entry.current_debt) || 0;
   const creditLimit = Number(selectedCustomer?.credit_limit ?? entry.credit_limit) || 0;
+  const creditRenderVersion = `${entry.customer_id || 'unselected'}:${entry.today_credit ?? entry.amount ?? 0}`;
   const { todayCredit, availableCredit, newCreditBalance, remainingCreditLimit: remainingCredit, exceededBy, limitExceeded } = customerCreditSnapshot({
     previousCredit,
     creditLimit,
@@ -382,12 +383,14 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
               <CreditMetric label="Available Credit" value={availableCredit} currency={currency} tone="text-emerald-600" />
             </div>
           </div>
-          <NumInput id={`quick-closing-credit-${entry.id}`} label="Today Credit" value={entry.amount || ''} onChange={(value) => onUpdate(entry.id, 'today_credit', value)} prefix={currency} disabled={disabled} error={limitExceeded ? 'Credit limit exceeded.' : undefined} />
-          <div className={`grid grid-cols-1 gap-2 rounded-lg border p-3 text-sm sm:grid-cols-2 ${limitExceeded ? 'border-red-200 bg-red-50 text-red-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
-            <CreditMetric label="New Credit Balance" value={newCreditBalance} currency={currency} tone={limitExceeded ? 'text-red-700' : 'text-emerald-700'} />
-            <CreditMetric label="Remaining Credit Limit" value={remainingCredit} currency={currency} tone={limitExceeded ? 'text-red-700' : 'text-emerald-700'} />
+          <NumInput id={`quick-closing-credit-${entry.id}`} label="Today Credit" value={entry.today_credit ?? entry.amount ?? ''} onChange={(value) => onUpdate(entry.id, 'today_credit', value)} prefix={currency} disabled={disabled} error={limitExceeded ? 'Credit limit exceeded.' : undefined} />
+          <div key={`customer-credit-metrics-${creditRenderVersion}`} className="space-y-3" aria-live="polite">
+            <div className={`grid grid-cols-1 gap-2 rounded-lg border p-3 text-sm sm:grid-cols-2 ${limitExceeded ? 'border-red-200 bg-red-50 text-red-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+              <CreditMetric label="New Credit Balance" value={newCreditBalance} currency={currency} tone={limitExceeded ? 'text-red-700' : 'text-emerald-700'} />
+              <CreditMetric label="Remaining Credit Limit" value={remainingCredit} currency={currency} tone={limitExceeded ? 'text-red-700' : 'text-emerald-700'} />
+            </div>
+            {limitExceeded && <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-900"><p className="font-black">Credit limit exceeded.</p><div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1"><span>Credit Limit</span><span className="text-right font-bold">{currency} {creditLimit.toLocaleString()}</span><span>Previous Credit</span><span className="text-right font-bold">{currency} {previousCredit.toLocaleString()}</span><span>Available</span><span className="text-right font-bold">{currency} {availableCredit.toLocaleString()}</span><span>Requested Today</span><span className="text-right font-bold">{currency} {todayCredit.toLocaleString()}</span><span>Exceeded By</span><span className="text-right font-bold">{currency} {exceededBy.toLocaleString()}</span></div>{canOverride && !disabled && <label className="mt-3 flex min-h-11 items-center gap-2 border-t border-red-200 pt-3 font-bold"><input type="checkbox" checked={Boolean(entry.manager_override)} onChange={(event) => onUpdate(entry.id, 'manager_override', event.target.checked)} className="h-4 w-4 accent-red-600" />Authorized manager override</label>}</div>}
           </div>
-          {limitExceeded && <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-900"><p className="font-black">Credit limit exceeded.</p><div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1"><span>Credit Limit</span><span className="text-right font-bold">{currency} {creditLimit.toLocaleString()}</span><span>Previous Credit</span><span className="text-right font-bold">{currency} {previousCredit.toLocaleString()}</span><span>Available</span><span className="text-right font-bold">{currency} {availableCredit.toLocaleString()}</span><span>Requested Today</span><span className="text-right font-bold">{currency} {todayCredit.toLocaleString()}</span><span>Exceeded By</span><span className="text-right font-bold">{currency} {exceededBy.toLocaleString()}</span></div>{canOverride && !disabled && <label className="mt-3 flex min-h-11 items-center gap-2 border-t border-red-200 pt-3 font-bold"><input type="checkbox" checked={Boolean(entry.manager_override)} onChange={(event) => onUpdate(entry.id, 'manager_override', event.target.checked)} className="h-4 w-4 accent-red-600" />Authorized manager override</label>}</div>}
         </>
       )}
     </div>
@@ -1678,7 +1681,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
             <div className="space-y-3 p-3 sm:p-4">
               {custLoading ? <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-muted-foreground">Loading Customer Master…</div> : creditEntries.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-muted-foreground">No customer credit has been added to this Closing.</div> : <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{creditEntries.map((entry, index) => <CustomerCreditEntry key={entry.id} entry={entry} idx={index} onRemove={removeCredit} onUpdate={updateCredit} customers={customers} currency={currency} canOverride={canManageCreditOverride} disabled={isProtectedClosing} />)}</div>}
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-3"><span className="text-xs font-black uppercase tracking-wide text-blue-950">Customer Credit Today Total</span><Money currency={currency} value={manualCreditTotal} className="text-lg font-black text-blue-700" /></div>
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-3"><span className="text-xs font-black uppercase tracking-wide text-blue-950">Customer Credit Today Total</span><Money key={`customer-credit-today-total-${manualCreditTotal}`} currency={currency} value={manualCreditTotal} className="text-lg font-black text-blue-700" /></div>
               {inlineErrors.credit && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}
             </div>
           </section>
