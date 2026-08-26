@@ -49,6 +49,40 @@ export function calcInvoiceTotals(items = [], additionalCosts = []) {
   return { subtotal, taxAmount, discountAmount, additionalTotal, grandTotal };
 }
 
+function assertValidInvoiceLines(items = [], additionalCosts = []) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error('At least one purchase line item is required.');
+  }
+
+  items.forEach((item, index) => {
+    const quantity = Number(item?.quantity);
+    const unitCost = Number(item?.unit_cost);
+    const discount = Number(item?.discount || 0);
+    const tax = Number(item?.tax || 0);
+    const lineLabel = `Line ${index + 1}`;
+
+    if (!item?.product_id && !String(item?.product_name || '').trim()) {
+      throw new Error(`${lineLabel} must include a product.`);
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error(`${lineLabel} quantity must be greater than zero.`);
+    }
+    if (!Number.isFinite(unitCost) || unitCost < 0) {
+      throw new Error(`${lineLabel} unit cost cannot be negative.`);
+    }
+    if (!Number.isFinite(discount) || discount < 0 || discount > quantity * unitCost) {
+      throw new Error(`${lineLabel} discount is invalid.`);
+    }
+    if (!Number.isFinite(tax) || tax < 0 || tax > 100) {
+      throw new Error(`${lineLabel} tax must be between 0 and 100 percent.`);
+    }
+  });
+
+  if (!Array.isArray(additionalCosts) || additionalCosts.some((cost) => !Number.isFinite(Number(cost?.amount)) || Number(cost?.amount) < 0)) {
+    throw new Error('Additional costs cannot be negative.');
+  }
+}
+
 // ── Create Purchase Invoice ────────────────────────────────────────────────
 export async function createPurchaseInvoice({
   invoiceData,
@@ -56,6 +90,7 @@ export async function createPurchaseInvoice({
   additionalCosts,
   createdBy,
 }) {
+  assertValidInvoiceLines(items, additionalCosts);
   const { grandTotal, subtotal, taxAmount, discountAmount } = calcInvoiceTotals(items, additionalCosts);
   const approvalStatus = computeApprovalStatus(grandTotal);
   const status = approvalStatus === 'auto_approved' ? 'approved' : 'pending';
@@ -108,7 +143,19 @@ export async function updatePurchaseInvoice({
   additionalCosts,
   createdBy,
 }) {
+  assertValidInvoiceLines(items, additionalCosts);
   const { grandTotal, subtotal, taxAmount, discountAmount } = calcInvoiceTotals(items, additionalCosts);
+
+  const { data: currentInvoice, error: currentInvoiceError } = await supabase
+    .from('supplier_invoices')
+    .select('status, approval_status')
+    .eq('id', invoiceId)
+    .single();
+
+  if (currentInvoiceError) throw new Error(`Invoice fetch failed: ${currentInvoiceError.message}`);
+  if (currentInvoice?.status !== 'draft' || ['approved', 'auto_approved'].includes(currentInvoice?.approval_status)) {
+    throw new Error('Finalized purchase invoices cannot be edited. Use the authorized correction workflow.');
+  }
 
   const payload = {
     ...invoiceData,
@@ -383,9 +430,19 @@ export async function addInvoicePayment({
 
   if (fetchError) throw new Error(`Invoice fetch failed: ${fetchError.message}`);
 
-  const newPaidAmount = (invoice.paid_amount || 0) + amount;
-  const remaining = (invoice.total_amount || 0) - newPaidAmount;
-  const newStatus = computeInvoiceStatus(invoice.total_amount, newPaidAmount);
+  const paymentAmount = Number(amount);
+  if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+    throw new Error('Payment amount must be greater than zero.');
+  }
+
+  const newPaidAmount = Number(invoice.paid_amount || 0) + paymentAmount;
+  const totalAmount = Number(invoice.total_amount || 0);
+  if (newPaidAmount > totalAmount + 0.005) {
+    throw new Error('Payment amount cannot exceed the outstanding invoice balance.');
+  }
+
+  const remaining = totalAmount - newPaidAmount;
+  const newStatus = computeInvoiceStatus(totalAmount, newPaidAmount);
   const paymentDate = date || new Date().toISOString().split('T')[0];
   const isCash = !paymentMethod || paymentMethod === 'cash';
 
@@ -401,7 +458,7 @@ export async function addInvoicePayment({
       supplier_id: invoice.supplier_id,
       supplier_name: invoice.supplier_name,
       branch: invoice.branch,
-      amount,
+      amount: paymentAmount,
       payment_method: paymentMethod || 'cash',
       restaurant_id: invoice.restaurant_id || null,
       // RLS required scope fields — branch_id must be present for policy check
@@ -451,7 +508,7 @@ export async function addInvoicePayment({
         direction: 'out',
         wallet: 'branch_cash',
         branch: invoice.branch,
-        amount,
+        amount: paymentAmount,
         payment_method: isCash ? 'cash' : 'network',
         description: `Supplier Payment — ${invoice.supplier_name || 'Supplier'} — Invoice ${invoice.invoice_number || invoiceId}`,
         reference_id: invoiceId,

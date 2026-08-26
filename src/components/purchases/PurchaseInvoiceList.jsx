@@ -32,6 +32,9 @@ const OVERDUE_COLORS = {
   red:    'border-l-4 border-l-red-500 bg-red-50/30',
 };
 
+const isMutableDraft = (invoice) =>
+  invoice?.status === 'draft' && !['approved', 'auto_approved'].includes(invoice?.approval_status);
+
 export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, onBulkDelete, onView }) {
   const { currency } = useLanguage();
   const { user } = useAuth();
@@ -40,6 +43,7 @@ export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, o
   const isOwner = role === ROLES.OWNER;
   const canDelete = role === ROLES.OWNER || role === ROLES.MANAGER || role === ROLES.GENERAL_MANAGER;
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const mutableDrafts = invoices.filter(isMutableDraft);
 
   const toggleSelect = useCallback((id) => {
     setSelectedIds(prev => {
@@ -50,12 +54,12 @@ export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, o
   }, []);
 
   const toggleSelectAll = useCallback(() => {
-    if (selectedIds.size === invoices.length) {
+    if (selectedIds.size === mutableDrafts.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(invoices.map(i => i.id)));
+      setSelectedIds(new Set(mutableDrafts.map((invoice) => invoice.id)));
     }
-  }, [selectedIds.size, invoices]);
+  }, [selectedIds.size, mutableDrafts]);
 
   const handleApprove = async (invoice) => {
     try {
@@ -79,27 +83,27 @@ export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, o
 
   return (
     <div className="space-y-2">
-      {/* Bulk action toolbar */}
-      {canDelete && (
+      {/* Only unapproved drafts may be removed. Finalized invoices require the canonical correction workflow. */}
+      {canDelete && onBulkDelete && mutableDrafts.length > 0 && (
         <div className="flex items-center gap-2 py-1">
           <button
             type="button"
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
             onClick={toggleSelectAll}
           >
-            {selectedIds.size === invoices.length && invoices.length > 0
+            {selectedIds.size === mutableDrafts.length
               ? <CheckSquare className="w-4 h-4 text-primary" />
               : <Square className="w-4 h-4" />}
-            {selectedIds.size === invoices.length && invoices.length > 0 ? 'Deselect All' : 'Select All'}
+            {selectedIds.size === mutableDrafts.length ? 'Deselect All Drafts' : 'Select All Drafts'}
           </button>
-          {selectedIds.size > 0 && onBulkDelete && (
+          {selectedIds.size > 0 && (
             <button
               type="button"
               className="flex items-center gap-1.5 text-xs text-destructive hover:text-destructive/80 ml-auto"
               onClick={() => { onBulkDelete(Array.from(selectedIds)); setSelectedIds(new Set()); }}
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Delete Selected ({selectedIds.size})
+              Delete Drafts ({selectedIds.size})
             </button>
           )}
         </div>
@@ -114,7 +118,7 @@ export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, o
           <Card key={inv.id} className={`p-3 ${isOverdue ? OVERDUE_COLORS[color] : ''} ${selectedIds.has(inv.id) ? 'ring-2 ring-primary/50' : ''}`}>
 
             <div className="flex items-start gap-3">
-              {canDelete && (
+              {canDelete && isMutableDraft(inv) && (
                 <button type="button" onClick={() => toggleSelect(inv.id)} className="text-muted-foreground hover:text-primary mt-0.5 flex-shrink-0">
                   {selectedIds.has(inv.id) ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}
                 </button>
@@ -177,7 +181,7 @@ export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, o
                     <Eye className="w-3.5 h-3.5" />
                   </Button>
                 )}
-                {onEdit && inv.status !== 'paid' && inv.status !== 'cancelled' && (
+                {onEdit && isMutableDraft(inv) && (
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(inv)}>
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
@@ -187,8 +191,8 @@ export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, o
                     <CheckCircle2 className="w-3.5 h-3.5" />
                   </Button>
                 )}
-                {onDelete && canDelete && (
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(inv)} title="Delete Invoice">
+                {onDelete && canDelete && isMutableDraft(inv) && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(inv)} title="Delete Draft Invoice">
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 )}

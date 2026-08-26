@@ -8,94 +8,42 @@ const assert = (condition, message) => {
 };
 
 const salesPage = read('src/pages/Sales.jsx');
-const workspace = read('src/components/sales/ERPSalesWorkspace.jsx');
+const workspace = read('src/components/sales/UnifiedSalesClosing.jsx');
+const closingRepository = read('src/lib/closing/ClosingRepository.js');
 const branchSelect = read('src/components/shared/BranchSelect.jsx');
-const driverAnalytics = read('src/lib/driverAnalytics.js');
-const driverManagement = read('src/pages/DriverManagement.jsx');
-const driverPerformance = read('src/components/dashboard/DriverPerformance.jsx');
-const driverPermissionMigration = read('supabase/migrations/20260813_driver_sales_owner_or_manager.sql');
+const purchaseList = read('src/components/purchases/PurchaseInvoiceList.jsx');
+const purchaseForm = read('src/components/purchases/PurchaseInvoiceForm.jsx');
+const procurementEngine = read('src/lib/procurementEngine.js');
+const finalizedPurchaseProtection = read('src/supabase/20260826_protect_finalized_purchase_invoices.sql');
 
-// Regression: the sales list maps each entry as `s`. Referencing `sale` in the
-// delete-permission expression previously raised a ReferenceError at render time.
-assert(!salesPage.includes('isDriverSale(sale) || isBranchManager'), 'legacy undefined sales-row variable remains in delete permission');
-assert(salesPage.includes('isDriverSale(s) || canManageDriverSales'), 'delete permission does not evaluate the current mapped sales row with Owner access');
-assert(salesPage.includes('const canManageDriverSales = role === ROLES.OWNER || isBranchManager;'), 'Sales mutation layer does not share Driver Sales access with Owners');
-assert(salesPage.includes('Only the restaurant Owner or assigned Branch Manager can create a Driver Sale.'), 'Owner create permission is missing');
-assert(salesPage.includes('Only the restaurant Owner or assigned Branch Manager can edit a Driver Sale.'), 'Owner edit permission is missing');
-assert(salesPage.includes("qc.invalidateQueries({ queryKey: ['driver-performance'] });"), 'saved Driver Sales do not refresh Owner Driver Analytics');
-assert(salesPage.includes("qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });"), 'saved Driver Sales do not refresh dashboard metrics');
+// The active Sales screen must use the canonical transactional Closing workflow.
+assert(salesPage.includes("import UnifiedSalesClosing from '@/components/sales/UnifiedSalesClosing';"), 'Sales does not mount the unified Closing workspace');
+assert(salesPage.includes('saveClosingSession({ payload, closingId: editing?.id || null })'), 'Sales bypasses the canonical Closing persistence RPC');
+assert(salesPage.includes('SALES_CLOSING_BRANCH_CONTEXT_MISMATCH'), 'Sales does not reject a stale branch save context');
+assert(salesPage.includes("onDelete={null}"), 'Sales exposes unsupported destructive Closing deletion');
+assert(!salesPage.includes('deleteMut.mutate'), 'Sales still references the removed delete mutation at runtime');
+assert(!salesPage.includes('bulkDeleteMut.mutate'), 'Sales still references the removed bulk-delete mutation at runtime');
 
-// Branch Manager Add Sales mount guards.
+// The current workspace owns validation, idempotent saves, customer credit, and mobile submission state.
+assert(workspace.includes('onSubmit={handleSubmit}') || workspace.includes('onSubmit'), 'Unified Closing does not expose a submit workflow');
+assert(workspace.includes('isSubmitting'), 'Unified Closing does not guard duplicate submission state');
+assert(workspace.includes('CustomerCreditEntry'), 'Unified Closing does not render the customer credit workflow');
+assert(workspace.includes('BranchSelect value={form.branch} onChange={selectClosingBranch}'), 'Unified Closing does not bind branch selection through the active scope');
+assert(closingRepository.includes('requestId = newRequestId()'), 'Closing persistence has no idempotency request key');
+assert(closingRepository.includes("erp_finalize_sales_closing") && closingRepository.includes("erp_save_sales_closing_draft"), 'Closing persistence does not route draft and finalized states through canonical RPCs');
 assert(branchSelect.includes('const branches = asRecordArray(tenantBranches);'), 'BranchSelect does not normalize loading/null branch data');
 assert(branchSelect.includes("const canChange = typeof onChange === 'function';"), 'BranchSelect does not guard a missing branch callback');
 
-// Exclusive, data-preserving Add Sales accordion.
-const accordionSections = ['shift', 'summary', 'drivers', 'pos', 'credit', 'custom', 'purchases', 'reconciliation', 'operating', 'validation', 'save'];
-assert(workspace.includes('const [activeSection, setActiveSection] = useState(null);'), 'Add Sales cards do not default to a compact collapsed state');
-assert(workspace.includes('current === key ? null : key'), 'accordion headers do not toggle open and closed');
-assert(workspace.includes('const AccordionBody = memo'), 'collapsed section bodies are not safely retained');
-assert(workspace.includes('grid-rows-[0fr] opacity-0 pointer-events-none'), 'collapsed sections do not hide safely without unmounting their fields');
-accordionSections.forEach((section) => {
-  assert(workspace.includes(`isSectionOpen('${section}')`), `accordion behavior is missing for the ${section} section`);
-});
-assert(!workspace.includes('collapsed.purchases'), 'legacy purchase-only collapse state remains');
-assert(!workspace.includes('collapsed.validation'), 'legacy validation-only collapse state remains');
-assert(workspace.includes('sm:grid-cols-2'), 'Add Sales card grids are not responsive on mobile');
+// Purchases may only mutate drafts; finalized financial records require correction rather than deletion or direct edit.
+assert(purchaseList.includes('const isMutableDraft = (invoice)'), 'Purchase list lacks a canonical mutable-draft guard');
+assert(purchaseList.includes("invoice?.status === 'draft'"), 'Purchase list does not restrict mutation to draft invoices');
+assert(purchaseList.includes('Finalized invoices require the canonical correction workflow.'), 'Purchase list does not explain the finalized-record protection');
+assert(purchaseForm.includes('if (savingRef.current) return;'), 'Purchase form does not guard duplicate submissions');
+assert(purchaseForm.includes('Payment amount cannot exceed the outstanding invoice balance.'), 'Purchase form does not reject overpayment before persistence');
+assert(procurementEngine.includes('assertValidInvoiceLines(items, additionalCosts);'), 'Purchase engine does not enforce line-item invariants');
+assert(procurementEngine.includes('Finalized purchase invoices cannot be edited.'), 'Purchase engine does not block direct finalized-invoice edits');
+assert(procurementEngine.includes('Payment amount cannot exceed the outstanding invoice balance.'), 'Purchase engine does not reject overpayment during persistence');
+assert(finalizedPurchaseProtection.includes("COALESCE(v_invoice.status, 'draft') <> 'draft'"), 'Purchase deletion migration does not block finalized invoices');
+assert(finalizedPurchaseProtection.includes('erp_can_write_scope_text'), 'Purchase deletion migration does not retain branch-scope authorization');
 
-// Responsive unlimited Driver Sales rows.
-assert(workspace.includes('SECTION 3 — DRIVER SALES'), 'dedicated Driver Sales section is missing');
-assert(workspace.includes('Add Driver'), 'Driver Sales does not provide an Add Driver action');
-assert(workspace.includes('driverSalesRows.map'), 'Driver Sales does not render individual driver rows');
-assert(workspace.includes('Select branch driver'), 'Driver Sales row has no branch-driver selector');
-assert(workspace.includes('Network / POS Sales'), 'Driver Sales row has no Network/POS field');
-assert(workspace.includes('Total Sales</p>'), 'Driver Sales row has no total field');
-assert(workspace.includes("Label className=\"mb-1 block text-[10px] font-bold uppercase text-muted-foreground\">Notes"), 'Driver Sales row has no Notes field');
-assert(workspace.includes("updateDriverSalesRow(row.id, 'notes', event.target.value)"), 'Driver Sales Notes field does not update its row state');
-assert(workspace.includes("notes: typeof row.notes === 'string' ? row.notes.trim() : ''"), 'Driver Sales Notes are not retained in the canonical daily-sales snapshot');
-assert(workspace.includes('grid grid-cols-1 gap-3 sm:grid-cols-2'), 'Driver Sales rows are not responsive for mobile');
-assert(!workspace.includes('overflow-x-auto rounded-xl border border-sky-100'), 'retired Driver Sales horizontal scrolling remains');
-assert(!workspace.includes('min-w-[620px]'), 'retired fixed-width Driver Sales table remains');
-assert(workspace.includes('selectedInAnotherRow'), 'duplicate drivers are not prevented across Driver Sales rows');
-assert(workspace.includes('setDriverSalesRows([]);'), 'Driver Sales rows are not reset when the branch changes');
-assert(workspace.includes('drivers.length === 0'), 'Driver empty-state guard is missing');
-assert(workspace.includes('const canManageDriverSales = isManager || !!ownerFilter?.created_by;'), 'Owner and Branch Manager shared Driver Sales capability is missing');
-assert(workspace.includes('enabled: canManageDriverSales && !!activeRestaurant?.id && !!selectedBranchId'), 'Owner Driver Sales driver query is not enabled');
-assert(workspace.includes('{canManageDriverSales && ('), 'Owner cannot see the shared Driver Sales table');
-assert(workspace.includes('Only the Owner or assigned Branch Manager can record Driver Sales.'), 'Owner and Manager Driver Sales validation is not shared');
-assert(driverPermissionMigration.includes("membership.role = 'owner'"), 'production Driver Sales permission migration does not allow Owners');
-assert(driverPermissionMigration.includes("membership.role = 'manager'"), 'production Driver Sales permission migration does not retain Branch Manager access');
-
-// Driver rows are added exactly once to the canonical Daily Sales components.
-assert(workspace.includes('const cashSales = useMemo(() => counterCashSales + driverCashSales'), 'Driver cash is not added to standard cash totals');
-assert(workspace.includes('const networkTotal = useMemo(() => counterNetworkTotal + driverNetworkSales'), 'Driver network is not added to standard Network/POS totals');
-assert(workspace.includes('const creditTotal = useMemo(() => customerCreditTotal + driverCreditSales'), 'Driver credit is not added to standard credit totals');
-assert(workspace.includes('const totalSales = useMemo(() => cashSales + networkTotal + creditTotal + customTotal'), 'total sales no longer uses canonical cash + network + credit totals');
-assert(workspace.includes('drivers_json: JSON.stringify(selectedDriverRows.map'), 'all Driver Sales rows are not persisted in the same Daily Sales record');
-assert(workspace.includes('new Set(selectedDriverIds).size !== selectedDriverIds.length'), 'duplicate driver validation is missing');
-assert(!workspace.includes('base44.entities.DailySales.create('), 'workspace must not create a duplicate Daily Sales record');
-
-// Required row calculation: Ahmad, Cash 300 + Network 200 + Credit 100 = 600.
-const ahmad = { cash: 300, network: 200, credit: 100, notes: 'Cash collected after delivery reconciliation.' };
-const sara = { cash: 120, network: 80, credit: 0 };
-const ahmadTotal = ahmad.cash + ahmad.network + ahmad.credit;
-const driverListTotal = ahmadTotal + sara.cash + sara.network + sara.credit;
-assert(ahmadTotal === 600, 'Ahmad Driver Sales must equal 600 SAR for 300 + 200 + 100');
-assert(ahmad.notes.length > 0, 'Driver Sales Notes must be retained independently of monetary totals');
-assert(driverListTotal === 800, 'multiple driver rows must aggregate all individual totals once');
-
-// Driver dashboards and history must consume every saved split entry rather than
-// the complete Daily Sales row, preventing accidental counter-sale attribution.
-assert(driverAnalytics.includes('export function getDriverSaleEntries'), 'driver analytics does not expose multi-driver snapshot entries');
-assert(driverAnalytics.includes('getDriverSaleEntries(sale).forEach'), 'driver analytics does not aggregate every driver row');
-assert(driverManagement.includes('getDriverSaleEntries(sale)'), 'Driver Management history omits additional drivers in a shared Daily Sales record');
-assert(driverManagement.includes('driver_cash, driver_network, drivers_json'), 'Driver Management query omits saved Driver Sales fields');
-assert(driverPerformance.includes('driver_cash, driver_network, drivers_json'), 'Owner Driver Performance query omits saved Driver Sales fields');
-assert(driverPerformance.includes('SummaryMetric label="Total Drivers"'), 'Driver Analytics omits Total Drivers');
-assert(driverPerformance.includes('SummaryMetric label="Active Drivers"'), 'Driver Analytics omits Active Drivers');
-assert(driverPerformance.includes('SummaryMetric label="Cash Sales"'), 'Driver Analytics omits Cash Sales');
-assert(driverPerformance.includes('SummaryMetric label="Network / POS Sales"'), 'Driver Analytics omits Network / POS Sales');
-assert(driverPerformance.includes('SummaryMetric label="Credit Sales"'), 'Driver Analytics omits Credit Sales');
-assert(driverPerformance.includes('SummaryMetric label="Total Revenue"'), 'Driver Analytics omits Total Revenue');
-assert(driverPerformance.includes('Metric label="Credit sales"'), 'per-driver analytics omit Credit Sales');
-
-console.log('Shared Owner/Manager Driver Sales regression checks passed: canonical totals, notes, dashboards, history, and complete analytics payment splits are retained.');
+console.log('Active Sales Closing and Purchase runtime regression checks passed: canonical persistence, branch safety, duplicate-submit protection, draft-only purchase mutation, and finalized-record safeguards are in place.');

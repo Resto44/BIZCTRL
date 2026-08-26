@@ -9,8 +9,7 @@ import UnifiedSalesClosing from '@/components/sales/UnifiedSalesClosing';
 import SalesListItem from '@/components/sales/SalesListItem';
 import EmptyState from '@/components/shared/EmptyState';
 import { Button } from '@/components/ui/button';
-import { Plus, Download, SlidersHorizontal, BarChart3, Trash2, CheckSquare, Square, Loader2 } from 'lucide-react';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Plus, Download, SlidersHorizontal, BarChart3, Loader2 } from 'lucide-react';
 import { downloadCSV, downloadPDF, buildSalesCSV, buildSalesPDF } from '@/lib/exportUtils';
 import ExportDialog from '@/components/shared/ExportDialog';
 import SalesFilterSidebar from '@/components/sales/SalesFilterSidebar';
@@ -73,7 +72,6 @@ export default function Sales() {
   const notif = useNotify();
   const { user } = useAuth();
   const { role } = useRole();
-  const canDelete = role === ROLES.OWNER || role === ROLES.MANAGER || role === ROLES.GENERAL_MANAGER;
   const isBranchManager = role === ROLES.MANAGER;
   const canManageDriverSales = role === ROLES.OWNER || isBranchManager;
   const isDriverSale = (sale) => Boolean(sale?.driver_id || sale?.drivers_json);
@@ -84,9 +82,6 @@ export default function Sales() {
   const [newClosingInstance, setNewClosingInstance] = useState(0);
   const [sessionContext, setSessionContext] = useState(null);
   const [isOpeningNewClosing, setIsOpeningNewClosing] = useState(false);
-  const [deleting, setDeleting] = useState(null);
-  const [selectedIds, setSelectedIds] = useState(new Set());
-  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showFinancialPanel, setShowFinancialPanel] = useState(false);
@@ -156,7 +151,6 @@ export default function Sales() {
     setEditing(null);
     setNewClosingDefaults(null);
     setSessionContext(null);
-    setSelectedIds(new Set());
     setShowForm(true);
     setNewClosingInstance((value) => value + 1);
   }, [activeRestaurant?.id, qc, selectedBranchId, selectedBranchKey]);
@@ -583,22 +577,6 @@ export default function Sales() {
 
   const filtered = useMemo(() => filterDailySalesRecords(sales, filters), [sales, filters]);
 
-  const toggleSelect = useCallback((id) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const toggleSelectAll = useCallback(() => {
-    if (selectedIds.size === filtered.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filtered.map(s => s.id)));
-    }
-  }, [selectedIds.size, filtered]);
-
   const runClosingFinalizationSideEffects = useCallback(async (saleData, savedClosing, previousClosing, proofUrl, ocr) => {
     // The database has already committed the finalization. Run legacy downstream
     // integrations only for the one successful state transition, never for an
@@ -779,35 +757,7 @@ export default function Sales() {
         )}
 
         <div className="flex-1 min-w-0 w-full">
-          {/* Bulk action toolbar */}
-          {canDelete && filtered.length > 0 && (
-            <div className="flex items-center gap-2 mb-2">
-              <button
-                type="button"
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                onClick={toggleSelectAll}
-              >
-                {selectedIds.size === filtered.length && filtered.length > 0
-                  ? <CheckSquare className="w-4 h-4 text-primary" />
-                  : <Square className="w-4 h-4" />}
-                {selectedIds.size === filtered.length && filtered.length > 0 ? 'Deselect All' : 'Select All'}
-              </button>
-              {selectedIds.size > 0 && (
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 text-xs text-destructive hover:text-destructive/80 ml-auto"
-                  onClick={() => setBulkDeleting(true)}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete Selected ({selectedIds.size})
-                </button>
-              )}
-              {selectedIds.size === 0 && (
-                <span className="text-xs text-muted-foreground ml-auto">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
-              )}
-            </div>
-          )}
-          <div className="mb-2 flex items-center justify-between gap-3"><h2 className="text-sm font-black uppercase tracking-wide text-foreground">Closing History</h2>{!canDelete && filtered.length > 0 && <p className="text-xs text-muted-foreground">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</p>}</div>
+          <div className="mb-2 flex items-center justify-between gap-3"><h2 className="text-sm font-black uppercase tracking-wide text-foreground">Closing History</h2>{filtered.length > 0 && <p className="text-xs text-muted-foreground">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</p>}</div>
           {isLoading ? (
             <p className="text-center text-muted-foreground text-sm py-8">{t('loading')}</p>
           ) : filtered.length === 0 ? (
@@ -835,9 +785,9 @@ export default function Sales() {
                     setEditing(sale);
                     setShowForm(false);
                   }}
-                  onDelete={canDelete && (!isDriverSale(s) || canManageDriverSales) ? (sale) => setDeleting(sale) : null}
-                  selected={selectedIds.has(s.id)}
-                  onToggleSelect={canDelete ? toggleSelect : null}
+                  onDelete={null}
+                  selected={false}
+                  onToggleSelect={null}
                 />
               ))}
             </div>
@@ -845,38 +795,6 @@ export default function Sales() {
         </div>
       </div>
 
-      {/* Single Delete Confirmation */}
-      <AlertDialog open={!!deleting} onOpenChange={(open) => { if (!open) setDeleting(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('confirm_delete')}</AlertDialogTitle>
-            <AlertDialogDescription>Delete sales record for {deleting?.branch} on {deleting?.date}? This cannot be undone.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={() => deleteMut.mutate(deleting)}>{t('delete')}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Bulk Delete Confirmation */}
-      <AlertDialog open={bulkDeleting} onOpenChange={(open) => { if (!open) setBulkDeleting(false); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {selectedIds.size} Sales Record{selectedIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently delete {selectedIds.size} selected sales record{selectedIds.size !== 1 ? 's' : ''}. This action cannot be undone.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground"
-              onClick={() => bulkDeleteMut.mutate(Array.from(selectedIds))}
-            >
-              Delete All
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Invoice Share/Download Dialog removed to prevent blocking UI */}
 

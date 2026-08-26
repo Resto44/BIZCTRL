@@ -10,8 +10,8 @@
  * - Approval workflow display
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -29,7 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import {
   Plus, Trash2, Receipt, Package, Truck, AlertCircle, CheckCircle2,
-  Clock, Upload, Paperclip, ScanLine, ChevronDown, ChevronUp, DollarSign
+  Upload, Paperclip, ScanLine, ChevronDown, ChevronUp, DollarSign
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -270,6 +270,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
   const [attachments, setAttachments] = useState(invoice?.attachment_urls || []);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   // activeRestaurantId already destructured above as restaurantId
 
   // ── Auto-numbering ─────────────────────────────────────────────────────
@@ -411,6 +412,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
   // ── Submit ─────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (savingRef.current) return;
     setError('');
 
     if (!form.branch) { setError('Branch is required'); return; }
@@ -427,7 +429,15 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
     if (items.length === 0 || items.every(i => !i.product_name && !i.product_id)) {
       setError('At least one line item is required'); return;
     }
+    if (items.some((item) => Number(item.quantity) <= 0 || Number(item.unit_cost) < 0 || Number(item.discount || 0) < 0 || Number(item.tax || 0) < 0 || Number(item.tax || 0) > 100)) {
+      setError('Every purchase line requires a positive quantity, a non-negative cost and discount, and tax between 0 and 100%.'); return;
+    }
+    const outstandingBalance = Math.max(0, totals.grandTotal - Number(invoice?.paid_amount || 0));
+    if (paymentTotal > outstandingBalance + 0.005) {
+      setError('Payment amount cannot exceed the outstanding invoice balance.'); return;
+    }
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const cleanItems = items.map(({ _id, ...i }) => ({
@@ -502,6 +512,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
     } catch (err) {
       setError(err.message || 'Failed to save invoice');
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
