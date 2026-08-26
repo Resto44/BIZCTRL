@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useRole } from '@/lib/RoleContext';
 import { useTenant } from '@/lib/TenantContext';
+import { useBranchScope } from '@/lib/BranchScopeContext';
 import {
   DEFAULT_SALES_CLOSING_CONFIG,
   normalizeSalesClosingConfig,
@@ -36,6 +37,7 @@ const asArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 export function SalesClosingCustomizationProvider({ children }) {
   const queryClient = useQueryClient();
   const { activeRestaurant } = useTenant();
+  const { selectedBranchId, selectedBranchKey, isAllBranches } = useBranchScope();
   const { role, can } = useRole();
   const restaurantId = activeRestaurant?.id || null;
   const configKey = useMemo(() => ['sales-closing-config', restaurantId], [restaurantId]);
@@ -72,17 +74,37 @@ export function SalesClosingCustomizationProvider({ children }) {
     },
   });
 
-  const sourceQueryKey = useMemo(() => ['sales_sources_active', restaurantId], [restaurantId]);
+  // Source rows are accounting inputs. Their cache must never be shared across
+  // branch switches, and their backend read is explicitly scoped below.
+  const sourceQueryKey = useMemo(
+    () => ['sales_sources_active', restaurantId, selectedBranchId, selectedBranchKey, isAllBranches],
+    [restaurantId, selectedBranchId, selectedBranchKey, isAllBranches],
+  );
   const sourcePatchesRef = useRef(new Map());
   const sourceQuery = useQuery({
     queryKey: sourceQueryKey,
-    enabled: Boolean(restaurantId),
+    enabled: Boolean(restaurantId && (isAllBranches || selectedBranchId)),
     staleTime: 30_000,
     queryFn: async () => {
+      // There is intentionally no restaurant-wide source read followed by a
+      // browser filter. The branch RPC verifies access and applies its branch
+      // predicate before returning any accounting source row.
+      if (!isAllBranches && selectedBranchId) {
+        const { data, error } = await supabase.rpc('erp_sales_closing_branch_sources', {
+          p_restaurant_id: restaurantId,
+          p_branch_id: selectedBranchId,
+          p_include_inactive: true,
+        });
+        if (error) throw error;
+        return asArray(data);
+      }
+      // An explicit all-branches workspace may see only globally available
+      // source definitions, never a union of branch-specific source rows.
       const { data, error } = await supabase
         .from('sales_sources')
         .select('id, name_en, name_ar, name_fa, description, category, sort_order, is_active, is_system, is_global, branch_id, branch_ids, default_payment_method, icon, color, included_in_revenue, included_in_cash_register, included_in_dashboard_kpi, included_in_profit_calc, requires_customer, requires_pos_device, requires_reference, requires_wallet, system_key, created_by, created_date, updated_date, archived_at, archived_by')
         .eq('restaurant_id', restaurantId)
+        .eq('is_global', true)
         .order('sort_order');
       if (error) throw error;
       return asArray(data);
@@ -134,14 +156,12 @@ export function SalesClosingCustomizationProvider({ children }) {
   const sortSources = useCallback((items) => asArray(items).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)), []);
   const mergeSourceCache = useCallback((savedSource) => {
     if (!savedSource?.id) return;
-    const merge = (items) => {
-      const previous = asArray(items);
-      const exists = previous.some((item) => item.id === savedSource.id);
-      return sortSources(previous.map((item) => item.id === savedSource.id ? { ...item, ...savedSource } : item).concat(exists ? [] : [savedSource]));
-    };
+    // A source can become available to a different branch. Never optimistically
+    // merge it into the currently selected branch cache; re-read every affected
+    // branch through the server-scoped RPC instead.
     sourcePatchesRef.current.set(savedSource.id, savedSource);
-    queryClient.setQueriesData({ queryKey: ['sales_sources_active', restaurantId] }, merge);
-  }, [queryClient, restaurantId, sortSources]);
+    queryClient.invalidateQueries({ queryKey: ['sales_sources_active', restaurantId], refetchType: 'none' });
+  }, [queryClient, restaurantId]);
 
   useEffect(() => {
     const nextSources = sortSources(sourceQuery.data);
@@ -190,8 +210,7 @@ export function SalesClosingCustomizationProvider({ children }) {
     },
     onSuccess: (_, source) => {
       sourcePatchesRef.current.set(source.id, false);
-      queryClient.setQueriesData({ queryKey: ['sales_sources_active', restaurantId] }, (items) => asArray(items).filter((item) => item.id !== source.id));
-      queryClient.invalidateQueries({ queryKey: sourceQueryKey, refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: ['sales_sources_active', restaurantId], refetchType: 'none' });
     },
   });
 

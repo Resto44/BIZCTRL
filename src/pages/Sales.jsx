@@ -125,12 +125,15 @@ export default function Sales() {
   }, [activeRestaurant?.id, isAllBranches, selectedBranchId, selectedBranchKey]);
 
   const { data: salesData, isLoading, isError } = useQuery({
-    queryKey: ['sales', activeRestaurant?.id, selectedBranchId],
+    queryKey: ['sales', activeRestaurant?.id, selectedBranchId, selectedBranchKey, isAllBranches],
     queryFn: fetchScopedSales,
     staleTime: 120000,
     enabled: Boolean(activeRestaurant?.id),
   });
-  const sales = asRecordArray(salesData);
+  // Do not render a prior branch list while the canonical selected branch is
+  // loading. A query key contains the complete branch scope, and this guard
+  // makes the transition visually empty rather than temporarily stale.
+  const sales = isLoading ? [] : asRecordArray(salesData);
 
   // A successful Closing must refresh authoritative server state before the
   // workspace reports completion. This routine was missing at runtime, causing
@@ -144,6 +147,19 @@ export default function Sales() {
       ['sales_dashboard'],
     ].forEach((queryKey) => qc.invalidateQueries({ queryKey }));
   }, [qc]);
+
+  useEffect(() => {
+    // A branch switch invalidates every mutable Closing artifact from the former
+    // scope: draft/edit selection, history selections, session identity, and the
+    // component key used to mount its local input state.
+    qc.cancelQueries({ queryKey: ['sales'] });
+    setEditing(null);
+    setNewClosingDefaults(null);
+    setSessionContext(null);
+    setSelectedIds(new Set());
+    setShowForm(true);
+    setNewClosingInstance((value) => value + 1);
+  }, [activeRestaurant?.id, qc, selectedBranchId, selectedBranchKey]);
 
   const updateClosingSessionContext = useCallback((nextContext) => {
     setSessionContext((current) => {
@@ -622,6 +638,28 @@ export default function Sales() {
   }, [autoSettle, notif, user?.email]);
 
   const handleSave = async (data, proofUrl, ocr) => {
+    const activeBranch = branches.find((branch) => String(branch.id) === String(selectedBranchId));
+    const activeBranchKey = activeBranch?.key || activeBranch?.branch_key || null;
+    const payloadBranchId = data?.branch_id ? String(data.branch_id) : null;
+    if (isAllBranches || !selectedBranchId || !activeBranchKey || payloadBranchId !== String(selectedBranchId) || data?.branch !== activeBranchKey) {
+      const error = new Error('The Closing branch changed or is unavailable. Reload the active branch context before saving.');
+      error.code = 'SALES_CLOSING_BRANCH_CONTEXT_MISMATCH';
+      error.userMessage = error.message;
+      throw error;
+    }
+    if (editing?.id && !matchesSalesClosingSession(editing, {
+      branch_id: selectedBranchId,
+      branch: activeBranchKey,
+      date: editing.date,
+      shift: editing.shift,
+      cashier_id: salesClosingCashierId(editing),
+      cashier_name: editing.cashier_name,
+    })) {
+      const error = new Error('The selected draft belongs to a different branch. Reload the active branch context before saving.');
+      error.code = 'SALES_CLOSING_BRANCH_CONTEXT_MISMATCH';
+      error.userMessage = error.message;
+      throw error;
+    }
     const payload = {
       ...data,
       restaurant_id: activeRestaurant?.id || data.restaurant_id,
@@ -711,7 +749,7 @@ export default function Sales() {
       {(showForm || editing) && (
         <section aria-label="Sales Closing" className="mb-4 overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
           <UnifiedSalesClosing
-            key={editing?.id || `new-closing-${newClosingInstance}`}
+            key={editing?.id || `new-closing-${newClosingInstance}-${selectedBranchId || 'none'}-${selectedBranchKey || 'none'}`}
             initial={editing || newClosingDefaults || undefined}
             onSubmit={handleSave}
             onCancel={() => { setEditing(null); setNewClosingDefaults(null); setShowForm(false); }}

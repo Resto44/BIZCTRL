@@ -22,11 +22,12 @@
  */
 import React, { useState, useMemo, useEffect, useLayoutEffect, useCallback, memo } from 'react';
 import { flushSync } from 'react-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
+import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
@@ -441,6 +442,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const { user } = useAuth();
   const { role } = useRole();
   const { ownerFilter, branches: tenantBranches, managerBranch, activeRestaurant, isManager } = useTenant();
+  const { selectedBranchId: activeBranchId, selectedBranchKey: activeBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const {
     config: closingConfig,
@@ -531,7 +534,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // ── Form meta state ───────────────────────────────────────────────────────
   const [form, setForm] = useState({
     date: initial?.date || format(new Date(), 'yyyy-MM-dd'),
-    branch: initial?.branch || assignedManagerBranch?.key || assignedManagerBranch?.branch_key || managerBranch || branches.at(0)?.key || '',
+    branch: initial?.branch || (!isAllBranches ? activeBranchKey : '') || assignedManagerBranch?.key || assignedManagerBranch?.branch_key || managerBranch || '',
+    branch_id: initial?.branch_id || (!isAllBranches ? activeBranchId : null) || null,
     shift: initial?.shift || 'Morning',
     cashier_name: initial?.cashier_name || '',
     cashier_employee_id: initial?.cashier_employee_id || '',
@@ -572,27 +576,18 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     requestAnimationFrame(() => document.getElementById(`quick-closing-${field}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
   }, []);
 
-  // Remember the last safe branch and shift for a new closing. Editing an
-  // existing closing always preserves the record values instead.
+  // The global branch UUID is the sole active Closing context. Do not restore a
+  // private component preference that can reintroduce a previous branch after a
+  // user switch. Parent scope changes remount an empty branch-specific form.
   useEffect(() => {
-    if (initial?.id || typeof window === 'undefined' || !branches.length) return;
-    try {
-      const stored = JSON.parse(window.localStorage.getItem('quick-sales-closing-preferences') || '{}');
-      const matchingBranch = branches.find((branch) => branch.key === stored.branch || branch.branch_key === stored.branch);
-      if (!matchingBranch) return;
-      setForm((previous) => ({
-        ...previous,
-        branch: matchingBranch.key || matchingBranch.branch_key || previous.branch,
-        branch_id: matchingBranch.id || previous.branch_id,
-        shift: stored.shift === 'Evening' ? 'Evening' : previous.shift,
-      }));
-    } catch { /* local preference is optional */ }
-  }, [branches, initial?.id]);
-
-  useEffect(() => {
-    if (initial?.id || typeof window === 'undefined' || !form.branch) return;
-    window.localStorage.setItem('quick-sales-closing-preferences', JSON.stringify({ branch: form.branch, shift: form.shift }));
-  }, [form.branch, form.shift, initial?.id]);
+    if (initial?.id || isAllBranches || !activeBranchId || !branches.length) return;
+    const activeBranch = branches.find((branch) => String(branch.id) === String(activeBranchId));
+    const activeKey = activeBranch?.key || activeBranch?.branch_key;
+    if (!activeKey) return;
+    setForm((previous) => previous.branch === activeKey && String(previous.branch_id || '') === String(activeBranchId)
+      ? previous
+      : { ...previous, branch: activeKey, branch_id: activeBranchId });
+  }, [activeBranchId, branches, initial?.id, isAllBranches]);
 
   // Tenant branches load after the workspace mounts. Persist the Branch Manager's
   // assigned branch key and UUID as soon as that record is available.
@@ -615,6 +610,45 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     );
     return branch?.id || form.branch_id || null;
   }, [branches, form.branch, form.branch_id]);
+
+  const selectClosingBranch = useCallback((nextBranchKey) => {
+    const nextBranch = branches.find((branch) => branch.key === nextBranchKey || branch.branch_key === nextBranchKey);
+    if (!nextBranch?.id) {
+      toast.error('The selected branch is unavailable. Reload the authorized branch list and try again.');
+      return;
+    }
+    // Clear the current component’s branch-dependent output synchronously. The
+    // Sales page then remounts it under the same canonical global branch UUID,
+    // preventing old branch data or in-flight responses from being rendered.
+    queryClient.cancelQueries({ queryKey: ['sales-source-previous-balances'] });
+    queryClient.cancelQueries({ queryKey: ['customers_form'] });
+    queryClient.cancelQueries({ queryKey: ['approved_purchases_for_date'] });
+    queryClient.cancelQueries({ queryKey: ['closing_expenses_for_date'] });
+    queryClient.cancelQueries({ queryKey: ['sales-closing-cash-ledger-context'] });
+    setSavedClosing(null);
+    setRuntimeError(null);
+    setInlineErrors({});
+    setRequestedClosingState('draft');
+    setCashSalesInput('');
+    setOpeningCash('');
+    setActualCashCount('');
+    setOwnerContributionInput('');
+    setCashNotes('');
+    setManagerApproved(false);
+    setPosEntries([{ id: newStableRowId('pos'), device_id: '', device_name: '', amount: '', notes: '' }]);
+    setCreditEntries([]);
+    setCustomSourceAmounts({});
+    setCustomClosingFieldValues({});
+    setSelectedBranchId(nextBranch.id);
+    setForm((previous) => ({
+      ...previous,
+      branch: nextBranch.key || nextBranch.branch_key,
+      branch_id: nextBranch.id,
+      customer_id: '',
+      pos_device_id: '',
+      sales_notes: '',
+    }));
+  }, [branches, queryClient, setSelectedBranchId]);
 
   // Previous source balances are calculated once in the database from immutable,
   // earlier completed closing snapshots. The aggregate is scoped by tenant, branch
@@ -898,30 +932,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     }));
   }, [cashiers, form.cashier_employee_id, form.cashier_id, form.cashier_name, initial?.id, isManager, user?.email, user?.full_name]);
 
-  // Rule 9: Auto-populate Opening Cash from previous shift's Closing Cash
-  // BUG FIX: also support manager context (uses restaurant_id + branch, not created_by)
-  useEffect(() => {
-    if (!initial?.id && openingCash === '' && form.branch) {
-      const canFetch = isManager ? !!activeRestaurant?.id : !!ownerFilter?.created_by;
-      if (!canFetch) return;
-      let q = supabase
-        .from('daily_sales')
-        .select('closing_cash, date, shift')
-        .eq('branch', form.branch)
-        .order('date', { ascending: false })
-        .order('created_date', { ascending: false })
-        .limit(1);
-      if (isManager) {
-        q = q.eq('restaurant_id', activeRestaurant.id);
-      } else {
-        q = q.eq('created_by', ownerFilter.created_by);
-      }
-      q.then((result = {}) => {
-        const previousSale = firstRecord(result.data);
-        setOpeningCash(previousSale?.closing_cash ?? 0);
-      }).catch(() => setOpeningCash(0));
-    }
-  }, [ownerFilter?.created_by, form.branch, initial?.id, isManager, activeRestaurant?.id]);
+  // Opening Cash is supplied only by the canonical cash-context RPC below. The
+  // former direct daily_sales fallback had no cashier or shift identity and could
+  // apply a late response from a previously selected branch.
 
   // ── POS devices ───────────────────────────────────────────────────────────
   const { data: posDevicesData, isLoading: posLoading } = useQuery({
@@ -965,24 +978,23 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
   // ── Customers ─────────────────────────────────────────────────────────────
   const { data: allCustomersData, isLoading: custLoading } = useQuery({
-    queryKey: ['customers_form', activeRestaurant?.id, ownerFilter?.created_by, form.branch, selectedBranchId],
+    queryKey: ['customers_form', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift],
     queryFn: async () => {
-      if (isManager && !activeRestaurant?.id) return [];
-      if (!isManager && !ownerFilter?.created_by) return [];
-      let query = supabase
+      if (!activeRestaurant?.id || !selectedBranchId || !form.branch) return [];
+      const base = () => supabase
         .from('customers')
         .select('id, name, customer_name:name, phone, branch, branch_id, credit_limit, outstanding_balance, is_active, restaurant_id')
-        .eq('is_active', true);
-      query = isManager
-        ? query.eq('restaurant_id', activeRestaurant.id)
-        : query.eq('created_by', ownerFilter.created_by);
-      if (!isManager && activeRestaurant?.id) query = query.eq('restaurant_id', activeRestaurant.id);
-      const { data, error } = await query.order('name');
-      if (error) {
-        console.error('[UnifiedSalesClosing] Customer fetch error:', error);
-        return [];
-      }
-      return asRecordArray(data);
+        .eq('restaurant_id', activeRestaurant.id)
+        .eq('is_active', true)
+        .order('name')
+        .limit(500);
+      const [canonical, legacy] = await Promise.all([
+        base().eq('branch_id', selectedBranchId),
+        base().is('branch_id', null).eq('branch', form.branch),
+      ]);
+      if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+      return asRecordArray(Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+        .map((record) => [record.id, record])).values()));
     },
     staleTime: 0, // Always fresh
     enabled: isManager ? !!activeRestaurant?.id && !!form.branch : !!ownerFilter?.created_by,
@@ -990,14 +1002,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const allCustomers = asRecordArray(allCustomersData);
 
   // ── Filter customers by selected branch ──────────────────────────────────────
-  const customers = useMemo(() =>
-    isManager
-      ? allCustomers.filter((customer) => matchesBranch(customer, form.branch, selectedBranchId))
-      : (!form.branch || form.branch === 'all'
-          ? allCustomers
-          : allCustomers.filter((customer) => customer.branch === form.branch || customer.branch_id === form.branch)),
-    [allCustomers, form.branch, isManager, selectedBranchId]
-  );
+  // The backend query already applies the active branch predicate. Do not reuse
+  // a restaurant-wide customer cache and visually filter it after a switch.
+  const customers = allCustomers;
   const addCredit = () => setCreditEntries((previous) => [...previous, {
     id: newStableRowId('credit'),
     client_row_id: newStableRowId('credit-client'),
@@ -1017,23 +1024,26 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // ── Approved Purchases ────────────────────────────────────────────────────
   // BUG FIX: Approved purchases query must work for both Owner (created_by) and
   // Manager (restaurant_id + branch). When isManager, scope by restaurant_id and branch.
-  const purchasesEnabled = !!activeRestaurant?.id && !!form.date && !!form.branch;
+  const purchasesEnabled = !!activeRestaurant?.id && !!form.date && !!selectedBranchId && !!form.branch;
 
   const { data: approvedPurchasesForDateData, isLoading: purchasesLoading } = useQuery({
-    queryKey: ['approved_purchases_for_date', ownerFilter?.created_by, form.date, activeRestaurant?.id, form.branch],
+    queryKey: ['approved_purchases_for_date', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift],
     queryFn: async () => {
-      if (!activeRestaurant?.id || !form.date || !form.branch) return [];
-      let q = supabase
+      if (!activeRestaurant?.id || !form.date || !selectedBranchId || !form.branch) return [];
+      const base = () => supabase
         .from('supplier_invoices')
-        .select('id, total_amount, paid_amount, approval_status, date, supplier_name, branch')
+        .select('id, total_amount, paid_amount, approval_status, date, supplier_name, branch, branch_id')
         .eq('restaurant_id', activeRestaurant.id)
         .eq('date', form.date)
         .in('approval_status', ['approved', 'auto_approved'])
         .limit(100);
-      if (form.branch !== 'all') q = q.eq('branch', form.branch);
-      const { data, error } = await q;
-      if (error) return [];
-      return asRecordArray(data);
+      const [canonical, legacy] = await Promise.all([
+        base().eq('branch_id', selectedBranchId),
+        base().is('branch_id', null).eq('branch', form.branch),
+      ]);
+      if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+      return asRecordArray(Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+        .map((record) => [record.id, record])).values()));
     },
     staleTime: 15000,
     enabled: purchasesEnabled,
@@ -1042,20 +1052,23 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
   // Pending purchases (not approved)
   const { data: pendingPurchasesData, isLoading: pendingLoading } = useQuery({
-    queryKey: ['pending_purchases_for_date', ownerFilter?.created_by, form.date, activeRestaurant?.id, form.branch],
+    queryKey: ['pending_purchases_for_date', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift],
     queryFn: async () => {
-      if (!activeRestaurant?.id || !form.date || !form.branch) return [];
-      let q = supabase
+      if (!activeRestaurant?.id || !form.date || !selectedBranchId || !form.branch) return [];
+      const base = () => supabase
         .from('supplier_invoices')
-        .select('id, total_amount, approval_status, date, supplier_name')
+        .select('id, total_amount, approval_status, date, supplier_name, branch, branch_id')
         .eq('restaurant_id', activeRestaurant.id)
         .eq('date', form.date)
         .in('approval_status', ['pending'])
         .limit(50);
-      if (form.branch !== 'all') q = q.eq('branch', form.branch);
-      const { data, error } = await q;
-      if (error) return [];
-      return asRecordArray(data);
+      const [canonical, legacy] = await Promise.all([
+        base().eq('branch_id', selectedBranchId),
+        base().is('branch_id', null).eq('branch', form.branch),
+      ]);
+      if (canonical.error || legacy.error) throw canonical.error || legacy.error;
+      return asRecordArray(Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+        .map((record) => [record.id, record])).values()));
     },
     staleTime: 15000,
     enabled: purchasesEnabled,
@@ -1678,7 +1691,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 const fieldKey = field.field_key;
                 const label = closingFieldLabel(fieldKey, field.fallback);
                 if (fieldKey === 'date') return <div key={fieldKey} className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><Input id="quick-closing-date" type="date" value={form.date} onChange={e => set('date', e.target.value)} className="min-h-11 text-sm" /></div>;
-                if (fieldKey === 'branch') return <div key={fieldKey} id="quick-closing-branch" className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><BranchSelect value={form.branch} onChange={v => { set('branch', v); set('branch_id', ''); setCreditEntries([]); }} /></div>;
+                if (fieldKey === 'branch') return <div key={fieldKey} id="quick-closing-branch" className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><BranchSelect value={form.branch} onChange={selectClosingBranch} /></div>;
                 if (fieldKey === 'shift') return <div key={fieldKey} id="quick-closing-shift" className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><Select value={form.shift} onValueChange={v => set('shift', v)}><SelectTrigger className="min-h-11 text-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Morning">Morning</SelectItem><SelectItem value="Evening">Evening</SelectItem></SelectContent></Select></div>;
                 return <div key={fieldKey} id="quick-closing-cashier" className={`min-w-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 ${closingFieldVisibilityClass(fieldKey)}`}><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">{label}</p><p className="mt-1 truncate text-sm font-bold text-emerald-900">{cashierDisplayName || (empLoading ? 'Loading…' : empError ? 'Unable to load cashier' : 'No cashier')}</p></div>;
               })}

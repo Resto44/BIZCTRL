@@ -51,7 +51,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('Cash balanced.');
   });
 
-  it('keeps globally available and multi-branch Sales Sources visible under a selected branch while mapping only Today amounts into canonical totals', async () => {
+  it('loads global and multi-branch Sales Sources through the selected branch server scope while mapping only Today amounts into canonical totals', async () => {
     const [sourceHook, workspace, context] = await Promise.all([
       source('../src/hooks/useSalesSources.js'),
       source('../src/components/sales/UnifiedSalesClosing.jsx'),
@@ -59,10 +59,12 @@ describe('Unified Sales Closing workflow contract', () => {
     ]);
 
     expect(sourceHook).toContain('useSalesClosingCustomization()');
-    expect(sourceHook).toContain('source?.is_global || (!source?.branch_id && !asRecordArray(source?.branch_ids).length)');
-    expect(sourceHook).toContain('canonicalIds.includes(String(branchId))');
-    expect(sourceHook).toContain('String(source.branch_id) === String(branchId)');
-    expect(context).toContain("const sourceQueryKey = useMemo(() => ['sales_sources_active', restaurantId]");
+    expect(sourceHook).toContain('useBranchScope()');
+    expect(sourceHook).toContain('requestedScopeMatchesActive');
+    expect(sourceHook).not.toContain('.filter((source) => branchMatchesSource(');
+    expect(context).toContain("['sales_sources_active', restaurantId, selectedBranchId, selectedBranchKey, isAllBranches]");
+    expect(context).toContain("supabase.rpc('erp_sales_closing_branch_sources'");
+    expect(context).toContain('p_branch_id: selectedBranchId');
     expect(workspace).toContain('paymentBucketForCode(source.default_payment_method)');
     expect(workspace).toContain('const customSourcePaymentTotals = useMemo(() =>');
     expect(workspace).toContain('const cashSales = baseCashSales + customSourcePaymentTotals.cash;');
@@ -79,16 +81,15 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const expectedCash = reconciliation.expectedCash;');
   });
 
-  it('keeps a successful Owner source mutation visible in every active branch cache until explicit reload', async () => {
+  it('invalidates every branch-scoped source cache after an Owner source mutation rather than merging it into another branch', async () => {
     const context = await source('../src/lib/SalesClosingCustomizationContext.jsx');
     const customization = await source('../src/pages/SalesClosingCustomization.jsx');
 
-    expect(context).toContain("const sourceQueryKey = useMemo(() => ['sales_sources_active', restaurantId]");
+    expect(context).toContain("['sales_sources_active', restaurantId, selectedBranchId, selectedBranchKey, isAllBranches]");
     expect(context).toContain('const sourcePatchesRef = useRef(new Map());');
-    expect(context).toContain('previous.map((item) => item.id === savedSource.id ? { ...item, ...savedSource } : item)');
     expect(context).toContain('sourcePatchesRef.current.set(savedSource.id, savedSource);');
-    expect(context).toContain("queryClient.setQueriesData({ queryKey: ['sales_sources_active', restaurantId] }, merge);");
-    expect(context).toContain("queryClient.invalidateQueries({ queryKey: sourceQueryKey, refetchType: 'none' });");
+    expect(context).toContain("queryClient.invalidateQueries({ queryKey: ['sales_sources_active', restaurantId], refetchType: 'none' });");
+    expect(context).not.toContain("queryClient.setQueriesData({ queryKey: ['sales_sources_active', restaurantId] }, merge);");
     expect(context).toContain('saveSalesSource: (source) => saveSourceMutation.mutateAsync(source)');
     expect(context).toContain('deleteSalesSource: (source) => deleteSourceMutation.mutateAsync(source)');
     expect(context).toContain('const { id: fieldId, ...fieldPayload } = field;');
@@ -216,7 +217,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(sales).toContain('dailyClosingDefaults({');
     expect(sales).toContain("existing?.closing_state === 'finalized'");
     expect(sales).toContain('No record is created until you save it.');
-    expect(sales).toContain('key={editing?.id || `new-closing-${newClosingInstance}`}');
+    expect(sales).toContain("key={editing?.id || `new-closing-${newClosingInstance}-${selectedBranchId || 'none'}-${selectedBranchKey || 'none'}`}");
     expect(sales).toContain('matchesSalesClosingSession(record, session)');
     expect(sales).toContain('disabled={isOpeningNewClosing}');
 

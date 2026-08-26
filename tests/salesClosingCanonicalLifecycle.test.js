@@ -71,3 +71,57 @@ describe('Sales Closing editable-finalized lifecycle regression', () => {
     expect(minorToMoney(result.erpRevenueMinor)).not.toBe(1600);
   });
 });
+
+
+describe('Sales Closing branch-isolation regression', () => {
+  it('resets the active Closing workspace and remounts it on every canonical branch change', async () => {
+    const [workspace, sales] = await Promise.all([
+      source('src/components/sales/UnifiedSalesClosing.jsx'),
+      source('src/pages/Sales.jsx'),
+    ]);
+
+    expect(workspace).toContain('const selectClosingBranch = useCallback');
+    expect(workspace).toContain('setSelectedBranchId(nextBranch.id)');
+    expect(workspace).toContain("setCashSalesInput('')");
+    expect(workspace).toContain("setOpeningCash('')");
+    expect(workspace).toContain("setActualCashCount('')");
+    expect(workspace).toContain('setCreditEntries([])');
+    expect(workspace).toContain('setCustomSourceAmounts({})');
+    expect(workspace).toContain("queryClient.cancelQueries({ queryKey: ['sales-closing-cash-ledger-context'] })");
+    expect(workspace).not.toContain('branches.at(0)?.key');
+
+    expect(sales).toContain("qc.cancelQueries({ queryKey: ['sales'] })");
+    expect(sales).toContain('setEditing(null)');
+    expect(sales).toContain('setNewClosingDefaults(null)');
+    expect(sales).toContain('setSessionContext(null)');
+    expect(sales).toContain('setSelectedIds(new Set())');
+    expect(sales).toContain("new-closing-${newClosingInstance}-${selectedBranchId || 'none'}-${selectedBranchKey || 'none'}");
+    expect(sales).toContain('const sales = isLoading ? [] : asRecordArray(salesData);');
+  });
+
+  it('queries branch-dependent customers and purchases on the backend rather than filtering restaurant-wide results', async () => {
+    const workspace = await source('src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).toContain("base().eq('branch_id', selectedBranchId)");
+    expect(workspace).toContain("base().is('branch_id', null).eq('branch', form.branch)");
+    expect(workspace).toContain("queryKey: ['customers_form', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift]");
+    expect(workspace).toContain("queryKey: ['approved_purchases_for_date', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift]");
+    expect(workspace).toContain('const customers = allCustomers;');
+    expect(workspace).not.toContain('allCustomers.filter((customer) => matchesBranch');
+  });
+
+  it('rejects stale Closing IDs in both the client save guard and canonical server transaction', async () => {
+    const [sales, repository, migration] = await Promise.all([
+      source('src/pages/Sales.jsx'),
+      source('src/lib/closing/ClosingRepository.js'),
+      source('src/supabase/20260827_sales_closing_branch_isolation.sql'),
+    ]);
+
+    expect(sales).toContain("error.code = 'SALES_CLOSING_BRANCH_CONTEXT_MISMATCH'");
+    expect(sales).toContain('payloadBranchId !== String(selectedBranchId)');
+    expect(repository).toContain('SALES_CLOSING_BRANCH_CONTEXT_MISMATCH');
+    expect(migration).toContain('erp_sales_closing_assert_existing_branch_context');
+    expect(migration).toContain("RAISE EXCEPTION 'SALES_CLOSING_BRANCH_CONTEXT_MISMATCH'");
+    expect(migration).toContain("PERFORM public.erp_sales_closing_assert_existing_branch_context(p_closing_id, v_restaurant_id, v_branch_id, v_branch);");
+  });
+});

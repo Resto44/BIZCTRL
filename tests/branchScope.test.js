@@ -74,19 +74,24 @@ describe('central branch UUID scope contract', () => {
     }
   });
 
-  it('uses canonical branch UUIDs while reusing the centralized Sales Source configuration cache', async () => {
+  it('uses canonical branch UUIDs and server-scoped Sales Source reads without browser filtering', async () => {
     const hook = await source('../src/hooks/useSalesSources.js');
     const context = await source('../src/lib/SalesClosingCustomizationContext.jsx');
+    const migration = await source('../src/supabase/20260827_sales_closing_branch_isolation.sql');
 
     expect(hook).toContain('useSalesSources({ branchId, branchKey, includeInactive = false } = {})');
-    expect(hook).toContain('useSalesClosingCustomization()');
-    expect(hook).toContain('const canonicalIds = asRecordArray(source?.branch_ids).map(String);');
-    expect(hook).toContain('canonicalIds.includes(String(branchId))');
-    expect(hook).toContain('String(source.branch_id) === String(branchId)');
-    expect(hook).toContain('source?.is_global || (!source?.branch_id && !asRecordArray(source?.branch_ids).length)');
-    expect(hook).toContain('includeInactive || source.is_active !== false');
-    expect(context).toContain("const sourceQueryKey = useMemo(() => ['sales_sources_active', restaurantId]");
-    expect(context).toContain("from('sales_sources')");
+    expect(hook).toContain('useBranchScope()');
+    expect(hook).toContain('requestedScopeMatchesActive');
+    expect(hook).not.toContain('.filter((source) => branchMatchesSource(');
+    expect(context).toContain("['sales_sources_active', restaurantId, selectedBranchId, selectedBranchKey, isAllBranches]");
+    expect(context).toContain("supabase.rpc('erp_sales_closing_branch_sources'");
+    expect(context).toContain("p_branch_id: selectedBranchId");
+    expect(context).toContain(".eq('is_global', true)");
+    expect(context).not.toContain(".or('is_global.eq.true,and(branch_id.is.null,branch_ids.is.null)')");
+    expect(context).not.toContain("const sourceQueryKey = useMemo(() => ['sales_sources_active', restaurantId]");
+    expect(migration).toContain('erp_can_access_scope_text(p_restaurant_id::text, p_branch_id::text)');
+    expect(migration).toContain('source.branch_id = p_branch_id::text');
+    expect(migration).toContain('p_branch_id = ANY(COALESCE(source.branch_ids');
   });
 
   it('sends a canonical branch UUID to Copilot and verifies it against the resolved tenant before tools run', async () => {

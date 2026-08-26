@@ -32,7 +32,7 @@ describe('Daily Sales manager attribution', () => {
     expect(workspace).toContain('custom_sources_total: otherPaymentTotal');
     expect(salesPage).toContain("import { filterDailySalesRecords, toDailySalesCardRecord } from '@/lib/dailySalesPresentation';");
     expect(salesPage).toContain('sale={toDailySalesCardRecord(s)}');
-    expect(salesPage).toContain("queryKey: ['sales', activeRestaurant?.id, selectedBranchId]");
+    expect(salesPage).toContain("queryKey: ['sales', activeRestaurant?.id, selectedBranchId, selectedBranchKey, isAllBranches]");
     expect(salesPage).toContain("baseQuery().eq('branch_id', selectedBranchId)");
     expect(salesPage).toContain("baseQuery().is('branch_id', null).eq('branch', selectedBranchKey)");
   });

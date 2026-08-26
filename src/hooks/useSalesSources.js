@@ -8,6 +8,7 @@
  */
 import { useMemo } from 'react';
 import { useTenant } from '@/lib/TenantContext';
+import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useSalesClosingCustomization } from '@/lib/SalesClosingCustomizationContext';
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
@@ -24,6 +25,7 @@ const branchMatchesSource = (source, branchId, branchKey) => {
 
 export function useSalesSources({ branchId, branchKey, includeInactive = false } = {}) {
   const { managerBranchObject } = useTenant();
+  const { selectedBranchId, selectedBranchKey, isAllBranches } = useBranchScope();
   const {
     sources: allSourcesData,
     isLoading,
@@ -33,13 +35,19 @@ export function useSalesSources({ branchId, branchKey, includeInactive = false }
 
   // The canonical branch UUID and legacy key are both supported while the ERP
   // finishes its existing legacy branch-key migration.
-  const effectiveBranchId = branchId || managerBranchObject?.id || null;
-  const effectiveBranchKey = branchKey || managerBranchObject?.key || managerBranchObject?.branch_key || null;
+  const effectiveBranchId = branchId || managerBranchObject?.id || (isAllBranches ? null : selectedBranchId) || null;
+  const effectiveBranchKey = branchKey || managerBranchObject?.key || managerBranchObject?.branch_key || (isAllBranches ? null : selectedBranchKey) || null;
 
-  const allSources = useMemo(() => asRecordArray(allSourcesData)
+  // The provider queries the database/RPC with the canonical branch scope. If a
+  // caller has not yet caught up with a branch switch, expose no sources rather
+  // than filtering a prior branch response in the browser.
+  const requestedScopeMatchesActive = isAllBranches
+    ? !effectiveBranchId && !effectiveBranchKey
+    : String(effectiveBranchId || '') === String(selectedBranchId || '')
+      && String(effectiveBranchKey || '') === String(selectedBranchKey || '');
+  const allSources = useMemo(() => (requestedScopeMatchesActive ? asRecordArray(allSourcesData) : [])
     .filter((source) => includeInactive || source.is_active !== false)
-    .filter((source) => branchMatchesSource(source, effectiveBranchId, effectiveBranchKey))
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)), [allSourcesData, effectiveBranchId, effectiveBranchKey, includeInactive]);
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)), [allSourcesData, includeInactive, requestedScopeMatchesActive]);
 
   const activeSources = useMemo(() => allSources.filter((source) => source.is_active !== false), [allSources]);
   const cashSource = activeSources.find((source) => source.system_key === 'cash');

@@ -36,6 +36,8 @@ export function normalizeClosingPayload(payload, requestId) {
 const BUSINESS_MESSAGES = {
   SALES_CLOSING_AUTH_REQUIRED: 'Your session has expired. Sign in again before saving the Closing.',
   SALES_CLOSING_SCOPE_REQUIRED: 'Select the business, branch, date, shift, and cashier before saving the Closing.',
+  SALES_CLOSING_BRANCH_CONTEXT_INVALID: 'The active branch is unavailable. Reload the authorized branch context before saving the Closing.',
+  SALES_CLOSING_BRANCH_CONTEXT_MISMATCH: 'The Closing belongs to a different branch than the active branch. Reload the Closing context before saving.',
   SALES_CLOSING_PERMISSION_DENIED: 'You do not have permission to change this Closing.',
   SALES_CLOSING_STATE_INVALID: 'This Closing cannot be saved in its current state.',
   SALES_CLOSING_ACTUAL_CASH_REQUIRED: 'Actual cash is required before finalizing this Closing.',

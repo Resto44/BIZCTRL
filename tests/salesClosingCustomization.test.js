@@ -122,13 +122,14 @@ describe('Sales Closing in-workspace runtime customization contract', () => {
     expect(dialogs).toContain("t('salesClosing.dialog.helpTextOptional')");
   });
 
-  it('adds sources and fields in place, updates the canonical cache, and links to the existing customization route', async () => {
+  it('adds sources and fields in place, invalidates every branch-scoped source cache, and links to the existing customization route', async () => {
     const context = await source('../src/lib/SalesClosingCustomizationContext.jsx');
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
     expect(context).toContain('saveSalesSource');
     expect(context).toContain('saveClosingField');
-    expect(context).toContain("queryClient.setQueriesData({ queryKey: ['sales_sources_active', restaurantId] }");
+    expect(context).toContain("queryClient.invalidateQueries({ queryKey: ['sales_sources_active', restaurantId], refetchType: 'none' });");
+    expect(context).not.toContain("queryClient.setQueriesData({ queryKey: ['sales_sources_active', restaurantId] }, merge);");
     expect(workspace).toContain('salesClosingWorkspaceCopy.addSource');
     expect(workspace).toContain('salesClosingWorkspaceCopy.addField');
     expect(workspace).toContain('salesClosingWorkspaceCopy.customize');
