@@ -12,6 +12,7 @@ export const PAYMENT_METHODS = Object.freeze({
   ONLINE: 'online',
   WALLET: 'wallet',
   CREDIT: 'credit',
+  OTHER: 'other',
 });
 
 export const paymentMethodForCode = (value) => {
@@ -22,7 +23,8 @@ export const paymentMethodForCode = (value) => {
   if (['online', 'digital', 'gateway'].includes(code)) return PAYMENT_METHODS.ONLINE;
   if (['wallet', 'e_wallet', 'ewallet'].includes(code)) return PAYMENT_METHODS.WALLET;
   if (['credit', 'customer_credit', 'on_account'].includes(code)) return PAYMENT_METHODS.CREDIT;
-  return PAYMENT_METHODS.CASH;
+  if (['other', 'other_sales', 'unknown'].includes(code)) return PAYMENT_METHODS.OTHER;
+  return PAYMENT_METHODS.OTHER;
 };
 
 export const paymentBuckets = (entries = []) => entries.reduce((totals, entry) => {
@@ -37,6 +39,7 @@ export const paymentBuckets = (entries = []) => entries.reduce((totals, entry) =
   [PAYMENT_METHODS.ONLINE]: 0,
   [PAYMENT_METHODS.WALLET]: 0,
   [PAYMENT_METHODS.CREDIT]: 0,
+  [PAYMENT_METHODS.OTHER]: 0,
 });
 
 export const ledgerTotals = (movements = []) => movements.reduce((totals, movement) => {
@@ -108,7 +111,8 @@ export const cashReconciliationSnapshot = ({
   const onlineSales = payments.online;
   const walletSales = payments.wallet;
   const creditSales = payments.credit + explicitCredit;
-  const revenueToday = cashSales + cardSales + bankTransferSales + onlineSales + walletSales + creditSales;
+  const otherSales = payments.other;
+  const revenueToday = cashSales + cardSales + bankTransferSales + onlineSales + walletSales + creditSales + otherSales;
   const opening = money(openingCash);
   const expectedCash = money(opening + ledger.cashIn + cashSales - ledger.cashOut);
   const actual = actualCash === '' || actualCash === null || actualCash === undefined ? null : money(actualCash);
@@ -129,6 +133,7 @@ export const cashReconciliationSnapshot = ({
     onlineSales,
     walletSales,
     creditSales,
+    otherSales,
     nonCashSales: cardSales + bankTransferSales + onlineSales + walletSales,
     revenueToday,
     expectedCash,

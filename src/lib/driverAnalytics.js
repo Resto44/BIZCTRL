@@ -9,6 +9,7 @@ export const DRIVER_ANALYTICS_PERIODS = [
 ];
 
 const number = (value) => Number(value) || 0;
+const records = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 
 export function getDriverAnalyticsDateRange(period, now = new Date()) {
   const today = startOfDay(now);
@@ -37,10 +38,10 @@ export function getCustomSourcesTotal(sale = {}) {
   if (!sale.sales_sources_json) return 0;
 
   try {
-    const entries = JSON.parse(sale.sales_sources_json);
-    return Array.isArray(entries)
-      ? entries.reduce((total, entry) => total + number(entry?.amount), 0)
-      : 0;
+    const entries = typeof sale.sales_sources_json === 'string'
+      ? JSON.parse(sale.sales_sources_json)
+      : sale.sales_sources_json;
+    return records(entries).reduce((total, entry) => total + number(entry?.amount), 0);
   } catch {
     return 0;
   }
@@ -53,12 +54,13 @@ const amountsFromDriverEntry = (entry = {}) => {
   return { cash, network, credit, other: 0, revenue: cash + network + credit };
 };
 
+// Legacy snapshot parsing remains only for historical callers. New Driver
+// Analytics callers supply canonical driver_sales_entries and never aggregate
+// these legacy daily_sales fields, preventing duplicate revenue recognition.
 export function getDriverSaleEntries(sale = {}) {
-  // New multi-driver entries carry one snapshot element per branch driver in
-  // the same daily_sales row. This is deliberately separate from normal POS.
   if (sale.drivers_json) {
     try {
-      const snapshot = JSON.parse(sale.drivers_json);
+      const snapshot = typeof sale.drivers_json === 'string' ? JSON.parse(sale.drivers_json) : sale.drivers_json;
       if (Array.isArray(snapshot) && snapshot.length) {
         return snapshot
           .filter((entry) => entry?.driver_id || entry?.driver_name)
@@ -74,15 +76,12 @@ export function getDriverSaleEntries(sale = {}) {
 
   if (!sale.driver_id && !sale.driver_name) return [];
 
-  // Some legacy driver entries stored only cash/network split columns.
   if (number(sale.driver_cash) > 0 || number(sale.driver_network) > 0) {
     const cash = number(sale.driver_cash);
     const network = number(sale.driver_network);
     return [{ driver_id: sale.driver_id || '', driver_name: sale.driver_name || '', notes: '', cash, network, credit: 0, other: 0, revenue: cash + network }];
   }
 
-  // Legacy attributed records predate the dedicated snapshot. Preserve their
-  // historical reporting behavior rather than rewriting existing results.
   const cash = number(sale.restaurant_cash ?? sale.cash);
   const network = number(sale.restaurant_network ?? sale.network);
   const credit = number(sale.credit);
@@ -119,11 +118,34 @@ function saleDateMatches(sale, dateFrom, dateTo) {
   return (!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo);
 }
 
-export function buildDriverSalesAnalytics({ drivers = [], sales = [], branchKey, branchId, dateFrom, dateTo } = {}) {
-  const scopedDrivers = drivers.filter((driver) => driverBranchMatches(driver, branchKey, branchId));
-  const driverById = new Map(scopedDrivers.map((driver) => [String(driver.id), driver]));
-  const driverByName = new Map(scopedDrivers.map((driver) => [String(driver.full_name || '').trim().toLowerCase(), driver]));
+export function paymentBucketForDriverSale(value) {
+  const code = String(value || '').trim().toLowerCase();
+  if (['cash', 'cash_on_delivery', 'cod'].includes(code)) return 'cash';
+  if (['card', 'network', 'pos', 'visa', 'mastercard', 'mada'].includes(code)) return 'network';
+  if (['credit', 'customer_credit', 'on_account'].includes(code)) return 'credit';
+  return 'other';
+}
 
+export function canonicalDriverSaleAmounts(entry = {}) {
+  const revenue = Math.max(0, number(entry.amount ?? entry.today_amount));
+  const bucket = paymentBucketForDriverSale(entry.payment_method ?? entry.payment_bucket);
+  return {
+    cash: bucket === 'cash' ? revenue : 0,
+    network: bucket === 'network' ? revenue : 0,
+    credit: bucket === 'credit' ? revenue : 0,
+    other: bucket === 'other' ? revenue : 0,
+    revenue,
+  };
+}
+
+export function isFinalizedDriverSale(entry = {}) {
+  const status = String(entry.status || '').toLowerCase();
+  const closingState = String(entry.closing_state || '').toLowerCase();
+  return status === 'finalized' || closingState === 'finalized' || Boolean(entry.finalized_at);
+}
+
+function buildRows(drivers, branchKey, branchId) {
+  const scopedDrivers = records(drivers).filter((driver) => driverBranchMatches(driver, branchKey, branchId));
   const rows = new Map(scopedDrivers.map((driver) => [String(driver.id), {
     driverId: driver.id,
     name: driver.full_name || 'Unnamed driver',
@@ -137,28 +159,13 @@ export function buildDriverSalesAnalytics({ drivers = [], sales = [], branchKey,
     other: 0,
     revenue: 0,
   }]));
+  return { scopedDrivers, rows };
+}
 
-  sales.forEach((sale) => {
-    if (!branchMatches(sale, branchKey, branchId) || !saleDateMatches(sale, dateFrom, dateTo)) return;
-    getDriverSaleEntries(sale).forEach((entry) => {
-      const linkedDriver = entry.driver_id
-        ? driverById.get(String(entry.driver_id))
-        : driverByName.get(String(entry.driver_name || '').trim().toLowerCase());
-      if (!linkedDriver) return;
-
-      const row = rows.get(String(linkedDriver.id));
-      row.orders += 1;
-      row.cash += entry.cash;
-      row.network += entry.network;
-      row.credit += entry.credit;
-      row.other += entry.other;
-      row.revenue += entry.revenue;
-    });
-  });
-
+function summarizeRows(rows) {
   const driverRows = Array.from(rows.values())
     .map((row) => ({ ...row, averageSale: row.orders > 0 ? row.revenue / row.orders : 0 }))
-    .sort((left, right) => right.revenue - left.revenue || right.orders - left.orders || left.name.localeCompare(right.name));
+    .sort((left, right) => right.revenue - left.revenue || left.name.localeCompare(right.name));
 
   const totals = driverRows.reduce((summary, row) => ({
     drivers: summary.drivers + 1,
@@ -178,11 +185,69 @@ export function buildDriverSalesAnalytics({ drivers = [], sales = [], branchKey,
   };
 }
 
-export function buildBranchDriverAnalytics({ drivers = [], sales = [], branches = [], dateFrom, dateTo } = {}) {
-  return branches.map((branch) => {
+function addCanonicalDriverSales({ rows, driverEntries, branchKey, branchId, dateFrom, dateTo }) {
+  records(driverEntries).forEach((entry) => {
+    if (!isFinalizedDriverSale(entry) || !branchMatches(entry, branchKey, branchId) || !saleDateMatches(entry, dateFrom, dateTo)) return;
+    const driverId = String(entry.driver_id || '');
+    const row = rows.get(driverId);
+    if (!row) return;
+    // A database transaction already enforces this relationship. This client
+    // guard ensures stale or malformed responses cannot cross branch analytics.
+    if (entry.branch_id && row.branchId && String(entry.branch_id) !== String(row.branchId)) return;
+
+    const amounts = canonicalDriverSaleAmounts(entry);
+    row.orders += 1;
+    row.cash += amounts.cash;
+    row.network += amounts.network;
+    row.credit += amounts.credit;
+    row.other += amounts.other;
+    row.revenue += amounts.revenue;
+  });
+}
+
+function addLegacyDriverSnapshots({ rows, drivers, sales, branchKey, branchId, dateFrom, dateTo }) {
+  const driverById = new Map(records(drivers).map((driver) => [String(driver.id), driver]));
+  const driverByName = new Map(records(drivers).map((driver) => [String(driver.full_name || '').trim().toLowerCase(), driver]));
+
+  records(sales).forEach((sale) => {
+    if (!branchMatches(sale, branchKey, branchId) || !saleDateMatches(sale, dateFrom, dateTo)) return;
+    getDriverSaleEntries(sale).forEach((entry) => {
+      const linkedDriver = entry.driver_id
+        ? driverById.get(String(entry.driver_id))
+        : driverByName.get(String(entry.driver_name || '').trim().toLowerCase());
+      if (!linkedDriver) return;
+
+      const row = rows.get(String(linkedDriver.id));
+      if (!row) return;
+      row.orders += 1;
+      row.cash += entry.cash;
+      row.network += entry.network;
+      row.credit += entry.credit;
+      row.other += entry.other;
+      row.revenue += entry.revenue;
+    });
+  });
+}
+
+export function buildDriverSalesAnalytics({ drivers = [], sales = [], driverEntries, branchKey, branchId, dateFrom, dateTo } = {}) {
+  const { scopedDrivers, rows } = buildRows(drivers, branchKey, branchId);
+
+  // Supplying canonical entries opts into the production data source, even when
+  // the period has no rows. Legacy snapshots are never combined with this path.
+  if (Array.isArray(driverEntries)) {
+    addCanonicalDriverSales({ rows, driverEntries, branchKey, branchId, dateFrom, dateTo });
+  } else {
+    addLegacyDriverSnapshots({ rows, drivers: scopedDrivers, sales, branchKey, branchId, dateFrom, dateTo });
+  }
+
+  return summarizeRows(rows);
+}
+
+export function buildBranchDriverAnalytics({ drivers = [], sales = [], driverEntries, branches = [], dateFrom, dateTo } = {}) {
+  return records(branches).map((branch) => {
     const branchKey = branch.key || branch.branch_key || '';
     const branchId = branch.id || null;
-    const analytics = buildDriverSalesAnalytics({ drivers, sales, branchKey, branchId, dateFrom, dateTo });
+    const analytics = buildDriverSalesAnalytics({ drivers, sales, driverEntries, branchKey, branchId, dateFrom, dateTo });
     return {
       branchId,
       branchKey,
@@ -192,13 +257,10 @@ export function buildBranchDriverAnalytics({ drivers = [], sales = [], branches 
   }).sort((left, right) => right.revenue - left.revenue || left.branchName.localeCompare(right.branchName));
 }
 
-
-// Builds the chart-ready trend data used by both the Owner dashboard and the
-// branch-scoped Driver Management workspace. Every metric is attributed via the
-// same canonical getDriverSaleEntries() path as Driver Sales history and totals.
 export function buildDriverTrendAnalytics({
   drivers = [],
   sales = [],
+  driverEntries,
   branches = [],
   branchKey,
   branchId,
@@ -208,13 +270,14 @@ export function buildDriverTrendAnalytics({
   const analytics = buildDriverSalesAnalytics({
     drivers,
     sales,
+    driverEntries,
     branchKey,
     branchId,
     dateFrom,
     dateTo,
   });
 
-  const scopedBranches = branches.filter((branch) => {
+  const scopedBranches = records(branches).filter((branch) => {
     if (!branchKey && !branchId) return true;
     return branchMatches({
       branch_id: branch.id,
@@ -224,6 +287,7 @@ export function buildDriverTrendAnalytics({
   const branchRows = buildBranchDriverAnalytics({
     drivers,
     sales,
+    driverEntries,
     branches: scopedBranches,
     dateFrom,
     dateTo,
@@ -241,10 +305,11 @@ export function buildDriverTrendAnalytics({
       || 'Unassigned branch',
   }));
 
+  const datedRecords = Array.isArray(driverEntries) ? records(driverEntries) : records(sales);
   const dates = Array.from(new Set(
-    sales
-      .filter((sale) => branchMatches(sale, branchKey, branchId) && saleDateMatches(sale, dateFrom, dateTo))
-      .map((sale) => String(sale.date || '').slice(0, 10))
+    datedRecords
+      .filter((record) => branchMatches(record, branchKey, branchId) && saleDateMatches(record, dateFrom, dateTo))
+      .map((record) => String(record.date || '').slice(0, 10))
       .filter(Boolean),
   )).sort((left, right) => left.localeCompare(right));
 
@@ -252,6 +317,7 @@ export function buildDriverTrendAnalytics({
     const daily = buildDriverSalesAnalytics({
       drivers,
       sales,
+      driverEntries,
       branchKey,
       branchId,
       dateFrom: date,

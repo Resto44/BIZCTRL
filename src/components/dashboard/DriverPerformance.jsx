@@ -54,14 +54,15 @@ const DriverPerformance = memo(function DriverPerformance({
     staleTime: 0,
   });
 
-  const { data: salesData = [], isLoading: salesLoading, error: salesError } = useQuery({
-    queryKey: ['driver-performance', 'sales', restaurantId, selectedBranch, range.startDate, range.endDate],
+  const { data: driverEntriesData = [], isLoading: driverEntriesLoading, error: driverEntriesError } = useQuery({
+    queryKey: ['driver-performance', 'canonical-driver-source-entries', restaurantId, selectedBranch, range.startDate, range.endDate],
     queryFn: async () => {
       let query = supabase
-        .from('daily_sales')
-        .select('id, date, restaurant_id, branch, branch_id, driver_id, driver_name, driver_cash, driver_network, drivers_json, restaurant_cash, restaurant_network, cash, network, credit, sales_sources_json, custom_sources_total')
+        .from('driver_sales_entries')
+        .select('id, closing_id, restaurant_id, branch, branch_id, driver_id, sales_source_id, subcategory, date, shift, amount, payment_method, notes, status, finalized_at, daily_sales!inner(closing_state)')
         .eq('restaurant_id', restaurantId)
-        .or('driver_id.not.is.null,drivers_json.not.is.null')
+        .eq('status', 'finalized')
+        .eq('daily_sales.closing_state', 'finalized')
         .gte('date', range.startDate)
         .lte('date', range.endDate)
         .order('date', { ascending: false })
@@ -76,21 +77,25 @@ const DriverPerformance = memo(function DriverPerformance({
   });
 
   const drivers = asArray(driversData);
-  const sales = asArray(salesData);
+  const driverEntries = asArray(driverEntriesData).map((entry) => ({ ...entry, closing_state: entry.daily_sales?.closing_state }));
   const analytics = useMemo(() => buildDriverSalesAnalytics({
     drivers,
-    sales,
+    driverEntries,
     branchKey: selectedBranchKey,
     branchId,
-  }), [drivers, sales, selectedBranchKey, branchId]);
+    dateFrom: range.startDate,
+    dateTo: range.endDate,
+  }), [drivers, driverEntries, selectedBranchKey, branchId, range.startDate, range.endDate]);
   const branchRows = useMemo(() => buildBranchDriverAnalytics({
     drivers: selectedBranch === 'all' ? drivers : [],
-    sales: selectedBranch === 'all' ? sales : [],
+    driverEntries: selectedBranch === 'all' ? driverEntries : [],
     branches: selectedBranch === 'all' ? branchList : [],
-  }), [drivers, sales, branchList, selectedBranch]);
+    dateFrom: range.startDate,
+    dateTo: range.endDate,
+  }), [drivers, driverEntries, branchList, selectedBranch, range.startDate, range.endDate]);
 
-  const loading = driversLoading || salesLoading;
-  const error = driversError || salesError;
+  const loading = driversLoading || driverEntriesLoading;
+  const error = driversError || driverEntriesError;
 
   return (
     <section className="w-full min-w-0 max-w-full space-y-4">
@@ -176,7 +181,7 @@ const DriverPerformance = memo(function DriverPerformance({
       {!loading && !error && (
         <DriverTrendAnalytics
           drivers={drivers}
-          sales={sales}
+          driverEntries={driverEntries}
           branches={branchList}
           branchKey={selectedBranchKey}
           branchId={branchId}

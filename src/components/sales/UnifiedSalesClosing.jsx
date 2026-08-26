@@ -53,7 +53,7 @@ import { toast } from 'sonner';
 import { useSalesSources } from '@/hooks/useSalesSources';
 import { useSalesClosingCustomization } from '@/lib/SalesClosingCustomizationContext';
 import { newSalesClosingCustomField } from '@/lib/salesClosingCustomization';
-import { buildSalesSourceClosingSnapshots, salesSourceTodayTotal } from '@/lib/salesSourceClosingLifecycle';
+import { buildSalesSourceClosingSnapshots, driverSourceTodayTotal, salesSourceTodayTotal } from '@/lib/salesSourceClosingLifecycle';
 import { SalesClosingFieldDialog, SalesSourceDialog, newSalesClosingSource } from '@/components/sales/SalesClosingCustomizationDialogs';
 import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
@@ -113,6 +113,13 @@ const paymentBucketForCode = (value) => paymentMethodForCode(value);
 const salesSourceAmountForBucket = (record, bucket) => parseSalesSourceEntries(record)
   .reduce((total, entry) => {
     if (entry?.included_in_revenue === false) return total;
+    const driverEntries = asRecordArray(entry?.driver_entries);
+    if (driverEntries.length) {
+      return total + driverEntries.reduce((driverTotal, driverEntry) => {
+        const driverBucket = paymentBucketForCode(driverEntry?.payment_method || driverEntry?.payment_bucket);
+        return driverBucket === bucket ? driverTotal + Math.max(0, Number(driverEntry?.amount ?? driverEntry?.today_amount) || 0) : driverTotal;
+      }, 0);
+    }
     const entryBucket = entry?.payment_bucket || paymentBucketForCode(entry?.default_payment_method);
     if (entryBucket !== bucket) return total;
     return total + Math.max(0, Number(entry?.amount ?? entry?.today_amount) || 0);
@@ -261,6 +268,41 @@ const SalesSourceDailyHistoryCard = memo(function SalesSourceDailyHistoryCard({ 
   );
 });
 
+const DriverSalesSourceCard = memo(function DriverSalesSourceCard({ source, sourceLabel, entries, drivers, previous, currency, onAdd, onChange, onRemove, isHistoryLoading, isHistoryUnavailable, copy }) {
+  const today = driverSourceTodayTotal(entries);
+  const total = previous + today;
+  const availableDrivers = asRecordArray(drivers).filter((driver) => driver.is_active !== false && driver.status !== 'inactive');
+
+  return (
+    <div className="rounded-xl border border-cyan-200 bg-background p-3 shadow-sm" data-i18n-skip="true">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0"><p className="truncate text-sm font-bold text-cyan-950">{sourceLabel}</p><p className="text-[10px] text-muted-foreground">{source.subcategory || 'Drivers'} · Branch-scoped Driver Master entries</p></div>
+        <Badge variant="outline" className="shrink-0 border-cyan-200 bg-cyan-50 text-[10px] text-cyan-700">Driver source</Badge>
+      </div>
+      <div className="space-y-2">
+        {entries.length === 0 ? <p className="rounded-lg border border-dashed border-cyan-200 bg-cyan-50/40 px-3 py-3 text-xs text-cyan-800">No driver sales entered for this source today.</p> : entries.map((entry) => {
+          const usedDriverIds = new Set(entries.filter((candidate) => candidate.client_row_id !== entry.client_row_id).map((candidate) => String(candidate.driver_id || '')));
+          return <div key={entry.client_row_id} className="grid gap-2 rounded-lg border border-cyan-100 bg-cyan-50/30 p-2 sm:grid-cols-[minmax(11rem,1.5fr)_minmax(7rem,.75fr)_minmax(7rem,.75fr)_auto]">
+            <Select value={entry.driver_id || ''} onValueChange={(driver_id) => {
+              const driver = availableDrivers.find((candidate) => String(candidate.id) === String(driver_id));
+              onChange(entry.client_row_id, { driver_id, driver_name: driver?.full_name || '' });
+            }}><SelectTrigger className="bg-background"><SelectValue placeholder="Select Driver" /></SelectTrigger><SelectContent>{availableDrivers.map((driver) => <SelectItem key={driver.id} value={driver.id} disabled={usedDriverIds.has(String(driver.id))}>{driver.full_name}{driver.driver_id ? ` · ${driver.driver_id}` : ''}</SelectItem>)}</SelectContent></Select>
+            <Select value={entry.payment_method || 'cash'} onValueChange={(payment_method) => onChange(entry.client_row_id, { payment_method })}><SelectTrigger className="bg-background"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="cash">Cash</SelectItem><SelectItem value="card">Network / POS</SelectItem><SelectItem value="credit">Customer Credit</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select>
+            <Input type="number" min="0" step="0.01" value={entry.amount ?? ''} onChange={(event) => onChange(entry.client_row_id, { amount: event.target.value, today_amount: event.target.value })} placeholder="Amount" className="bg-background" aria-label="Driver sale amount" />
+            <Button type="button" variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onRemove(entry.client_row_id)} aria-label="Remove driver sale"><Trash2 className="h-4 w-4" /></Button>
+            <Textarea value={entry.notes || ''} onChange={(event) => onChange(entry.client_row_id, { notes: event.target.value })} placeholder="Optional note" className="sm:col-span-3" rows={1} />
+          </div>;
+        })}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><Button type="button" size="sm" variant="outline" onClick={onAdd} disabled={availableDrivers.length === 0}><PlusCircle className="mr-1 h-3.5 w-3.5" />Add Driver</Button><div className="text-right"><p className="text-[10px] font-bold uppercase tracking-wide text-cyan-700">Today from drivers</p><Money currency={currency} value={today} className="text-sm font-black text-cyan-700" /></div></div>
+      {availableDrivers.length === 0 && <p className="mt-2 text-xs text-amber-700">Create an active Driver Master record for this branch before adding driver sales.</p>}
+      <div className="mt-3 space-y-2 border-t border-cyan-100 pt-3">
+        <div className="flex items-center justify-between gap-3 text-sm"><div><p className="font-medium">{copy.previous}</p><p className="text-[10px] text-muted-foreground">{copy.previousHelp}</p></div>{isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={previous} className="font-semibold text-muted-foreground" />}</div>
+        <div className="flex items-center justify-between gap-3 border-t border-cyan-100 pt-2 text-sm"><div><p className="font-bold text-cyan-950">{copy.total}</p><p className="text-[10px] text-muted-foreground">{copy.totalHelp}</p></div>{isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={total} className="font-black text-cyan-800" />}</div>
+      </div>
+    </div>
+  );
+});
 // ─────────────────────────────────────────────────────────────────────────────
 // KPI CARD — Large ERP style
 // ─────────────────────────────────────────────────────────────────────────────
@@ -767,13 +809,32 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // ── Dynamic Sales Sources ───────────────────────────────────────────────────────────────
   const { customSources: customSourcesData, isLoading: sourcesLoading } = useSalesSources({ branchId: selectedBranchId });
   const customSources = asRecordArray(customSourcesData);
+  const { data: driverSourceDriversData = [], isLoading: driverSourceDriversLoading } = useQuery({
+    queryKey: ['sales-closing-driver-source-drivers', activeRestaurant?.id, selectedBranchId],
+    queryFn: async () => {
+      if (!activeRestaurant?.id || !selectedBranchId) return [];
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('id, restaurant_id, branch_id, driver_id, full_name, phone, status, is_active')
+        .eq('restaurant_id', activeRestaurant.id)
+        .eq('branch_id', selectedBranchId)
+        .order('full_name')
+        .limit(500);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: Boolean(activeRestaurant?.id && selectedBranchId),
+    staleTime: 0,
+  });
+  const driverSourceDrivers = asRecordArray(driverSourceDriversData);
   const historicalSourceAmounts = useMemo(() => asRecordArray(sourcePreviousBalanceRows)
     .reduce((balances, row) => {
       if (!row?.source_id) return balances;
       balances[row.source_id] = Math.max(0, Number(row.previous_amount) || 0);
       return balances;
     }, {}), [sourcePreviousBalanceRows]);
-  // Amounts keyed by source.id
+  // Amounts keyed by source.id. Driver-enabled source values are always derived
+  // from their child records and never accept a separate manual source amount.
   const [customSourceAmounts, setCustomSourceAmounts] = useState(() => {
     const map = {};
     parseSalesSourceEntries(initial).forEach((entry) => {
@@ -781,20 +842,80 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     });
     return map;
   });
+  const [customSourceDriverEntries, setCustomSourceDriverEntries] = useState(() => parseSalesSourceEntries(initial)
+    .reduce((grouped, sourceEntry) => {
+      if (!sourceEntry?.source_id || !Array.isArray(sourceEntry.driver_entries)) return grouped;
+      grouped[sourceEntry.source_id] = sourceEntry.driver_entries.map((entry) => ({
+        ...entry,
+        client_row_id: entry.client_row_id || entry.id || newStableRowId(`driver-source-${sourceEntry.source_id}`),
+        sales_source_id: sourceEntry.source_id,
+      }));
+      return grouped;
+    }, {}));
   const setCustomAmount = (sourceId, val) => updateCalculatedInput(setCustomSourceAmounts, prev => ({ ...prev, [sourceId]: val }));
+  const addDriverSourceEntry = useCallback((source) => {
+    setCustomSourceDriverEntries((current) => ({
+      ...current,
+      [source.id]: [...asRecordArray(current[source.id]), {
+        client_row_id: newStableRowId(`driver-source-${source.id}`),
+        sales_source_id: source.id,
+        subcategory: source.subcategory || 'Drivers',
+        date: form.date,
+        branch_id: selectedBranchId,
+        branch: form.branch,
+        shift: form.shift,
+        driver_id: '',
+        driver_name: '',
+        amount: '',
+        today_amount: '',
+        payment_method: 'cash',
+        notes: '',
+      }],
+    }));
+  }, [form.branch, form.date, form.shift, selectedBranchId]);
+  const updateDriverSourceEntry = useCallback((sourceId, clientRowId, patch) => {
+    setCustomSourceDriverEntries((current) => ({
+      ...current,
+      [sourceId]: asRecordArray(current[sourceId]).map((entry) => entry.client_row_id === clientRowId ? { ...entry, ...patch } : entry),
+    }));
+  }, []);
+  const removeDriverSourceEntry = useCallback((sourceId, clientRowId) => {
+    setCustomSourceDriverEntries((current) => ({
+      ...current,
+      [sourceId]: asRecordArray(current[sourceId]).filter((entry) => entry.client_row_id !== clientRowId),
+    }));
+  }, []);
   const customSourceSummaries = useMemo(() => customSources.map((source) => {
-    const today = Math.max(0, Number(customSourceAmounts[source.id]) || 0);
+    const driverEntries = source.allows_driver_entries === true ? asRecordArray(customSourceDriverEntries[source.id]) : [];
+    const today = source.allows_driver_entries === true
+      ? driverSourceTodayTotal(driverEntries)
+      : Math.max(0, Number(customSourceAmounts[source.id]) || 0);
     const previous = Math.max(0, Number(historicalSourceAmounts[source.id] ?? 0) || 0);
-    return { source, sourceLabel: sourceNameForLanguage(source), today, previous, total: previous + today };
-  }), [customSources, customSourceAmounts, historicalSourceAmounts, sourceNameForLanguage]);
+    return { source, sourceLabel: sourceNameForLanguage(source), driverEntries, today, previous, total: previous + today };
+  }), [customSources, customSourceAmounts, customSourceDriverEntries, historicalSourceAmounts, sourceNameForLanguage]);
   const customSourcePaymentTotals = useMemo(() =>
-    customSourceSummaries.reduce((totals, { source, today }) => {
+    customSourceSummaries.reduce((totals, { source, today, driverEntries }) => {
       if (source.included_in_revenue === false) return totals;
-      totals[paymentBucketForCode(source.default_payment_method)] += today;
+      if (source.allows_driver_entries === true) {
+        driverEntries.forEach((entry) => {
+          const bucket = paymentBucketForCode(entry.payment_method);
+          totals[bucket] += Math.max(0, Number(entry.amount ?? entry.today_amount) || 0);
+        });
+      } else {
+        totals[paymentBucketForCode(source.default_payment_method)] += today;
+      }
       return totals;
-    }, { cash: 0, card: 0, bank_transfer: 0, online: 0, wallet: 0, credit: 0 }),
+    }, { cash: 0, card: 0, bank_transfer: 0, online: 0, wallet: 0, credit: 0, other: 0 }),
     [customSourceSummaries]
   );
+  const driverSourcePaymentTotals = useMemo(() => customSourceSummaries.reduce((totals, { source, driverEntries }) => {
+    if (source.allows_driver_entries !== true || source.included_in_revenue === false) return totals;
+    driverEntries.forEach((entry) => {
+      const bucket = paymentBucketForCode(entry.payment_method);
+      totals[bucket] += Math.max(0, Number(entry.amount ?? entry.today_amount) || 0);
+    });
+    return totals;
+  }, { cash: 0, card: 0, bank_transfer: 0, online: 0, wallet: 0, credit: 0, other: 0 }), [customSourceSummaries]);
   // The Sales Sources section and every revenue calculation use only current
   // Today values. Historical Previous values remain display/audit context.
   const customTotal = useMemo(() => salesSourceTodayTotal(customSourceSummaries), [customSourceSummaries]);
@@ -1247,7 +1368,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const onlineTotal = customSourcePaymentTotals.online;
   const walletTotal = customSourcePaymentTotals.wallet;
   const creditTotal = baseCreditTotal + customSourcePaymentTotals.credit;
-  const otherPaymentTotal = useAutomaticSales ? automaticClosingSnapshot.other : 0;
+  const otherPaymentTotal = (useAutomaticSales ? automaticClosingSnapshot.other : 0) + customSourcePaymentTotals.other;
   const networkTotal = cardTotal + bankTransferTotal + onlineTotal + walletTotal;
   const totalSales = cashSales + networkTotal + creditTotal + otherPaymentTotal;
 
@@ -1278,7 +1399,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       (movement) => !isCurrentClosingOwnerSettlementMovement(movement),
     ),
     currentCashSales: baseCashSales,
-    revenueEntries: customSourceSummaries.map(({ source, today }) => ({ amount: today, payment_method: source.default_payment_method })),
+    revenueEntries: customSourceSummaries.flatMap(({ source, today, driverEntries }) => source.allows_driver_entries === true
+      ? driverEntries.map((entry) => ({ amount: entry.amount ?? entry.today_amount, payment_method: entry.payment_method }))
+      : [{ amount: today, payment_method: source.default_payment_method }]),
     actualCash: actualCount,
     branchWalletAvailable,
   });
@@ -1396,6 +1519,16 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       return amount > Math.max(0, limit - previous) && !entry.manager_override;
     });
     const nextErrors = {};
+    const invalidDriverSourceEntry = customSourceSummaries
+      .filter(({ source }) => source.allows_driver_entries === true)
+      .flatMap(({ driverEntries }) => driverEntries)
+      .find((entry) => !entry.driver_id || Math.max(0, Number(entry.amount ?? entry.today_amount) || 0) <= 0);
+    const duplicateDriverSourceEntry = customSourceSummaries
+      .filter(({ source }) => source.allows_driver_entries === true)
+      .find(({ driverEntries }) => {
+        const ids = driverEntries.map((entry) => String(entry.driver_id || '')).filter(Boolean);
+        return new Set(ids).size !== ids.length;
+      });
     if (!form.date) nextErrors.date = 'Date is required.';
     if (!form.branch) nextErrors.branch = 'Branch is required.';
     if (!form.shift) nextErrors.shift = 'Shift is required.';
@@ -1404,6 +1537,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (!savingDraft && requiresCashReconciliation && cashDifference !== null && cashDifference !== 0 && !cashNotes.trim()) nextErrors.cashNotes = 'A reconciliation note is required for a cash difference.';
     if (invalidCredit) nextErrors.credit = 'Select an active Customer Master customer for every Today Credit amount.';
     if (!savingDraft && limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer_name_snapshot || limitExceededEntry.customer}. Correct the amount or perform an authorized manager override.`;
+    if (!savingDraft && invalidDriverSourceEntry) nextErrors.driverSources = 'Each driver sales row requires an active branch driver and a positive amount.';
+    if (!savingDraft && duplicateDriverSourceEntry) nextErrors.driverSources = 'A driver can appear only once per Sales Source and closing shift.';
     customClosingFields.forEach((field) => {
       if (!savingDraft && field.is_required && !hasCustomClosingFieldValue(field)) nextErrors[`custom_${field.id}`] = `${field.label_en} is required.`;
     });
@@ -1487,13 +1622,16 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         // recognized exactly once rather than being added again server-side.
         restaurant_cash: baseCashSales,
         cash: baseCashSales,
-        restaurant_network: networkTotal,
-        network: networkTotal,
+        // Driver-linked source payments are reconstructed and validated by the
+        // database transaction from `driver_entries`; send only the non-driver
+        // portion here to guarantee that no child amount is recognized twice.
+        restaurant_network: Math.max(0, networkTotal - driverSourcePaymentTotals.card - driverSourcePaymentTotals.bank_transfer - driverSourcePaymentTotals.online - driverSourcePaymentTotals.wallet),
+        network: Math.max(0, networkTotal - driverSourcePaymentTotals.card - driverSourcePaymentTotals.bank_transfer - driverSourcePaymentTotals.online - driverSourcePaymentTotals.wallet),
         restaurant_network_account_id: posDeviceId || '',
         cashier_id: cashierId,
         customer_id: customerId,
         pos_device_id: posDeviceId,
-        credit: creditTotal,
+        credit: Math.max(0, creditTotal - driverSourcePaymentTotals.credit),
         pos_entries_json: JSON.stringify(posEntries.map(({ id, ...rest }) => rest)),
         credit_entries_json: creditEntries.map(({ id, ...rest }) => {
           const customer = customers.find((candidate) => String(candidate.id) === String(rest.customer_id));
@@ -1528,9 +1666,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           cashierName: cashierDisplayName,
         }).map((snapshot) => ({
           ...snapshot,
-          payment_bucket: paymentBucketForCode(snapshot.default_payment_method),
+          payment_bucket: snapshot.allows_driver_entries === true ? 'other' : paymentBucketForCode(snapshot.default_payment_method),
         })),
-        custom_sources_total: otherPaymentTotal,
+        custom_sources_total: Math.max(0, otherPaymentTotal - driverSourcePaymentTotals.other),
         sales_closing_custom_fields: customClosingFields
           .filter((field) => customClosingFieldValues[field.id] !== undefined && customClosingFieldValues[field.id] !== '')
           .map((field) => ({
@@ -1726,7 +1864,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="w-fit border-blue-200 bg-white text-[10px] text-blue-700">{salesClosingWorkspaceCopy.liveConfiguration}</Badge>{canCustomize && <><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setSourceEditor({ mode: 'create', source: newSalesClosingSource(customSources.length * 10 + 10) })}>+ {salesClosingWorkspaceCopy.addSource}</Button><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setFieldEditor({ mode: 'create', field: newSalesClosingCustomField(configuredClosingFields.length * 10 + 10) })}>+ {salesClosingWorkspaceCopy.addField}</Button><Button type="button" size="sm" className="min-h-10" onClick={() => navigate('/sales-closing-customization')}>{salesClosingWorkspaceCopy.customize}</Button></>}</div>
               </div>
               <div className="space-y-4 p-3 sm:p-4">
-                {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div><div className="mb-2 flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-foreground">{salesSourceCopy.title}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{salesSourceCopy.todayIncluded}</p></div><div className="text-right"><p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">{salesSourceCopy.todayTotal}</p><Money currency={currency} value={customTotal} className="text-sm font-black text-blue-700" /></div></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{customSourceSummaries.map(({ source, sourceLabel, today, previous }) => <SalesSourceDailyHistoryCard key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} isHistoryLoading={sourceHistoryLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} />)}</div></div>}
+                {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div><div className="mb-2 flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-foreground">{salesSourceCopy.title}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{salesSourceCopy.todayIncluded}</p></div><div className="text-right"><p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">{salesSourceCopy.todayTotal}</p><Money currency={currency} value={customTotal} className="text-sm font-black text-blue-700" /></div></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{customSourceSummaries.map(({ source, sourceLabel, today, previous, driverEntries }) => source.allows_driver_entries === true ? <DriverSalesSourceCard key={source.id} source={source} sourceLabel={sourceLabel} entries={driverEntries} drivers={driverSourceDrivers} previous={previous} currency={currency} onAdd={() => addDriverSourceEntry(source)} onChange={(clientRowId, patch) => updateDriverSourceEntry(source.id, clientRowId, patch)} onRemove={(clientRowId) => removeDriverSourceEntry(source.id, clientRowId)} isHistoryLoading={sourceHistoryLoading || driverSourceDriversLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} /> : <SalesSourceDailyHistoryCard key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} isHistoryLoading={sourceHistoryLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} />)}</div></div>}
                 {isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false) && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-800">{salesClosingWorkspaceCopy.paymentMethods}</p><div className="mt-2 flex flex-wrap gap-2">{configuredPaymentMethods.filter((method) => method.is_active !== false).map((method) => <Badge key={method.id} variant="outline" className="bg-background" data-i18n-skip="true">{sourceNameForLanguage(method)}</Badge>)}</div></div>}
                 {customClosingFields.length > 0 && <div><p className="mb-2 text-xs font-bold uppercase tracking-wide text-foreground">{salesClosingWorkspaceCopy.additionalFields}</p><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{customClosingFields.map((field) => { const visibilityClass = field.visible_mobile === false ? 'hidden sm:block' : field.visible_desktop === false ? 'sm:hidden' : ''; const value = customClosingFieldValues[field.id] ?? ''; const error = inlineErrors[`custom_${field.id}`]; const inputId = `quick-closing-custom_${field.id}`; return <div key={field.id} id={`quick-closing-custom_${field.id}`} className={visibilityClass}>{field.field_type === 'long_text' || field.field_type === 'notes' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingFieldNameForLanguage(field)}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Textarea id={inputId} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} className="min-h-20 resize-none text-sm" />{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'dropdown' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingFieldNameForLanguage(field)}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Select value={value} onValueChange={(next) => updateCustomClosingField(field.id, next)}><SelectTrigger id={inputId} className="min-h-11 text-sm"><SelectValue placeholder={closingFieldNameForLanguage(field)} /></SelectTrigger><SelectContent>{field.options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'checkbox' ? <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-input px-3 py-2 text-sm"><span>{closingFieldNameForLanguage(field)}{field.is_required && <span className="ml-1 text-destructive">*</span>}</span><input id={inputId} type="checkbox" checked={Boolean(value)} onChange={(event) => updateCustomClosingField(field.id, event.target.checked)} className="h-4 w-4 accent-primary" /></label> : <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingFieldNameForLanguage(field)}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label>{field.field_type === 'currency' || field.field_type === 'number' ? <ClosingNumericInput id={inputId} value={value} onChange={(next) => updateCustomClosingField(field.id, next)} required={field.is_required} inputClassName="min-h-11 text-sm" /> : <Input id={inputId} type={field.field_type === 'date' ? 'date' : field.field_type === 'time' ? 'time' : 'text'} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} className="min-h-11 text-sm" />}{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div>}{field.help_text && <p className="mt-1 text-[10px] leading-snug text-muted-foreground">{field.help_text}</p>}</div>; })}</div></div>}
               </div>

@@ -68,6 +68,7 @@ function DriverMobileCards({ rows, currency }) {
 const DriverTrendAnalytics = memo(function DriverTrendAnalytics({
   drivers = [],
   sales = [],
+  driverEntries,
   branches = [],
   branchKey,
   branchId,
@@ -79,12 +80,13 @@ const DriverTrendAnalytics = memo(function DriverTrendAnalytics({
   const trends = useMemo(() => buildDriverTrendAnalytics({
     drivers,
     sales,
+    driverEntries,
     branches,
     branchKey,
     branchId,
     dateFrom,
     dateTo,
-  }), [branches, branchId, branchKey, dateFrom, dateTo, drivers, sales]);
+  }), [branches, branchId, branchKey, dateFrom, dateTo, driverEntries, drivers, sales]);
   const topDrivers = trends.driverRows.filter((row) => row.orders > 0).slice(0, 10);
 
   return (

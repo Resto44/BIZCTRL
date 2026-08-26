@@ -27,6 +27,7 @@ export function newSalesClosingSource(order = 10) {
     description: '',
     category: 'other',
     subcategory: '',
+    allows_driver_entries: false,
     sort_order: order,
     is_active: true,
     is_global: true,
@@ -130,6 +131,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
       category: String(draft.category || 'other'),
       subcategory: String(draft.subcategory || '').trim() || null,
       default_payment_method: String(draft.default_payment_method || 'cash'),
+      allows_driver_entries: Boolean(draft.allows_driver_entries),
       branch_ids: draft.is_global === false ? Array.from(new Set(asArray(draft.branch_ids).map(String).filter(Boolean))) : [],
     };
     if (!source.name_en) return setError(t('salesClosing.dialog.sourceNameRequired'));
@@ -158,10 +160,11 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('salesSourceManagement.configuration')}</p>
             <div className="grid gap-3 sm:grid-cols-3">
               <div><Label>{t('salesSourceManagement.category')}</Label><Select value={draft.category || 'other'} onValueChange={(category) => set({ category })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SOURCE_CATEGORIES.map((category) => <SelectItem key={category} value={category}>{t(`salesSourceManagement.category.${category}`)}</SelectItem>)}</SelectContent></Select></div>
-              <div><Label>Optional Subcategory</Label><Input value={draft.subcategory || ''} onChange={(event) => set({ subcategory: event.target.value })} placeholder="e.g. Delivery platform" maxLength={120} /></div>
+              <div><Label>Optional Subcategory</Label><Input value={draft.subcategory || ''} onChange={(event) => set({ subcategory: event.target.value })} placeholder="e.g. Drivers" maxLength={120} /></div>
               <div><Label>{t('salesClosing.dialog.defaultPayment')}</Label><Select value={draft.default_payment_method || 'cash'} onValueChange={(default_payment_method) => set({ default_payment_method })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{paymentMethods.filter((method) => method.is_active !== false).map((method) => <SelectItem key={method.id} value={method.code}>{localizedDataName(method, lang)}</SelectItem>)}</SelectContent></Select></div>
               <div><Label>{t('salesClosing.dialog.displayOrder')}</Label><Input type="number" min="0" value={draft.sort_order ?? 0} onChange={(event) => set({ sort_order: Number(event.target.value) || 0 })} /></div>
             </div>
+            <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm"><span><span className="block font-medium">Driver-linked entries</span><span className="mt-0.5 block text-xs text-muted-foreground">Allow this source to collect branch-scoped Driver Master records. Its today total will be derived from those entries.</span></span><Switch checked={Boolean(draft.allows_driver_entries)} onCheckedChange={(allows_driver_entries) => set({ allows_driver_entries })} /></label>
             <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm"><span><span className="block font-medium">{t('salesSourceManagement.allBranches')}</span><span className="mt-0.5 block text-xs text-muted-foreground">{t('salesSourceManagement.allBranchesHelp')}</span></span><Switch checked={draft.is_global !== false} onCheckedChange={(is_global) => set({ is_global, branch_ids: is_global ? [] : draft.branch_ids || [] })} /></label>
             {draft.is_global === false && <div className="grid gap-2 rounded-lg border bg-background p-3 sm:grid-cols-2">{branches.map((branch) => { const id = String(branch.id); const checked = asArray(draft.branch_ids).map(String).includes(id); return <label key={id} className="flex min-h-10 items-center gap-2 rounded-md px-2 text-sm hover:bg-muted"><input type="checkbox" checked={checked} onChange={() => toggleBranch(id)} className="h-4 w-4 accent-primary" /><span className="truncate">{branch.name || branch.label || branch.branch_key || branch.key}</span></label>; })}</div>}
           </section>

@@ -27,9 +27,10 @@ describe('Daily Sales manager attribution', () => {
     ]);
     expect(card).toContain('const total = rCash + rNet + credit + customSourcesTotal;');
     expect(workspace).toContain('restaurant_cash: baseCashSales');
-    expect(workspace).toContain('restaurant_network: networkTotal');
-    expect(workspace).toContain('credit: creditTotal');
-    expect(workspace).toContain('custom_sources_total: otherPaymentTotal');
+    expect(workspace).toContain('const driverSourcePaymentTotals = useMemo(() =>');
+    expect(workspace).toContain('restaurant_network: Math.max(0, networkTotal - driverSourcePaymentTotals.card');
+    expect(workspace).toContain('credit: Math.max(0, creditTotal - driverSourcePaymentTotals.credit)');
+    expect(workspace).toContain('custom_sources_total: Math.max(0, otherPaymentTotal - driverSourcePaymentTotals.other)');
     expect(salesPage).toContain("import { filterDailySalesRecords, toDailySalesCardRecord } from '@/lib/dailySalesPresentation';");
     expect(salesPage).toContain('sale={toDailySalesCardRecord(s)}');
     expect(salesPage).toContain("queryKey: ['sales', activeRestaurant?.id, selectedBranchId, selectedBranchKey, isAllBranches]");
@@ -54,23 +55,24 @@ describe('Daily Sales manager attribution', () => {
     expect(profileScope).toContain('v_assigned_branch_id := coalesce(v_membership.branch_id, v_profile.branch_id);');
   });
 
-  it('keeps Driver Sales isolated from Daily Sales Add/Edit while retaining the independent module', async () => {
-    const [workspace, driverManagement, sql] = await Promise.all([
+  it('keeps Driver Sales out of legacy Daily Sales fields and persists them only as canonical Sales Source children', async () => {
+    const [workspace, driverManagement, driverSourceMigration] = await Promise.all([
       readFile(workspacePath, 'utf8'),
       readFile(new URL('../src/pages/DriverManagement.jsx', import.meta.url), 'utf8'),
-      readFile(migrationPath, 'utf8'),
+      readFile(new URL('../src/supabase/20260827_driver_sales_sources_canonical.sql', import.meta.url), 'utf8'),
     ]);
-    expect(workspace).not.toContain('title="Driver Sales"');
     expect(workspace).not.toContain('drivers_json');
-    expect(workspace).not.toContain('driver_name');
-    expect(workspace).not.toContain('base44.entities.Driver.filter');
+    expect(workspace).toContain('DriverSalesSourceCard');
+    expect(workspace).toContain('driver_entries');
+    expect(workspace).toContain(".from('drivers')");
     expect(driverManagement).toContain('DriverManagement');
-    expect(driverManagement).toContain('getDriverSaleEntries');
-    expect(driverManagement).toContain('recordDriverSaleMutation');
-    expect(driverManagement).toContain('Record Driver Sale');
-    expect(driverManagement).toContain('Edit Driver Sale');
-    expect(driverManagement).toContain('base44.entities.DailySales.update(editingDriverSale.id, payload)');
-    expect(sql).toContain('Driver-specific information remains available only in Driver Management and');
+    expect(driverManagement).toContain(".from('driver_sales_entries')");
+    expect(driverManagement).not.toContain('recordDriverSaleMutation');
+    expect(driverManagement).not.toContain('Record Driver Sale');
+    expect(driverManagement).not.toContain('base44.entities.DailySales.update');
+    expect(driverSourceMigration).toContain('driver_sales_entries_sales_source_id_fkey');
+    expect(driverSourceMigration).toContain('driver_sales_entries_closing_id_fkey');
+    expect(driverSourceMigration).toContain("v_state = 'finalized'");
   });
 
   it('does not count a saved source snapshot again after its amount is classified into a canonical payment bucket', async () => {

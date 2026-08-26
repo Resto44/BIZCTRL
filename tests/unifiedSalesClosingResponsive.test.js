@@ -75,7 +75,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const walletTotal = customSourcePaymentTotals.wallet;');
     expect(workspace).toContain('const creditTotal = baseCreditTotal + customSourcePaymentTotals.credit;');
     expect(workspace).toContain('buildSalesSourceClosingSnapshots(customSourceSummaries');
-    expect(workspace).toContain('payment_bucket: paymentBucketForCode(snapshot.default_payment_method)');
+    expect(workspace).toContain("payment_bucket: snapshot.allows_driver_entries === true ? 'other' : paymentBucketForCode(snapshot.default_payment_method)");
     expect(workspace).toContain('salesSourceTodayTotal(customSourceSummaries)');
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
     expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
@@ -322,8 +322,11 @@ describe('Sales source daily and historical balance contract', () => {
   it('uses only the current daily amount in all today-total and persistence calculations', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
-    expect(workspace).toContain('customSourceSummaries.reduce((totals, { source, today }) =>');
+    expect(workspace).toContain('customSourceSummaries.reduce((totals, { source, today, driverEntries }) =>');
+    expect(workspace).toContain('if (source.allows_driver_entries === true) {');
+    expect(workspace).toContain('driverEntries.forEach((entry) => {');
     expect(workspace).toContain('totals[paymentBucketForCode(source.default_payment_method)] += today;');
+    expect(workspace).toContain('driverSourceTodayTotal(driverEntries)');
     expect(workspace).toContain('buildSalesSourceClosingSnapshots(customSourceSummaries');
     expect(workspace).toContain('Today values. Historical Previous values remain display/audit context.');
     expect(workspace).toContain('`amount` / `today_amount` are the only');

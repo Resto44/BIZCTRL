@@ -2,51 +2,70 @@
   "name": "DriverSalesEntry",
   "type": "object",
   "properties": {
-    "daily_sales_id": {
+    "closing_id": {
       "type": "string",
-      "description": "Reference to parent DailySales record"
+      "description": "Immutable parent DailySales closing identifier"
+    },
+    "sales_source_id": {
+      "type": "string",
+      "description": "Canonical configured Sales Source identifier"
+    },
+    "subcategory": {
+      "type": "string",
+      "description": "Sales Source sub-category, such as Drivers"
+    },
+    "driver_id": {
+      "type": "string",
+      "description": "Canonical Driver Master identifier"
+    },
+    "driver_name": {
+      "type": "string",
+      "description": "Immutable Driver Master display-name snapshot"
     },
     "date": {
       "type": "string",
       "format": "date"
     },
+    "branch_id": {
+      "type": "string",
+      "description": "Canonical branch identifier"
+    },
     "branch": {
       "type": "string",
-      "description": "Branch key"
+      "description": "Branch key snapshot"
     },
-    "driver_name": {
+    "shift": {
       "type": "string"
     },
-    "driver_employee_id": {
+    "amount": {
+      "type": "number",
+      "minimum": 0
+    },
+    "payment_method": {
       "type": "string",
-      "description": "Reference to Employee id"
-    },
-    "cash": {
-      "type": "number",
-      "default": 0,
-      "description": "Driver cash collected"
-    },
-    "network": {
-      "type": "number",
-      "default": 0,
-      "description": "Driver network/card collected"
-    },
-    "network_account_id": {
-      "type": "string",
-      "description": "Payment device used by driver"
-    },
-    "order_count": {
-      "type": "number",
-      "default": 0,
-      "description": "Number of delivery orders"
+      "description": "Cash, card/network, customer credit, or other canonical payment method"
     },
     "notes": {
       "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "finalized", "cancelled"],
+      "default": "draft"
+    },
+    "finalized_at": {
+      "type": "string",
+      "format": "date-time"
     }
   },
   "required": [
+    "closing_id",
+    "sales_source_id",
+    "driver_id",
     "date",
-    "branch"
+    "branch_id",
+    "amount",
+    "payment_method"
   ],
   "rls": {
     "create": null,
