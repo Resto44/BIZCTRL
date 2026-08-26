@@ -38,7 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import {
-  Store, Trash2, Search,
+  Store, Trash2,
   TrendingDown, TrendingUp, CheckCircle2, XCircle,
   AlertCircle, ShieldCheck,
   Scale, DollarSign, BarChart3,
@@ -56,6 +56,7 @@ import { buildSalesSourceClosingSnapshots, salesSourceTodayTotal } from '@/lib/s
 import { SalesClosingFieldDialog, SalesSourceDialog, newSalesClosingSource } from '@/components/sales/SalesClosingCustomizationDialogs';
 import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
+import { customerCreditSnapshot, creditEntryRequiresCustomer } from '@/lib/closing/CustomerCreditCalculations';
 import { Banknote as BanknoteIcon, CreditCard as CreditCardIcon, UserCheck, PlusCircle, ShoppingBag, Truck, Star, Globe, Smartphone, UtensilsCrossed, Package as PackageIcon, DollarSign as DollarSignIcon, Gift, Users as UsersIcon, Building2 as Building2Icon, Zap as ZapIcon, Activity as ActivityIcon, BarChart3 as BarChart3Icon, Shield } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,6 +75,10 @@ function getSourceIcon(iconName) {
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const firstRecord = (value) => asRecordArray(value).at(0) || null;
+const newStableRowId = (prefix) => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return `${prefix}-${crypto.randomUUID()}`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
 const parseSalesSourceEntries = (record) => {
   const rawEntries = record?.sales_sources_json;
   if (Array.isArray(rawEntries)) return asRecordArray(rawEntries);
@@ -324,136 +329,73 @@ const ValidationRow = memo(function ValidationRow({ label, passed, message }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // CUSTOMER CREDIT ENTRY
 // ─────────────────────────────────────────────────────────────────────────────
-function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, currency }) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
+function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, currency, canOverride, disabled = false }) {
+  const selectedCustomer = customers.find((customer) => String(customer.id) === String(entry.customer_id));
+  const customerName = selectedCustomer?.customer_name || selectedCustomer?.name || entry.customer_name_snapshot || entry.customer || '';
+  const previousCredit = Number(selectedCustomer?.outstanding_balance ?? entry.previous_credit ?? entry.current_debt) || 0;
+  const creditLimit = Number(selectedCustomer?.credit_limit ?? entry.credit_limit) || 0;
+  const { todayCredit, availableCredit, newCreditBalance, remainingCreditLimit: remainingCredit, exceededBy, limitExceeded } = customerCreditSnapshot({
+    previousCredit,
+    creditLimit,
+    todayCredit: entry.amount,
+  });
 
-  const filteredCustomers = useMemo(() => {
-    if (!searchQuery.trim()) return customers.slice(0, 20);
-    const q = searchQuery.toLowerCase();
-    return customers.filter(c =>
-      (c.customer_name || '').toLowerCase().includes(q) ||
-      (c.phone || '').toLowerCase().includes(q)
-    ).slice(0, 20);
-  }, [customers, searchQuery]);
-
-  const selectedCustomer = customers.find(c => c.customer_name === entry.customer);
-  const invoiceAmt = Number(entry.amount) || 0;
-  const currentDebt = Number(entry.current_debt) || 0;
-  const creditLimit = Number(entry.credit_limit) || 0;
-  const newDebt = currentDebt + invoiceAmt;
-  const availableCredit = Math.max(0, creditLimit - currentDebt);
-  const remainingCredit = Math.max(0, creditLimit - newDebt);
-  const limitExceeded = creditLimit > 0 && newDebt > creditLimit;
-  const creditUsagePct = creditLimit > 0 ? (currentDebt / creditLimit) * 100 : 0;
-  const creditScore = creditUsagePct > 80 ? 'Poor' : creditUsagePct > 50 ? 'Fair' : creditUsagePct > 20 ? 'Good' : 'Excellent';
-  const creditScoreColor = { Poor: 'text-red-600', Fair: 'text-amber-600', Good: 'text-blue-600', Excellent: 'text-emerald-600' }[creditScore];
+  const selectCustomer = (customerId) => {
+    const customer = customers.find((candidate) => String(candidate.id) === String(customerId));
+    if (!customer) return;
+    const name = customer.customer_name || customer.name || '';
+    onUpdate(entry.id, {
+      customer_id: customer.id,
+      customer: name,
+      customer_name_snapshot: name,
+      customer_phone: customer.phone || '',
+      previous_credit: Number(customer.outstanding_balance) || 0,
+      current_debt: Number(customer.outstanding_balance) || 0,
+      credit_limit: Number(customer.credit_limit) || 0,
+      available_credit: Math.max(0, (Number(customer.credit_limit) || 0) - (Number(customer.outstanding_balance) || 0)),
+      manager_override: false,
+    });
+  };
 
   return (
-    <div className={`rounded-xl border p-3 space-y-3 transition-colors ${limitExceeded ? 'border-red-300 bg-red-50/50' : 'border-border bg-muted/20'}`}>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-bold text-muted-foreground">Customer #{idx + 1}</span>
-        <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={() => onRemove(entry.id)}>
-          <Trash2 className="w-3.5 h-3.5" />
-        </Button>
+    <div className={`space-y-3 rounded-xl border p-3 transition-colors ${limitExceeded ? 'border-red-300 bg-red-50/50' : 'border-border bg-muted/20'}`} data-testid="customer-credit-entry">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-bold text-muted-foreground">Customer Credit #{idx + 1}</span>
+        {!disabled && <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => onRemove(entry.id)} aria-label={`Remove customer ${customerName || idx + 1}`}><Trash2 className="h-3.5 w-3.5" /></Button>}
       </div>
 
-      {/* Customer Search */}
-      <div className="relative">
-        <Label className="text-[10px] text-muted-foreground uppercase font-bold mb-1 block">Customer</Label>
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input
-            value={entry.customer || searchQuery}
-            placeholder="Search by name or phone..."
-            className="h-10 pl-8 text-sm"
-            onChange={e => {
-              setSearchQuery(e.target.value);
-              if (entry.customer) {
-                onUpdate(entry.id, 'customer', '');
-                onUpdate(entry.id, 'customer_phone', '');
-                onUpdate(entry.id, 'current_debt', 0);
-                onUpdate(entry.id, 'credit_limit', 0);
-              }
-              setShowDropdown(true);
-            }}
-            onFocus={() => setShowDropdown(true)}
-            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-          />
-        </div>
-        {showDropdown && filteredCustomers.length > 0 && (
-          <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-xl shadow-xl max-h-52 overflow-y-auto">
-            {filteredCustomers.map(c => (
-              <button
-                key={c.customer_name}
-                type="button"
-                className="w-full text-left px-3 py-2.5 hover:bg-muted/60 text-sm border-b border-border/50 last:border-0 transition-colors"
-                onMouseDown={() => {
-                  onUpdate(entry.id, 'customer', c.customer_name);
-                  onUpdate(entry.id, 'customer_id', c.id);
-                  onUpdate(entry.id, 'customer_phone', c.phone || '');
-                  onUpdate(entry.id, 'current_debt', c.outstanding_balance || 0);
-                  onUpdate(entry.id, 'credit_limit', c.credit_limit || 0);
-                  setShowDropdown(false);
-                  setSearchQuery('');
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-foreground">{c.customer_name}</p>
-                    {c.phone && <p className="text-[10px] text-muted-foreground">{c.phone}</p>}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-red-600">{currency}{'\u00A0'}{Number(c.outstanding_balance || 0).toLocaleString()}</p>
-                    <p className="text-[9px] text-muted-foreground uppercase">Debt</p>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
+      <div>
+        <Label className="mb-1 block text-[10px] font-bold uppercase text-muted-foreground">Customer</Label>
+        <Select value={entry.customer_id || ''} onValueChange={selectCustomer} disabled={disabled || !customers.length}>
+          <SelectTrigger className="min-h-11 text-sm" aria-label={`Select customer for credit entry ${idx + 1}`}><SelectValue placeholder={customers.length ? 'Select Customer' : 'No active customers available'} /></SelectTrigger>
+          <SelectContent>{customers.map((customer) => <SelectItem key={customer.id} value={customer.id}>{customer.customer_name || customer.name}{customer.phone ? ` · ${customer.phone}` : ''}</SelectItem>)}</SelectContent>
+        </Select>
       </div>
 
-      {/* Credit Intelligence Panel */}
-      {entry.customer && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <div className="bg-background rounded-lg p-2 border border-border">
-            <p className="text-[9px] text-muted-foreground uppercase font-bold">Current Debt</p>
-            <p className="text-sm font-bold text-red-600">{currency}{'\u00A0'}{currentDebt.toLocaleString()}</p>
+      {entry.customer_id && (
+        <>
+          <div className="rounded-lg border border-border bg-background p-3 text-sm">
+            <p className="font-bold text-foreground">{customerName}</p>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <CreditMetric label="Previous Credit" value={previousCredit} currency={currency} tone="text-red-600" />
+              <CreditMetric label="Credit Limit" value={creditLimit} currency={currency} tone="text-blue-600" />
+              <CreditMetric label="Available Credit" value={availableCredit} currency={currency} tone="text-emerald-600" />
+            </div>
           </div>
-          <div className="bg-background rounded-lg p-2 border border-border">
-            <p className="text-[9px] text-muted-foreground uppercase font-bold">Credit Limit</p>
-            <p className="text-sm font-bold text-blue-600">{currency}{'\u00A0'}{creditLimit.toLocaleString()}</p>
+          <NumInput id={`quick-closing-credit-${entry.id}`} label="Today Credit" value={entry.amount || ''} onChange={(value) => onUpdate(entry.id, 'amount', value)} prefix={currency} disabled={disabled} error={limitExceeded ? 'Credit limit exceeded.' : undefined} />
+          <div className={`grid grid-cols-1 gap-2 rounded-lg border p-3 text-sm sm:grid-cols-2 ${limitExceeded ? 'border-red-200 bg-red-50 text-red-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+            <CreditMetric label="New Credit Balance" value={newCreditBalance} currency={currency} tone={limitExceeded ? 'text-red-700' : 'text-emerald-700'} />
+            <CreditMetric label="Remaining Credit Limit" value={remainingCredit} currency={currency} tone={limitExceeded ? 'text-red-700' : 'text-emerald-700'} />
           </div>
-          <div className="bg-background rounded-lg p-2 border border-border">
-            <p className="text-[9px] text-muted-foreground uppercase font-bold">Available Credit</p>
-            <p className="text-sm font-bold text-emerald-600">{currency}{'\u00A0'}{availableCredit.toLocaleString()}</p>
-          </div>
-          <div className="bg-background rounded-lg p-2 border border-border">
-            <p className="text-[9px] text-muted-foreground uppercase font-bold">Credit Score</p>
-            <p className={`text-sm font-bold ${creditScoreColor}`}>{creditScore}</p>
-          </div>
-        </div>
-      )}
-
-      <NumInput
-        label="Invoice Amount"
-        value={entry.amount}
-        onChange={v => onUpdate(entry.id, 'amount', v)}
-        prefix={currency}
-        error={limitExceeded ? `Exceeds credit limit by ${currency}${(newDebt - creditLimit).toLocaleString()}` : undefined}
-      />
-
-      {entry.customer && invoiceAmt > 0 && (
-        <div className={`rounded-lg p-2 border text-xs font-medium ${limitExceeded ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
-          <div className="flex justify-between">
-            <span>Remaining Credit After Sale</span>
-            <span className="font-bold">{currency}{'\u00A0'}{remainingCredit.toLocaleString()}</span>
-          </div>
-        </div>
+          {limitExceeded && <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-900"><p className="font-black">Credit limit exceeded.</p><div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1"><span>Credit Limit</span><span className="text-right font-bold">{currency} {creditLimit.toLocaleString()}</span><span>Previous Credit</span><span className="text-right font-bold">{currency} {previousCredit.toLocaleString()}</span><span>Available</span><span className="text-right font-bold">{currency} {availableCredit.toLocaleString()}</span><span>Requested Today</span><span className="text-right font-bold">{currency} {todayCredit.toLocaleString()}</span><span>Exceeded By</span><span className="text-right font-bold">{currency} {exceededBy.toLocaleString()}</span></div>{canOverride && !disabled && <label className="mt-3 flex min-h-11 items-center gap-2 border-t border-red-200 pt-3 font-bold"><input type="checkbox" checked={Boolean(entry.manager_override)} onChange={(event) => onUpdate(entry.id, 'manager_override', event.target.checked)} className="h-4 w-4 accent-red-600" />Authorized manager override</label>}</div>}
+        </>
       )}
     </div>
   );
+}
+
+function CreditMetric({ label, value, currency, tone }) {
+  return <div><p className="text-[9px] font-bold uppercase text-muted-foreground">{label}</p><p className={`mt-0.5 font-black ${tone}`}>{currency}{'\u00A0'}{Number(value || 0).toLocaleString()}</p></div>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -558,6 +500,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         : '';
   const branches = asRecordArray(tenantBranches);
   const canUseAdvancedClosing = isManager || [ROLES.OWNER, ROLES.GENERAL_MANAGER].includes(role);
+  const canManageCreditOverride = isManager || [ROLES.OWNER, ROLES.GENERAL_MANAGER].includes(role);
   const [closingView, setClosingView] = useState('quick');
   const [sourceEditor, setSourceEditor] = useState(null);
   const [fieldEditor, setFieldEditor] = useState(null);
@@ -742,9 +685,21 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const parseCreditEntries = () => {
     if (initial?.credit_entries_json) {
       try {
-        const parsed = asRecordArray(JSON.parse(initial.credit_entries_json));
-        if (parsed.length) return parsed.map((e, i) => ({ ...e, id: Date.now() + i }));
-      } catch { /* ignore */ }
+        const raw = Array.isArray(initial.credit_entries_json) ? initial.credit_entries_json : JSON.parse(initial.credit_entries_json);
+        const parsed = asRecordArray(raw);
+        if (parsed.length) return parsed.map((entry) => ({
+          ...entry,
+          id: entry.client_row_id || newStableRowId('credit'),
+          customer_id: entry.customer_id || '',
+          customer: entry.customer_name_snapshot || entry.customer || '',
+          customer_name_snapshot: entry.customer_name_snapshot || entry.customer || '',
+          previous_credit: entry.previous_credit ?? entry.current_debt ?? 0,
+          current_debt: entry.previous_credit ?? entry.current_debt ?? 0,
+          credit_limit: entry.credit_limit_snapshot ?? entry.credit_limit ?? 0,
+          amount: entry.today_credit ?? entry.amount ?? '',
+          manager_override: Boolean(entry.manager_override),
+        }));
+      } catch { /* ignore malformed legacy draft entries */ }
     }
     return [];
   };
@@ -753,8 +708,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const addPos = () => setPosEntries(prev => [...prev, { id: Date.now(), device_id: '', device_name: '', amount: '', notes: '' }]);
   const removePos = (id) => setPosEntries(prev => prev.filter(e => e.id !== id));
   const updatePos = (id, field, value) => updateCalculatedInput(setPosEntries, prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
-  const removeCredit = (id) => setCreditEntries(prev => prev.filter(e => e.id !== id));
-  const updateCredit = (id, field, value) => updateCalculatedInput(setCreditEntries, prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
+  const removeCredit = (id) => setCreditEntries((previous) => previous.filter((entry) => entry.id !== id));
+  const updateCredit = (id, fieldOrPatch, value) => updateCalculatedInput(setCreditEntries, (previous) => previous.map((entry) => {
+    if (entry.id !== id) return entry;
+    return typeof fieldOrPatch === 'object' ? { ...entry, ...fieldOrPatch } : { ...entry, [fieldOrPatch]: value };
+  }));
 
   // ── Dynamic Sales Sources ───────────────────────────────────────────────────────────────
   const { customSources: customSourcesData, isLoading: sourcesLoading } = useSalesSources({ branchId: selectedBranchId });
@@ -1023,34 +981,19 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           : allCustomers.filter((customer) => customer.branch === form.branch || customer.branch_id === form.branch)),
     [allCustomers, form.branch, isManager, selectedBranchId]
   );
-  const defaultCustomer = useMemo(() =>
-    customers.find((customer) => /walk[ -]?in|default/i.test(customer.customer_name || customer.name || '')) || firstRecord(customers),
-    [customers]
-  );
-
-  useEffect(() => {
-    if (initial?.id || !isManager || form.customer_id || !defaultCustomer?.id) return;
-    setForm((previous) => ({ ...previous, customer_id: defaultCustomer.id }));
-    setCreditEntries((previous) => previous.length > 0 ? previous : [{
-      id: Date.now(),
-      customer: defaultCustomer.customer_name,
-      customer_id: defaultCustomer.id,
-      customer_phone: defaultCustomer.phone || '',
-      current_debt: defaultCustomer.outstanding_balance || 0,
-      credit_limit: defaultCustomer.credit_limit || 0,
-      amount: '',
-      notes: '',
-    }]);
-  }, [defaultCustomer, form.customer_id, initial?.id, isManager]);
-
   const addCredit = () => setCreditEntries((previous) => [...previous, {
-    id: Date.now(),
-    customer: isManager ? defaultCustomer?.customer_name || '' : '',
-    customer_id: isManager ? defaultCustomer?.id || '' : '',
-    customer_phone: isManager ? defaultCustomer?.phone || '' : '',
-    current_debt: isManager ? defaultCustomer?.outstanding_balance || 0 : 0,
-    credit_limit: isManager ? defaultCustomer?.credit_limit || 0 : 0,
+    id: newStableRowId('credit'),
+    client_row_id: newStableRowId('credit-client'),
+    customer_id: '',
+    customer: '',
+    customer_name_snapshot: '',
+    customer_phone: '',
+    previous_credit: 0,
+    current_debt: 0,
+    credit_limit: 0,
+    available_credit: 0,
     amount: '',
+    manager_override: false,
     notes: '',
   }]);
 
@@ -1285,7 +1228,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const manualCreditTotal = asRecordArray(creditEntries).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
   const baseCashSales = useAutomaticSales ? automaticClosingSnapshot.cash : manualCashSales;
   const baseNetworkTotal = useAutomaticSales ? automaticClosingSnapshot.network : manualNetworkTotal;
-  const baseCreditTotal = useAutomaticSales ? automaticClosingSnapshot.credit : manualCreditTotal;
+  // Customer Credit rows are entered directly against Customer Master and must
+  // always contribute their Today amount to the Closing, even when unrelated
+  // automatic ERP payments are present for the same business session.
+  const baseCreditTotal = (useAutomaticSales ? automaticClosingSnapshot.credit : 0) + manualCreditTotal;
   const baseOtherPaymentTotal = useAutomaticSales ? automaticClosingSnapshot.other : 0;
   const cashSales = baseCashSales + customSourcePaymentTotals.cash;
   const networkTotal = baseNetworkTotal + customSourcePaymentTotals.network;
@@ -1356,8 +1302,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     {
       key: 'credit',
       label: 'Credit Totals Valid',
-      passed: creditEntries.every(e => !e.customer || (Number(e.amount) >= 0 && e.customer)),
-      message: `${currency}\u00A0${creditTotal.toLocaleString()}`,
+      passed: creditEntries.every((entry) => Number(entry.amount) <= 0 || Boolean(entry.customer_id)),
+      message: `${currency}\u00A0${manualCreditTotal.toLocaleString()} today`,
     },
     {
       key: 'cash',
@@ -1368,13 +1314,13 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     {
       key: 'creditLimit',
       label: 'Credit Limits Not Exceeded',
-      passed: !creditEntries.some(e => {
-        const limit = Number(e.credit_limit) || 0;
-        const debt = Number(e.current_debt) || 0;
-        const amt = Number(e.amount) || 0;
-        return limit > 0 && (debt + amt) > limit;
+      passed: !creditEntries.some((entry) => {
+        const limit = Number(entry.credit_limit) || 0;
+        const previous = Number(entry.previous_credit ?? entry.current_debt) || 0;
+        const amount = Number(entry.amount) || 0;
+        return amount > Math.max(0, limit - previous) && !entry.manager_override;
       }),
-      message: 'All within limits',
+      message: 'All within limits or explicitly overridden',
     },
     {
       key: 'cashBalance',
@@ -1406,12 +1352,12 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     }
     const savingDraft = requestedClosingState === 'draft';
 
-    const invalidCredit = creditEntries.find((entry) => Number(entry.amount) > 0 && !entry.customer);
+    const invalidCredit = creditEntries.find(creditEntryRequiresCustomer);
     const limitExceededEntry = creditEntries.find((entry) => {
       const limit = Number(entry.credit_limit) || 0;
-      const debt = Number(entry.current_debt) || 0;
+      const previous = Number(entry.previous_credit ?? entry.current_debt) || 0;
       const amount = Number(entry.amount) || 0;
-      return limit > 0 && (debt + amount) > limit;
+      return amount > Math.max(0, limit - previous) && !entry.manager_override;
     });
     const nextErrors = {};
     if (!form.date) nextErrors.date = 'Date is required.';
@@ -1421,8 +1367,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (!savingDraft && requiresCashReconciliation && actualCount === null) nextErrors.actualCash = 'Actual Cash is required.';
     if (!savingDraft && requiresCashReconciliation && remainingDifference !== 0 && remainingDifference !== null && !managerApproved) nextErrors.reconciliation = 'Cash difference must be reviewed before closing.';
     if (!savingDraft && requiresCashReconciliation && cashDifference !== null && cashDifference !== 0 && !cashNotes.trim()) nextErrors.cashNotes = 'A reconciliation note is required for a cash difference.';
-    if (invalidCredit) nextErrors.credit = 'Credit customer is required.';
-    if (limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer}.`;
+    if (invalidCredit) nextErrors.credit = 'Select an active Customer Master customer for every Today Credit amount.';
+    if (!savingDraft && limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer_name_snapshot || limitExceededEntry.customer}. Correct the amount or perform an authorized manager override.`;
     customClosingFields.forEach((field) => {
       if (!savingDraft && field.is_required && !hasCustomClosingFieldValue(field)) nextErrors[`custom_${field.id}`] = `${field.label_en} is required.`;
     });
@@ -1445,7 +1391,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     );
     const branchId = selectedBranch?.id || selectedBranchId || null;
     const cashierId = form.cashier_id || form.cashier_employee_id || defaultCashier?.id || user?.id || null;
-    const customerId = form.customer_id || creditEntries.find((entry) => entry.customer_id)?.customer_id || defaultCustomer?.id || null;
+    const customerId = form.customer_id || creditEntries.find((entry) => entry.customer_id)?.customer_id || null;
     const posDeviceId = form.pos_device_id || posEntries.find((entry) => entry.device_id)?.device_id || null;
     const createdBy = user?.email || ownerFilter?.created_by || '';
     const tenantId = activeRestaurant?.id || user?.organization_id || user?.restaurant_id || '';
@@ -1514,7 +1460,25 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         pos_device_id: posDeviceId,
         credit: creditTotal,
         pos_entries_json: JSON.stringify(posEntries.map(({ id, ...rest }) => rest)),
-        credit_entries_json: JSON.stringify(creditEntries.map(({ id, ...rest }) => rest)),
+        credit_entries_json: creditEntries.map(({ id, ...rest }) => {
+          const customer = customers.find((candidate) => String(candidate.id) === String(rest.customer_id));
+          const previousCredit = Number(customer?.outstanding_balance ?? rest.previous_credit ?? rest.current_debt) || 0;
+          const creditLimit = Number(customer?.credit_limit ?? rest.credit_limit) || 0;
+          const todayCredit = Math.max(0, Number(rest.amount) || 0);
+          return {
+            ...rest,
+            client_row_id: id,
+            customer: customer?.customer_name || customer?.name || rest.customer_name_snapshot || rest.customer || '',
+            customer_name_snapshot: customer?.customer_name || customer?.name || rest.customer_name_snapshot || rest.customer || '',
+            previous_credit: previousCredit,
+            credit_limit: creditLimit,
+            available_credit: Math.max(0, creditLimit - previousCredit),
+            today_credit: todayCredit,
+            new_credit_balance: previousCredit + todayCredit,
+            remaining_credit_limit: creditLimit - previousCredit - todayCredit,
+            manager_override: Boolean(rest.manager_override),
+          };
+        }),
         // Dynamic Sales Sources — `amount` / `today_amount` are the only
         // revenue inputs. Previous and Total are immutable historical context
         // retained for History and never added to current-period accounting.
@@ -1689,6 +1653,18 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 )}
               </div>
             )}
+          </section>
+
+          <section className="overflow-hidden rounded-2xl border border-blue-200 bg-background shadow-sm" data-testid="customer-credit-card">
+            <div className="flex flex-col gap-2 border-b border-blue-100 bg-blue-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+              <div className="min-w-0"><h2 className="text-xs font-black uppercase tracking-wide text-blue-950">Customer Credit</h2><p className="mt-0.5 text-[11px] text-blue-800">Select active customers from Customer Master. Previous balances are reference-only and never count as today&apos;s sales.</p></div>
+              {!isProtectedClosing && <Button type="button" size="sm" className="min-h-10 shrink-0" onClick={addCredit} disabled={custLoading}><PlusCircle className="mr-1.5 h-4 w-4" />Add Customer</Button>}
+            </div>
+            <div className="space-y-3 p-3 sm:p-4">
+              {custLoading ? <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-muted-foreground">Loading Customer Master…</div> : creditEntries.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-muted-foreground">No customer credit has been added to this Closing.</div> : <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{creditEntries.map((entry, index) => <CustomerCreditEntry key={entry.id} entry={entry} idx={index} onRemove={removeCredit} onUpdate={updateCredit} customers={customers} currency={currency} canOverride={canManageCreditOverride} disabled={isProtectedClosing} />)}</div>}
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-3"><span className="text-xs font-black uppercase tracking-wide text-blue-950">Customer Credit Today Total</span><Money currency={currency} value={manualCreditTotal} className="text-lg font-black text-blue-700" /></div>
+              {inlineErrors.credit && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}
+            </div>
           </section>
 
           {showCustomizationCard && (

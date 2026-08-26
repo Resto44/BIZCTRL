@@ -504,21 +504,9 @@ export default function Sales() {
           });
         }
 
-        // UPDATE CUSTOMER OUTSTANDING BALANCE (BUG 2)
-        // We look up the customer by name or ID and increment their balance
-        try {
-          const customers = asRecordArray(await base44.entities.Customer.filter(
-            customerId ? { id: customerId } : { customer_name: customerName }
-          ));
-          const c = firstRecord(customers);
-          if (c) {
-            await base44.entities.Customer.update(c.id, {
-              outstanding_balance: (Number(c.outstanding_balance) || 0) + amt
-            });
-          }
-        } catch (custErr) {
-          console.warn('[autoSaveCreditDebts] customer balance update failed:', custErr.message);
-        }
+        // Customer Master balances are updated atomically by the canonical Sales
+        // Closing transaction. Do not mutate them again from this asynchronous
+        // side effect, or a finalized credit sale would be counted twice.
 
       } catch (e) { 
         console.warn('[autoSaveCreditDebts] failed:', e.message); 

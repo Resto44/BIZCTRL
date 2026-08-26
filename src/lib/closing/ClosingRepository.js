@@ -29,6 +29,7 @@ export function normalizeClosingPayload(payload, requestId) {
     // serialized values, so normalize them at the one persistence boundary.
     sales_sources_json: normalizeJsonArray(payload.sales_sources_json),
     payment_reconciliation_json: normalizeJsonArray(payload.payment_reconciliation_json),
+    credit_entries_json: normalizeJsonArray(payload.credit_entries_json),
   };
 }
 
@@ -40,7 +41,11 @@ const BUSINESS_MESSAGES = {
   SALES_CLOSING_ACTUAL_CASH_REQUIRED: 'Actual cash is required before finalizing this Closing.',
   SALES_CLOSING_VARIANCE_NOTE_REQUIRED: 'Add a cash variance note before finalizing this Closing.',
   SALES_CLOSING_MANAGER_APPROVAL_REQUIRED: 'Manager approval is required for this cash variance.',
-  SALES_CLOSING_PAYLOAD_INVALID: 'The Closing details could not be processed. Review the entered sales sources and try again.',
+  SALES_CLOSING_PAYLOAD_INVALID: 'The Closing details could not be processed. Review the entered sales sources and customer credit entries, then try again.',
+  SALES_CLOSING_CREDIT_CUSTOMER_REQUIRED: 'Select an active Customer Master customer for every Today Credit amount.',
+  SALES_CLOSING_CREDIT_CUSTOMER_INVALID: 'One or more selected credit customers are no longer active or do not belong to this branch.',
+  SALES_CLOSING_CREDIT_LIMIT_EXCEEDED: 'Credit limit exceeded. Correct the Today Credit amount or perform an authorized manager override.',
+  SALES_CLOSING_CREDIT_OVERRIDE_DENIED: 'Only an authorized manager or owner can approve a credit-limit override.',
   SALES_CLOSING_HISTORY_IMMUTABLE: 'This finalized Closing requires an authorized correction.',
   SALES_CLOSING_CORRECTION_REQUIRED: 'This finalized Closing requires an authorized correction.',
   SALES_CLOSING_PROTECTED_RECORD: 'This finalized Closing requires an authorized correction.',
