@@ -80,5 +80,7 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
     expect(workspace).toContain('ownerSettlementPaymentTarget');
     expect(workspace).toContain('Math.max(ownerSettlementRequired, reconciliation.shortage)');
     expect(workspace).toContain('ownerSettlementPaymentApplied >= ownerSettlementPaymentTarget');
+    expect(workspace).toContain('ownerSettlementRemaining');
+    expect(workspace).toContain('reconciliation.shortage > 0 && ownerSettlementRemaining === 0');
   });
 });
