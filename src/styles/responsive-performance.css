@@ -1,0 +1,37 @@
+/* Global responsive/performance guardrails shared by ERP pages. */
+html { min-width: 320px; overflow-x: hidden; }
+body { min-width: 320px; overflow-x: hidden; }
+img, svg, video, canvas { max-width: 100%; }
+button, a, input, select, textarea { touch-action: manipulation; }
+
+@media (max-width: 1023px) {
+  [data-erp-page-viewport="true"] { min-width: 0; max-width: 100%; }
+  [data-erp-page-viewport="true"] table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  [data-erp-page-viewport="true"] th,
+  [data-erp-page-viewport="true"] td { white-space: nowrap; }
+}
+
+@media (max-width: 639px) {
+  .page-title { font-size: 1.5rem !important; line-height: 1.25; }
+  .section-title { font-size: 1.125rem !important; }
+  .kpi-value { font-size: 1.75rem !important; }
+  .kpi-card-hover:hover { transform: none; }
+}
+
+@media (max-width: 480px) {
+  .erp-section-title { font-size: 0.625rem; padding-inline: 0.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
