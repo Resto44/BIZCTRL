@@ -6,45 +6,59 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── RestoCTRL Enterprise Design System ─────────────────────────────────── */
 @layer base {
   :root {
-    --primary: 217 91% 50%;
+    /* ── Brand ── */
+    --primary:            217 91% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
+    --secondary:          210 40% 96%;
     --secondary-foreground: 222 47% 11%;
-    --accent: 172 66% 50%;
-    --accent-foreground: 0 0% 100%;
-    --success: 142 71% 45%;
+    --accent:             172 66% 50%;
+    --accent-foreground:  0 0% 100%;
+
+    /* ── Semantic ── */
+    --success:            142 71% 45%;
     --success-foreground: 0 0% 100%;
-    --success-light: 142 71% 95%;
-    --warning: 38 92% 50%;
+    --success-light:      142 71% 95%;
+    --warning:            38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    --warning-light: 38 92% 95%;
-    --info: 199 89% 48%;
-    --info-foreground: 0 0% 100%;
-    --info-light: 199 89% 95%;
-    --destructive: 0 84% 60%;
+    --warning-light:      38 92% 95%;
+    --info:               199 89% 48%;
+    --info-foreground:    0 0% 100%;
+    --info-light:         199 89% 95%;
+
+    /* ── Destructive / Danger ── */
+    --destructive:        0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --danger: 0 84% 60%;
-    --danger-foreground: 0 0% 98%;
-    --danger-light: 0 84% 96%;
-    --background: 220 20% 97%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
+    --danger:             0 84% 60%;
+    --danger-foreground:  0 0% 98%;
+    --danger-light:       0 84% 96%;
+
+    /* ── Surface ── */
+    --background:         220 20% 97%;
+    --foreground:         222 47% 11%;
+    --card:               0 0% 100%;
+    --card-foreground:    222 47% 11%;
+    --popover:            0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --border: 214 32% 91%;
-    --border-strong: 214 32% 82%;
-    --input: 214 32% 91%;
-    --ring: 217 91% 50%;
-    --radius: 0.75rem;
+    --muted:              210 40% 96%;
+    --muted-foreground:   215 16% 47%;
+
+    /* ── Border & Input ── */
+    --border:             214 32% 91%;
+    --border-strong:      214 32% 82%;
+    --input:              214 32% 91%;
+    --ring:               217 91% 50%;
+
+    /* ── Radius ── */
+    --radius:    0.75rem;
     --radius-sm: 0.375rem;
     --radius-md: 0.5rem;
     --radius-lg: 0.75rem;
     --radius-xl: 1rem;
+
+    /* ── Charts ── */
     --chart-1: 217 91% 50%;
     --chart-2: 172 66% 50%;
     --chart-3: 43 96% 56%;
@@ -52,62 +66,79 @@
     --chart-5: 262 83% 58%;
     --chart-6: 142 71% 45%;
     --chart-7: 199 89% 48%;
-    --sidebar-background: 220 20% 97%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 217 91% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 91% 95%;
-    --sidebar-accent-foreground: 217 91% 30%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 217 91% 50%;
-    --bottom-nav-height: 64px;
+
+    /* ── Sidebar ── */
+    --sidebar-background:          220 20% 97%;
+    --sidebar-foreground:          222 47% 11%;
+    --sidebar-primary:             217 91% 50%;
+    --sidebar-primary-foreground:  0 0% 100%;
+    --sidebar-accent:              217 91% 95%;
+    --sidebar-accent-foreground:   217 91% 30%;
+    --sidebar-border:              214 32% 91%;
+    --sidebar-ring:                217 91% 50%;
+
+    /* ── Layout ── */
+    --bottom-nav-height:     64px;
     --quick-shortcuts-height: 88px;
-    --erp-header-height: 60px;
-    --erp-sidebar-width: 260px;
+    --erp-header-height:     60px;
+    --erp-sidebar-width:     260px;
     --erp-sidebar-collapsed: 64px;
-    --kpi-sales: 217 91% 50%;
-    --kpi-cash: 142 71% 45%;
+
+    /* ── KPI accent colors ── */
+    --kpi-sales:     217 91% 50%;
+    --kpi-cash:      142 71% 45%;
     --kpi-purchases: 38 92% 50%;
-    --kpi-expenses: 0 84% 60%;
+    --kpi-expenses:  0 84% 60%;
     --kpi-inventory: 262 83% 58%;
-    --kpi-treasury: 172 66% 45%;
-    --kpi-credit: 199 89% 48%;
-    --kpi-staff: 38 92% 50%;
+    --kpi-treasury:  172 66% 45%;
+    --kpi-credit:    199 89% 48%;
+    --kpi-staff:     38 92% 50%;
   }
 
   .dark {
-    --primary: 217 91% 60%;
+    /* ── Brand ── */
+    --primary:            217 91% 60%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 217 33% 17%;
+    --secondary:          217 33% 17%;
     --secondary-foreground: 210 40% 98%;
-    --accent: 172 66% 45%;
-    --accent-foreground: 0 0% 100%;
-    --success: 142 71% 45%;
+    --accent:             172 66% 45%;
+    --accent-foreground:  0 0% 100%;
+
+    /* ── Semantic ── */
+    --success:            142 71% 45%;
     --success-foreground: 0 0% 100%;
-    --success-light: 142 71% 12%;
-    --warning: 38 92% 50%;
+    --success-light:      142 71% 12%;
+    --warning:            38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    --warning-light: 38 92% 12%;
-    --info: 199 89% 48%;
-    --info-foreground: 0 0% 100%;
-    --info-light: 199 89% 12%;
-    --destructive: 0 63% 31%;
+    --warning-light:      38 92% 12%;
+    --info:               199 89% 48%;
+    --info-foreground:    0 0% 100%;
+    --info-light:         199 89% 12%;
+
+    /* ── Destructive / Danger ── */
+    --destructive:        0 63% 31%;
     --destructive-foreground: 0 0% 98%;
-    --danger: 0 63% 55%;
-    --danger-foreground: 0 0% 98%;
-    --danger-light: 0 63% 12%;
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 9%;
+    --danger:             0 63% 55%;
+    --danger-foreground:  0 0% 98%;
+    --danger-light:       0 63% 12%;
+
+    /* ── Surface ── */
+    --background:         222 47% 6%;
+    --foreground:         210 40% 98%;
+    --card:               222 47% 9%;
+    --card-foreground:    210 40% 98%;
+    --popover:            222 47% 9%;
     --popover-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 55%;
-    --border: 217 33% 17%;
-    --border-strong: 217 33% 25%;
-    --input: 217 33% 17%;
-    --ring: 217 91% 60%;
+    --muted:              217 33% 17%;
+    --muted-foreground:   215 20% 55%;
+
+    /* ── Border & Input ── */
+    --border:             217 33% 17%;
+    --border-strong:      217 33% 25%;
+    --input:              217 33% 17%;
+    --ring:               217 91% 60%;
+
+    /* ── Charts ── */
     --chart-1: 217 91% 60%;
     --chart-2: 172 66% 45%;
     --chart-3: 43 96% 56%;
@@ -115,41 +146,58 @@
     --chart-5: 262 83% 58%;
     --chart-6: 142 71% 45%;
     --chart-7: 199 89% 48%;
-    --sidebar-background: 222 47% 6%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 217 91% 60%;
-  }
 
-  * { @apply border-border outline-ring/50; }
-  html { min-width: 320px; overflow-x: hidden; }
+    /* ── Sidebar ── */
+    --sidebar-background:          222 47% 6%;
+    --sidebar-foreground:          210 40% 98%;
+    --sidebar-primary:             217 91% 60%;
+    --sidebar-primary-foreground:  0 0% 100%;
+    --sidebar-accent:              217 33% 17%;
+    --sidebar-accent-foreground:   210 40% 98%;
+    --sidebar-border:              217 33% 17%;
+    --sidebar-ring:                217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-    min-width: 320px;
-    overflow-x: hidden;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
   }
-
-  img, svg, video, canvas { max-width: 100%; }
-  button, a, input, select, textarea { touch-action: manipulation; }
 }
 
+/* ─── Dark surface consistency ──────────────────────────────────────────────
+   Older ERP screens include direct Tailwind light surface utilities.  In dark
+   mode, convert only elements that do not already declare a `dark:bg-*`
+   companion, preserving intentionally themed Owner Dashboard widgets while
+   preventing white/light cards, alerts, and panels from leaking through. */
 .dark :is([class*="bg-white"], [class*="bg-slate-50"], [class*="bg-slate-100"], [class*="bg-slate-200"], [class*="bg-gray-50"], [class*="bg-gray-100"], [class*="bg-gray-200"]):not([class*="dark:bg-"]) {
   background-color: hsl(222 47% 9%) !important;
 }
-.dark :is([class*="bg-blue-50"], [class*="bg-blue-100"], [class*="bg-blue-200"]):not([class*="dark:bg-"]) { background-color: hsl(217 42% 13%) !important; }
-.dark :is([class*="bg-emerald-50"], [class*="bg-emerald-100"], [class*="bg-emerald-200"], [class*="bg-green-50"], [class*="bg-green-100"], [class*="bg-green-200"]):not([class*="dark:bg-"]) { background-color: hsl(158 38% 12%) !important; }
-.dark :is([class*="bg-amber-50"], [class*="bg-amber-100"], [class*="bg-amber-200"], [class*="bg-yellow-50"], [class*="bg-yellow-100"], [class*="bg-yellow-200"]):not([class*="dark:bg-"]) { background-color: hsl(38 42% 12%) !important; }
-.dark :is([class*="bg-red-50"], [class*="bg-red-100"], [class*="bg-red-200"]):not([class*="dark:bg-"]) { background-color: hsl(0 38% 13%) !important; }
-.dark :is([class*="bg-purple-50"], [class*="bg-purple-100"], [class*="bg-purple-200"], [class*="bg-violet-50"], [class*="bg-violet-100"], [class*="bg-violet-200"], [class*="bg-indigo-50"], [class*="bg-indigo-100"], [class*="bg-indigo-200"]):not([class*="dark:bg-"]) { background-color: hsl(262 38% 13%) !important; }
-.dark :is([class*="bg-cyan-50"], [class*="bg-cyan-100"], [class*="bg-cyan-200"]):not([class*="dark:bg-"]) { background-color: hsl(199 38% 12%) !important; }
-.dark :is([class*="border-slate-100"], [class*="border-gray-100"], [class*="border-slate-200"], [class*="border-gray-200"]):not([class*="dark:border-"]) { border-color: hsl(var(--border)) !important; }
+.dark :is([class*="bg-blue-50"], [class*="bg-blue-100"], [class*="bg-blue-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(217 42% 13%) !important;
+}
+.dark :is([class*="bg-emerald-50"], [class*="bg-emerald-100"], [class*="bg-emerald-200"], [class*="bg-green-50"], [class*="bg-green-100"], [class*="bg-green-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(158 38% 12%) !important;
+}
+.dark :is([class*="bg-amber-50"], [class*="bg-amber-100"], [class*="bg-amber-200"], [class*="bg-yellow-50"], [class*="bg-yellow-100"], [class*="bg-yellow-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(38 42% 12%) !important;
+}
+.dark :is([class*="bg-red-50"], [class*="bg-red-100"], [class*="bg-red-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(0 38% 13%) !important;
+}
+.dark :is([class*="bg-purple-50"], [class*="bg-purple-100"], [class*="bg-purple-200"], [class*="bg-violet-50"], [class*="bg-violet-100"], [class*="bg-violet-200"], [class*="bg-indigo-50"], [class*="bg-indigo-100"], [class*="bg-indigo-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(262 38% 13%) !important;
+}
+.dark :is([class*="bg-cyan-50"], [class*="bg-cyan-100"], [class*="bg-cyan-200"]):not([class*="dark:bg-"]) {
+  background-color: hsl(199 38% 12%) !important;
+}
+.dark :is([class*="border-slate-100"], [class*="border-gray-100"], [class*="border-slate-200"], [class*="border-gray-200"]):not([class*="dark:border-"]) {
+  border-color: hsl(var(--border)) !important;
+}
 .dark [class*="border-blue-100"]:not([class*="dark:border-"]) { border-color: hsl(217 42% 23%) !important; }
 .dark :is([class*="border-emerald-100"], [class*="border-green-100"]):not([class*="dark:border-"]) { border-color: hsl(158 38% 22%) !important; }
 .dark :is([class*="border-amber-100"], [class*="border-yellow-100"]):not([class*="dark:border-"]) { border-color: hsl(38 42% 24%) !important; }
@@ -157,6 +205,7 @@
 .dark :is([class*="border-purple-100"], [class*="border-violet-100"], [class*="border-indigo-100"]):not([class*="dark:border-"]) { border-color: hsl(262 38% 24%) !important; }
 .dark [class*="border-cyan-100"]:not([class*="dark:border-"]) { border-color: hsl(199 38% 23%) !important; }
 
+/* ─── RTL support ─────────────────────────────────────────────────────────── */
 [dir="rtl"] {
   text-align: right;
   font-family: 'Vazirmatn', 'Noto Sans Arabic', sans-serif;
@@ -171,13 +220,16 @@
 [dir="rtl"] button, [dir="rtl"] .btn { font-size: 1.0625rem; font-weight: 700; }
 [dir="rtl"] .card { padding: 1.25rem; }
 [dir="rtl"] tr { height: 2.75rem; }
-[dir="rtl"] .text-xs { font-size: 0.875rem !important; }
-[dir="rtl"] .text-sm { font-size: 1rem !important; }
+[dir="rtl"] .text-xs  { font-size: 0.875rem !important; }
+[dir="rtl"] .text-sm  { font-size: 1rem !important; }
 [dir="rtl"] .text-base { font-size: 1.0625rem !important; }
-[dir="rtl"] .text-lg { font-size: 1.25rem !important; }
-[dir="rtl"] .text-xl { font-size: 1.5rem !important; }
+[dir="rtl"] .text-lg  { font-size: 1.25rem !important; }
+[dir="rtl"] .text-xl  { font-size: 1.5rem !important; }
 [dir="rtl"] .text-2xl { font-size: 1.75rem !important; }
 [dir="rtl"] .text-3xl { font-size: 2rem !important; }
+
+/* Directional ERP behavior. These rules use the document direction rather than
+   translating or mutating any database value, number, identifier, or currency. */
 html[dir="rtl"] .erp-layout { direction: rtl; }
 html[dir="rtl"] .erp-layout > aside { border-right-width: 0; border-left-width: 1px; }
 html[dir="rtl"] .erp-section-title { letter-spacing: normal; text-transform: none; }
@@ -190,6 +242,7 @@ html[dir="rtl"] .border-l { border-left-width: 0; border-right-width: 1px; }
 html[dir="rtl"] table { direction: rtl; }
 html[dir="rtl"] table :is(th, td) { text-align: start; }
 
+/* ─── ERP Section title ───────────────────────────────────────────────────── */
 .erp-section-title {
   font-size: 0.6875rem;
   font-weight: 600;
@@ -198,60 +251,125 @@ html[dir="rtl"] table :is(th, td) { text-align: start; }
   color: hsl(var(--muted-foreground));
   padding: 0.375rem 0.75rem;
 }
-.kpi-card-hover { transition: box-shadow 150ms ease, transform 150ms ease; }
-.kpi-card-hover:hover { box-shadow: 0 4px 12px -2px rgb(0 0 0 / 0.12); transform: translateY(-1px); }
+
+/* ─── KPI card hover ──────────────────────────────────────────────────────── */
+.kpi-card-hover {
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+.kpi-card-hover:hover {
+  box-shadow: 0 4px 12px -2px rgb(0 0 0 / 0.12);
+  transform: translateY(-1px);
+}
+
+/* ─── Status dots ─────────────────────────────────────────────────────────── */
 .status-dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 9999px; }
-.status-dot-active { background: hsl(var(--success)); }
-.status-dot-pending { background: hsl(var(--warning)); }
+.status-dot-active   { background: hsl(var(--success)); }
+.status-dot-pending  { background: hsl(var(--warning)); }
 .status-dot-inactive { background: hsl(var(--muted-foreground)); }
-.status-dot-error { background: hsl(var(--danger)); }
-.nav-item-active { background: hsl(var(--sidebar-accent)); color: hsl(var(--sidebar-primary)); font-weight: 600; }
-.breadcrumb-sep::before { content: '/'; margin: 0 0.375rem; color: hsl(var(--muted-foreground)); opacity: 0.5; }
+.status-dot-error    { background: hsl(var(--danger)); }
 
-@keyframes slide-in-left { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes slide-in-right { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes fade-in-up { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-.animate-slide-in-left { animation: slide-in-left 200ms ease forwards; }
+/* ─── Sidebar nav item active state ──────────────────────────────────────── */
+.nav-item-active {
+  background: hsl(var(--sidebar-accent));
+  color: hsl(var(--sidebar-primary));
+  font-weight: 600;
+}
+
+/* ─── Breadcrumb separator ───────────────────────────────────────────────── */
+.breadcrumb-sep::before {
+  content: '/';
+  margin: 0 0.375rem;
+  color: hsl(var(--muted-foreground));
+  opacity: 0.5;
+}
+
+/* ─── Animations ──────────────────────────────────────────────────────────── */
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes fade-in-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+.animate-slide-in-left  { animation: slide-in-left  200ms ease forwards; }
 .animate-slide-in-right { animation: slide-in-right 200ms ease forwards; }
-.animate-fade-in-up { animation: fade-in-up 200ms ease forwards; }
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
-}
+.animate-fade-in-up     { animation: fade-in-up     200ms ease forwards; }
 
-@keyframes accordion-down { from { height: 0; } to { height: var(--radix-accordion-content-height); } }
-@keyframes accordion-up { from { height: var(--radix-accordion-content-height); } to { height: 0; } }
+/* ─── Accordion animations (Radix) ───────────────────────────────────────── */
+@keyframes accordion-down {
+  from { height: 0; }
+  to   { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to   { height: 0; }
+}
 .animate-accordion-down { animation: accordion-down 0.2s ease-out; }
-.animate-accordion-up { animation: accordion-up 0.2s ease-out; }
+.animate-accordion-up   { animation: accordion-up   0.2s ease-out; }
 
-.treasury-tab-scroll { width: 100%; overflow-x: auto; overflow-y: hidden; overscroll-behavior-inline: contain; scrollbar-width: thin; padding-bottom: 0.25rem; -webkit-overflow-scrolling: touch; }
-.treasury-tab-list { display: inline-flex; width: max-content; min-width: 100%; height: auto; min-height: 2.75rem; align-items: stretch; gap: 0.25rem; padding: 0.25rem; }
-.treasury-tab-trigger { display: inline-flex; min-height: 2.25rem; flex: 0 0 auto; align-items: center; justify-content: center; gap: 0.375rem; padding-inline: 0.75rem; white-space: nowrap; font-size: 0.75rem; line-height: 1rem; }
-html[dir='rtl'] .treasury-tab-scroll { direction: rtl; }
-html[dir='rtl'] .treasury-tab-trigger > svg { margin-inline: 0; }
-
-@media (max-width: 1023px) {
-  :root { --bottom-nav-height: 68px; }
-  .erp-page-content, [data-erp-page-viewport="true"] > * { min-width: 0; max-width: 100%; }
-  table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  th, td { white-space: nowrap; }
+/* ─── Treasury: responsive, RTL-safe section navigation ─────────────────── */
+.treasury-tab-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  padding-bottom: 0.25rem;
 }
 
-@media (max-width: 639px) {
-  [dir="rtl"] { font-size: 1rem; }
-  .page-title { font-size: 1.5rem !important; line-height: 1.25; }
-  .section-title { font-size: 1.125rem !important; }
-  .kpi-value { font-size: 1.75rem !important; }
-  .kpi-card-hover:hover { transform: none; }
-  .treasury-tab-trigger { min-height: 2.5rem; padding-inline: 0.625rem; }
+.treasury-tab-list {
+  display: inline-flex;
+  width: max-content;
+  min-width: 100%;
+  height: auto;
+  min-height: 2.75rem;
+  align-items: stretch;
+  gap: 0.25rem;
+  padding: 0.25rem;
 }
 
-@media (max-width: 480px) {
-  .treasury-tab-scroll { margin-inline: -0.25rem; padding-inline: 0.25rem; }
-  .erp-section-title { font-size: 0.625rem; padding-inline: 0.5rem; }
-  .card { border-radius: 0.625rem; }
+.treasury-tab-trigger {
+  display: inline-flex;
+  min-height: 2.25rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding-inline: 0.75rem;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+html[dir='rtl'] .treasury-tab-scroll {
+  direction: rtl;
+}
+
+html[dir='rtl'] .treasury-tab-trigger > svg {
+  margin-inline: 0;
 }
 
 @media (min-width: 768px) {
-  .treasury-tab-list { min-width: 0; }
-  .treasury-tab-trigger { padding-inline: 0.875rem; }
+  .treasury-tab-list {
+    min-width: 0;
+  }
+  .treasury-tab-trigger {
+    padding-inline: 0.875rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .treasury-tab-scroll {
+    margin-inline: -0.25rem;
+    padding-inline: 0.25rem;
+  }
+  .treasury-tab-trigger {
+    min-height: 2.5rem;
+    padding-inline: 0.625rem;
+  }
 }
