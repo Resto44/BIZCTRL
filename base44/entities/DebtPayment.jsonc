@@ -6,6 +6,10 @@
       "type": "string",
       "description": "Canonical Customer Master reference for customer payments"
     },
+    "request_id": {
+      "type": "string",
+      "description": "Idempotency reference for an atomic customer repayment"
+    },
     "debt_id": {
       "type": "string",
       "description": "Reference to DebtRecord id"

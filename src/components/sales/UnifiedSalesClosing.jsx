@@ -398,7 +398,7 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
         <Label className="mb-1 block text-[10px] font-bold uppercase text-muted-foreground">Customer</Label>
         <Select value={entry.customer_id || ''} onValueChange={selectCustomer} disabled={disabled || !customers.length}>
           <SelectTrigger className="min-h-11 text-sm" aria-label={`Select customer for credit entry ${idx + 1}`}><SelectValue placeholder={customers.length ? 'Select Customer' : 'No active customers available'} /></SelectTrigger>
-          <SelectContent>{customers.map((customer) => <SelectItem key={customer.id} value={customer.id}>{customer.customer_name || customer.name}{customer.phone ? ` · ${customer.phone}` : ''}</SelectItem>)}</SelectContent>
+          <SelectContent>{customers.map((customer) => <SelectItem key={customer.id} value={customer.id}>{customer.customer_name || customer.name}{customer.phone ? ` · ${customer.phone}` : ''}{` · Debt ${currency} ${Number(customer.outstanding_balance || 0).toLocaleString()} · Available ${currency} ${Number(customer.available_credit ?? Math.max(0, Number(customer.credit_limit || 0) - Number(customer.outstanding_balance || 0))).toLocaleString()}`}</SelectItem>)}</SelectContent>
         </Select>
       </div>
 

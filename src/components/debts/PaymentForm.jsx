@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,18 +12,20 @@ import { useDebtI18n } from '@/lib/debtI18n';
 import { useNotify } from '@/lib/useNotify';
 import { Loader2, Receipt, MessageCircle, Clock, FileText } from 'lucide-react';
 import { processPaymentSave, generateReceiptPDF, openPDFInNewTab } from '@/lib/debtInvoiceService';
+import { customerDebtPaymentErrorMessage, newReceivableRequestId, recordCustomerDebtPayment } from '@/lib/debt/customerReceivableRepository';
 import { isWhatsAppConfigured } from '@/lib/whatsappService';
 
 export default function PaymentForm({ debt, onSave, onCancel }) {
   const notif = useNotify();
   const { user } = useAuth();
-  const { activeRestaurantId, branches, allBranches } = useTenant();
+  const { activeRestaurantId } = useTenant();
   const d = useDebtI18n();
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('cash');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const paymentRequestId = useRef(null);
 
   const remaining = (debt.remaining_amount ?? debt.total_amount - (debt.paid_amount || 0));
 
@@ -35,61 +36,44 @@ export default function PaymentForm({ debt, onSave, onCancel }) {
     setSaving(true);
 
     try {
-      // 1. Create payment record
-      // Resolve branch_id from debt.branch (text key) if not already set
-      const branchLookup = [...(allBranches || [])].find(
-        b => b.key === debt.branch || b.branch_key === debt.branch
-      );
-      const resolvedBranchId = debt.branch_id || branchLookup?.id || null;
-
-      const payment = await base44.entities.DebtPayment.create({
-        debt_id: debt.id,
-        party_name: debt.party_name,
-        date,
+      // The RPC locks the receivable, prevents overpayment and duplicate request
+      // writes, records the payment, updates the remaining balance, and refreshes
+      // the Customer Master compatibility cache in one database transaction.
+      const result = await recordCustomerDebtPayment({
+        debtId: debt.id,
         amount: amt,
-        payment_method: method,
+        date,
+        paymentMethod: method,
         notes,
-        recorded_by: user?.email,
-        recorded_by_name: user?.full_name || user?.email,
-        // RLS required scope fields
-        restaurant_id: debt.restaurant_id || activeRestaurantId || null,
-        branch_id: resolvedBranchId,
-        branch: debt.branch || '',
+        requestId: paymentRequestId.current || (paymentRequestId.current = newReceivableRequestId()),
       });
+      const payment = result.payment;
+      const updatedDebt = result.debt || debt;
 
-      // 2. Update debt record
-      const newPaid = (debt.paid_amount || 0) + amt;
-      const newRemaining = debt.total_amount - newPaid;
-      const newStatus = newRemaining <= 0 ? 'paid' : 'partial';
-      await base44.entities.DebtRecord.update(debt.id, {
-        paid_amount: newPaid,
-        remaining_amount: Math.max(0, newRemaining),
-        status: newStatus,
-      });
-
-      // 3. Auto-create receipt + send WhatsApp
-      if (payment) {
+      // Receipt/WhatsApp delivery is a post-commit communication side effect. It
+      // cannot undo or duplicate the authoritative repayment if delivery fails.
+      try {
         await processPaymentSave({
           payment: { ...payment, amount: amt, payment_method: method, date, notes },
-          debtRecord: debt,
+          debtRecord: updatedDebt,
           restaurantId: activeRestaurantId,
           createdBy: user?.email,
           brandName: 'BizCTRL',
         });
+      } catch (receiptError) {
+        console.warn('Customer payment receipt delivery failed after commit:', receiptError?.message || receiptError);
       }
 
-      // 4. Notify
       await notif.creditCollection({
-        branch: debt.branch || 'General',
+        branch: updatedDebt.branch || debt.branch || 'General',
         amount: amt,
-        action: 'create'
+        action: 'create',
       });
-
-      setSaving(false);
       onSave();
     } catch (err) {
       console.error('Payment error:', err);
-      alert('Error: ' + (err.message || 'Unknown error'));
+      alert(customerDebtPaymentErrorMessage(err));
+    } finally {
       setSaving(false);
     }
   };

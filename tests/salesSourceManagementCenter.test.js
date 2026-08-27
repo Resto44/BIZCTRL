@@ -103,14 +103,17 @@ describe('Sales Source Management Center contract', () => {
     expect(page).toContain('canManage={canManage}');
   });
 
-  it('carries optional source IDs through the existing customer-credit debt workflow and preserves source-inclusive sales exports', async () => {
-    const [sales, exports] = await Promise.all([
+  it('keeps Customer Credit receivables in the server-side Closing transaction and preserves source-inclusive sales exports', async () => {
+    const [sales, migration, exports] = await Promise.all([
       source('../src/pages/Sales.jsx'),
+      source('../src/supabase/20260828_customer_credit_receivable_source_of_truth.sql'),
       source('../src/lib/exportUtils.js'),
     ]);
 
-    expect(sales).toContain('source_id: debtRecord.source_id || entry.source_id || null');
-    expect(sales).toContain('source_id: entry.source_id || null');
+    expect(sales).not.toContain('autoSaveCreditDebts');
+    expect(migration).toContain("'Credit sale from Sales Closing'");
+    expect(migration).toContain('sales_closing_id, source_id');
+    expect(migration).toContain("NULLIF(v_entry ->> 'source_id', '')::uuid");
     expect(exports).toContain('function salesSourceDailyTotal(record)');
     expect(exports).toContain("const sourceLabel = t('salesClosing.sources.title') || 'Sales Sources';");
     expect(exports).toContain('const sources = salesSourceDailyTotal(s);');

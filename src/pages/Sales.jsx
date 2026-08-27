@@ -33,9 +33,7 @@ import {
 import { filterDailySalesRecords, toDailySalesCardRecord } from '@/lib/dailySalesPresentation';
 import { closingSaveErrorMessage, recordClosingOwnerPayment, saveClosingSession } from '@/lib/closing/ClosingRepository';
 import { dailyClosingDefaults } from '@/lib/closing/CashReconciliationLedger';
-
-const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
-const firstRecord = (value) => asRecordArray(value).at(0) || null;
+import { invalidateCustomerReceivableQueries } from '@/lib/debt/customerReceivableRepository';
 const dailySalesTotal = (sale) =>
   Number(sale?.restaurant_cash ?? sale?.cash ?? 0) +
   Number(sale?.restaurant_network ?? sale?.network ?? 0) +
@@ -431,142 +429,6 @@ export default function Sales() {
     }
   };
 
-  // Auto-save customer credit entries to DebtRecord + DebtPayment
-  // Debt Management is the single source of truth for customer credit
-  const autoSaveCreditDebts = async (saleData, saleId) => {
-    if (!saleData.credit_entries_json) return;
-    let entries = [];
-    try { entries = asRecordArray(JSON.parse(saleData.credit_entries_json)); } catch { return; }
-    if (!entries.length) return;
-
-    for (const entry of entries) {
-      const amt = Number(entry.amount) || 0;
-      if (amt <= 0) continue;
-
-      const customerName = entry.customer || 'Unknown Customer';
-      const customerId = entry.customer_id;
-
-      try {
-        // A Customer Master ID is never a DebtRecord ID. Resolve the existing
-        // receivable by its canonical customer reference first, scoped to the
-        // finalized Closing's tenant and branch. Older rows without customer_id
-        // may be matched once by their existing name/phone snapshot and are then
-        // linked, rather than duplicated.
-        const debtScope = {
-          party_type: 'customer',
-          type: 'receivable',
-          restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
-          branch: saleData.branch,
-        };
-        let debtRecord = null;
-        if (customerId) {
-          debtRecord = firstRecord(asRecordArray(await base44.entities.DebtRecord.filter({
-            ...debtScope,
-            customer_id: customerId,
-          })));
-        }
-        if (!debtRecord) {
-          const legacyMatches = asRecordArray(await base44.entities.DebtRecord.filter({
-            ...debtScope,
-            party_name: customerName,
-            ...(entry.customer_phone ? { party_phone: entry.customer_phone } : {}),
-          }));
-          const legacyMatch = firstRecord(legacyMatches);
-          // Never merge two different canonical customers solely because their
-          // historic display names happen to match.
-          if (!legacyMatch?.customer_id || String(legacyMatch.customer_id) === String(customerId || '')) {
-            debtRecord = legacyMatch;
-          }
-        }
-
-        if (debtRecord) {
-          // Update existing DebtRecord
-          const newTotal = (debtRecord.total_amount || 0) + amt;
-          const newRemaining = (debtRecord.remaining_amount || 0) + amt;
-          const newStatus = newRemaining > 0 ? (debtRecord.paid_amount > 0 ? 'partial' : 'open') : 'paid';
-          await base44.entities.DebtRecord.update(debtRecord.id, {
-            total_amount: newTotal,
-            remaining_amount: newRemaining,
-            status: newStatus,
-            // Keep the existing debt record authoritative while retaining an
-            // optional immutable Sales Source relationship for analysis.
-            source_id: debtRecord.source_id || entry.source_id || null,
-            ...(customerId && !debtRecord.customer_id ? { customer_id: customerId } : {}),
-          });
-          
-          // Record the transaction in DebtPayment
-          await base44.entities.DebtPayment.create({
-            debt_id: debtRecord.id,
-            party_name: debtRecord.party_name,
-            date: saleData.date,
-            amount: -amt, // negative = new debt added
-            payment_method: 'credit',
-            notes: `Credit sale — ${saleData.date} — Branch: ${saleData.branch}`,
-            recorded_by: user?.email || '',
-            recorded_by_name: user?.full_name || user?.email || '',
-            restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
-            branch_id: saleData.branch_id || null,
-            branch: saleData.branch || '',
-            source_id: entry.source_id || debtRecord.source_id || null,
-            customer_id: customerId || debtRecord.customer_id || null,
-          });
-        } else {
-          // Create new DebtRecord
-          const newDebt = await base44.entities.DebtRecord.create({
-            type: 'receivable',
-            party_type: 'customer',
-            party_name: customerName,
-            party_phone: entry.customer_phone || '',
-            customer_id: customerId || null,
-            branch: saleData.branch,
-            date: saleData.date,
-            total_amount: amt,
-            paid_amount: 0,
-            remaining_amount: amt,
-            status: 'open',
-            description: `Credit sale — ${saleData.date}`,
-            notes: entry.notes || '',
-            restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
-            branch_id: saleData.branch_id || null,
-            source_id: entry.source_id || null,
-          });
-          
-          await base44.entities.DebtPayment.create({
-            debt_id: newDebt.id,
-            party_name: customerName,
-            date: saleData.date,
-            amount: -amt,
-            payment_method: 'credit',
-            notes: `Credit sale — ${saleData.date}`,
-            recorded_by: user?.email || '',
-            restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
-            branch_id: saleData.branch_id || null,
-            branch: saleData.branch || '',
-            source_id: entry.source_id || null,
-            customer_id: customerId || null,
-          });
-        }
-
-        // Customer Master balances are updated atomically by the canonical Sales
-        // Closing transaction. Do not mutate them again from this asynchronous
-        // side effect, or a finalized credit sale would be counted twice.
-
-      } catch (e) { 
-        console.warn('[autoSaveCreditDebts] failed:', e.message); 
-      }
-    }
-
-    // Invalidate ALL relevant queries for Debts & Receivables and Customer Credit KPI
-    qc.invalidateQueries({ queryKey: ['debts_customer'] });
-    qc.invalidateQueries({ queryKey: ['debts_customer_dash'] });
-    qc.invalidateQueries({ queryKey: ['debt_customers_form'] });
-    qc.invalidateQueries({ queryKey: ['debt_records'] });
-    qc.invalidateQueries({ queryKey: ['debt_payments'] });
-    qc.invalidateQueries({ queryKey: ['customers'] });
-    qc.invalidateQueries({ queryKey: ['v_customer_summary'] });
-    qc.invalidateQueries({ queryKey: ['debt_records_customers'] });
-  };
-
   // Auto-generate invoice after sale save — SILENT BACKGROUND PDF GENERATION
   const autoGenerateInvoice = async (saleData, saleId) => {
     // Fired in background — do NOT await this in handleSave to keep UI fast.
@@ -618,15 +480,9 @@ export default function Sales() {
     }
 
     // Wallet-first settlement is part of the canonical finalization transaction.
-    // Do not create legacy wallet / daily-settlement rows after commit: those
-    // asynchronous writes can double-charge a shortage or bypass branch-wallet priority.
-    const sideEffects = [
-      autoSaveCreditDebts(savedClosing, savedClosing.id),
-    ];
-    const outcomes = await Promise.allSettled(sideEffects);
-    outcomes.forEach((outcome) => {
-      if (outcome.status === 'rejected') console.warn('[Sales] Closing finalization side effect failed:', outcome.reason?.message || outcome.reason);
-    });
+    // Customer Credit receivables are written in the finalized Closing database
+    // transaction. Do not create a second post-commit debt or payment record.
+    invalidateCustomerReceivableQueries(qc);
 
     autoGenerateInvoice(savedClosing, savedClosing.id);
     try {

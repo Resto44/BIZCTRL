@@ -20,12 +20,13 @@
  *           v_customer_summary, v_customer_aging, v_collection_dashboard
  */
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useRole } from '@/lib/RoleContext';
+import { createCustomerReceivable, customerDebtPaymentErrorMessage, invalidateCustomerReceivableQueries, newReceivableRequestId, recordCustomerDebtPayment } from '@/lib/debt/customerReceivableRepository';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 
@@ -89,13 +90,13 @@ const emptyCustomerForm = {
   branch_id: '', branch: '',
 };
 const emptyCreditSaleForm = {
-  party_name: '', party_phone: '', invoice_number: '',
+  customer_id: '', party_name: '', party_phone: '', invoice_number: '',
   date: format(new Date(), 'yyyy-MM-dd'),
   due_date: '', total_amount: '', paid_amount: '0',
   notes: '', branch: '',
 };
 const emptyCollectionForm = {
-  customer_name: '', debt_id: '', amount: '',
+  customer_id: '', customer_name: '', debt_id: '', amount: '',
   date: format(new Date(), 'yyyy-MM-dd'),
   payment_method: 'cash', notes: '', branch: '',
 };
@@ -218,6 +219,8 @@ export default function CustomerManagement() {
   const [collectionForm, setCollectionForm] = useState(emptyCollectionForm);
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
+  const creditSaleRequestId = useRef(null);
+  const collectionRequestId = useRef(null);
 
   // Auto-set default branch for managers
   useEffect(() => {
@@ -230,15 +233,14 @@ export default function CustomerManagement() {
   }, [isManager, managerBranch, branches, showCustomerForm]);
 
   const createdBy = ownerFilter?.created_by;
-  const enabled = !!createdBy;
+  const enabled = !!activeRestaurantId;
 
   // ── Data Fetching ──────────────────────────────────────────────────────
 
   const { data: customerSummary = [], isLoading: loadingSummary, refetch: refetchSummary } = useQuery({
-    queryKey: ['v_customer_summary', createdBy],
+    queryKey: ['v_customer_summary', activeRestaurantId],
     queryFn: async () => {
-      let q = supabase.from('v_customer_summary').select('*');
-      if (createdBy) q = q.eq('created_by', createdBy);
+      const q = supabase.from('v_customer_summary').select('*').eq('restaurant_id', activeRestaurantId);
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
@@ -247,10 +249,9 @@ export default function CustomerManagement() {
   });
 
   const { data: registeredCustomers = [], isLoading: loadingCustomers, refetch: refetchCustomers } = useQuery({
-    queryKey: ['customers', createdBy],
+    queryKey: ['customers', activeRestaurantId],
     queryFn: async () => {
-      let q = supabase.from('customers').select('*').order('name');
-      if (createdBy) q = q.eq('created_by', createdBy);
+      const q = supabase.from('customers').select('*').eq('restaurant_id', activeRestaurantId).order('name');
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
@@ -259,13 +260,13 @@ export default function CustomerManagement() {
   });
 
   const { data: debtRecords = [], isLoading: loadingDebts } = useQuery({
-    queryKey: ['debt_records_customers', createdBy],
+    queryKey: ['debt_records_customers', activeRestaurantId],
     queryFn: async () => {
-      let q = supabase.from('debt_records').select('*')
+      const q = supabase.from('debt_records').select('*')
+        .eq('restaurant_id', activeRestaurantId)
         .eq('party_type', 'customer')
         .order('date', { ascending: false })
         .limit(500);
-      if (createdBy) q = q.eq('created_by', createdBy);
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
@@ -274,11 +275,11 @@ export default function CustomerManagement() {
   });
 
   const { data: collections = [], isLoading: loadingCollections } = useQuery({
-    queryKey: ['customer_collections', createdBy],
+    queryKey: ['customer_collections', activeRestaurantId],
     queryFn: async () => {
-      let q = supabase.from('customer_collections').select('*')
+      const q = supabase.from('customer_collections').select('*')
+        .eq('restaurant_id', activeRestaurantId)
         .order('date', { ascending: false }).limit(500);
-      if (createdBy) q = q.eq('created_by', createdBy);
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
@@ -287,10 +288,9 @@ export default function CustomerManagement() {
   });
 
   const { data: agingData = [], isLoading: loadingAging } = useQuery({
-    queryKey: ['v_customer_aging', createdBy],
+    queryKey: ['v_customer_aging', activeRestaurantId],
     queryFn: async () => {
-      let q = supabase.from('v_customer_aging').select('*');
-      if (createdBy) q = q.eq('created_by', createdBy);
+      const q = supabase.from('v_customer_aging').select('*').eq('restaurant_id', activeRestaurantId);
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
@@ -299,10 +299,9 @@ export default function CustomerManagement() {
   });
 
   const { data: collectionDash = [], isLoading: loadingDash } = useQuery({
-    queryKey: ['v_collection_dashboard', createdBy],
+    queryKey: ['v_collection_dashboard', activeRestaurantId],
     queryFn: async () => {
-      let q = supabase.from('v_collection_dashboard').select('*');
-      if (createdBy) q = q.eq('created_by', createdBy);
+      const q = supabase.from('v_collection_dashboard').select('*').eq('restaurant_id', activeRestaurantId);
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
@@ -412,15 +411,13 @@ export default function CustomerManagement() {
 
   // ── Selected customer data ────────────────────────────────────────────
   const selectedDebts = useMemo(() => {
-    if (!selectedCustomer) return [];
-    const name = selectedCustomer.customer_name || selectedCustomer.name;
-    return debtRecords.filter(d => d.party_name === name);
+    if (!selectedCustomer?.id) return [];
+    return debtRecords.filter((debt) => String(debt.customer_id) === String(selectedCustomer.id));
   }, [selectedCustomer, debtRecords]);
 
   const selectedCollections = useMemo(() => {
-    if (!selectedCustomer) return [];
-    const name = selectedCustomer.customer_name || selectedCustomer.name;
-    return collections.filter(c => c.customer_name === name);
+    if (!selectedCustomer?.id) return [];
+    return collections.filter((collection) => String(collection.customer_id) === String(selectedCustomer.id));
   }, [selectedCustomer, collections]);
 
   // ── Mutations ─────────────────────────────────────────────────────────
@@ -480,83 +477,52 @@ export default function CustomerManagement() {
 
   const addCreditSaleMutation = useMutation({
     mutationFn: async (form) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const paid = Number(form.paid_amount || 0);
-      const total = Number(form.total_amount);
-      const remaining = total - paid;
-      const status = remaining <= 0 ? 'paid' : paid > 0 ? 'partial' : 'open';
       const branch = form.branch || managerBranch || '';
-      const branchId = branches.find(b => b.key === branch)?.id || null;
+      const branchId = branches.find((candidate) => candidate.key === branch || candidate.branch_key === branch)?.id || null;
       if (!activeRestaurantId || !branchId) {
         throw new Error('An active organization and branch are required to save a credit sale.');
       }
-      const { data, error } = await supabase.from('debt_records').insert({
-        party_type: 'customer', type: 'receivable',
-        party_name: form.party_name, party_phone: form.party_phone,
-        invoice_number: form.invoice_number, date: form.date,
-        due_date: form.due_date || null, total_amount: total,
-        paid_amount: paid, remaining_amount: remaining, status,
-        notes: form.notes, branch,
-        restaurant_id: activeRestaurantId,
-        branch_id: branchId,
-        created_by: user?.email || '',
-        created_date: new Date().toISOString(),
-        updated_date: new Date().toISOString(),
-      }).select().single();
-      if (error) throw error;
-      return data;
+      return createCustomerReceivable({
+        customerId: form.customer_id,
+        branchId,
+        branch,
+        totalAmount: form.total_amount,
+        paidAmount: form.paid_amount,
+        date: form.date,
+        dueDate: form.due_date,
+        invoiceNumber: form.invoice_number,
+        description: 'Manual customer credit sale',
+        notes: form.notes,
+        requestId: creditSaleRequestId.current || (creditSaleRequestId.current = newReceivableRequestId()),
+      });
     },
     onSuccess: () => {
       toast.success(t('credit_sale_saved'));
-      qc.invalidateQueries({ queryKey: ['debt_records_customers'] });
-      qc.invalidateQueries({ queryKey: ['v_customer_summary'] });
+      invalidateCustomerReceivableQueries(qc);
+      qc.invalidateQueries({ queryKey: ['v_collection_dashboard'] });
+      creditSaleRequestId.current = null;
       setShowCreditSaleForm(false); setCreditSaleForm(emptyCreditSaleForm);
     },
-    onError: (e) => toast.error(e.message),
+    onError: (error) => toast.error(customerDebtPaymentErrorMessage(error)),
   });
 
   const addCollectionMutation = useMutation({
-    mutationFn: async (form) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const amount = Number(form.amount);
-      const branch = form.branch || managerBranch || '';
-      const branchId = branches.find(b => b.key === branch)?.id || null;
-      if (!activeRestaurantId || !branchId) {
-        throw new Error('An active organization and branch are required to save a collection.');
-      }
-      const { data: col, error: colErr } = await supabase.from('customer_collections').insert({
-        customer_name: form.customer_name, amount, date: form.date,
-        payment_method: form.payment_method, notes: form.notes, branch,
-        restaurant_id: activeRestaurantId,
-        branch_id: branchId,
-        created_by: user?.email || '',
-        created_date: new Date().toISOString(),
-        updated_date: new Date().toISOString(),
-      }).select().single();
-      if (colErr) throw colErr;
-      if (form.debt_id) {
-        const { data: debt } = await supabase.from('debt_records').select('paid_amount,total_amount').eq('id', form.debt_id).single();
-        if (debt) {
-          const newPaid = Number(debt.paid_amount || 0) + amount;
-          const newRemaining = Math.max(0, Number(debt.total_amount) - newPaid);
-          const newStatus = newRemaining <= 0 ? 'paid' : newPaid > 0 ? 'partial' : 'open';
-          await supabase.from('debt_records').update({
-            paid_amount: newPaid, remaining_amount: newRemaining, status: newStatus,
-            updated_date: new Date().toISOString(),
-          }).eq('id', form.debt_id);
-        }
-      }
-      return col;
-    },
+    mutationFn: async (form) => recordCustomerDebtPayment({
+      debtId: form.debt_id,
+      amount: form.amount,
+      date: form.date,
+      paymentMethod: form.payment_method,
+      notes: form.notes,
+      requestId: collectionRequestId.current || (collectionRequestId.current = newReceivableRequestId()),
+    }),
     onSuccess: () => {
       toast.success(t('collection_saved'));
-      qc.invalidateQueries({ queryKey: ['customer_collections'] });
-      qc.invalidateQueries({ queryKey: ['debt_records_customers'] });
-      qc.invalidateQueries({ queryKey: ['v_customer_summary'] });
+      invalidateCustomerReceivableQueries(qc);
       qc.invalidateQueries({ queryKey: ['v_collection_dashboard'] });
+      collectionRequestId.current = null;
       setShowCollectionForm(false); setCollectionForm(emptyCollectionForm);
     },
-    onError: (e) => toast.error(e.message),
+    onError: (error) => toast.error(customerDebtPaymentErrorMessage(error)),
   });
 
   const addNoteMutation = useMutation({
@@ -1056,10 +1022,24 @@ export default function CustomerManagement() {
           <div className="space-y-3">
             <div>
               <Label className="text-xs">{t('customer_name')} *</Label>
-              <Input value={creditSaleForm.party_name} onChange={e => setCreditSaleForm(f => ({ ...f, party_name: e.target.value }))} className="h-9 mt-1" list="cs-names" />
-              <datalist id="cs-names">{mergedCustomers.filter(c => !creditSaleForm.branch || c.branch === creditSaleForm.branch).map((c, i) => <option key={i} value={c.customer_name || c.name} />)}</datalist>
+              <Select value={creditSaleForm.customer_id || '__none__'} onValueChange={(customerId) => {
+                const customer = registeredCustomers.find((candidate) => String(candidate.id) === String(customerId));
+                setCreditSaleForm((current) => ({
+                  ...current,
+                  customer_id: customer?.id || '',
+                  party_name: customer?.name || '',
+                  party_phone: customer?.phone || '',
+                  branch: customer?.branch || current.branch,
+                }));
+              }}>
+                <SelectTrigger className="h-9 mt-1"><SelectValue placeholder="Select active customer" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— {t('filter_all')} —</SelectItem>
+                  {registeredCustomers.filter((customer) => customer.is_active !== false && (!activeRestaurantId || customer.restaurant_id === activeRestaurantId) && (!creditSaleForm.branch || customer.branch === creditSaleForm.branch)).map((customer) => <SelectItem key={customer.id} value={customer.id}>{customer.name}{customer.phone ? ` · ${customer.phone}` : ''}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            <div><Label className="text-xs">{t('phone')}</Label><Input value={creditSaleForm.party_phone} onChange={e => setCreditSaleForm(f => ({ ...f, party_phone: e.target.value }))} className="h-9 mt-1" /></div>
+            <div><Label className="text-xs">{t('phone')}</Label><Input value={creditSaleForm.party_phone} readOnly className="h-9 mt-1 bg-muted/40" /></div>
             <div className="grid grid-cols-2 gap-2">
               <div><Label className="text-xs">{t('invoice_number')}</Label><Input value={creditSaleForm.invoice_number} onChange={e => setCreditSaleForm(f => ({ ...f, invoice_number: e.target.value }))} className="h-9 mt-1" /></div>
               <div><Label className="text-xs">{t('sale_date')} *</Label><Input type="date" value={creditSaleForm.date} onChange={e => setCreditSaleForm(f => ({ ...f, date: e.target.value }))} className="h-9 mt-1" /></div>
@@ -1073,7 +1053,7 @@ export default function CustomerManagement() {
             <div><Label className="text-xs">{t('notes')}</Label><Textarea value={creditSaleForm.notes} onChange={e => setCreditSaleForm(f => ({ ...f, notes: e.target.value }))} className="mt-1 text-sm" rows={2} /></div>
             <div className="flex gap-2 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setShowCreditSaleForm(false)}>{t('cancel')}</Button>
-              <Button className="flex-1" onClick={() => addCreditSaleMutation.mutate(creditSaleForm)} disabled={!creditSaleForm.party_name || !creditSaleForm.total_amount || addCreditSaleMutation.isPending}>
+              <Button className="flex-1" onClick={() => addCreditSaleMutation.mutate(creditSaleForm)} disabled={!creditSaleForm.customer_id || !creditSaleForm.total_amount || addCreditSaleMutation.isPending}>
                 {addCreditSaleMutation.isPending ? t('loading') : t('save')}
               </Button>
             </div>
@@ -1088,10 +1068,24 @@ export default function CustomerManagement() {
           <div className="space-y-3">
             <div>
               <Label className="text-xs">{t('customer_name')} *</Label>
-              <Input value={collectionForm.customer_name} onChange={e => setCollectionForm(f => ({ ...f, customer_name: e.target.value }))} className="h-9 mt-1" list="coll-names" />
-              <datalist id="coll-names">{mergedCustomers.filter(c => !collectionForm.branch || c.branch === collectionForm.branch).map((c, i) => <option key={i} value={c.customer_name || c.name} />)}</datalist>
+              <Select value={collectionForm.customer_id || '__none__'} onValueChange={(customerId) => {
+                const customer = registeredCustomers.find((candidate) => String(candidate.id) === String(customerId));
+                setCollectionForm((current) => ({
+                  ...current,
+                  customer_id: customer?.id || '',
+                  customer_name: customer?.name || '',
+                  debt_id: '',
+                  branch: customer?.branch || current.branch,
+                }));
+              }}>
+                <SelectTrigger className="h-9 mt-1"><SelectValue placeholder="Select active customer" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— {t('filter_all')} —</SelectItem>
+                  {registeredCustomers.filter((customer) => customer.is_active !== false && (!activeRestaurantId || customer.restaurant_id === activeRestaurantId) && (!collectionForm.branch || customer.branch === collectionForm.branch)).map((customer) => <SelectItem key={customer.id} value={customer.id}>{customer.name}{customer.phone ? ` · ${customer.phone}` : ''}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            {collectionForm.customer_name && (
+            {collectionForm.customer_id && (
               <div>
                 <Label className="text-xs">{t('credit_sales')} (link)</Label>
                 <Select value={collectionForm.debt_id || "__none__"} onValueChange={v => setCollectionForm(f => ({ ...f, debt_id: v === "__none__" ? "" : v }))}>
@@ -1099,7 +1093,7 @@ export default function CustomerManagement() {
                   <SelectContent>
                     <SelectItem value="__none__">— {t('filter_all')} —</SelectItem>
                     {debtRecords.filter(d => 
-                      d.party_name === collectionForm.customer_name && 
+                      String(d.customer_id) === String(collectionForm.customer_id) &&
                       ['open','partial','overdue'].includes(d.status) &&
                       (!activeRestaurantId || d.restaurant_id === activeRestaurantId) &&
                       (!collectionForm.branch || d.branch === collectionForm.branch)
@@ -1125,7 +1119,7 @@ export default function CustomerManagement() {
             <div><Label className="text-xs">{t('notes')}</Label><Textarea value={collectionForm.notes} onChange={e => setCollectionForm(f => ({ ...f, notes: e.target.value }))} className="mt-1 text-sm" rows={2} /></div>
             <div className="flex gap-2 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setShowCollectionForm(false)}>{t('cancel')}</Button>
-              <Button className="flex-1" onClick={() => addCollectionMutation.mutate(collectionForm)} disabled={!collectionForm.customer_name || !collectionForm.amount || addCollectionMutation.isPending}>
+              <Button className="flex-1" onClick={() => addCollectionMutation.mutate(collectionForm)} disabled={!collectionForm.customer_id || !collectionForm.debt_id || !collectionForm.amount || addCollectionMutation.isPending}>
                 {addCollectionMutation.isPending ? t('loading') : t('save')}
               </Button>
             </div>
