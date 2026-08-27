@@ -324,8 +324,9 @@ describe('Sales source daily and historical balance contract', () => {
 
     expect(workspace).toContain('customSourceSummaries.reduce((totals, { source, today, driverEntries }) =>');
     expect(workspace).toContain('if (source.allows_driver_entries === true) {');
-    expect(workspace).toContain('driverEntries.forEach((entry) => {');
-    expect(workspace).toContain('totals[paymentBucketForCode(source.default_payment_method)] += today;');
+    expect(workspace).toContain('const driverTotals = driverSourcePaymentBreakdown(driverEntries);');
+    expect(workspace).toContain('totals.cash += driverTotals.cash;');
+    expect(workspace).toContain('totals.card += driverTotals.network;');
     expect(workspace).toContain('driverSourceTodayTotal(driverEntries)');
     expect(workspace).toContain('buildSalesSourceClosingSnapshots(customSourceSummaries');
     expect(workspace).toContain('Today values. Historical Previous values remain display/audit context.');

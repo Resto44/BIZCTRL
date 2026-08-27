@@ -194,7 +194,7 @@ export default function DriverManagement() {
     queryFn: async () => {
       let query = supabase
         .from('driver_sales_entries')
-        .select('id, closing_id, date, branch, branch_id, driver_id, sales_source_id, subcategory, shift, amount, payment_method, notes, status, finalized_at, daily_sales!inner(closing_state)')
+        .select('id, closing_id, date, branch, branch_id, driver_id, sales_source_id, subcategory, shift, amount, cash_amount, network_amount, total_amount, payment_method, notes, status, finalized_at, daily_sales!inner(closing_state)')
         .eq('restaurant_id', activeRestaurant.id)
         .eq('status', 'finalized')
         .eq('daily_sales.closing_state', 'finalized')

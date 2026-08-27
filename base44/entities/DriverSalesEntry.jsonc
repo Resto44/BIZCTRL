@@ -37,13 +37,29 @@
     "shift": {
       "type": "string"
     },
+    "cash_amount": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Physical cash collected by the driver for this closing"
+    },
+    "network_amount": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Network or card payment collected by the driver for this closing"
+    },
+    "total_amount": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Canonical total equal to cash_amount plus network_amount"
+    },
     "amount": {
       "type": "number",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Legacy compatibility mirror of total_amount"
     },
     "payment_method": {
       "type": "string",
-      "description": "Cash, card/network, customer credit, or other canonical payment method"
+      "description": "Legacy compatibility value; split entries use split"
     },
     "notes": {
       "type": "string"
@@ -64,8 +80,9 @@
     "driver_id",
     "date",
     "branch_id",
-    "amount",
-    "payment_method"
+    "cash_amount",
+    "network_amount",
+    "total_amount"
   ],
   "rls": {
     "create": null,

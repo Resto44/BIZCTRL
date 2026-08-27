@@ -2,27 +2,65 @@ const records = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 
 export const salesSourceAmount = (value) => Math.max(0, Number(value) || 0);
 
-export const driverSourceEntries = (value) => records(value)
-  .map((entry) => ({
-    client_row_id: entry?.client_row_id || entry?.id || '',
-    driver_id: entry?.driver_id || '',
-    driver_name: entry?.driver_name || '',
-    sales_source_id: entry?.sales_source_id || entry?.source_id || '',
-    subcategory: entry?.subcategory || 'Drivers',
-    date: entry?.date || null,
-    branch_id: entry?.branch_id || null,
-    branch: entry?.branch || null,
-    shift: entry?.shift || null,
-    amount: salesSourceAmount(entry?.amount ?? entry?.today_amount),
-    today_amount: salesSourceAmount(entry?.today_amount ?? entry?.amount),
-    payment_method: entry?.payment_method || 'cash',
-    payment_bucket: entry?.payment_bucket || entry?.payment_method || 'cash',
-    notes: entry?.notes || '',
-  }))
-  .filter((entry) => entry.driver_id && entry.amount > 0);
+const hasValue = (value) => value !== undefined && value !== null && value !== '';
 
-export const driverSourceTodayTotal = (value) => driverSourceEntries(value)
-  .reduce((total, entry) => total + salesSourceAmount(entry.amount), 0);
+export const driverSourceEntryAmounts = (entry = {}) => {
+  const hasSplitAmounts = hasValue(entry.cash_amount)
+    || hasValue(entry.network_amount)
+    || hasValue(entry.cash)
+    || hasValue(entry.network);
+
+  if (hasSplitAmounts) {
+    const cash = salesSourceAmount(entry.cash_amount ?? entry.cash);
+    const network = salesSourceAmount(entry.network_amount ?? entry.network);
+    return { cash, network, total: cash + network };
+  }
+
+  const total = salesSourceAmount(entry.amount ?? entry.today_amount ?? entry.total_amount);
+  const paymentMethod = String(entry.payment_method ?? entry.payment_bucket ?? 'cash').trim().toLowerCase();
+  return {
+    cash: ['cash', 'cash_on_delivery', 'cod'].includes(paymentMethod) ? total : 0,
+    network: ['card', 'network', 'pos', 'visa', 'mastercard', 'mada', 'bank', 'bank_transfer', 'transfer', 'iban', 'online', 'digital', 'gateway', 'wallet', 'e_wallet', 'ewallet'].includes(paymentMethod) ? total : 0,
+    total,
+  };
+};
+
+export const driverSourcePaymentBreakdown = (value) => records(value)
+  .reduce((totals, entry) => {
+    const amounts = driverSourceEntryAmounts(entry);
+    totals.cash += amounts.cash;
+    totals.network += amounts.network;
+    totals.total += amounts.total;
+    return totals;
+  }, { cash: 0, network: 0, total: 0 });
+
+export const driverSourceEntries = (value) => records(value)
+  .map((entry) => {
+    const amounts = driverSourceEntryAmounts(entry);
+    return {
+      client_row_id: entry?.client_row_id || entry?.id || '',
+      driver_id: entry?.driver_id || '',
+      driver_name: entry?.driver_name || '',
+      sales_source_id: entry?.sales_source_id || entry?.source_id || '',
+      subcategory: entry?.subcategory || 'Drivers',
+      date: entry?.date || null,
+      branch_id: entry?.branch_id || null,
+      branch: entry?.branch || null,
+      shift: entry?.shift || null,
+      cash_amount: amounts.cash,
+      network_amount: amounts.network,
+      total_amount: amounts.total,
+      amount: amounts.total,
+      today_amount: amounts.total,
+      // Retained only for legacy readers. New code uses the persisted split values.
+      payment_method: amounts.cash > 0 && amounts.network > 0 ? 'mixed' : (amounts.network > 0 ? 'card' : 'cash'),
+      payment_bucket: amounts.cash > 0 && amounts.network > 0 ? 'mixed' : (amounts.network > 0 ? 'network' : 'cash'),
+      notes: entry?.notes || '',
+    };
+  })
+  .filter((entry) => entry.driver_id && entry.total_amount > 0);
+
+export const driverSourceTodayTotal = (value) => driverSourcePaymentBreakdown(value).total;
 
 // This deliberately reads only the editable Today values. Previous is a
 // presentation and audit value derived from finalized history; it is never

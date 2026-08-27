@@ -127,6 +127,15 @@ export function paymentBucketForDriverSale(value) {
 }
 
 export function canonicalDriverSaleAmounts(entry = {}) {
+  const hasSplitAmounts = entry.cash_amount !== undefined
+    || entry.network_amount !== undefined
+    || entry.total_amount !== undefined;
+  if (hasSplitAmounts) {
+    const cash = Math.max(0, number(entry.cash_amount));
+    const network = Math.max(0, number(entry.network_amount));
+    return { cash, network, credit: 0, other: 0, revenue: cash + network };
+  }
+
   const revenue = Math.max(0, number(entry.amount ?? entry.today_amount));
   const bucket = paymentBucketForDriverSale(entry.payment_method ?? entry.payment_bucket);
   return {

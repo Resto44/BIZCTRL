@@ -53,7 +53,7 @@ import { toast } from 'sonner';
 import { useSalesSources } from '@/hooks/useSalesSources';
 import { useSalesClosingCustomization } from '@/lib/SalesClosingCustomizationContext';
 import { newSalesClosingCustomField } from '@/lib/salesClosingCustomization';
-import { buildSalesSourceClosingSnapshots, driverSourceTodayTotal, salesSourceTodayTotal } from '@/lib/salesSourceClosingLifecycle';
+import { buildSalesSourceClosingSnapshots, driverSourceEntryAmounts, driverSourcePaymentBreakdown, driverSourceTodayTotal, salesSourceTodayTotal } from '@/lib/salesSourceClosingLifecycle';
 import { SalesClosingFieldDialog, SalesSourceDialog, newSalesClosingSource } from '@/components/sales/SalesClosingCustomizationDialogs';
 import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
@@ -282,19 +282,19 @@ const DriverSalesSourceCard = memo(function DriverSalesSourceCard({ source, sour
       <div className="space-y-2">
         {entries.length === 0 ? <p className="rounded-lg border border-dashed border-cyan-200 bg-cyan-50/40 px-3 py-3 text-xs text-cyan-800">No driver sales entered for this source today.</p> : entries.map((entry) => {
           const usedDriverIds = new Set(entries.filter((candidate) => candidate.client_row_id !== entry.client_row_id).map((candidate) => String(candidate.driver_id || '')));
-          return <div key={entry.client_row_id} className="grid gap-2 rounded-lg border border-cyan-100 bg-cyan-50/30 p-2 sm:grid-cols-[minmax(11rem,1.5fr)_minmax(7rem,.75fr)_minmax(7rem,.75fr)_auto]">
+          const amounts = driverSourceEntryAmounts(entry);
+          return <div key={entry.client_row_id} className="grid gap-2 rounded-lg border border-cyan-100 bg-cyan-50/30 p-2 sm:grid-cols-[minmax(11rem,1.25fr)_minmax(18rem,1.75fr)_auto]">
             <Select value={entry.driver_id || ''} onValueChange={(driver_id) => {
               const driver = availableDrivers.find((candidate) => String(candidate.id) === String(driver_id));
               onChange(entry.client_row_id, { driver_id, driver_name: driver?.full_name || '' });
             }}><SelectTrigger className="bg-background"><SelectValue placeholder="Select Driver" /></SelectTrigger><SelectContent>{availableDrivers.map((driver) => <SelectItem key={driver.id} value={driver.id} disabled={usedDriverIds.has(String(driver.id))}>{driver.full_name}{driver.driver_id ? ` · ${driver.driver_id}` : ''}</SelectItem>)}</SelectContent></Select>
-            <Select value={entry.payment_method || 'cash'} onValueChange={(payment_method) => onChange(entry.client_row_id, { payment_method })}><SelectTrigger className="bg-background"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="cash">Cash</SelectItem><SelectItem value="card">Network / POS</SelectItem><SelectItem value="credit">Customer Credit</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select>
-            <Input type="number" min="0" step="0.01" value={entry.amount ?? ''} onChange={(event) => onChange(entry.client_row_id, { amount: event.target.value, today_amount: event.target.value })} placeholder="Amount" className="bg-background" aria-label="Driver sale amount" />
-            <Button type="button" variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onRemove(entry.client_row_id)} aria-label="Remove driver sale"><Trash2 className="h-4 w-4" /></Button>
-            <Textarea value={entry.notes || ''} onChange={(event) => onChange(entry.client_row_id, { notes: event.target.value })} placeholder="Optional note" className="sm:col-span-3" rows={1} />
+            <div className="grid grid-cols-3 gap-2"><div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Cash</Label><Input type="number" min="0" step="0.01" value={entry.cash_amount ?? entry.cash ?? ''} onChange={(event) => onChange(entry.client_row_id, { cash_amount: event.target.value })} placeholder="SAR 0" className="bg-background" aria-label="Driver cash amount" /></div><div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Network / Card</Label><Input type="number" min="0" step="0.01" value={entry.network_amount ?? entry.network ?? ''} onChange={(event) => onChange(entry.client_row_id, { network_amount: event.target.value })} placeholder="SAR 0" className="bg-background" aria-label="Driver network amount" /></div><div className="rounded-md border border-cyan-100 bg-cyan-50 px-2 py-1.5"><p className="text-[10px] font-bold uppercase tracking-wide text-cyan-800">Total</p><Money currency={currency} value={amounts.total} className="text-sm font-black text-cyan-900" /></div></div>
+            <Button type="button" variant="ghost" size="icon" className="self-end text-destructive hover:text-destructive" onClick={() => onRemove(entry.client_row_id)} aria-label="Remove driver sale"><Trash2 className="h-4 w-4" /></Button>
+            <Textarea value={entry.notes || ''} onChange={(event) => onChange(entry.client_row_id, { notes: event.target.value })} placeholder="Optional note" className="sm:col-span-2" rows={1} />
           </div>;
         })}
       </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><Button type="button" size="sm" variant="outline" onClick={onAdd} disabled={availableDrivers.length === 0}><PlusCircle className="mr-1 h-3.5 w-3.5" />Add Driver</Button><div className="text-right"><p className="text-[10px] font-bold uppercase tracking-wide text-cyan-700">Today from drivers</p><Money currency={currency} value={today} className="text-sm font-black text-cyan-700" /></div></div>
+      {(() => { const breakdown = driverSourcePaymentBreakdown(entries); return <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><Button type="button" size="sm" variant="outline" onClick={onAdd} disabled={availableDrivers.length === 0}><PlusCircle className="mr-1 h-3.5 w-3.5" />Add Driver</Button><div className="grid grid-cols-3 gap-3 text-right"><div><p className="text-[10px] font-bold uppercase tracking-wide text-cyan-700">Driver Cash</p><Money currency={currency} value={breakdown.cash} className="text-sm font-black text-cyan-700" /></div><div><p className="text-[10px] font-bold uppercase tracking-wide text-cyan-700">Driver Network</p><Money currency={currency} value={breakdown.network} className="text-sm font-black text-cyan-700" /></div><div><p className="text-[10px] font-bold uppercase tracking-wide text-cyan-700">Today from drivers</p><Money currency={currency} value={today} className="text-sm font-black text-cyan-700" /></div></div></div>; })()}
       {availableDrivers.length === 0 && <p className="mt-2 text-xs text-amber-700">Create an active Driver Master record for this branch before adding driver sales.</p>}
       <div className="mt-3 space-y-2 border-t border-cyan-100 pt-3">
         <div className="flex items-center justify-between gap-3 text-sm"><div><p className="font-medium">{copy.previous}</p><p className="text-[10px] text-muted-foreground">{copy.previousHelp}</p></div>{isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={previous} className="font-semibold text-muted-foreground" />}</div>
@@ -866,9 +866,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         shift: form.shift,
         driver_id: '',
         driver_name: '',
-        amount: '',
-        today_amount: '',
-        payment_method: 'cash',
+        cash_amount: '',
+        network_amount: '',
         notes: '',
       }],
     }));
@@ -897,10 +896,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     customSourceSummaries.reduce((totals, { source, today, driverEntries }) => {
       if (source.included_in_revenue === false) return totals;
       if (source.allows_driver_entries === true) {
-        driverEntries.forEach((entry) => {
-          const bucket = paymentBucketForCode(entry.payment_method);
-          totals[bucket] += Math.max(0, Number(entry.amount ?? entry.today_amount) || 0);
-        });
+        const driverTotals = driverSourcePaymentBreakdown(driverEntries);
+        totals.cash += driverTotals.cash;
+        totals.card += driverTotals.network;
       } else {
         totals[paymentBucketForCode(source.default_payment_method)] += today;
       }
@@ -910,10 +908,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   );
   const driverSourcePaymentTotals = useMemo(() => customSourceSummaries.reduce((totals, { source, driverEntries }) => {
     if (source.allows_driver_entries !== true || source.included_in_revenue === false) return totals;
-    driverEntries.forEach((entry) => {
-      const bucket = paymentBucketForCode(entry.payment_method);
-      totals[bucket] += Math.max(0, Number(entry.amount ?? entry.today_amount) || 0);
-    });
+    const driverTotals = driverSourcePaymentBreakdown(driverEntries);
+    totals.cash += driverTotals.cash;
+    totals.card += driverTotals.network;
     return totals;
   }, { cash: 0, card: 0, bank_transfer: 0, online: 0, wallet: 0, credit: 0, other: 0 }), [customSourceSummaries]);
   // The Sales Sources section and every revenue calculation use only current
@@ -1400,7 +1397,13 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     ),
     currentCashSales: baseCashSales,
     revenueEntries: customSourceSummaries.flatMap(({ source, today, driverEntries }) => source.allows_driver_entries === true
-      ? driverEntries.map((entry) => ({ amount: entry.amount ?? entry.today_amount, payment_method: entry.payment_method }))
+      ? driverEntries.flatMap((entry) => {
+        const amounts = driverSourceEntryAmounts(entry);
+        return [
+          ...(amounts.cash > 0 ? [{ amount: amounts.cash, payment_method: 'cash' }] : []),
+          ...(amounts.network > 0 ? [{ amount: amounts.network, payment_method: 'card' }] : []),
+        ];
+      })
       : [{ amount: today, payment_method: source.default_payment_method }]),
     actualCash: actualCount,
     branchWalletAvailable,
@@ -1522,7 +1525,12 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     const invalidDriverSourceEntry = customSourceSummaries
       .filter(({ source }) => source.allows_driver_entries === true)
       .flatMap(({ driverEntries }) => driverEntries)
-      .find((entry) => !entry.driver_id || Math.max(0, Number(entry.amount ?? entry.today_amount) || 0) <= 0);
+      .find((entry) => {
+        const cash = Number(entry.cash_amount ?? entry.cash ?? 0);
+        const network = Number(entry.network_amount ?? entry.network ?? 0);
+        const total = driverSourceEntryAmounts(entry).total;
+        return !entry.driver_id || cash < 0 || network < 0 || total <= 0;
+      });
     const duplicateDriverSourceEntry = customSourceSummaries
       .filter(({ source }) => source.allows_driver_entries === true)
       .find(({ driverEntries }) => {
@@ -1537,7 +1545,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (!savingDraft && requiresCashReconciliation && cashDifference !== null && cashDifference !== 0 && !cashNotes.trim()) nextErrors.cashNotes = 'A reconciliation note is required for a cash difference.';
     if (invalidCredit) nextErrors.credit = 'Select an active Customer Master customer for every Today Credit amount.';
     if (!savingDraft && limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer_name_snapshot || limitExceededEntry.customer}. Correct the amount or perform an authorized manager override.`;
-    if (!savingDraft && invalidDriverSourceEntry) nextErrors.driverSources = 'Each driver sales row requires an active branch driver and a positive amount.';
+    if (!savingDraft && invalidDriverSourceEntry) nextErrors.driverSources = 'Each driver sales row requires an active branch driver, non-negative Cash and Network amounts, and a positive total.';
     if (!savingDraft && duplicateDriverSourceEntry) nextErrors.driverSources = 'A driver can appear only once per Sales Source and closing shift.';
     customClosingFields.forEach((field) => {
       if (!savingDraft && field.is_required && !hasCustomClosingFieldValue(field)) nextErrors[`custom_${field.id}`] = `${field.label_en} is required.`;
