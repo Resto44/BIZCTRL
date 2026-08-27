@@ -6,6 +6,14 @@
       "type": "string",
       "description": "Canonical Customer Master reference for customer receivables"
     },
+    "sales_closing_id": {
+      "type": "string",
+      "description": "Finalized Sales Closing that created this receivable"
+    },
+    "settlement_request_id": {
+      "type": "string",
+      "description": "Idempotency reference for server-created customer receivables"
+    },
     "type": {
       "type": "string",
       "enum": [

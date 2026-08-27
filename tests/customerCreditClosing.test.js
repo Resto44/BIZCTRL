@@ -60,17 +60,18 @@ describe('Customer Master credit Closing runtime', () => {
     expect(migration).toContain('erp_guard_sales_closing_customer_credit_snapshot_immutable');
   });
 
-  it('does not asynchronously increment Customer Master balances after the server transaction commits', async () => {
+  it('does not perform a post-commit Customer Credit debt write after the server transaction commits', async () => {
     const salesPage = await source('src/pages/Sales.jsx');
-    expect(salesPage).toContain('Customer Master balances are updated atomically by the canonical Sales');
+    expect(salesPage).toContain('Customer Credit receivables are written in the finalized Closing database');
+    expect(salesPage).toContain('invalidateCustomerReceivableQueries(qc)');
+    expect(salesPage).not.toContain('autoSaveCreditDebts');
     expect(salesPage).not.toContain('outstanding_balance: (Number(c.outstanding_balance) || 0) + amt');
   });
 
-  it('keeps the selected canonical customer reference through legacy receivable and payment synchronization', async () => {
-    const salesPage = await source('src/pages/Sales.jsx');
-    expect(salesPage).toContain('A Customer Master ID is never a DebtRecord ID');
-    expect(salesPage).not.toContain('DebtRecord.filter({ id: customerId })');
-    expect(salesPage).toContain('customer_id: customerId');
-    expect(salesPage).toContain('customer_id: customerId || debtRecord.customer_id || null');
+  it('keeps the selected canonical customer reference in the receivable transaction rather than treating it as a DebtRecord ID', async () => {
+    const migration = await source('src/supabase/20260828_customer_credit_receivable_source_of_truth.sql');
+    expect(migration).toContain('customer_id, sales_closing_id');
+    expect(migration).toContain('uq_debt_records_sales_closing_customer');
+    expect(migration).toContain('v_customer_id := (v_entry ->> \'customer_id\')::uuid');
   });
 });

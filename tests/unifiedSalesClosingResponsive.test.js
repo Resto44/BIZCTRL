@@ -185,7 +185,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(sales).toContain('Wallet-first settlement is part of the canonical finalization transaction.');
     expect(sales).not.toContain('autoWalletTx(savedClosing, savedClosing.id, previousClosing)');
     expect(sales).not.toContain('autoSettle(savedClosing, savedClosing.id, proofUrl || null, ocr || null, previousClosing)');
-    expect(sales.indexOf('autoSaveCreditDebts(savedClosing, savedClosing.id)')).toBeGreaterThan(guard);
+    expect(sales.indexOf('invalidateCustomerReceivableQueries(qc)')).toBeGreaterThan(guard);
+    expect(sales).not.toContain('autoSaveCreditDebts');
   });
 
   it('keeps finalized invoice totals aligned with the canonical Other payment total', async () => {

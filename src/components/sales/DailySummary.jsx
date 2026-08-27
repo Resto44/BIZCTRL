@@ -120,8 +120,18 @@ export default function DailySummary({ date, branch }) {
   // Today's collections
   const { data: collections = [] } = useQuery({
     queryKey: ['customer_collections_daily', ownerFilter, todayStr],
-    queryFn: () => base44.entities.CreditCollection.filter({ ...(ownerFilter || {}), date: todayStr }, '-date', 100),
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    queryFn: async () => {
+      if (!ownerFilter?.created_by) return [];
+      const { data, error } = await supabase
+        .from('customer_collections')
+        .select('id, amount, date, branch, branch_id, customer_id, debt_id, payment_method')
+        .eq('created_by', ownerFilter.created_by)
+        .eq('date', todayStr)
+        .limit(200);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!ownerFilter?.created_by,
     staleTime: 15000,
   });
 

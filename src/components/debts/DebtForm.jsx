@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,10 @@ import { useTenant } from '@/lib/TenantContext';
 import { useDebtI18n } from '@/lib/debtI18n';
 import { useAuth } from '@/lib/AuthContext';
 import { format } from 'date-fns';
-import { FileText, MessageCircle, Loader2, CheckCircle, Clock } from 'lucide-react';
+import { FileText, MessageCircle, Loader2, Clock } from 'lucide-react';
 import { generateInvoiceNumber, processDebtSave, generateInvoicePDF, openPDFInNewTab } from '@/lib/debtInvoiceService';
 import { isWhatsAppConfigured } from '@/lib/whatsappService';
+import { createCustomerReceivable, customerDebtPaymentErrorMessage, newReceivableRequestId } from '@/lib/debt/customerReceivableRepository';
 
 export default function DebtForm({ initial = {}, onSave, onCancel }) {
   const { branches, activeRestaurantId, ownerFilter } = useTenant();
@@ -52,6 +53,7 @@ export default function DebtForm({ initial = {}, onSave, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [autoInvoiceNum, setAutoInvoiceNum] = useState('');
   const [saveResult, setSaveResult] = useState(null);
+  const receivableRequestId = useRef(null);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -71,6 +73,12 @@ export default function DebtForm({ initial = {}, onSave, onCancel }) {
     queryKey: ['employees', ownerFilter],
     queryFn: () => base44.entities.Employee.filter(ownerFilter || {}, 'full_name', 500),
     enabled: form.party_type === 'employee' && !!ownerFilter?.created_by,
+  });
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers', activeRestaurantId, form.branch],
+    queryFn: () => base44.entities.Customer.filter({ restaurant_id: activeRestaurantId, is_active: true }, 'name', 500),
+    enabled: form.party_type === 'customer' && form.type === 'receivable' && !!activeRestaurantId,
   });
 
   // Load Drivers
@@ -108,7 +116,23 @@ export default function DebtForm({ initial = {}, onSave, onCancel }) {
       delete finalData.party_id;
 
       let savedRecord;
-      if (initial.id) {
+      if (!initial.id && form.party_type === 'customer' && form.type === 'receivable') {
+        const branchId = branches.find((branch) => branch.key === form.branch || branch.branch_key === form.branch)?.id || null;
+        const result = await createCustomerReceivable({
+          customerId: form.customer_id,
+          branchId,
+          branch: form.branch,
+          totalAmount: total,
+          paidAmount: paid,
+          date: form.date,
+          dueDate: form.due_date,
+          invoiceNumber: form.invoice_number,
+          description: form.description,
+          notes: form.notes,
+          requestId: receivableRequestId.current || (receivableRequestId.current = newReceivableRequestId()),
+        });
+        savedRecord = result.debt;
+      } else if (initial.id) {
         savedRecord = await base44.entities.DebtRecord.update(initial.id, finalData);
       } else {
         savedRecord = await base44.entities.DebtRecord.create(finalData);
@@ -128,7 +152,7 @@ export default function DebtForm({ initial = {}, onSave, onCancel }) {
       onSave(savedRecord);
     } catch (err) {
       console.error('Failed to save debt:', err);
-      alert('Error: ' + (err.message || 'Unknown error'));
+      alert(customerDebtPaymentErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -154,6 +178,18 @@ export default function DebtForm({ initial = {}, onSave, onCancel }) {
           party_id: drv.id,
           party_name: drv.full_name,
           party_phone: drv.phone || '',
+        }));
+      }
+    } else if (form.party_type === 'customer') {
+      const customer = customers.find((candidate) => String(candidate.id) === String(val));
+      if (customer) {
+        setForm(f => ({
+          ...f,
+          party_id: customer.id,
+          customer_id: customer.id,
+          party_name: customer.name || '',
+          party_phone: customer.phone || '',
+          branch: customer.branch || f.branch,
         }));
       }
     }
@@ -248,6 +284,15 @@ export default function DebtForm({ initial = {}, onSave, onCancel }) {
               <SelectContent>
                 {drivers.map(drv => (
                   <SelectItem key={drv.id} value={drv.id}>{drv.full_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : form.party_type === 'customer' && form.type === 'receivable' ? (
+            <Select value={form.customer_id || form.party_id || ''} onValueChange={handlePartySelect}>
+              <SelectTrigger><SelectValue placeholder="Select active customer" /></SelectTrigger>
+              <SelectContent>
+                {customers.filter((customer) => !form.branch || customer.branch === form.branch).map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>{customer.name}{customer.phone ? ` · ${customer.phone}` : ''}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
