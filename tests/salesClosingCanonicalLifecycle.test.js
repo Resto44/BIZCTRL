@@ -101,11 +101,16 @@ describe('Sales Closing branch-isolation regression', () => {
   });
 
   it('queries branch-dependent customers and purchases on the backend rather than filtering restaurant-wide results', async () => {
-    const workspace = await source('src/components/sales/UnifiedSalesClosing.jsx');
+    const [workspace, customerLoader] = await Promise.all([
+      source('src/components/sales/UnifiedSalesClosing.jsx'),
+      source('src/lib/closing/CanonicalCustomerLoader.js'),
+    ]);
 
-    expect(workspace).toContain("base().eq('branch_id', selectedBranchId)");
-    expect(workspace).toContain("base().is('branch_id', null).eq('branch', form.branch)");
-    expect(workspace).toContain("queryKey: ['customers_form', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift]");
+    expect(workspace).toContain('loadCanonicalActiveCustomers({ client: supabase, ...canonicalCustomerScope })');
+    expect(workspace).toContain("queryKey: ['customers_form', canonicalCustomerScope.restaurantId, canonicalCustomerScope.branchId, canonicalCustomerScope.branchKey]");
+    expect(customerLoader).toContain(".eq('branch_id', branchId)");
+    expect(customerLoader).toContain(".is('branch_id', null).eq('branch', branchKey)");
+    expect(customerLoader).toContain(".eq('branch', branchKey)");
     expect(workspace).toContain("queryKey: ['approved_purchases_for_date', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift]");
     expect(workspace).toContain('const customers = allCustomers;');
     expect(workspace).not.toContain('allCustomers.filter((customer) => matchesBranch');

@@ -2,6 +2,10 @@
   "name": "DebtPayment",
   "type": "object",
   "properties": {
+    "customer_id": {
+      "type": "string",
+      "description": "Canonical Customer Master reference for customer payments"
+    },
     "debt_id": {
       "type": "string",
       "description": "Reference to DebtRecord id"

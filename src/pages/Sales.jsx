@@ -447,19 +447,36 @@ export default function Sales() {
       const customerId = entry.customer_id;
 
       try {
-        // Fetch or create DebtRecord for this customer
+        // A Customer Master ID is never a DebtRecord ID. Resolve the existing
+        // receivable by its canonical customer reference first, scoped to the
+        // finalized Closing's tenant and branch. Older rows without customer_id
+        // may be matched once by their existing name/phone snapshot and are then
+        // linked, rather than duplicated.
+        const debtScope = {
+          party_type: 'customer',
+          type: 'receivable',
+          restaurant_id: saleData.restaurant_id || activeRestaurant?.id,
+          branch: saleData.branch,
+        };
         let debtRecord = null;
         if (customerId) {
-          const existing = asRecordArray(await base44.entities.DebtRecord.filter({ id: customerId }));
-          debtRecord = firstRecord(existing);
-        } else {
-          // Look up by name + branch + type=receivable to avoid duplicates
-          const existing = asRecordArray(await base44.entities.DebtRecord.filter({
+          debtRecord = firstRecord(asRecordArray(await base44.entities.DebtRecord.filter({
+            ...debtScope,
+            customer_id: customerId,
+          })));
+        }
+        if (!debtRecord) {
+          const legacyMatches = asRecordArray(await base44.entities.DebtRecord.filter({
+            ...debtScope,
             party_name: customerName,
-            branch: saleData.branch,
-            type: 'receivable'
+            ...(entry.customer_phone ? { party_phone: entry.customer_phone } : {}),
           }));
-          debtRecord = firstRecord(existing);
+          const legacyMatch = firstRecord(legacyMatches);
+          // Never merge two different canonical customers solely because their
+          // historic display names happen to match.
+          if (!legacyMatch?.customer_id || String(legacyMatch.customer_id) === String(customerId || '')) {
+            debtRecord = legacyMatch;
+          }
         }
 
         if (debtRecord) {
@@ -474,6 +491,7 @@ export default function Sales() {
             // Keep the existing debt record authoritative while retaining an
             // optional immutable Sales Source relationship for analysis.
             source_id: debtRecord.source_id || entry.source_id || null,
+            ...(customerId && !debtRecord.customer_id ? { customer_id: customerId } : {}),
           });
           
           // Record the transaction in DebtPayment
@@ -490,6 +508,7 @@ export default function Sales() {
             branch_id: saleData.branch_id || null,
             branch: saleData.branch || '',
             source_id: entry.source_id || debtRecord.source_id || null,
+            customer_id: customerId || debtRecord.customer_id || null,
           });
         } else {
           // Create new DebtRecord
@@ -498,6 +517,7 @@ export default function Sales() {
             party_type: 'customer',
             party_name: customerName,
             party_phone: entry.customer_phone || '',
+            customer_id: customerId || null,
             branch: saleData.branch,
             date: saleData.date,
             total_amount: amt,
@@ -523,6 +543,7 @@ export default function Sales() {
             branch_id: saleData.branch_id || null,
             branch: saleData.branch || '',
             source_id: entry.source_id || null,
+            customer_id: customerId || null,
           });
         }
 

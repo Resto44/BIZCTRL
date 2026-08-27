@@ -58,6 +58,7 @@ import { SalesClosingFieldDialog, SalesSourceDialog, newSalesClosingSource } fro
 import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { customerCreditSnapshot, creditEntryRequiresCustomer } from '@/lib/closing/CustomerCreditCalculations';
+import { customerCreditEntryPatch, hasCanonicalCustomerScope, loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
 import { cashReconciliationSnapshot, paymentMethodForCode } from '@/lib/closing/CashReconciliationLedger';
 import { Banknote as BanknoteIcon, CreditCard as CreditCardIcon, UserCheck, PlusCircle, ShoppingBag, Truck, Star, Globe, Smartphone, UtensilsCrossed, Package as PackageIcon, DollarSign as DollarSignIcon, Gift, Users as UsersIcon, Building2 as Building2Icon, Zap as ZapIcon, Activity as ActivityIcon, BarChart3 as BarChart3Icon, Shield } from 'lucide-react';
 
@@ -381,19 +382,9 @@ function CustomerCreditEntry({ entry, idx, onRemove, onUpdate, customers, curren
 
   const selectCustomer = (customerId) => {
     const customer = customers.find((candidate) => String(candidate.id) === String(customerId));
-    if (!customer) return;
-    const name = customer.customer_name || customer.name || '';
-    onUpdate(entry.id, {
-      customer_id: customer.id,
-      customer: name,
-      customer_name_snapshot: name,
-      customer_phone: customer.phone || '',
-      previous_credit: Number(customer.outstanding_balance) || 0,
-      current_debt: Number(customer.outstanding_balance) || 0,
-      credit_limit: Number(customer.credit_limit) || 0,
-      available_credit: Math.max(0, (Number(customer.credit_limit) || 0) - (Number(customer.outstanding_balance) || 0)),
-      manager_override: false,
-    });
+    const patch = customerCreditEntryPatch(customer);
+    if (!patch) return;
+    onUpdate(entry.id, patch);
   };
 
   return (
@@ -1094,27 +1085,19 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   }, [form.pos_device_id, initial?.id, isManager, posDevices]);
 
   // ── Customers ─────────────────────────────────────────────────────────────
+  const canonicalCustomerScope = {
+    restaurantId: activeRestaurant?.id,
+    branchId: selectedBranchId,
+    branchKey: form.branch,
+  };
   const { data: allCustomersData, isLoading: custLoading } = useQuery({
-    queryKey: ['customers_form', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift],
-    queryFn: async () => {
-      if (!activeRestaurant?.id || !selectedBranchId || !form.branch) return [];
-      const base = () => supabase
-        .from('customers')
-        .select('id, name, customer_name:name, phone, branch, branch_id, credit_limit, outstanding_balance, is_active, restaurant_id')
-        .eq('restaurant_id', activeRestaurant.id)
-        .eq('is_active', true)
-        .order('name')
-        .limit(500);
-      const [canonical, legacy] = await Promise.all([
-        base().eq('branch_id', selectedBranchId),
-        base().is('branch_id', null).eq('branch', form.branch),
-      ]);
-      if (canonical.error || legacy.error) throw canonical.error || legacy.error;
-      return asRecordArray(Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
-        .map((record) => [record.id, record])).values()));
-    },
+    queryKey: ['customers_form', canonicalCustomerScope.restaurantId, canonicalCustomerScope.branchId, canonicalCustomerScope.branchKey],
+    queryFn: () => loadCanonicalActiveCustomers({ client: supabase, ...canonicalCustomerScope }),
     staleTime: 0, // Always fresh
-    enabled: isManager ? !!activeRestaurant?.id && !!form.branch : !!ownerFilter?.created_by,
+    // The query and the gate intentionally use the same scope condition. This
+    // avoids returning a cached-looking empty selector while the branch UUID or
+    // legacy branch key is still being resolved, without widening branch access.
+    enabled: hasCanonicalCustomerScope(canonicalCustomerScope),
   });
   const allCustomers = asRecordArray(allCustomersData);
 
