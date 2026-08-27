@@ -2,6 +2,10 @@
   "name": "DebtRecord",
   "type": "object",
   "properties": {
+    "customer_id": {
+      "type": "string",
+      "description": "Canonical Customer Master reference for customer receivables"
+    },
     "type": {
       "type": "string",
       "enum": [

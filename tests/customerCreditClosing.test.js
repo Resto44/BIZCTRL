@@ -65,4 +65,12 @@ describe('Customer Master credit Closing runtime', () => {
     expect(salesPage).toContain('Customer Master balances are updated atomically by the canonical Sales');
     expect(salesPage).not.toContain('outstanding_balance: (Number(c.outstanding_balance) || 0) + amt');
   });
+
+  it('keeps the selected canonical customer reference through legacy receivable and payment synchronization', async () => {
+    const salesPage = await source('src/pages/Sales.jsx');
+    expect(salesPage).toContain('A Customer Master ID is never a DebtRecord ID');
+    expect(salesPage).not.toContain('DebtRecord.filter({ id: customerId })');
+    expect(salesPage).toContain('customer_id: customerId');
+    expect(salesPage).toContain('customer_id: customerId || debtRecord.customer_id || null');
+  });
 });
