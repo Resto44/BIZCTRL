@@ -34,6 +34,9 @@ import { filterDailySalesRecords, toDailySalesCardRecord } from '@/lib/dailySale
 import { closingSaveErrorMessage, recordClosingOwnerPayment, saveClosingSession } from '@/lib/closing/ClosingRepository';
 import { dailyClosingDefaults } from '@/lib/closing/CashReconciliationLedger';
 import { invalidateCustomerReceivableQueries } from '@/lib/debt/customerReceivableRepository';
+
+const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
+
 const dailySalesTotal = (sale) =>
   Number(sale?.restaurant_cash ?? sale?.cash ?? 0) +
   Number(sale?.restaurant_network ?? sale?.network ?? 0) +
