@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App.jsx';
 import '@/index.css';
+import '@/styles/responsive-performance.css';
 
 class GlobalErrorBoundary extends React.Component {
   constructor(props) {
@@ -38,7 +39,6 @@ class GlobalErrorBoundary extends React.Component {
   }
 }
 
-// Service worker — register only, no forced reloads (they cause infinite loops in preview)
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
