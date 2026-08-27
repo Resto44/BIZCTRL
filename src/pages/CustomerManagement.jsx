@@ -641,12 +641,12 @@ export default function CustomerManagement() {
 
       {/* Main Tabs */}
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full grid grid-cols-5 h-9">
-          <TabsTrigger value="dashboard" className="text-xs">{t('collection_dashboard')}</TabsTrigger>
-          <TabsTrigger value="customers" className="text-xs">{t('customer_profiles')}</TabsTrigger>
-          <TabsTrigger value="ranking" className="text-xs">{t('customer_ranking')}</TabsTrigger>
-          <TabsTrigger value="aging" className="text-xs">{t('aging_report')}</TabsTrigger>
-          <TabsTrigger value="vip" className="text-xs">{t('vip_customers')}</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 sm:grid-cols-5">
+          <TabsTrigger value="dashboard" className="min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:min-h-9 sm:whitespace-nowrap">{t('collection_dashboard')}</TabsTrigger>
+          <TabsTrigger value="customers" className="min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:min-h-9 sm:whitespace-nowrap">{t('customer_profiles')}</TabsTrigger>
+          <TabsTrigger value="ranking" className="min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:min-h-9 sm:whitespace-nowrap">{t('customer_ranking')}</TabsTrigger>
+          <TabsTrigger value="aging" className="min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:min-h-9 sm:whitespace-nowrap">{t('aging_report')}</TabsTrigger>
+          <TabsTrigger value="vip" className="col-span-2 min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:col-span-1 sm:min-h-9 sm:whitespace-nowrap">{t('vip_customers')}</TabsTrigger>
         </TabsList>
 
         {/* ── DASHBOARD ── */}
