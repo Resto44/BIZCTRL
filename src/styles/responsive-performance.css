@@ -1,32 +1,26 @@
-/* App shell: keep the browser document fixed, but allow the ERP content viewport to scroll. */
+/* App shell: fixed viewport, scrollable content surface. */
 html,
-body,
+body {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+body {
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
 #root {
   width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
-  max-width: 100%;
-  max-height: 100%;
-  margin: 0;
-  overflow: hidden !important;
-  overscroll-behavior: none !important;
-  position: fixed;
-  inset: 0;
-}
-
-html {
-  touch-action: pan-y !important;
-  -webkit-text-size-adjust: 100% !important;
-  text-size-adjust: 100% !important;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-body,
-#root {
-  touch-action: pan-y !important;
 }
 
 *,
@@ -43,31 +37,30 @@ iframe {
   max-width: 100%;
 }
 
-/* Interactive controls remain fully tappable/clickable. */
+/* Controls keep normal iOS click/tap behavior. */
+button,
+a,
 input,
 textarea,
 select,
-button,
-a,
-[contenteditable="true"],
-[data-selectable="true"] {
+[role="button"],
+[contenteditable="true"] {
   -webkit-user-select: text;
   user-select: text;
   touch-action: manipulation;
 }
 
+/* The ERP shell fills the viewport without taking html/body out of flow. */
 .erp-layout {
-  position: fixed !important;
-  inset: 0 !important;
+  position: relative !important;
   width: 100% !important;
-  height: 100% !important;
+  height: 100dvh !important;
   max-width: 100% !important;
-  max-height: 100% !important;
+  max-height: 100dvh !important;
   min-width: 0 !important;
   min-height: 0 !important;
   overflow: hidden !important;
   overscroll-behavior: none !important;
-  touch-action: pan-y !important;
 }
 
 .erp-main {
@@ -76,85 +69,58 @@ a,
   max-width: 100% !important;
   max-height: 100% !important;
   overflow: hidden !important;
-  overscroll-behavior: none !important;
-  touch-action: pan-y !important;
 }
 
-/* The page viewport is the ONLY vertical scroller. */
-[data-erp-page-viewport="true"],
-.erp-content {
+/* The page viewport is the only content scroller. */
+[data-erp-page-viewport="true"] {
   width: 100% !important;
-  max-width: 100% !important;
   min-width: 0 !important;
   min-height: 0 !important;
-  max-height: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 auto !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
-  overscroll-behavior: contain !important;
+  overscroll-behavior-y: contain !important;
   touch-action: pan-y !important;
   -webkit-overflow-scrolling: touch !important;
   scrollbar-width: none;
 }
 
-[data-erp-page-viewport="true"]::-webkit-scrollbar,
-.erp-content::-webkit-scrollbar {
-  display: none;
+[data-erp-page-viewport="true"]::-webkit-scrollbar {
   width: 0;
   height: 0;
+  display: none;
 }
 
-/* Prevent wide descendants from moving the fixed viewport. */
+/* Prevent accidental horizontal page movement from wide descendants. */
 table,
 pre,
 code {
   max-width: 100%;
 }
 
-@media (max-width: 1023px) {
-  html,
-  body,
-  #root,
-  .erp-layout,
-  .erp-main {
-    width: 100% !important;
-    max-width: 100vw !important;
-    height: 100% !important;
-    max-height: 100dvh !important;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    touch-action: pan-y !important;
-  }
-
-  [data-erp-page-viewport="true"],
-  .erp-content {
-    width: 100% !important;
-    max-width: 100vw !important;
-    min-width: 0 !important;
-    max-height: 100% !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
-    touch-action: pan-y !important;
-    -webkit-overflow-scrolling: touch !important;
-  }
-}
-
 @supports (height: 100dvh) {
-  html,
-  body,
-  #root,
   .erp-layout {
     height: 100dvh !important;
     max-height: 100dvh !important;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation: none !important;
-    transition: none !important;
+@media (max-width: 1023px) {
+  .erp-layout {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+
+  [data-erp-page-viewport="true"] {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 }
