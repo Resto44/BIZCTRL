@@ -39,11 +39,19 @@ class GlobalErrorBoundary extends React.Component {
   }
 }
 
-// App-like viewport controls. Safari can ignore viewport/CSS hints for pinch
-// gestures, so explicitly suppress Safari gesture events at the document level.
+// Safari/iOS viewport guards: suppress native pinch and double-tap zoom while
+// preserving normal scrolling and form interaction. Viewport meta also enforces
+// a fixed scale, but the runtime listeners cover Safari gesture events.
 function installMobileViewportGuards() {
+  const isTouchDevice = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
+  if (!isTouchDevice || typeof document === 'undefined') return undefined;
+
   const root = document.documentElement;
   const body = document.body;
+  const previous = {
+    rootTouchAction: root.style.touchAction,
+    bodyTouchAction: body.style.touchAction,
+  };
 
   root.style.touchAction = 'pan-y';
   body.style.touchAction = 'pan-y';
@@ -52,30 +60,35 @@ function installMobileViewportGuards() {
     event.preventDefault();
   };
 
-  const preventMultiTouch = (event) => {
-    if (event.touches?.length > 1) event.preventDefault();
-  };
-
-  const preventDoubleTapZoom = (event) => {
-    const now = Date.now();
-    if (installMobileViewportGuards.lastTouchEnd && now - installMobileViewportGuards.lastTouchEnd < 300) {
+  const preventPinch = (event) => {
+    if (event.touches && event.touches.length > 1) {
       event.preventDefault();
     }
-    installMobileViewportGuards.lastTouchEnd = now;
+  };
+
+  let lastTouchEnd = 0;
+  const preventDoubleTapZoom = (event) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) {
+      event.preventDefault();
+    }
+    lastTouchEnd = now;
   };
 
   document.addEventListener('gesturestart', preventGesture, { passive: false });
   document.addEventListener('gesturechange', preventGesture, { passive: false });
   document.addEventListener('gestureend', preventGesture, { passive: false });
-  document.addEventListener('touchmove', preventMultiTouch, { passive: false });
+  document.addEventListener('touchmove', preventPinch, { passive: false });
   document.addEventListener('touchend', preventDoubleTapZoom, { passive: false });
 
   return () => {
     document.removeEventListener('gesturestart', preventGesture);
     document.removeEventListener('gesturechange', preventGesture);
     document.removeEventListener('gestureend', preventGesture);
-    document.removeEventListener('touchmove', preventMultiTouch);
+    document.removeEventListener('touchmove', preventPinch);
     document.removeEventListener('touchend', preventDoubleTapZoom);
+    root.style.touchAction = previous.rootTouchAction;
+    body.style.touchAction = previous.bodyTouchAction;
   };
 }
 
