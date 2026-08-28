@@ -163,9 +163,22 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    scrollbar-gutter: stable;
+  }
   body {
     @apply bg-background text-foreground;
+    min-width: 0;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  }
+  #root {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
   }
 }
 
@@ -257,6 +270,12 @@ html[dir="rtl"] .animate-slide-in-left { animation-name: slide-in-right; }
 html[dir="rtl"] .animate-slide-in-right { animation-name: slide-in-left; }
 
 @media (max-width: 640px) {
+  /* Prevent mobile Safari/Chromium from zooming the whole page when a small
+     form control receives focus. Keep the viewport fixed while preserving
+     normal page scrolling and user text selection. */
+  input, select, textarea, button {
+    font-size: 16px;
+  }
   html[dir="rtl"] [role="dialog"] { max-width: calc(100vw - 1rem); }
   html[dir="rtl"] table { min-width: max-content; }
 }
@@ -273,7 +292,9 @@ html[dir="rtl"] .animate-slide-in-right { animation-name: slide-in-left; }
 /* ─── ERP Layout ──────────────────────────────────────────────────────────── */
 .erp-layout {
   display: flex;
-  min-height: 100dvh;
+  width: 100%;
+  min-width: 0;
+  min-height: 100svh;
 }
 
 .erp-sidebar {
@@ -295,7 +316,18 @@ html[dir="rtl"] .animate-slide-in-right { animation-name: slide-in-left; }
 
 .erp-content {
   flex: 1;
+  min-width: 0;
+  overflow-x: clip;
   overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.owner-dashboard-shell {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+  contain: inline-size;
 }
 
 /* ─── ERP Section title ───────────────────────────────────────────────────── */
