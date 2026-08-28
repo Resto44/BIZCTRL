@@ -1,58 +1,50 @@
 /* Shared app-like viewport + responsive guardrails. Keep page business logic unchanged. */
 html, body, #root {
   width: 100%;
-  min-width: 320px;
+  min-width: 0;
   max-width: 100%;
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   margin: 0;
+  overflow: hidden;
 }
 
-/* The document is a fixed application viewport. Scrolling belongs to explicit
-   app content containers, not the browser page. */
+/* Fixed application viewport: the browser document itself never scrolls or pans. */
 html {
   width: 100%;
   height: 100%;
-  overflow: hidden;
-  overscroll-behavior: none;
-  -webkit-text-size-adjust: 100%;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  touch-action: none !important;
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
   -webkit-user-select: none;
   user-select: none;
-  touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
 }
 
 body {
   width: 100%;
   height: 100%;
-  overflow: hidden;
-  overscroll-behavior: none;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   -webkit-user-select: none;
   user-select: none;
-  touch-action: pan-y;
-  margin: 0;
+  touch-action: none !important;
+  position: fixed;
+  inset: 0;
 }
 
 #root {
+  width: 100%;
   height: 100%;
-  overflow: hidden;
-  overscroll-behavior: none;
-  touch-action: pan-y;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  touch-action: none !important;
 }
 
-/* Inputs and editable controls must remain selectable and usable. */
-input,
-textarea,
-select,
-[contenteditable="true"],
-[data-selectable="true"] {
-  -webkit-user-select: text;
-  user-select: text;
-  touch-action: manipulation;
-}
-
-/* Keep the whole web app inside the viewport; never allow a child to widen it. */
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -61,84 +53,93 @@ img, svg, video, canvas {
   max-width: 100%;
 }
 
-button, a {
+/* Form controls remain usable while the document remains fixed. */
+input,
+textarea,
+select,
+button,
+a,
+[contenteditable="true"],
+[data-selectable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
   touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
 }
 
-/* App shell owns the viewport. Pages scroll only in explicit containers. */
 .erp-layout {
   width: 100%;
   height: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow: hidden;
-  overscroll-behavior: none;
-  touch-action: pan-y;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  touch-action: none !important;
+  position: relative;
 }
 
 .erp-main {
   min-width: 0;
   min-height: 0;
   max-width: 100%;
-  overflow: hidden;
-  overscroll-behavior: none;
-  touch-action: pan-y;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  touch-action: none !important;
 }
 
-.erp-content,
+/* The only intentional app scrolling surface. */
 [data-erp-page-viewport="true"] {
+  width: 100%;
   min-width: 0;
   min-height: 0;
   max-width: 100%;
-  overflow-x: hidden;
-  overscroll-behavior-x: none;
-  touch-action: pan-y;
-}
-
-/* This is the only normal vertical scrolling surface in the ERP shell. */
-[data-erp-page-viewport="true"] {
-  overflow-y: auto;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-x: none !important;
   overscroll-behavior-y: contain;
+  touch-action: pan-y !important;
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
 }
 
-/* Prevent common iOS selection/gesture affordances from turning into page zoom. */
-html, body, #root,
-.erp-layout, .erp-main, .erp-content,
-[data-erp-page-viewport="true"] {
-  -ms-touch-action: pan-y;
+iframe {
+  max-width: 100%;
+  border: 0;
+}
+
+table {
+  max-width: 100%;
 }
 
 @media (max-width: 1023px) {
-  html, body, #root,
-  .erp-layout,
-  .erp-main {
-    overflow: hidden;
+  html, body, #root, .erp-layout, .erp-main {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden !important;
   }
 
-  .erp-content,
   [data-erp-page-viewport="true"] {
-    overflow-x: hidden;
-    overscroll-behavior-x: none;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
   }
 }
 
 @media (max-width: 640px) {
-  .mobile-full-width {
-    width: calc(100% + 1rem);
-    margin-inline: -0.5rem;
+  html, body, #root {
+    min-width: 0;
+    max-width: 100vw;
   }
 
-  [data-erp-page-viewport="true"] table {
+  [data-erp-page-viewport="true"] {
     width: 100%;
     max-width: 100%;
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
   }
 
   [data-erp-page-viewport="true"] input,
   [data-erp-page-viewport="true"] select,
-  [data-erp-page-viewport="true"] textarea {
+  [data-erp-page-viewport="true"] textarea,
+  [data-erp-page-viewport="true"] button {
     max-width: 100%;
     min-width: 0;
   }
