@@ -26,12 +26,48 @@ const ERP_SIDEBAR_ROLES = [
   'read_only',
 ];
 
+function useAppViewportLock(locked) {
+  useEffect(() => {
+    const { body, documentElement } = document;
+    const previous = {
+      bodyOverflow: body.style.overflow,
+      bodyOverscroll: body.style.overscrollBehavior,
+      rootOverflow: documentElement.style.overflow,
+      rootOverscroll: documentElement.style.overscrollBehavior,
+      bodyTouchAction: body.style.touchAction,
+      rootTouchAction: documentElement.style.touchAction,
+    };
+
+    if (locked) {
+      body.style.overflow = 'hidden';
+      body.style.overscrollBehavior = 'none';
+      body.style.touchAction = 'manipulation';
+      documentElement.style.overflow = 'hidden';
+      documentElement.style.overscrollBehavior = 'none';
+      documentElement.style.touchAction = 'manipulation';
+    }
+
+    return () => {
+      body.style.overflow = previous.bodyOverflow;
+      body.style.overscrollBehavior = previous.bodyOverscroll;
+      body.style.touchAction = previous.bodyTouchAction;
+      documentElement.style.overflow = previous.rootOverflow;
+      documentElement.style.overscrollBehavior = previous.rootOverscroll;
+      documentElement.style.touchAction = previous.rootTouchAction;
+    };
+  }, [locked]);
+}
+
 export default function ERPLayout({ children }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { role } = useRole();
 
   const showSidebar = ERP_SIDEBAR_ROLES.includes(role);
+
+  // The app shell owns the viewport. Individual pages may scroll inside <main>,
+  // but the browser document itself should never become the scroller.
+  useAppViewportLock(true);
 
   useEffect(() => {
     if (!mobileMenuOpen) return undefined;
@@ -56,7 +92,7 @@ export default function ERPLayout({ children }) {
   }, [mobileMenuOpen]);
 
   return (
-    <div className="flex min-h-dvh w-full min-w-0 max-w-full bg-background">
+    <div className="erp-layout flex h-dvh max-h-dvh w-full min-w-0 max-w-full overflow-hidden overscroll-none bg-background">
       {/* Desktop Sidebar */}
       {showSidebar && (
         <ERPSidebar
@@ -74,7 +110,7 @@ export default function ERPLayout({ children }) {
             aria-label="Close navigation drawer"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 z-[110] w-[min(86vw,420px)] max-w-full min-w-0 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation drawer">
+          <div className="fixed inset-y-0 left-0 z-[110] h-dvh w-[min(86vw,420px)] max-w-full min-w-0 overflow-hidden lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation drawer">
             <ERPSidebar
               collapsed={false}
               mobile
@@ -86,15 +122,15 @@ export default function ERPLayout({ children }) {
       )}
 
       {/* Main content area */}
-      <div className="flex min-h-dvh min-w-0 max-w-full flex-1 flex-col">
+      <div className="flex h-dvh min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
         <ERPHeader onMobileMenuToggle={() => setMobileMenuOpen(o => !o)} />
 
-        {/* Page content */}
+        {/* Page content: this is the only vertical page scroller. */}
         <main
           data-erp-page-viewport="true"
           className={cn(
-            'flex-1 min-w-0 max-w-full overflow-y-auto',
-            // Bottom padding on mobile accounts for BottomNav and iPhone safe-area.
+            'min-h-0 min-w-0 max-w-full flex-1 overflow-x-hidden overflow-y-auto overscroll-contain',
+            '[-webkit-overflow-scrolling:touch]',
             'pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+1rem)] lg:pb-0'
           )}
         >
