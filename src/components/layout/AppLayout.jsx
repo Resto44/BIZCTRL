@@ -10,7 +10,7 @@
  *   - Unified Customer Credit screen for the customer-management route
  */
 import React, { lazy, Suspense, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 
 import ERPLayout from './ERPLayout';
 import OwnerWorkspaceTabs from './OwnerWorkspaceTabs';
@@ -55,12 +55,11 @@ export default function AppLayout() {
         <Suspense fallback={<CustomerCreditFallback />}>
           <CustomerCredit />
         </Suspense>
-      ) : null}
-      {!showUnifiedCustomerCredit ? null : null}
+      ) : (
+        <Outlet />
+      )}
       <NotificationPopups />
       <PWAInstallBanner />
-      {!showUnifiedCustomerCredit && null}
-      {showUnifiedCustomerCredit ? null : null}
     </ERPLayout>
   );
 }
