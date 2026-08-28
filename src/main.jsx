@@ -53,15 +53,6 @@ function installFixedAppViewportGuards() {
     ['touchforcechange', (event) => event.preventDefault()],
   ];
 
-  let lastTouchEnd = 0;
-  const preventDoubleTap = (event) => {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 350) {
-      event.preventDefault();
-    }
-    lastTouchEnd = now;
-  };
-
   const previous = {
     htmlOverflow: root.style.overflow,
     bodyOverflow: body.style.overflow,
@@ -87,13 +78,11 @@ function installFixedAppViewportGuards() {
   listeners.forEach(([type, handler]) => {
     document.addEventListener(type, handler, { passive: false, capture: true });
   });
-  document.addEventListener('touchend', preventDoubleTap, { passive: false, capture: true });
 
   return () => {
     listeners.forEach(([type, handler]) => {
       document.removeEventListener(type, handler, { capture: true });
     });
-    document.removeEventListener('touchend', preventDoubleTap, { capture: true });
     root.style.overflow = previous.htmlOverflow;
     body.style.overflow = previous.bodyOverflow;
     root.style.position = previous.htmlPosition;
