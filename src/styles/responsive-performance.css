@@ -1,20 +1,21 @@
-/* Shared app-like viewport + responsive guardrails. Keep page business logic unchanged. */
-html, body, #root {
+/* Shared app-shell lock: every ERP screen behaves like a fixed native viewport. */
+html,
+body,
+#root {
   width: 100%;
+  height: 100%;
   min-width: 0;
-  max-width: 100%;
-  height: 100%;
   min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
   margin: 0;
-  overflow: hidden;
-}
-
-/* Fixed application viewport: the browser document itself never scrolls or pans. */
-html {
-  width: 100%;
-  height: 100%;
   overflow: hidden !important;
   overscroll-behavior: none !important;
+  position: fixed;
+  inset: 0;
+}
+
+html {
   touch-action: none !important;
   -webkit-text-size-adjust: 100% !important;
   text-size-adjust: 100% !important;
@@ -23,37 +24,26 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
-body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden !important;
-  overscroll-behavior: none !important;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  -webkit-user-select: none;
-  user-select: none;
-  touch-action: none !important;
-  position: fixed;
-  inset: 0;
-}
-
+body,
 #root {
-  width: 100%;
-  height: 100%;
-  overflow: hidden !important;
-  overscroll-behavior: none !important;
   touch-action: none !important;
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-img, svg, video, canvas {
+img,
+svg,
+video,
+canvas,
+iframe {
   max-width: 100%;
 }
 
-/* Form controls remain usable while the document remains fixed. */
+/* Inputs stay usable for typing, but never become browser zoom/scroll surfaces. */
 input,
 textarea,
 select,
@@ -67,89 +57,93 @@ a,
 }
 
 .erp-layout {
-  width: 100%;
-  height: 100%;
-  max-width: 100%;
-  min-width: 0;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
   overflow: hidden !important;
   overscroll-behavior: none !important;
   touch-action: none !important;
-  position: relative;
 }
 
 .erp-main {
-  min-width: 0;
-  min-height: 0;
-  max-width: 100%;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
   overflow: hidden !important;
   overscroll-behavior: none !important;
   touch-action: none !important;
 }
 
-/* The only intentional app scrolling surface. */
-[data-erp-page-viewport="true"] {
-  width: 100%;
-  min-width: 0;
-  min-height: 0;
-  max-width: 100%;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
-  overscroll-behavior-x: none !important;
-  overscroll-behavior-y: contain;
-  touch-action: pan-y !important;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-gutter: stable;
+/* No page-level scrolling anywhere. The application viewport is frozen. */
+[data-erp-page-viewport="true"],
+.erp-content {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  touch-action: none !important;
+  -webkit-overflow-scrolling: auto !important;
+  scrollbar-width: none;
 }
 
-iframe {
-  max-width: 100%;
-  border: 0;
+[data-erp-page-viewport="true"]::-webkit-scrollbar,
+.erp-content::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
-table {
+/* Prevent wide descendants from moving the fixed viewport. */
+table,
+pre,
+code {
   max-width: 100%;
 }
 
 @media (max-width: 1023px) {
-  html, body, #root, .erp-layout, .erp-main {
-    width: 100%;
-    max-width: 100%;
-    overflow: hidden !important;
-  }
-
+  html,
+  body,
+  #root,
+  .erp-layout,
+  .erp-main,
+  .erp-content,
   [data-erp-page-viewport="true"] {
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    height: 100% !important;
+    max-height: 100dvh !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    touch-action: none !important;
   }
 }
 
-@media (max-width: 640px) {
-  html, body, #root {
-    min-width: 0;
-    max-width: 100vw;
-  }
-
-  [data-erp-page-viewport="true"] {
-    width: 100%;
-    max-width: 100%;
-    padding-left: max(0px, env(safe-area-inset-left));
-    padding-right: max(0px, env(safe-area-inset-right));
-  }
-
-  [data-erp-page-viewport="true"] input,
-  [data-erp-page-viewport="true"] select,
-  [data-erp-page-viewport="true"] textarea,
-  [data-erp-page-viewport="true"] button {
-    max-width: 100%;
-    min-width: 0;
+@supports (height: 100dvh) {
+  html,
+  body,
+  #root,
+  .erp-layout {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     scroll-behavior: auto !important;
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
+    animation: none !important;
+    transition: none !important;
   }
 }
