@@ -56,6 +56,7 @@ import { newSalesClosingCustomField } from '@/lib/salesClosingCustomization';
 import { buildSalesSourceClosingSnapshots, driverSourceEntryAmounts, driverSourcePaymentBreakdown, driverSourceTodayTotal, salesSourceTodayTotal } from '@/lib/salesSourceClosingLifecycle';
 import { SalesClosingFieldDialog, SalesSourceDialog, newSalesClosingSource } from '@/components/sales/SalesClosingCustomizationDialogs';
 import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
+import CustomerCreditSalesSource from '@/components/sales/CustomerCreditSalesSource';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { hasCanonicalCustomerScope, loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
 import { recordCustomerReceivablePayment, invalidateCustomerReceivableQueries, customerDebtPaymentErrorMessage } from '@/lib/debt/customerReceivableRepository';
@@ -364,85 +365,6 @@ const ValidationRow = memo(function ValidationRow({ label, passed, message }) {
     </div>
   );
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CUSTOMER CREDIT SALES SOURCE
-// ─────────────────────────────────────────────────────────────────────────────
-function CustomerCreditSalesSource({ entry, idx, onRemove, onUpdate, customers, currency, customerSearch, onCustomerSearch, onSelectCustomer, onRecordPayment, isRecordingPayment, disabled = false }) {
-  const selectedCustomer = customers.find((customer) => String(customer.id) === String(entry.customer_id));
-  const customerName = selectedCustomer?.customer_name || selectedCustomer?.name || entry.customer_name_snapshot || '';
-  const outstandingDebt = Number(selectedCustomer?.outstanding_balance ?? entry.previous_outstanding_debt) || 0;
-  const creditLimit = Number(selectedCustomer?.credit_limit ?? entry.credit_limit) || 0;
-  const availableCredit = Number(selectedCustomer?.available_credit ?? Math.max(0, creditLimit - outstandingDebt)) || 0;
-  const creditSaleAmount = Number(entry.amount) || 0;
-  const paymentAmount = Number(entry.payment_amount) || 0;
-  const saleExceedsLimit = creditSaleAmount > availableCredit;
-  const paymentExceedsDebt = paymentAmount > outstandingDebt;
-
-  const selectCustomer = (customerId) => {
-    const customer = customers.find((candidate) => String(candidate.id) === String(customerId));
-    if (!customer) return;
-    onUpdate(entry.id, {
-      customer_id: customer.id,
-      customer_name_snapshot: customer.customer_name || customer.name || '',
-      customer_phone: customer.phone || '',
-      previous_outstanding_debt: Number(customer.outstanding_balance) || 0,
-      credit_limit: Number(customer.credit_limit) || 0,
-      available_credit: Number(customer.available_credit) || 0,
-      payment_amount: '',
-    });
-    onSelectCustomer?.();
-  };
-
-  return (
-    <div className={`space-y-3 rounded-xl border p-3 ${saleExceedsLimit || paymentExceedsDebt ? 'border-red-300 bg-red-50/50' : 'border-amber-200 bg-amber-50/30'}`} data-testid="customer-credit-sales-source">
-      <div className="flex items-center justify-between gap-3">
-        <div><p className="text-xs font-black uppercase tracking-wide text-amber-950">Customer Credit</p><p className="text-[11px] text-amber-800">Credit sales create receivables; debt payments never create sales revenue.</p></div>
-        {!disabled && <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => onRemove(entry.id)} aria-label={`Remove customer credit source ${customerName || idx + 1}`}><Trash2 className="h-3.5 w-3.5" /></Button>}
-      </div>
-
-      <div>
-        <Label className="mb-1 block text-[10px] font-bold uppercase text-muted-foreground">Search Customer</Label>
-        <Input value={customerSearch} onChange={(event) => onCustomerSearch(event.target.value)} placeholder="Search by name, phone, or customer code" className="min-h-11 text-base" disabled={disabled} />
-      </div>
-      <div>
-        <Label className="mb-1 block text-[10px] font-bold uppercase text-muted-foreground">Customer</Label>
-        <Select value={entry.customer_id || ''} onValueChange={selectCustomer} disabled={disabled || !customers.length}>
-          <SelectTrigger className="min-h-11 text-base" aria-label={`Select customer for Customer Credit source ${idx + 1}`}><SelectValue placeholder={customers.length ? 'Select Customer' : 'No active customers available'} /></SelectTrigger>
-          <SelectContent>{customers.map((customer) => <SelectItem key={customer.id} value={customer.id}>{customer.customer_name || customer.name}{customer.phone ? ` · ${customer.phone}` : ''}{` · Debt ${currency} ${Number(customer.outstanding_balance || 0).toLocaleString()} · Available ${currency} ${Number(customer.available_credit ?? Math.max(0, Number(customer.credit_limit || 0) - Number(customer.outstanding_balance || 0))).toLocaleString()}`}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-
-      {entry.customer_id && (
-        <>
-          <div className="rounded-lg border border-amber-200 bg-background p-3 text-sm" aria-live="polite">
-            <p className="font-bold text-foreground">{customerName}</p>
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <CreditMetric label="Previous Outstanding Debt" value={outstandingDebt} currency={currency} tone="text-red-600" />
-              <CreditMetric label="Credit Limit" value={creditLimit} currency={currency} tone="text-blue-600" />
-              <CreditMetric label="Available Credit" value={availableCredit} currency={currency} tone="text-emerald-600" />
-            </div>
-          </div>
-          <NumInput id={`quick-closing-credit-sale-${entry.id}`} label="Credit Sale Amount" value={entry.amount ?? ''} onChange={(value) => onUpdate(entry.id, 'amount', value)} prefix={currency} disabled={disabled} max={availableCredit} inputClassName="min-h-11 text-base" error={saleExceedsLimit ? 'Credit sale cannot exceed the live available credit.' : undefined} helpText="This amount is recorded as a receivable when the sales closing is finalized. It does not add cash." />
-
-          <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <div><p className="text-xs font-black uppercase tracking-wide text-slate-900">Customer Debt Payment</p><p className="mt-0.5 text-[11px] text-muted-foreground">Record settlement against this customer’s existing receivables. This is not a sale.</p></div>
-            <CreditMetric label="Outstanding Debt" value={outstandingDebt} currency={currency} tone="text-red-600" />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <NumInput id={`quick-closing-credit-payment-${entry.id}`} label="Payment Amount" value={entry.payment_amount ?? ''} onChange={(value) => onUpdate(entry.id, 'payment_amount', value)} prefix={currency} disabled={disabled || outstandingDebt <= 0 || isRecordingPayment} max={outstandingDebt} inputClassName="min-h-11 text-base" error={paymentExceedsDebt ? 'Payment cannot exceed the live outstanding debt.' : undefined} />
-              <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Payment Method</Label><Select value={entry.payment_method || 'cash'} onValueChange={(value) => onUpdate(entry.id, 'payment_method', value)} disabled={disabled || outstandingDebt <= 0 || isRecordingPayment}><SelectTrigger className="min-h-11 text-base"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="cash">Cash</SelectItem><SelectItem value="card">Card</SelectItem><SelectItem value="bank_transfer">Bank Transfer</SelectItem><SelectItem value="online">Online Payment</SelectItem><SelectItem value="wallet">Wallet</SelectItem></SelectContent></Select></div>
-            </div>
-            <Button type="button" className="min-h-11 w-full sm:w-auto" variant="outline" disabled={disabled || isRecordingPayment || outstandingDebt <= 0 || paymentAmount <= 0 || paymentExceedsDebt} onClick={() => onRecordPayment(entry)} aria-busy={isRecordingPayment}>{isRecordingPayment ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Recording payment…</> : 'Record Payment'}</Button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function CreditMetric({ label, value, currency, tone }) {
-  return <div><p className="text-[9px] font-bold uppercase text-muted-foreground">{label}</p><p className={`mt-0.5 font-black ${tone}`}>{currency}{'\u00A0'}{Number(value || 0).toLocaleString()}</p></div>;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STICKY SUMMARY BAR
@@ -777,6 +699,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           previous_outstanding_debt: entry.previous_outstanding_debt ?? entry.previous_credit ?? entry.current_debt ?? 0,
           credit_limit: entry.credit_limit ?? entry.credit_limit_snapshot ?? 0,
           available_credit: entry.available_credit ?? 0,
+          transaction_type: 'credit_sale',
           amount: entry.amount ?? entry.today_credit ?? '',
           payment_amount: '',
           payment_method: 'cash',
@@ -1122,6 +1045,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     previous_outstanding_debt: 0,
     credit_limit: 0,
     available_credit: 0,
+    transaction_type: 'credit_sale',
     amount: '',
     payment_amount: '',
     payment_method: 'cash',
@@ -1507,6 +1431,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       return !Number.isFinite(amount) || amount < 0 || (amount > 0 && !entry.customer_id);
     });
     const limitExceededEntry = customerCreditSales.find((entry) => (Number(entry.amount) || 0) > (Number(entry.available_credit) || 0));
+    const pendingPaymentEntry = customerCreditSales.find((entry) => (Number(entry.payment_amount) || 0) > 0);
     const nextErrors = {};
     const invalidDriverSourceEntry = customSourceSummaries
       .filter(({ source }) => source.allows_driver_entries === true)
@@ -1530,6 +1455,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (!savingDraft && requiresCashReconciliation && actualCount === null) nextErrors.actualCash = 'Actual Cash is required.';
     if (!savingDraft && requiresCashReconciliation && cashDifference !== null && cashDifference !== 0 && !cashNotes.trim()) nextErrors.cashNotes = 'A reconciliation note is required for a cash difference.';
     if (invalidCredit) nextErrors.credit = 'Select an active branch customer and enter a valid non-negative credit sale amount.';
+    if (!savingDraft && pendingPaymentEntry) nextErrors.credit = 'Record or clear the customer debt payment before saving the Sales Closing.';
     if (!savingDraft && limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer_name_snapshot || 'the selected customer'}. Reduce the credit sale to the live available credit.`;
     if (!savingDraft && invalidDriverSourceEntry) nextErrors.driverSources = 'Each driver sales row requires an active branch driver, non-negative Cash and Network amounts, and a positive total.';
     if (!savingDraft && duplicateDriverSourceEntry) nextErrors.driverSources = 'A driver can appear only once per Sales Source and closing shift.';
@@ -1921,12 +1847,54 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                     <div><p className="text-xs font-bold uppercase tracking-wide text-foreground">{salesSourceCopy.title}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{salesSourceCopy.todayIncluded}</p></div>
                     <div className="text-right"><p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">{salesSourceCopy.todayTotal}</p><Money currency={currency} value={customTotal + manualCreditTotal} className="text-sm font-black text-blue-700" /></div>
                   </div>
-                  {creditSource && <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/40 p-3">
-                    <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-black uppercase tracking-wide text-amber-950">Customer Credit</p><p className="mt-0.5 text-[11px] text-amber-800">Uses Debts & Receivables as the only balance and settlement ledger.</p></div><Button type="button" size="sm" className="min-h-10 shrink-0" onClick={addCustomerCreditSale} disabled={custLoading || !creditSource}><PlusCircle className="mr-1.5 h-4 w-4" />Add Customer</Button></div>
-                    {custLoading ? <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-muted-foreground">Loading canonical customer receivables…</div> : customerCreditSales.length === 0 ? <div className="rounded-lg border border-dashed border-amber-300 bg-background px-3 py-4 text-sm text-muted-foreground">No Customer Credit transaction has been added.</div> : <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{customerCreditSales.map((entry, index) => <CustomerCreditSalesSource key={entry.id} entry={entry} idx={index} onRemove={removeCustomerCreditSale} onUpdate={updateCustomerCreditSale} customers={customers} currency={currency} customerSearch={customerSearch} onCustomerSearch={setCustomerSearch} onSelectCustomer={refetchCustomers} onRecordPayment={recordCustomerCreditPayment} isRecordingPayment={isRecordingCustomerDebtPayment} disabled={isSubmitting} />)}</div>}
-                    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-background px-3 py-3"><span className="text-xs font-black uppercase tracking-wide text-amber-950">Credit Sale Total</span><Money currency={currency} value={manualCreditTotal} className="text-lg font-black text-amber-700" /></div>
-                    {inlineErrors.credit && <p role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}
-                  </div>}
+                  {creditSource && (
+                    <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+                      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black text-slate-950">Customer Credit</p>
+                          <p className="mt-0.5 text-[11px] leading-5 text-slate-500">Managed by Sales Sources. Customer balances and payments come only from Debt Management.</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" size="sm" variant="outline" className="min-h-10 bg-white" onClick={() => navigate('/debt-management')}>Debt Management</Button>
+                          <Button type="button" size="sm" className="min-h-10" onClick={addCustomerCreditSale} disabled={custLoading || !creditSource}><PlusCircle className="mr-1.5 h-4 w-4" />Add Transaction</Button>
+                        </div>
+                      </div>
+                      {custLoading ? (
+                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-4 text-sm text-muted-foreground">Loading Debt Management customers…</div>
+                      ) : customerCreditSales.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-5 text-center">
+                          <p className="text-sm font-bold text-slate-800">No customer transaction added</p>
+                          <p className="mt-1 text-xs text-slate-500">Add a transaction, then choose a customer from Debt Management.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                          {customerCreditSales.map((entry, index) => (
+                            <CustomerCreditSalesSource
+                              key={entry.id}
+                              entry={entry}
+                              idx={index}
+                              onRemove={removeCustomerCreditSale}
+                              onUpdate={updateCustomerCreditSale}
+                              customers={customers}
+                              currency={currency}
+                              customerSearch={customerSearch}
+                              onCustomerSearch={setCustomerSearch}
+                              onSelectCustomer={refetchCustomers}
+                              onRecordPayment={recordCustomerCreditPayment}
+                              isRecordingPayment={isRecordingCustomerDebtPayment}
+                              paymentMethods={configuredPaymentMethods}
+                              disabled={isSubmitting}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-slate-950 px-3 py-3 text-white">
+                        <span className="text-xs font-black uppercase tracking-wide text-slate-300">Credit Sale Total</span>
+                        <Money currency={currency} value={manualCreditTotal} className="text-lg font-black text-white" />
+                      </div>
+                      {inlineErrors.credit && <p role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}
+                    </div>
+                  )}
                   {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{customSourceSummaries.map(({ source, sourceLabel, today, previous, driverEntries }) => source.allows_driver_entries === true ? <DriverSalesSourceCard key={source.id} source={source} sourceLabel={sourceLabel} entries={driverEntries} drivers={driverSourceDrivers} previous={previous} currency={currency} onAdd={() => addDriverSourceEntry(source)} onChange={(clientRowId, patch) => updateDriverSourceEntry(source.id, clientRowId, patch)} onRemove={(clientRowId) => removeDriverSourceEntry(source.id, clientRowId)} isHistoryLoading={sourceHistoryLoading || driverSourceDriversLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} /> : <SalesSourceDailyHistoryCard key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} isHistoryLoading={sourceHistoryLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} />)}</div>}
                 </div>}
                 {isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false) && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-800">{salesClosingWorkspaceCopy.paymentMethods}</p><div className="mt-2 flex flex-wrap gap-2">{configuredPaymentMethods.filter((method) => method.is_active !== false).map((method) => <Badge key={method.id} variant="outline" className="bg-background" data-i18n-skip="true">{sourceNameForLanguage(method)}</Badge>)}</div></div>}
