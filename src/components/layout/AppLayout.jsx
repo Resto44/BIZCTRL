@@ -7,10 +7,9 @@
  *   - Audit logger initialization
  *   - Notification popups
  *   - PWA install banner
- *   - Unified Customer Credit screen for the customer-management route
  */
-import React, { lazy, Suspense, useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Outlet } from 'react-router-dom';
 
 import ERPLayout from './ERPLayout';
 import OwnerWorkspaceTabs from './OwnerWorkspaceTabs';
@@ -21,24 +20,13 @@ import { useRouteGuard } from '@/lib/RoleContext';
 import PWAInstallBanner from '@/components/pwa/PWAInstallBanner';
 import SubscriptionStatusBanner from '@/components/subscription/SubscriptionStatusBanner';
 
-const CustomerCredit = lazy(() => import('@/pages/CustomerCredit'));
-
 function RouteEnforcer() {
   useRouteGuard();
   return null;
 }
 
-const CustomerCreditFallback = () => (
-  <div className="flex min-h-[40vh] items-center justify-center">
-    <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-800" aria-label="Loading customer credit" />
-  </div>
-);
-
 export default function AppLayout() {
   const { user } = useAuth();
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  const showUnifiedCustomerCredit = location.pathname === '/customer-management' && searchParams.get('mode') !== 'directory';
 
   useEffect(() => {
     if (user) initAuditLogger(user);
@@ -51,13 +39,7 @@ export default function AppLayout() {
         <SubscriptionStatusBanner />
         <OwnerWorkspaceTabs />
       </div>
-      {showUnifiedCustomerCredit ? (
-        <Suspense fallback={<CustomerCreditFallback />}>
-          <CustomerCredit />
-        </Suspense>
-      ) : (
-        <Outlet />
-      )}
+      <Outlet />
       <NotificationPopups />
       <PWAInstallBanner />
     </ERPLayout>
