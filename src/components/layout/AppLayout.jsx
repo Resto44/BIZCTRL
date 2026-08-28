@@ -8,8 +8,7 @@
  *   - Notification popups
  *   - PWA install banner
  */
-import React, { lazy, Suspense, useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
 
 import ERPLayout from './ERPLayout';
 import OwnerWorkspaceTabs from './OwnerWorkspaceTabs';
@@ -20,27 +19,13 @@ import { useRouteGuard } from '@/lib/RoleContext';
 import PWAInstallBanner from '@/components/pwa/PWAInstallBanner';
 import SubscriptionStatusBanner from '@/components/subscription/SubscriptionStatusBanner';
 
-const CustomerCredit = lazy(() => import('@/pages/CustomerCredit'));
-
 function RouteEnforcer() {
   useRouteGuard();
   return null;
 }
 
-const CustomerCreditFallback = () => (
-  <div className="flex min-h-[40vh] items-center justify-center">
-    <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-800" aria-label="Loading customer credit" />
-  </div>
-);
-
 export default function AppLayout() {
   const { user } = useAuth();
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  // Customer Credit is an explicit sub-mode. The normal Customer Management
-  // route must always render its canonical route child through <Outlet /> so a
-  // new credit screen can never break the authenticated app shell.
-  const showCustomerCredit = location.pathname === '/customer-management' && searchParams.get('mode') === 'credit';
 
   useEffect(() => {
     if (user) initAuditLogger(user);
@@ -53,13 +38,6 @@ export default function AppLayout() {
         <SubscriptionStatusBanner />
         <OwnerWorkspaceTabs />
       </div>
-      {showCustomerCredit ? (
-        <Suspense fallback={<CustomerCreditFallback />}>
-          <CustomerCredit />
-        </Suspense>
-      ) : (
-        <Outlet />
-      )}
       <NotificationPopups />
       <PWAInstallBanner />
     </ERPLayout>
