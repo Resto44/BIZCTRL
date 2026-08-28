@@ -39,6 +39,50 @@ class GlobalErrorBoundary extends React.Component {
   }
 }
 
+// App-like viewport controls. Safari can ignore viewport/CSS hints for pinch
+// gestures, so explicitly suppress Safari gesture events at the document level.
+function installMobileViewportGuards() {
+  const root = document.documentElement;
+  const body = document.body;
+
+  root.style.touchAction = 'pan-y';
+  body.style.touchAction = 'pan-y';
+
+  const preventGesture = (event) => {
+    event.preventDefault();
+  };
+
+  const preventMultiTouch = (event) => {
+    if (event.touches?.length > 1) event.preventDefault();
+  };
+
+  const preventDoubleTapZoom = (event) => {
+    const now = Date.now();
+    if (installMobileViewportGuards.lastTouchEnd && now - installMobileViewportGuards.lastTouchEnd < 300) {
+      event.preventDefault();
+    }
+    installMobileViewportGuards.lastTouchEnd = now;
+  };
+
+  document.addEventListener('gesturestart', preventGesture, { passive: false });
+  document.addEventListener('gesturechange', preventGesture, { passive: false });
+  document.addEventListener('gestureend', preventGesture, { passive: false });
+  document.addEventListener('touchmove', preventMultiTouch, { passive: false });
+  document.addEventListener('touchend', preventDoubleTapZoom, { passive: false });
+
+  return () => {
+    document.removeEventListener('gesturestart', preventGesture);
+    document.removeEventListener('gesturechange', preventGesture);
+    document.removeEventListener('gestureend', preventGesture);
+    document.removeEventListener('touchmove', preventMultiTouch);
+    document.removeEventListener('touchend', preventDoubleTapZoom);
+  };
+}
+
+if (typeof document !== 'undefined') {
+  installMobileViewportGuards();
+}
+
 // Service worker — register only, no forced reloads (they cause infinite loops in preview)
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
