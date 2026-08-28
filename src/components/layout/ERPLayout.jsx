@@ -28,24 +28,24 @@ const ERP_SIDEBAR_ROLES = [
 
 function useAppViewportLock(locked) {
   useEffect(() => {
+    if (!locked || typeof document === 'undefined') return undefined;
+
     const { body, documentElement } = document;
     const previous = {
       bodyOverflow: body.style.overflow,
       bodyOverscroll: body.style.overscrollBehavior,
+      bodyTouchAction: body.style.touchAction,
       rootOverflow: documentElement.style.overflow,
       rootOverscroll: documentElement.style.overscrollBehavior,
-      bodyTouchAction: body.style.touchAction,
       rootTouchAction: documentElement.style.touchAction,
     };
 
-    if (locked) {
-      body.style.overflow = 'hidden';
-      body.style.overscrollBehavior = 'none';
-      body.style.touchAction = 'manipulation';
-      documentElement.style.overflow = 'hidden';
-      documentElement.style.overscrollBehavior = 'none';
-      documentElement.style.touchAction = 'manipulation';
-    }
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+    body.style.touchAction = 'pan-y';
+    documentElement.style.overflow = 'hidden';
+    documentElement.style.overscrollBehavior = 'none';
+    documentElement.style.touchAction = 'pan-y';
 
     return () => {
       body.style.overflow = previous.bodyOverflow;
@@ -75,8 +75,6 @@ export default function ERPLayout({ children }) {
     const { body, documentElement } = document;
     const previousBodyOverflow = body.style.overflow;
     const previousBodyOverscrollBehavior = body.style.overscrollBehavior;
-    const previousRootOverflow = documentElement.style.overflow;
-    const previousRootOverscrollBehavior = documentElement.style.overscrollBehavior;
 
     body.style.overflow = 'hidden';
     body.style.overscrollBehavior = 'none';
@@ -86,8 +84,8 @@ export default function ERPLayout({ children }) {
     return () => {
       body.style.overflow = previousBodyOverflow;
       body.style.overscrollBehavior = previousBodyOverscrollBehavior;
-      documentElement.style.overflow = previousRootOverflow;
-      documentElement.style.overscrollBehavior = previousRootOverscrollBehavior;
+      documentElement.style.overflow = previousBodyOverflow;
+      documentElement.style.overscrollBehavior = previousBodyOverscrollBehavior;
     };
   }, [mobileMenuOpen]);
 
