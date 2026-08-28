@@ -34,12 +34,14 @@ function CustomerLedger({ debts, payments, currency }) {
   const customerMap = React.useMemo(() => {
     const map = {};
     debts.filter(d => d.party_type === 'customer').forEach(debt => {
-      const key = debt.party_name || 'Unknown';
-      if (!map[key]) map[key] = { name: key, phone: debt.party_phone || '', debts: [], totalDebt: 0, totalPaid: 0, remaining: 0 };
+      // A customer’s receivables are keyed by canonical identity, never by a
+      // mutable display name. Unlinked legacy rows stay isolated for review.
+      const key = debt.customer_id || `legacy:${debt.id}`;
+      if (!map[key]) map[key] = { id: key, name: debt.party_name || 'Unknown', phone: debt.party_phone || '', debts: [], totalDebt: 0, totalPaid: 0, remaining: 0 };
       map[key].debts.push(debt);
-      map[key].totalDebt += debt.total_amount || 0;
-      map[key].totalPaid += debt.paid_amount || 0;
-      map[key].remaining += debt.remaining_amount || 0;
+      map[key].totalDebt += Number(debt.total_amount) || 0;
+      map[key].totalPaid += Number(debt.paid_amount) || 0;
+      map[key].remaining += Number(debt.remaining_amount) || 0;
     });
     return Object.values(map);
   }, [debts]);
@@ -65,7 +67,7 @@ function CustomerLedger({ debts, payments, currency }) {
       ) : (
         <div className="space-y-2">
           {filtered.map(customer => (
-            <div key={customer.name} className={`rounded-lg p-3 border ${customer.remaining > 0 ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'}`}>
+            <div key={customer.id} className={`rounded-lg p-3 border ${customer.remaining > 0 ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">{customer.name.charAt(0).toUpperCase()}</div>

@@ -85,7 +85,7 @@ describe('Sales Closing branch-isolation regression', () => {
     expect(workspace).toContain("setCashSalesInput('')");
     expect(workspace).toContain("setOpeningCash('')");
     expect(workspace).toContain("setActualCashCount('')");
-    expect(workspace).toContain('setCreditEntries([])');
+    expect(workspace).toContain('setCustomerCreditSales([])');
     expect(workspace).toContain('setCustomSourceAmounts({})');
     expect(workspace).toContain("queryClient.cancelQueries({ queryKey: ['sales-closing-cash-ledger-context'] })");
     expect(workspace).not.toContain('branches.at(0)?.key');
@@ -107,11 +107,11 @@ describe('Sales Closing branch-isolation regression', () => {
       source('src/lib/closing/CanonicalCustomerLoader.js'),
     ]);
 
-    expect(workspace).toContain('loadCanonicalActiveCustomers({ client: supabase, ...canonicalCustomerScope })');
-    expect(workspace).toContain("queryKey: ['customers_form', canonicalCustomerScope.restaurantId, canonicalCustomerScope.branchId, canonicalCustomerScope.branchKey]");
-    expect(customerLoader).toContain(".eq('branch_id', branchId)");
-    expect(customerLoader).toContain(".is('branch_id', null).eq('branch', branchKey)");
-    expect(customerLoader).toContain(".eq('branch', branchKey)");
+    expect(workspace).toContain('loadCanonicalActiveCustomers({');
+    expect(workspace).toContain("queryKey: ['canonical_customer_credit_options', canonicalCustomerScope.restaurantId, canonicalCustomerScope.branchId, deferredCustomerSearch]");
+    expect(customerLoader).toContain("client.rpc('erp_list_customer_credit_options'");
+    expect(customerLoader).toContain('p_branch_id: branchId');
+    expect(customerLoader).toContain('p_limit: Math.min(Math.max(Number(limit) || 100, 1), 100)');
     expect(workspace).toContain("queryKey: ['approved_purchases_for_date', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift]");
     expect(workspace).toContain('const customers = allCustomers;');
     expect(workspace).not.toContain('allCustomers.filter((customer) => matchesBranch');

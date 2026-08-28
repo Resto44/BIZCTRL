@@ -29,7 +29,8 @@ describe('Daily Sales manager attribution', () => {
     expect(workspace).toContain('restaurant_cash: baseCashSales');
     expect(workspace).toContain('const driverSourcePaymentTotals = useMemo(() =>');
     expect(workspace).toContain('restaurant_network: Math.max(0, networkTotal - driverSourcePaymentTotals.card');
-    expect(workspace).toContain('credit: Math.max(0, creditTotal - driverSourcePaymentTotals.credit)');
+    expect(workspace).toContain('credit: manualCreditTotal');
+    expect(workspace).toContain('customerCreditSourceSnapshot');
     expect(workspace).toContain('custom_sources_total: Math.max(0, otherPaymentTotal - driverSourcePaymentTotals.other)');
     expect(salesPage).toContain("import { filterDailySalesRecords, toDailySalesCardRecord } from '@/lib/dailySalesPresentation';");
     expect(salesPage).toContain('sale={toDailySalesCardRecord(s)}');

@@ -34,6 +34,32 @@ export async function createCustomerReceivable({ customerId, branchId, branch, t
   return data;
 }
 
+export async function recordCustomerReceivablePayment({ restaurantId, branchId, branch, customerId, amount, date, paymentMethod, notes, requestId = newReceivableRequestId() }) {
+  const numericAmount = Number(amount);
+  if (!restaurantId || !branchId || !branch || !customerId || !Number.isFinite(numericAmount) || numericAmount <= 0) {
+    const error = new Error('Select an active branch customer and enter a valid debt payment amount.');
+    error.code = 'CUSTOMER_DEBT_PAYMENT_INVALID';
+    throw error;
+  }
+
+  const { data, error } = await supabase.rpc('erp_record_customer_receivable_payment', {
+    p_payload: {
+      restaurant_id: restaurantId,
+      branch_id: branchId,
+      branch,
+      customer_id: customerId,
+      amount: numericAmount,
+      date: date || null,
+      payment_method: paymentMethod || 'cash',
+      notes: notes || null,
+      request_id: requestId,
+    },
+  });
+  if (error) throw error;
+  if (!data?.payment) throw new Error('The customer payment was not recorded. Please retry using the same request reference.');
+  return data;
+}
+
 export async function recordCustomerDebtPayment({ debtId, amount, date, paymentMethod, notes, requestId = newReceivableRequestId() }) {
   const numericAmount = Number(amount);
   if (!debtId || !Number.isFinite(numericAmount) || numericAmount <= 0) {
@@ -71,6 +97,8 @@ export function invalidateCustomerReceivableQueries(queryClient) {
     ['customer_collections'],
     ['customer_collections_daily'],
     ['wallet_transactions'],
+    ['cash_movements'],
+    ['sales-closing-cash-ledger-context'],
   ].forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
 }
 
@@ -79,6 +107,7 @@ export const CUSTOMER_DEBT_PAYMENT_MESSAGES = {
   CUSTOMER_DEBT_PAYMENT_INVALID: 'Select an open customer debt and enter a valid payment amount.',
   CUSTOMER_DEBT_PAYMENT_SETTLED: 'This debt is already settled and cannot accept another payment.',
   CUSTOMER_DEBT_PAYMENT_EXCEEDS_REMAINING: 'The payment cannot exceed the remaining debt balance.',
+  CUSTOMER_DEBT_PAYMENT_METHOD_INVALID: 'Select a valid payment method for the customer debt payment.',
   SALES_CLOSING_PERMISSION_DENIED: 'You do not have permission to record a payment for this branch.',
 };
 

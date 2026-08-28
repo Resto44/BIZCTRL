@@ -90,69 +90,26 @@ export const mergeCanonicalCustomersWithReceivables = (customers, receivables) =
   });
 };
 
-export const customerCreditEntryPatch = (customer) => {
-  const canonicalCustomer = normalizeCanonicalCustomer(customer);
-  if (!canonicalCustomer) return null;
+export const loadCanonicalActiveCustomers = async ({ client, restaurantId, branchId, branchKey, search = '', limit = 100 }) => {
+  if (!hasCanonicalCustomerScope({ restaurantId, branchId, branchKey }) || !branchId) return [];
 
-  const previousCredit = canonicalCustomer.outstanding_balance;
-  const creditLimit = canonicalCustomer.credit_limit;
-
-  return {
-    customer_id: canonicalCustomer.id,
-    customer: canonicalCustomer.name,
-    customer_name_snapshot: canonicalCustomer.name,
-    customer_phone: canonicalCustomer.phone,
-    previous_credit: previousCredit,
-    current_debt: previousCredit,
-    credit_limit: creditLimit,
-    available_credit: Math.max(0, creditLimit - previousCredit),
-    manager_override: false,
-  };
-};
-
-const scopedBranchQueries = ({ branchId, branchKey, makeBaseQuery }) => {
-  const queries = [];
-  if (branchId) queries.push(makeBaseQuery().eq('branch_id', branchId));
-  if (branchKey) {
-    queries.push(
-      branchId
-        ? makeBaseQuery().is('branch_id', null).eq('branch', branchKey)
-        : makeBaseQuery().eq('branch', branchKey),
-    );
-  }
-  return queries;
-};
-
-export const loadCanonicalActiveCustomers = async ({ client, restaurantId, branchId, branchKey }) => {
-  if (!hasCanonicalCustomerScope({ restaurantId, branchId, branchKey })) return [];
-
-  const customerBaseQuery = () => client
-    .from('customers')
-    .select('id, name, customer_name:name, phone, credit_limit, branch, branch_id, is_active')
-    .eq('restaurant_id', restaurantId)
-    .eq('is_active', true)
-    .order('name')
-    .limit(500);
-  const receivableBaseQuery = () => client
-    .from('debt_records')
-    .select('id, customer_id, total_amount, paid_amount, remaining_amount, status, branch, branch_id')
-    .eq('restaurant_id', restaurantId)
-    .eq('party_type', 'customer')
-    .eq('type', 'receivable')
-    .limit(1000);
-
-  const customerQueries = scopedBranchQueries({ branchId, branchKey, makeBaseQuery: customerBaseQuery });
-  const receivableQueries = scopedBranchQueries({ branchId, branchKey, makeBaseQuery: receivableBaseQuery });
-  const results = await Promise.all([...customerQueries, ...receivableQueries]);
-  const failed = results.find((result) => result?.error);
-  if (failed?.error) throw failed.error;
-
-  const customerResults = results.slice(0, customerQueries.length);
-  const receivableResults = results.slice(customerQueries.length);
-  return mergeCanonicalCustomersWithReceivables(
-    customerResults.flatMap((result) => asRecordArray(result?.data)),
-    receivableResults.flatMap((result) => asRecordArray(result?.data)),
-  );
+  const { data, error } = await client.rpc('erp_list_customer_credit_options', {
+    p_restaurant_id: restaurantId,
+    p_branch_id: branchId,
+    p_search: String(search || '').trim() || null,
+    p_limit: Math.min(Math.max(Number(limit) || 100, 1), 100),
+  });
+  if (error) throw error;
+  return mergeCanonicalCustomers(asRecordArray(data)).map((customer) => ({
+    ...customer,
+    // The RPC calculates these values directly from debt_records under the
+    // authorized branch scope. Do not fall back to Customer Master caches.
+    outstanding_balance: asNonNegativeAmount(customer.outstanding_balance),
+    total_credit_sales: asNonNegativeAmount(customer.total_credit_sales),
+    total_collected: asNonNegativeAmount(customer.total_collected),
+    available_credit: asNonNegativeAmount(customer.available_credit),
+    credit_status: customer.credit_status || 'settled',
+  }));
 };
 
 export { asNonNegativeAmount };

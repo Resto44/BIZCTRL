@@ -3,75 +3,57 @@ import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { normalizeClosingPayload } from '../src/lib/closing/ClosingRepository';
-import { customerCreditSnapshot, creditEntryRequiresCustomer } from '../src/lib/closing/CustomerCreditCalculations';
 
 const source = (relativePath) => readFile(resolve(process.cwd(), relativePath), 'utf8');
 
-describe('Customer Master credit Closing runtime', () => {
-  it('calculates available, new, remaining, and exceeded amounts from Today Credit only', () => {
-    expect(customerCreditSnapshot({ previousCredit: 1200, creditLimit: 2000, todayCredit: 300 })).toMatchObject({
-      availableCredit: 800,
-      newCreditBalance: 1500,
-      remainingCreditLimit: 500,
-      exceededBy: 0,
-      limitExceeded: false,
-    });
-    expect(customerCreditSnapshot({ previousCredit: 1200, creditLimit: 2000, todayCredit: 900 })).toMatchObject({
-      availableCredit: 800,
-      newCreditBalance: 2100,
-      remainingCreditLimit: -100,
-      exceededBy: 100,
-      limitExceeded: true,
-    });
-    expect(creditEntryRequiresCustomer({ amount: 300, customer_id: '' })).toBe(true);
-    expect(creditEntryRequiresCustomer({ amount: 0, customer_id: '' })).toBe(false);
-  });
-
-  it('passes Customer Credit rows to the RPC as a typed array', () => {
-    const entries = [{ customer_id: 'customer-1', today_credit: 300 }];
+describe('Customer Credit Sales Source runtime', () => {
+  it('passes Customer Credit sale rows to the RPC as a typed array', () => {
+    const entries = [{ customer_id: 'customer-1', amount: 300 }];
     expect(normalizeClosingPayload({ credit_entries_json: entries }, 'credit-request-1').credit_entries_json).toEqual(entries);
     expect(normalizeClosingPayload({ credit_entries_json: JSON.stringify(entries) }, 'credit-request-2').credit_entries_json).toEqual(entries);
   });
 
-  it('uses Customer Master selection, stable row keys, and Today-only Closing totals in the workspace', async () => {
+  it('places Customer Credit inside Sales Sources with canonical debt and payment controls', async () => {
     const workspace = await source('src/components/sales/UnifiedSalesClosing.jsx');
-    expect(workspace).toContain('data-testid="customer-credit-card"');
-    expect(workspace).toContain('Customer Credit Today Total');
-    expect(workspace).toContain('customers.map((customer) => <SelectItem key={customer.id} value={customer.id}>');
-    expect(workspace).toContain('creditEntries.map((entry, index) => <CustomerCreditEntry key={entry.id}');
-    expect(workspace).toContain('id={`quick-closing-credit-${entry.id}`}');
-    expect(workspace).toContain('credit_entries_json: creditEntries.map');
-    expect(workspace).toContain('creditEntryRequiresCustomer');
+    expect(workspace).toContain('CustomerCreditSalesSource');
+    expect(workspace).toContain('Credit Sale Amount');
+    expect(workspace).toContain('Previous Outstanding Debt');
+    expect(workspace).toContain('Available Credit');
+    expect(workspace).toContain('Customer Debt Payment');
+    expect(workspace).toContain('recordCustomerReceivablePayment');
+    expect(workspace).toContain('customerCreditSourceSnapshot');
     expect(workspace).toContain('manualCreditTotal');
-    expect(workspace).not.toContain('defaultCustomer');
+    expect(workspace).not.toContain('CustomerCreditEntry');
+    expect(workspace).not.toContain('customerCreditSnapshot');
+    expect(workspace).not.toContain('creditEntryRequiresCustomer');
   });
 
-  it('enforces Customer Master validation and records immutable finalized snapshots in the canonical transaction', async () => {
-    const migration = await source('src/supabase/20260826_sales_closing_customer_credit_runtime.sql');
-    expect(migration).toContain('CREATE TABLE IF NOT EXISTS public.sales_closing_customer_credit_snapshots');
-    expect(migration).toContain('customer_name_snapshot');
-    expect(migration).toContain('previous_credit_snapshot');
-    expect(migration).toContain('available_credit_snapshot');
-    expect(migration).toContain('remaining_credit_limit');
+  it('creates one customer-id-linked receivable per finalized Closing and validates available credit in the transactional core', async () => {
+    const migration = await source('src/supabase/20260828_customer_credit_sales_source_receivables_rebuild.sql');
+    expect(migration).toContain('erp_save_sales_closing_core_legacy_customer_balance');
+    expect(migration).toContain('ON CONFLICT (sales_closing_id, customer_id)');
     expect(migration).toContain('SALES_CLOSING_CREDIT_LIMIT_EXCEEDED');
-    expect(migration).toContain('SALES_CLOSING_CREDIT_OVERRIDE_DENIED');
-    expect(migration).toContain('credit_entries_json = v_credit_entries_sanitized');
-    expect(migration).toContain('UPDATE public.customers AS customer');
-    expect(migration).toContain('erp_guard_sales_closing_customer_credit_snapshot_immutable');
+    expect(migration).toContain("'receivable', 'customer'");
+    expect(migration).toContain('previous_outstanding_debt');
+    expect(migration).toContain('available_credit');
   });
 
-  it('does not perform a post-commit Customer Credit debt write after the server transaction commits', async () => {
+  it('records a customer debt payment separately from sales revenue and adds cash exactly once for cash payments', async () => {
+    const migration = await source('src/supabase/20260828_customer_credit_sales_source_receivables_rebuild.sql');
+    expect(migration).toContain('erp_record_customer_receivable_payment');
+    expect(migration).toContain('ORDER BY due_date NULLS LAST, date, created_date, id');
+    expect(migration).toContain('credit_collection_cash');
+    expect(migration).toContain('customer_debt_collection');
+    expect(migration).toContain("'CustomerPayments'");
+    expect(migration).toContain('settlement_request_id');
+    expect(migration).not.toContain('INSERT INTO public.daily_sales');
+  });
+
+  it('does not perform a post-commit Customer Credit debt write after the Closing transaction commits', async () => {
     const salesPage = await source('src/pages/Sales.jsx');
     expect(salesPage).toContain('Customer Credit receivables are written in the finalized Closing database');
     expect(salesPage).toContain('invalidateCustomerReceivableQueries(qc)');
     expect(salesPage).not.toContain('autoSaveCreditDebts');
     expect(salesPage).not.toContain('outstanding_balance: (Number(c.outstanding_balance) || 0) + amt');
-  });
-
-  it('keeps the selected canonical customer reference in the receivable transaction rather than treating it as a DebtRecord ID', async () => {
-    const migration = await source('src/supabase/20260828_customer_credit_receivable_source_of_truth.sql');
-    expect(migration).toContain('customer_id, sales_closing_id');
-    expect(migration).toContain('uq_debt_records_sales_closing_customer');
-    expect(migration).toContain('v_customer_id := (v_entry ->> \'customer_id\')::uuid');
   });
 });

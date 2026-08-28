@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
-  customerCreditEntryPatch,
   hasCanonicalCustomerScope,
   loadCanonicalActiveCustomers,
   mergeCanonicalCustomers,
@@ -28,33 +27,6 @@ const receivable = (overrides = {}) => ({
   ...overrides,
 });
 
-const createCustomerClient = (responses) => {
-  const calls = [];
-  const from = (table) => {
-    const filters = [];
-    const query = {
-      select: () => query,
-      eq: (field, value) => {
-        filters.push(['eq', field, value]);
-        return query;
-      },
-      is: (field, value) => {
-        filters.push(['is', field, value]);
-        return query;
-      },
-      order: () => query,
-      limit: () => query,
-      then: (onFulfilled, onRejected) => {
-        calls.push({ table, filters: [...filters] });
-        return Promise.resolve(responses[calls.length - 1] || { data: [], error: null }).then(onFulfilled, onRejected);
-      },
-    };
-    return query;
-  };
-
-  return { client: { from }, calls };
-};
-
 describe('canonical Sales Closing customer loader', () => {
   it('requires a tenant and either the canonical branch ID or the legacy branch key', () => {
     expect(hasCanonicalCustomerScope({ restaurantId: '', branchId: 'branch-1', branchKey: '' })).toBe(false);
@@ -66,11 +38,9 @@ describe('canonical Sales Closing customer loader', () => {
   it('returns no option for empty, null, malformed, or inactive customer inputs', () => {
     expect(mergeCanonicalCustomers([])).toEqual([]);
     expect(mergeCanonicalCustomers([null, undefined, {}, activeCustomer({ id: '', is_active: true }), activeCustomer({ is_active: false })])).toEqual([]);
-    expect(customerCreditEntryPatch(null)).toBeNull();
-    expect(customerCreditEntryPatch({ id: 'missing-name', is_active: true })).toBeNull();
   });
 
-  it('preserves a canonical customer ID and credit-entry snapshot after receivable-backed selection', () => {
+  it('preserves canonical identity while deriving a displayed position from receivables', () => {
     const customer = mergeCanonicalCustomersWithReceivables([activeCustomer()], [receivable({ remaining_amount: 85 })])[0];
     expect(customer).toMatchObject({
       id: 'customer-1',
@@ -78,14 +48,6 @@ describe('canonical Sales Closing customer loader', () => {
       outstanding_balance: 85,
       available_credit: 1915,
       credit_status: 'outstanding',
-    });
-    expect(customerCreditEntryPatch(customer)).toMatchObject({
-      customer_id: 'customer-1',
-      customer_name_snapshot: 'Canonical Customer',
-      previous_credit: 85,
-      current_debt: 85,
-      credit_limit: 2000,
-      available_credit: 1915,
     });
   });
 
@@ -122,7 +84,7 @@ describe('canonical Sales Closing customer loader', () => {
     ]);
   });
 
-  it('ignores written-off, malformed, negative, and unrelated receivable values rather than displaying NaN or negative credit', () => {
+  it('ignores written-off, malformed, negative, and unlinked receivable values', () => {
     const totals = receivableTotalsByCustomer([
       receivable({ id: 'valid', remaining_amount: 50, total_amount: 100, paid_amount: 50 }),
       receivable({ id: 'written-off', status: 'written_off', remaining_amount: 900 }),
@@ -138,54 +100,45 @@ describe('canonical Sales Closing customer loader', () => {
     });
   });
 
-  it('queries customers and receivables through both canonical and legacy branch storage, deduplicates customers, and never widens another branch', async () => {
-    const canonical = activeCustomer({ id: 'customer-1', name: 'Alpha', branch_id: 'branch-1', branch: '0045' });
-    const legacy = activeCustomer({ id: 'customer-2', name: 'Beta', branch_id: null, branch: '0045' });
-    const { client, calls } = createCustomerClient([
-      { data: [canonical], error: null },
-      { data: [legacy, canonical], error: null },
-      { data: [receivable({ customer_id: 'customer-1', remaining_amount: 85 })], error: null },
-      { data: [receivable({ id: 'legacy-debt', customer_id: 'customer-2', remaining_amount: 40 })], error: null },
-    ]);
+  it('uses one branch-scoped aggregate RPC with bounded search rather than loading all customers and debts', async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: [activeCustomer({
+        customer_name: 'Canonical Customer',
+        outstanding_balance: 85,
+        total_credit_sales: 285,
+        total_collected: 200,
+        available_credit: 1915,
+        credit_status: 'outstanding',
+      })],
+      error: null,
+    });
 
     await expect(loadCanonicalActiveCustomers({
-      client,
+      client: { rpc },
       restaurantId: 'tenant-1',
       branchId: 'branch-1',
       branchKey: '0045',
-    })).resolves.toEqual([
-      expect.objectContaining({ id: 'customer-1', name: 'Alpha', outstanding_balance: 85 }),
-      expect.objectContaining({ id: 'customer-2', name: 'Beta', outstanding_balance: 40 }),
-    ]);
+      search: 'Canonical',
+      limit: 500,
+    })).resolves.toEqual([expect.objectContaining({ id: 'customer-1', outstanding_balance: 85, available_credit: 1915 })]);
 
-    expect(calls).toHaveLength(4);
-    expect(calls[0]).toMatchObject({ table: 'customers' });
-    expect(calls[0].filters).toContainEqual(['eq', 'restaurant_id', 'tenant-1']);
-    expect(calls[0].filters).toContainEqual(['eq', 'branch_id', 'branch-1']);
-    expect(calls[1].filters).toContainEqual(['is', 'branch_id', null]);
-    expect(calls[1].filters).toContainEqual(['eq', 'branch', '0045']);
-    expect(calls[2]).toMatchObject({ table: 'debt_records' });
-    expect(calls[2].filters).toContainEqual(['eq', 'party_type', 'customer']);
-    expect(calls[2].filters).toContainEqual(['eq', 'type', 'receivable']);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith('erp_list_customer_credit_options', {
+      p_restaurant_id: 'tenant-1',
+      p_branch_id: 'branch-1',
+      p_search: 'Canonical',
+      p_limit: 100,
+    });
   });
 
-  it('uses a resolved canonical branch ID even while the legacy branch key is temporarily unavailable', async () => {
-    const canonical = activeCustomer({ branch_id: 'branch-1' });
-    const { client, calls } = createCustomerClient([
-      { data: [canonical], error: null },
-      { data: [receivable({ remaining_amount: 85 })], error: null },
-    ]);
-
+  it('does not issue a customer query until the canonical branch UUID is resolved', async () => {
+    const rpc = vi.fn();
     await expect(loadCanonicalActiveCustomers({
-      client,
+      client: { rpc },
       restaurantId: 'tenant-1',
-      branchId: 'branch-1',
-      branchKey: '',
-    })).resolves.toEqual([expect.objectContaining({ id: 'customer-1', outstanding_balance: 85 })]);
-
-    expect(calls).toHaveLength(2);
-    expect(calls[0].filters).toContainEqual(['eq', 'branch_id', 'branch-1']);
-    expect(calls[1]).toMatchObject({ table: 'debt_records' });
-    expect(calls[1].filters).toContainEqual(['eq', 'branch_id', 'branch-1']);
+      branchId: '',
+      branchKey: '0045',
+    })).resolves.toEqual([]);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });
