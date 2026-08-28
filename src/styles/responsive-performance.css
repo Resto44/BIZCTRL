@@ -14,10 +14,11 @@ html {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
-  touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
   -webkit-user-select: none;
   user-select: none;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -27,24 +28,28 @@ body {
   overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
+  touch-action: pan-y;
+  margin: 0;
 }
 
 #root {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
+  touch-action: pan-y;
 }
 
-/* Inputs and editable controls must remain selectable. */
+/* Inputs and editable controls must remain selectable and usable. */
 input,
 textarea,
+select,
 [contenteditable="true"],
 [data-selectable="true"] {
   -webkit-user-select: text;
   user-select: text;
+  touch-action: manipulation;
 }
 
 /* Keep the whole web app inside the viewport; never allow a child to widen it. */
@@ -56,8 +61,9 @@ img, svg, video, canvas {
   max-width: 100%;
 }
 
-button, a, input, select, textarea {
+button, a {
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* App shell owns the viewport. Pages scroll only in explicit containers. */
@@ -68,6 +74,7 @@ button, a, input, select, textarea {
   min-width: 0;
   overflow: hidden;
   overscroll-behavior: none;
+  touch-action: pan-y;
 }
 
 .erp-main {
@@ -76,6 +83,7 @@ button, a, input, select, textarea {
   max-width: 100%;
   overflow: hidden;
   overscroll-behavior: none;
+  touch-action: pan-y;
 }
 
 .erp-content,
@@ -85,6 +93,7 @@ button, a, input, select, textarea {
   max-width: 100%;
   overflow-x: hidden;
   overscroll-behavior-x: none;
+  touch-action: pan-y;
 }
 
 /* This is the only normal vertical scrolling surface in the ERP shell. */
@@ -95,15 +104,11 @@ button, a, input, select, textarea {
   scrollbar-gutter: stable;
 }
 
-/* Prevent common page-level gestures that trigger browser zoom/pan behavior. */
-html,
-body,
-#root,
-.erp-layout,
-.erp-main,
-.erp-content,
+/* Prevent common iOS selection/gesture affordances from turning into page zoom. */
+html, body, #root,
+.erp-layout, .erp-main, .erp-content,
 [data-erp-page-viewport="true"] {
-  -ms-touch-action: manipulation;
+  -ms-touch-action: pan-y;
 }
 
 @media (max-width: 1023px) {
