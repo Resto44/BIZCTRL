@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App.jsx';
 import '@/index.css';
+import '@/styles/responsive-performance.css';
 
 class GlobalErrorBoundary extends React.Component {
   constructor(props) {
@@ -38,7 +39,77 @@ class GlobalErrorBoundary extends React.Component {
   }
 }
 
-// Service worker — register only, no forced reloads (they cause infinite loops in preview)
+// The ERP is intentionally a fixed app viewport. Safari/iOS gesture defaults
+// are blocked at document capture level so pinch, double-tap zoom, page panning,
+// and browser scrolling cannot move the application surface.
+function installFixedAppViewportGuards() {
+  if (typeof document === 'undefined') return undefined;
+
+  const root = document.documentElement;
+  const body = document.body;
+  const listeners = [
+    ['gesturestart', (event) => event.preventDefault()],
+    ['gesturechange', (event) => event.preventDefault()],
+    ['gestureend', (event) => event.preventDefault()],
+    ['touchmove', (event) => event.preventDefault()],
+    ['touchforcechange', (event) => event.preventDefault()],
+    ['wheel', (event) => event.preventDefault()],
+  ];
+
+  let lastTouchEnd = 0;
+  const preventDoubleTap = (event) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 350) {
+      event.preventDefault();
+    }
+    lastTouchEnd = now;
+  };
+
+  const previous = {
+    htmlOverflow: root.style.overflow,
+    bodyOverflow: body.style.overflow,
+    htmlPosition: root.style.position,
+    bodyPosition: body.style.position,
+    htmlTouchAction: root.style.touchAction,
+    bodyTouchAction: body.style.touchAction,
+  };
+
+  root.style.overflow = 'hidden';
+  body.style.overflow = 'hidden';
+  root.style.position = 'fixed';
+  body.style.position = 'fixed';
+  root.style.inset = '0';
+  body.style.inset = '0';
+  root.style.width = '100%';
+  body.style.width = '100%';
+  root.style.height = '100dvh';
+  body.style.height = '100dvh';
+  root.style.touchAction = 'none';
+  body.style.touchAction = 'none';
+
+  listeners.forEach(([type, handler]) => {
+    document.addEventListener(type, handler, { passive: false, capture: true });
+  });
+  document.addEventListener('touchend', preventDoubleTap, { passive: false, capture: true });
+
+  return () => {
+    listeners.forEach(([type, handler]) => {
+      document.removeEventListener(type, handler, { capture: true });
+    });
+    document.removeEventListener('touchend', preventDoubleTap, { capture: true });
+    root.style.overflow = previous.htmlOverflow;
+    body.style.overflow = previous.bodyOverflow;
+    root.style.position = previous.htmlPosition;
+    body.style.position = previous.bodyPosition;
+    root.style.touchAction = previous.htmlTouchAction;
+    body.style.touchAction = previous.bodyTouchAction;
+  };
+}
+
+if (typeof document !== 'undefined') {
+  installFixedAppViewportGuards();
+}
+
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
