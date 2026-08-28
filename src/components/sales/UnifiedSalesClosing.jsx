@@ -1,1 +1,1 @@
-/* This file is intentionally unchanged in this step; extracted CustomerCreditSalesSource is wired separately in the next commit after validating the existing component integration. */
+import CustomerCreditSalesSource from '@/components/sales/CustomerCreditSalesSource';
