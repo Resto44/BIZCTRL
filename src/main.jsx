@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App.jsx';
 import '@/index.css';
-import '@/styles/responsive-performance.css';
 
 class GlobalErrorBoundary extends React.Component {
   constructor(props) {
@@ -38,9 +37,6 @@ class GlobalErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
-
-// Do not intercept touchmove/touchend: Safari needs those events for scrolling and taps.
-// Browser zoom is controlled by the document viewport policy and control-level touch-action.
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
