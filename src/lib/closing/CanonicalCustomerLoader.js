@@ -21,6 +21,7 @@ export const normalizeCanonicalCustomer = (customer) => {
     name,
     customer_name: name,
     phone: customer.phone || '',
+    customer_code: customer.customer_code || '',
     credit_limit: asNonNegativeAmount(customer.credit_limit),
     outstanding_balance: asNonNegativeAmount(customer.outstanding_balance),
   };
@@ -39,12 +40,6 @@ export const mergeCanonicalCustomers = (...customerGroups) => {
   return [...uniqueCustomers.values()].sort((left, right) => left.name.localeCompare(right.name));
 };
 
-/**
- * Customer Master is the identity and limit source. Receivable rows are the
- * sole source for outstanding debt and collection totals. Invalid legacy rows
- * without a canonical customer_id are intentionally excluded here: associating
- * them by display name at read-time could attach one customer's debt to another.
- */
 export const receivableTotalsByCustomer = (...receivableGroups) => {
   const totals = new Map();
 
@@ -80,7 +75,6 @@ export const mergeCanonicalCustomersWithReceivables = (customers, receivables) =
 
     return {
       ...customer,
-      // Do not use the legacy Customer Master balance cache for Customer Credit.
       outstanding_balance: outstandingBalance,
       total_credit_sales: asNonNegativeAmount(totals.total_credit_sales),
       total_collected: asNonNegativeAmount(totals.total_collected),
@@ -102,8 +96,6 @@ export const loadCanonicalActiveCustomers = async ({ client, restaurantId, branc
   if (error) throw error;
   return mergeCanonicalCustomers(asRecordArray(data)).map((customer) => ({
     ...customer,
-    // The RPC calculates these values directly from debt_records under the
-    // authorized branch scope. Do not fall back to Customer Master caches.
     outstanding_balance: asNonNegativeAmount(customer.outstanding_balance),
     total_credit_sales: asNonNegativeAmount(customer.total_credit_sales),
     total_collected: asNonNegativeAmount(customer.total_collected),
