@@ -39,61 +39,19 @@ class GlobalErrorBoundary extends React.Component {
   }
 }
 
-// Keep the browser document fixed while allowing the ERP's internal content
-// viewport to scroll and receive normal touch/click interaction on iOS Safari.
-function installFixedAppViewportGuards() {
-  if (typeof document === 'undefined') return undefined;
+// Prevent Safari pinch-zoom gestures without hijacking ordinary touch scrolling
+// or click/tap dispatch. Viewport sizing and scrolling are owned by ERPLayout CSS.
+function installSafariZoomGuards() {
+  if (typeof document === 'undefined') return;
 
-  const root = document.documentElement;
-  const body = document.body;
-  const listeners = [
-    ['gesturestart', (event) => event.preventDefault()],
-    ['gesturechange', (event) => event.preventDefault()],
-    ['gestureend', (event) => event.preventDefault()],
-    ['touchforcechange', (event) => event.preventDefault()],
-  ];
-
-  const previous = {
-    htmlOverflow: root.style.overflow,
-    bodyOverflow: body.style.overflow,
-    htmlPosition: root.style.position,
-    bodyPosition: body.style.position,
-    htmlTouchAction: root.style.touchAction,
-    bodyTouchAction: body.style.touchAction,
-  };
-
-  root.style.overflow = 'hidden';
-  body.style.overflow = 'hidden';
-  root.style.position = 'fixed';
-  body.style.position = 'fixed';
-  root.style.inset = '0';
-  body.style.inset = '0';
-  root.style.width = '100%';
-  body.style.width = '100%';
-  root.style.height = '100dvh';
-  body.style.height = '100dvh';
-  root.style.touchAction = 'pan-y';
-  body.style.touchAction = 'pan-y';
-
-  listeners.forEach(([type, handler]) => {
-    document.addEventListener(type, handler, { passive: false, capture: true });
-  });
-
-  return () => {
-    listeners.forEach(([type, handler]) => {
-      document.removeEventListener(type, handler, { capture: true });
-    });
-    root.style.overflow = previous.htmlOverflow;
-    body.style.overflow = previous.bodyOverflow;
-    root.style.position = previous.htmlPosition;
-    body.style.position = previous.bodyPosition;
-    root.style.touchAction = previous.htmlTouchAction;
-    body.style.touchAction = previous.bodyTouchAction;
-  };
+  const preventGestureZoom = (event) => event.preventDefault();
+  document.addEventListener('gesturestart', preventGestureZoom, { passive: false });
+  document.addEventListener('gesturechange', preventGestureZoom, { passive: false });
+  document.addEventListener('gestureend', preventGestureZoom, { passive: false });
 }
 
 if (typeof document !== 'undefined') {
-  installFixedAppViewportGuards();
+  installSafariZoomGuards();
 }
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
