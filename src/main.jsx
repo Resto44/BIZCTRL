@@ -39,64 +39,77 @@ class GlobalErrorBoundary extends React.Component {
   }
 }
 
-// Safari/iOS viewport guards: suppress native pinch and double-tap zoom while
-// preserving normal scrolling and form interaction. Viewport meta also enforces
-// a fixed scale, but the runtime listeners cover Safari gesture events.
-function installMobileViewportGuards() {
-  const isTouchDevice = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
-  if (!isTouchDevice || typeof document === 'undefined') return undefined;
+// The ERP is intentionally a fixed app viewport. Safari/iOS gesture defaults
+// are blocked at document capture level so pinch, double-tap zoom, page panning,
+// and browser scrolling cannot move the application surface.
+function installFixedAppViewportGuards() {
+  if (typeof document === 'undefined') return undefined;
 
   const root = document.documentElement;
   const body = document.body;
-  const previous = {
-    rootTouchAction: root.style.touchAction,
-    bodyTouchAction: body.style.touchAction,
-  };
-
-  root.style.touchAction = 'pan-y';
-  body.style.touchAction = 'pan-y';
-
-  const preventGesture = (event) => {
-    event.preventDefault();
-  };
-
-  const preventPinch = (event) => {
-    if (event.touches && event.touches.length > 1) {
-      event.preventDefault();
-    }
-  };
+  const listeners = [
+    ['gesturestart', (event) => event.preventDefault()],
+    ['gesturechange', (event) => event.preventDefault()],
+    ['gestureend', (event) => event.preventDefault()],
+    ['touchmove', (event) => event.preventDefault()],
+    ['touchforcechange', (event) => event.preventDefault()],
+    ['wheel', (event) => event.preventDefault()],
+  ];
 
   let lastTouchEnd = 0;
-  const preventDoubleTapZoom = (event) => {
+  const preventDoubleTap = (event) => {
     const now = Date.now();
-    if (now - lastTouchEnd <= 300) {
+    if (now - lastTouchEnd <= 350) {
       event.preventDefault();
     }
     lastTouchEnd = now;
   };
 
-  document.addEventListener('gesturestart', preventGesture, { passive: false });
-  document.addEventListener('gesturechange', preventGesture, { passive: false });
-  document.addEventListener('gestureend', preventGesture, { passive: false });
-  document.addEventListener('touchmove', preventPinch, { passive: false });
-  document.addEventListener('touchend', preventDoubleTapZoom, { passive: false });
+  const previous = {
+    htmlOverflow: root.style.overflow,
+    bodyOverflow: body.style.overflow,
+    htmlPosition: root.style.position,
+    bodyPosition: body.style.position,
+    htmlTouchAction: root.style.touchAction,
+    bodyTouchAction: body.style.touchAction,
+  };
+
+  root.style.overflow = 'hidden';
+  body.style.overflow = 'hidden';
+  root.style.position = 'fixed';
+  body.style.position = 'fixed';
+  root.style.inset = '0';
+  body.style.inset = '0';
+  root.style.width = '100%';
+  body.style.width = '100%';
+  root.style.height = '100dvh';
+  body.style.height = '100dvh';
+  root.style.touchAction = 'none';
+  body.style.touchAction = 'none';
+
+  listeners.forEach(([type, handler]) => {
+    document.addEventListener(type, handler, { passive: false, capture: true });
+  });
+  document.addEventListener('touchend', preventDoubleTap, { passive: false, capture: true });
 
   return () => {
-    document.removeEventListener('gesturestart', preventGesture);
-    document.removeEventListener('gesturechange', preventGesture);
-    document.removeEventListener('gestureend', preventGesture);
-    document.removeEventListener('touchmove', preventPinch);
-    document.removeEventListener('touchend', preventDoubleTapZoom);
-    root.style.touchAction = previous.rootTouchAction;
+    listeners.forEach(([type, handler]) => {
+      document.removeEventListener(type, handler, { capture: true });
+    });
+    document.removeEventListener('touchend', preventDoubleTap, { capture: true });
+    root.style.overflow = previous.htmlOverflow;
+    body.style.overflow = previous.bodyOverflow;
+    root.style.position = previous.htmlPosition;
+    body.style.position = previous.bodyPosition;
+    root.style.touchAction = previous.htmlTouchAction;
     body.style.touchAction = previous.bodyTouchAction;
   };
 }
 
 if (typeof document !== 'undefined') {
-  installMobileViewportGuards();
+  installFixedAppViewportGuards();
 }
 
-// Service worker — register only, no forced reloads (they cause infinite loops in preview)
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
