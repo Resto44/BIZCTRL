@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App.jsx';
 import '@/index.css';
+import '@/styles/responsive-performance.css';
 
 class GlobalErrorBoundary extends React.Component {
   constructor(props) {
