@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +16,7 @@ import { FileText, MessageCircle, Loader2, Clock } from 'lucide-react';
 import { generateInvoiceNumber, processDebtSave, generateInvoicePDF, openPDFInNewTab } from '@/lib/debtInvoiceService';
 import { isWhatsAppConfigured } from '@/lib/whatsappService';
 import { createCustomerReceivable, customerDebtPaymentErrorMessage, newReceivableRequestId } from '@/lib/debt/customerReceivableRepository';
+import { hasCanonicalCustomerScope, loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
 
 export default function DebtForm({ initial = {}, onSave, onCancel }) {
   const { branches, activeRestaurantId, ownerFilter } = useTenant();
@@ -75,10 +77,18 @@ export default function DebtForm({ initial = {}, onSave, onCancel }) {
     enabled: form.party_type === 'employee' && !!ownerFilter?.created_by,
   });
 
+  const selectedDebtBranch = branches.find((branch) => branch.key === form.branch || branch.branch_key === form.branch);
+  const canonicalCustomerScope = {
+    restaurantId: activeRestaurantId,
+    branchId: selectedDebtBranch?.id || null,
+    branchKey: form.branch || null,
+  };
   const { data: customers = [] } = useQuery({
-    queryKey: ['customers', activeRestaurantId, form.branch],
-    queryFn: () => base44.entities.Customer.filter({ restaurant_id: activeRestaurantId, is_active: true }, 'name', 500),
-    enabled: form.party_type === 'customer' && form.type === 'receivable' && !!activeRestaurantId,
+    queryKey: ['canonical_customer_credit_options', canonicalCustomerScope.restaurantId, canonicalCustomerScope.branchId, canonicalCustomerScope.branchKey],
+    queryFn: () => loadCanonicalActiveCustomers({ client: supabase, ...canonicalCustomerScope }),
+    enabled: form.party_type === 'customer'
+      && form.type === 'receivable'
+      && hasCanonicalCustomerScope(canonicalCustomerScope),
   });
 
   // Load Drivers
@@ -94,9 +104,16 @@ export default function DebtForm({ initial = {}, onSave, onCancel }) {
     setSaveResult(null);
     const total = parseFloat(form.total_amount) || 0;
     const paid = parseFloat(form.paid_amount) || 0;
+    const selectedBranch = branches.find((branch) => branch.key === form.branch || branch.branch_key === form.branch);
+    if (form.party_type === 'customer' && form.type === 'receivable' && (!form.customer_id || !selectedBranch?.id || !form.branch)) {
+      setSaving(false);
+      alert('Select an active customer from the current branch before creating a customer receivable.');
+      return;
+    }
     const data = {
       ...form,
       restaurant_id: activeRestaurantId,
+      branch_id: selectedBranch?.id || null,
       total_amount: total,
       paid_amount: paid,
       remaining_amount: total - paid,
@@ -117,8 +134,9 @@ export default function DebtForm({ initial = {}, onSave, onCancel }) {
 
       let savedRecord;
       if (!initial.id && form.party_type === 'customer' && form.type === 'receivable') {
-        const branchId = branches.find((branch) => branch.key === form.branch || branch.branch_key === form.branch)?.id || null;
+        const branchId = selectedBranch?.id || null;
         const result = await createCustomerReceivable({
+          restaurantId: activeRestaurantId,
           customerId: form.customer_id,
           branchId,
           branch: form.branch,
@@ -256,6 +274,7 @@ export default function DebtForm({ initial = {}, onSave, onCancel }) {
             set('party_name', '');
             set('party_phone', '');
             set('party_id', '');
+            set('customer_id', '');
           }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -291,8 +310,8 @@ export default function DebtForm({ initial = {}, onSave, onCancel }) {
             <Select value={form.customer_id || form.party_id || ''} onValueChange={handlePartySelect}>
               <SelectTrigger><SelectValue placeholder="Select active customer" /></SelectTrigger>
               <SelectContent>
-                {customers.filter((customer) => !form.branch || customer.branch === form.branch).map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>{customer.name}{customer.phone ? ` · ${customer.phone}` : ''}</SelectItem>
+                {customers.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>{customer.name}{customer.phone ? ` · ${customer.phone}` : ''}{` · Debt ${Number(customer.outstanding_balance || 0).toLocaleString()} · Available ${Number(customer.available_credit || 0).toLocaleString()}`}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

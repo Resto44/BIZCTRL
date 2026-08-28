@@ -77,7 +77,7 @@ describe('canonical Sales Closing customer loader', () => {
       customer_name: 'Canonical Customer',
       outstanding_balance: 85,
       available_credit: 1915,
-      credit_status: 'outstanding',
+      credit_status: 'open',
     });
     expect(customerCreditEntryPatch(customer)).toMatchObject({
       customer_id: 'customer-1',
@@ -117,8 +117,8 @@ describe('canonical Sales Closing customer loader', () => {
     );
 
     expect(positions).toEqual([
-      expect.objectContaining({ id: 'customer-with-debt', outstanding_balance: 100, credit_status: 'outstanding' }),
-      expect.objectContaining({ id: 'customer-without-debt', outstanding_balance: 0, available_credit: 600, credit_status: 'settled' }),
+      expect.objectContaining({ id: 'customer-with-debt', outstanding_balance: 100, credit_status: 'open' }),
+      expect.objectContaining({ id: 'customer-without-debt', outstanding_balance: 0, available_credit: 600, credit_status: 'no_debt' }),
     ]);
   });
 
@@ -135,6 +135,9 @@ describe('canonical Sales Closing customer loader', () => {
       outstanding_balance: 50,
       total_credit_sales: 100,
       total_collected: 50,
+      has_open_receivable: false,
+      has_partial_receivable: true,
+      open_receivables: [{ id: 'valid', remaining_amount: 50, date: null, status: 'open' }],
     });
   });
 

@@ -102,7 +102,7 @@ describe('Customer Credit receivable source-of-truth', () => {
     expect(migration).not.toContain('UPDATE public.daily_sales\n   SET credit = credit + v_amount');
     expect(repository).toContain("supabase.rpc('erp_record_customer_debt_payment'");
     expect(paymentForm).toContain('paymentRequestId.current || (paymentRequestId.current = newReceivableRequestId())');
-    expect(dailySummary).toContain(".from('customer_collections')");
+    expect(dailySummary).toContain('loadScopedCustomerCollections');
     expect(dailySummary).not.toContain('entities.CreditCollection');
   });
 

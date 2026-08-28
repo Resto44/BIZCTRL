@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,16 +12,13 @@ import DebtForm from '@/components/debts/DebtForm';
 import PaymentForm from '@/components/debts/PaymentForm';
 import DebtDetailSheet from '@/components/debts/DebtDetailSheet';
 import DebtDashboard from '@/components/debts/DebtDashboard';
-import LiquidityForecast from '@/components/debts/LiquidityForecast';
-import ReminderSettings from '@/components/debts/ReminderSettings';
 import { useRole } from '@/lib/RoleContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useDebtI18n } from '@/lib/debtI18n';
 import { useLanguage } from '@/lib/LanguageContext';
 import { supabase } from '@/api/supabaseClient';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { FileText, Receipt, MessageCircle, Clock, CheckCircle } from 'lucide-react';
+import { useBranchScope } from '@/lib/BranchScopeContext';
+import { invalidateCustomerReceivableQueries, loadScopedDebtPayments, loadScopedDebtRecords } from '@/lib/debt/customerReceivableRepository';
 import { format } from 'date-fns';
 import { isWhatsAppConfigured } from '@/lib/whatsappService';
 import { generateInvoicePDF, generateReceiptPDF, openPDFInNewTab } from '@/lib/debtInvoiceService';
@@ -34,8 +30,10 @@ function CustomerLedger({ debts, payments, currency }) {
   const customerMap = React.useMemo(() => {
     const map = {};
     debts.filter(d => d.party_type === 'customer').forEach(debt => {
-      const key = debt.party_name || 'Unknown';
-      if (!map[key]) map[key] = { name: key, phone: debt.party_phone || '', debts: [], totalDebt: 0, totalPaid: 0, remaining: 0 };
+      // A display name is not an identity. Group canonical receivables by
+      // customer_id so same-name customers can never merge across records.
+      const key = debt.customer_id ? `customer:${debt.customer_id}` : `unlinked:${debt.id}`;
+      if (!map[key]) map[key] = { id: debt.customer_id || debt.id, name: debt.party_name || 'Unknown', phone: debt.party_phone || '', debts: [], totalDebt: 0, totalPaid: 0, remaining: 0 };
       map[key].debts.push(debt);
       map[key].totalDebt += debt.total_amount || 0;
       map[key].totalPaid += debt.paid_amount || 0;
@@ -65,7 +63,7 @@ function CustomerLedger({ debts, payments, currency }) {
       ) : (
         <div className="space-y-2">
           {filtered.map(customer => (
-            <div key={customer.name} className={`rounded-lg p-3 border ${customer.remaining > 0 ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'}`}>
+            <div key={customer.id} className={`rounded-lg p-3 border ${customer.remaining > 0 ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">{customer.name.charAt(0).toUpperCase()}</div>
@@ -273,35 +271,31 @@ export default function DebtManagement() {
 
   const { ownerFilter, activeRestaurantId } = tenant;
   const createdBy = ownerFilter?.created_by;
+  const { selectedBranchId, selectedBranchKey, isAllBranches } = useBranchScope();
+  const debtScope = {
+    restaurantId: activeRestaurantId,
+    branchId: selectedBranchId,
+    branchKey: selectedBranchKey,
+    isAllBranches,
+  };
+  const hasDebtScope = Boolean(activeRestaurantId && (isAllBranches || selectedBranchId || selectedBranchKey));
 
-  const { data: payments = [] } = useQuery({
-    queryKey: ['debt_payments', createdBy],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('debt_payments')
-        .select('*')
-        .eq('created_by', createdBy)
-        .order('date', { ascending: false })
-        .limit(200);
-      if (error) return [];
-      return data || [];
-    },
-    enabled: !!createdBy,
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+    queryKey: ['debt_payments', activeRestaurantId, selectedBranchId, selectedBranchKey, isAllBranches],
+    queryFn: () => loadScopedDebtPayments(debtScope),
+    enabled: hasDebtScope,
   });
 
-  const { data: debts = [], isLoading } = useQuery({
-    queryKey: ['debts', ownerFilter],
-    queryFn: () => base44.entities.DebtRecord.filter(ownerFilter || {}, '-date', 200),
-    enabled: !!ownerFilter?.created_by,
+  const { data: debts = [], isLoading: debtsLoading } = useQuery({
+    queryKey: ['debts', activeRestaurantId, selectedBranchId, selectedBranchKey, isAllBranches],
+    queryFn: () => loadScopedDebtRecords(debtScope),
+    enabled: hasDebtScope,
   });
 
-  const userBranch = tenant?.currentBranch;
-  const filteredByRole = useMemo(() => {
-    if (role === 'manager' && userBranch) {
-      return debts.filter(d => !d.branch || d.branch === userBranch);
-    }
-    return debts;
-  }, [debts, role, userBranch]);
+  // Both owner and manager reads are already constrained in the database query.
+  // Keeping this alias avoids reintroducing browser-side branch filtering.
+  const filteredByRole = debts;
+  const isLoading = debtsLoading || paymentsLoading;
 
   const filtered = useMemo(() => {
     return filteredByRole.filter(debt => {
@@ -331,14 +325,14 @@ export default function DebtManagement() {
   const handleSaved = () => {
     setShowForm(false);
     setEditingDebt(null);
-    qc.invalidateQueries({ queryKey: ['debts'] });
+    invalidateCustomerReceivableQueries(qc);
     qc.invalidateQueries({ queryKey: ['debt_invoices'] });
     qc.invalidateQueries({ queryKey: ['whatsapp_queue'] });
   };
 
   const handlePaymentSaved = () => {
     setPayingDebt(null);
-    qc.invalidateQueries({ queryKey: ['debts'] });
+    invalidateCustomerReceivableQueries(qc);
     qc.invalidateQueries({ queryKey: ['debt_payments'] });
     qc.invalidateQueries({ queryKey: ['debt_receipts'] });
     qc.invalidateQueries({ queryKey: ['whatsapp_queue'] });
@@ -550,7 +544,7 @@ export default function DebtManagement() {
         debt={viewingDebt}
         open={!!viewingDebt}
         onClose={() => setViewingDebt(null)}
-        onUpdated={() => qc.invalidateQueries({ queryKey: ['debts'] })}
+        onUpdated={() => invalidateCustomerReceivableQueries(qc)}
       />
     </div>
   );

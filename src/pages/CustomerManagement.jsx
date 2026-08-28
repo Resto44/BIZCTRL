@@ -483,6 +483,7 @@ export default function CustomerManagement() {
         throw new Error('An active organization and branch are required to save a credit sale.');
       }
       return createCustomerReceivable({
+        restaurantId: activeRestaurantId,
         customerId: form.customer_id,
         branchId,
         branch,

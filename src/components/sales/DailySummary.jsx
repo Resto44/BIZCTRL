@@ -13,6 +13,8 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
+import { useBranchScope } from '@/lib/BranchScopeContext';
+import { loadScopedCustomerCollections, loadScopedDebtRecords } from '@/lib/debt/customerReceivableRepository';
 import { format } from 'date-fns';
 import { TrendingUp, Wallet, ShoppingCart, Truck, Users, BarChart3, Scale, DollarSign } from 'lucide-react';
 
@@ -106,8 +108,21 @@ function SectionCard({ icon: Icon, title, children, color = 'bg-secondary/40' })
 export default function DailySummary({ date, branch }) {
   const { language, currency } = useLanguage();
   const lbl = LABELS[language] || LABELS.en;
-  const { ownerFilter } = useTenant();
+  const { ownerFilter, activeRestaurantId, branches } = useTenant();
+  const { selectedBranchId, selectedBranchKey, isAllBranches } = useBranchScope();
   const todayStr = date || format(new Date(), 'yyyy-MM-dd');
+  const requestedBranch = branch && branch !== 'all'
+    ? branches.find((candidate) => candidate.key === branch || candidate.branch_key === branch)
+    : null;
+  const customerDebtScope = {
+    restaurantId: activeRestaurantId,
+    branchId: requestedBranch?.id || selectedBranchId,
+    branchKey: requestedBranch?.key || requestedBranch?.branch_key || selectedBranchKey,
+    isAllBranches: branch === 'all' || (!branch && isAllBranches),
+  };
+  const hasCustomerDebtScope = Boolean(activeRestaurantId && (
+    customerDebtScope.isAllBranches || customerDebtScope.branchId || customerDebtScope.branchKey
+  ));
 
   // Today's sales
   const { data: sales = [] } = useQuery({
@@ -119,19 +134,9 @@ export default function DailySummary({ date, branch }) {
 
   // Today's collections
   const { data: collections = [] } = useQuery({
-    queryKey: ['customer_collections_daily', ownerFilter, todayStr],
-    queryFn: async () => {
-      if (!ownerFilter?.created_by) return [];
-      const { data, error } = await supabase
-        .from('customer_collections')
-        .select('id, amount, date, branch, branch_id, customer_id, debt_id, payment_method')
-        .eq('created_by', ownerFilter.created_by)
-        .eq('date', todayStr)
-        .limit(200);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!ownerFilter?.created_by,
+    queryKey: ['customer_collections_daily', activeRestaurantId, customerDebtScope.branchId, customerDebtScope.branchKey, customerDebtScope.isAllBranches, todayStr],
+    queryFn: () => loadScopedCustomerCollections({ ...customerDebtScope, date: todayStr }),
+    enabled: hasCustomerDebtScope,
     staleTime: 15000,
   });
 
@@ -164,9 +169,9 @@ export default function DailySummary({ date, branch }) {
 
   // All open customer debts for balance
   const { data: customerDebts = [] } = useQuery({
-    queryKey: ['debts_customer', ownerFilter],
-    queryFn: () => base44.entities.DebtRecord.filter({ ...(ownerFilter || {}), type: 'receivable', party_type: 'customer' }, '-date', 500),
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+    queryKey: ['debts_customer', activeRestaurantId, customerDebtScope.branchId, customerDebtScope.branchKey, customerDebtScope.isAllBranches],
+    queryFn: () => loadScopedDebtRecords(customerDebtScope),
+    enabled: hasCustomerDebtScope,
     staleTime: 30000,
   });
 
@@ -216,7 +221,7 @@ export default function DailySummary({ date, branch }) {
       .reduce((s, inv) => s + Math.max(0, (inv.amount || 0) - (inv.paid_amount || 0)), 0);
 
     const customerDebtBalance = customerDebts
-      .filter(d => d.status !== 'paid' && d.status !== 'written_off')
+      .filter(d => d.type === 'receivable' && d.party_type === 'customer' && d.status !== 'paid' && d.status !== 'written_off')
       .reduce((s, d) => s + (Number(d.remaining_amount) || 0), 0);
 
     return {

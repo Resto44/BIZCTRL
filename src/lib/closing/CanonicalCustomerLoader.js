@@ -56,10 +56,25 @@ export const receivableTotalsByCustomer = (...receivableGroups) => {
       outstanding_balance: 0,
       total_credit_sales: 0,
       total_collected: 0,
+      has_open_receivable: false,
+      has_partial_receivable: false,
+      open_receivables: [],
     };
-    current.outstanding_balance += asNonNegativeAmount(receivable.remaining_amount);
+    const remainingAmount = asNonNegativeAmount(receivable.remaining_amount);
+    const paidAmount = asNonNegativeAmount(receivable.paid_amount);
+    current.outstanding_balance += remainingAmount;
     current.total_credit_sales += asNonNegativeAmount(receivable.total_amount);
-    current.total_collected += asNonNegativeAmount(receivable.paid_amount);
+    current.total_collected += paidAmount;
+    current.has_open_receivable ||= remainingAmount > 0 && paidAmount === 0;
+    current.has_partial_receivable ||= remainingAmount > 0 && paidAmount > 0;
+    if (remainingAmount > 0 && receivable.id) {
+      current.open_receivables.push({
+        id: receivable.id,
+        remaining_amount: remainingAmount,
+        date: receivable.date || null,
+        status: receivable.status || 'open',
+      });
+    }
     totals.set(String(customerId), current);
   });
 
@@ -74,6 +89,9 @@ export const mergeCanonicalCustomersWithReceivables = (customers, receivables) =
       outstanding_balance: 0,
       total_credit_sales: 0,
       total_collected: 0,
+      has_open_receivable: false,
+      has_partial_receivable: false,
+      open_receivables: [],
     };
     const outstandingBalance = asNonNegativeAmount(totals.outstanding_balance);
     const creditLimit = asNonNegativeAmount(customer.credit_limit);
@@ -84,8 +102,12 @@ export const mergeCanonicalCustomersWithReceivables = (customers, receivables) =
       outstanding_balance: outstandingBalance,
       total_credit_sales: asNonNegativeAmount(totals.total_credit_sales),
       total_collected: asNonNegativeAmount(totals.total_collected),
+      open_receivables: asRecordArray(totals.open_receivables)
+        .sort((left, right) => String(left.date || '').localeCompare(String(right.date || ''))),
       available_credit: Math.max(0, creditLimit - outstandingBalance),
-      credit_status: outstandingBalance > 0 ? 'outstanding' : 'settled',
+      credit_status: outstandingBalance > 0
+        ? (totals.has_partial_receivable ? 'partial' : 'open')
+        : (asNonNegativeAmount(totals.total_credit_sales) > 0 ? 'paid' : 'no_debt'),
     };
   });
 };
