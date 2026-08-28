@@ -19,10 +19,17 @@ vi.mock('lucide-react', () => ({
   ArrowDownLeft: () => null,
   ArrowUpRight: () => null,
   Check: () => null,
+  CircleCheck: () => null,
+  ClipboardCheck: () => null,
+  CreditCard: () => null,
   ExternalLink: () => null,
+  Info: () => null,
   Loader2: () => null,
+  Pencil: () => null,
   Search: () => null,
+  ShoppingCart: () => null,
   Trash2: () => null,
+  TrendingDown: () => null,
   UserCheck: () => null,
   X: () => null,
 }));
@@ -104,12 +111,11 @@ describe('CustomerCreditSalesSource', () => {
     expect(tree.root.findAllByType('input').filter((node) => node.props['aria-label'] === 'Credit sale amount')).toHaveLength(0);
   });
 
-  it('shows compact after-transaction math and a Debt Management fallback', () => {
+  it('shows the selected-design closing status and a Debt Management fallback', () => {
     const tree = renderSource({
       entry: { id: '1', customer_id: 'c1', amount: '50', payment_amount: '', transaction_type: 'credit_sale' },
     });
-    expect(tree.root.findAllByProps({ children: 'After Transaction' }).length).toBeGreaterThan(0);
-    expect(JSON.stringify(tree.toJSON())).toContain('SAR 160');
+    expect(JSON.stringify(tree.toJSON())).toContain('Credit Sale Ready — Save with Closing');
 
     const emptyTree = renderSource({
       entry: { id: '2', customer_id: '', amount: '', payment_amount: '' },
