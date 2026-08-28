@@ -39,9 +39,8 @@ class GlobalErrorBoundary extends React.Component {
   }
 }
 
-// The ERP is intentionally a fixed app viewport. Safari/iOS gesture defaults
-// are blocked at document capture level so pinch, double-tap zoom, page panning,
-// and browser scrolling cannot move the application surface.
+// Keep the browser document fixed while allowing the ERP's internal content
+// viewport to scroll and receive normal touch/click interaction on iOS Safari.
 function installFixedAppViewportGuards() {
   if (typeof document === 'undefined') return undefined;
 
@@ -51,9 +50,7 @@ function installFixedAppViewportGuards() {
     ['gesturestart', (event) => event.preventDefault()],
     ['gesturechange', (event) => event.preventDefault()],
     ['gestureend', (event) => event.preventDefault()],
-    ['touchmove', (event) => event.preventDefault()],
     ['touchforcechange', (event) => event.preventDefault()],
-    ['wheel', (event) => event.preventDefault()],
   ];
 
   let lastTouchEnd = 0;
@@ -84,8 +81,8 @@ function installFixedAppViewportGuards() {
   body.style.width = '100%';
   root.style.height = '100dvh';
   body.style.height = '100dvh';
-  root.style.touchAction = 'none';
-  body.style.touchAction = 'none';
+  root.style.touchAction = 'pan-y';
+  body.style.touchAction = 'pan-y';
 
   listeners.forEach(([type, handler]) => {
     document.addEventListener(type, handler, { passive: false, capture: true });
