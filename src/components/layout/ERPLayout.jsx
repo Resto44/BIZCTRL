@@ -42,10 +42,10 @@ function useAppViewportLock(locked) {
 
     body.style.overflow = 'hidden';
     body.style.overscrollBehavior = 'none';
-    body.style.touchAction = 'pan-y';
+    body.style.touchAction = 'none';
     documentElement.style.overflow = 'hidden';
     documentElement.style.overscrollBehavior = 'none';
-    documentElement.style.touchAction = 'pan-y';
+    documentElement.style.touchAction = 'none';
 
     return () => {
       body.style.overflow = previous.bodyOverflow;
@@ -75,17 +75,25 @@ export default function ERPLayout({ children }) {
     const { body, documentElement } = document;
     const previousBodyOverflow = body.style.overflow;
     const previousBodyOverscrollBehavior = body.style.overscrollBehavior;
+    const previousRootOverflow = documentElement.style.overflow;
+    const previousRootOverscrollBehavior = documentElement.style.overscrollBehavior;
+    const previousBodyTouchAction = body.style.touchAction;
+    const previousRootTouchAction = documentElement.style.touchAction;
 
     body.style.overflow = 'hidden';
     body.style.overscrollBehavior = 'none';
+    body.style.touchAction = 'none';
     documentElement.style.overflow = 'hidden';
     documentElement.style.overscrollBehavior = 'none';
+    documentElement.style.touchAction = 'none';
 
     return () => {
       body.style.overflow = previousBodyOverflow;
       body.style.overscrollBehavior = previousBodyOverscrollBehavior;
-      documentElement.style.overflow = previousBodyOverflow;
-      documentElement.style.overscrollBehavior = previousBodyOverscrollBehavior;
+      body.style.touchAction = previousBodyTouchAction;
+      documentElement.style.overflow = previousRootOverflow;
+      documentElement.style.overscrollBehavior = previousRootOverscrollBehavior;
+      documentElement.style.touchAction = previousRootTouchAction;
     };
   }, [mobileMenuOpen]);
 
