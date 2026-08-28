@@ -83,6 +83,22 @@ const newStableRowId = (prefix) => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return `${prefix}-${crypto.randomUUID()}`;
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
+const newCustomerCreditEntry = (sourceId = '') => ({
+  id: newStableRowId('customer-credit'),
+  client_row_id: newStableRowId('customer-credit-client'),
+  source_id: sourceId,
+  customer_id: '',
+  customer_name_snapshot: '',
+  customer_phone: '',
+  previous_outstanding_debt: 0,
+  credit_limit: 0,
+  available_credit: 0,
+  transaction_type: 'credit_sale',
+  amount: '',
+  payment_amount: '',
+  payment_method: 'cash',
+  notes: '',
+});
 const parseSalesSourceEntries = (record) => {
   const rawEntries = record?.sales_sources_json;
   if (Array.isArray(rawEntries)) return asRecordArray(rawEntries);
@@ -1035,22 +1051,20 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // The server-side RPC owns branch filtering and receivable aggregation. Never
   // reuse a restaurant-wide customer/debt cache after a branch switch.
   const customers = allCustomers;
-  const addCustomerCreditSale = () => setCustomerCreditSales((previous) => [...previous, {
-    id: newStableRowId('customer-credit'),
-    client_row_id: newStableRowId('customer-credit-client'),
-    source_id: creditSource?.id || '',
-    customer_id: '',
-    customer_name_snapshot: '',
-    customer_phone: '',
-    previous_outstanding_debt: 0,
-    credit_limit: 0,
-    available_credit: 0,
-    transaction_type: 'credit_sale',
-    amount: '',
-    payment_amount: '',
-    payment_method: 'cash',
-    notes: '',
-  }]);
+  const addCustomerCreditSale = () => setCustomerCreditSales((previous) => [
+    ...previous,
+    newCustomerCreditEntry(creditSource?.id || ''),
+  ]);
+
+  // The selected design is a direct transaction composer. It must be ready as
+  // soon as the Customer Credit Sales Source is active, without the old
+  // "Add Transaction" gate or its nested wrapper.
+  useEffect(() => {
+    if (!creditSource || sourcesLoading) return;
+    setCustomerCreditSales((previous) => previous.length
+      ? previous
+      : [newCustomerCreditEntry(creditSource.id)]);
+  }, [creditSource?.id, sourcesLoading]);
 
   // ── Approved Purchases ────────────────────────────────────────────────────
   // BUG FIX: Approved purchases query must work for both Owner (created_by) and
@@ -1732,7 +1746,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Requirement: Remove blocking success state.
   // Save returns immediately to Daily Sales via onSubmit callback.
 
-  const showCustomizationCard = Boolean(creditSource) || canCustomize || (isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0) || customClosingFields.length > 0 || (isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false));
+  const showCustomizationCard = canCustomize || (isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0) || customClosingFields.length > 0 || (isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false));
 
   return (
     <form onSubmit={handleSubmit} className="flex h-full min-h-0 min-w-0 flex-col">
@@ -1835,6 +1849,45 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             )}
           </section>
 
+          {creditSource && (
+            <section className="space-y-3" data-testid="customer-credit-closing-section" data-i18n-skip="true">
+              {custLoading ? (
+                <div className="rounded-3xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">Loading Debt Management customers…</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                    {customerCreditSales.map((entry, index) => (
+                      <CustomerCreditSalesSource
+                        key={entry.id}
+                        entry={entry}
+                        idx={index}
+                        onRemove={removeCustomerCreditSale}
+                        onUpdate={updateCustomerCreditSale}
+                        customers={customers}
+                        currency={currency}
+                        customerSearch={customerSearch}
+                        onCustomerSearch={setCustomerSearch}
+                        onSelectCustomer={refetchCustomers}
+                        onRecordPayment={recordCustomerCreditPayment}
+                        isRecordingPayment={isRecordingCustomerDebtPayment}
+                        paymentMethods={configuredPaymentMethods}
+                        disabled={isSubmitting}
+                      />
+                    ))}
+                  </div>
+                  {customerCreditSales.length > 0 && customerCreditSales.every((entry) => entry.customer_id) && (
+                    <div className="flex justify-end">
+                      <Button type="button" size="sm" variant="outline" className="min-h-10 rounded-xl bg-white" onClick={addCustomerCreditSale} disabled={isSubmitting}>
+                        <PlusCircle className="mr-1.5 h-4 w-4" />Add Another Customer
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+              {inlineErrors.credit && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}
+            </section>
+          )}
+
           {showCustomizationCard && (
             <section className="overflow-hidden rounded-2xl border border-blue-200 bg-background shadow-sm" data-i18n-skip="true">
               <div className="flex flex-col gap-2 border-b border-blue-100 bg-blue-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
@@ -1842,59 +1895,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="w-fit border-blue-200 bg-white text-[10px] text-blue-700">{salesClosingWorkspaceCopy.liveConfiguration}</Badge>{canCustomize && <><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setSourceEditor({ mode: 'create', source: newSalesClosingSource(customSources.length * 10 + 10) })}>+ {salesClosingWorkspaceCopy.addSource}</Button><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setFieldEditor({ mode: 'create', field: newSalesClosingCustomField(configuredClosingFields.length * 10 + 10) })}>+ {salesClosingWorkspaceCopy.addField}</Button><Button type="button" size="sm" className="min-h-10" onClick={() => navigate('/sales-closing-customization')}>{salesClosingWorkspaceCopy.customize}</Button></>}</div>
               </div>
               <div className="space-y-4 p-3 sm:p-4">
-                {(creditSource || (isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0)) && <div>
+                {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div><p className="text-xs font-bold uppercase tracking-wide text-foreground">{salesSourceCopy.title}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{salesSourceCopy.todayIncluded}</p></div>
                     <div className="text-right"><p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">{salesSourceCopy.todayTotal}</p><Money currency={currency} value={customTotal + manualCreditTotal} className="text-sm font-black text-blue-700" /></div>
                   </div>
-                  {creditSource && (
-                    <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
-                      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-black text-slate-950">Customer Credit</p>
-                          <p className="mt-0.5 text-[11px] leading-5 text-slate-500">Managed by Sales Sources. Customer balances and payments come only from Debt Management.</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button type="button" size="sm" variant="outline" className="min-h-10 bg-white" onClick={() => navigate('/debt-management')}>Debt Management</Button>
-                          <Button type="button" size="sm" className="min-h-10" onClick={addCustomerCreditSale} disabled={custLoading || !creditSource}><PlusCircle className="mr-1.5 h-4 w-4" />Add Transaction</Button>
-                        </div>
-                      </div>
-                      {custLoading ? (
-                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-4 text-sm text-muted-foreground">Loading Debt Management customers…</div>
-                      ) : customerCreditSales.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-5 text-center">
-                          <p className="text-sm font-bold text-slate-800">No customer transaction added</p>
-                          <p className="mt-1 text-xs text-slate-500">Add a transaction, then choose a customer from Debt Management.</p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                          {customerCreditSales.map((entry, index) => (
-                            <CustomerCreditSalesSource
-                              key={entry.id}
-                              entry={entry}
-                              idx={index}
-                              onRemove={removeCustomerCreditSale}
-                              onUpdate={updateCustomerCreditSale}
-                              customers={customers}
-                              currency={currency}
-                              customerSearch={customerSearch}
-                              onCustomerSearch={setCustomerSearch}
-                              onSelectCustomer={refetchCustomers}
-                              onRecordPayment={recordCustomerCreditPayment}
-                              isRecordingPayment={isRecordingCustomerDebtPayment}
-                              paymentMethods={configuredPaymentMethods}
-                              disabled={isSubmitting}
-                            />
-                          ))}
-                        </div>
-                      )}
-                      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-slate-950 px-3 py-3 text-white">
-                        <span className="text-xs font-black uppercase tracking-wide text-slate-300">Credit Sale Total</span>
-                        <Money currency={currency} value={manualCreditTotal} className="text-lg font-black text-white" />
-                      </div>
-                      {inlineErrors.credit && <p role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}
-                    </div>
-                  )}
                   {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{customSourceSummaries.map(({ source, sourceLabel, today, previous, driverEntries }) => source.allows_driver_entries === true ? <DriverSalesSourceCard key={source.id} source={source} sourceLabel={sourceLabel} entries={driverEntries} drivers={driverSourceDrivers} previous={previous} currency={currency} onAdd={() => addDriverSourceEntry(source)} onChange={(clientRowId, patch) => updateDriverSourceEntry(source.id, clientRowId, patch)} onRemove={(clientRowId) => removeDriverSourceEntry(source.id, clientRowId)} isHistoryLoading={sourceHistoryLoading || driverSourceDriversLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} /> : <SalesSourceDailyHistoryCard key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} isHistoryLoading={sourceHistoryLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} />)}</div>}
                 </div>}
                 {isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false) && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-800">{salesClosingWorkspaceCopy.paymentMethods}</p><div className="mt-2 flex flex-wrap gap-2">{configuredPaymentMethods.filter((method) => method.is_active !== false).map((method) => <Badge key={method.id} variant="outline" className="bg-background" data-i18n-skip="true">{sourceNameForLanguage(method)}</Badge>)}</div></div>}
@@ -1965,7 +1970,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         </div>
       </div>
 
-      <div className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
+      <div id="sales-closing-actions" className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
         <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-2 sm:flex sm:justify-end">
           <Button type="button" variant="outline" className="min-h-12 font-bold sm:w-32" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button>
           <><Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerLoading || cashLedgerUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button><Button type="submit" className={`min-h-12 font-black sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerLoading || cashLedgerUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button></>

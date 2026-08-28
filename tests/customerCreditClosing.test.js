@@ -13,7 +13,7 @@ describe('Customer Credit Sales Source runtime', () => {
     expect(normalizeClosingPayload({ credit_entries_json: JSON.stringify(entries) }, 'credit-request-2').credit_entries_json).toEqual(entries);
   });
 
-  it('places Customer Credit inside Sales Sources with canonical debt and payment controls', async () => {
+  it('places the selected Customer Credit design outside the legacy Sales Sources box', async () => {
     const [workspace, customerCreditSource] = await Promise.all([
       source('src/components/sales/UnifiedSalesClosing.jsx'),
       source('src/components/sales/CustomerCreditSalesSource.jsx'),
@@ -21,18 +21,21 @@ describe('Customer Credit Sales Source runtime', () => {
     expect(workspace).toContain('CustomerCreditSalesSource');
     expect(workspace).toContain("import CustomerCreditSalesSource from '@/components/sales/CustomerCreditSalesSource'");
     expect(workspace).not.toContain('function CustomerCreditSalesSource');
-    expect(workspace).toContain('Managed by Sales Sources. Customer balances and payments come only from Debt Management.');
+    expect(workspace).toContain('data-testid="customer-credit-closing-section"');
+    expect(workspace).not.toContain('Managed by Sales Sources. Customer balances and payments come only from Debt Management.');
     expect(workspace).toContain('paymentMethods={configuredPaymentMethods}');
     expect(customerCreditSource).toContain("CREDIT_SALE: 'credit_sale'");
     expect(customerCreditSource).toContain("DEBT_PAYMENT: 'debt_payment'");
     expect(customerCreditSource).toContain("isPayment ? 'payment_amount' : 'amount'");
-    expect(customerCreditSource).toContain('Search Debt Management customer');
+    expect(customerCreditSource).toContain('Sales Sources · Debt Management');
+    expect(customerCreditSource).toContain('Search by name, phone, or customer ID');
+    expect(customerCreditSource).toContain('Credit Sale Saves with Sales Closing');
     expect(customerCreditSource).toContain('Open Debt Management');
     expect(customerCreditSource).toContain('Payment cannot exceed outstanding debt.');
     expect(workspace).toContain('recordCustomerReceivablePayment');
     expect(workspace).toContain('customerCreditSourceSnapshot');
     expect(workspace).toContain('manualCreditTotal');
-    expect(workspace).not.toContain('CustomerCreditEntry');
+    expect(workspace).not.toContain('function CustomerCreditEntry');
     expect(workspace).not.toContain('customerCreditSnapshot');
     expect(workspace).not.toContain('creditEntryRequiresCustomer');
   });
