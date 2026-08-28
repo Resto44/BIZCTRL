@@ -97,6 +97,7 @@ describe('Sales Closing branch-isolation regression', () => {
     expect(sales).not.toContain('setSelectedIds(new Set())');
     expect(sales).toContain('onDelete={null}');
     expect(sales).toContain("new-closing-${newClosingInstance}-${selectedBranchId || 'none'}-${selectedBranchKey || 'none'}");
+    expect(sales).toContain('const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];');
     expect(sales).toContain('const sales = isLoading ? [] : asRecordArray(salesData);');
   });
 
