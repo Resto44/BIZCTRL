@@ -66,7 +66,7 @@ export default function ERPLayout({ children }) {
           className={cn(
             'min-h-0 min-w-0 max-w-full flex-1 overflow-x-hidden overflow-y-auto overscroll-contain',
             '[-webkit-overflow-scrolling:touch]',
-            'pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+1rem) lg:pb-0]'
+            'pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+1rem)] lg:pb-0'
           )}
         >
           {children}
