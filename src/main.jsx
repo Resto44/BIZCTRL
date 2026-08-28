@@ -39,20 +39,8 @@ class GlobalErrorBoundary extends React.Component {
   }
 }
 
-// Prevent Safari pinch-zoom gestures without hijacking ordinary touch scrolling
-// or click/tap dispatch. Viewport sizing and scrolling are owned by ERPLayout CSS.
-function installSafariZoomGuards() {
-  if (typeof document === 'undefined') return;
-
-  const preventGestureZoom = (event) => event.preventDefault();
-  document.addEventListener('gesturestart', preventGestureZoom, { passive: false });
-  document.addEventListener('gesturechange', preventGestureZoom, { passive: false });
-  document.addEventListener('gestureend', preventGestureZoom, { passive: false });
-}
-
-if (typeof document !== 'undefined') {
-  installSafariZoomGuards();
-}
+// Do not intercept touchmove/touchend: Safari needs those events for scrolling and taps.
+// Browser zoom is controlled by the document viewport policy and control-level touch-action.
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
