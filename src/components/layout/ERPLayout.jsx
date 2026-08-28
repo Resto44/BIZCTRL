@@ -42,10 +42,10 @@ function useAppViewportLock(locked) {
 
     body.style.overflow = 'hidden';
     body.style.overscrollBehavior = 'none';
-    body.style.touchAction = 'none';
+    body.style.touchAction = 'pan-y';
     documentElement.style.overflow = 'hidden';
     documentElement.style.overscrollBehavior = 'none';
-    documentElement.style.touchAction = 'none';
+    documentElement.style.touchAction = 'pan-y';
 
     return () => {
       body.style.overflow = previous.bodyOverflow;
@@ -82,10 +82,10 @@ export default function ERPLayout({ children }) {
 
     body.style.overflow = 'hidden';
     body.style.overscrollBehavior = 'none';
-    body.style.touchAction = 'none';
+    body.style.touchAction = 'pan-y';
     documentElement.style.overflow = 'hidden';
     documentElement.style.overscrollBehavior = 'none';
-    documentElement.style.touchAction = 'none';
+    documentElement.style.touchAction = 'pan-y';
 
     return () => {
       body.style.overflow = previousBodyOverflow;
