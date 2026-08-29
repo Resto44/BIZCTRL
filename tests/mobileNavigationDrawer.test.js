@@ -15,7 +15,7 @@ describe('mobile navigation drawer contract', () => {
     expect(header).toContain('aria-label="Open navigation drawer"');
     expect(header).toContain('onClick={() => onMobileMenuToggle?.()}');
     expect(layout).toContain('{mobileMenuOpen && (');
-    expect(layout).toContain('w-[min(86vw,420px)] max-w-full min-w-0');
+    expect(layout).toContain('w-[min(90vw,440px)] max-w-full min-w-0');
     expect(layout).toContain('touch-none overscroll-none bg-black/50');
     expect(layout).toContain("body.style.overflow = 'hidden'");
     expect(layout).toContain("documentElement.style.overflow = 'hidden'");
@@ -29,6 +29,32 @@ describe('mobile navigation drawer contract', () => {
     expect(sidebar).toContain('[overflow-wrap:anywhere]');
     expect(sidebar).toContain('[word-break:break-word]');
     expect(sidebar).toContain('onClick={onNavigate}');
+  });
+
+  it('renders the approved smart Owner menu with live work cards and fixed quick-entry actions', async () => {
+    const [sidebar, purchases] = await Promise.all([
+      source('../src/components/layout/ERPSidebar.jsx'),
+      source('../src/pages/Purchases.jsx'),
+    ]);
+
+    expect(sidebar).toContain('function MobileOwnerMenu');
+    expect(sidebar).toContain('Command Center');
+    expect(sidebar).toContain('Ask or search ERP');
+    expect(sidebar).toContain("TODAY'S WORK");
+    expect(sidebar).toContain('Executive Reports');
+    expect(sidebar).toContain('Sales & Customers');
+    expect(sidebar).toContain('Finance & Treasury');
+    expect(sidebar).toContain('Inventory & Supply');
+    expect(sidebar).toContain('Team & Administration');
+    expect(sidebar).toContain('useActiveAlerts()');
+    expect(sidebar).toContain(".from('daily_sales')");
+    expect(sidebar).toContain(".from('supplier_invoices')");
+    expect(sidebar).toContain('QUICK ENTRY');
+    expect(sidebar).toContain('to="/sales"');
+    expect(sidebar).toContain('to="/purchases?create=1"');
+    expect(purchases).toContain("searchParams.get('create') !== '1'");
+    expect(purchases).toContain('setShowForm(true)');
+    expect(purchases).toContain("nextParams.delete('create')");
   });
 
   it('exposes existing Owner routes through canonical role and feature guards', async () => {

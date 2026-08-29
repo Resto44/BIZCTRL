@@ -74,7 +74,7 @@ export default function ERPLayout({ children }) {
             aria-label="Close navigation drawer"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 z-[110] w-[min(86vw,420px)] max-w-full min-w-0 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation drawer">
+          <div className="fixed inset-y-0 left-0 z-[110] w-[min(90vw,440px)] max-w-full min-w-0 animate-in slide-in-from-left duration-200 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation drawer">
             <ERPSidebar
               collapsed={false}
               mobile

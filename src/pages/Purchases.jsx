@@ -4,14 +4,12 @@
  * branch/status filtering, and supplier ledger integration.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
-import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useBranchScope } from '@/lib/BranchScopeContext';
-import { useAuth } from '@/lib/AuthContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import PageHeader from '@/components/shared/PageHeader';
 import BranchSelect from '@/components/shared/BranchSelect';
@@ -19,24 +17,23 @@ import PurchaseInvoiceForm from '@/components/purchases/PurchaseInvoiceForm';
 import PurchaseInvoiceList from '@/components/purchases/PurchaseInvoiceList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import {
-  Plus, BarChart3, BookOpen, Receipt, Filter, Search, AlertCircle, Clock, Trash2
+  Plus, BarChart3, BookOpen, Receipt, Search, AlertCircle, Clock
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { deletePurchaseInvoiceWithRollback, getOverdueInfo } from '@/lib/procurementEngine';
 
 const STATUS_FILTERS = ['all', 'draft', 'pending', 'approved', 'paid', 'partial', 'unpaid', 'cancelled'];
 
 export default function Purchases() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { currency } = useLanguage();
-  const { ownerFilter, activeRestaurant, branches } = useTenant();
+  const { activeRestaurant, branches } = useTenant();
   const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
-  const { user } = useAuth();
   const { role } = useRole();
   const qc = useQueryClient();
   const isOwner = role === ROLES.OWNER;
@@ -49,6 +46,15 @@ export default function Purchases() {
   const filterBranch = isAllBranches ? 'all' : (selectedBranchKey || 'all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') return;
+    setEditing(null);
+    setShowForm(true);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('create');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // ── Fetch invoices ─────────────────────────────────────────────────────
   // Scope every request by the authenticated restaurant. For a selected branch,
