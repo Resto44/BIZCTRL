@@ -5,6 +5,7 @@ import path from 'node:path';
 const read = (relativePath) => fs.readFileSync(path.resolve(process.cwd(), relativePath), 'utf8');
 const migration = read('src/supabase/20260827_sales_closing_erp_cash_reconciliation.sql');
 const workspace = read('src/components/sales/UnifiedSalesClosing.jsx');
+const reconciliationPanel = read('src/components/sales/CashReconciliationPanel.jsx');
 const salesPage = read('src/pages/Sales.jsx');
 const settlementLedgerFix = read('src/supabase/20260827_fix_sales_closing_owner_settlement_ledger.sql');
 const walletFirstMigration = read('src/supabase/20260827_sales_closing_wallet_first_settlement.sql');
@@ -38,8 +39,8 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
     expect(settlementLedgerFix).toContain("'owner_injection'");
     expect(settlementLedgerFix).toContain("'OwnerCashInjection'");
     expect(salesPage).toContain('recordClosingOwnerPayment');
-    expect(workspace).toContain('Record Owner Payment');
-    expect(workspace).toContain('never sales revenue');
+    expect(reconciliationPanel).toContain('Record Owner Payment');
+    expect(reconciliationPanel).toContain('Separate settlement — no sales impact');
   });
 
   it('never imports legacy daily settlement cash sales into a new Closing', () => {
@@ -109,10 +110,10 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
   });
 
   it('keeps the mobile Actual Cash field as the shared DOM-stable numeric control', () => {
-    expect(workspace).toContain('id="quick-closing-actualCash"');
+    expect(reconciliationPanel).toContain('id="quick-closing-actualCash"');
     expect(workspace).toContain('updateActualCashCount(value)');
-    expect(workspace).toContain('ClosingNumericInput');
-    expect(workspace).toContain('money-ledger-cash-sales-${cashSales}');
+    expect(reconciliationPanel).toContain('ClosingNumericInput');
+    expect(workspace).toContain('cashSales={reconciliation.cashSales}');
     expect(workspace).toContain('money-summary-cash-sales-${cashSales}');
     expect(workspace).toContain('cashLedgerContext.owner_settlement?.closing_id === currentClosingId');
     expect(workspace).toContain('ownerSettlementPaymentApplied');
@@ -125,5 +126,13 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
     expect(workspace).toContain('ownerSettlementPaymentApplied >= ownerSettlementPaymentTarget');
     expect(workspace).toContain('ownerSettlementRemaining');
     expect(workspace).toContain('reconciliation.shortage > 0 && ownerSettlementRemaining === 0');
+  });
+
+  it('keeps variance notes optional and resets count approval after any Actual Cash edit', () => {
+    expect(workspace).not.toContain("nextErrors.cashNotes = 'A reconciliation note is required");
+    expect(workspace).not.toContain("key: 'cashNote'");
+    expect(workspace).toContain('setManagerApproved(false);');
+    expect(workspace).toContain('onCashNotesChange={setCashNotes}');
+    expect(reconciliationPanel).toContain('Optional reconciliation note');
   });
 });

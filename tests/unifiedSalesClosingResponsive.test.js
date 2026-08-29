@@ -6,13 +6,17 @@ const source = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 describe('Unified Sales Closing workflow contract', () => {
   it('uses one compact, continuous mobile-first closing workflow instead of the former nine-step form', async () => {
-    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+    const [workspace, reconciliationPanel] = await Promise.all([
+      source('../src/components/sales/UnifiedSalesClosing.jsx'),
+      source('../src/components/sales/CashReconciliationPanel.jsx'),
+    ]);
 
     expect(workspace).toContain('Daily Sales Closing');
     expect(workspace).toContain("data-testid=\"quick-closing-auto-summary\"");
     expect(workspace).toContain('Daily Closing Summary');
     expect(workspace).toContain('touch-pan-y overflow-y-auto overscroll-contain');
-    expect(workspace).toContain('grid grid-cols-1 gap-3 lg:grid-cols-2');
+    expect(workspace).toContain('<CashReconciliationPanel');
+    expect(reconciliationPanel).toContain('grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)]');
     expect(workspace).toContain('pb-[calc(env(safe-area-inset-bottom)+6.5rem)]');
     expect(workspace).toContain('env(safe-area-inset-bottom)+0.75rem');
     expect(workspace).not.toContain('100vw');
@@ -40,7 +44,10 @@ describe('Unified Sales Closing workflow contract', () => {
   });
 
   it('calculates total sales, cash reconciliation, purchases, expenses and operating result automatically', async () => {
-    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+    const [workspace, reconciliationPanel] = await Promise.all([
+      source('../src/components/sales/UnifiedSalesClosing.jsx'),
+      source('../src/components/sales/CashReconciliationPanel.jsx'),
+    ]);
 
     expect(workspace).toContain('cashSales + networkTotal + creditTotal + otherPaymentTotal');
     expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
@@ -48,8 +55,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;');
     expect(workspace).toContain('const operatingResult = totalSales - totalDailyExpenses;');
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
-    expect(workspace).toContain('Actual Cash');
-    expect(workspace).toContain('Cash balanced.');
+    expect(reconciliationPanel).toContain('Actual Cash');
+    expect(reconciliationPanel).toContain('No settlement required');
   });
 
   it('loads global and multi-branch Sales Sources through the selected branch server scope while mapping only Today amounts into canonical totals', async () => {
@@ -172,7 +179,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('if (queryError) throw queryError;');
     expect(workspace).toContain('automaticClosingUnavailable');
     expect(workspace).toContain('Retry ERP data load');
-    expect(workspace).toContain('cashLedgerLoading || cashLedgerUnavailable || !allValid');
+    expect(workspace).toContain('cashLedgerLoading || autoSourceLoading');
+    expect(workspace).toContain('cashLedgerUnavailable || !allValid');
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
   });
 
