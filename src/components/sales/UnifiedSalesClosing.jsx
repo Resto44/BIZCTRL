@@ -1582,8 +1582,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
           {automaticClosingUnavailable && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"><p className="font-black">ERP sales data needs attention</p><p className="mt-1 text-xs">Check the branch and date, then retry before finalizing.</p><Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-300 bg-white" onClick={() => refetchAutomaticClosing()}><RefreshCw className="mr-1.5 h-4 w-4" />Retry ERP data</Button></div>}
 
-          {attentionCount > 0 && <section className="space-y-3" aria-label="Required closing actions">
-            {requiresCashReconciliation && actualCount === null && <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-4 shadow-sm sm:p-5" data-testid="closing-cash-action">
+          {(requiresCashReconciliation || attentionCount > 0) && <section className="space-y-3" aria-label="Required closing actions">
+            {requiresCashReconciliation && <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-4 shadow-sm sm:p-5" data-testid="closing-cash-action">
               <div className="flex items-center gap-2 text-amber-900"><AlertTriangle className="h-5 w-5 shrink-0" /><h2 className="text-base font-black">Count cash drawer</h2></div>
               <div className="mt-4 flex items-center justify-between gap-3"><span className="text-sm text-slate-600">Expected cash</span><Money currency={currency} value={expectedCash} className="text-xl font-black text-slate-950" /></div>
               <div className="mt-3"><Label htmlFor="quick-closing-actualCash" className="mb-1.5 block text-xs font-bold text-slate-700">Actual cash</Label><ClosingNumericInput id="quick-closing-actualCash" value={actualCashCount} onChange={handleActualCashChange} prefix={currency} inputClassName="h-14 border-amber-300 bg-white text-lg font-black" /></div>

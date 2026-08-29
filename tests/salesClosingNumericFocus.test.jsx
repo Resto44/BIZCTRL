@@ -126,4 +126,16 @@ describe('Sales Closing numeric input focus stability', () => {
     expect(workspace).toContain('key={source.id}');
     expect(workspace).toContain('key={field.id}');
   });
+
+  it('keeps the Cash Drawer action mounted after the first digit is entered', async () => {
+    const [{ readFile }, { resolve }] = await Promise.all([
+      import('node:fs/promises'),
+      import('node:path'),
+    ]);
+    const workspace = await readFile(resolve(process.cwd(), 'src/components/sales/UnifiedSalesClosing.jsx'), 'utf8');
+
+    expect(workspace).toContain('{(requiresCashReconciliation || attentionCount > 0) && <section');
+    expect(workspace).toContain('{requiresCashReconciliation && <div');
+    expect(workspace).not.toContain('requiresCashReconciliation && actualCount === null && <div');
+  });
 });
