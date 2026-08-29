@@ -7,6 +7,7 @@ import PageHeader from '@/components/shared/PageHeader';
 // SalesForm removed to enforce single ERP workspace entry point
 import UnifiedSalesClosing from '@/components/sales/UnifiedSalesClosing';
 import SalesListItem from '@/components/sales/SalesListItem';
+import ClosingHistoryToolbar from '@/components/sales/ClosingHistoryToolbar';
 import EmptyState from '@/components/shared/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Plus, Download, SlidersHorizontal, BarChart3, Loader2 } from 'lucide-react';
@@ -87,6 +88,9 @@ export default function Sales() {
   const [showExport, setShowExport] = useState(false);
   const [showFinancialPanel, setShowFinancialPanel] = useState(false);
   const [filters, setFilters] = useState({ branch: 'all', from: '', to: '', minTotal: '', maxTotal: '' });
+  const [historyFilters, setHistoryFilters] = useState({ month: format(new Date(), 'yyyy-MM'), branch: 'all', cashier: 'all' });
+  const [historyStatus, setHistoryStatus] = useState('all');
+  const [expandedClosingId, setExpandedClosingId] = useState(null);
   useEffect(() => {
     setFilters((current) => ({ ...current, branch: isAllBranches ? 'all' : (selectedBranchKey || 'all') }));
   }, [isAllBranches, selectedBranchKey]);
@@ -462,6 +466,24 @@ export default function Sales() {
   // they bypass the canonical server lifecycle and audit transaction.
 
   const filtered = useMemo(() => filterDailySalesRecords(sales, filters), [sales, filters]);
+  const historyScopeRecords = useMemo(() => filtered.filter((sale) => {
+    if (historyFilters.month !== 'all' && !String(sale.date || '').startsWith(historyFilters.month)) return false;
+    if (historyFilters.branch !== 'all' && sale.branch !== historyFilters.branch) return false;
+    const cashierName = sale.cashier_name || sale.manager_name || '';
+    if (historyFilters.cashier !== 'all' && cashierName !== historyFilters.cashier) return false;
+    return true;
+  }), [filtered, historyFilters]);
+  const historyRecords = useMemo(() => historyScopeRecords.filter((sale) => {
+    const closingState = sale.closing_state || 'finalized';
+    if (historyStatus === 'finalized') return closingState === 'finalized';
+    if (historyStatus === 'draft') return ['draft', 'ready'].includes(closingState);
+    if (historyStatus === 'variance') return Math.abs(Number(sale.cash_difference) || 0) > 0 || ['Shortage', 'Overage'].includes(sale.cash_status);
+    return true;
+  }), [historyScopeRecords, historyStatus]);
+  const updateHistoryFilter = useCallback((key, value) => {
+    setHistoryFilters((current) => ({ ...current, [key]: value }));
+    setExpandedClosingId(null);
+  }, []);
 
   const runClosingFinalizationSideEffects = useCallback(async (saleData, savedClosing, previousClosing, proofUrl, ocr) => {
     // The database has already committed the finalization. Run legacy downstream
@@ -637,10 +659,19 @@ export default function Sales() {
         )}
 
         <div className="flex-1 min-w-0 w-full">
-          <div className="mb-2 flex items-center justify-between gap-3"><h2 className="text-sm font-black uppercase tracking-wide text-foreground">Closing History</h2>{filtered.length > 0 && <p className="text-xs text-muted-foreground">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</p>}</div>
+          <ClosingHistoryToolbar
+            records={historyScopeRecords}
+            allRecords={filtered}
+            branches={branches}
+            filters={historyFilters}
+            onFilterChange={updateHistoryFilter}
+            statusTab={historyStatus}
+            onStatusTabChange={(value) => { setHistoryStatus(value); setExpandedClosingId(null); }}
+            onExport={() => setShowExport(true)}
+          />
           {isLoading ? (
             <p className="text-center text-muted-foreground text-sm py-8">{t('loading')}</p>
-          ) : filtered.length === 0 ? (
+          ) : historyRecords.length === 0 ? (
             <div>
               {isError && (
                 <p role="status" className="mb-3 text-center text-sm text-muted-foreground">
@@ -650,12 +681,14 @@ export default function Sales() {
               <EmptyState />
             </div>
           ) : (
-            <div className="space-y-2">
-              {filtered.map(s => (
+            <div className="space-y-3">
+              {historyRecords.map(s => (
                 <SalesListItem
                   key={s.id}
                   sale={toDailySalesCardRecord(s)}
                   record={s}
+                  expanded={expandedClosingId === s.id}
+                  onToggleExpanded={() => setExpandedClosingId((current) => current === s.id ? null : s.id)}
                   onEdit={(sale) => {
                     if (isDriverSale(sale) && !canManageDriverSales) {
                       toast.error('Driver Sales can only be edited by the restaurant Owner or assigned Branch Manager.');
@@ -665,6 +698,7 @@ export default function Sales() {
                     setEditing(sale);
                     setShowForm(false);
                   }}
+                  onExport={() => setShowExport(true)}
                   onDelete={null}
                   selected={false}
                   onToggleSelect={null}
