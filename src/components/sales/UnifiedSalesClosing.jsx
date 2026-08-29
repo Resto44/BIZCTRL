@@ -1,7 +1,7 @@
 /**
  * UnifiedSalesClosing — Canonical ERP Sales Closing module
  *
- * Architecture: single-page, role-aware ERP closing workflow.
+ * Architecture: four-step, role-aware ERP closing workflow.
  * Design: Material 3 / Enterprise ERP, responsive, mobile-first.
  *
  * Finalized Accounting Rules (PRESERVED — DO NOT MODIFY):
@@ -30,7 +30,6 @@ import { useTenant } from '@/lib/TenantContext';
 import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
-import { useRole, ROLES } from '@/lib/RoleContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -46,7 +45,9 @@ import {
   AlertTriangle,
   ArrowUpRight, ArrowDownRight,
   ChevronDown, ChevronUp,
-  Loader2, RefreshCw, Save, X,
+  Loader2, RefreshCw, Save, X, PlusCircle,
+  ReceiptText, WalletCards, Scale, ClipboardCheck,
+  ArrowLeft, ArrowRight,
 } from 'lucide-react';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { toast } from 'sonner';
@@ -62,21 +63,7 @@ import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { hasCanonicalCustomerScope, loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
 import { recordCustomerReceivablePayment, invalidateCustomerReceivableQueries, customerDebtPaymentErrorMessage } from '@/lib/debt/customerReceivableRepository';
 import { cashReconciliationSnapshot, paymentMethodForCode } from '@/lib/closing/CashReconciliationLedger';
-import { Banknote as BanknoteIcon, CreditCard as CreditCardIcon, UserCheck, PlusCircle, ShoppingBag, Truck, Star, Globe, Smartphone, UtensilsCrossed, Package as PackageIcon, DollarSign as DollarSignIcon, Gift, Users as UsersIcon, Building2 as Building2Icon, Zap as ZapIcon, Activity as ActivityIcon, BarChart3 as BarChart3Icon, Shield } from 'lucide-react';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DYNAMIC ICON REGISTRY (for Sales Sources)
-// ─────────────────────────────────────────────────────────────────────────────
-const SOURCE_ICON_MAP = {
-  Banknote: BanknoteIcon, CreditCard: CreditCardIcon, UserCheck, PlusCircle,
-  ShoppingBag, Truck, Star, Globe, Smartphone, UtensilsCrossed,
-  Package: PackageIcon, DollarSign: DollarSignIcon, Gift,
-  Users: UsersIcon, Building2: Building2Icon, Zap: ZapIcon,
-  Activity: ActivityIcon, BarChart3: BarChart3Icon, Shield,
-};
-function getSourceIcon(iconName) {
-  return SOURCE_ICON_MAP[iconName] || BanknoteIcon;
-}
+import { salesSourceIconFor, salesSourceToneFor } from '@/lib/salesSourceAppearance';
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const firstRecord = (value) => asRecordArray(value).at(0) || null;
@@ -257,13 +244,16 @@ function Money({ currency, value, className = '', signed = false }) {
 
 const SalesSourceDailyHistoryCard = memo(function SalesSourceDailyHistoryCard({ source, sourceLabel, todayInput, today, previous, currency, onChange, isHistoryLoading, isHistoryUnavailable, copy }) {
   const total = previous + today;
+  const SourceIcon = salesSourceIconFor(source.icon);
+  const tone = salesSourceToneFor(source.color);
   return (
-    <div className="rounded-xl border border-blue-200 bg-background p-3 shadow-sm" data-i18n-skip="true">
+    <div className={`rounded-2xl border bg-background p-3 shadow-sm ${tone.border}`} data-i18n-skip="true">
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-blue-950" data-i18n-skip="true">{sourceLabel}</p>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone.soft} ${tone.text}`}><SourceIcon className="h-5 w-5" /></span>
+          <div className="min-w-0"><p className={`truncate text-sm font-bold ${tone.strongText}`} data-i18n-skip="true">{sourceLabel}</p><p className="truncate text-[10px] text-muted-foreground">{source.description || String(source.default_payment_method || 'cash').replaceAll('_', ' ')}</p></div>
         </div>
-        <Badge variant="outline" className="shrink-0 border-blue-200 bg-blue-50 text-[10px] text-blue-700">{copy.dailySource}</Badge>
+        <Badge variant="outline" className={`shrink-0 text-[10px] ${tone.border} ${tone.soft} ${tone.text}`}>{copy.dailySource}</Badge>
       </div>
       <NumInput
         id={`quick-closing-source-${source.id}`}
@@ -291,12 +281,14 @@ const DriverSalesSourceCard = memo(function DriverSalesSourceCard({ source, sour
   const today = driverSourceTodayTotal(entries);
   const total = previous + today;
   const availableDrivers = asRecordArray(drivers).filter((driver) => driver.is_active !== false && driver.status !== 'inactive');
+  const SourceIcon = salesSourceIconFor(source.icon);
+  const tone = salesSourceToneFor(source.color);
 
   return (
-    <div className="rounded-xl border border-cyan-200 bg-background p-3 shadow-sm" data-i18n-skip="true">
+    <div className={`rounded-2xl border bg-background p-3 shadow-sm ${tone.border}`} data-i18n-skip="true">
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="min-w-0"><p className="truncate text-sm font-bold text-cyan-950">{sourceLabel}</p><p className="text-[10px] text-muted-foreground">{source.subcategory || 'Drivers'} · Branch-scoped Driver Master entries</p></div>
-        <Badge variant="outline" className="shrink-0 border-cyan-200 bg-cyan-50 text-[10px] text-cyan-700">Driver source</Badge>
+        <div className="flex min-w-0 items-center gap-2.5"><span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone.soft} ${tone.text}`}><SourceIcon className="h-5 w-5" /></span><div className="min-w-0"><p className={`truncate text-sm font-bold ${tone.strongText}`}>{sourceLabel}</p><p className="text-[10px] text-muted-foreground">{source.subcategory || 'Drivers'} · Branch-scoped Driver Master entries</p></div></div>
+        <Badge variant="outline" className={`shrink-0 text-[10px] ${tone.border} ${tone.soft} ${tone.text}`}>Driver source</Badge>
       </div>
       <div className="space-y-2">
         {entries.length === 0 ? <p className="rounded-lg border border-dashed border-cyan-200 bg-cyan-50/40 px-3 py-3 text-xs text-cyan-800">No driver sales entered for this source today.</p> : entries.map((entry) => {
@@ -420,13 +412,75 @@ const StickySummary = memo(function StickySummary({ totalSales, operatingResult,
   );
 });
 
+const CLOSING_WORKFLOW_STEP_IDS = ['sales', 'expenses', 'reconcile', 'review'];
+
+const ClosingWorkflowStepper = memo(function ClosingWorkflowStepper({ steps, activeStep, onStepChange, disabled }) {
+  const activeIndex = steps.findIndex((step) => step.id === activeStep);
+  return (
+    <nav className="overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm" aria-label="Closing workflow" data-testid="closing-workflow-stepper">
+      <div className="grid grid-cols-4">
+        {steps.map((step, index) => {
+          const active = step.id === activeStep;
+          const completed = index < activeIndex;
+          const Icon = step.icon;
+          return (
+            <button
+              key={step.id}
+              type="button"
+              disabled={disabled}
+              aria-current={active ? 'step' : undefined}
+              onClick={() => onStepChange(step.id)}
+              className={`relative flex min-w-0 flex-col items-center gap-1 border-r border-slate-100 px-1.5 py-3 text-center transition last:border-r-0 sm:flex-row sm:justify-center sm:gap-2 sm:px-3 ${active ? 'bg-emerald-50 text-emerald-900' : completed ? 'bg-white text-emerald-700 hover:bg-emerald-50/50' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+            >
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-black transition ${active ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm' : completed ? 'border-emerald-200 bg-emerald-100 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                {completed ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-[11px] font-black sm:text-xs">{step.label}</span>
+                <span className="hidden truncate text-[10px] text-muted-foreground md:block">{step.description}</span>
+              </span>
+              {active && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-emerald-500" />}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+});
+
+const ExpensesReviewStep = memo(function ExpensesReviewStep({ currency, purchases, fixedExpenses, variableExpenses, totalExpenses, operatingResult, loading }) {
+  const rows = [
+    { label: 'Approved Purchases', value: purchases, color: 'orange' },
+    { label: 'Fixed Expense Today', value: fixedExpenses, color: 'sky' },
+    { label: 'Variable Expenses', value: variableExpenses, color: 'rose' },
+  ];
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm" data-testid="closing-expenses-step">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2"><WalletCards className="h-4 w-4 shrink-0 text-slate-700" /><div><h2 className="text-xs font-black uppercase tracking-wide text-slate-950">Expenses Review</h2><p className="text-[11px] text-muted-foreground">Read-only totals from Purchases and Expense Management</p></div></div>
+        <Badge variant="outline" className="shrink-0 border-emerald-200 bg-emerald-50 text-[10px] text-emerald-700">ERP synced</Badge>
+      </div>
+      {loading ? <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4 sm:p-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div> : <div className="grid gap-3 p-3 sm:p-4 lg:grid-cols-[1.35fr_0.65fr]">
+        <div className="grid gap-3 sm:grid-cols-3">
+          {rows.map((row) => <div key={row.label} className={`rounded-2xl border p-4 ${row.color === 'orange' ? 'border-orange-100 bg-orange-50' : row.color === 'sky' ? 'border-sky-100 bg-sky-50' : 'border-rose-100 bg-rose-50'}`}><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{row.label}</p><Money currency={currency} value={row.value} className="mt-2 text-xl font-black text-slate-950" /></div>)}
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:col-span-3"><div><p className="text-xs font-black uppercase tracking-wide text-slate-900">Total Daily Expenses</p><p className="mt-0.5 text-[11px] text-muted-foreground">Purchases + fixed + variable</p></div><Money currency={currency} value={totalExpenses} className="text-xl font-black text-slate-950" /></div>
+        </div>
+        <div className={`flex flex-col justify-between rounded-2xl border-2 p-4 ${operatingResult >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+          <div><p className={`text-[10px] font-black uppercase tracking-wide ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>Operating Result</p><p className="mt-1 text-xs text-muted-foreground">Sales minus total daily expenses</p></div>
+          <Money currency={currency} value={operatingResult} signed className={`mt-6 text-3xl font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`} />
+        </div>
+        <div className="flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs text-blue-900 lg:col-span-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" /><span>These accounting totals are loaded from their source modules. Closing Sales reviews them but does not duplicate or overwrite them.</span></div>
+      </div>}
+    </section>
+  );
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing, onSessionContextChange, onRecordOwnerPayment, isOpeningNewClosing = false }) {
   const { currency, lang, t } = useLanguage();
   const { user } = useAuth();
-  const { role } = useRole();
   const { ownerFilter, branches: tenantBranches, managerBranch, activeRestaurant, isManager } = useTenant();
   const { selectedBranchId: activeBranchId, selectedBranchKey: activeBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const queryClient = useQueryClient();
@@ -490,11 +544,15 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         ? 'sm:hidden'
         : '';
   const branches = asRecordArray(tenantBranches);
-  const canUseAdvancedClosing = isManager || [ROLES.OWNER, ROLES.GENERAL_MANAGER].includes(role);
-  const [closingView, setClosingView] = useState('quick');
+  const workflowSteps = useMemo(() => [
+    { id: 'sales', label: t('salesClosing.workflow.sales'), description: t('salesClosing.workflow.salesHelp'), icon: ReceiptText },
+    { id: 'expenses', label: t('salesClosing.workflow.expenses'), description: t('salesClosing.workflow.expensesHelp'), icon: WalletCards },
+    { id: 'reconcile', label: t('salesClosing.workflow.reconcile'), description: t('salesClosing.workflow.reconcileHelp'), icon: Scale },
+    { id: 'review', label: t('salesClosing.workflow.review'), description: t('salesClosing.workflow.reviewHelp'), icon: ClipboardCheck },
+  ], [t]);
+  const [workflowStep, setWorkflowStep] = useState(initial?.closing_state === 'finalized' ? 'review' : 'sales');
   const [sourceEditor, setSourceEditor] = useState(null);
   const [fieldEditor, setFieldEditor] = useState(null);
-  const isQuickClosing = closingView === 'quick';
   const assignedManagerBranch = useMemo(() => {
     if (!isManager) return null;
     return branches.find((branch) =>
@@ -511,10 +569,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const [requestedClosingState, setRequestedClosingState] = useState(
     initial?.closing_state === 'finalized' ? 'finalized' : 'draft',
   );
-
-  useEffect(() => {
-    if (!canUseAdvancedClosing) setClosingView('quick');
-  }, [canUseAdvancedClosing]);
 
   // ── Form meta state ───────────────────────────────────────────────────────
   const [form, setForm] = useState({
@@ -1475,6 +1529,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (Object.keys(nextErrors).length) {
       setInlineErrors(nextErrors);
       const firstError = Object.keys(nextErrors)[0];
+      const targetStep = ['actualCash', 'reconciliation'].includes(firstError) ? 'reconcile' : 'sales';
+      if (targetStep !== workflowStep) flushSync(() => setWorkflowStep(targetStep));
       focusField(firstError);
       return;
     }
@@ -1743,6 +1799,21 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Save returns immediately to Daily Sales via onSubmit callback.
 
   const showCustomizationCard = canCustomize || (isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0) || customClosingFields.length > 0 || (isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false));
+  const workflowStepIndex = Math.max(0, CLOSING_WORKFLOW_STEP_IDS.indexOf(workflowStep));
+  const openWorkflowStep = useCallback((step) => {
+    if (!CLOSING_WORKFLOW_STEP_IDS.includes(step)) return;
+    setWorkflowStep(step);
+    requestAnimationFrame(() => document.getElementById('sales-closing-workspace')?.scrollTo({ top: 0, behavior: 'smooth' }));
+  }, []);
+  const goToPreviousWorkflowStep = useCallback(() => openWorkflowStep(CLOSING_WORKFLOW_STEP_IDS[Math.max(0, workflowStepIndex - 1)]), [openWorkflowStep, workflowStepIndex]);
+  const goToNextWorkflowStep = useCallback(() => {
+    if (workflowStep === 'reconcile' && requiresCashReconciliation && actualCount === null) {
+      setInlineErrors((current) => ({ ...current, actualCash: 'Actual Cash is required.' }));
+      focusField('actualCash');
+      return;
+    }
+    openWorkflowStep(CLOSING_WORKFLOW_STEP_IDS[Math.min(CLOSING_WORKFLOW_STEP_IDS.length - 1, workflowStepIndex + 1)]);
+  }, [actualCount, focusField, openWorkflowStep, requiresCashReconciliation, workflowStep, workflowStepIndex]);
 
   return (
     <form onSubmit={handleSubmit} className="flex h-full min-h-0 min-w-0 flex-col">
@@ -1755,12 +1826,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         className={summaryVisibilityClass}
       />
 
-      <div className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+      <div id="sales-closing-workspace" className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
         <div className="mx-auto w-full max-w-6xl space-y-3 p-3 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:space-y-4 sm:p-4 sm:pb-6">
-          <section className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between" aria-label="Closing mode">
-            <div><p className="text-xs font-black uppercase tracking-wide text-slate-900">{isQuickClosing ? 'Quick Closing' : 'Advanced Closing'}</p><p className="text-[11px] text-muted-foreground">{isQuickClosing ? 'Complete the essential cash, payment, and reconciliation fields on one screen.' : 'Review source detail, purchases, expenses, and operating results before saving.'}</p></div>
-            {canUseAdvancedClosing && <div className="grid grid-cols-2 gap-1 rounded-lg border bg-background p-1" role="group" aria-label="Closing mode"><Button type="button" size="sm" variant={isQuickClosing ? 'default' : 'ghost'} className="min-h-9" aria-pressed={isQuickClosing} aria-label="Switch to Quick Closing" onClick={() => setClosingView('quick')}>Quick</Button><Button type="button" size="sm" variant={!isQuickClosing ? 'default' : 'ghost'} className="min-h-9" aria-pressed={!isQuickClosing} aria-label="Switch to Advanced Closing" onClick={() => setClosingView('advanced')}>Advanced</Button></div>}
-          </section>
+          <ClosingWorkflowStepper steps={workflowSteps} activeStep={workflowStep} onStepChange={openWorkflowStep} disabled={isSubmitting} />
           {runtimeError && (
             <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-red-950">
               <p className="text-sm font-bold">Save failed</p>
@@ -1785,13 +1853,14 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
           )}
 
+          {workflowStep === 'sales' ? <div className="space-y-3 sm:space-y-4" data-testid="closing-sales-step">
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm">
             <div className="border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4">
               <div className="flex min-w-0 items-center gap-2">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white"><Store className="h-4 w-4" /></div>
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-black tracking-tight text-slate-900">Daily Sales Closing</h2>
-                  <p className="truncate text-[11px] text-muted-foreground">Review ERP data, enter the physical cash count, then save.</p>
+                  <p className="truncate text-[11px] text-muted-foreground">Confirm the business context, then review every sales source.</p>
                 </div>
               </div>
             </div>
@@ -1904,7 +1973,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </section>
           )}
 
-          <div className="space-y-3">
+          </div> : null}
+
+          {workflowStep === 'expenses' ? <ExpensesReviewStep currency={currency} purchases={approvedPurchasesTotal} fixedExpenses={fixedExpensesToday} variableExpenses={variableExpensesToday} totalExpenses={totalDailyExpenses} operatingResult={operatingResult} loading={purchasesLoading || cashLedgerLoading} /> : null}
+
+          {workflowStep === 'reconcile' ? <div className="space-y-3" data-testid="closing-reconcile-step">
             {/* This subtree must retain its identity while Actual Cash updates Difference. */}
             <CashReconciliationPanel
               currency={currency}
@@ -1939,20 +2012,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               disabled={isSubmitting}
             />
 
-            <section className={`${isQuickClosing ? 'hidden' : ''} overflow-hidden rounded-2xl border border-emerald-200 bg-background shadow-sm`}>
-              <div className="flex items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50 px-3 py-3 sm:px-4"><div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-emerald-600" /><h2 className="text-xs font-black uppercase tracking-wide text-emerald-950">Operating Result</h2></div><Money key={`money-operating-${operatingResult}`} currency={currency} value={operatingResult} signed className={`text-sm font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`} /></div>
-              <div className="space-y-2 p-3 sm:p-4">
-                <div className="flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2 text-xs"><span className="font-semibold text-blue-900">Sales</span><Money key={`money-total-${totalSales}`} currency={currency} value={totalSales} className="font-bold text-blue-700" /></div>
-                <div className="flex items-center justify-between gap-3 rounded-lg bg-orange-50 px-3 py-2 text-xs"><span className="font-semibold text-orange-900">Purchases</span><Money key={`money-purchases-${approvedPurchasesTotal}`} currency={currency} value={approvedPurchasesTotal} className="font-bold text-orange-700" /></div>
-                <div className="flex items-center justify-between gap-3 rounded-lg bg-sky-50 px-3 py-2 text-xs"><span className="font-semibold text-sky-900">Fixed Expense Today</span><Money key={`money-fixed-expenses-${fixedExpensesToday}`} currency={currency} value={fixedExpensesToday} className="font-bold text-sky-700" /></div><div className="flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2 text-xs"><span className="font-semibold text-rose-900">Variable Expenses</span><Money key={`money-variable-expenses-${variableExpensesToday}`} currency={currency} value={variableExpensesToday} className="font-bold text-rose-700" /></div><div className="flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2 text-xs"><span className="font-semibold text-rose-900">Total Daily Expenses</span><Money key={`money-total-daily-expenses-${totalDailyExpenses}`} currency={currency} value={totalDailyExpenses} className="font-bold text-rose-700" /></div>
-                <div className={`flex items-center justify-between gap-3 rounded-xl border-2 px-3 py-3 text-xs ${operatingResult >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}><span className="font-black uppercase tracking-wide text-foreground">Operating Result</span><Money key={`money-operating-${operatingResult}`} currency={currency} value={operatingResult} signed className={`text-lg font-black ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`} /></div>
-                <p className="pt-1 text-[11px] leading-relaxed text-muted-foreground">Automatically calculated as Daily Sales − Purchases − Fixed Expense Today − Variable Expenses. Funding never changes this result.</p>
-              </div>
-            </section>
-          </div>
+          </div> : null}
 
-          <section className={`${summaryVisibilityClass} overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm`}>
-            <div className="border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4"><h2 className="text-xs font-black uppercase tracking-wide text-slate-900">Daily Closing Summary</h2></div>
+          {workflowStep === 'review' ? <section className="overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm" data-testid="closing-review-step">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4"><div className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-slate-700" /><div><h2 className="text-xs font-black uppercase tracking-wide text-slate-900">Review & Close Day</h2><p className="text-[11px] text-muted-foreground">Verify the final figures before posting the closing</p></div></div><Badge variant="outline" className={allValid ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}>{allValid ? 'Ready to close' : 'Needs attention'}</Badge></div>
             <div className="p-3 sm:p-4">
               <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 py-2"><span className="text-muted-foreground">Daily Sales</span><Money key={`money-total-${totalSales}`} currency={currency} value={totalSales} className="font-bold text-foreground" /></div>
@@ -1976,14 +2039,16 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               {inlineErrors.duplicate && <div role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" /><p className="text-xs font-bold">{inlineErrors.duplicate}</p></div>}
               {!allValid && <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" /><p className="text-xs font-bold text-red-800">{validations.filter(v => !v.passed).map(v => v.label).join(', ')}</p></div>}
             </div>
-          </section>
+          </section> : null}
         </div>
       </div>
 
       <div id="sales-closing-actions" className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-2 sm:flex sm:justify-end">
-          <Button type="button" variant="outline" className="min-h-12 font-bold sm:w-32" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button>
-          <><Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button><Button type="submit" className={`col-span-2 min-h-12 font-black sm:col-auto sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button></>
+        <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-2 sm:flex sm:items-center">
+          {workflowStepIndex === 0 ? <Button type="button" variant="ghost" className="min-h-12 font-bold sm:w-28" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button> : <Button type="button" variant="outline" className="min-h-12 font-bold sm:w-28" onClick={goToPreviousWorkflowStep} disabled={isSubmitting}><ArrowLeft className="mr-1 h-4 w-4" />{t('salesClosing.workflow.back')}</Button>}
+          <div className="hidden flex-1 sm:block" />
+          <Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button>
+          {workflowStep !== 'review' ? <Button type="button" className="col-span-2 min-h-12 bg-emerald-600 font-black hover:bg-emerald-700 sm:col-auto sm:w-52" onClick={goToNextWorkflowStep} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable}>{workflowStep === 'reconcile' ? t('salesClosing.workflow.continueReview') : t('salesClosing.workflow.continue')}<ArrowRight className="ml-1.5 h-4 w-4" /></Button> : <Button type="submit" className={`col-span-2 min-h-12 font-black sm:col-auto sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><ClipboardCheck className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button>}
         </div>
       </div>
       <SalesClosingFieldDialog editor={fieldEditor} onClose={() => setFieldEditor(null)} onSave={saveInlineClosingField} isSaving={isSavingClosingField} />

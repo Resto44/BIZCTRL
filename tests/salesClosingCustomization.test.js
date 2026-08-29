@@ -96,8 +96,9 @@ describe('Sales Closing Customization runtime contract', () => {
     expect(workspace).toContain("field.visible_desktop === false ? 'sm:hidden'");
     expect(workspace).toContain('nextErrors[`custom_${field.id}`]');
     expect(workspace).toContain("description: t('salesClosing.workspace.description')");
-    expect(workspace).toContain('Quick Closing');
-    expect(workspace).toContain('Advanced Closing');
+    expect(workspace).toContain('ClosingWorkflowStepper');
+    expect(workspace).toContain("workflowStep === 'sales'");
+    expect(workspace).toContain("workflowStep === 'review'");
     expect(workspace).toContain("closing_state: requestedClosingState");
     expect(workspace).toContain('Save Draft');
     expect(workspace).toContain('Finalize Closing');
@@ -121,6 +122,28 @@ describe('Sales Closing in-workspace runtime customization contract', () => {
     expect(page).toContain("from '@/components/sales/SalesClosingCustomizationDialogs'");
     expect(dialogs).toContain("t('salesClosing.dialog.descriptionOptional')");
     expect(dialogs).toContain("t('salesClosing.dialog.helpTextOptional')");
+  });
+
+  it('lets owners design unlimited Sales Sources with persistent icon, color, branch, payment, and accounting behavior', async () => {
+    const [dialogs, appearance, context, workspace] = await Promise.all([
+      source('../src/components/sales/SalesClosingCustomizationDialogs.jsx'),
+      source('../src/lib/salesSourceAppearance.jsx'),
+      source('../src/lib/SalesClosingCustomizationContext.jsx'),
+      source('../src/components/sales/UnifiedSalesClosing.jsx'),
+    ]);
+
+    expect(dialogs).toContain('SALES_SOURCE_ICON_OPTIONS');
+    expect(dialogs).toContain('SALES_SOURCE_COLOR_OPTIONS');
+    expect(dialogs).toContain('branch_ids');
+    expect(dialogs).toContain('default_payment_method');
+    expect(dialogs).toContain('included_in_profit_calc');
+    expect(dialogs).toContain('requires_pos_device');
+    expect(dialogs).toContain('requires_wallet');
+    expect(appearance).toContain("{ value: 'Truck', label: 'Delivery'");
+    expect(appearance).toContain("{ value: 'violet', label: 'Violet'");
+    expect(context).toContain("supabase.from('sales_sources').insert(payload)");
+    expect(workspace).toContain('salesSourceIconFor(source.icon)');
+    expect(workspace).toContain('salesSourceToneFor(source.color)');
   });
 
   it('adds sources and fields in place, invalidates every branch-scoped source cache, and links to the existing customization route', async () => {

@@ -9,6 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { CORE_SALES_CLOSING_FIELDS, SALES_CLOSING_FIELD_TYPES, newSalesClosingCustomField, normalizeSalesClosingField } from '@/lib/salesClosingCustomization';
 import { useLanguage } from '@/lib/LanguageContext';
+import { Check } from 'lucide-react';
+import { SALES_SOURCE_COLOR_OPTIONS, SALES_SOURCE_ICON_OPTIONS, salesSourceToneFor } from '@/lib/salesSourceAppearance';
 
 const asArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const localizedDataName = (record, lang) => {
@@ -131,6 +133,8 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
       category: String(draft.category || 'other'),
       subcategory: String(draft.subcategory || '').trim() || null,
       default_payment_method: String(draft.default_payment_method || 'cash'),
+      icon: SALES_SOURCE_ICON_OPTIONS.some((option) => option.value === draft.icon) ? draft.icon : 'Banknote',
+      color: SALES_SOURCE_COLOR_OPTIONS.some((option) => option.value === draft.color) ? draft.color : 'emerald',
       allows_driver_entries: Boolean(draft.allows_driver_entries),
       branch_ids: draft.is_global === false ? Array.from(new Set(asArray(draft.branch_ids).map(String).filter(Boolean))) : [],
     };
@@ -164,6 +168,31 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
               <div><Label>{t('salesClosing.dialog.defaultPayment')}</Label><Select value={draft.default_payment_method || 'cash'} onValueChange={(default_payment_method) => set({ default_payment_method })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{paymentMethods.filter((method) => method.is_active !== false).map((method) => <SelectItem key={method.id} value={method.code}>{localizedDataName(method, lang)}</SelectItem>)}</SelectContent></Select></div>
               <div><Label>{t('salesClosing.dialog.displayOrder')}</Label><Input type="number" min="0" value={draft.sort_order ?? 0} onChange={(event) => set({ sort_order: Number(event.target.value) || 0 })} /></div>
             </div>
+            <div className="grid gap-4 rounded-xl border bg-background p-3">
+              <div>
+                <Label>{t('salesSourceManagement.appearance')}</Label>
+                <p className="mt-1 text-xs text-muted-foreground">{t('salesSourceManagement.appearanceHelp')}</p>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold text-foreground">{t('salesSourceManagement.icon')}</p>
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-7" role="group" aria-label={t('salesSourceManagement.icon')}>
+                  {SALES_SOURCE_ICON_OPTIONS.map(({ value, label, Icon }) => {
+                    const selected = (draft.icon || 'Banknote') === value;
+                    const tone = salesSourceToneFor(draft.color);
+                    return <button key={value} type="button" aria-label={label} aria-pressed={selected} title={label} onClick={() => set({ icon: value })} className={`flex min-h-12 items-center justify-center rounded-xl border transition ${selected ? `${tone.border} ${tone.soft} ${tone.text} ring-2 ring-current/20` : 'border-border bg-background text-muted-foreground hover:bg-muted'}`}><Icon className="h-5 w-5" /></button>;
+                  })}
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold text-foreground">{t('salesSourceManagement.color')}</p>
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-7" role="group" aria-label={t('salesSourceManagement.color')}>
+                  {SALES_SOURCE_COLOR_OPTIONS.map((option) => {
+                    const selected = (draft.color || 'emerald') === option.value;
+                    return <button key={option.value} type="button" aria-label={option.label} aria-pressed={selected} title={option.label} onClick={() => set({ color: option.value })} className={`relative flex min-h-11 items-center justify-center rounded-xl border ${selected ? `${option.border} ${option.soft} ring-2 ring-current/20` : 'border-border bg-background hover:bg-muted'}`}><span className={`h-5 w-5 rounded-full ${option.swatch}`} />{selected && <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-background shadow"><Check className={`h-3 w-3 ${option.text}`} /></span>}</button>;
+                  })}
+                </div>
+              </div>
+            </div>
             <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm"><span><span className="block font-medium">Driver-linked entries</span><span className="mt-0.5 block text-xs text-muted-foreground">Allow this source to collect branch-scoped Driver Master records. Its today total will be derived from those entries.</span></span><Switch checked={Boolean(draft.allows_driver_entries)} onCheckedChange={(allows_driver_entries) => set({ allows_driver_entries })} /></label>
             <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm"><span><span className="block font-medium">{t('salesSourceManagement.allBranches')}</span><span className="mt-0.5 block text-xs text-muted-foreground">{t('salesSourceManagement.allBranchesHelp')}</span></span><Switch checked={draft.is_global !== false} onCheckedChange={(is_global) => set({ is_global, branch_ids: is_global ? [] : draft.branch_ids || [] })} /></label>
             {draft.is_global === false && <div className="grid gap-2 rounded-lg border bg-background p-3 sm:grid-cols-2">{branches.map((branch) => { const id = String(branch.id); const checked = asArray(draft.branch_ids).map(String).includes(id); return <label key={id} className="flex min-h-10 items-center gap-2 rounded-md px-2 text-sm hover:bg-muted"><input type="checkbox" checked={checked} onChange={() => toggleBranch(id)} className="h-4 w-4 accent-primary" /><span className="truncate">{branch.name || branch.label || branch.branch_key || branch.key}</span></label>; })}</div>}
@@ -175,8 +204,11 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
               <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesClosing.dialog.includeRevenue')}<Switch checked={draft.included_in_revenue !== false} onCheckedChange={(included_in_revenue) => set({ included_in_revenue })} /></label>
               <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.includeCashRegister')}<Switch checked={draft.included_in_cash_register !== false} onCheckedChange={(included_in_cash_register) => set({ included_in_cash_register })} /></label>
               <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.includeDashboard')}<Switch checked={draft.included_in_dashboard_kpi !== false} onCheckedChange={(included_in_dashboard_kpi) => set({ included_in_dashboard_kpi })} /></label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.includeProfit')}<Switch checked={draft.included_in_profit_calc !== false} onCheckedChange={(included_in_profit_calc) => set({ included_in_profit_calc })} /></label>
               <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.requireCustomer')}<Switch checked={Boolean(draft.requires_customer)} onCheckedChange={(requires_customer) => set({ requires_customer })} /></label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.requirePos')}<Switch checked={Boolean(draft.requires_pos_device)} onCheckedChange={(requires_pos_device) => set({ requires_pos_device })} /></label>
               <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.requireReference')}<Switch checked={Boolean(draft.requires_reference)} onCheckedChange={(requires_reference) => set({ requires_reference })} /></label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.requireWallet')}<Switch checked={Boolean(draft.requires_wallet)} onCheckedChange={(requires_wallet) => set({ requires_wallet })} /></label>
             </div>
           </section>
           {error && <Alert variant="destructive"><AlertTitle>{t('salesClosing.dialog.unableSaveSource')}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}

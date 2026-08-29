@@ -5,15 +5,21 @@ import translations from '../src/lib/i18n';
 const source = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 describe('Unified Sales Closing workflow contract', () => {
-  it('uses one compact, continuous mobile-first closing workflow instead of the former nine-step form', async () => {
+  it('uses a compact four-step mobile-first workflow with dedicated sales, expense, reconciliation, and review surfaces', async () => {
     const [workspace, reconciliationPanel] = await Promise.all([
       source('../src/components/sales/UnifiedSalesClosing.jsx'),
       source('../src/components/sales/CashReconciliationPanel.jsx'),
     ]);
 
     expect(workspace).toContain('Daily Sales Closing');
+    expect(workspace).toContain('CLOSING_WORKFLOW_STEP_IDS');
+    expect(workspace).toContain('data-testid="closing-workflow-stepper"');
+    expect(workspace).toContain('data-testid="closing-sales-step"');
+    expect(workspace).toContain('data-testid="closing-expenses-step"');
+    expect(workspace).toContain('data-testid="closing-reconcile-step"');
+    expect(workspace).toContain('data-testid="closing-review-step"');
     expect(workspace).toContain("data-testid=\"quick-closing-auto-summary\"");
-    expect(workspace).toContain('Daily Closing Summary');
+    expect(workspace).toContain('Review & Close Day');
     expect(workspace).toContain('touch-pan-y overflow-y-auto overscroll-contain');
     expect(workspace).toContain('<CashReconciliationPanel');
     expect(reconciliationPanel).toContain('grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)]');
@@ -22,10 +28,12 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).not.toContain('100vw');
   });
 
-  it('defaults every role to the streamlined Quick Closing view and does not mask the authenticated operator behind a pending employee query', async () => {
+  it('starts new sessions on Sales, opens finalized sessions on Review, and does not mask the authenticated operator behind a pending employee query', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
-    expect(workspace).toContain("const [closingView, setClosingView] = useState('quick');");
+    expect(workspace).toContain("useState(initial?.closing_state === 'finalized' ? 'review' : 'sales')");
+    expect(workspace).not.toContain('Quick Closing');
+    expect(workspace).not.toContain('Advanced Closing');
     expect(workspace).toContain("cashierDisplayName || (empLoading ? 'Loading…' : empError ? 'Unable to load cashier' : 'No cashier')");
   });
 
@@ -207,16 +215,16 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(migration).toContain('other_sales         = EXCLUDED.other_sales');
   });
 
-  it('keeps Quick and Advanced as in-place presentation modes of the same closing session and makes New Closing idempotent by its business key', async () => {
+  it('keeps the four workflow steps inside the same closing session and makes New Closing idempotent by its business key', async () => {
     const [workspace, sales, migration] = await Promise.all([
       source('../src/components/sales/UnifiedSalesClosing.jsx'),
       source('../src/pages/Sales.jsx'),
       source('../src/supabase/20260827_sales_closing_draft_lifecycle.sql'),
     ]);
 
-    expect(workspace).toContain("const [closingView, setClosingView] = useState('quick');");
-    expect(workspace).toContain('aria-pressed={isQuickClosing}');
-    expect(workspace).toContain('aria-pressed={!isQuickClosing}');
+    expect(workspace).toContain("const CLOSING_WORKFLOW_STEP_IDS = ['sales', 'expenses', 'reconcile', 'review'];");
+    expect(workspace).toContain("aria-current={active ? 'step' : undefined}");
+    expect(workspace).toContain('goToNextWorkflowStep');
     expect(workspace).toContain('onSessionContextChange?.({');
     expect(workspace).toContain('isOpeningNewClosing = false');
     expect(workspace).not.toContain("key={editing?.id || 'new-closing'}");
