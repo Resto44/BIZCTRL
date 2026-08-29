@@ -91,14 +91,13 @@ describe('Sales Closing Customization runtime contract', () => {
     const page = await source('../src/pages/SalesClosingCustomization.jsx');
 
     expect(workspace).toContain('useSalesClosingCustomization()');
-    expect(workspace).toContain('configuredPaymentMethods.filter((method) => method.is_active !== false)');
+    expect(workspace).toContain('paymentMethods={configuredPaymentMethods}');
     expect(workspace).toContain("field.visible_mobile === false ? 'hidden sm:grid'");
     expect(workspace).toContain("field.visible_desktop === false ? 'sm:hidden'");
     expect(workspace).toContain('nextErrors[`custom_${field.id}`]');
-    expect(workspace).toContain("description: t('salesClosing.workspace.description')");
-    expect(workspace).toContain('ClosingWorkflowStepper');
-    expect(workspace).toContain("workflowStep === 'sales'");
-    expect(workspace).toContain("workflowStep === 'review'");
+    expect(workspace).toContain('incompleteRequiredFields');
+    expect(workspace).toContain('data-testid="closing-full-details"');
+    expect(workspace).not.toContain('ClosingWorkflowStepper');
     expect(workspace).toContain("closing_state: requestedClosingState");
     expect(workspace).toContain('Save Draft');
     expect(workspace).toContain('Finalize Closing');
@@ -113,12 +112,12 @@ describe('Sales Closing Customization runtime contract', () => {
 
 
 describe('Sales Closing in-workspace runtime customization contract', () => {
-  it('reuses the shared source and field dialogs from both canonical entry points', async () => {
+  it('keeps source and field dialogs in Owner customization instead of the daily closing flow', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
     const page = await source('../src/pages/SalesClosingCustomization.jsx');
     const dialogs = await source('../src/components/sales/SalesClosingCustomizationDialogs.jsx');
 
-    expect(workspace).toContain("from '@/components/sales/SalesClosingCustomizationDialogs'");
+    expect(workspace).not.toContain("from '@/components/sales/SalesClosingCustomizationDialogs'");
     expect(page).toContain("from '@/components/sales/SalesClosingCustomizationDialogs'");
     expect(dialogs).toContain("t('salesClosing.dialog.descriptionOptional')");
     expect(dialogs).toContain("t('salesClosing.dialog.helpTextOptional')");
@@ -146,7 +145,7 @@ describe('Sales Closing in-workspace runtime customization contract', () => {
     expect(workspace).toContain('salesSourceToneFor(source.color)');
   });
 
-  it('adds sources and fields in place, invalidates every branch-scoped source cache, and links to the existing customization route', async () => {
+  it('centralizes source and field administration outside the quick daily closing flow', async () => {
     const context = await source('../src/lib/SalesClosingCustomizationContext.jsx');
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
@@ -154,12 +153,11 @@ describe('Sales Closing in-workspace runtime customization contract', () => {
     expect(context).toContain('saveClosingField');
     expect(context).toContain("queryClient.invalidateQueries({ queryKey: ['sales_sources_active', restaurantId], refetchType: 'none' });");
     expect(context).not.toContain("queryClient.setQueriesData({ queryKey: ['sales_sources_active', restaurantId] }, merge);");
-    expect(workspace).toContain('salesClosingWorkspaceCopy.addSource');
-    expect(workspace).toContain('salesClosingWorkspaceCopy.addField');
-    expect(workspace).toContain('salesClosingWorkspaceCopy.customize');
-    expect(workspace).toContain("navigate('/sales-closing-customization')");
-    expect(workspace).toContain('Sales source saved and is ready to use.');
-    expect(workspace).toContain('Closing field saved and is ready to use.');
+    expect(workspace).not.toContain('salesClosingWorkspaceCopy.addSource');
+    expect(workspace).not.toContain('salesClosingWorkspaceCopy.addField');
+    expect(workspace).not.toContain("navigate('/sales-closing-customization')");
+    expect(workspace).toContain('Manual sales sources');
+    expect(workspace).toContain('Closing fields');
   });
 
   it('persists and renders optional field help text without changing historical closing snapshots', async () => {

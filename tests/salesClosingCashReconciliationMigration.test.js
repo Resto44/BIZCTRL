@@ -69,8 +69,8 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
     expect(walletFirstMigration).toContain('uq_wallet_transactions_closing_settlement');
     expect(salesPage).not.toContain('autoWalletTx(savedClosing, savedClosing.id, previousClosing)');
     expect(salesPage).not.toContain('autoSettle(savedClosing, savedClosing.id, proofUrl || null, ocr || null, previousClosing)');
-    expect(workspace).toContain('Branch Wallet');
-    expect(workspace).toContain('Branch Wallet Applied');
+    expect(reconciliationPanel).toContain('Branch Wallet');
+    expect(workspace).toContain('branchWalletApplied={branchWalletApplied}');
   });
 
   it('recomputes fixed and variable daily costs server-side and snapshots settlement allocation immutably', () => {
@@ -79,8 +79,8 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
     expect(walletFirstMigration).toContain('variable_expenses_total = v_variable_expenses');
     expect(walletFirstMigration).toContain('sales_closing_settlement_snapshots');
     expect(walletFirstMigration).toContain('SALES_CLOSING_SETTLEMENT_SNAPSHOT_IMMUTABLE');
-    expect(workspace).toContain('Fixed Expense Today');
-    expect(workspace).toContain('Variable Expenses');
+    expect(workspace).toContain('fixed_expenses_total: fixedExpensesToday');
+    expect(workspace).toContain('variable_expenses_total: variableExpensesToday');
     expect(workspace).toContain('Funding never changes this result');
   });
 
@@ -114,7 +114,7 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
     expect(workspace).toContain('updateActualCashCount(value)');
     expect(reconciliationPanel).toContain('ClosingNumericInput');
     expect(workspace).toContain('cashSales={reconciliation.cashSales}');
-    expect(workspace).toContain('money-summary-cash-sales-${cashSales}');
+    expect(workspace).toContain('value={cashSales}');
     expect(workspace).toContain('cashLedgerContext.owner_settlement?.closing_id === currentClosingId');
     expect(workspace).toContain('ownerSettlementPaymentApplied');
     expect(workspace).toContain('isCurrentClosingOwnerSettlementMovement');

@@ -42,8 +42,8 @@ describe('Sales Closing expense integration', () => {
     expect(workspace).toContain('const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;');
     expect(workspace).toContain('const operatingResult = totalSales - totalDailyExpenses;');
     expect(workspace).toContain('expenses_total: operatingExpensesTotal');
-    expect(workspace).toContain('Total Daily Expenses');
-    expect(workspace).toContain('money-total-daily-expenses-${totalDailyExpenses}');
+    expect(workspace).toContain('Expenses &amp; purchases');
+    expect(workspace).toContain('value={totalDailyExpenses}');
   });
 
   it('does not pass accounting purchases or expenses into the physical cash formula, preserving ledger-only Expected Cash and wallet-first settlement', () => {
