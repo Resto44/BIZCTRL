@@ -31,6 +31,18 @@ describe('Sales Closing runtime persistence contract', () => {
     expect(error.userMessage).toContain('Closing details');
   });
 
+  it('surfaces immutable-version failures as a typed Closing error instead of a generic retry toast', () => {
+    const error = createClosingSaveError({
+      code: 'P0001',
+      message: 'SALES_CLOSING_VERSION_IMMUTABLE',
+      details: 'Finalized Sales Closing versions are append-only.',
+    }, 'request-version-conflict');
+
+    expect(error.code).toBe('SALES_CLOSING_VERSION_IMMUTABLE');
+    expect(error.userMessage).toContain('snapshot');
+    expect(error.request_id).toBe('request-version-conflict');
+  });
+
   it('uses explicit server operations for draft and finalization and exposes diagnostic references in the workspace', async () => {
     const [repository, workspace, salesPage, migration] = await Promise.all([
       source('src/lib/closing/ClosingRepository.js'),
