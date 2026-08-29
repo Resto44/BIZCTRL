@@ -112,24 +112,18 @@ describe('Owner dashboard customization', () => {
     expect(migration).toContain("membership.permissions ->> 'manageDashboardCustomization'");
   });
 
-  it('keeps DriverPerformance and its branch-aware metrics intact while routing section metadata through the reusable system', async () => {
+  it('keeps the legacy customization module intact but removes its accordion integration from the new Control Tower', async () => {
     const [ownerDashboard, driverPerformance] = await Promise.all([
       readFile(ownerDashboardPath, 'utf8'),
       readFile(driverPerformancePath, 'utf8'),
     ]);
-    expect(ownerDashboard).toContain("import DriverPerformance from '@/components/dashboard/DriverPerformance';");
-    expect(ownerDashboard).toContain('restaurantId={activeRestaurant?.id}');
-    expect(ownerDashboard).toContain('branches={branches}');
-    expect(ownerDashboard).toContain('selectedBranch={selectedBranch}');
-    expect(ownerDashboard).toContain('currency={currency}');
-    expect(ownerDashboard).toContain("title={dashboardCustomization.widgetsById['driver-analytics']?.title}");
-    expect(ownerDashboard).toContain("description={dashboardCustomization.widgetsById['driver-analytics']?.description}");
+    expect(ownerDashboard).not.toContain("import DriverPerformance from '@/components/dashboard/DriverPerformance';");
+    expect(ownerDashboard).not.toContain('DashboardCustomizationContext.Provider');
+    expect(ownerDashboard).not.toContain('DashboardAccordionSection');
+    expect(ownerDashboard).toContain('data-testid="owner-control-tower-summary"');
+    expect(ownerDashboard).toContain('data-testid="owner-branch-rankings"');
     expect(driverPerformance).toContain('<h2 className="text-sm font-bold text-foreground leading-tight">{title}</h2>');
     expect(driverPerformance).not.toContain('>Driver Analytics</h2>');
     expect(driverPerformance).not.toContain('Branch and driver sales performance, refreshed from canonical driver and sales records.');
-    expect(ownerDashboard).toContain('DashboardCustomizationContext.Provider');
-    expect(ownerDashboard).toContain('configuredWidget?.title ?? title');
-    expect(ownerDashboard).not.toContain('title="Driver Analytics"');
-    expect(ownerDashboard).not.toContain('subtitle="Branch and driver sales performance"');
   });
 });

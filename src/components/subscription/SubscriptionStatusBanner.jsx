@@ -25,9 +25,17 @@ export default function SubscriptionStatusBanner() {
   const label = trial ? `${copy.trial}: ${trialDaysRemaining} ${copy.remaining}` : pending ? copy.pending : free ? copy.free : copy.active;
 
   return (
-    <div className={`mb-4 flex flex-col gap-3 rounded-xl border px-4 py-3 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between ${tone}`} dir={isRTL ? 'rtl' : 'ltr'}>
-      <div className="flex min-w-0 items-center gap-2"><Icon className="h-4 w-4 shrink-0" /><span className="font-semibold">{label}</span>{trial && <span className="hidden text-xs opacity-75 sm:inline">· {summary.plan_name}</span>}</div>
-      <Link to="/billing" className="inline-flex shrink-0 items-center gap-1.5 font-semibold underline-offset-4 hover:underline"><Sparkles className="h-3.5 w-3.5" />{copy.review}<ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" /></Link>
+    <div className={`mb-3 flex min-h-10 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs shadow-sm ${tone}`} dir={isRTL ? 'rtl' : 'ltr'}>
+      <div className="flex min-w-0 items-center gap-2">
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="truncate font-bold">{label}</span>
+        {trial && <span className="hidden shrink-0 text-[11px] opacity-70 md:inline">· {summary.plan_name}</span>}
+      </div>
+      <Link to="/billing" aria-label={copy.review} title={copy.review} className="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border border-current/15 bg-background/40 px-2 font-bold transition hover:bg-background/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current">
+        <Sparkles className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">{copy.review}</span>
+        <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
+      </Link>
     </div>
   );
 }

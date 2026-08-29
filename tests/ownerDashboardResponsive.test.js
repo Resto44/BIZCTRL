@@ -16,14 +16,17 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
     expect(files.join('\n')).not.toMatch(/100vw/);
   });
 
-  it('uses shrinkable viewport-bounded containers for the shared shell and Owner Dashboard', async () => {
+  it('uses shrinkable viewport-bounded containers for the shared shell and Owner Control Tower', async () => {
     const [owner, appLayout, erpLayout] = await Promise.all([
       source('../src/pages/OwnerDashboard.jsx'),
       source('../src/components/layout/AppLayout.jsx'),
       source('../src/components/layout/ERPLayout.jsx'),
     ]);
-    expect(owner).toContain('w-full min-w-0 max-w-full');
-    expect(owner).toContain('flex-col gap-3 pt-2 sm:flex-row');
+    expect(owner).toContain('data-testid="owner-mega-dashboard"');
+    expect(owner).toContain('mx-auto w-full max-w-6xl');
+    expect(owner).toContain('flex flex-col gap-4 sm:flex-row');
+    expect(owner).toContain('overflow-x-auto pb-1');
+    expect(owner).toContain('min-w-[34rem]');
     expect(appLayout).toContain('mx-auto w-full min-w-0 max-w-[1600px]');
     expect(erpLayout).toContain('flex-1 min-w-0 max-w-full overflow-y-auto');
   });
@@ -40,32 +43,23 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
     expect(trend).toContain('min-w-[800px]');
   });
 
-  it('keeps Quick Shortcuts fixed above Bottom Navigation while reserving dashboard access space', async () => {
-    const [quickActions, owner, appLayout, bottomNav, erpLayout, indexCss, serviceWorker] = await Promise.all([
-      source('../src/components/dashboard/QuickActionsDock.jsx'),
+  it('removes the floating shortcuts from Owner Dashboard and keeps actions inside normal document flow', async () => {
+    const [owner, appLayout, bottomNav, erpLayout, subscriptionBanner] = await Promise.all([
       source('../src/pages/OwnerDashboard.jsx'),
       source('../src/components/layout/AppLayout.jsx'),
       source('../src/components/layout/BottomNav.jsx'),
       source('../src/components/layout/ERPLayout.jsx'),
-      source('../src/index.css'),
-      source('../public/sw.js'),
+      source('../src/components/subscription/SubscriptionStatusBanner.jsx'),
     ]);
-    expect(quickActions).toContain('pointer-events-none fixed inset-x-0');
-    expect(quickActions).toContain('bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))]');
-    expect(quickActions).toContain('z-40');
-    expect(quickActions).toContain('overflow-x-auto overscroll-x-contain');
-    expect(quickActions).toContain('lg:overflow-x-visible');
-    expect(quickActions).not.toMatch(/sticky|absolute|bottom-0/);
-    expect(owner).toContain("import QuickActionsDock from '@/components/dashboard/QuickActionsDock';");
-    expect(owner).toContain('<QuickActionsDock');
-    expect(owner).toContain('onOpenCopilot={() => setCopilotOpen(true)}');
-    expect(owner).toContain("onAddBranch={role === 'owner' ? () => setQuickAddBranchOpen(true) : undefined}");
-    expect(owner).toContain('pb-[calc(var(--quick-shortcuts-height)+1rem)]');
+    expect(owner).not.toContain("import QuickActionsDock from '@/components/dashboard/QuickActionsDock';");
+    expect(owner).not.toContain('<QuickActionsDock');
+    expect(owner).toContain('data-testid="owner-mega-actions"');
+    expect(owner).toContain("role === 'owner' ? { label: copy.addBranch");
     expect(appLayout).not.toContain('QuickActionsDock');
     expect(bottomNav).toContain('fixed inset-x-0 bottom-0 z-50');
     expect(bottomNav).toContain('pb-[env(safe-area-inset-bottom,0px)]');
     expect(erpLayout).toContain('pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+1rem)]');
-    expect(indexCss).toContain('--quick-shortcuts-height: 88px;');
-    expect(serviceWorker).toContain("const CACHE_VERSION = 'v10';");
+    expect(subscriptionBanner).toContain('min-h-10 items-center justify-between');
+    expect(subscriptionBanner).not.toContain('flex flex-col gap-3');
   });
 });

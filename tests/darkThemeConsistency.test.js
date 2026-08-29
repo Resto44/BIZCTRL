@@ -35,7 +35,8 @@ describe('Dark theme surface consistency', () => {
       source('../src/pages/OwnerDashboard.jsx'),
     ]);
     expect(css).toContain('preserving intentionally themed Owner Dashboard widgets');
-    expect(owner).toContain('dark:bg-blue-950/30');
-    expect(owner).toContain('dark:bg-emerald-950/20');
+    expect(owner).toContain('dark:from-slate-950');
+    expect(owner).toContain('dark:bg-blue-950/60');
+    expect(owner).toContain('dark:bg-emerald-950/40');
   });
 });

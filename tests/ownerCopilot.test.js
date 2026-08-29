@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 const source = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 describe('Owner AI Copilot contract', () => {
-  it('opens from the fixed Owner Quick Shortcuts dock and preserves its dashboard integration', async () => {
+  it('keeps the secure Copilot module available without forcing a floating overlay into the new dashboard', async () => {
     const [dock, dashboard, panel] = await Promise.all([
       source('../src/components/dashboard/QuickActionsDock.jsx'),
       source('../src/pages/OwnerDashboard.jsx'),
@@ -14,9 +14,9 @@ describe('Owner AI Copilot contract', () => {
     expect(dock).toContain('onOpenCopilot');
     expect(dock).toContain("label: 'AI Copilot'");
     expect(dock).toContain('Ask anything about your business or BizCTRL.');
-    expect(dashboard).toContain('<QuickActionsDock');
-    expect(dashboard).toContain('onOpenCopilot={() => setCopilotOpen(true)}');
-    expect(dashboard).toContain('<OwnerCopilotPanel');
+    expect(dashboard).not.toContain('<QuickActionsDock');
+    expect(dashboard).not.toContain('<OwnerCopilotPanel');
+    expect(dashboard).toContain('data-testid="owner-mega-dashboard"');
     expect(panel).toContain("supabase.functions.invoke('owner-copilot'");
     expect(panel).toContain('fixed inset-0 z-[130]');
     expect(panel).toContain('overflow-y-auto overscroll-contain');

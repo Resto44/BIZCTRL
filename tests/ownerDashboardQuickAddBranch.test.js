@@ -4,15 +4,12 @@ import { readFile } from 'node:fs/promises';
 const source = (relativePath) => readFile(new URL(relativePath, import.meta.url), 'utf8');
 
 describe('Owner Dashboard quick Add Branch runtime', () => {
-  it('adds a callback-based Add Branch action to the Owner Dashboard dock only for owners', async () => {
-    const [dock, dashboard] = await Promise.all([
-      source('../src/components/dashboard/QuickActionsDock.jsx'),
-      source('../src/pages/OwnerDashboard.jsx'),
-    ]);
-    expect(dock).toContain("id: 'add-branch'");
-    expect(dock).toContain("label: 'Add Branch'");
-    expect(dock).toContain('onAddBranch');
-    expect(dashboard).toContain("onAddBranch={role === 'owner' ? () => setQuickAddBranchOpen(true) : undefined}");
+  it('keeps Add Branch inside the Owner Control Tower action grid and limits it to owners', async () => {
+    const dashboard = await source('../src/pages/OwnerDashboard.jsx');
+    expect(dashboard).toContain('data-testid="owner-mega-actions"');
+    expect(dashboard).toContain("role === 'owner' ? { label: copy.addBranch");
+    expect(dashboard).toContain('onClick: () => setQuickAddBranchOpen(true)');
+    expect(dashboard).not.toContain('<QuickActionsDock');
     expect(dashboard).toContain('<QuickAddBranchDialog open={isQuickAddBranchOpen} onOpenChange={setQuickAddBranchOpen} />');
   });
 

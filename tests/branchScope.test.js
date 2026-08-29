@@ -36,12 +36,11 @@ describe('central branch UUID scope contract', () => {
 
     expect(app).toContain('<BranchScopeProvider>');
     expect(app).toContain('<TenantProvider>');
-    expect(dashboard).toContain('const selectedBranch = selectedBranchId;');
     expect(dashboard).not.toContain("const [selectedBranch, setSelectedBranch] = useState('all')");
-    expect(dashboard).toContain('onSelect={setSelectedBranchId}');
-    expect(dashboard).toContain("const selectedLabel = selectedBranch === 'all'");
-    expect(dashboard).toContain('key={`branch-selector-${selectedBranchId}`}');
-    expect(dashboard).toContain('key={`branch-dashboard-${selectedBranchId}`}');
+    expect(dashboard).toContain('data-testid="owner-branch-selector"');
+    expect(dashboard).toContain('onChange={(event) => setSelectedBranchId(event.target.value)}');
+    expect(dashboard).toContain('const displayScope = isAllBranches ? copy.allBranches : selectedBranchLabel;');
+    expect(dashboard).toContain("value={isAllBranches ? 'all' : selectedBranchId || 'all'}");
     expect(dashboard).toContain("queryKey: ['sales_today', activeRestaurant?.id, selectedBranchId, today]");
     expect(dashboard).toContain("createQuery().eq('branch_id', selectedBranchId)");
     expect(dashboard).toContain("createQuery().is('branch_id', null).eq(legacyColumn, selectedBranchKey)");

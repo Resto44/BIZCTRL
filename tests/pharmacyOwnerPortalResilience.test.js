@@ -50,13 +50,13 @@ describe('Pharmacy Owner portal resilience', () => {
     const shellIndex = dashboard.indexOf('export default function OwnerDashboard()');
     const contentIndex = dashboard.indexOf('function OwnerDashboardContent()');
     expect(shellIndex).toBeGreaterThan(-1);
-    expect(contentIndex).toBeGreaterThan(shellIndex);
+    expect(contentIndex).toBeGreaterThan(-1);
     expect(dashboard).toContain('isLoadingAuth || loadingRestaurants || (activeRestaurant && loadingPortalIdentity)');
     expect(dashboard).toContain("if (!user || authError?.type === 'auth_required')");
     expect(dashboard).toContain('Your session has expired. Please sign in again.');
     expect(dashboard).toContain('if (!activeRestaurant || portalIdentityError)');
     expect(dashboard).toContain('await refetchRestaurants(); await refetchPortalIdentity();');
-    expect(dashboard).toContain('return <OwnerDashboardContent />;');
+    expect(dashboard).toContain('return <WidgetErrorBoundary><OwnerDashboardContent /></WidgetErrorBoundary>;');
   });
 
   it('keeps every owner dashboard data path tenant-scoped and safely disabled until a canonical organization exists', async () => {
@@ -69,9 +69,9 @@ describe('Pharmacy Owner portal resilience', () => {
     expect(dashboard).toContain("createQuery().eq('branch_id', selectedBranchId)");
     expect(dashboard).toContain(".eq('restaurant_id', activeRestaurant.id)");
     expect(dashboard).toContain('<WidgetErrorBoundary>');
-    expect(dashboard).toContain('lowStockItems={[]}');
-    expect(dashboard).toContain('expiryAlerts={[]}');
-    expect(dashboard).toContain('pendingOrders={[]}');
+    expect(dashboard).toContain('data-testid="owner-mega-dashboard"');
+    expect(dashboard).toContain('buildActiveAlertCandidates({');
+    expect(dashboard).toContain('reconcileActiveAlerts({');
   });
 
   it('renders a safe placeholder when the canonical portal identity has no owner name', () => {
