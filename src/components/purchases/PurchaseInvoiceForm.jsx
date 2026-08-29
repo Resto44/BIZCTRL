@@ -14,7 +14,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
-import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useAuth } from '@/lib/AuthContext';
 import { usePurchaseProductsByCategory } from '@/hooks/usePurchaseProductsByCategory';
@@ -29,11 +28,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import {
   Plus, Trash2, Receipt, Package, Truck, AlertCircle, CheckCircle2,
-  Upload, Paperclip, ScanLine, ChevronDown, ChevronUp, DollarSign
+  Paperclip, ScanLine, ChevronDown, ChevronUp, DollarSign,
+  ArrowLeft, ShieldCheck, RefreshCw, FileText, Clock3, Building2,
+  Hash, CalendarDays, CreditCard, ChevronRight, Save, Send, Calculator
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
-  calcLineTotal, calcInvoiceTotals, computeApprovalStatus, normalizePurchaseLine,
+  calcLineTotal, calcInvoiceTotals, normalizePurchaseLine,
   createPurchaseInvoice, updatePurchaseInvoice, addInvoicePayment
 } from '@/lib/procurementEngine';
 import OcrScanDialog from './OcrScanDialog';
@@ -41,23 +42,6 @@ import OcrScanDialog from './OcrScanDialog';
 const CURRENCIES = ['SAR', 'USD', 'AED', 'EGP', 'KWD', 'QAR', 'BHD', 'OMR', 'EUR', 'GBP'];
 const PAYMENT_METHODS = ['cash', 'bank', 'pos', 'transfer'];
 const ADDITIONAL_COST_TYPES = ['delivery', 'transport', 'customs', 'packaging', 'miscellaneous'];
-
-const STATUS_CONFIG = {
-  draft:     { label: 'Draft',    cls: 'bg-gray-100 text-gray-700 border-gray-200' },
-  pending:   { label: 'Pending',  cls: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  approved:  { label: 'Approved', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
-  paid:      { label: 'Paid',     cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  partial:   { label: 'Partial',  cls: 'bg-orange-100 text-orange-700 border-orange-200' },
-  unpaid:    { label: 'Unpaid',   cls: 'bg-red-100 text-red-700 border-red-200' },
-  cancelled: { label: 'Cancelled',cls: 'bg-gray-100 text-gray-500 border-gray-200' },
-};
-
-const APPROVAL_CONFIG = {
-  auto_approved: { label: 'Auto Approved', cls: 'bg-emerald-100 text-emerald-700' },
-  pending:       { label: 'Pending Approval', cls: 'bg-yellow-100 text-yellow-700' },
-  approved:      { label: 'Approved', cls: 'bg-blue-100 text-blue-700' },
-  rejected:      { label: 'Rejected', cls: 'bg-red-100 text-red-700' },
-};
 
 const emptyItem = () => ({
   _id: Math.random().toString(36).slice(2),
@@ -103,6 +87,7 @@ function PurchaseInvoiceItemRow({
   categories,
   categoriesTree
 }) {
+  const [expanded, setExpanded] = useState(() => !item.product_name && !item.product_id);
   // Fetch products for this item's category/subcategory and supplier
   // Calling hook here is safe because it's the top level of this component
   const { products: categoryProducts = [] } = usePurchaseProductsByCategory(item.category_id, supplierId, item.subcategory_id);
@@ -116,15 +101,37 @@ function PurchaseInvoiceItemRow({
   };
 
   return (
-    <div className="rounded-lg border border-border p-3 space-y-2 bg-secondary/20 overflow-hidden">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground">Item {idx + 1}</span>
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center gap-3 p-3">
+        <button
+          type="button"
+          onClick={() => setExpanded(value => !value)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          aria-expanded={expanded}
+        >
+          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-blue-50 text-xs font-bold text-blue-700">{idx + 1}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-slate-900">{item.product_name || 'New line item'}</span>
+            <span className="block truncate text-[11px] text-slate-500">
+              {Number(item.quantity || 0).toLocaleString()} {item.unit || 'unit'} × {Number(item.unit_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+          </span>
+          {item._ocr_confidence ? (
+            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">{item._ocr_confidence}%</span>
+          ) : null}
+          <span className="whitespace-nowrap text-sm font-bold text-slate-900">
+            {calcLineTotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+          {expanded ? <ChevronUp className="h-4 w-4 flex-none text-slate-400" /> : <ChevronDown className="h-4 w-4 flex-none text-slate-400" />}
+        </button>
         {itemsCount > 1 && (
-          <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-destructive flex-shrink-0" onClick={() => removeItem(item._id)}>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 text-destructive" onClick={() => removeItem(item._id)}>
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
         )}
       </div>
+
+      {expanded && <div className="space-y-2 border-t border-slate-100 bg-slate-50/70 p-3">
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="min-w-0">
@@ -194,7 +201,7 @@ function PurchaseInvoiceItemRow({
               )}
             </SelectContent>
           </Select>
-          {!item.product_id && (item.category_id || item.subcategory_id) && (
+          {!item.product_id && (
             <Input value={item.product_name} onChange={e => updateItem(item._id, 'product_name', e.target.value)}
               placeholder="Or type product name" className="h-8 text-xs mt-1 w-full min-w-0" />
           )}
@@ -248,12 +255,39 @@ function PurchaseInvoiceItemRow({
           </div>
         </div>
       </div>
+      </div>}
     </div>
   );
 }
 
+function VerificationCard({ title, value, verified, icon: Icon, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-w-0 rounded-xl border p-3 text-left transition-all ${
+        active
+          ? 'border-blue-400 bg-blue-50/70 shadow-sm ring-2 ring-blue-100'
+          : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50'
+      }`}
+    >
+      <span className="mb-2 block text-[11px] font-medium text-slate-500">{title}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl ${verified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+          <Icon className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{value || 'Needs review'}</span>
+        <ChevronRight className="h-4 w-4 flex-none text-slate-400" />
+      </span>
+      <span className={`mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold ${verified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+        {verified ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+        {verified ? 'Verified' : 'Review'}
+      </span>
+    </button>
+  );
+}
+
 export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCancel }) {
-  const { currency: currencySymbol, lang } = useLanguage();
   const { ownerFilter, branches, activeRestaurantId: restaurantId } = useTenant();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -290,8 +324,13 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
   const [showPayments, setShowPayments] = useState(false);
   const [showOcr, setShowOcr] = useState(false);
   const [attachments, setAttachments] = useState(invoice?.attachment_urls || []);
+  const [ocrMeta, setOcrMeta] = useState(null);
+  const [vatNumber, setVatNumber] = useState(invoice?.vat_number || '');
+  const [paymentTerms, setPaymentTerms] = useState(invoice?.payment_terms || '');
+  const [activeDetail, setActiveDetail] = useState('supplier');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [submitMode, setSubmitMode] = useState(null);
   const savingRef = useRef(false);
   // activeRestaurantId already destructured above as restaurantId
 
@@ -338,13 +377,36 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
   // Use hierarchical categories hook
   const { categories, tree: categoriesTree } = usePurchaseCategoriesHierarchy();
 
+  const selectedSupplier = suppliers.find(s => s.id === form.supplier_id);
+  const resolvedVatNumber = vatNumber || selectedSupplier?.vat_number || selectedSupplier?.tax_number || '';
+  const resolvedPaymentTerms = paymentTerms || selectedSupplier?.payment_terms || '';
+
   // ── Totals ─────────────────────────────────────────────────────────────
   const totals = calcInvoiceTotals(items, additionalCosts);
   const paymentTotal = payFullAmount
     ? totals.grandTotal
     : payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
   const remaining = payFullAmount ? 0 : totals.grandTotal - paymentTotal;
-  const approvalStatus = computeApprovalStatus(totals.grandTotal);
+  const scannedInvoiceTotal = Number(ocrMeta?.invoiceTotal || 0);
+  const invoiceDifference = scannedInvoiceTotal > 0 ? totals.grandTotal - scannedInvoiceTotal : 0;
+  const invoiceMatchesScan = scannedInvoiceTotal > 0 && Math.abs(invoiceDifference) < 0.01;
+  const hasLineItems = items.some(item => Boolean(item.product_name || item.product_id));
+  const verificationChecks = [
+    Boolean(form.supplier_id || form.supplier_name.trim()),
+    Boolean(form.branch),
+    Boolean(form.invoice_number.trim()),
+    Boolean(form.date),
+    Boolean(resolvedPaymentTerms || form.due_date),
+    Boolean(resolvedVatNumber),
+    hasLineItems,
+    invoiceMatchesScan,
+  ];
+  const verifiedCount = verificationChecks.filter(Boolean).length;
+  const reviewCount = verificationChecks.length - verifiedCount;
+  const averageLineConfidence = Math.round(
+    items.reduce((sum, item) => sum + Number(item._ocr_confidence || 0), 0) /
+      Math.max(1, items.filter(item => item._ocr_confidence).length),
+  );
 
   // ── Pay Full Amount handler ────────────────────────────────────────────
   const handlePayFullAmount = (checked) => {
@@ -404,12 +466,44 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
 
   // ── OCR pre-fill ───────────────────────────────────────────────────────
   const handleOcrResult = (extracted) => {
+    const normalizedSupplierName = String(extracted.supplier_name || '').trim().toLocaleLowerCase();
+    const matchedSupplier = suppliers.find(supplier =>
+      String(supplier.name || '').trim().toLocaleLowerCase() === normalizedSupplierName,
+    );
     setForm(f => ({
       ...f,
       invoice_number: extracted.invoice_number || f.invoice_number,
       date: extracted.date || f.date,
-      supplier_name: extracted.supplier_name || f.supplier_name,
+      due_date: extracted.due_date || f.due_date,
+      currency: extracted.currency || f.currency,
+      supplier_id: matchedSupplier?.id || f.supplier_id,
+      supplier_name: matchedSupplier?.name || extracted.supplier_name || f.supplier_name,
+      supplier_email: matchedSupplier?.email || f.supplier_email,
     }));
+    setVatNumber(extracted.vat_number || matchedSupplier?.vat_number || matchedSupplier?.tax_number || '');
+    setPaymentTerms(extracted.payment_terms || matchedSupplier?.payment_terms || '');
+    setOcrMeta({
+      ...(extracted.__ocr || {}),
+      invoiceTotal: Number(extracted.total_amount || extracted.invoice_total || 0),
+      subtotal: Number(extracted.subtotal || 0),
+      taxAmount: Number(extracted.tax_amount || 0),
+      confidence: Number(extracted.overall_confidence || extracted.__ocr?.confidence || 0),
+      fieldConfidence: extracted.field_confidence || {},
+    });
+    if (extracted.__ocr?.fileUrl?.startsWith('http')) {
+      setAttachments(prev => prev.includes(extracted.__ocr.fileUrl) ? prev : [...prev, extracted.__ocr.fileUrl]);
+    }
+    if (Array.isArray(extracted.items) && extracted.items.length > 0) {
+      setItems(extracted.items.map(line => normalizePurchaseLine({
+        ...emptyItem(),
+        product_name: line.description || line.product_name || '',
+        unit: line.unit || '',
+        quantity: Number(line.quantity || 1),
+        unit_cost: Number(line.unit_price || line.unit_cost || 0),
+        tax: Number(line.tax_rate || line.tax || 0),
+        _ocr_confidence: Number(line.confidence || 0),
+      })));
+    }
     setShowOcr(false);
   };
 
@@ -431,10 +525,12 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
   };
 
   // ── Submit ─────────────────────────────────────────────────────────────
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, mode = 'post') => {
     e.preventDefault();
     if (savingRef.current) return;
     setError('');
+
+    const isDraft = mode === 'draft';
 
     if (!form.branch) { setError('Branch is required'); return; }
     
@@ -442,26 +538,27 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
     const supplierId = form.supplier_id && form.supplier_id.trim() !== '' ? form.supplier_id : null;
     const supplierName = form.supplier_name && form.supplier_name.trim() !== '' ? form.supplier_name : null;
     
-    if (!supplierId && !supplierName) { 
+    if (!isDraft && !supplierId && !supplierName) {
       setError('Supplier selection or name is required'); 
       return; 
     }
 
-    if (items.length === 0 || items.every(i => !i.product_name && !i.product_id)) {
+    if (!isDraft && (items.length === 0 || items.every(i => !i.product_name && !i.product_id))) {
       setError('At least one line item is required'); return;
     }
-    if (items.some((item) => Number(item.quantity) <= 0 || Number(item.unit_cost) < 0 || Number(item.discount || 0) < 0 || Number(item.tax || 0) < 0 || Number(item.tax || 0) > 100)) {
+    if (!isDraft && items.some((item) => Number(item.quantity) <= 0 || Number(item.unit_cost) < 0 || Number(item.discount || 0) < 0 || Number(item.tax || 0) < 0 || Number(item.tax || 0) > 100)) {
       setError('Every purchase line requires a positive quantity, a non-negative cost and discount, and tax between 0 and 100%.'); return;
     }
     const outstandingBalance = Math.max(0, totals.grandTotal - Number(invoice?.paid_amount || 0));
-    if (paymentTotal > outstandingBalance + 0.005) {
+    if (!isDraft && paymentTotal > outstandingBalance + 0.005) {
       setError('Payment amount cannot exceed the outstanding invoice balance.'); return;
     }
 
     savingRef.current = true;
     setSaving(true);
+    setSubmitMode(mode);
     try {
-      const cleanItems = items.map(({ _id, ...i }) => normalizePurchaseLine(i));
+      const cleanItems = items.map(({ _id, _ocr_confidence, ...i }) => normalizePurchaseLine(i));
       const cleanCosts = additionalCosts.map(({ _id, ...c }) => c);
 
       // Resolve branch_id UUID from branch key string
@@ -491,6 +588,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
           items: cleanItems,
           additionalCosts: cleanCosts,
           createdBy: user?.email,
+          mode,
         });
       } else {
         savedInvoice = await createPurchaseInvoice({
@@ -498,11 +596,12 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
           items: cleanItems,
           additionalCosts: cleanCosts,
           createdBy: user?.email,
+          mode,
         });
       }
 
       // Process payments if any have amounts
-      const validPayments = payments.filter(p => parseFloat(p.amount) > 0);
+      const validPayments = isDraft ? [] : payments.filter(p => parseFloat(p.amount) > 0);
       for (const pmt of validPayments) {
         await addInvoicePayment({
           invoiceId: savedInvoice.id,
@@ -532,377 +631,183 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
     } finally {
       savingRef.current = false;
       setSaving(false);
+      setSubmitMode(null);
     }
   };
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 overflow-x-hidden">
-      {/* Error */}
-      {error && (
-        <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
-          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{error}
-        </div>
-      )}
-
-      {/* OCR Scan Button */}
-      <div className="flex justify-end px-4">
-        <Button type="button" variant="outline" size="sm" onClick={() => setShowOcr(true)} className="gap-1.5 text-xs">
-          <ScanLine className="w-3.5 h-3.5" /> Scan Invoice (OCR)
+    <form onSubmit={e => handleSubmit(e, 'post')} className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-50 text-slate-950">
+      <header className="flex h-16 flex-none items-center gap-3 border-b border-slate-200 bg-white px-4">
+        <Button type="button" variant="ghost" size="icon" onClick={onCancel} className="h-9 w-9 rounded-full" aria-label="Back">
+          <ArrowLeft className="h-5 w-5" />
         </Button>
-      </div>
-
-      {/* ── HEADER ─────────────────────────────────────────────────────── */}
-      <Card className="p-4 space-y-3 overflow-hidden">
-        <div className="flex items-center gap-2 mb-1">
-          <Receipt className="w-4 h-4 text-primary flex-shrink-0" />
-          <span className="text-sm font-semibold">Invoice Header</span>
-          {isEdit && (
-            <Badge className={`ms-auto text-[10px] border ${STATUS_CONFIG[form.status]?.cls}`}>
-              {STATUS_CONFIG[form.status]?.label}
-            </Badge>
-          )}
-          {!isEdit && (
-            <Badge className={`ms-auto text-[10px] border ${APPROVAL_CONFIG[approvalStatus]?.cls}`}>
-              {APPROVAL_CONFIG[approvalStatus]?.label}
-            </Badge>
-          )}
+        <div className="min-w-0 flex-1 text-center">
+          <h2 className="truncate text-base font-bold sm:text-lg">Smart Invoice Capture</h2>
+          <p className="text-[10px] text-slate-500">AI-assisted procurement posting</p>
         </div>
+        <Badge className="border-0 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-50">
+          OCR {ocrMeta?.confidence ? `${Math.round(ocrMeta.confidence)}%` : 'Ready'}
+        </Badge>
+      </header>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="min-w-0">
-            <Label className="text-xs text-muted-foreground">Invoice Number</Label>
-            <Input value={form.invoice_number} onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))} placeholder="INV-001" className="h-9 w-full min-w-0 truncate" />
-          </div>
-          <div className="min-w-0">
-            <Label className="text-xs text-muted-foreground">Currency</Label>
-            <Select value={form.currency} onValueChange={v => setForm(f => ({ ...f, currency: v }))}>
-              <SelectTrigger className="h-9 w-full min-w-0"><SelectValue /></SelectTrigger>
-              <SelectContent>{CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <Label className="text-xs text-muted-foreground">Supplier *</Label>
-          <Select value={form.supplier_id} onValueChange={v => {
-            const s = suppliers.find(s => s.id === v);
-            setForm(f => ({ ...f, supplier_id: v, supplier_name: s?.name || '', supplier_email: s?.email || '' }));
-          }}>
-            <SelectTrigger className="h-9 w-full min-w-0">
-              <SelectValue placeholder="Select supplier..." />
-            </SelectTrigger>
-            <SelectContent>
-              {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {!form.supplier_id && (
-            <Input value={form.supplier_name} onChange={e => setForm(f => ({ ...f, supplier_name: e.target.value }))}
-              placeholder="Or type supplier name..." className="h-9 mt-1.5 text-sm w-full min-w-0" />
-          )}
-        </div>
-
-        <div className="min-w-0">
-          <Label className="text-xs text-muted-foreground">Branch *</Label>
-          <BranchSelect value={form.branch} onChange={v => setForm(f => ({ ...f, branch: v }))} />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="min-w-0">
-            <Label className="text-xs text-muted-foreground">Purchase Date *</Label>
-            <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="h-9 w-full min-w-0" />
-          </div>
-          <div className="min-w-0">
-            <Label className="text-xs text-muted-foreground">Due Date</Label>
-            <Input type="date" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} className="h-9 w-full min-w-0" />
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <Label className="text-xs text-muted-foreground">Notes</Label>
-          <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="text-sm resize-none w-full min-w-0" placeholder="Additional notes..." />
-        </div>
-      </Card>
-
-      {/* ── LINE ITEMS ──────────────────────────────────────────────────── */}
-      <Card className="p-4 overflow-hidden">
-        <div className="flex items-center gap-2 mb-3">
-          <Package className="w-4 h-4 text-primary flex-shrink-0" />
-          <span className="text-sm font-semibold">Line Items</span>
-          <Button type="button" size="sm" variant="outline" onClick={addItem} className="ms-auto gap-1 text-xs h-7">
-            <Plus className="w-3 h-3" /> Add Item
-          </Button>
-        </div>
-
-        <div className="space-y-3">
-          {items.map((item, idx) => (
-            <PurchaseInvoiceItemRow 
-              key={item._id}
-              item={item}
-              idx={idx}
-              itemsCount={items.length}
-              updateItem={updateItem}
-              removeItem={removeItem}
-              supplierId={form.supplier_id}
-              categories={categories}
-              categoriesTree={categoriesTree}
-            />
-          ))}
-        </div>
-      </Card>
-
-      {/* ── ADDITIONAL COSTS ────────────────────────────────────────────── */}
-      <Card className="p-4 overflow-hidden">
-        <button type="button" className="flex items-center gap-2 w-full" onClick={() => setShowAdditionalCosts(v => !v)}>
-          <Truck className="w-4 h-4 text-primary flex-shrink-0" />
-          <span className="text-sm font-semibold">Additional Costs</span>
-          {totals.additionalTotal > 0 && (
-            <span className="text-xs text-muted-foreground ms-1">({currencySymbol}{totals.additionalTotal.toLocaleString()})</span>
-          )}
-          <span className="ms-auto">{showAdditionalCosts ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</span>
-        </button>
-
-        {showAdditionalCosts && (
-          <div className="mt-3 space-y-2">
-            {additionalCosts.map(cost => (
-              <div key={cost._id} className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end rounded-lg border border-border p-2.5 bg-secondary/20">
-                <div className="min-w-0">
-                  <Label className="text-[10px] text-muted-foreground">Type</Label>
-                  <Select value={cost.type} onValueChange={v => updateAdditionalCost(cost._id, 'type', v)}>
-                    <SelectTrigger className="h-8 text-xs w-full min-w-0"><SelectValue /></SelectTrigger>
-                    <SelectContent>{ADDITIONAL_COST_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="min-w-0 sm:col-span-2">
-                  <Label className="text-[10px] text-muted-foreground">Description</Label>
-                  <Input value={cost.description} onChange={e => updateAdditionalCost(cost._id, 'description', e.target.value)}
-                    placeholder="Description" className="h-8 text-xs w-full min-w-0" />
-                </div>
-                <div className="min-w-0">
-                  <Label className="text-[10px] text-muted-foreground">Amount</Label>
-                  <Input type="number" min="0" step="0.01" value={cost.amount}
-                    onChange={e => updateAdditionalCost(cost._id, 'amount', parseFloat(e.target.value) || 0)}
-                    className="h-8 text-xs w-full min-w-0" placeholder="0.00" />
-                </div>
-                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive flex-shrink-0" onClick={() => removeAdditionalCost(cost._id)}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            ))}
-            <Button type="button" variant="outline" size="sm" onClick={addAdditionalCost} className="gap-1 text-xs h-7 w-full">
-              <Plus className="w-3 h-3" /> Add Cost
-            </Button>
-          </div>
-        )}
-      </Card>
-
-      {/* ── TOTALS SUMMARY ──────────────────────────────────────────────── */}
-      <Card className="p-4 bg-secondary/30 overflow-hidden">
-        <div className="space-y-1.5 text-sm">
-          <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span className="font-medium truncate">{currencySymbol}{totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-          </div>
-          {totals.discountAmount > 0 && (
-            <div className="flex justify-between gap-2 text-emerald-600">
-              <span>Discount</span>
-              <span className="truncate">-{currencySymbol}{totals.discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5">
+        <div className="mx-auto max-w-3xl space-y-4 pb-4">
+          {error && (
+            <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700" role="alert">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-none" />{error}
             </div>
           )}
-          {totals.taxAmount > 0 && (
-            <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground">Tax</span>
-              <span className="truncate">+{currencySymbol}{totals.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-            </div>
-          )}
-          {totals.additionalTotal > 0 && (
-            <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground">Additional Costs</span>
-              <span className="truncate">+{currencySymbol}{totals.additionalTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-            </div>
-          )}
-          <div className="flex justify-between gap-2 border-t border-border pt-1.5 font-bold text-base">
-            <span>Grand Total</span>
-            <span className="text-primary truncate">{currencySymbol}{totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-          </div>
-        </div>
-      </Card>
 
-      {/* ── PAYMENTS ────────────────────────────────────────────────────── */}
-      <Card className="p-4 overflow-hidden">
-        <button type="button" className="flex items-center gap-2 w-full" onClick={() => setShowPayments(v => !v)}>
-          <DollarSign className="w-4 h-4 text-primary flex-shrink-0" />
-          <span className="text-sm font-semibold">Payments</span>
-          {paymentTotal > 0 && (
-            <span className="text-xs text-muted-foreground ms-1">(Paid: {currencySymbol}{paymentTotal.toLocaleString()})</span>
-          )}
-          {totals.grandTotal > 0 && (
-            <span className={`ms-2 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-              remaining <= 0
-                ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
-                : paymentTotal > 0
-                  ? 'bg-orange-100 text-orange-700 border-orange-200'
-                  : 'bg-gray-100 text-gray-600 border-gray-200'
-            }`}>
-              {remaining <= 0 ? 'Paid' : paymentTotal > 0 ? 'Partial' : 'Draft'}
-            </span>
-          )}
-          <span className="ms-auto">{showPayments ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</span>
-        </button>
-
-        {showPayments && (
-          <div className="mt-3 space-y-2">
-            {/* ☑ Pay Full Amount */}
-            <div className="flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/20 px-3 py-2">
-              <input
-                id="pay-full-amount"
-                type="checkbox"
-                checked={payFullAmount}
-                onChange={e => handlePayFullAmount(e.target.checked)}
-                className="w-4 h-4 accent-primary cursor-pointer"
-              />
-              <label htmlFor="pay-full-amount" className="text-xs font-semibold text-foreground cursor-pointer select-none flex-1">
-                Pay Full Amount
-              </label>
-              {payFullAmount && totals.grandTotal > 0 && (
-                <span className="text-xs font-bold text-primary">
-                  {currencySymbol}{totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </span>
-              )}
-            </div>
-
-            {/* Payment rows — hidden when Pay Full Amount is checked */}
-            {!payFullAmount && payments.map((pmt, idx) => (
-              <div key={pmt._id} className="rounded-lg border border-border p-2.5 space-y-2 bg-secondary/20 overflow-hidden">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">Payment {idx + 1}</span>
-                  {payments.length > 1 && (
-                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-destructive flex-shrink-0" onClick={() => removePayment(pmt._id)}>
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="min-w-0">
-                    <Label className="text-[10px] text-muted-foreground">Amount</Label>
-                    <Input type="number" min="0" step="0.01" value={pmt.amount}
-                      onChange={e => updatePayment(pmt._id, 'amount', e.target.value)} className="h-8 text-xs w-full min-w-0" />
-                  </div>
-                  <div className="min-w-0">
-                    <Label className="text-[10px] text-muted-foreground">Method</Label>
-                    <Select value={pmt.payment_method} onValueChange={v => updatePayment(pmt._id, 'payment_method', v)}>
-                      <SelectTrigger className="h-8 text-xs w-full min-w-0"><SelectValue /></SelectTrigger>
-                      <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="min-w-0">
-                    <Label className="text-[10px] text-muted-foreground">Date</Label>
-                    <Input type="date" value={pmt.date} onChange={e => updatePayment(pmt._id, 'date', e.target.value)} className="h-8 text-xs w-full min-w-0" />
-                  </div>
-                  <div className="min-w-0">
-                    <Label className="text-[10px] text-muted-foreground">Notes</Label>
-                    <Input value={pmt.notes} onChange={e => updatePayment(pmt._id, 'notes', e.target.value)} placeholder="..." className="h-8 text-xs w-full min-w-0" />
-                  </div>
-                </div>
+          <Card className="overflow-hidden border-slate-200 bg-white p-3 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="flex h-14 w-14 flex-none items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+                <FileText className="h-7 w-7 text-blue-600" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-slate-900">{ocrMeta?.fileName || 'Invoice document'}</p>
+                <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
+                  <Clock3 className="h-3 w-3" />
+                  {ocrMeta?.scannedAt ? `Scanned ${new Date(ocrMeta.scannedAt).toLocaleString()}` : 'Upload PDF, JPG or PNG for extraction'}
+                </p>
               </div>
-            ))}
-
-            {/* When Pay Full Amount: show method/date/notes only */}
-            {payFullAmount && (
-              <div className="rounded-lg border border-border p-2.5 space-y-2 bg-secondary/20 overflow-hidden">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="min-w-0">
-                    <Label className="text-[10px] text-muted-foreground">Method</Label>
-                    <Select value={payments[0]?.payment_method || 'cash'} onValueChange={v => setPayments(prev => [{ ...(prev[0] || emptyPayment()), payment_method: v }])}>
-                      <SelectTrigger className="h-8 text-xs w-full min-w-0"><SelectValue /></SelectTrigger>
-                      <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="min-w-0">
-                    <Label className="text-[10px] text-muted-foreground">Date</Label>
-                    <Input type="date" value={payments[0]?.date || format(new Date(), 'yyyy-MM-dd')} onChange={e => setPayments(prev => [{ ...(prev[0] || emptyPayment()), date: e.target.value }])} className="h-8 text-xs w-full min-w-0" />
-                  </div>
-                </div>
-                <div className="min-w-0">
-                  <Label className="text-[10px] text-muted-foreground">Notes</Label>
-                  <Input value={payments[0]?.notes || ''} onChange={e => setPayments(prev => [{ ...(prev[0] || emptyPayment()), notes: e.target.value }])} placeholder="..." className="h-8 text-xs w-full min-w-0" />
-                </div>
-              </div>
-            )}
-
-            {!payFullAmount && (
-              <Button type="button" variant="outline" size="sm" onClick={addPayment} className="gap-1 text-xs h-7 w-full">
-                <Plus className="w-3 h-3" /> Add Payment
-              </Button>
-            )}
-
-            {/* Remaining balance summary */}
-            {totals.grandTotal > 0 && (
-              <div className={`flex justify-between items-center rounded-lg px-3 py-2.5 gap-2 ${
-                remaining <= 0 ? 'bg-emerald-50 dark:bg-emerald-950' :
-                paymentTotal > 0 ? 'bg-orange-50 dark:bg-orange-950' :
-                'bg-red-50 dark:bg-red-950'
-              }`}>
-                <div>
-                  <p className={`text-xs font-medium ${
-                    remaining <= 0 ? 'text-emerald-700' :
-                    paymentTotal > 0 ? 'text-orange-700' : 'text-red-700'
-                  }`}>Remaining Balance</p>
-                  {paymentTotal > 0 && (
-                    <p className="text-[10px] text-muted-foreground">Paid: {currencySymbol}{paymentTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {remaining <= 0 ? <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
-                  <span className={`text-base font-bold truncate ${
-                    remaining <= 0 ? 'text-emerald-700' :
-                    paymentTotal > 0 ? 'text-orange-700' : 'text-red-700'
-                  }`}>
-                    {currencySymbol}{Math.max(0, remaining).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
-
-      {/* ── ATTACHMENTS ─────────────────────────────────────────────────── */}
-      <Card className="p-4 overflow-hidden">
-        <div className="flex items-center gap-2 mb-3">
-          <Paperclip className="w-4 h-4 text-primary flex-shrink-0" />
-          <span className="text-sm font-semibold">Attachments</span>
-        </div>
-        <div className="space-y-2">
-          {attachments.map((url, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground bg-secondary/30 rounded px-2 py-1 min-w-0">
-              <Paperclip className="w-3 h-3 flex-shrink-0" />
-              <a href={url} target="_blank" rel="noreferrer" className="truncate flex-1 text-primary hover:underline">{url.split('/').pop()}</a>
-              <Button type="button" variant="ghost" size="icon" className="h-5 w-5 text-destructive flex-shrink-0" onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))}>
-                <Trash2 className="w-3 h-3" />
+              <Button type="button" variant="outline" onClick={() => setShowOcr(true)} className="h-10 gap-1.5 rounded-xl border-slate-200 px-3 text-xs font-semibold text-blue-700">
+                {ocrMeta ? <RefreshCw className="h-4 w-4" /> : <ScanLine className="h-4 w-4" />}
+                {ocrMeta ? 'Rescan' : 'Scan'}
               </Button>
             </div>
-          ))}
-          <label className="flex items-center gap-2 cursor-pointer">
-            <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs h-7 pointer-events-none">
-              <Upload className="w-3.5 h-3.5" /> Upload File
-            </Button>
-            <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleFileUpload} />
-          </label>
-        </div>
-      </Card>
+          </Card>
 
-      {/* ── ACTIONS ─────────────────────────────────────────────────────── */}
-      <div className="flex gap-2 pb-4 px-4">
-        <Button type="submit" className="flex-1 h-11 font-bold" disabled={saving}>
-          {saving ? 'Saving...' : isEdit ? 'Update Invoice' : 'Create Invoice'}
-        </Button>
-        {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel} className="flex-1 h-11">Cancel</Button>
-        )}
+          <Card className="border-slate-200 bg-white p-3 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                <ShieldCheck className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-slate-900">{verifiedCount} fields verified · {reviewCount} need review</p>
+                <p className="text-[11px] text-slate-500">Accounting checks update as you complete the invoice.</p>
+              </div>
+              <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${reviewCount === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                {reviewCount === 0 ? 'Ready' : 'Review'}
+              </span>
+            </div>
+          </Card>
+
+          <section className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <VerificationCard title="Supplier" value={selectedSupplier?.name || form.supplier_name} verified={Boolean(form.supplier_id || form.supplier_name.trim())} icon={Building2} active={activeDetail === 'supplier'} onClick={() => setActiveDetail('supplier')} />
+            <VerificationCard title="Branch" value={branches.find(b => b.key === form.branch || b.branch_key === form.branch)?.name || form.branch} verified={Boolean(form.branch)} icon={Building2} active={activeDetail === 'branch'} onClick={() => setActiveDetail('branch')} />
+            <VerificationCard title="Invoice No" value={form.invoice_number} verified={Boolean(form.invoice_number.trim())} icon={Hash} active={activeDetail === 'invoice'} onClick={() => setActiveDetail('invoice')} />
+            <VerificationCard title="Date" value={form.date} verified={Boolean(form.date)} icon={CalendarDays} active={activeDetail === 'date'} onClick={() => setActiveDetail('date')} />
+            <VerificationCard title="Payment Terms" value={resolvedPaymentTerms || (form.due_date ? `Due ${form.due_date}` : '')} verified={Boolean(resolvedPaymentTerms || form.due_date)} icon={CreditCard} active={activeDetail === 'terms'} onClick={() => setActiveDetail('terms')} />
+            <VerificationCard title="VAT Number" value={resolvedVatNumber} verified={Boolean(resolvedVatNumber)} icon={Receipt} active={activeDetail === 'vat'} onClick={() => setActiveDetail('vat')} />
+          </section>
+
+          <Card className="border-blue-100 bg-white p-4 shadow-sm ring-1 ring-blue-50">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-bold text-slate-900">Review selected field</p>
+              <Badge variant="outline" className="border-blue-100 bg-blue-50 text-[10px] text-blue-700">Editable</Badge>
+            </div>
+            {activeDetail === 'supplier' && <div className="space-y-2">
+              <Label className="text-xs text-slate-600">Supplier *</Label>
+              <Select value={form.supplier_id} onValueChange={v => {
+                const supplier = suppliers.find(s => s.id === v);
+                setForm(current => ({ ...current, supplier_id: v, supplier_name: supplier?.name || '', supplier_email: supplier?.email || '' }));
+                setPaymentTerms(supplier?.payment_terms || '');
+                setVatNumber(supplier?.vat_number || supplier?.tax_number || '');
+              }}>
+                <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select supplier..." /></SelectTrigger>
+                <SelectContent>{suppliers.map(supplier => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent>
+              </Select>
+              {!form.supplier_id && <Input value={form.supplier_name} onChange={e => setForm(current => ({ ...current, supplier_name: e.target.value }))} placeholder="Or type supplier name" className="h-11 rounded-xl" />}
+            </div>}
+            {activeDetail === 'branch' && <div>
+              <Label className="mb-1.5 block text-xs text-slate-600">Receiving branch *</Label>
+              <BranchSelect value={form.branch} onChange={value => setForm(current => ({ ...current, branch: value }))} />
+            </div>}
+            {activeDetail === 'invoice' && <div className="grid grid-cols-2 gap-2">
+              <div className="min-w-0"><Label className="text-xs text-slate-600">Invoice number</Label><Input value={form.invoice_number} onChange={e => setForm(current => ({ ...current, invoice_number: e.target.value }))} className="mt-1 h-11 rounded-xl" /></div>
+              <div className="min-w-0"><Label className="text-xs text-slate-600">Currency</Label><Select value={form.currency} onValueChange={value => setForm(current => ({ ...current, currency: value }))}><SelectTrigger className="mt-1 h-11 rounded-xl"><SelectValue /></SelectTrigger><SelectContent>{CURRENCIES.map(currency => <SelectItem key={currency} value={currency}>{currency}</SelectItem>)}</SelectContent></Select></div>
+            </div>}
+            {activeDetail === 'date' && <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-xs text-slate-600">Invoice date *</Label><Input type="date" value={form.date} onChange={e => setForm(current => ({ ...current, date: e.target.value }))} className="mt-1 h-11 rounded-xl" /></div>
+              <div><Label className="text-xs text-slate-600">Due date</Label><Input type="date" value={form.due_date} onChange={e => setForm(current => ({ ...current, due_date: e.target.value }))} className="mt-1 h-11 rounded-xl" /></div>
+            </div>}
+            {activeDetail === 'terms' && <div><Label className="text-xs text-slate-600">Payment terms</Label><Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="e.g. Net 30 days" className="mt-1 h-11 rounded-xl" /></div>}
+            {activeDetail === 'vat' && <div><Label className="text-xs text-slate-600">Supplier VAT number</Label><Input value={vatNumber} onChange={e => setVatNumber(e.target.value)} placeholder="15-digit VAT number" inputMode="numeric" className="mt-1 h-11 rounded-xl" /></div>}
+          </Card>
+
+          <Card className="border-slate-200 bg-white p-3 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <Package className="h-4 w-4 text-blue-600" />
+              <div className="min-w-0 flex-1"><p className="text-sm font-bold">Line Items ({items.length})</p><p className="text-[10px] text-slate-500">{averageLineConfidence ? `Average OCR confidence ${averageLineConfidence}%` : 'Tap a line to review details'}</p></div>
+              <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-8 gap-1 rounded-lg text-xs"><Plus className="h-3.5 w-3.5" /> Add Item</Button>
+            </div>
+            <div className="space-y-2">
+              {items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} categories={categories} categoriesTree={categoriesTree} />)}
+            </div>
+          </Card>
+
+          <Card className="border-slate-200 bg-white p-3 shadow-sm">
+            <button type="button" className="flex w-full items-center gap-2" onClick={() => setShowAdditionalCosts(value => !value)}>
+              <Truck className="h-4 w-4 text-blue-600" /><span className="flex-1 text-left text-sm font-bold">Additional Costs</span>
+              <span className="text-xs font-semibold text-slate-500">{form.currency} {totals.additionalTotal.toFixed(2)}</span>{showAdditionalCosts ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {showAdditionalCosts && <div className="mt-3 space-y-2">
+              {additionalCosts.map(cost => <div key={cost._id} className="grid grid-cols-[1fr_1fr_auto] gap-2 rounded-xl bg-slate-50 p-2">
+                <Select value={cost.type} onValueChange={value => updateAdditionalCost(cost._id, 'type', value)}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent>{ADDITIONAL_COST_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent></Select>
+                <Input type="number" min="0" step="0.01" value={cost.amount} onChange={e => updateAdditionalCost(cost._id, 'amount', Number(e.target.value || 0))} className="h-9" placeholder="Amount" />
+                <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-600" onClick={() => removeAdditionalCost(cost._id)}><Trash2 className="h-4 w-4" /></Button>
+                <Input value={cost.description} onChange={e => updateAdditionalCost(cost._id, 'description', e.target.value)} className="col-span-3 h-9" placeholder="Description" />
+              </div>)}
+              <Button type="button" variant="outline" size="sm" onClick={addAdditionalCost} className="w-full gap-1"><Plus className="h-3.5 w-3.5" /> Add cost</Button>
+            </div>}
+          </Card>
+
+          <Card className="border-slate-200 bg-white p-3 shadow-sm">
+            <button type="button" className="flex w-full items-center gap-2" onClick={() => setShowPayments(value => !value)}>
+              <DollarSign className="h-4 w-4 text-blue-600" /><span className="flex-1 text-left text-sm font-bold">Payment</span>
+              <span className="text-xs font-semibold text-slate-500">Remaining {form.currency} {Math.max(0, remaining).toFixed(2)}</span>{showPayments ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {showPayments && <div className="mt-3 space-y-3">
+              <label className="flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs font-semibold"><input id="pay-full-amount" type="checkbox" checked={payFullAmount} onChange={e => handlePayFullAmount(e.target.checked)} className="h-4 w-4 accent-blue-600" /> Pay full invoice amount</label>
+              {payments.map((payment, index) => <div key={payment._id} className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-2">
+                <Input type="number" min="0" step="0.01" value={payment.amount} onChange={e => updatePayment(payment._id, 'amount', e.target.value)} disabled={payFullAmount} className="h-9" placeholder="Amount" />
+                <Select value={payment.payment_method} onValueChange={value => updatePayment(payment._id, 'payment_method', value)}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent>{PAYMENT_METHODS.map(method => <SelectItem key={method} value={method}>{method}</SelectItem>)}</SelectContent></Select>
+                <Input type="date" value={payment.date} onChange={e => updatePayment(payment._id, 'date', e.target.value)} className="h-9" />
+                <div className="flex gap-1"><Input value={payment.notes} onChange={e => updatePayment(payment._id, 'notes', e.target.value)} className="h-9" placeholder={`Payment ${index + 1} note`} />{payments.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removePayment(payment._id)} className="h-9 w-9 text-red-600"><Trash2 className="h-4 w-4" /></Button>}</div>
+              </div>)}
+              {!payFullAmount && <Button type="button" variant="outline" size="sm" onClick={addPayment} className="w-full gap-1"><Plus className="h-3.5 w-3.5" /> Add payment</Button>}
+            </div>}
+          </Card>
+
+          <Card className="border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2"><Paperclip className="h-4 w-4 text-blue-600" /><span className="flex-1 text-sm font-bold">Documents & Notes</span><label className="cursor-pointer"><span className="text-xs font-bold text-blue-700">Upload</span><input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleFileUpload} /></label></div>
+            {attachments.map((url, index) => <div key={`${url}-${index}`} className="mb-2 flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5 text-xs"><FileText className="h-3.5 w-3.5 text-blue-600" /><a href={url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-blue-700">{url.split('/').pop()}</a><Button type="button" variant="ghost" size="icon" onClick={() => setAttachments(current => current.filter((_, itemIndex) => itemIndex !== index))} className="h-7 w-7 text-red-600"><Trash2 className="h-3.5 w-3.5" /></Button></div>)}
+            <Textarea value={form.notes} onChange={e => setForm(current => ({ ...current, notes: e.target.value }))} rows={2} placeholder="Internal procurement notes" className="resize-none rounded-xl" />
+          </Card>
+
+          <Card className="border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><Calculator className="h-4 w-4" /></span><div><p className="text-sm font-bold">Invoice Reconciliation</p><p className="text-[10px] text-slate-500">Calculated from verified line data</p></div></div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span className="font-semibold">{form.currency} {totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Tax</span><span className="font-semibold">{form.currency} {totals.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+              {totals.discountAmount > 0 && <div className="flex justify-between text-emerald-700"><span>Discount</span><span>-{form.currency} {totals.discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>}
+              {totals.additionalTotal > 0 && <div className="flex justify-between"><span className="text-slate-500">Additional costs</span><span className="font-semibold">{form.currency} {totals.additionalTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>}
+              <div className="flex justify-between border-y border-slate-100 py-2 text-base font-bold"><span>Invoice Total</span><span>{form.currency} {totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+              <div className={`flex justify-between font-bold ${invoiceMatchesScan ? 'text-emerald-700' : 'text-amber-700'}`}><span>Difference</span><span>{scannedInvoiceTotal > 0 ? `${form.currency} ${invoiceDifference.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Awaiting scan'}</span></div>
+            </div>
+          </Card>
+        </div>
       </div>
+
+      <footer className="grid flex-none grid-cols-2 gap-3 border-t border-slate-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.06)] sm:px-5">
+        <Button type="button" variant="outline" disabled={saving} onClick={e => handleSubmit(e, 'draft')} className="h-12 gap-2 rounded-xl border-blue-300 font-bold text-blue-700">
+          <Save className="h-4 w-4" />{saving && submitMode === 'draft' ? 'Saving...' : 'Save Draft'}
+        </Button>
+        <Button type="submit" disabled={saving} className="h-12 gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-blue-600 font-bold shadow-lg shadow-blue-200 hover:from-blue-800 hover:to-blue-700">
+          <Send className="h-4 w-4" />{saving && submitMode === 'post' ? 'Posting...' : isEdit ? 'Approve & Update' : 'Approve & Post'}
+        </Button>
+      </footer>
 
       {/* OCR Dialog */}
       {showOcr && (

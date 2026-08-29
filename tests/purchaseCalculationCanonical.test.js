@@ -90,7 +90,7 @@ describe('canonical purchase calculation flow', () => {
     expect(form).toContain('normalizePurchaseLine(i)');
     expect(form).toContain('{calcLineTotal(item).toLocaleString');
     expect(form).toContain('return normalizePurchaseLine(updated);');
-    expect(form).toContain('const cleanItems = items.map(({ _id, ...i }) => normalizePurchaseLine(i));');
+    expect(form).toContain('const cleanItems = items.map(({ _id, _ocr_confidence, ...i }) => normalizePurchaseLine(i));');
     expect(form).toContain("onInput={e => updateNumericItem('quantity', e)}");
     expect(form).toContain("onInput={e => updateNumericItem('unit_cost', e)}");
     expect(form).toContain("onInput={e => updateNumericItem('discount', e)}");

@@ -8,7 +8,6 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { ScanLine, Upload, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
@@ -17,6 +16,7 @@ export default function OcrScanDialog({ onResult, onClose, branch, createdBy }) 
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState('idle'); // idle | uploading | processing | done | error
   const [extracted, setExtracted] = useState(null);
+  const [uploadedFileUrl, setUploadedFileUrl] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleFile = (e) => {
@@ -40,23 +40,49 @@ export default function OcrScanDialog({ onResult, onClose, branch, createdBy }) 
           fileUrl = publicUrl;
         }
       } catch {
-        // If storage fails, use base64 fallback
-        fileUrl = await fileToBase64(file);
+        // Base64 fallback is applied below.
       }
+      if (!fileUrl) fileUrl = await fileToBase64(file);
+      setUploadedFileUrl(fileUrl);
 
       setStatus('processing');
 
       // Use LLM vision to extract invoice data
       let extractedData = {};
       try {
-        const prompt = `You are an invoice OCR system. Extract the following fields from this invoice image/PDF and return ONLY valid JSON with these exact keys:
+        const prompt = `You are an enterprise accounts-payable invoice OCR system. Extract the following fields from this invoice image/PDF and return ONLY valid JSON with these exact keys. Confidence values must be integers from 0 to 100. Do not invent unreadable values:
 {
   "invoice_number": "string or null",
   "supplier_name": "string or null",
   "date": "YYYY-MM-DD format or null",
   "due_date": "YYYY-MM-DD format or null",
   "total_amount": number or null,
-  "currency": "3-letter code or null"
+  "subtotal": number or null,
+  "tax_amount": number or null,
+  "currency": "3-letter code or null",
+  "vat_number": "string or null",
+  "payment_terms": "string or null",
+  "overall_confidence": number,
+  "field_confidence": {
+    "invoice_number": number,
+    "supplier_name": number,
+    "date": number,
+    "due_date": number,
+    "vat_number": number,
+    "payment_terms": number,
+    "total_amount": number
+  },
+  "items": [
+    {
+      "description": "string",
+      "quantity": number,
+      "unit": "string or null",
+      "unit_price": number,
+      "tax_rate": number,
+      "amount": number,
+      "confidence": number
+    }
+  ]
 }
 Return ONLY the JSON object, no other text.`;
 
@@ -71,7 +97,31 @@ Return ONLY the JSON object, no other text.`;
               date: { type: 'string' },
               due_date: { type: 'string' },
               total_amount: { type: 'number' },
+              subtotal: { type: 'number' },
+              tax_amount: { type: 'number' },
               currency: { type: 'string' },
+              vat_number: { type: 'string' },
+              payment_terms: { type: 'string' },
+              overall_confidence: { type: 'number' },
+              field_confidence: {
+                type: 'object',
+                additionalProperties: { type: 'number' },
+              },
+              items: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    description: { type: 'string' },
+                    quantity: { type: 'number' },
+                    unit: { type: 'string' },
+                    unit_price: { type: 'number' },
+                    tax_rate: { type: 'number' },
+                    amount: { type: 'number' },
+                    confidence: { type: 'number' },
+                  },
+                },
+              },
             },
           },
         });
@@ -106,7 +156,15 @@ Return ONLY the JSON object, no other text.`;
   };
 
   const handleApply = () => {
-    onResult(extracted || {});
+    onResult({
+      ...(extracted || {}),
+      __ocr: {
+        fileName: file?.name || 'Scanned invoice',
+        fileUrl: uploadedFileUrl,
+        scannedAt: new Date().toISOString(),
+        confidence: Number(extracted?.overall_confidence || 0),
+      },
+    });
   };
 
   return (
@@ -153,12 +211,11 @@ Return ONLY the JSON object, no other text.`;
                 <CheckCircle2 className="w-3.5 h-3.5" /> Data extracted successfully
               </div>
               <div className="rounded-lg border border-border p-3 space-y-2 text-xs">
-                {Object.entries(extracted).filter(([, v]) => v).map(([k, v]) => (
-                  <div key={k} className="flex justify-between">
-                    <span className="text-muted-foreground capitalize">{k.replace(/_/g, ' ')}</span>
-                    <span className="font-medium">{String(v)}</span>
-                  </div>
-                ))}
+                <div className="flex justify-between"><span className="text-muted-foreground">Supplier</span><span className="max-w-[60%] truncate font-medium">{extracted.supplier_name || 'Not detected'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Invoice number</span><span className="font-medium">{extracted.invoice_number || 'Not detected'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Line items</span><span className="font-medium">{extracted.items?.length || 0}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Invoice total</span><span className="font-medium">{extracted.currency || ''} {Number(extracted.total_amount || 0).toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Confidence</span><span className="font-bold text-emerald-700">{Math.round(Number(extracted.overall_confidence || 0))}%</span></div>
               </div>
               <div className="text-xs text-muted-foreground">Review the extracted data above. Click Apply to pre-fill the form.</div>
               <div className="flex gap-2">

@@ -255,12 +255,9 @@ export default function Purchases() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={showForm} onOpenChange={open => { if (!open) { setShowForm(false); setEditing(null); } }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-primary" />
-              {editing ? 'Edit Purchase Invoice' : 'New Purchase Invoice'}
-            </DialogTitle>
+        <DialogContent className="h-[100dvh] w-screen max-w-none gap-0 overflow-hidden rounded-none border-0 p-0 sm:h-[94vh] sm:max-w-3xl sm:rounded-2xl [&>button]:hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{editing ? 'Edit Purchase Invoice' : 'New Purchase Invoice'}</DialogTitle>
           </DialogHeader>
           <PurchaseInvoiceForm
             invoice={editing}

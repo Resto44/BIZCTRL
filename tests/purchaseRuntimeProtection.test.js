@@ -38,6 +38,27 @@ describe('Sales and purchase financial-record protection', () => {
     expect(engine).toContain('unit cost cannot be negative.');
     expect(engine).toContain('Payment amount must be greater than zero.');
     expect(engine).toContain('Payment amount cannot exceed the outstanding invoice balance.');
+    expect(engine).toContain("if (mode !== 'draft') assertValidInvoiceLines(items, additionalCosts);");
+    expect(engine).toContain("const approvalStatus = mode === 'draft' ? 'draft'");
+    expect(form).toContain("handleSubmit(e, 'draft')");
+    expect(form).toContain('Save Draft');
+    expect(form).toContain('Approve & Post');
+  });
+
+  it('implements the Smart Invoice Capture review and reconciliation workflow', async () => {
+    const [form, ocr] = await Promise.all([
+      source('../src/components/purchases/PurchaseInvoiceForm.jsx'),
+      source('../src/components/purchases/OcrScanDialog.jsx'),
+    ]);
+
+    expect(form).toContain('Smart Invoice Capture');
+    expect(form).toContain('Invoice Reconciliation');
+    expect(form).toContain('fields verified');
+    expect(form).toContain('invoiceDifference');
+    expect(ocr).toContain('overall_confidence');
+    expect(ocr).toContain('field_confidence');
+    expect(ocr).toContain('"items"');
+    expect(ocr).toContain('unit_price');
   });
 
   it('enforces the finalized-invoice lifecycle and branch authorization in the database routine', async () => {

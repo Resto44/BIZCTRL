@@ -144,11 +144,14 @@ export async function createPurchaseInvoice({
   items,
   additionalCosts,
   createdBy,
+  mode = 'post',
 }) {
-  assertValidInvoiceLines(items, additionalCosts);
+  if (mode !== 'draft') assertValidInvoiceLines(items, additionalCosts);
   const { grandTotal, subtotal, taxAmount, discountAmount } = calcInvoiceTotals(items, additionalCosts);
-  const approvalStatus = computeApprovalStatus(grandTotal);
-  const status = approvalStatus === 'auto_approved' ? 'approved' : 'pending';
+  const approvalStatus = mode === 'draft' ? 'draft' : computeApprovalStatus(grandTotal);
+  const status = mode === 'draft'
+    ? 'draft'
+    : approvalStatus === 'auto_approved' ? 'approved' : 'pending';
 
   const payload = {
     ...invoiceData,
@@ -173,7 +176,7 @@ export async function createPurchaseInvoice({
   if (error) throw new Error(`Invoice creation failed: ${error.message}`);
 
   // If auto-approved, process inventory and create debt record immediately
-  if (approvalStatus === 'auto_approved') {
+  if (mode !== 'draft' && approvalStatus === 'auto_approved') {
     await processApprovedInvoice(invoice, createdBy);
   }
 
@@ -197,8 +200,9 @@ export async function updatePurchaseInvoice({
   items,
   additionalCosts,
   createdBy,
+  mode = 'draft',
 }) {
-  assertValidInvoiceLines(items, additionalCosts);
+  if (mode !== 'draft') assertValidInvoiceLines(items, additionalCosts);
   const { grandTotal, subtotal, taxAmount, discountAmount } = calcInvoiceTotals(items, additionalCosts);
 
   const { data: currentInvoice, error: currentInvoiceError } = await supabase
@@ -220,6 +224,8 @@ export async function updatePurchaseInvoice({
     subtotal,
     tax_amount: taxAmount,
     discount_amount: discountAmount,
+    status: mode === 'draft' ? 'draft' : computeApprovalStatus(grandTotal) === 'auto_approved' ? 'approved' : 'pending',
+    approval_status: mode === 'draft' ? 'draft' : computeApprovalStatus(grandTotal),
     updated_date: new Date().toISOString(),
   };
 
@@ -231,6 +237,10 @@ export async function updatePurchaseInvoice({
     .single();
 
   if (error) throw new Error(`Invoice update failed: ${error.message}`);
+
+  if (mode !== 'draft' && invoice.approval_status === 'auto_approved') {
+    await processApprovedInvoice(invoice, createdBy);
+  }
   return invoice;
 }
 
