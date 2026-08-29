@@ -27,6 +27,21 @@ describe('production audit remediation contract', () => {
     expect(navigation).toContain('}, [baseMoreSections, baseNav, can, configuration]);');
   });
 
+  it('renders the compact More and Control workspace with real scoped metrics and permanent quick actions', async () => {
+    const navigation = await source('../src/components/layout/BottomNav.jsx');
+
+    expect(navigation).toContain('More &amp; Control');
+    expect(navigation).toContain('ERP workspace and system access');
+    expect(navigation).toContain("queryKey: ['more-control-metrics', activeRestaurant?.id]");
+    expect(navigation).toContain(".eq('restaurant_id', activeRestaurant.id)");
+    expect(navigation).toContain("path: '/sales', label: 'Add Sale'");
+    expect(navigation).toContain("path: '/purchases?create=1', label: 'Add Purchase'");
+    expect(navigation).toContain('All ERP Modules');
+    expect(navigation).toContain('System Status');
+    expect(navigation).toContain('function readableLabel(t, labelKey)');
+    expect(navigation).not.toContain('grid grid-cols-3 gap-2');
+  });
+
   it('hardens audited state-changing RPC execution without removing authenticated invoice rollback access', async () => {
     const migration = await source('../supabase/migrations/20260823_audit_rpc_execution_hardening.sql');
 

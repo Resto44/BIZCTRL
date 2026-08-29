@@ -8,19 +8,23 @@
  * The "More" menu also filters items by business mode.
  */
 
-import React, { memo, useMemo, useState } from 'react';
+import React, { memo, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/api/supabaseClient';
 import {
   LayoutDashboard, Receipt, BarChart3, Wallet, Users, Truck,
   ClipboardList, UserCheck, Bot, Building2,
   Package, CreditCard, ShoppingCart, Star, Grid3x3, X,
   TrendingUp, Calendar, Zap, Barcode, Boxes, Tags,
-  ScanLine, Hash, Layers, ShieldCheck,
+  ScanLine, Hash, Layers, ShieldCheck, Search, ChevronDown,
+  AlertTriangle, CheckCircle2,
 } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import { useBusinessMode } from '@/lib/BusinessModeContext';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
+import { useTenant } from '@/lib/TenantContext';
 
 // ── Primary Nav by Role + Mode ────────────────────────────────────────────────
 
@@ -273,51 +277,242 @@ const MORE_SECTIONS_MANAGER_RETAIL = [
 
 // ── More Menu Component ───────────────────────────────────────────────────────
 
-function MoreMenu({ sections, onClose }) {
+const CONTROL_GROUPS = [
+  {
+    key: 'sales',
+    title: 'Sales & Revenue',
+    icon: TrendingUp,
+    iconClass: 'bg-blue-600 text-white',
+    paths: ['/cash-register', '/sales/invoices'],
+  },
+  {
+    key: 'purchasing',
+    title: 'Purchasing & Suppliers',
+    icon: ShoppingCart,
+    iconClass: 'bg-emerald-500 text-white',
+    paths: ['/purchases', '/suppliers'],
+  },
+  {
+    key: 'inventory',
+    title: 'Stock & Products',
+    icon: Package,
+    iconClass: 'bg-orange-500 text-white',
+    paths: ['/inventory', '/product-management', '/inventory-waste', '/retail/barcode', '/retail/sku', '/retail/variants', '/retail/batches', '/retail/expiry', '/retail/serials'],
+  },
+  {
+    key: 'finance',
+    title: 'Finance & Treasury',
+    icon: Wallet,
+    iconClass: 'bg-violet-600 text-white',
+    paths: ['/network-management', '/profit-loss', '/debt-management', '/treasury', '/payroll'],
+  },
+  {
+    key: 'team',
+    title: 'Team & Access',
+    icon: Users,
+    iconClass: 'bg-cyan-600 text-white',
+    paths: ['/employees', '/staff-invitations', '/customer-management', '/driver-management'],
+  },
+  {
+    key: 'system',
+    title: 'System Settings',
+    icon: Zap,
+    iconClass: 'bg-slate-600 text-white',
+    paths: [],
+  },
+];
+
+function readableLabel(t, labelKey) {
+  const translated = t(labelKey);
+  if (translated && translated !== labelKey) return translated;
+  return labelKey
+    .split('_')
+    .filter(Boolean)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function MoreMenu({ sections, can, onClose }) {
   const { t } = useLanguage();
   const location = useLocation();
+  const { activeRestaurant } = useTenant();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [openSection, setOpenSection] = useState(null);
+
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [onClose]);
+
+  const allItems = useMemo(() => sections.flatMap(section => section.items), [sections]);
+  const groupedSections = useMemo(() => {
+    const assignedPaths = new Set(CONTROL_GROUPS.flatMap(group => group.paths));
+    return CONTROL_GROUPS.map(group => ({
+      ...group,
+      items: group.key === 'system'
+        ? allItems.filter(item => !assignedPaths.has(item.path))
+        : allItems.filter(item => group.paths.includes(item.path)),
+    })).filter(group => group.items.length > 0);
+  }, [allItems]);
+
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const searchedSections = useMemo(() => groupedSections
+    .map(section => ({
+      ...section,
+      items: normalizedSearch
+        ? section.items.filter(item => readableLabel(t, item.labelKey).toLowerCase().includes(normalizedSearch))
+        : section.items,
+    }))
+    .filter(section => section.items.length > 0), [groupedSections, normalizedSearch, t]);
+
+  const { data: metrics, isError: metricsError } = useQuery({
+    queryKey: ['more-control-metrics', activeRestaurant?.id],
+    queryFn: async () => {
+      const [approvalResult, alertResult] = await Promise.all([
+        supabase
+          .from('supplier_invoices')
+          .select('id', { count: 'exact', head: true })
+          .eq('restaurant_id', activeRestaurant.id)
+          .eq('approval_status', 'pending'),
+        supabase
+          .from('active_alerts')
+          .select('id', { count: 'exact', head: true })
+          .eq('restaurant_id', activeRestaurant.id)
+          .eq('status', 'active'),
+      ]);
+      if (approvalResult.error || alertResult.error) throw approvalResult.error || alertResult.error;
+      return {
+        pendingApprovals: approvalResult.count ?? 0,
+        openAlerts: alertResult.count ?? 0,
+      };
+    },
+    enabled: Boolean(activeRestaurant?.id),
+    staleTime: 60000,
+    retry: 1,
+  });
+
+  const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
+  const availablePaths = useMemo(() => new Set(allItems.map(item => item.path)), [allItems]);
+  const quickActions = [
+    can?.viewSales ? { path: '/sales', label: 'Add Sale', description: 'Create a new sale', icon: ShoppingCart, iconClass: 'bg-blue-50 text-blue-700' } : null,
+    can?.viewPurchases ? { path: '/purchases?create=1', label: 'Add Purchase', description: 'Create a purchase invoice', icon: Package, iconClass: 'bg-emerald-50 text-emerald-700' } : null,
+    availablePaths.has('/cash-register') ? { path: '/cash-register', label: 'Cash Register', description: 'Open the register', icon: CreditCard, iconClass: 'bg-violet-50 text-violet-700' } : null,
+    can?.viewReports ? { path: '/reports', label: 'Reports', description: 'Analyze performance', icon: BarChart3, iconClass: 'bg-sky-50 text-sky-700' } : null,
+  ].filter(Boolean);
+
   return (
-    <div className="fixed inset-0 z-[60] bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] overflow-hidden bg-slate-950/50 backdrop-blur-[2px]" onClick={onClose}>
       <div
-        className="absolute bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] left-0 right-0 w-full max-w-full max-h-[75vh] overflow-y-auto rounded-t-2xl bg-background"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="more-control-title"
+        className="absolute inset-x-0 bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] flex h-[82dvh] max-h-[calc(100dvh-var(--bottom-nav-height)-env(safe-area-inset-bottom,0px))] w-full max-w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-slate-50 text-slate-950 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-bold">{t('more')}</h2>
-          <button onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground">
-            <X className="w-5 h-5" />
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3.5">
+          <div className="min-w-0">
+            <h2 id="more-control-title" className="truncate text-xl font-black tracking-tight">More &amp; Control</h2>
+            <p className="truncate text-xs text-slate-500">ERP workspace and system access</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close More and Control" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950">
+            <X className="h-6 w-6" />
           </button>
-        </div>
-        <div className="p-4 space-y-4 pb-8">
-          {sections.map(section => (
-            <div key={section.title}>
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                {section.title}
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                {section.items.map(item => {
-                  const isActive = location.pathname.startsWith(item.path);
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={onClose}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl transition-colors ${
-                        isActive
-                          ? 'bg-primary/10 text-primary'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      }`}
-                    >
-                      <item.icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : ''}`} />
-                        <span className="w-full break-words text-[10px] font-medium text-center leading-tight">
-                        {t(item.labelKey) || item.labelKey.replace(/_/g, ' ')}
-                      </span>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3.5 py-3.5 sm:px-5">
+          <div className="mx-auto w-full max-w-2xl space-y-4 pb-4">
+            <div className="flex gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                <Building2 className="h-5 w-5 shrink-0 text-blue-600" />
+                <span className="min-w-0 flex-1 truncate text-sm font-bold">{activeRestaurant?.name || 'Restaurant'} · All branches</span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+              </div>
+              <label className="flex h-11 min-w-11 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 sm:max-w-[15rem]">
+                <Search className="h-5 w-5 shrink-0 text-slate-500" />
+                <input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} aria-label="Search ERP modules" placeholder="Search" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
+              </label>
+            </div>
+
+            <section className="grid grid-cols-3 divide-x divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="ERP control summary">
+              <Link to={availablePaths.has('/erp-approval-center') ? '/erp-approval-center' : location.pathname} onClick={availablePaths.has('/erp-approval-center') ? onClose : undefined} className="flex min-w-0 flex-col items-center px-1.5 py-3 text-center hover:bg-slate-50">
+                <ShieldCheck className="h-5 w-5 text-blue-600" />
+                <span className="mt-1 text-[10px] leading-tight text-slate-500">Pending approvals</span>
+                <strong className="mt-1 text-lg text-slate-950">{metrics?.pendingApprovals ?? '—'}</strong>
+              </Link>
+              <Link to={can?.viewAlerts ? '/alerts' : location.pathname} onClick={can?.viewAlerts ? onClose : undefined} className="flex min-w-0 flex-col items-center px-1.5 py-3 text-center hover:bg-slate-50">
+                <AlertTriangle className="h-5 w-5 text-orange-500" />
+                <span className="mt-1 text-[10px] leading-tight text-slate-500">Open alerts</span>
+                <strong className="mt-1 text-lg text-slate-950">{metrics?.openAlerts ?? '—'}</strong>
+              </Link>
+              <div className="flex min-w-0 flex-col items-center px-1.5 py-3 text-center">
+                <CheckCircle2 className={`h-5 w-5 ${isOnline && !metricsError ? 'text-emerald-600' : 'text-amber-500'}`} />
+                <span className="mt-1 text-[10px] leading-tight text-slate-500">Connection</span>
+                <strong className={`mt-1 text-sm ${isOnline && !metricsError ? 'text-emerald-700' : 'text-amber-700'}`}>{isOnline && !metricsError ? 'Online' : 'Check'}</strong>
+              </div>
+            </section>
+
+            {quickActions.length > 0 && (
+              <section aria-labelledby="more-quick-access-title">
+                <h3 id="more-quick-access-title" className="mb-2 text-sm font-black">Quick Access</h3>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {quickActions.map(action => (
+                    <Link key={action.path} to={action.path} onClick={onClose} className="flex min-h-[4.75rem] min-w-0 items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition-all hover:border-blue-200 hover:shadow-md">
+                      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${action.iconClass}`}><action.icon className="h-5 w-5" /></span>
+                      <span className="min-w-0"><span className="block truncate text-sm font-black">{action.label}</span><span className="mt-0.5 block text-[10px] leading-tight text-slate-500">{action.description}</span></span>
                     </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section aria-labelledby="all-erp-modules-title">
+              <h3 id="all-erp-modules-title" className="mb-2 text-sm font-black">All ERP Modules</h3>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                {searchedSections.map(section => {
+                  const SectionIcon = section.icon;
+                  const isOpen = Boolean(normalizedSearch) || openSection === section.key;
+                  return (
+                    <div key={section.key} className="border-b border-slate-200 last:border-b-0">
+                      <button type="button" onClick={() => setOpenSection(current => current === section.key ? null : section.key)} className="flex min-h-14 w-full items-center gap-3 px-3 text-left hover:bg-slate-50" aria-expanded={isOpen}>
+                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${section.iconClass}`}><SectionIcon className="h-4 w-4" /></span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-bold">{section.title}</span>
+                        <span className="shrink-0 text-[11px] font-medium text-slate-500">{section.items.length} module{section.items.length === 1 ? '' : 's'}</span>
+                        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {isOpen && (
+                        <div className="grid grid-cols-1 border-t border-slate-100 bg-slate-50/70 p-2 sm:grid-cols-2">
+                          {section.items.map(item => {
+                            const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+                            return (
+                              <Link key={item.path} to={item.path} onClick={onClose} className={`flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition-colors ${isActive ? 'bg-blue-100 text-blue-800' : 'text-slate-700 hover:bg-white hover:text-blue-700'}`}>
+                                <item.icon className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 truncate">{readableLabel(t, item.labelKey)}</span><ChevronDown className="h-3.5 w-3.5 -rotate-90 text-slate-400" />
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
+                {searchedSections.length === 0 && <div className="px-4 py-8 text-center text-sm text-slate-500">No matching ERP module found.</div>}
               </div>
+            </section>
+
+            <div className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-sm"><ShieldCheck className="h-5 w-5" /></span>
+              <div className="min-w-0 flex-1"><p className="text-sm font-black">System Status</p><p className={`text-xs ${isOnline && !metricsError ? 'text-emerald-700' : 'text-amber-700'}`}>{isOnline && !metricsError ? 'ERP data connected' : 'Connection needs review'}</p></div>
+              <Link to="/settings" onClick={onClose} className="shrink-0 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">View details</Link>
             </div>
-          ))}
+          </div>
         </div>
       </div>
     </div>
@@ -379,7 +574,7 @@ const BottomNav = memo(function BottomNav() {
   return (
     <>
       {showMore && moreSections.length > 0 && (
-        <MoreMenu sections={moreSections} onClose={() => setShowMore(false)} />
+        <MoreMenu sections={moreSections} can={can} onClose={() => setShowMore(false)} />
       )}
       <nav className="fixed inset-x-0 bottom-0 z-50 w-full max-w-full border-t border-border bg-card pb-[env(safe-area-inset-bottom,0px)] shadow-lg">
         <div className="mx-auto flex h-[var(--bottom-nav-height)] w-full max-w-lg items-center justify-between px-0.5">
