@@ -12,10 +12,7 @@
  *   - Responsive: hidden on mobile (BottomNav handles mobile)
  */
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
-import { format } from 'date-fns';
-import { supabase } from '@/api/supabaseClient';
 import { useRole } from '@/lib/RoleContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -35,7 +32,6 @@ import {
   Search, Plus, CircleAlert, CheckCircle2, LifeBuoy, MapPinned
 } from 'lucide-react';
 import { useERPNavigation } from '@/hooks/useERPNavigation';
-import { useActiveAlerts } from '@/hooks/useActiveAlerts';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import { getCustomizedNavigationGroups } from '@/lib/workspaceCustomization';
 import LogoutButton from './LogoutButton';
@@ -214,14 +210,86 @@ function isCurrentPath(pathname, path) {
   return pathname === path || pathname.startsWith(`${path}/`);
 }
 
+function MobileMenuFallback({ can, role, onNavigate, onToggle }) {
+  const dashboardPath = roleDashboardPath(role);
+
+  return (
+    <aside className="flex h-dvh max-h-dvh w-full flex-col overflow-hidden bg-slate-50 text-slate-950 shadow-2xl dark:bg-slate-950 dark:text-white">
+      <header className="shrink-0 bg-gradient-to-br from-slate-950 via-blue-950 to-blue-900 px-4 pb-5 pt-[max(0.75rem,env(safe-area-inset-top))] text-white">
+        <div className="flex items-center justify-between">
+          <button type="button" onClick={onToggle} aria-label="Close navigation" className="flex h-11 w-11 items-center justify-center rounded-xl text-white/80 hover:bg-white/10">
+            <X className="h-6 w-6" />
+          </button>
+          <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-[11px] font-bold text-amber-200">Safe menu</span>
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600"><ChefHat className="h-6 w-6" /></span>
+          <div>
+            <h2 className="text-xl font-black">ERP Navigation</h2>
+            <p className="text-sm text-blue-100/75">Core actions remain available</p>
+          </div>
+        </div>
+      </header>
+
+      <nav className="flex-1 space-y-2 overflow-y-auto p-4" aria-label="Safe navigation">
+        {can?.viewDashboard && (
+          <Link to={dashboardPath} onClick={onNavigate} className="flex min-h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 font-bold shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <LayoutDashboard className="h-5 w-5 text-blue-600" /> Dashboard
+          </Link>
+        )}
+        {can?.viewSales && (
+          <Link to="/sales" onClick={onNavigate} className="flex min-h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 font-bold shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <ShoppingCart className="h-5 w-5 text-emerald-600" /> Sales
+          </Link>
+        )}
+        {can?.viewPurchases && (
+          <Link to="/purchases" onClick={onNavigate} className="flex min-h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 font-bold shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <Package className="h-5 w-5 text-blue-600" /> Purchases
+          </Link>
+        )}
+      </nav>
+
+      <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:border-slate-800 dark:bg-slate-950">
+        {can?.viewSales && (
+          <Link to="/sales" onClick={onNavigate} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-3 text-sm font-black text-white">
+            <ShoppingCart className="h-5 w-5" /> Add Sale
+          </Link>
+        )}
+        {can?.viewPurchases && (
+          <Link to="/purchases?create=1" onClick={onNavigate} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 text-sm font-black text-white">
+            <Plus className="h-5 w-5" /> Add Purchase
+          </Link>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+class MobileMenuErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('[mobile-erp-menu] render failed; showing safe navigation', error, info);
+  }
+
+  render() {
+    if (this.state.failed) return <MobileMenuFallback {...this.props.fallbackProps} />;
+    return this.props.children;
+  }
+}
+
 function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGroups, onNavigate, onToggle }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [openSection, setOpenSection] = useState(null);
   const { translateLiteral, t } = useLanguage();
-  const { alertCount, isError: alertsError } = useActiveAlerts();
-  const restaurantId = activeRestaurant?.id || null;
   const dashboardPath = roleDashboardPath(role);
-  const today = format(new Date(), 'yyyy-MM-dd');
 
   const accessibleItems = useMemo(
     () => navigationGroups
@@ -249,76 +317,33 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
       : section.items,
   })).filter((section) => section.items.length > 0), [normalizedSearch, sections]);
 
-  const closingQuery = useQuery({
-    queryKey: ['mobile-menu-closing-status', restaurantId, today],
-    enabled: Boolean(restaurantId && can.viewSales),
-    staleTime: 30_000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('daily_sales')
-        .select('id, closing_state')
-        .eq('restaurant_id', restaurantId)
-        .eq('date', today)
-        .limit(250);
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
-  const pendingPurchasesQuery = useQuery({
-    queryKey: ['mobile-menu-pending-purchases', restaurantId],
-    enabled: Boolean(restaurantId && can.viewPurchases),
-    staleTime: 30_000,
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('supplier_invoices')
-        .select('id', { count: 'exact', head: true })
-        .eq('restaurant_id', restaurantId)
-        .eq('approval_status', 'pending');
-      if (error) throw error;
-      return count || 0;
-    },
-  });
-
-  const closingRecords = closingQuery.data || [];
-  const systemsHealthy = !alertsError && !closingQuery.isError && !pendingPurchasesQuery.isError;
-  const finalizedClosings = closingRecords.filter((record) => record.closing_state === 'finalized').length;
-  const draftClosings = closingRecords.length - finalizedClosings;
-  const closingStatus = closingQuery.isLoading
-    ? 'Checking today’s records…'
-    : draftClosings > 0
-      ? `${draftClosings} closing${draftClosings === 1 ? '' : 's'} ready to finish`
-      : finalizedClosings > 0
-        ? `${finalizedClosings} finalized today`
-        : 'No closing recorded today';
-
   const todayActions = [
     can.viewSales && {
       path: '/sales',
       label: "Close today's sales",
-      description: closingStatus,
+      description: 'Record, reconcile and finalize today',
       icon: CheckCircle2,
       iconClass: 'border-emerald-200 bg-emerald-50 text-emerald-600',
-      badge: draftClosings > 0 ? String(draftClosings) : finalizedClosings > 0 ? 'Done' : 'Start',
-      badgeClass: draftClosings > 0 ? 'bg-amber-100 text-amber-700' : finalizedClosings > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700',
+      badge: 'Open',
+      badgeClass: 'bg-emerald-100 text-emerald-700',
     },
     can.viewAlerts && {
       path: '/alerts',
       label: 'Review critical alerts',
-      description: alertCount > 0 ? 'Stock, cash variance and pricing need attention' : 'No active ERP alerts',
+      description: 'Stock, cash variance and pricing exceptions',
       icon: CircleAlert,
-      iconClass: alertCount > 0 ? 'border-red-200 bg-red-50 text-red-600' : 'border-slate-200 bg-slate-50 text-slate-500',
-      badge: String(alertCount),
-      badgeClass: alertCount > 0 ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-600',
+      iconClass: 'border-red-200 bg-red-50 text-red-600',
+      badge: 'Review',
+      badgeClass: 'bg-red-100 text-red-700',
     },
     can.viewPurchases && {
       path: '/enterprise-purchases',
       label: ['owner', 'general_manager'].includes(role) ? 'Approve purchases' : 'Review purchases',
-      description: pendingPurchasesQuery.data > 0 ? 'Waiting for owner review' : 'No purchases waiting for approval',
+      description: 'Review supplier invoices and approvals',
       icon: Clock,
-      iconClass: pendingPurchasesQuery.data > 0 ? 'border-amber-200 bg-amber-50 text-amber-600' : 'border-slate-200 bg-slate-50 text-slate-500',
-      badge: String(pendingPurchasesQuery.data || 0),
-      badgeClass: pendingPurchasesQuery.data > 0 ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600',
+      iconClass: 'border-amber-200 bg-amber-50 text-amber-600',
+      badge: 'Open',
+      badgeClass: 'bg-amber-100 text-amber-700',
     },
   ].filter(Boolean);
 
@@ -334,14 +359,9 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
           >
             <X className="h-6 w-6" />
           </button>
-          <span className={cn(
-            'rounded-full border px-2.5 py-1 text-[11px] font-bold',
-            systemsHealthy
-              ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-300'
-              : 'border-amber-300/20 bg-amber-400/10 text-amber-200',
-          )}>
-            <span className={cn('me-1 inline-block h-1.5 w-1.5 rounded-full', systemsHealthy ? 'bg-emerald-400' : 'bg-amber-300')} />
-            {translateLiteral(systemsHealthy ? 'Systems live' : 'Sync issue')}
+          <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-bold text-emerald-300">
+            <span className="me-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            {translateLiteral('ERP ready')}
           </span>
         </div>
 
@@ -655,15 +675,17 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
 
   if (mobile) {
     return (
-      <MobileOwnerMenu
-        activeRestaurant={activeRestaurant}
-        can={can}
-        role={role}
-        location={location}
-        navigationGroups={navigationGroups}
-        onNavigate={onNavigate}
-        onToggle={onToggle}
-      />
+      <MobileMenuErrorBoundary fallbackProps={{ can, role, onNavigate, onToggle }}>
+        <MobileOwnerMenu
+          activeRestaurant={activeRestaurant}
+          can={can}
+          role={role}
+          location={location}
+          navigationGroups={navigationGroups}
+          onNavigate={onNavigate}
+          onToggle={onToggle}
+        />
+      </MobileMenuErrorBoundary>
     );
   }
 

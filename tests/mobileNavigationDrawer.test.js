@@ -31,7 +31,7 @@ describe('mobile navigation drawer contract', () => {
     expect(sidebar).toContain('onClick={onNavigate}');
   });
 
-  it('renders the approved smart Owner menu with live work cards and fixed quick-entry actions', async () => {
+  it('renders the approved smart Owner menu without opening live data channels and keeps fixed quick-entry actions', async () => {
     const [sidebar, purchases] = await Promise.all([
       source('../src/components/layout/ERPSidebar.jsx'),
       source('../src/pages/Purchases.jsx'),
@@ -46,9 +46,12 @@ describe('mobile navigation drawer contract', () => {
     expect(sidebar).toContain('Finance & Treasury');
     expect(sidebar).toContain('Inventory & Supply');
     expect(sidebar).toContain('Team & Administration');
-    expect(sidebar).toContain('useActiveAlerts()');
-    expect(sidebar).toContain(".from('daily_sales')");
-    expect(sidebar).toContain(".from('supplier_invoices')");
+    expect(sidebar).toContain('class MobileMenuErrorBoundary');
+    expect(sidebar).toContain('function MobileMenuFallback');
+    expect(sidebar).toContain('ERP ready');
+    expect(sidebar).not.toContain('useActiveAlerts()');
+    expect(sidebar).not.toContain(".from('daily_sales')");
+    expect(sidebar).not.toContain(".from('supplier_invoices')");
     expect(sidebar).toContain('QUICK ENTRY');
     expect(sidebar).toContain('to="/sales"');
     expect(sidebar).toContain('to="/purchases?create=1"');
