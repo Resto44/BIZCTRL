@@ -157,7 +157,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('whitespace-nowrap');
     expect(workspace).toContain('className="border-t border-border bg-background/95');
     expect(workspace).toContain('Save Draft');
-    expect(workspace).toContain('Finalize Closing');
+    expect(workspace).toContain('Finalize &amp; Save');
   });
 
   it('preserves scoped purchase and expense loading, inline validation, and duplicate-closing protection', async () => {
@@ -264,7 +264,7 @@ describe('Unified Sales Closing workflow contract', () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
     expect(workspace).toContain('Save Draft');
-    expect(workspace).toContain('Finalize Closing');
+    expect(workspace).toContain('Finalize &amp; Save');
     expect(workspace).toContain("setRequestedClosingState('draft')");
     expect(workspace).toContain("setRequestedClosingState('finalized')");
     expect(workspace).not.toContain('isProtectedClosing');
@@ -333,7 +333,22 @@ describe('Sales source daily and historical balance contract', () => {
     expect(workspace).toContain("previous: t('salesClosing.sources.previous')");
     expect(workspace).toContain("total: t('salesClosing.sources.total')");
     expect(workspace).toContain('label={copy.today}');
-    expect(workspace).toContain('isHistoryLoading={sourceHistoryLoading}');
+    expect(workspace).toContain('historyLoading={sourceHistoryLoading}');
+  });
+
+  it('implements the Closing Control Center with live channel totals, network detail and owner closing fields', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).toContain('Closing Control Center');
+    expect(workspace).toContain('Monitor all sources and closing fields before finalizing.');
+    expect(workspace).toContain('ClosingChannelCard');
+    expect(workspace).toContain('Network Breakdown');
+    expect(workspace).toContain('const networkCounterTotal = baseNetworkTotal;');
+    expect(workspace).toContain('const networkDriversTotal = driverSourcePaymentTotals.card;');
+    expect(workspace).toContain('networkTotal - networkCounterTotal - networkDriversTotal');
+    expect(workspace).toContain('Owner Configured Closing Fields');
+    expect(workspace).toContain('ClosingFieldControlRow');
+    expect(workspace).toContain('Finalize &amp; Save');
   });
 
   it('uses only the current daily amount in all today-total and persistence calculations', async () => {

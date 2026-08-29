@@ -92,7 +92,7 @@ describe('Sales Closing Customization runtime contract', () => {
 
     expect(workspace).toContain('useSalesClosingCustomization()');
     expect(workspace).toContain('configuredPaymentMethods.filter((method) => method.is_active !== false)');
-    expect(workspace).toContain("field.visible_mobile === false ? 'hidden sm:block'");
+    expect(workspace).toContain("field.visible_mobile === false ? 'hidden sm:grid'");
     expect(workspace).toContain("field.visible_desktop === false ? 'sm:hidden'");
     expect(workspace).toContain('nextErrors[`custom_${field.id}`]');
     expect(workspace).toContain("description: t('salesClosing.workspace.description')");

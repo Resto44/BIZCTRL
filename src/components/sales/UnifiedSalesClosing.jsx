@@ -48,6 +48,8 @@ import {
   Loader2, RefreshCw, Save, X, PlusCircle,
   ReceiptText, WalletCards, Scale, ClipboardCheck,
   ArrowLeft, ArrowRight,
+  Banknote, CreditCard, Network, ShieldCheck,
+  Building2, Bike, MoreHorizontal, Coins, FileText, ChevronRight,
 } from 'lucide-react';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { toast } from 'sonner';
@@ -273,6 +275,92 @@ const SalesSourceDailyHistoryCard = memo(function SalesSourceDailyHistoryCard({ 
           {isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={total} className="font-black text-blue-800" />}
         </div>
       </div>
+    </div>
+  );
+});
+
+const ClosingChannelCard = memo(function ClosingChannelCard({
+  active, icon: Icon, label, amount, currency, tone, onClick,
+}) {
+  const tones = {
+    emerald: { icon: 'bg-emerald-50 text-emerald-600', bar: 'bg-emerald-500', border: 'border-emerald-200' },
+    blue: { icon: 'bg-blue-50 text-blue-600', bar: 'bg-blue-600', border: 'border-blue-300' },
+    violet: { icon: 'bg-violet-50 text-violet-600', bar: 'bg-violet-500', border: 'border-violet-200' },
+    amber: { icon: 'bg-amber-50 text-amber-600', bar: 'bg-amber-400', border: 'border-amber-200' },
+  };
+  const style = tones[tone] || tones.blue;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`min-w-0 rounded-2xl border bg-background p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${active ? `${style.border} ring-1 ring-blue-300` : 'border-slate-200'}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${style.icon}`}><Icon className="h-5 w-5" /></span>
+        <CheckCircle2 className={`h-5 w-5 shrink-0 ${amount >= 0 ? 'text-emerald-500' : 'text-slate-300'}`} />
+      </div>
+      <p className="mt-3 truncate text-sm font-bold text-slate-900">{label}</p>
+      <Money currency={currency} value={amount} className="mt-0.5 text-lg font-black text-slate-900" />
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="text-[10px] font-medium text-slate-500">Tap for details</span>
+        <span className="flex h-1 w-10 overflow-hidden rounded-full bg-slate-100"><span className={`h-full w-3/4 rounded-full ${style.bar}`} /></span>
+      </div>
+    </button>
+  );
+});
+
+const CompactSalesSourceRow = memo(function CompactSalesSourceRow({
+  source, sourceLabel, todayInput, today, previous, currency, onChange, historyLoading, historyUnavailable,
+}) {
+  const SourceIcon = salesSourceIconFor(source.icon);
+  const tone = salesSourceToneFor(source.color);
+  return (
+    <div className="grid min-w-0 gap-3 rounded-xl border border-slate-200 bg-background p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(9rem,0.55fr)] sm:items-center">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone.soft} ${tone.text}`}><SourceIcon className="h-5 w-5" /></span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-slate-900" data-i18n-skip="true">{sourceLabel}</p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-500">
+            <span>{String(source.default_payment_method || 'cash').replaceAll('_', ' ')}</span>
+            <span aria-hidden="true">•</span>
+            <span>{historyLoading ? 'Loading history…' : historyUnavailable ? 'History unavailable' : <>Previous <Money currency={currency} value={previous} className="font-semibold" /></>}</span>
+          </div>
+        </div>
+      </div>
+      <ClosingNumericInput
+        id={`quick-closing-source-${source.id}`}
+        value={todayInput}
+        onChange={onChange}
+        prefix={currency}
+        inputClassName="h-11 border-blue-200 font-bold"
+      />
+      <span className="sr-only">Today {today}; total {previous + today}</span>
+    </div>
+  );
+});
+
+const ClosingFieldControlRow = memo(function ClosingFieldControlRow({ field, label, value, error, onChange }) {
+  const inputId = `quick-closing-custom_${field.id}`;
+  const visibilityClass = field.visible_mobile === false ? 'hidden sm:grid' : field.visible_desktop === false ? 'sm:hidden' : '';
+  const commonLabel = <span className="min-w-0 truncate text-sm font-bold text-slate-800">{label}{field.is_required && <span className="ml-1 text-destructive">*</span>}</span>;
+  let control;
+  if (field.field_type === 'long_text' || field.field_type === 'notes') {
+    control = <Textarea id={inputId} value={value} onChange={(event) => onChange(event.target.value)} className="min-h-16 resize-none text-sm sm:max-w-md" />;
+  } else if (field.field_type === 'dropdown') {
+    control = <Select value={value} onValueChange={onChange}><SelectTrigger id={inputId} className="min-h-11 sm:max-w-64"><SelectValue placeholder={label} /></SelectTrigger><SelectContent>{field.options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>;
+  } else if (field.field_type === 'checkbox') {
+    control = <label className="inline-flex min-h-11 items-center justify-end gap-2 text-sm font-semibold text-emerald-700"><input id={inputId} type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 accent-emerald-600" />{value ? 'Completed' : 'Pending'}</label>;
+  } else if (field.field_type === 'currency' || field.field_type === 'number') {
+    control = <ClosingNumericInput id={inputId} value={value} onChange={onChange} required={field.is_required} inputClassName="h-11 font-bold sm:max-w-56" />;
+  } else {
+    control = <Input id={inputId} type={field.field_type === 'date' ? 'date' : field.field_type === 'time' ? 'time' : 'text'} value={value} onChange={(event) => onChange(event.target.value)} className="min-h-11 sm:max-w-64" />;
+  }
+  return (
+    <div id={`closing-control-field-${field.id}`} className={`grid min-w-0 gap-2 rounded-xl border border-slate-200 bg-background p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(11rem,0.75fr)_auto] sm:items-center ${visibilityClass}`}>
+      <div className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><FileText className="h-4 w-4" /></span><div className="min-w-0">{commonLabel}{field.help_text && <p className="mt-0.5 truncate text-[10px] text-slate-500">{field.help_text}</p>}</div></div>
+      <div className="min-w-0">{control}{error && <p className="mt-1 text-[10px] font-medium text-destructive">{error}</p>}</div>
+      <CheckCircle2 className={`hidden h-5 w-5 sm:block ${field.field_type === 'checkbox' ? (value ? 'text-emerald-500' : 'text-slate-300') : String(value ?? '').trim() ? 'text-emerald-500' : 'text-slate-300'}`} />
     </div>
   );
 });
@@ -551,6 +639,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     { id: 'review', label: t('salesClosing.workflow.review'), description: t('salesClosing.workflow.reviewHelp'), icon: ClipboardCheck },
   ], [t]);
   const [workflowStep, setWorkflowStep] = useState(initial?.closing_state === 'finalized' ? 'review' : 'sales');
+  const [closingControlTab, setClosingControlTab] = useState('sources');
+  const [expandedSalesChannel, setExpandedSalesChannel] = useState('network');
   const [sourceEditor, setSourceEditor] = useState(null);
   const [fieldEditor, setFieldEditor] = useState(null);
   const assignedManagerBranch = useMemo(() => {
@@ -1410,6 +1500,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const cashReconcStatus = cashDifference === null ? null : cashDifference === 0 ? 'Balanced' : cashDifference < 0 ? 'Shortage' : 'Overage';
   const closingCash = actualCount !== null ? actualCount : opening;
   const remainingDifference = cashDifference;
+  // Funding never changes this result; it is a settlement flow, not revenue.
   const operatingResult = totalSales - totalDailyExpenses;
 
   // Validation checks
@@ -1486,6 +1577,37 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   ], [form, automaticClosingUnavailable, cashLedgerUnavailable, useAutomaticSales, cashierDisplayName, approvedPurchasesForDate, posEntries, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
+  const networkCounterTotal = baseNetworkTotal;
+  const networkDriversTotal = driverSourcePaymentTotals.card;
+  const otherNetworkTotal = Math.max(0, networkTotal - networkCounterTotal - networkDriversTotal);
+  const completedConfiguredSources = useMemo(() => customSourceSummaries.filter(({ source, driverEntries }) => (
+    source.allows_driver_entries === true
+      ? driverEntries.some((entry) => driverSourceEntryAmounts(entry).total > 0)
+      : String(customSourceAmounts[source.id] ?? '').trim().length > 0
+  )).length, [customSourceAmounts, customSourceSummaries]);
+  const completedClosingFields = useMemo(() => customClosingFields.filter(hasCustomClosingFieldValue).length, [customClosingFields, hasCustomClosingFieldValue]);
+  const closingControlUnitCount = customSources.length + customClosingFields.length;
+  const closingControlCompletedCount = completedConfiguredSources + completedClosingFields;
+  const closingControlProgress = closingControlUnitCount > 0
+    ? Math.min(100, Math.round((closingControlCompletedCount / closingControlUnitCount) * 100))
+    : 100;
+  const closingControlReady = closingControlProgress === 100 && !automaticClosingUnavailable && !cashLedgerUnavailable;
+  const selectedCustomSourceSummaries = useMemo(() => customSourceSummaries.filter(({ source }) => {
+    if (source.allows_driver_entries === true) return expandedSalesChannel === 'cash' || expandedSalesChannel === 'network';
+    const bucket = paymentBucketForCode(source.default_payment_method);
+    if (expandedSalesChannel === 'cash') return bucket === 'cash';
+    if (expandedSalesChannel === 'credit') return bucket === 'credit';
+    if (expandedSalesChannel === 'apps') return bucket === 'online';
+    return ['card', 'bank_transfer', 'wallet'].includes(bucket);
+  }), [customSourceSummaries, expandedSalesChannel]);
+  const expandedChannelTitle = expandedSalesChannel === 'cash' ? 'Cash Breakdown'
+    : expandedSalesChannel === 'credit' ? 'Credit Breakdown'
+      : expandedSalesChannel === 'apps' ? 'Delivery Apps Breakdown'
+        : 'Network Breakdown';
+  const expandedChannelTotal = expandedSalesChannel === 'cash' ? cashSales
+    : expandedSalesChannel === 'credit' ? creditTotal
+      : expandedSalesChannel === 'apps' ? onlineTotal
+        : networkTotal;
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1798,7 +1920,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Requirement: Remove blocking success state.
   // Save returns immediately to Daily Sales via onSubmit callback.
 
-  const showCustomizationCard = canCustomize || (isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0) || customClosingFields.length > 0 || (isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false));
   const workflowStepIndex = Math.max(0, CLOSING_WORKFLOW_STEP_IDS.indexOf(workflowStep));
   const openWorkflowStep = useCallback((step) => {
     if (!CLOSING_WORKFLOW_STEP_IDS.includes(step)) return;
@@ -1876,42 +1997,69 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
           </section>
 
-          <section data-testid="quick-closing-auto-summary" className="overflow-hidden rounded-2xl border border-indigo-200 bg-background shadow-sm">
-            <div className="flex items-center justify-between gap-3 border-b border-indigo-100 bg-indigo-50 px-3 py-3 sm:px-4">
-              <div className="flex min-w-0 items-center gap-2"><BarChart3 className="h-4 w-4 shrink-0 text-indigo-600" /><h2 className="truncate text-xs font-black uppercase tracking-wide text-indigo-950">Today&apos;s Sales</h2></div>
-              <Badge variant="outline" className="shrink-0 border-indigo-200 bg-white text-[10px] text-indigo-700">{autoSourceLoading ? 'Loading ERP data' : useAutomaticSales ? 'Auto-loaded' : 'No source posted'}</Badge>
-            </div>
-            {automaticClosingUnavailable ? (
-              <div role="alert" className="m-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900 sm:m-4">
-                <p className="font-bold">Unable to load ERP sales data.</p>
-                <p className="mt-1 text-xs leading-relaxed">Check the branch and date, then retry before saving this closing.</p>
-                <Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-300 bg-white" onClick={() => refetchAutomaticClosing()}>
-                  <RefreshCw className="mr-1.5 h-4 w-4" />Retry ERP data load
-                </Button>
-              </div>
-            ) : autoSourceLoading ? (
-              <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>
-            ) : (
-              <div className="p-3 sm:p-4">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3"><p className="text-[10px] font-bold uppercase text-emerald-800">Cash</p><Money key={`money-cash-${cashSales}`} currency={currency} value={cashSales} className="mt-1 text-lg font-black text-emerald-700" /></div>
-                  <div className="rounded-xl border border-violet-100 bg-violet-50 p-3"><p className="text-[10px] font-bold uppercase text-violet-800">Card / Network</p><Money key={`money-network-${networkTotal}`} currency={currency} value={networkTotal} className="mt-1 text-lg font-black text-violet-700" /></div>
-                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-3"><p className="text-[10px] font-bold uppercase text-blue-800">Customer Credit</p><Money key={`money-credit-${creditTotal}`} currency={currency} value={creditTotal} className="mt-1 text-lg font-black text-blue-700" /></div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase text-slate-700">Other</p><Money key={`money-other-${otherPaymentTotal}`} currency={currency} value={otherPaymentTotal} className="mt-1 text-lg font-black text-slate-800" /></div>
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/70 px-3 py-3">
-                  <span className="text-xs font-black uppercase tracking-wide text-indigo-900">Total Sales</span>
-                  <Money key={`money-total-${totalSales}`} currency={currency} value={totalSales} className="text-xl font-black text-indigo-700" />
-                </div>
-                {!useAutomaticSales && (
-                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                    <p className="text-xs font-bold text-amber-900">No posted ERP sales were found for this branch, date and shift.</p>
-                    <p className="mt-1 text-[11px] leading-relaxed text-amber-800">Record sales at POS first. Use this exceptional adjustment only when an offline sale cannot be posted before closing.</p>
-                    <div className="mt-3"><NumInput id="quick-closing-cashSales" label="Exceptional Cash Adjustment" value={cashSalesInput} onChange={updateCashSales} prefix={currency} helpText="Not required when the ERP has sales data" /></div>
+          <section data-testid="quick-closing-auto-summary" className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50/60 shadow-sm">
+            <div className="relative isolate overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-blue-900 px-4 py-5 text-white sm:px-6 sm:py-6">
+              <div aria-hidden="true" className="absolute -right-12 -top-16 -z-10 h-56 w-56 rounded-full bg-cyan-400/20 blur-3xl" />
+              <div aria-hidden="true" className="absolute bottom-0 right-0 -z-10 h-36 w-1/2 bg-[radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.55),transparent_68%)]" />
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0">
+                  <h2 className="text-xl font-black tracking-tight sm:text-2xl">Closing Control Center</h2>
+                  <p className="mt-1 text-xs text-blue-100 sm:text-sm">Monitor all sources and closing fields before finalizing.</p>
+                  <div className="mt-5 flex items-center gap-4">
+                    <div className="relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(#22d3ee 0 ${closingControlProgress}%, rgba(255,255,255,0.16) ${closingControlProgress}% 100%)` }}>
+                      <div className="flex h-[4.75rem] w-[4.75rem] items-center justify-center rounded-full bg-slate-950/90 text-2xl font-black tabular-nums">{closingControlProgress}%</div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className={`flex items-center gap-2 text-sm font-black sm:text-base ${closingControlReady ? 'text-emerald-300' : 'text-amber-300'}`}><span>{closingControlReady ? 'Ready to Finalize' : 'Closing in Progress'}</span><ShieldCheck className="h-5 w-5 shrink-0" /></div>
+                      <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:text-sm">
+                        <div><p className="text-blue-200">Today&apos;s Sales</p><Money currency={currency} value={totalSales} className="mt-1 text-lg font-black text-white" /></div>
+                        <div className="border-l border-white/20 pl-5"><p className="text-blue-200">Difference</p>{cashDifference === null ? <p className="mt-1 text-lg font-black">—</p> : <Money currency={currency} value={cashDifference} signed className={`mt-1 text-lg font-black ${cashDifference === 0 ? 'text-emerald-300' : 'text-amber-300'}`} />}</div>
+                      </div>
+                    </div>
                   </div>
-                )}
+                </div>
+                <Badge variant="outline" className="w-fit border-white/20 bg-white/10 px-3 py-1.5 text-[10px] text-white backdrop-blur">{autoSourceLoading ? 'Loading ERP data' : useAutomaticSales ? 'ERP data loaded' : 'Manual source entry'}</Badge>
               </div>
-            )}
+            </div>
+
+            {automaticClosingUnavailable ? <div role="alert" className="m-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900 sm:m-4"><p className="font-bold">Unable to load ERP sales data.</p><p className="mt-1 text-xs">Check the branch and date, then retry before saving this closing.</p><Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-300 bg-white" onClick={() => refetchAutomaticClosing()}><RefreshCw className="mr-1.5 h-4 w-4" />Retry ERP data load</Button></div> : null}
+
+            <div className="p-3 sm:p-4">
+              <div className="grid grid-cols-2 rounded-2xl border border-slate-200 bg-background p-1 shadow-sm" role="tablist" aria-label="Closing control sections">
+                <button type="button" role="tab" aria-selected={closingControlTab === 'sources'} className={`flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-bold transition ${closingControlTab === 'sources' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`} onClick={() => { setClosingControlTab('sources'); document.getElementById('closing-control-sources')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }}><Store className="h-4 w-4" />Sources <span className={`rounded-full px-2 py-0.5 text-[10px] ${closingControlTab === 'sources' ? 'bg-white/20' : 'bg-slate-100'}`}>{customSources.length}</span></button>
+                <button type="button" role="tab" aria-selected={closingControlTab === 'fields'} className={`flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-bold transition ${closingControlTab === 'fields' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`} onClick={() => { setClosingControlTab('fields'); document.getElementById('closing-control-fields')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }}><ClipboardCheck className="h-4 w-4" />Closing Fields <span className={`rounded-full px-2 py-0.5 text-[10px] ${closingControlTab === 'fields' ? 'bg-white/20' : 'bg-slate-100'}`}>{customClosingFields.length}</span></button>
+              </div>
+
+              <div id="closing-control-sources" className="mt-3">
+                {autoSourceLoading ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div> : <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <ClosingChannelCard active={expandedSalesChannel === 'cash'} icon={Banknote} label="Cash" amount={cashSales} currency={currency} tone="emerald" onClick={() => setExpandedSalesChannel('cash')} />
+                  <ClosingChannelCard active={expandedSalesChannel === 'network'} icon={Network} label="Network" amount={networkTotal} currency={currency} tone="blue" onClick={() => setExpandedSalesChannel('network')} />
+                  <ClosingChannelCard active={expandedSalesChannel === 'credit'} icon={CreditCard} label="Credit" amount={creditTotal} currency={currency} tone="violet" onClick={() => setExpandedSalesChannel('credit')} />
+                  <ClosingChannelCard active={expandedSalesChannel === 'apps'} icon={Bike} label="Delivery Apps" amount={onlineTotal} currency={currency} tone="amber" onClick={() => setExpandedSalesChannel('apps')} />
+                </div>}
+
+                <div className="mt-3 overflow-hidden rounded-2xl border border-blue-200 bg-background shadow-sm">
+                  <div className="flex items-center justify-between gap-3 border-b border-blue-100 px-3 py-3 sm:px-4"><h3 className="text-sm font-black text-slate-900">{expandedChannelTitle}</h3><Money currency={currency} value={expandedChannelTotal} className="text-base font-black text-blue-700" /></div>
+                  {expandedSalesChannel === 'network' ? <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4 sm:p-4">
+                    <div className="rounded-xl bg-blue-50 p-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-blue-600"><Building2 className="h-4 w-4" /></span><p className="mt-2 text-[10px] font-semibold text-slate-500">Counter</p><Money currency={currency} value={networkCounterTotal} className="text-sm font-black text-slate-900" /></div>
+                    <div className="rounded-xl bg-cyan-50 p-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-cyan-600"><Bike className="h-4 w-4" /></span><p className="mt-2 text-[10px] font-semibold text-slate-500">Drivers</p><Money currency={currency} value={networkDriversTotal} className="text-sm font-black text-slate-900" /></div>
+                    <div className="rounded-xl bg-slate-50 p-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-600"><MoreHorizontal className="h-4 w-4" /></span><p className="mt-2 text-[10px] font-semibold text-slate-500">Other</p><Money currency={currency} value={otherNetworkTotal} className="text-sm font-black text-slate-900" /></div>
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-blue-700"><Coins className="h-4 w-4" /></span><p className="mt-2 text-[10px] font-semibold text-blue-600">Network Total</p><Money currency={currency} value={networkTotal} className="text-sm font-black text-blue-700" /></div>
+                  </div> : <div className="grid grid-cols-2 gap-2 p-3 sm:p-4"><div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase text-slate-500">ERP / Posted</p><Money currency={currency} value={expandedSalesChannel === 'cash' ? baseCashSales : expandedSalesChannel === 'credit' ? baseCreditTotal : 0} className="mt-1 text-base font-black text-slate-900" /></div><div className="rounded-xl bg-blue-50 p-3"><p className="text-[10px] font-bold uppercase text-blue-600">Configured Sources</p><Money currency={currency} value={expandedSalesChannel === 'cash' ? customSourcePaymentTotals.cash : expandedSalesChannel === 'credit' ? customSourcePaymentTotals.credit : onlineTotal} className="mt-1 text-base font-black text-blue-700" /></div></div>}
+
+                  {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && selectedCustomSourceSummaries.length > 0 && <div className="space-y-2 border-t border-slate-100 p-3 sm:p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-black uppercase tracking-wide text-slate-700">Editable Sales Sources</p><Money currency={currency} value={customTotal} className="text-[11px] font-bold text-blue-700" /></div>{canCustomize && <div className="flex items-center gap-1"><Button type="button" size="sm" variant="ghost" className="h-8 text-xs text-blue-700" onClick={() => setSourceEditor({ mode: 'create', source: newSalesClosingSource(customSources.length * 10 + 10) })}><PlusCircle className="mr-1 h-3.5 w-3.5" />{salesClosingWorkspaceCopy.addSource}</Button><Button type="button" size="sm" variant="ghost" className="h-8 text-xs text-blue-700" onClick={() => navigate('/sales-closing-customization')}>Manage<ChevronRight className="ml-1 h-3.5 w-3.5" /></Button></div>}</div>{selectedCustomSourceSummaries.map(({ source, sourceLabel, today, previous, driverEntries }) => source.allows_driver_entries === true ? <DriverSalesSourceCard key={source.id} source={source} sourceLabel={sourceLabel} entries={driverEntries} drivers={driverSourceDrivers} previous={previous} currency={currency} onAdd={() => addDriverSourceEntry(source)} onChange={(clientRowId, patch) => updateDriverSourceEntry(source.id, clientRowId, patch)} onRemove={(clientRowId) => removeDriverSourceEntry(source.id, clientRowId)} isHistoryLoading={sourceHistoryLoading || driverSourceDriversLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} /> : <CompactSalesSourceRow key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} historyLoading={sourceHistoryLoading} historyUnavailable={sourceHistoryUnavailable} />)}</div>}
+
+                  {!useAutomaticSales && expandedSalesChannel === 'cash' && <div className="border-t border-amber-200 bg-amber-50 p-3 sm:p-4"><p className="text-xs font-bold text-amber-900">No posted ERP cash sales were found for this scope.</p><p className="mt-1 text-[11px] text-amber-800">Record sales at POS first. Use the adjustment only for an offline sale that cannot be posted before closing.</p><div className="mt-3"><NumInput id="quick-closing-cashSales" label="Exceptional Cash Adjustment" value={cashSalesInput} onChange={updateCashSales} prefix={currency} helpText="Not required when ERP sales are available" /></div></div>}
+                </div>
+              </div>
+
+              <div id="closing-control-fields" className="mt-3 rounded-2xl border border-slate-200 bg-background p-3 shadow-sm sm:p-4">
+                <div className="flex items-center justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><h3 className="truncate text-sm font-black text-slate-900">Owner Configured Closing Fields</h3><Badge variant="secondary" className="h-5 min-w-5 justify-center rounded-full px-1.5 text-[10px]">{customClosingFields.length}</Badge></div><p className="mt-0.5 text-[10px] text-slate-500">Values are saved with this closing only.</p></div>{canCustomize && <Button type="button" size="sm" variant="ghost" className="h-8 shrink-0 text-xs text-blue-700" onClick={() => navigate('/sales-closing-customization')}>{salesClosingWorkspaceCopy.customize}</Button>}</div>
+                {customClosingFields.length > 0 ? <div className="mt-3 space-y-2">{customClosingFields.map((field) => <ClosingFieldControlRow key={field.id} field={field} label={closingFieldNameForLanguage(field)} value={customClosingFieldValues[field.id] ?? ''} error={inlineErrors[`custom_${field.id}`]} onChange={(value) => updateCustomClosingField(field.id, value)} />)}</div> : <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-xs text-slate-500">No owner-configured closing fields yet.</p>}
+                {isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false) && <div className="mt-3 flex flex-wrap gap-2">{configuredPaymentMethods.filter((method) => method.is_active !== false).map((method) => <Badge key={method.id} variant="outline" className="bg-slate-50" data-i18n-skip="true">{sourceNameForLanguage(method)}</Badge>)}</div>}
+                {canCustomize && <button type="button" className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-blue-300 bg-blue-50/30 text-sm font-bold text-blue-700 transition hover:bg-blue-50" onClick={() => setFieldEditor({ mode: 'create', field: newSalesClosingCustomField(configuredClosingFields.length * 10 + 10) })}><PlusCircle className="h-4 w-4" />{salesClosingWorkspaceCopy.addField}</button>}
+              </div>
+            </div>
           </section>
 
           {creditSource && (
@@ -1950,26 +2098,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 </>
               )}
               {inlineErrors.credit && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}
-            </section>
-          )}
-
-          {showCustomizationCard && (
-            <section className="overflow-hidden rounded-2xl border border-blue-200 bg-background shadow-sm" data-i18n-skip="true">
-              <div className="flex flex-col gap-2 border-b border-blue-100 bg-blue-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-                <div className="flex min-w-0 items-center gap-2"><PlusCircle className="h-4 w-4 shrink-0 text-blue-600" /><div><h2 className="truncate text-xs font-black uppercase tracking-wide text-blue-950">{salesClosingWorkspaceCopy.title}</h2><p className="text-[11px] text-blue-800">{salesClosingWorkspaceCopy.description}</p></div></div>
-                <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="w-fit border-blue-200 bg-white text-[10px] text-blue-700">{salesClosingWorkspaceCopy.liveConfiguration}</Badge>{canCustomize && <><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setSourceEditor({ mode: 'create', source: newSalesClosingSource(customSources.length * 10 + 10) })}>+ {salesClosingWorkspaceCopy.addSource}</Button><Button type="button" size="sm" variant="outline" className="min-h-10 border-blue-300 bg-white" onClick={() => setFieldEditor({ mode: 'create', field: newSalesClosingCustomField(configuredClosingFields.length * 10 + 10) })}>+ {salesClosingWorkspaceCopy.addField}</Button><Button type="button" size="sm" className="min-h-10" onClick={() => navigate('/sales-closing-customization')}>{salesClosingWorkspaceCopy.customize}</Button></>}</div>
-              </div>
-              <div className="space-y-4 p-3 sm:p-4">
-                {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <div><p className="text-xs font-bold uppercase tracking-wide text-foreground">{salesSourceCopy.title}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{salesSourceCopy.todayIncluded}</p></div>
-                    <div className="text-right"><p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">{salesSourceCopy.todayTotal}</p><Money currency={currency} value={customTotal + manualCreditTotal} className="text-sm font-black text-blue-700" /></div>
-                  </div>
-                  {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{customSourceSummaries.map(({ source, sourceLabel, today, previous, driverEntries }) => source.allows_driver_entries === true ? <DriverSalesSourceCard key={source.id} source={source} sourceLabel={sourceLabel} entries={driverEntries} drivers={driverSourceDrivers} previous={previous} currency={currency} onAdd={() => addDriverSourceEntry(source)} onChange={(clientRowId, patch) => updateDriverSourceEntry(source.id, clientRowId, patch)} onRemove={(clientRowId) => removeDriverSourceEntry(source.id, clientRowId)} isHistoryLoading={sourceHistoryLoading || driverSourceDriversLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} /> : <SalesSourceDailyHistoryCard key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} isHistoryLoading={sourceHistoryLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} />)}</div>}
-                </div>}
-                {isConfiguredClosingFieldShown('payment_methods') && configuredPaymentMethods.some((method) => method.is_active !== false) && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-800">{salesClosingWorkspaceCopy.paymentMethods}</p><div className="mt-2 flex flex-wrap gap-2">{configuredPaymentMethods.filter((method) => method.is_active !== false).map((method) => <Badge key={method.id} variant="outline" className="bg-background" data-i18n-skip="true">{sourceNameForLanguage(method)}</Badge>)}</div></div>}
-                {customClosingFields.length > 0 && <div><p className="mb-2 text-xs font-bold uppercase tracking-wide text-foreground">{salesClosingWorkspaceCopy.additionalFields}</p><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{customClosingFields.map((field) => { const visibilityClass = field.visible_mobile === false ? 'hidden sm:block' : field.visible_desktop === false ? 'sm:hidden' : ''; const value = customClosingFieldValues[field.id] ?? ''; const error = inlineErrors[`custom_${field.id}`]; const inputId = `quick-closing-custom_${field.id}`; return <div key={field.id} id={`quick-closing-custom_${field.id}`} className={visibilityClass}>{field.field_type === 'long_text' || field.field_type === 'notes' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingFieldNameForLanguage(field)}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Textarea id={inputId} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} className="min-h-20 resize-none text-sm" />{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'dropdown' ? <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingFieldNameForLanguage(field)}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label><Select value={value} onValueChange={(next) => updateCustomClosingField(field.id, next)}><SelectTrigger id={inputId} className="min-h-11 text-sm"><SelectValue placeholder={closingFieldNameForLanguage(field)} /></SelectTrigger><SelectContent>{field.options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div> : field.field_type === 'checkbox' ? <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-input px-3 py-2 text-sm"><span>{closingFieldNameForLanguage(field)}{field.is_required && <span className="ml-1 text-destructive">*</span>}</span><input id={inputId} type="checkbox" checked={Boolean(value)} onChange={(event) => updateCustomClosingField(field.id, event.target.checked)} className="h-4 w-4 accent-primary" /></label> : <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingFieldNameForLanguage(field)}{field.is_required && <span className="ml-1 text-destructive">*</span>}</Label>{field.field_type === 'currency' || field.field_type === 'number' ? <ClosingNumericInput id={inputId} value={value} onChange={(next) => updateCustomClosingField(field.id, next)} required={field.is_required} inputClassName="min-h-11 text-sm" /> : <Input id={inputId} type={field.field_type === 'date' ? 'date' : field.field_type === 'time' ? 'time' : 'text'} value={value} onChange={(event) => updateCustomClosingField(field.id, event.target.value)} className="min-h-11 text-sm" />}{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div>}{field.help_text && <p className="mt-1 text-[10px] leading-snug text-muted-foreground">{field.help_text}</p>}</div>; })}</div></div>}
-              </div>
             </section>
           )}
 
@@ -2045,10 +2173,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
       <div id="sales-closing-actions" className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
         <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-2 sm:flex sm:items-center">
+          <div className="col-span-2 flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 sm:order-none sm:mr-2 sm:min-w-40 sm:flex-col sm:items-start sm:justify-center sm:border-0 sm:bg-transparent sm:p-0"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Net Closing</span><Money currency={currency} value={totalSales} className="text-lg font-black text-blue-700" /></div>
           {workflowStepIndex === 0 ? <Button type="button" variant="ghost" className="min-h-12 font-bold sm:w-28" onClick={onCancel} disabled={isSubmitting}><X className="mr-1 h-4 w-4" />Cancel</Button> : <Button type="button" variant="outline" className="min-h-12 font-bold sm:w-28" onClick={goToPreviousWorkflowStep} disabled={isSubmitting}><ArrowLeft className="mr-1 h-4 w-4" />{t('salesClosing.workflow.back')}</Button>}
           <div className="hidden flex-1 sm:block" />
           <Button type="submit" variant="outline" className="min-h-12 font-bold sm:w-40" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button>
-          {workflowStep !== 'review' ? <Button type="button" className="col-span-2 min-h-12 bg-emerald-600 font-black hover:bg-emerald-700 sm:col-auto sm:w-52" onClick={goToNextWorkflowStep} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable}>{workflowStep === 'reconcile' ? t('salesClosing.workflow.continueReview') : t('salesClosing.workflow.continue')}<ArrowRight className="ml-1.5 h-4 w-4" /></Button> : <Button type="submit" className={`col-span-2 min-h-12 font-black sm:col-auto sm:w-52 ${allValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'}`} onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><ClipboardCheck className="mr-1.5 h-4 w-4" />Finalize Closing</>}</Button>}
+          {workflowStep !== 'review' ? <Button type="button" className="col-span-2 min-h-12 bg-blue-600 font-black hover:bg-blue-700 sm:col-auto sm:w-52" onClick={goToNextWorkflowStep} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable}>{workflowStep === 'reconcile' ? t('salesClosing.workflow.continueReview') : t('salesClosing.workflow.continue')}<ArrowRight className="ml-1.5 h-4 w-4" /></Button> : <Button type="submit" aria-label="Finalize Closing" className="col-span-2 min-h-12 bg-blue-600 font-black hover:bg-blue-700 sm:col-auto sm:w-52" onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : <><ClipboardCheck className="mr-1.5 h-4 w-4" />Finalize &amp; Save</>}</Button>}
         </div>
       </div>
       <SalesClosingFieldDialog editor={fieldEditor} onClose={() => setFieldEditor(null)} onSave={saveInlineClosingField} isSaving={isSavingClosingField} />
