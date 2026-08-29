@@ -30,13 +30,14 @@ describe('Dark theme surface consistency', () => {
   });
 
   it('keeps the Owner Dashboard reference design on explicit dark variants instead of overriding it globally', async () => {
-    const [css, owner] = await Promise.all([
+    const [css, owner, reportCenter] = await Promise.all([
       source('../src/index.css'),
       source('../src/pages/OwnerDashboard.jsx'),
+      source('../src/components/dashboard/OwnerReportCenter.jsx'),
     ]);
     expect(css).toContain('preserving intentionally themed Owner Dashboard widgets');
     expect(owner).toContain('dark:from-slate-950');
-    expect(owner).toContain('dark:bg-blue-950/60');
-    expect(owner).toContain('dark:bg-emerald-950/40');
+    expect(reportCenter).toContain('dark:bg-blue-950/60');
+    expect(reportCenter).toContain('dark:bg-emerald-950/40');
   });
 });

@@ -7,6 +7,7 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
   it('does not use 100vw in the Owner Dashboard or shared responsive shell', async () => {
     const files = await Promise.all([
       source('../src/pages/OwnerDashboard.jsx'),
+      source('../src/components/dashboard/OwnerReportCenter.jsx'),
       source('../src/components/layout/AppLayout.jsx'),
       source('../src/components/layout/ERPLayout.jsx'),
       source('../src/components/layout/ERPHeader.jsx'),
@@ -16,17 +17,21 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
     expect(files.join('\n')).not.toMatch(/100vw/);
   });
 
-  it('uses shrinkable viewport-bounded containers for the shared shell and Owner Control Tower', async () => {
-    const [owner, appLayout, erpLayout] = await Promise.all([
+  it('uses shrinkable viewport-bounded containers for the shared shell and four-page Report Center', async () => {
+    const [owner, reportCenter, appLayout, erpLayout] = await Promise.all([
       source('../src/pages/OwnerDashboard.jsx'),
+      source('../src/components/dashboard/OwnerReportCenter.jsx'),
       source('../src/components/layout/AppLayout.jsx'),
       source('../src/components/layout/ERPLayout.jsx'),
     ]);
     expect(owner).toContain('data-testid="owner-mega-dashboard"');
+    expect(owner).toContain('data-testid="owner-report-center"');
+    expect(owner).toContain('data-testid="owner-report-nav"');
     expect(owner).toContain('mx-auto w-full max-w-6xl');
     expect(owner).toContain('flex flex-col gap-4 sm:flex-row');
-    expect(owner).toContain('overflow-x-auto pb-1');
-    expect(owner).toContain('min-w-[34rem]');
+    expect(owner).toContain('overflow-x-auto rounded-2xl');
+    expect(reportCenter).toContain('overflow-x-auto pb-1');
+    expect(reportCenter).toContain('min-w-[34rem]');
     expect(appLayout).toContain('mx-auto w-full min-w-0 max-w-[1600px]');
     expect(erpLayout).toContain('flex-1 min-w-0 max-w-full overflow-y-auto');
   });
@@ -44,8 +49,9 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
   });
 
   it('removes the floating shortcuts from Owner Dashboard and keeps actions inside normal document flow', async () => {
-    const [owner, appLayout, bottomNav, erpLayout, subscriptionBanner] = await Promise.all([
+    const [owner, reportCenter, appLayout, bottomNav, erpLayout, subscriptionBanner] = await Promise.all([
       source('../src/pages/OwnerDashboard.jsx'),
+      source('../src/components/dashboard/OwnerReportCenter.jsx'),
       source('../src/components/layout/AppLayout.jsx'),
       source('../src/components/layout/BottomNav.jsx'),
       source('../src/components/layout/ERPLayout.jsx'),
@@ -53,8 +59,9 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
     ]);
     expect(owner).not.toContain("import QuickActionsDock from '@/components/dashboard/QuickActionsDock';");
     expect(owner).not.toContain('<QuickActionsDock');
-    expect(owner).toContain('data-testid="owner-mega-actions"');
-    expect(owner).toContain("role === 'owner' ? { label: copy.addBranch");
+    expect(reportCenter).toContain('data-testid="owner-mega-actions"');
+    expect(reportCenter).toContain('model.canAddBranch ?');
+    expect(owner).toContain("canAddBranch: role === 'owner'");
     expect(appLayout).not.toContain('QuickActionsDock');
     expect(bottomNav).toContain('fixed inset-x-0 bottom-0 z-50');
     expect(bottomNav).toContain('pb-[env(safe-area-inset-bottom,0px)]');

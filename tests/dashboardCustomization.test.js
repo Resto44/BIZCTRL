@@ -8,6 +8,7 @@ import {
 } from '../src/lib/dashboardCustomization.js';
 
 const ownerDashboardPath = new URL('../src/pages/OwnerDashboard.jsx', import.meta.url);
+const ownerReportCenterPath = new URL('../src/components/dashboard/OwnerReportCenter.jsx', import.meta.url);
 const driverPerformancePath = new URL('../src/components/dashboard/DriverPerformance.jsx', import.meta.url);
 const migrationPath = new URL('../src/supabase/20260821_dashboard_customization.sql', import.meta.url);
 
@@ -113,15 +114,18 @@ describe('Owner dashboard customization', () => {
   });
 
   it('keeps the legacy customization module intact but removes its accordion integration from the new Control Tower', async () => {
-    const [ownerDashboard, driverPerformance] = await Promise.all([
+    const [ownerDashboard, reportCenter, driverPerformance] = await Promise.all([
       readFile(ownerDashboardPath, 'utf8'),
+      readFile(ownerReportCenterPath, 'utf8'),
       readFile(driverPerformancePath, 'utf8'),
     ]);
     expect(ownerDashboard).not.toContain("import DriverPerformance from '@/components/dashboard/DriverPerformance';");
     expect(ownerDashboard).not.toContain('DashboardCustomizationContext.Provider');
     expect(ownerDashboard).not.toContain('DashboardAccordionSection');
-    expect(ownerDashboard).toContain('data-testid="owner-control-tower-summary"');
-    expect(ownerDashboard).toContain('data-testid="owner-branch-rankings"');
+    expect(ownerDashboard).toContain('data-testid="owner-report-center"');
+    expect(ownerDashboard).toContain('data-testid="owner-report-nav"');
+    expect(reportCenter).toContain('data-testid="report-executive"');
+    expect(reportCenter).toContain('data-testid="report-price-control"');
     expect(driverPerformance).toContain('<h2 className="text-sm font-bold text-foreground leading-tight">{title}</h2>');
     expect(driverPerformance).not.toContain('>Driver Analytics</h2>');
     expect(driverPerformance).not.toContain('Branch and driver sales performance, refreshed from canonical driver and sales records.');

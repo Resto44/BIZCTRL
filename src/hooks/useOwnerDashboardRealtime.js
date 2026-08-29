@@ -39,7 +39,7 @@ const TABLE_QUERY_MAP = {
   // Purchases
   // BUG FIX: also invalidate 'supplier_invoices' history list key
   purchases:              ['purchases_week', 'purchases_month'],
-  supplier_invoices:      ['supplier_invoices', 'purchases', 'purchases_erp', 'bi_purchases', 'bm_purchases', 'mgr-today-purchases', 'mgr-pending-invoices'],
+  supplier_invoices:      ['supplier_invoices', 'purchases', 'purchases_erp', 'product_price_history', 'bi_purchases', 'bm_purchases', 'mgr-today-purchases', 'mgr-pending-invoices'],
   purchase_orders:        ['purchase_orders', 'mgr-pending-pos'],
 
   // Expenses
@@ -52,7 +52,7 @@ const TABLE_QUERY_MAP = {
   product_categories:     ['product_categories'],
   inventory:              ['inventory', 'inventory_dash'],
   inventory_transfers:    ['inventory_dash'],
-  inventory_transactions: ['inventory_dash'],
+  inventory_transactions: ['inventory_dash', 'inventory_transactions_report'],
   inventory_waste:        ['inventory_dash'],
 
   // Suppliers & Customers
