@@ -42,19 +42,20 @@ describe('Sales and purchase financial-record protection', () => {
     expect(engine).toContain("const approvalStatus = mode === 'draft' ? 'draft'");
     expect(form).toContain("handleSubmit(e, 'draft')");
     expect(form).toContain('Save Draft');
-    expect(form).toContain('Approve & Post');
+    expect(form).toContain('Review & Post');
   });
 
-  it('implements the Smart Invoice Capture review and reconciliation workflow', async () => {
+  it('implements the compact Purchase Invoice workspace and keeps OCR extraction', async () => {
     const [form, ocr] = await Promise.all([
       source('../src/components/purchases/PurchaseInvoiceForm.jsx'),
       source('../src/components/purchases/OcrScanDialog.jsx'),
     ]);
 
-    expect(form).toContain('Smart Invoice Capture');
-    expect(form).toContain('Invoice Reconciliation');
-    expect(form).toContain('fields verified');
-    expect(form).toContain('invoiceDifference');
+    expect(form).toContain('Purchase Invoice');
+    expect(form).toContain('function InvoiceAccordion');
+    expect(form).toContain('adjustQuantity');
+    expect(form).toContain('Line Items');
+    expect(form).toContain('Review & Post');
     expect(ocr).toContain('overall_confidence');
     expect(ocr).toContain('field_confidence');
     expect(ocr).toContain('"items"');

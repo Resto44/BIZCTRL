@@ -22,15 +22,14 @@ import BranchSelect from '@/components/shared/BranchSelect';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Plus, Trash2, Receipt, Package, Truck, AlertCircle, CheckCircle2,
-  Paperclip, ScanLine, ChevronDown, ChevronUp, DollarSign,
-  ArrowLeft, ShieldCheck, RefreshCw, FileText, Clock3, Building2,
-  Hash, CalendarDays, CreditCard, ChevronRight, Save, Send, Calculator
+  Plus, Trash2, Package, Truck, AlertCircle, CheckCircle2,
+  Paperclip, ScanLine, ChevronDown, ChevronUp,
+  FileText, Save, X, PencilLine, Minus, UserRound,
+  Store, WalletCards, ClipboardCheck
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -100,38 +99,47 @@ function PurchaseInvoiceItemRow({
     updateItem(item._id, field, Number.isFinite(parsed) ? parsed : 0);
   };
 
+  const adjustQuantity = (change) => {
+    const nextQuantity = Math.max(0, Number(item.quantity || 0) + change);
+    updateItem(item._id, 'quantity', nextQuantity);
+  };
+
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center gap-3 p-3">
-        <button
-          type="button"
-          onClick={() => setExpanded(value => !value)}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left"
-          aria-expanded={expanded}
-        >
-          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-blue-50 text-xs font-bold text-blue-700">{idx + 1}</span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-slate-900">{item.product_name || 'New line item'}</span>
-            <span className="block truncate text-[11px] text-slate-500">
-              {Number(item.quantity || 0).toLocaleString()} {item.unit || 'unit'} × {Number(item.unit_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            </span>
-          </span>
-          {item._ocr_confidence ? (
-            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">{item._ocr_confidence}%</span>
-          ) : null}
-          <span className="whitespace-nowrap text-sm font-bold text-slate-900">
-            {calcLineTotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </span>
-          {expanded ? <ChevronUp className="h-4 w-4 flex-none text-slate-400" /> : <ChevronDown className="h-4 w-4 flex-none text-slate-400" />}
-        </button>
-        {itemsCount > 1 && (
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 text-destructive" onClick={() => removeItem(item._id)}>
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>
-        )}
+    <div className="border-t border-slate-200 bg-white first:border-t-0">
+      <div className="relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3.5 sm:grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] sm:items-center sm:px-5">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-slate-900">{item.product_name || `New item ${idx + 1}`}</p>
+          <p className="truncate text-[11px] text-slate-500">Per {item.unit || 'unit'}</p>
+        </div>
+
+        <div className="hidden truncate text-sm font-medium text-slate-700 sm:block">{item.unit || '—'}</div>
+
+        <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:justify-start">
+          <div className="inline-flex h-10 items-center overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <button type="button" onClick={() => adjustQuantity(-1)} className="flex h-full w-9 items-center justify-center text-slate-500 hover:bg-slate-50" aria-label={`Decrease ${item.product_name || `item ${idx + 1}`} quantity`}>
+              <Minus className="h-4 w-4" />
+            </button>
+            <span className="min-w-9 px-1 text-center text-sm font-semibold text-slate-900">{Number(item.quantity || 0).toLocaleString()}</span>
+            <button type="button" onClick={() => adjustQuantity(1)} className="flex h-full w-9 items-center justify-center text-blue-700 hover:bg-blue-50" aria-label={`Increase ${item.product_name || `item ${idx + 1}`} quantity`}>
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="text-right sm:hidden">
+            <p className="text-[10px] text-slate-500">Unit cost</p>
+            <p className="text-xs font-semibold text-slate-800">{Number(item.unit_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+          </div>
+        </div>
+
+        <div className="hidden text-sm font-medium tabular-nums text-slate-700 sm:block">{Number(item.unit_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+        <div className="absolute right-14 mt-0 text-sm font-bold tabular-nums text-slate-950 sm:static sm:text-right">
+          {calcLineTotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </div>
+        <Button type="button" variant="ghost" size="icon" onClick={() => setExpanded(value => !value)} className="absolute right-4 mt-0 h-8 w-8 text-blue-700 sm:static" aria-label={`Edit ${item.product_name || `item ${idx + 1}`}`} aria-expanded={expanded}>
+          <PencilLine className="h-4 w-4" />
+        </Button>
       </div>
 
-      {expanded && <div className="space-y-2 border-t border-slate-100 bg-slate-50/70 p-3">
+      {expanded && <div className="space-y-2 border-t border-blue-100 bg-blue-50/40 p-3 sm:p-4">
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="min-w-0">
@@ -255,35 +263,31 @@ function PurchaseInvoiceItemRow({
           </div>
         </div>
       </div>
+      <div className="flex justify-end">
+        {itemsCount > 1 && <Button type="button" variant="ghost" size="sm" className="h-8 gap-1 text-xs text-red-600" onClick={() => removeItem(item._id)}><Trash2 className="h-3.5 w-3.5" /> Remove item</Button>}
+      </div>
       </div>}
     </div>
   );
 }
 
-function VerificationCard({ title, value, verified, icon: Icon, active, onClick }) {
+function InvoiceAccordion({ title, subtitle, icon: Icon, verified = false, open, onToggle, trailing, children }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`min-w-0 rounded-xl border p-3 text-left transition-all ${
-        active
-          ? 'border-blue-400 bg-blue-50/70 shadow-sm ring-2 ring-blue-100'
-          : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50'
-      }`}
-    >
-      <span className="mb-2 block text-[11px] font-medium text-slate-500">{title}</span>
-      <span className="flex min-w-0 items-center gap-2">
-        <span className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl ${verified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-          <Icon className="h-4 w-4" />
+    <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
+      <button type="button" onClick={onToggle} className="flex w-full items-center gap-3 px-4 py-3.5 text-left sm:px-5" aria-expanded={open}>
+        <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-blue-600 text-white shadow-sm shadow-blue-200"><Icon className="h-5 w-5" /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold text-slate-900">{title}</span>
+          <span className="mt-0.5 flex min-w-0 items-center gap-2">
+            <span className="truncate text-sm text-slate-700">{subtitle || 'Not selected'}</span>
+            {verified && <span className="inline-flex flex-none items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3 w-3" /> Verified</span>}
+          </span>
         </span>
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{value || 'Needs review'}</span>
-        <ChevronRight className="h-4 w-4 flex-none text-slate-400" />
-      </span>
-      <span className={`mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold ${verified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-        {verified ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
-        {verified ? 'Verified' : 'Review'}
-      </span>
-    </button>
+        {trailing}
+        {open ? <ChevronUp className="h-5 w-5 flex-none text-slate-500" /> : <ChevronDown className="h-5 w-5 flex-none text-slate-500" />}
+      </button>
+      {open && <div className="border-t border-slate-100 bg-slate-50/60 p-4 sm:p-5">{children}</div>}
+    </Card>
   );
 }
 
@@ -320,14 +324,13 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
 
   const [payments, setPayments] = useState([emptyPayment()]);
   const [payFullAmount, setPayFullAmount] = useState(false);
-  const [showAdditionalCosts, setShowAdditionalCosts] = useState(false);
-  const [showPayments, setShowPayments] = useState(false);
   const [showOcr, setShowOcr] = useState(false);
   const [attachments, setAttachments] = useState(invoice?.attachment_urls || []);
-  const [ocrMeta, setOcrMeta] = useState(null);
+  const [, setOcrMeta] = useState(null);
   const [vatNumber, setVatNumber] = useState(invoice?.vat_number || '');
   const [paymentTerms, setPaymentTerms] = useState(invoice?.payment_terms || '');
-  const [activeDetail, setActiveDetail] = useState('supplier');
+  const [openSection, setOpenSection] = useState(null);
+  const [showLineItems, setShowLineItems] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [submitMode, setSubmitMode] = useState(null);
@@ -387,26 +390,12 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
     ? totals.grandTotal
     : payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
   const remaining = payFullAmount ? 0 : totals.grandTotal - paymentTotal;
-  const scannedInvoiceTotal = Number(ocrMeta?.invoiceTotal || 0);
-  const invoiceDifference = scannedInvoiceTotal > 0 ? totals.grandTotal - scannedInvoiceTotal : 0;
-  const invoiceMatchesScan = scannedInvoiceTotal > 0 && Math.abs(invoiceDifference) < 0.01;
-  const hasLineItems = items.some(item => Boolean(item.product_name || item.product_id));
-  const verificationChecks = [
-    Boolean(form.supplier_id || form.supplier_name.trim()),
-    Boolean(form.branch),
-    Boolean(form.invoice_number.trim()),
-    Boolean(form.date),
-    Boolean(resolvedPaymentTerms || form.due_date),
-    Boolean(resolvedVatNumber),
-    hasLineItems,
-    invoiceMatchesScan,
-  ];
-  const verifiedCount = verificationChecks.filter(Boolean).length;
-  const reviewCount = verificationChecks.length - verifiedCount;
-  const averageLineConfidence = Math.round(
-    items.reduce((sum, item) => sum + Number(item._ocr_confidence || 0), 0) /
-      Math.max(1, items.filter(item => item._ocr_confidence).length),
-  );
+  const displaySubtotal = Math.max(0, totals.subtotal - totals.taxAmount);
+  const selectedBranch = branches.find(branch => branch.key === form.branch || branch.branch_key === form.branch);
+  const selectedBranchName = selectedBranch?.name || selectedBranch?.branch_name || form.branch;
+  const paymentMethodLabel = paymentTotal > 0
+    ? payments[0]?.payment_method || 'Payment entered'
+    : resolvedPaymentTerms || (form.due_date ? 'Credit' : 'Not configured');
 
   // ── Pay Full Amount handler ────────────────────────────────────────────
   const handlePayFullAmount = (checked) => {
@@ -638,165 +627,83 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
   // ── Render ─────────────────────────────────────────────────────────────
   return (
     <form onSubmit={e => handleSubmit(e, 'post')} className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-50 text-slate-950">
-      <header className="flex h-16 flex-none items-center gap-3 border-b border-slate-200 bg-white px-4">
-        <Button type="button" variant="ghost" size="icon" onClick={onCancel} className="h-9 w-9 rounded-full" aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
+      <header className="flex flex-none items-center gap-3 bg-white px-4 py-4 sm:px-5">
+        <Button type="button" variant="ghost" size="icon" onClick={onCancel} className="h-10 w-10 flex-none rounded-full" aria-label="Close purchase invoice">
+          <X className="h-6 w-6" />
         </Button>
-        <div className="min-w-0 flex-1 text-center">
-          <h2 className="truncate text-base font-bold sm:text-lg">Smart Invoice Capture</h2>
-          <p className="text-[10px] text-slate-500">AI-assisted procurement posting</p>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-xl font-black tracking-tight text-slate-950 sm:text-2xl">Purchase Invoice</h2>
+          <div className="mt-0.5 flex min-w-0 items-center gap-2">
+            <span className="truncate text-sm text-slate-500">{form.invoice_number || 'Invoice number pending'}</span>
+            <span className="inline-flex flex-none items-center gap-1.5 rounded-full bg-orange-50 px-2 py-1 text-[11px] font-bold capitalize text-orange-600">
+              <span className="h-2 w-2 rounded-full bg-orange-500" />{isEdit ? form.status : 'Draft'}
+            </span>
+          </div>
         </div>
-        <Badge className="border-0 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-50">
-          OCR {ocrMeta?.confidence ? `${Math.round(ocrMeta.confidence)}%` : 'Ready'}
-        </Badge>
+        <Button type="button" variant="outline" onClick={() => setShowOcr(true)} className="h-10 flex-none gap-2 rounded-lg border-blue-500 px-3 font-bold text-blue-700 hover:bg-blue-50">
+          <ScanLine className="h-4 w-4" /> Scan
+        </Button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5">
-        <div className="mx-auto max-w-3xl space-y-4 pb-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4">
+        <div className="mx-auto max-w-3xl space-y-3.5 pb-4">
           {error && (
             <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700" role="alert">
               <AlertCircle className="mt-0.5 h-4 w-4 flex-none" />{error}
             </div>
           )}
 
-          <Card className="overflow-hidden border-slate-200 bg-white p-3 shadow-sm">
-            <div className="flex items-center gap-3">
-              <span className="flex h-14 w-14 flex-none items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
-                <FileText className="h-7 w-7 text-blue-600" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-slate-900">{ocrMeta?.fileName || 'Invoice document'}</p>
-                <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
-                  <Clock3 className="h-3 w-3" />
-                  {ocrMeta?.scannedAt ? `Scanned ${new Date(ocrMeta.scannedAt).toLocaleString()}` : 'Upload PDF, JPG or PNG for extraction'}
-                </p>
-              </div>
-              <Button type="button" variant="outline" onClick={() => setShowOcr(true)} className="h-10 gap-1.5 rounded-xl border-slate-200 px-3 text-xs font-semibold text-blue-700">
-                {ocrMeta ? <RefreshCw className="h-4 w-4" /> : <ScanLine className="h-4 w-4" />}
-                {ocrMeta ? 'Rescan' : 'Scan'}
-              </Button>
-            </div>
+          <Card className="grid grid-cols-4 divide-x divide-slate-200 overflow-hidden border-slate-200 bg-white px-1 py-4 shadow-sm">
+            <div className="min-w-0 px-2 text-center sm:px-4"><p className="text-[11px] text-slate-500 sm:text-sm">Items</p><p className="mt-1 truncate text-lg font-black text-slate-950 sm:text-xl">{items.length}</p></div>
+            <div className="min-w-0 px-2 text-center sm:px-4"><p className="text-[11px] text-slate-500 sm:text-sm">Subtotal</p><p className="mt-1 truncate text-sm font-black text-slate-950 sm:text-xl"><span className="me-1 text-[10px] font-medium text-slate-500 sm:text-sm">{form.currency}</span>{displaySubtotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
+            <div className="min-w-0 px-2 text-center sm:px-4"><p className="text-[11px] text-slate-500 sm:text-sm">VAT</p><p className="mt-1 truncate text-sm font-black text-slate-950 sm:text-xl"><span className="me-1 text-[10px] font-medium text-slate-500 sm:text-sm">{form.currency}</span>{totals.taxAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
+            <div className="min-w-0 px-2 text-center sm:px-4"><p className="text-[11px] text-slate-500 sm:text-sm">Total</p><p className="mt-1 truncate text-sm font-black text-blue-700 sm:text-xl"><span className="me-1 text-[10px] font-medium text-slate-500 sm:text-sm">{form.currency}</span>{totals.grandTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
           </Card>
 
-          <Card className="border-slate-200 bg-white p-3 shadow-sm">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                <ShieldCheck className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-slate-900">{verifiedCount} fields verified · {reviewCount} need review</p>
-                <p className="text-[11px] text-slate-500">Accounting checks update as you complete the invoice.</p>
-              </div>
-              <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${reviewCount === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                {reviewCount === 0 ? 'Ready' : 'Review'}
-              </span>
-            </div>
-          </Card>
-
-          <section className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <VerificationCard title="Supplier" value={selectedSupplier?.name || form.supplier_name} verified={Boolean(form.supplier_id || form.supplier_name.trim())} icon={Building2} active={activeDetail === 'supplier'} onClick={() => setActiveDetail('supplier')} />
-            <VerificationCard title="Branch" value={branches.find(b => b.key === form.branch || b.branch_key === form.branch)?.name || form.branch} verified={Boolean(form.branch)} icon={Building2} active={activeDetail === 'branch'} onClick={() => setActiveDetail('branch')} />
-            <VerificationCard title="Invoice No" value={form.invoice_number} verified={Boolean(form.invoice_number.trim())} icon={Hash} active={activeDetail === 'invoice'} onClick={() => setActiveDetail('invoice')} />
-            <VerificationCard title="Date" value={form.date} verified={Boolean(form.date)} icon={CalendarDays} active={activeDetail === 'date'} onClick={() => setActiveDetail('date')} />
-            <VerificationCard title="Payment Terms" value={resolvedPaymentTerms || (form.due_date ? `Due ${form.due_date}` : '')} verified={Boolean(resolvedPaymentTerms || form.due_date)} icon={CreditCard} active={activeDetail === 'terms'} onClick={() => setActiveDetail('terms')} />
-            <VerificationCard title="VAT Number" value={resolvedVatNumber} verified={Boolean(resolvedVatNumber)} icon={Receipt} active={activeDetail === 'vat'} onClick={() => setActiveDetail('vat')} />
-          </section>
-
-          <Card className="border-blue-100 bg-white p-4 shadow-sm ring-1 ring-blue-50">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-bold text-slate-900">Review selected field</p>
-              <Badge variant="outline" className="border-blue-100 bg-blue-50 text-[10px] text-blue-700">Editable</Badge>
-            </div>
-            {activeDetail === 'supplier' && <div className="space-y-2">
-              <Label className="text-xs text-slate-600">Supplier *</Label>
-              <Select value={form.supplier_id} onValueChange={v => {
-                const supplier = suppliers.find(s => s.id === v);
-                setForm(current => ({ ...current, supplier_id: v, supplier_name: supplier?.name || '', supplier_email: supplier?.email || '' }));
-                setPaymentTerms(supplier?.payment_terms || '');
-                setVatNumber(supplier?.vat_number || supplier?.tax_number || '');
-              }}>
-                <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select supplier..." /></SelectTrigger>
-                <SelectContent>{suppliers.map(supplier => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent>
-              </Select>
-              {!form.supplier_id && <Input value={form.supplier_name} onChange={e => setForm(current => ({ ...current, supplier_name: e.target.value }))} placeholder="Or type supplier name" className="h-11 rounded-xl" />}
-            </div>}
-            {activeDetail === 'branch' && <div>
-              <Label className="mb-1.5 block text-xs text-slate-600">Receiving branch *</Label>
-              <BranchSelect value={form.branch} onChange={value => setForm(current => ({ ...current, branch: value }))} />
-            </div>}
-            {activeDetail === 'invoice' && <div className="grid grid-cols-2 gap-2">
-              <div className="min-w-0"><Label className="text-xs text-slate-600">Invoice number</Label><Input value={form.invoice_number} onChange={e => setForm(current => ({ ...current, invoice_number: e.target.value }))} className="mt-1 h-11 rounded-xl" /></div>
-              <div className="min-w-0"><Label className="text-xs text-slate-600">Currency</Label><Select value={form.currency} onValueChange={value => setForm(current => ({ ...current, currency: value }))}><SelectTrigger className="mt-1 h-11 rounded-xl"><SelectValue /></SelectTrigger><SelectContent>{CURRENCIES.map(currency => <SelectItem key={currency} value={currency}>{currency}</SelectItem>)}</SelectContent></Select></div>
-            </div>}
-            {activeDetail === 'date' && <div className="grid grid-cols-2 gap-2">
-              <div><Label className="text-xs text-slate-600">Invoice date *</Label><Input type="date" value={form.date} onChange={e => setForm(current => ({ ...current, date: e.target.value }))} className="mt-1 h-11 rounded-xl" /></div>
-              <div><Label className="text-xs text-slate-600">Due date</Label><Input type="date" value={form.due_date} onChange={e => setForm(current => ({ ...current, due_date: e.target.value }))} className="mt-1 h-11 rounded-xl" /></div>
-            </div>}
-            {activeDetail === 'terms' && <div><Label className="text-xs text-slate-600">Payment terms</Label><Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="e.g. Net 30 days" className="mt-1 h-11 rounded-xl" /></div>}
-            {activeDetail === 'vat' && <div><Label className="text-xs text-slate-600">Supplier VAT number</Label><Input value={vatNumber} onChange={e => setVatNumber(e.target.value)} placeholder="15-digit VAT number" inputMode="numeric" className="mt-1 h-11 rounded-xl" /></div>}
-          </Card>
-
-          <Card className="border-slate-200 bg-white p-3 shadow-sm">
-            <div className="mb-3 flex items-center gap-2">
-              <Package className="h-4 w-4 text-blue-600" />
-              <div className="min-w-0 flex-1"><p className="text-sm font-bold">Line Items ({items.length})</p><p className="text-[10px] text-slate-500">{averageLineConfidence ? `Average OCR confidence ${averageLineConfidence}%` : 'Tap a line to review details'}</p></div>
-              <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-8 gap-1 rounded-lg text-xs"><Plus className="h-3.5 w-3.5" /> Add Item</Button>
-            </div>
-            <div className="space-y-2">
-              {items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} categories={categories} categoriesTree={categoriesTree} />)}
-            </div>
-          </Card>
-
-          <Card className="border-slate-200 bg-white p-3 shadow-sm">
-            <button type="button" className="flex w-full items-center gap-2" onClick={() => setShowAdditionalCosts(value => !value)}>
-              <Truck className="h-4 w-4 text-blue-600" /><span className="flex-1 text-left text-sm font-bold">Additional Costs</span>
-              <span className="text-xs font-semibold text-slate-500">{form.currency} {totals.additionalTotal.toFixed(2)}</span>{showAdditionalCosts ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
+            <button type="button" onClick={() => setShowLineItems(value => !value)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left sm:px-5" aria-expanded={showLineItems}>
+              <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-blue-600 text-white"><Package className="h-5 w-5" /></span>
+              <span className="flex-1 text-lg font-black text-slate-950">Line Items</span>
+              {showLineItems ? <ChevronUp className="h-5 w-5 text-slate-500" /> : <ChevronDown className="h-5 w-5 text-slate-500" />}
             </button>
-            {showAdditionalCosts && <div className="mt-3 space-y-2">
-              {additionalCosts.map(cost => <div key={cost._id} className="grid grid-cols-[1fr_1fr_auto] gap-2 rounded-xl bg-slate-50 p-2">
-                <Select value={cost.type} onValueChange={value => updateAdditionalCost(cost._id, 'type', value)}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent>{ADDITIONAL_COST_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent></Select>
-                <Input type="number" min="0" step="0.01" value={cost.amount} onChange={e => updateAdditionalCost(cost._id, 'amount', Number(e.target.value || 0))} className="h-9" placeholder="Amount" />
-                <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-600" onClick={() => removeAdditionalCost(cost._id)}><Trash2 className="h-4 w-4" /></Button>
-                <Input value={cost.description} onChange={e => updateAdditionalCost(cost._id, 'description', e.target.value)} className="col-span-3 h-9" placeholder="Description" />
-              </div>)}
-              <Button type="button" variant="outline" size="sm" onClick={addAdditionalCost} className="w-full gap-1"><Plus className="h-3.5 w-3.5" /> Add cost</Button>
-            </div>}
+            {showLineItems && <>
+              <div className="hidden grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] border-t border-slate-200 bg-slate-50 px-5 py-2.5 text-[11px] font-medium text-slate-500 sm:grid">
+                <span>Item</span><span>Unit</span><span>Qty</span><span>Unit Cost</span><span className="text-right">Total</span><span />
+              </div>
+              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} categories={categories} categoriesTree={categoriesTree} />)}</div>
+              <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 sm:px-5">
+                <Button type="button" variant="ghost" onClick={addItem} className="h-9 gap-2 px-0 font-bold text-blue-700 hover:bg-transparent"><Plus className="h-5 w-5 rounded-full border border-blue-600 p-0.5" /> Add Item</Button>
+                <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{items.length} item{items.length === 1 ? '' : 's'}</span>
+              </div>
+            </>}
           </Card>
 
-          <Card className="border-slate-200 bg-white p-3 shadow-sm">
-            <button type="button" className="flex w-full items-center gap-2" onClick={() => setShowPayments(value => !value)}>
-              <DollarSign className="h-4 w-4 text-blue-600" /><span className="flex-1 text-left text-sm font-bold">Payment</span>
-              <span className="text-xs font-semibold text-slate-500">Remaining {form.currency} {Math.max(0, remaining).toFixed(2)}</span>{showPayments ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-            {showPayments && <div className="mt-3 space-y-3">
-              <label className="flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs font-semibold"><input id="pay-full-amount" type="checkbox" checked={payFullAmount} onChange={e => handlePayFullAmount(e.target.checked)} className="h-4 w-4 accent-blue-600" /> Pay full invoice amount</label>
-              {payments.map((payment, index) => <div key={payment._id} className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-2">
-                <Input type="number" min="0" step="0.01" value={payment.amount} onChange={e => updatePayment(payment._id, 'amount', e.target.value)} disabled={payFullAmount} className="h-9" placeholder="Amount" />
-                <Select value={payment.payment_method} onValueChange={value => updatePayment(payment._id, 'payment_method', value)}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent>{PAYMENT_METHODS.map(method => <SelectItem key={method} value={method}>{method}</SelectItem>)}</SelectContent></Select>
-                <Input type="date" value={payment.date} onChange={e => updatePayment(payment._id, 'date', e.target.value)} className="h-9" />
-                <div className="flex gap-1"><Input value={payment.notes} onChange={e => updatePayment(payment._id, 'notes', e.target.value)} className="h-9" placeholder={`Payment ${index + 1} note`} />{payments.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removePayment(payment._id)} className="h-9 w-9 text-red-600"><Trash2 className="h-4 w-4" /></Button>}</div>
-              </div>)}
+          <InvoiceAccordion title="Supplier" subtitle={selectedSupplier?.name || form.supplier_name} icon={UserRound} verified={Boolean(form.supplier_id || form.supplier_name.trim())} open={openSection === 'supplier'} onToggle={() => setOpenSection(current => current === 'supplier' ? null : 'supplier')}>
+            <div className="space-y-3">
+              <div><Label className="text-xs text-slate-600">Supplier *</Label><Select value={form.supplier_id} onValueChange={value => { const supplier = suppliers.find(item => item.id === value); setForm(current => ({ ...current, supplier_id: value, supplier_name: supplier?.name || '', supplier_email: supplier?.email || '' })); setPaymentTerms(supplier?.payment_terms || ''); setVatNumber(supplier?.vat_number || supplier?.tax_number || ''); }}><SelectTrigger className="mt-1 h-11 rounded-xl bg-white"><SelectValue placeholder="Select supplier..." /></SelectTrigger><SelectContent>{suppliers.map(supplier => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent></Select>{!form.supplier_id && <Input value={form.supplier_name} onChange={event => setForm(current => ({ ...current, supplier_name: event.target.value }))} placeholder="Or type supplier name" className="mt-2 h-11 rounded-xl bg-white" />}</div>
+              <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs text-slate-600">Invoice number</Label><Input value={form.invoice_number} onChange={event => setForm(current => ({ ...current, invoice_number: event.target.value }))} className="mt-1 h-10 bg-white" /></div><div><Label className="text-xs text-slate-600">Currency</Label><Select value={form.currency} onValueChange={value => setForm(current => ({ ...current, currency: value }))}><SelectTrigger className="mt-1 h-10 bg-white"><SelectValue /></SelectTrigger><SelectContent>{CURRENCIES.map(currency => <SelectItem key={currency} value={currency}>{currency}</SelectItem>)}</SelectContent></Select></div></div>
+              <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs text-slate-600">Invoice date</Label><Input type="date" value={form.date} onChange={event => setForm(current => ({ ...current, date: event.target.value }))} className="mt-1 h-10 bg-white" /></div><div><Label className="text-xs text-slate-600">VAT number</Label><Input value={resolvedVatNumber} onChange={event => setVatNumber(event.target.value)} inputMode="numeric" className="mt-1 h-10 bg-white" placeholder="VAT number" /></div></div>
+            </div>
+          </InvoiceAccordion>
+
+          <InvoiceAccordion title="Branch" subtitle={selectedBranchName} icon={Store} verified={Boolean(form.branch)} open={openSection === 'branch'} onToggle={() => setOpenSection(current => current === 'branch' ? null : 'branch')}>
+            <div><Label className="mb-1.5 block text-xs text-slate-600">Receiving branch *</Label><BranchSelect value={form.branch} onChange={value => setForm(current => ({ ...current, branch: value }))} /></div>
+          </InvoiceAccordion>
+
+          <InvoiceAccordion title="Payment" subtitle={paymentMethodLabel} icon={WalletCards} open={openSection === 'payment'} onToggle={() => setOpenSection(current => current === 'payment' ? null : 'payment')} trailing={form.due_date ? <span className="hidden flex-none items-center gap-1 text-xs font-bold text-orange-600 sm:inline-flex"><span className="h-2 w-2 rounded-full bg-orange-500" />Due {form.due_date}</span> : null}>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs text-slate-600">Payment terms</Label><Input value={paymentTerms} onChange={event => setPaymentTerms(event.target.value)} placeholder="e.g. Credit / Net 30" className="mt-1 h-10 bg-white" /></div><div><Label className="text-xs text-slate-600">Due date</Label><Input type="date" value={form.due_date} onChange={event => setForm(current => ({ ...current, due_date: event.target.value }))} className="mt-1 h-10 bg-white" /></div></div>
+              <label className="flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs font-bold text-blue-950"><input id="pay-full-amount" type="checkbox" checked={payFullAmount} onChange={event => handlePayFullAmount(event.target.checked)} className="h-4 w-4 accent-blue-600" /> Pay full invoice amount</label>
+              {payments.map((payment, index) => <div key={payment._id} className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2.5"><Input type="number" min="0" step="0.01" value={payment.amount} onChange={event => updatePayment(payment._id, 'amount', event.target.value)} disabled={payFullAmount} className="h-9" placeholder="Amount" /><Select value={payment.payment_method} onValueChange={value => updatePayment(payment._id, 'payment_method', value)}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent>{PAYMENT_METHODS.map(method => <SelectItem key={method} value={method}>{method}</SelectItem>)}</SelectContent></Select><Input type="date" value={payment.date} onChange={event => updatePayment(payment._id, 'date', event.target.value)} className="h-9" /><div className="flex gap-1"><Input value={payment.notes} onChange={event => updatePayment(payment._id, 'notes', event.target.value)} className="h-9" placeholder={`Payment ${index + 1} note`} />{payments.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removePayment(payment._id)} className="h-9 w-9 text-red-600"><Trash2 className="h-4 w-4" /></Button>}</div></div>)}
               {!payFullAmount && <Button type="button" variant="outline" size="sm" onClick={addPayment} className="w-full gap-1"><Plus className="h-3.5 w-3.5" /> Add payment</Button>}
-            </div>}
-          </Card>
-
-          <Card className="border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-2"><Paperclip className="h-4 w-4 text-blue-600" /><span className="flex-1 text-sm font-bold">Documents & Notes</span><label className="cursor-pointer"><span className="text-xs font-bold text-blue-700">Upload</span><input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleFileUpload} /></label></div>
-            {attachments.map((url, index) => <div key={`${url}-${index}`} className="mb-2 flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5 text-xs"><FileText className="h-3.5 w-3.5 text-blue-600" /><a href={url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-blue-700">{url.split('/').pop()}</a><Button type="button" variant="ghost" size="icon" onClick={() => setAttachments(current => current.filter((_, itemIndex) => itemIndex !== index))} className="h-7 w-7 text-red-600"><Trash2 className="h-3.5 w-3.5" /></Button></div>)}
-            <Textarea value={form.notes} onChange={e => setForm(current => ({ ...current, notes: e.target.value }))} rows={2} placeholder="Internal procurement notes" className="resize-none rounded-xl" />
-          </Card>
-
-          <Card className="border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-2"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><Calculator className="h-4 w-4" /></span><div><p className="text-sm font-bold">Invoice Reconciliation</p><p className="text-[10px] text-slate-500">Calculated from verified line data</p></div></div>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span className="font-semibold">{form.currency} {totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Tax</span><span className="font-semibold">{form.currency} {totals.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
-              {totals.discountAmount > 0 && <div className="flex justify-between text-emerald-700"><span>Discount</span><span>-{form.currency} {totals.discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>}
-              {totals.additionalTotal > 0 && <div className="flex justify-between"><span className="text-slate-500">Additional costs</span><span className="font-semibold">{form.currency} {totals.additionalTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>}
-              <div className="flex justify-between border-y border-slate-100 py-2 text-base font-bold"><span>Invoice Total</span><span>{form.currency} {totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
-              <div className={`flex justify-between font-bold ${invoiceMatchesScan ? 'text-emerald-700' : 'text-amber-700'}`}><span>Difference</span><span>{scannedInvoiceTotal > 0 ? `${form.currency} ${invoiceDifference.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Awaiting scan'}</span></div>
+              <div className="border-t border-slate-200 pt-3"><div className="mb-2 flex items-center justify-between"><div className="flex items-center gap-2"><Truck className="h-4 w-4 text-blue-600" /><span className="text-xs font-bold text-slate-800">Additional costs</span></div><span className="text-xs font-bold text-slate-500">{form.currency} {totals.additionalTotal.toFixed(2)}</span></div>{additionalCosts.map(cost => <div key={cost._id} className="mb-2 grid grid-cols-[1fr_1fr_auto] gap-2 rounded-xl bg-white p-2"><Select value={cost.type} onValueChange={value => updateAdditionalCost(cost._id, 'type', value)}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent>{ADDITIONAL_COST_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent></Select><Input type="number" min="0" step="0.01" value={cost.amount} onChange={event => updateAdditionalCost(cost._id, 'amount', Number(event.target.value || 0))} className="h-9" placeholder="Amount" /><Button type="button" variant="ghost" size="icon" onClick={() => removeAdditionalCost(cost._id)} className="h-9 w-9 text-red-600"><Trash2 className="h-4 w-4" /></Button><Input value={cost.description} onChange={event => updateAdditionalCost(cost._id, 'description', event.target.value)} className="col-span-3 h-9" placeholder="Description" /></div>)}<Button type="button" variant="ghost" size="sm" onClick={addAdditionalCost} className="h-8 gap-1 px-0 text-xs font-bold text-blue-700"><Plus className="h-3.5 w-3.5" /> Add cost</Button></div>
+              <div className="flex justify-between rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold"><span>Remaining balance</span><span>{form.currency} {Math.max(0, remaining).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
             </div>
-          </Card>
+          </InvoiceAccordion>
+
+          <InvoiceAccordion title="Attachments" subtitle={attachments.length ? `${attachments.length} invoice ${attachments.length === 1 ? 'file' : 'files'}` : 'No invoice file'} icon={Paperclip} open={openSection === 'attachments'} onToggle={() => setOpenSection(current => current === 'attachments' ? null : 'attachments')} trailing={attachments.length ? <span className="hidden h-9 w-9 flex-none items-center justify-center rounded-lg bg-blue-50 text-blue-700 sm:flex"><FileText className="h-4 w-4" /></span> : null}>
+            <div className="space-y-2">{attachments.map((url, index) => <div key={`${url}-${index}`} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"><FileText className="h-3.5 w-3.5 text-blue-600" /><a href={url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-blue-700">{url.split('/').pop()}</a><Button type="button" variant="ghost" size="icon" onClick={() => setAttachments(current => current.filter((_, itemIndex) => itemIndex !== index))} className="h-7 w-7 text-red-600"><Trash2 className="h-3.5 w-3.5" /></Button></div>)}<label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-blue-300 bg-blue-50/50 text-xs font-bold text-blue-700"><Paperclip className="h-4 w-4" />Upload invoice<input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleFileUpload} /></label><Textarea value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} rows={2} placeholder="Internal procurement notes" className="resize-none rounded-xl bg-white" /></div>
+          </InvoiceAccordion>
         </div>
       </div>
 
@@ -805,7 +712,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
           <Save className="h-4 w-4" />{saving && submitMode === 'draft' ? 'Saving...' : 'Save Draft'}
         </Button>
         <Button type="submit" disabled={saving} className="h-12 gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-blue-600 font-bold shadow-lg shadow-blue-200 hover:from-blue-800 hover:to-blue-700">
-          <Send className="h-4 w-4" />{saving && submitMode === 'post' ? 'Posting...' : isEdit ? 'Approve & Update' : 'Approve & Post'}
+          <ClipboardCheck className="h-4 w-4" />{saving && submitMode === 'post' ? 'Posting...' : isEdit ? 'Review & Update' : 'Review & Post'}
         </Button>
       </footer>
 
