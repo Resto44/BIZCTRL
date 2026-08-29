@@ -1,6 +1,69 @@
+import {
+  differenceInCalendarDays,
+  endOfDay,
+  endOfMonth,
+  format,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  startOfYear,
+  subDays,
+  subMonths,
+  subYears,
+} from 'date-fns';
+
 const CONSUMPTION_TYPES = new Set(['recipe_consumption', 'sale', 'stock_out']);
 
 export const OWNER_PRICE_TARGET_MARGIN = 35;
+export const OWNER_REPORT_PERIOD_KEYS = ['today', 'week', 'month', 'six-months', 'year'];
+
+export function buildOwnerReportPeriod(periodKey = 'today', now = new Date()) {
+  const key = OWNER_REPORT_PERIOD_KEYS.includes(periodKey) ? periodKey : 'today';
+  const currentEnd = startOfDay(now);
+  let currentStart = currentEnd;
+  let previousStart;
+  let previousEnd;
+
+  if (key === 'week') {
+    currentStart = startOfWeek(currentEnd, { weekStartsOn: 0 });
+    previousStart = subDays(currentStart, 7);
+    previousEnd = subDays(currentStart, 1);
+  } else if (key === 'month') {
+    currentStart = startOfMonth(currentEnd);
+    previousStart = startOfMonth(subMonths(currentEnd, 1));
+    previousEnd = new Date(
+      previousStart.getFullYear(),
+      previousStart.getMonth(),
+      Math.min(currentEnd.getDate(), endOfMonth(previousStart).getDate()),
+    );
+  } else if (key === 'six-months') {
+    currentStart = startOfMonth(subMonths(currentEnd, 5));
+    previousStart = startOfMonth(subMonths(currentEnd, 11));
+    previousEnd = subMonths(currentEnd, 6);
+  } else if (key === 'year') {
+    currentStart = startOfYear(currentEnd);
+    previousStart = startOfYear(subYears(currentEnd, 1));
+    previousEnd = subYears(currentEnd, 1);
+  } else {
+    previousStart = subDays(currentEnd, 1);
+    previousEnd = previousStart;
+  }
+
+  const daysInPeriod = differenceInCalendarDays(currentEnd, currentStart) + 1;
+  return {
+    key,
+    rangeType: key === 'today' ? 'day' : key === 'week' ? 'week' : 'month',
+    daysInPeriod,
+    currentStart: format(currentStart, 'yyyy-MM-dd'),
+    currentEnd: format(currentEnd, 'yyyy-MM-dd'),
+    previousStart: format(previousStart, 'yyyy-MM-dd'),
+    previousEnd: format(previousEnd, 'yyyy-MM-dd'),
+    currentStartIso: startOfDay(currentStart).toISOString(),
+    currentEndIso: endOfDay(currentEnd).toISOString(),
+    previousStartIso: startOfDay(previousStart).toISOString(),
+    previousEndIso: endOfDay(previousEnd).toISOString(),
+  };
+}
 
 export function reportNumber(value) {
   const parsed = Number(value);

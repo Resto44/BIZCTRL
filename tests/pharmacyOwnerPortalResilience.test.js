@@ -64,8 +64,8 @@ describe('Pharmacy Owner portal resilience', () => {
     expect(dashboard).toContain('const enabled = !!(activeRestaurant?.id);');
     expect(dashboard).toContain('const fetchBranchScopedRows = useCallback(async (table, {');
     expect(dashboard).toContain(".eq('restaurant_id', activeRestaurant.id)");
-    expect(dashboard).toContain("queryKey: ['sales_today', activeRestaurant?.id, selectedBranchId, today]");
-    expect(dashboard).toContain("queryKey: ['expenses_today', activeRestaurant?.id, selectedBranchId, today]");
+    expect(dashboard).toContain("queryKey: ['sales_report_period', activeRestaurant?.id, selectedBranchId, period.currentStart, period.currentEnd]");
+    expect(dashboard).toContain("queryKey: ['expenses_report_period', activeRestaurant?.id, selectedBranchId, period.currentStart, period.currentEnd]");
     expect(dashboard).toContain("createQuery().eq('branch_id', selectedBranchId)");
     expect(dashboard).toContain(".eq('restaurant_id', activeRestaurant.id)");
     expect(dashboard).toContain('<WidgetErrorBoundary>');

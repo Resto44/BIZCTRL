@@ -4,6 +4,7 @@ import {
   buildBranchPriceInconsistencies,
   buildInventoryConsumption,
   buildInventoryOverview,
+  buildOwnerReportPeriod,
   buildPriceControlReport,
   buildSupplierPriceComparisons,
   groupExpensesByCategory,
@@ -25,6 +26,41 @@ describe('Owner ERP Report Center', () => {
     for (const testId of ['report-executive', 'report-finance', 'report-operations', 'report-price-control']) {
       expect(center).toContain(`data-testid="${testId}"`);
     }
+  });
+
+  it('provides a clickable five-period selector and connects its URL state to report queries', async () => {
+    const dashboard = await source('../src/pages/OwnerDashboard.jsx');
+    expect(dashboard).toContain('data-testid="owner-period-selector"');
+    expect(dashboard).toContain("{ key: 'today'");
+    expect(dashboard).toContain("{ key: 'week'");
+    expect(dashboard).toContain("{ key: 'month'");
+    expect(dashboard).toContain("{ key: 'six-months'");
+    expect(dashboard).toContain("{ key: 'year'");
+    expect(dashboard).toContain("next.set('period', nextPeriod)");
+    expect(dashboard).toContain("['sales_report_period'");
+    expect(dashboard).toContain("['expenses_report_period'");
+    expect(dashboard).toContain("['inventory_transactions_report'");
+  });
+
+  it('builds exact current and comparable previous ERP report ranges', () => {
+    const now = new Date(2026, 7, 29, 12, 0, 0);
+    expect(buildOwnerReportPeriod('today', now)).toMatchObject({
+      key: 'today', rangeType: 'day', daysInPeriod: 1,
+      currentStart: '2026-08-29', currentEnd: '2026-08-29', previousStart: '2026-08-28', previousEnd: '2026-08-28',
+    });
+    expect(buildOwnerReportPeriod('week', now)).toMatchObject({
+      key: 'week', rangeType: 'week', daysInPeriod: 7,
+      currentStart: '2026-08-23', currentEnd: '2026-08-29', previousStart: '2026-08-16', previousEnd: '2026-08-22',
+    });
+    expect(buildOwnerReportPeriod('month', now)).toMatchObject({
+      key: 'month', currentStart: '2026-08-01', currentEnd: '2026-08-29', previousStart: '2026-07-01', previousEnd: '2026-07-29',
+    });
+    expect(buildOwnerReportPeriod('six-months', now)).toMatchObject({
+      key: 'six-months', currentStart: '2026-03-01', currentEnd: '2026-08-29', previousStart: '2025-09-01', previousEnd: '2026-02-28',
+    });
+    expect(buildOwnerReportPeriod('year', now)).toMatchObject({
+      key: 'year', currentStart: '2026-01-01', currentEnd: '2026-08-29', previousStart: '2025-01-01', previousEnd: '2025-08-29',
+    });
   });
 
   it('uses canonical ERP sources rather than placeholder dashboard numbers', async () => {

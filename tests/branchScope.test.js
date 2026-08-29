@@ -41,7 +41,7 @@ describe('central branch UUID scope contract', () => {
     expect(dashboard).toContain('onChange={(event) => setSelectedBranchId(event.target.value)}');
     expect(dashboard).toContain('const displayScope = isAllBranches ? copy.allBranches : selectedBranchLabel;');
     expect(dashboard).toContain("value={isAllBranches ? 'all' : selectedBranchId || 'all'}");
-    expect(dashboard).toContain("queryKey: ['sales_today', activeRestaurant?.id, selectedBranchId, today]");
+    expect(dashboard).toContain("queryKey: ['sales_report_period', activeRestaurant?.id, selectedBranchId, period.currentStart, period.currentEnd]");
     expect(dashboard).toContain("createQuery().eq('branch_id', selectedBranchId)");
     expect(dashboard).toContain("createQuery().is('branch_id', null).eq(legacyColumn, selectedBranchKey)");
   });

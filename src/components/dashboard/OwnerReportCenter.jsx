@@ -155,7 +155,7 @@ function TrendChart({ data, copy, formatMoney }) {
 
 function ExecutiveReport({ model, copy }) {
   const {
-    formatMoney, todayMetrics, monthMetrics, monthSalesChange, branchRankings,
+    formatMoney, periodMetrics, periodSalesChange, periodLabel, branchRankings,
     scopedAlerts, inventoryOverview, receivables, payables, openQuickAddBranch,
   } = model;
   const navigate = useNavigate();
@@ -165,22 +165,22 @@ function ExecutiveReport({ model, copy }) {
         <div className="pointer-events-none absolute -end-12 -top-16 h-52 w-52 rounded-full bg-cyan-400/20 blur-3xl" />
         <div className="relative">
           <div className="flex items-start justify-between gap-3">
-            <div><p className="text-xs font-bold text-blue-100">{text(copy, 'executiveSnapshot', 'Executive snapshot')}</p><h2 className="mt-1 text-xl font-black sm:text-2xl">{text(copy, 'monthToDate', 'Month to date')}</h2></div>
+            <div><p className="text-xs font-bold text-blue-100">{text(copy, 'executiveSnapshot', 'Executive snapshot')}</p><h2 className="mt-1 text-xl font-black sm:text-2xl">{periodLabel}</h2></div>
             <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black backdrop-blur">{text(copy, 'verifiedERP', 'VERIFIED ERP')}</span>
           </div>
           <div className="mt-5 grid grid-cols-3 divide-x divide-white/20 rtl:divide-x-reverse">
             {[
-              [text(copy, 'sales', 'Sales'), formatMoney(monthMetrics.totalSales)],
-              [text(copy, 'netProfit', 'Net profit'), formatMoney(monthMetrics.netProfit)],
-              [text(copy, 'netMargin', 'Net margin'), `${monthMetrics.netMargin.toFixed(1)}%`],
+              [text(copy, 'sales', 'Sales'), formatMoney(periodMetrics.totalSales)],
+              [text(copy, 'netProfit', 'Net profit'), formatMoney(periodMetrics.netProfit)],
+              [text(copy, 'netMargin', 'Net margin'), `${periodMetrics.netMargin.toFixed(1)}%`],
             ].map(([label, value], index) => <div key={label} className={`min-w-0 px-2 text-center sm:px-5 ${index === 0 ? '' : ''}`}><p className="truncate text-[10px] font-semibold text-blue-100 sm:text-xs">{label}</p><p className="mt-1 truncate text-base font-black sm:text-2xl">{value}</p></div>)}
           </div>
-          {monthSalesChange != null ? <p className={`mt-4 flex items-center justify-center gap-1 text-xs font-black ${monthSalesChange >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{monthSalesChange >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}{monthSalesChange >= 0 ? '+' : ''}{monthSalesChange.toFixed(1)}% {text(copy, 'vsPreviousMonth', 'vs previous month')}</p> : null}
+          {periodSalesChange != null ? <p className={`mt-4 flex items-center justify-center gap-1 text-xs font-black ${periodSalesChange >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{periodSalesChange >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}{periodSalesChange >= 0 ? '+' : ''}{periodSalesChange.toFixed(1)}% {text(copy, 'vsPreviousPeriod', 'vs previous period')}</p> : null}
         </div>
       </section>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <MetricCard label={text(copy, 'todaySales', "Today's sales")} value={formatMoney(todayMetrics.totalSales)} icon={BarChart3} tone="blue" />
+        <MetricCard label={text(copy, 'periodSales', 'Period sales')} value={formatMoney(periodMetrics.totalSales)} icon={BarChart3} tone="blue" />
         <MetricCard label={text(copy, 'receivables', 'Receivables')} value={formatMoney(receivables)} icon={Landmark} tone="green" />
         <MetricCard label={text(copy, 'payables', 'Payables')} value={formatMoney(payables)} icon={ReceiptText} tone="amber" />
         <MetricCard label={text(copy, 'activeRisks', 'Active risks')} value={compactNumber(scopedAlerts.length)} icon={ShieldAlert} tone={scopedAlerts.length ? 'rose' : 'green'} />
@@ -238,34 +238,34 @@ function ExecutiveReport({ model, copy }) {
 }
 
 function FinancialReport({ model, copy }) {
-  const { formatMoney, monthMetrics, previousMonthMetrics, expenseGroups, revenueTrend, receivables, payables, cashRegister } = model;
+  const { formatMoney, periodMetrics, previousPeriodMetrics, periodSalesChange, periodLabel, expenseGroups, revenueTrend, receivables, payables, cashRegister } = model;
   const revenueBreakdown = [
-    { label: text(copy, 'cash', 'Cash'), value: monthMetrics.totalCash, color: 'bg-emerald-500' },
-    { label: text(copy, 'network', 'Network'), value: monthMetrics.totalNetwork, color: 'bg-blue-500' },
-    { label: text(copy, 'credit', 'Credit'), value: monthMetrics.totalCredit, color: 'bg-violet-500' },
-    { label: text(copy, 'otherSources', 'Other sources'), value: monthMetrics.totalAdditionalSources, color: 'bg-amber-500' },
+    { label: text(copy, 'cash', 'Cash'), value: periodMetrics.totalCash, color: 'bg-emerald-500' },
+    { label: text(copy, 'network', 'Network'), value: periodMetrics.totalNetwork, color: 'bg-blue-500' },
+    { label: text(copy, 'credit', 'Credit'), value: periodMetrics.totalCredit, color: 'bg-violet-500' },
+    { label: text(copy, 'otherSources', 'Other sources'), value: periodMetrics.totalAdditionalSources, color: 'bg-amber-500' },
   ];
   const maxExpense = Math.max(...expenseGroups.map((row) => row.amount), 1);
-  const operatingCash = monthMetrics.totalCash + monthMetrics.totalNetwork - monthMetrics.totalPurchaseCost - monthMetrics.totalExpenses;
+  const operatingCash = periodMetrics.totalCash + periodMetrics.totalNetwork - periodMetrics.totalPurchaseCost - periodMetrics.totalExpenses;
   return (
     <div data-testid="report-finance" className="w-full min-w-0 max-w-full overflow-x-hidden space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <MetricCard label={text(copy, 'revenue', 'Revenue')} value={formatMoney(monthMetrics.totalSales)} icon={CircleDollarSign} tone="blue" trend={model.monthSalesChange} />
-        <MetricCard label={text(copy, 'grossProfit', 'Gross profit')} value={formatMoney(monthMetrics.grossProfit)} icon={TrendingUp} tone="green" />
-        <MetricCard label={text(copy, 'operatingExpense', 'Operating expense')} value={formatMoney(monthMetrics.totalExpenses)} icon={ReceiptText} tone="amber" />
-        <MetricCard label={text(copy, 'netProfit', 'Net profit')} value={formatMoney(monthMetrics.netProfit)} icon={BadgeDollarSign} tone={monthMetrics.netProfit >= 0 ? 'violet' : 'rose'} />
+        <MetricCard label={text(copy, 'revenue', 'Revenue')} value={formatMoney(periodMetrics.totalSales)} icon={CircleDollarSign} tone="blue" trend={periodSalesChange} />
+        <MetricCard label={text(copy, 'grossProfit', 'Gross profit')} value={formatMoney(periodMetrics.grossProfit)} icon={TrendingUp} tone="green" />
+        <MetricCard label={text(copy, 'operatingExpense', 'Operating expense')} value={formatMoney(periodMetrics.totalExpenses)} icon={ReceiptText} tone="amber" />
+        <MetricCard label={text(copy, 'netProfit', 'Net profit')} value={formatMoney(periodMetrics.netProfit)} icon={BadgeDollarSign} tone={periodMetrics.netProfit >= 0 ? 'violet' : 'rose'} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
         <Panel>
-          <SectionTitle icon={BarChart3} title={text(copy, 'revenueTrend', 'Revenue trend')} subtitle={text(copy, 'revenueTrendHint', 'Verified daily revenue for the current month')} badge={text(copy, 'monthToDate', 'Month to date')} />
+          <SectionTitle icon={BarChart3} title={text(copy, 'revenueTrend', 'Revenue trend')} subtitle={text(copy, 'revenueTrendHint', 'Verified daily revenue in the selected period')} badge={periodLabel} />
           <TrendChart data={revenueTrend} copy={copy} formatMoney={formatMoney} />
         </Panel>
         <Panel>
           <SectionTitle icon={WalletCards} title={text(copy, 'revenueMix', 'Revenue mix')} subtitle={text(copy, 'revenueMixHint', 'Payment and configured sales sources')} tone="violet" />
           <div className="mt-4 space-y-3">
             {revenueBreakdown.map((row) => {
-              const pct = monthMetrics.totalSales > 0 ? (row.value / monthMetrics.totalSales) * 100 : 0;
+              const pct = periodMetrics.totalSales > 0 ? (row.value / periodMetrics.totalSales) * 100 : 0;
               return <div key={row.label}><div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="font-bold text-foreground">{row.label}</span><span className="font-black text-foreground">{formatMoney(row.value)} <span className="text-muted-foreground">· {pct.toFixed(1)}%</span></span></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${row.color}`} style={{ width: `${Math.min(100, pct)}%` }} /></div></div>;
             })}
           </div>
@@ -288,8 +288,8 @@ function FinancialReport({ model, copy }) {
             <MetricCard label={text(copy, 'payables', 'Payables')} value={formatMoney(payables)} icon={ReceiptText} tone="amber" />
           </div>
           <div className="mt-3 rounded-2xl border border-border bg-muted/30 p-3 text-xs">
-            <div className="flex justify-between"><span className="text-muted-foreground">{text(copy, 'previousMonthSales', 'Previous month sales')}</span><strong>{formatMoney(previousMonthMetrics.totalSales)}</strong></div>
-            <div className="mt-2 flex justify-between"><span className="text-muted-foreground">{text(copy, 'previousMonthProfit', 'Previous month profit')}</span><strong>{formatMoney(previousMonthMetrics.netProfit)}</strong></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">{text(copy, 'previousPeriodSales', 'Previous period sales')}</span><strong>{formatMoney(previousPeriodMetrics.totalSales)}</strong></div>
+            <div className="mt-2 flex justify-between"><span className="text-muted-foreground">{text(copy, 'previousPeriodProfit', 'Previous period profit')}</span><strong>{formatMoney(previousPeriodMetrics.netProfit)}</strong></div>
           </div>
         </Panel>
       </div>
@@ -309,7 +309,7 @@ function FinancialReport({ model, copy }) {
 }
 
 function OperationsReport({ model, copy }) {
-  const { formatMoney, consumption, inventoryOverview, todayPurchaseQuantity, todayPurchaseCost, supplierCount } = model;
+  const { formatMoney, consumption, inventoryOverview, periodPurchaseQuantity, periodPurchaseCost, periodLabel, supplierCount } = model;
   return (
     <div data-testid="report-operations" className="w-full min-w-0 max-w-full overflow-x-hidden space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -320,7 +320,7 @@ function OperationsReport({ model, copy }) {
       </div>
 
       <Panel>
-        <SectionTitle icon={ShoppingBasket} title={text(copy, 'todayConsumption', "Today's ingredient consumption")} subtitle={text(copy, 'todayConsumptionHint', 'Calculated from approved sales and inventory movements — not purchase quantities')} badge={`${consumption.items.length}`} tone="green" />
+        <SectionTitle icon={ShoppingBasket} title={`${text(copy, 'periodConsumption', 'Ingredient consumption')} · ${periodLabel}`} subtitle={text(copy, 'periodConsumptionHint', 'Calculated from approved sales and inventory movements in the selected period — not purchase quantities')} badge={`${consumption.items.length}`} tone="green" />
         <div className="mt-4 w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
           {consumption.items.length ? (
             <div className="min-w-[42rem]">
@@ -342,8 +342,8 @@ function OperationsReport({ model, copy }) {
         <Panel>
           <SectionTitle icon={Truck} title={text(copy, 'procurementPulse', 'Procurement pulse')} subtitle={text(copy, 'procurementPulseHint', "Today's approved supplier receipts")} tone="blue" />
           <div className="mt-4 grid grid-cols-3 gap-2">
-            <MetricCard label={text(copy, 'purchasedQty', 'Purchased qty')} value={compactNumber(todayPurchaseQuantity, 2)} icon={Boxes} tone="blue" />
-            <MetricCard label={text(copy, 'purchaseCost', 'Purchase cost')} value={formatMoney(todayPurchaseCost)} icon={ReceiptText} tone="violet" />
+            <MetricCard label={text(copy, 'purchasedQty', 'Purchased qty')} value={compactNumber(periodPurchaseQuantity, 2)} icon={Boxes} tone="blue" />
+            <MetricCard label={text(copy, 'purchaseCost', 'Purchase cost')} value={formatMoney(periodPurchaseCost)} icon={ReceiptText} tone="violet" />
             <MetricCard label={text(copy, 'suppliers', 'Suppliers')} value={compactNumber(supplierCount)} icon={Truck} tone="green" />
           </div>
         </Panel>
@@ -379,7 +379,7 @@ function PriceControlReport({ model, copy }) {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <MetricCard label={text(copy, 'targetMargin', 'Target margin')} value={`${priceReport.targetMargin}%`} icon={Target} tone="blue" />
         <MetricCard label={text(copy, 'averageMargin', 'Average margin')} value={priceReport.averageMargin == null ? '—' : `${priceReport.averageMargin.toFixed(1)}%`} icon={TrendingUp} tone={priceReport.averageMargin != null && priceReport.averageMargin >= priceReport.targetMargin ? 'green' : 'amber'} />
-        <MetricCard label={text(copy, 'costIncreases', 'Cost increases')} value={compactNumber(priceReport.increaseCount)} detail={text(copy, 'last30Days', 'Last 30 days')} icon={ArrowUpRight} tone={priceReport.increaseCount ? 'rose' : 'green'} />
+        <MetricCard label={text(copy, 'costIncreases', 'Cost increases')} value={compactNumber(priceReport.increaseCount)} detail={model.periodLabel} icon={ArrowUpRight} tone={priceReport.increaseCount ? 'rose' : 'green'} />
         <MetricCard label={text(copy, 'needsAction', 'Needs action')} value={compactNumber(priceReport.criticalCount + priceReport.watchCount)} detail={`${priceReport.criticalCount} ${text(copy, 'critical', 'critical')}`} icon={ShieldAlert} tone={priceReport.criticalCount ? 'rose' : 'green'} />
       </div>
 
