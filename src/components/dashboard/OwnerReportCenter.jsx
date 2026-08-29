@@ -54,7 +54,7 @@ function compactNumber(value, decimals = 0) {
 
 function Panel({ children, className = '', testId }) {
   return (
-    <section data-testid={testId} className={`rounded-[1.45rem] border border-border/80 bg-card p-4 shadow-sm sm:p-5 ${className}`}>
+    <section data-testid={testId} className={`w-full min-w-0 max-w-full overflow-hidden rounded-[1.45rem] border border-border/80 bg-card p-4 shadow-sm sm:p-5 ${className}`}>
       {children}
     </section>
   );
@@ -136,7 +136,7 @@ function ReportLinks({ links, copy }) {
 function TrendChart({ data, copy, formatMoney }) {
   if (!data.length) return <EmptyState label={text(copy, 'noPeriodData', 'No recorded data for this period.')} />;
   return (
-    <div className="mt-4 overflow-x-auto pb-1">
+    <div className="mt-4 w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain pb-1">
       <div className="h-56 min-w-[34rem]">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
@@ -160,7 +160,7 @@ function ExecutiveReport({ model, copy }) {
   } = model;
   const navigate = useNavigate();
   return (
-    <div data-testid="report-executive" className="space-y-4">
+    <div data-testid="report-executive" className="w-full min-w-0 max-w-full overflow-x-hidden space-y-4">
       <section className="relative overflow-hidden rounded-[1.65rem] bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-950 p-4 text-white shadow-xl shadow-blue-900/20 sm:p-6">
         <div className="pointer-events-none absolute -end-12 -top-16 h-52 w-52 rounded-full bg-cyan-400/20 blur-3xl" />
         <div className="relative">
@@ -248,7 +248,7 @@ function FinancialReport({ model, copy }) {
   const maxExpense = Math.max(...expenseGroups.map((row) => row.amount), 1);
   const operatingCash = monthMetrics.totalCash + monthMetrics.totalNetwork - monthMetrics.totalPurchaseCost - monthMetrics.totalExpenses;
   return (
-    <div data-testid="report-finance" className="space-y-4">
+    <div data-testid="report-finance" className="w-full min-w-0 max-w-full overflow-x-hidden space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <MetricCard label={text(copy, 'revenue', 'Revenue')} value={formatMoney(monthMetrics.totalSales)} icon={CircleDollarSign} tone="blue" trend={model.monthSalesChange} />
         <MetricCard label={text(copy, 'grossProfit', 'Gross profit')} value={formatMoney(monthMetrics.grossProfit)} icon={TrendingUp} tone="green" />
@@ -311,7 +311,7 @@ function FinancialReport({ model, copy }) {
 function OperationsReport({ model, copy }) {
   const { formatMoney, consumption, inventoryOverview, todayPurchaseQuantity, todayPurchaseCost, supplierCount } = model;
   return (
-    <div data-testid="report-operations" className="space-y-4">
+    <div data-testid="report-operations" className="w-full min-w-0 max-w-full overflow-x-hidden space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <MetricCard label={text(copy, 'ingredientsUsed', 'Ingredients used')} value={compactNumber(consumption.totalQuantity, 2)} detail={text(copy, 'verifiedMovements', 'Verified stock movements')} icon={ShoppingBasket} tone="blue" />
         <MetricCard label={text(copy, 'consumptionCost', 'Consumption cost')} value={formatMoney(consumption.totalCost)} icon={Calculator} tone="violet" />
@@ -321,7 +321,7 @@ function OperationsReport({ model, copy }) {
 
       <Panel>
         <SectionTitle icon={ShoppingBasket} title={text(copy, 'todayConsumption', "Today's ingredient consumption")} subtitle={text(copy, 'todayConsumptionHint', 'Calculated from approved sales and inventory movements — not purchase quantities')} badge={`${consumption.items.length}`} tone="green" />
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
           {consumption.items.length ? (
             <div className="min-w-[42rem]">
               <div className="grid grid-cols-[minmax(12rem,1.5fr)_7rem_8rem_8rem_7rem] gap-3 border-b border-border px-3 pb-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
@@ -375,7 +375,7 @@ function PriceControlReport({ model, copy }) {
   const { formatMoney, priceReport, supplierComparisons, branchPriceInconsistencies, priceHistory } = model;
   const navigate = useNavigate();
   return (
-    <div data-testid="report-price-control" className="space-y-4">
+    <div data-testid="report-price-control" className="w-full min-w-0 max-w-full overflow-x-hidden space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <MetricCard label={text(copy, 'targetMargin', 'Target margin')} value={`${priceReport.targetMargin}%`} icon={Target} tone="blue" />
         <MetricCard label={text(copy, 'averageMargin', 'Average margin')} value={priceReport.averageMargin == null ? '—' : `${priceReport.averageMargin.toFixed(1)}%`} icon={TrendingUp} tone={priceReport.averageMargin != null && priceReport.averageMargin >= priceReport.targetMargin ? 'green' : 'amber'} />
@@ -385,7 +385,7 @@ function PriceControlReport({ model, copy }) {
 
       <Panel>
         <SectionTitle icon={BadgeDollarSign} title={text(copy, 'marginIntelligence', 'Margin intelligence')} subtitle={text(copy, 'marginIntelligenceHint', 'Current cost, selling price and target-based recommendation')} badge={`${priceReport.rows.length}`} tone="violet" />
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
           {priceReport.rows.length ? (
             <div className="min-w-[50rem]">
               <div className="grid grid-cols-[minmax(12rem,1.5fr)_7rem_7rem_7rem_8rem_7rem] gap-3 border-b border-border px-3 pb-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground"><span>{text(copy, 'product', 'Product')}</span><span>{text(copy, 'cost', 'Cost')}</span><span>{text(copy, 'sellingPrice', 'Selling price')}</span><span>{text(copy, 'margin', 'Margin')}</span><span>{text(copy, 'suggestedPrice', 'Suggested price')}</span><span>{text(copy, 'status', 'Status')}</span></div>

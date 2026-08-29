@@ -334,7 +334,7 @@ function OwnerDashboardContent() {
   if (loading) return <DashboardSkeleton />;
 
   return (
-    <div data-testid="owner-mega-dashboard" className="mx-auto w-full max-w-6xl space-y-4 px-3 pb-8 pt-1 sm:space-y-5 sm:px-5" dir={isRTL ? 'rtl' : 'ltr'}>
+    <div data-testid="owner-mega-dashboard" className="mx-auto box-border w-full min-w-0 max-w-6xl overflow-x-hidden space-y-4 px-3 pb-8 pt-1 sm:space-y-5 sm:px-5" dir={isRTL ? 'rtl' : 'ltr'}>
       <header data-testid="owner-report-center" className="overflow-hidden rounded-[1.75rem] border border-blue-100 bg-gradient-to-br from-white via-blue-50/45 to-indigo-50/70 p-4 shadow-[0_18px_50px_-30px_rgba(37,99,235,0.45)] dark:border-blue-900/60 dark:from-slate-950 dark:via-blue-950/35 dark:to-indigo-950/40 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -349,12 +349,12 @@ function OwnerDashboardContent() {
         {hasQueryError ? <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{copy.unable}</div> : null}
       </header>
 
-      <nav data-testid="owner-report-nav" aria-label={copy.title} className="overflow-x-auto rounded-2xl border border-border/80 bg-card p-1.5 shadow-sm">
-        <div className="grid min-w-[38rem] grid-cols-4 gap-1">
+      <nav data-testid="owner-report-nav" aria-label={copy.title} className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border/80 bg-card p-1.5 shadow-sm">
+        <div className="grid min-w-0 grid-cols-2 gap-1 sm:grid-cols-4">
           {REPORT_PAGES.map((page) => {
             const active = activePage === page.key;
             const Icon = page.icon;
-            return <button key={page.key} type="button" aria-current={active ? 'page' : undefined} onClick={() => changeReportPage(page.key)} className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${active ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}><Icon className="h-4 w-4" />{copy[page.labelKey] || page.fallback}</button>;
+            return <button key={page.key} type="button" aria-current={active ? 'page' : undefined} onClick={() => changeReportPage(page.key)} className={`flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl px-2 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:px-3 ${active ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}><Icon className="h-4 w-4 shrink-0" /><span className="min-w-0 truncate">{copy[page.labelKey] || page.fallback}</span></button>;
           })}
         </div>
       </nav>

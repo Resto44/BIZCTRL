@@ -27,10 +27,14 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
     expect(owner).toContain('data-testid="owner-mega-dashboard"');
     expect(owner).toContain('data-testid="owner-report-center"');
     expect(owner).toContain('data-testid="owner-report-nav"');
-    expect(owner).toContain('mx-auto w-full max-w-6xl');
+    expect(owner).toContain('mx-auto box-border w-full min-w-0 max-w-6xl overflow-x-hidden');
     expect(owner).toContain('flex flex-col gap-4 sm:flex-row');
-    expect(owner).toContain('overflow-x-auto rounded-2xl');
-    expect(reportCenter).toContain('overflow-x-auto pb-1');
+    expect(owner).toContain('grid min-w-0 grid-cols-2 gap-1 sm:grid-cols-4');
+    expect(owner).not.toContain('min-w-[38rem]');
+    expect(reportCenter).toContain('w-full min-w-0 max-w-full overflow-hidden rounded-[1.45rem]');
+    expect(reportCenter).toContain('w-full min-w-0 max-w-full overflow-x-hidden space-y-4');
+    expect(reportCenter).toContain('w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain pb-1');
+    expect(reportCenter).toContain('w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain');
     expect(reportCenter).toContain('min-w-[34rem]');
     expect(appLayout).toContain('mx-auto w-full min-w-0 max-w-[1600px]');
     expect(erpLayout).toContain('flex-1 min-w-0 max-w-full overflow-y-auto');
