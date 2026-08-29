@@ -211,39 +211,94 @@ const ClosingFieldControlRow = memo(function ClosingFieldControlRow({ field, lab
   );
 });
 
-const DriverSalesSourceCard = memo(function DriverSalesSourceCard({ source, sourceLabel, entries, drivers, previous, currency, onAdd, onChange, onRemove, isHistoryLoading, isHistoryUnavailable, copy }) {
-  const today = driverSourceTodayTotal(entries);
+const DriverSalesSourceCard = memo(function DriverSalesSourceCard({ source, sourceLabel, entries, drivers, branchLabel, previous, currency, onAdd, onChange, onRemove, isHistoryLoading, isHistoryUnavailable, copy }) {
+  const driverEntries = asRecordArray(entries);
+  const today = driverSourceTodayTotal(driverEntries);
   const total = previous + today;
+  const breakdown = driverSourcePaymentBreakdown(driverEntries);
   const availableDrivers = asRecordArray(drivers).filter((driver) => driver.is_active !== false && driver.status !== 'inactive');
   const SourceIcon = salesSourceIconFor(source.icon);
   const tone = salesSourceToneFor(source.color);
+  const [expandedEntryId, setExpandedEntryId] = useState(null);
+  const [entryCountBeforeAdd, setEntryCountBeforeAdd] = useState(null);
+  const canAddDriver = availableDrivers.length > driverEntries.length;
+
+  useEffect(() => {
+    if (entryCountBeforeAdd !== null && driverEntries.length > entryCountBeforeAdd) {
+      setExpandedEntryId(driverEntries[driverEntries.length - 1]?.client_row_id || null);
+      setEntryCountBeforeAdd(null);
+      return;
+    }
+    if (expandedEntryId && !driverEntries.some((entry) => entry.client_row_id === expandedEntryId)) {
+      setExpandedEntryId(null);
+    }
+  }, [driverEntries, entryCountBeforeAdd, expandedEntryId]);
+
+  const addDriver = () => {
+    setEntryCountBeforeAdd(driverEntries.length);
+    onAdd();
+  };
 
   return (
-    <div className={`rounded-2xl border bg-background p-3 shadow-sm ${tone.border}`} data-i18n-skip="true">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5"><span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone.soft} ${tone.text}`}><SourceIcon className="h-5 w-5" /></span><div className="min-w-0"><p className={`truncate text-sm font-bold ${tone.strongText}`}>{sourceLabel}</p><p className="text-[10px] text-muted-foreground">{source.subcategory || 'Drivers'} · Branch-scoped Driver Master entries</p></div></div>
-        <Badge variant="outline" className={`shrink-0 text-[10px] ${tone.border} ${tone.soft} ${tone.text}`}>Driver source</Badge>
+    <div className={`overflow-hidden rounded-2xl border bg-background shadow-sm ${tone.border}`} data-i18n-skip="true" data-testid="driver-source-accordion">
+      <div className="p-3 sm:p-4">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tone.soft} ${tone.text}`}><SourceIcon className="h-5 w-5" /></span>
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2"><p className={`truncate text-sm font-black ${tone.strongText}`}>{sourceLabel}</p><Badge variant="outline" className={`hidden shrink-0 text-[9px] sm:inline-flex ${tone.border} ${tone.soft} ${tone.text}`}>Driver source</Badge></div>
+              <p className="mt-0.5 truncate text-[10px] font-medium text-muted-foreground">{branchLabel || 'Current branch'} · {availableDrivers.length} active {availableDrivers.length === 1 ? 'driver' : 'drivers'}</p>
+            </div>
+          </div>
+          <Button type="button" size="sm" className="min-h-11 rounded-xl bg-blue-600 px-3 font-bold hover:bg-blue-700" onClick={addDriver} disabled={!canAddDriver}><PlusCircle className="mr-1.5 h-4 w-4" />Add Driver</Button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70" data-testid="driver-source-summary">
+          <div className="min-w-0 px-2 py-3 text-center"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Today</p><Money currency={currency} value={today} className="mt-1 block truncate text-sm font-black text-slate-950" /></div>
+          <div className="min-w-0 border-x border-slate-200 px-2 py-3 text-center"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Cash</p><Money currency={currency} value={breakdown.cash} className="mt-1 block truncate text-sm font-black text-emerald-700" /></div>
+          <div className="min-w-0 px-2 py-3 text-center"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Network</p><Money currency={currency} value={breakdown.network} className="mt-1 block truncate text-sm font-black text-blue-700" /></div>
+        </div>
       </div>
-      <div className="space-y-2">
-        {entries.length === 0 ? <p className="rounded-lg border border-dashed border-cyan-200 bg-cyan-50/40 px-3 py-3 text-xs text-cyan-800">No driver sales entered for this source today.</p> : entries.map((entry) => {
-          const usedDriverIds = new Set(entries.filter((candidate) => candidate.client_row_id !== entry.client_row_id).map((candidate) => String(candidate.driver_id || '')));
+
+      <div className="space-y-2 border-t border-slate-100 bg-slate-50/40 p-3 sm:p-4">
+        {driverEntries.length === 0 ? <div className="flex min-h-16 items-center gap-3 rounded-xl border border-slate-200 bg-background px-3 py-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"><Bike className="h-4 w-4" /></span><div className="min-w-0"><p className="text-xs font-bold text-slate-800">No driver sales yet</p><p className="mt-0.5 text-[10px] text-slate-500">Use Add Driver to record today&apos;s Cash and Network.</p></div></div> : driverEntries.map((entry) => {
+          const usedDriverIds = new Set(driverEntries.filter((candidate) => candidate.client_row_id !== entry.client_row_id).map((candidate) => String(candidate.driver_id || '')));
           const amounts = driverSourceEntryAmounts(entry);
-          return <div key={entry.client_row_id} className="grid gap-2 rounded-lg border border-cyan-100 bg-cyan-50/30 p-2 sm:grid-cols-[minmax(11rem,1.25fr)_minmax(18rem,1.75fr)_auto]">
-            <Select value={entry.driver_id || ''} onValueChange={(driver_id) => {
-              const driver = availableDrivers.find((candidate) => String(candidate.id) === String(driver_id));
-              onChange(entry.client_row_id, { driver_id, driver_name: driver?.full_name || '' });
-            }}><SelectTrigger className="bg-background"><SelectValue placeholder="Select Driver" /></SelectTrigger><SelectContent>{availableDrivers.map((driver) => <SelectItem key={driver.id} value={driver.id} disabled={usedDriverIds.has(String(driver.id))}>{driver.full_name}{driver.driver_id ? ` · ${driver.driver_id}` : ''}</SelectItem>)}</SelectContent></Select>
-            <div className="grid grid-cols-3 gap-2"><div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Cash</Label><Input type="number" min="0" step="0.01" value={entry.cash_amount ?? entry.cash ?? ''} onChange={(event) => onChange(entry.client_row_id, { cash_amount: event.target.value })} placeholder="SAR 0" className="bg-background" aria-label="Driver cash amount" /></div><div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Network / Card</Label><Input type="number" min="0" step="0.01" value={entry.network_amount ?? entry.network ?? ''} onChange={(event) => onChange(entry.client_row_id, { network_amount: event.target.value })} placeholder="SAR 0" className="bg-background" aria-label="Driver network amount" /></div><div className="rounded-md border border-cyan-100 bg-cyan-50 px-2 py-1.5"><p className="text-[10px] font-bold uppercase tracking-wide text-cyan-800">Total</p><Money currency={currency} value={amounts.total} className="text-sm font-black text-cyan-900" /></div></div>
-            <Button type="button" variant="ghost" size="icon" className="self-end text-destructive hover:text-destructive" onClick={() => onRemove(entry.client_row_id)} aria-label="Remove driver sale"><Trash2 className="h-4 w-4" /></Button>
-            <Textarea value={entry.notes || ''} onChange={(event) => onChange(entry.client_row_id, { notes: event.target.value })} placeholder="Optional note" className="sm:col-span-2" rows={1} />
+          const expanded = expandedEntryId === entry.client_row_id;
+          const selectedDriver = availableDrivers.find((driver) => String(driver.id) === String(entry.driver_id || ''));
+          const driverName = entry.driver_name || selectedDriver?.full_name || 'Select driver';
+          const initials = driverName === 'Select driver' ? '?' : driverName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+          const complete = Boolean(entry.driver_id) && amounts.total > 0;
+          const panelId = `driver-source-panel-${entry.client_row_id}`;
+
+          return <div key={entry.client_row_id} className={`overflow-hidden rounded-xl border bg-background transition-colors ${expanded ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200'}`}>
+            <button type="button" className="grid min-h-16 w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-2.5 text-left" onClick={() => setExpandedEntryId(expanded ? null : entry.client_row_id)} aria-expanded={expanded} aria-controls={panelId}>
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-black ${complete ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{initials}</span>
+              <span className="min-w-0"><span className="block truncate text-sm font-bold text-slate-900">{driverName}</span><span className="mt-0.5 block truncate text-[10px] text-slate-500">{entry.driver_id ? <>Cash {currency} {amounts.cash.toLocaleString()} · Network {currency} {amounts.network.toLocaleString()}</> : 'Choose a branch driver'}</span></span>
+              <Money currency={currency} value={amounts.total} className="whitespace-nowrap text-sm font-black text-slate-900" />
+              <span className="flex items-center gap-1.5">{complete ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <AlertCircle className="h-5 w-5 text-amber-500" />}{expanded ? <ChevronUp className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}</span>
+            </button>
+
+            {expanded && <div id={panelId} className="space-y-3 border-t border-slate-100 bg-slate-50/50 p-3">
+              <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Driver</Label><Select value={entry.driver_id || ''} onValueChange={(driver_id) => {
+                const driver = availableDrivers.find((candidate) => String(candidate.id) === String(driver_id));
+                onChange(entry.client_row_id, { driver_id, driver_name: driver?.full_name || '' });
+              }}><SelectTrigger className="min-h-11 bg-background"><SelectValue placeholder="Select Driver" /></SelectTrigger><SelectContent>{availableDrivers.map((driver) => <SelectItem key={driver.id} value={driver.id} disabled={usedDriverIds.has(String(driver.id))}>{driver.full_name}{driver.driver_id ? ` · ${driver.driver_id}` : ''}</SelectItem>)}</SelectContent></Select></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label htmlFor={`driver-cash-${entry.client_row_id}`} className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Cash</Label><ClosingNumericInput id={`driver-cash-${entry.client_row_id}`} value={entry.cash_amount ?? entry.cash ?? ''} onChange={(value) => onChange(entry.client_row_id, { cash_amount: value })} prefix={currency} inputClassName="min-h-12 bg-background font-bold" /></div>
+                <div><Label htmlFor={`driver-network-${entry.client_row_id}`} className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Network</Label><ClosingNumericInput id={`driver-network-${entry.client_row_id}`} value={entry.network_amount ?? entry.network ?? ''} onChange={(value) => onChange(entry.client_row_id, { network_amount: value })} prefix={currency} inputClassName="min-h-12 bg-background font-bold" /></div>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2"><span className="text-xs font-bold text-blue-800">Driver total</span><Money currency={currency} value={amounts.total} className="text-base font-black text-blue-900" /></div>
+              <Textarea value={entry.notes || ''} onChange={(event) => onChange(entry.client_row_id, { notes: event.target.value })} placeholder="Optional note" className="min-h-11 resize-none bg-background" rows={1} />
+              <div className="flex items-center justify-between gap-2"><Button type="button" variant="ghost" size="sm" className="min-h-10 text-destructive hover:text-destructive" onClick={() => onRemove(entry.client_row_id)}><Trash2 className="mr-1.5 h-4 w-4" />Remove</Button><Button type="button" size="sm" variant="outline" className="min-h-10 bg-background font-bold" onClick={() => setExpandedEntryId(null)}>Done</Button></div>
+            </div>}
           </div>;
         })}
       </div>
-      {(() => { const breakdown = driverSourcePaymentBreakdown(entries); return <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><Button type="button" size="sm" variant="outline" onClick={onAdd} disabled={availableDrivers.length === 0}><PlusCircle className="mr-1 h-3.5 w-3.5" />Add Driver</Button><div className="grid grid-cols-3 gap-3 text-right"><div><p className="text-[10px] font-bold uppercase tracking-wide text-cyan-700">Driver Cash</p><Money currency={currency} value={breakdown.cash} className="text-sm font-black text-cyan-700" /></div><div><p className="text-[10px] font-bold uppercase tracking-wide text-cyan-700">Driver Network</p><Money currency={currency} value={breakdown.network} className="text-sm font-black text-cyan-700" /></div><div><p className="text-[10px] font-bold uppercase tracking-wide text-cyan-700">Today from drivers</p><Money currency={currency} value={today} className="text-sm font-black text-cyan-700" /></div></div></div>; })()}
-      {availableDrivers.length === 0 && <p className="mt-2 text-xs text-amber-700">Create an active Driver Master record for this branch before adding driver sales.</p>}
-      <div className="mt-3 space-y-2 border-t border-cyan-100 pt-3">
-        <div className="flex items-center justify-between gap-3 text-sm"><div><p className="font-medium">{copy.previous}</p><p className="text-[10px] text-muted-foreground">{copy.previousHelp}</p></div>{isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={previous} className="font-semibold text-muted-foreground" />}</div>
-        <div className="flex items-center justify-between gap-3 border-t border-cyan-100 pt-2 text-sm"><div><p className="font-bold text-cyan-950">{copy.total}</p><p className="text-[10px] text-muted-foreground">{copy.totalHelp}</p></div>{isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={total} className="font-black text-cyan-800" />}</div>
+      {availableDrivers.length === 0 && <p className="mx-3 mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 sm:mx-4">Create an active driver for this branch before recording driver sales.</p>}
+      <div className="space-y-2 border-t border-slate-100 px-3 py-3 sm:px-4">
+        <div className="flex items-center justify-between gap-3 text-sm"><div><p className="font-medium text-slate-700">Previous closings</p><p className="text-[10px] text-muted-foreground">{copy.previousHelp}</p></div>{isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={previous} className="font-semibold text-slate-500" />}</div>
+        <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-sm"><div><p className="font-black text-slate-950">Running total</p><p className="text-[10px] text-muted-foreground">Previous + Today · read only</p></div>{isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={total} className="text-lg font-black text-cyan-800" />}</div>
       </div>
     </div>
   );
@@ -1618,7 +1673,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><div><h2 className="text-sm font-black text-slate-950">Sales breakdown</h2><p className="mt-0.5 text-[11px] text-slate-500">Daily revenue only; historical amounts are not added.</p></div><Money currency={currency} value={totalSales} className="text-base font-black text-blue-700" /></div>
               <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4"><div className="rounded-xl bg-emerald-50 p-3"><Banknote className="h-4 w-4 text-emerald-600" /><p className="mt-2 text-[10px] text-slate-500">Cash</p><Money currency={currency} value={cashSales} className="text-sm font-black" /></div><div className="rounded-xl bg-blue-50 p-3"><Network className="h-4 w-4 text-blue-600" /><p className="mt-2 text-[10px] text-slate-500">Network</p><Money currency={currency} value={networkTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-violet-50 p-3"><CreditCard className="h-4 w-4 text-violet-600" /><p className="mt-2 text-[10px] text-slate-500">Credit</p><Money currency={currency} value={creditTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-amber-50 p-3"><Bike className="h-4 w-4 text-amber-600" /><p className="mt-2 text-[10px] text-slate-500">Delivery apps</p><Money currency={currency} value={onlineTotal} className="text-sm font-black" /></div></div>
               <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3 sm:grid-cols-4"><div className="rounded-xl bg-blue-50 p-3"><Building2 className="h-4 w-4 text-blue-600" /><p className="mt-2 text-[10px] text-slate-500">Counter network</p><Money currency={currency} value={networkCounterTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-cyan-50 p-3"><Bike className="h-4 w-4 text-cyan-600" /><p className="mt-2 text-[10px] text-slate-500">Driver network</p><Money currency={currency} value={networkDriversTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-slate-50 p-3"><MoreHorizontal className="h-4 w-4 text-slate-600" /><p className="mt-2 text-[10px] text-slate-500">Other network</p><Money currency={currency} value={otherNetworkTotal} className="text-sm font-black" /></div><div className="rounded-xl border border-blue-200 bg-blue-50 p-3"><Coins className="h-4 w-4 text-blue-700" /><p className="mt-2 text-[10px] text-blue-600">Network total</p><Money currency={currency} value={networkTotal} className="text-sm font-black text-blue-700" /></div></div>
-              {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div className="space-y-2 border-t border-slate-100 p-3"><p className="text-xs font-black uppercase tracking-wide text-slate-700">Manual sales sources</p>{customSourceSummaries.map(({ source, sourceLabel, today, previous, driverEntries }) => source.allows_driver_entries === true ? <DriverSalesSourceCard key={source.id} source={source} sourceLabel={sourceLabel} entries={driverEntries} drivers={driverSourceDrivers} previous={previous} currency={currency} onAdd={() => addDriverSourceEntry(source)} onChange={(clientRowId, patch) => updateDriverSourceEntry(source.id, clientRowId, patch)} onRemove={(clientRowId) => removeDriverSourceEntry(source.id, clientRowId)} isHistoryLoading={sourceHistoryLoading || driverSourceDriversLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} /> : <CompactSalesSourceRow key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} historyLoading={sourceHistoryLoading} historyUnavailable={sourceHistoryUnavailable} />)}</div>}
+              {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div className="space-y-2 border-t border-slate-100 p-3"><p className="text-xs font-black uppercase tracking-wide text-slate-700">Manual sales sources</p>{customSourceSummaries.map(({ source, sourceLabel, today, previous, driverEntries }) => source.allows_driver_entries === true ? <DriverSalesSourceCard key={source.id} source={source} sourceLabel={sourceLabel} entries={driverEntries} drivers={driverSourceDrivers} branchLabel={form.branch} previous={previous} currency={currency} onAdd={() => addDriverSourceEntry(source)} onChange={(clientRowId, patch) => updateDriverSourceEntry(source.id, clientRowId, patch)} onRemove={(clientRowId) => removeDriverSourceEntry(source.id, clientRowId)} isHistoryLoading={sourceHistoryLoading || driverSourceDriversLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} /> : <CompactSalesSourceRow key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} historyLoading={sourceHistoryLoading} historyUnavailable={sourceHistoryUnavailable} />)}</div>}
               {!useAutomaticSales && <div className="border-t border-amber-200 bg-amber-50 p-3"><p className="text-xs font-bold text-amber-900">No posted ERP cash sales were found. Record sales at POS first.</p><div className="mt-3"><NumInput id="quick-closing-cashSales" label="Exceptional Cash Adjustment" value={cashSalesInput} onChange={updateCashSales} prefix={currency} helpText="Use only for an offline sale that cannot be posted before closing" /></div></div>}
             </section>
 

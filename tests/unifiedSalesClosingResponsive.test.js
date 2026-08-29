@@ -353,6 +353,22 @@ describe('Sales source daily and historical balance contract', () => {
     expect(workspace).toContain('Finalize Closing');
   });
 
+  it('renders Driver Sales as a compact single-open accordion with stable split-payment inputs', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+
+    expect(workspace).toContain('data-testid="driver-source-accordion"');
+    expect(workspace).toContain('data-testid="driver-source-summary"');
+    expect(workspace).toContain('const [expandedEntryId, setExpandedEntryId] = useState(null);');
+    expect(workspace).toContain('aria-expanded={expanded}');
+    expect(workspace).toContain('id={`driver-cash-${entry.client_row_id}`}');
+    expect(workspace).toContain('id={`driver-network-${entry.client_row_id}`}');
+    expect(workspace).toContain('availableDrivers.length > driverEntries.length');
+    expect(workspace).toContain('Previous closings');
+    expect(workspace).toContain('Running total');
+    expect(workspace).not.toContain('Branch-scoped Driver Master entries');
+    expect(workspace).not.toContain('No driver sales entered for this source today.');
+  });
+
   it('uses only the current daily amount in all today-total and persistence calculations', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
