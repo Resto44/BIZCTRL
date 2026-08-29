@@ -167,6 +167,19 @@ export default function CustomerCreditSalesSource({
     onSelectCustomer?.();
   };
 
+  const selectCustomerFromPointer = (event, customer) => {
+    // On iOS Safari the search input blurs before the synthetic click fires.
+    // Select on pointer down so closing the list cannot swallow the choice.
+    event.preventDefault();
+    selectCustomer(customer);
+  };
+
+  const selectCustomerFromKeyboard = (event, customer) => {
+    // Native keyboard/button activation emits a click with detail 0. Pointer
+    // clicks are already handled above and must not apply the selection twice.
+    if (event.detail === 0) selectCustomer(customer);
+  };
+
   const changeTransactionType = (nextType) => {
     if (nextType === transactionType) return;
     onUpdate(entry.id, {
@@ -226,7 +239,15 @@ export default function CustomerCreditSalesSource({
           {searchOpen && (
             <div id={`customer-credit-options-${entry.id}`} role="listbox" className="absolute inset-x-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
               {matches.length > 0 ? matches.map((customer) => (
-                <button key={customer.id} type="button" role="option" aria-selected={String(customer.id) === String(entry.customer_id)} className="flex w-full min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-slate-50 focus:bg-slate-50 focus:outline-none" onClick={() => selectCustomer(customer)}>
+                <button
+                  key={customer.id}
+                  type="button"
+                  role="option"
+                  aria-selected={String(customer.id) === String(entry.customer_id)}
+                  className="flex w-full min-w-0 touch-manipulation items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
+                  onPointerDown={(event) => selectCustomerFromPointer(event, customer)}
+                  onClick={(event) => selectCustomerFromKeyboard(event, customer)}
+                >
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-black text-blue-700">{initialsFor(customer.customer_name || customer.name)}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-bold text-slate-900">{customer.customer_name || customer.name}</span>

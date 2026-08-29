@@ -94,6 +94,39 @@ describe('CustomerCreditSalesSource', () => {
     });
   });
 
+  it('selects a customer on pointer down before iOS blur closes the results', () => {
+    const onUpdate = vi.fn();
+    const onCustomerSearch = vi.fn();
+    const onSelectCustomer = vi.fn();
+    const tree = renderSource({
+      entry: { id: '1', customer_id: '', amount: '', payment_amount: '' },
+      customerSearch: 'Ghana',
+      onUpdate,
+      onCustomerSearch,
+      onSelectCustomer,
+    });
+    const option = tree.root.findByProps({ role: 'option' });
+    const preventDefault = vi.fn();
+
+    act(() => option.props.onPointerDown({ preventDefault, pointerType: 'touch' }));
+
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(onUpdate).toHaveBeenCalledWith('1', {
+      customer_id: 'c1',
+      customer_name_snapshot: 'Ghana Khan',
+      customer_phone: '565084065',
+      previous_outstanding_debt: 110,
+      credit_limit: 2000,
+      available_credit: 1890,
+      transaction_type: 'credit_sale',
+      amount: '',
+      payment_amount: '',
+    });
+    expect(onCustomerSearch).toHaveBeenLastCalledWith('');
+    expect(onSelectCustomer).toHaveBeenCalledOnce();
+    expect(tree.root.findAllByProps({ role: 'option' })).toHaveLength(0);
+  });
+
   it('renders configured Sales Source payment methods in debt-payment mode', () => {
     const tree = renderSource({
       entry: { id: '1', customer_id: 'c1', transaction_type: 'debt_payment', amount: '', payment_amount: '25', payment_method: 'bank_transfer' },
