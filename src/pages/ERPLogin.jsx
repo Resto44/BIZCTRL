@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Building2, Users, UserCheck, User, Package,
+  Building2, UserCheck, User, Package,
   Eye, EyeOff, Loader2, ArrowLeft, ShieldCheck, LogIn
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -22,16 +22,6 @@ const ROLE_CONFIG = [
     border: 'border-violet-500/40',
     bg: 'bg-violet-500/10',
     textColor: 'text-violet-300',
-  },
-  {
-    role: ROLES.GENERAL_MANAGER,
-    label: 'General Manager',
-    description: 'Cross-branch management and analytics',
-    icon: Users,
-    color: 'from-blue-600 to-cyan-700',
-    border: 'border-blue-500/40',
-    bg: 'bg-blue-500/10',
-    textColor: 'text-blue-300',
   },
   {
     role: ROLES.MANAGER,
@@ -91,24 +81,9 @@ export default function ERPLogin() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role, approval_status, branch_id, restaurant_id, organization_id')
-            .eq('id', session.user.id)
-            .single();
-          if (profile?.role && profile.approval_status === 'approved') {
-            // Pre-populate sessionStorage so dashboard opens on the correct branch
-            if (profile.branch_id && profile.role !== ROLES.OWNER) {
-              const orgId = profile.organization_id || profile.restaurant_id || '';
-              if (!sessionStorage.getItem('erp_active_branch_id')) {
-                const { data: branchRow } = await supabase
-                  .from('branches').select('name').eq('id', profile.branch_id).single();
-                sessionStorage.setItem('erp_active_branch_id', profile.branch_id);
-                sessionStorage.setItem('erp_active_branch_name', branchRow?.name || '');
-                sessionStorage.setItem('erp_active_restaurant_id', orgId);
-              }
-            }
-            const home = ROLE_HOME[profile.role] || '/owner-command-center';
+          const { data: context, error } = await supabase.rpc('erp_get_session_context');
+          if (!error && context?.role) {
+            const home = context.home_path || ROLE_HOME[context.role] || '/owner-command-center';
             navigate(postAuthenticationDestination || home, { replace: true });
           }
         } catch (_) {}
@@ -136,20 +111,17 @@ export default function ERPLogin() {
         return;
       }
 
-      // Fetch profile to validate role and approval status, and to pre-populate branch sessionStorage
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role, approval_status, full_name, branch_id, restaurant_id, organization_id')
-        .eq('id', data.user.id)
-        .single();
+      // Resolve the complete role, store, branch, status and effective permissions
+      // from one canonical database function. Profiles and user metadata are not
+      // authorization sources.
+      const { data: context, error: contextError } = await supabase.rpc('erp_get_session_context');
 
-      if (profileError || !profile) {
-        // No profile yet — check erp_memberships for pending/rejected/suspended status
+      if (contextError || !context) {
         const { data: mem } = await supabase
           .from('erp_memberships')
           .select('status, role')
           .eq('user_id', data.user.id)
-          .single();
+          .maybeSingle();
 
         if (mem?.status === 'pending') {
           toast.info('Your registration is pending approval. Please wait for the Owner to approve your account.');
@@ -175,59 +147,15 @@ export default function ERPLogin() {
         return;
       }
 
-      // Validate role matches selected portal (skip for owner)
-      if (selectedRole && selectedRole.role !== ROLES.OWNER) {
-        const actualRole = profile.role;
-        if (actualRole !== selectedRole.role) {
-          toast.error(`This account is registered as "${actualRole}", not "${selectedRole.label}". Please select the correct portal.`);
-          await supabase.auth.signOut();
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Check approval status for non-owner roles
-      // NULL approval_status = legacy user, treat as approved
-      const approvalStatus = profile.approval_status || 'approved';
-      if (profile.role !== ROLES.OWNER && approvalStatus === 'pending') {
-        toast.info('Your account is pending approval by the Owner.');
+      // Portal selection is a security boundary, including the Owner portal.
+      if (!selectedRole || context.role !== selectedRole.role) {
+        toast.error(`This account belongs to the ${context.role} portal. Please select the correct portal.`);
         await supabase.auth.signOut();
         setLoading(false);
         return;
       }
-
-      if (approvalStatus === 'rejected') {
-        toast.error('Your account registration was rejected. Please contact the Owner.');
-        await supabase.auth.signOut();
-        setLoading(false);
-        return;
-      }
-
-      if (approvalStatus === 'suspended') {
-        toast.error('Your account has been suspended. Please contact the Owner.');
-        await supabase.auth.signOut();
-        setLoading(false);
-        return;
-      }
-
-      const home = ROLE_HOME[profile.role] || '/owner-command-center';
-
-      // Pre-populate sessionStorage with the assigned branch so the dashboard
-      // skips BranchSelector and opens directly on the correct branch.
-      if (profile.branch_id && profile.role !== ROLES.OWNER) {
-        const orgId = profile.organization_id || profile.restaurant_id || '';
-        // Fetch branch name for the session label
-        const { data: branchRow } = await supabase
-          .from('branches')
-          .select('name')
-          .eq('id', profile.branch_id)
-          .single();
-        sessionStorage.setItem('erp_active_branch_id', profile.branch_id);
-        sessionStorage.setItem('erp_active_branch_name', branchRow?.name || '');
-        sessionStorage.setItem('erp_active_restaurant_id', orgId);
-      }
-
-      toast.success(`Welcome back, ${profile.full_name || email}!`);
+      const home = context.home_path || ROLE_HOME[context.role] || '/owner-command-center';
+      toast.success(`Welcome back, ${context.full_name || email}!`);
       navigate(postAuthenticationDestination || home, { replace: true });
     } catch (err) {
       toast.error('Login failed. Please try again.');

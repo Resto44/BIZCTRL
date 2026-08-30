@@ -130,7 +130,6 @@ const BillingVisualHarness = import.meta.env.DEV ? lazy(() => import('@/pages/de
 
 // ── Legacy pages removed — replaced by ERP portals ─────────────────────────
 // ── NEW ERP Multi-Tenant Portals ─────────────────────────────────────────────
-const GMDashboard           = lazy(() => import('@/pages/GMDashboard'));
 const ManagerDashboardERP   = lazy(() => import('@/pages/ManagerDashboardERP'));
 const EmployeeDashboardERP  = lazy(() => import('@/pages/EmployeeDashboardERP'));
 const SupplierPortalERP     = lazy(() => import('@/pages/SupplierPortalERP'));
@@ -331,7 +330,7 @@ const SubscribedRoutes = () => {
         <Route path="/super-admin" element={<Navigate to="/platform-owner/login" replace />} />
 
         {/* ── NEW ERP Role Portals — strict role-based access control ── */}
-        <Route path="/gm-dashboard" element={<ERPRoleGuard allowedRoles={['general_manager']}><GMDashboard /></ERPRoleGuard>} />
+        <Route path="/gm-dashboard" element={<Navigate to="/manager-dashboard" replace />} />
         <Route path="/manager-dashboard" element={<ERPRoleGuard allowedRoles={['manager']}><ManagerDashboardERP /></ERPRoleGuard>} />
         <Route path="/employee-dashboard" element={<ERPRoleGuard allowedRoles={['employee']}><EmployeeDashboardERP /></ERPRoleGuard>} />
         <Route path="/supplier-portal" element={<ERPRoleGuard allowedRoles={['supplier']}><SupplierPortalERP /></ERPRoleGuard>} />

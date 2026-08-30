@@ -50,6 +50,7 @@ const stubFrom = () => ({
 let supabase = {
   auth: stubAuth,
   from: () => stubFrom(),
+  rpc: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
   channel: () => ({
     on: function() { return this; },
     subscribe: function() { return this; },
@@ -302,14 +303,18 @@ const auth = {
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error || !user) return null;
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      // The database membership is the only authority for role, tenant, branch,
+      // status and permissions. auth.user_metadata is deliberately not used for
+      // authorization because users can edit it themselves.
+      const { data: sessionContext, error: contextError } = await supabase.rpc('erp_get_session_context');
+      if (contextError || !sessionContext) {
+        if (contextError) console.warn('[auth.me] ERP session rejected:', contextError.message);
+        return null;
+      }
       return {
         id: user.id,
         email: user.email,
-        full_name: profile?.full_name || user.user_metadata?.full_name || '',
-        role: profile?.role || user.user_metadata?.role || null,
-        branch: profile?.branch || null,
-        ...profile,
+        ...sessionContext,
       };
     } catch (e) {
       console.warn('[auth.me] error:', e.message);
@@ -442,4 +447,3 @@ export const base44 = {
   integrations: _b44?.integrations || stubIntegrations,
   agents:       _b44?.agents       || stubAgents,
 };
-

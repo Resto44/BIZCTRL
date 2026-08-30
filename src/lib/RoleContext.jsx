@@ -4,23 +4,24 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { audit } from '@/lib/auditLogger';
 
 /**
- * ROLE SYSTEM — 6 ERP Roles
+ * OWNER-CONTROLLED ERP ROLE SYSTEM
  * ─────────────────────────
  * 1. Owner            — full access, manages all branches
- * 2. General Manager  — cross-branch access, reports to Owner
- * 3. Manager          — single branch, reports to Owner/GM
- * 4. Employee         — single branch, limited ops
- * 5. Supplier         — no branch, purchase orders only
+ * 2. Manager          — assigned branch, permissions granted by Owner
+ * 3. Employee         — assigned branch, permissions granted by Owner
+ * 4. Supplier         — assigned supplier workflow, permissions granted by Owner
  *
  * Drivers are managed records, not authenticated ERP portal users.
  */
 
 export const ROLES = {
   OWNER:           'owner',
-  GENERAL_MANAGER: 'general_manager',
   MANAGER:         'manager',
   EMPLOYEE:        'employee',
   SUPPLIER:        'supplier',
+  // Temporary source-compatibility alias. Canonical session resolution maps
+  // every legacy general_manager membership to manager in the database.
+  GENERAL_MANAGER: 'general_manager',
   // Legacy aliases kept for backward-compat
   SPONSOR:         'sponsor',
   CUSTOMER:        'customer',
@@ -29,7 +30,7 @@ export const ROLES = {
 // Which route each role lands on after login
 export const ROLE_HOME = {
   [ROLES.OWNER]:           '/owner-command-center',
-  [ROLES.GENERAL_MANAGER]: '/gm-dashboard',
+  [ROLES.GENERAL_MANAGER]: '/manager-dashboard',
   [ROLES.MANAGER]:         '/manager-dashboard',
   [ROLES.EMPLOYEE]:        '/employee-dashboard',
   [ROLES.SUPPLIER]:        '/supplier-portal',
@@ -40,7 +41,6 @@ export const ROLE_HOME = {
 
 // Roles that must never be redirected to onboarding
 export const NON_OWNER_ROLES = new Set([
-  ROLES.GENERAL_MANAGER,
   ROLES.MANAGER,
   ROLES.EMPLOYEE,
   ROLES.SUPPLIER,
@@ -52,95 +52,13 @@ const RoleContext = createContext();
 
 // ─── Permission matrix ───────────────────────────────────────────────────────
 function buildCan(role) {
-  const is = (...r) => r.includes(role);
-  
   // Owner has full access
   if (role === ROLES.OWNER) {
     return Object.keys(PERMISSIONS_LIST).reduce((acc, key) => ({ ...acc, [key]: true }), {});
   }
-
-  // General Manager — cross-branch, no billing/admin
-  if (role === ROLES.GENERAL_MANAGER) {
-    return {
-      ...Object.keys(PERMISSIONS_LIST).reduce((acc, key) => ({ ...acc, [key]: true }), {}),
-      manageSettings: false,
-      manageBranches: false,
-      manageRoles: false,
-      viewBilling: false,
-    };
-  }
-
-  return {
-    // Dashboard
-    viewDashboard:      is(ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.SUPPLIER, ROLES.SPONSOR, ROLES.CUSTOMER),
-    // Sales
-    viewSales:          is(ROLES.MANAGER),
-    // Purchases
-    viewPurchases:      is(ROLES.MANAGER, ROLES.SUPPLIER),
-    // Inventory
-    viewInventory:      is(ROLES.MANAGER),
-    // Orders
-    viewOrders:         is(ROLES.MANAGER),
-    // Staff
-    viewStaff:          is(ROLES.MANAGER),
-    viewEmployees:      is(ROLES.MANAGER),
-    viewPayroll:        is(ROLES.MANAGER),
-    viewEmployeeControl: is(ROLES.MANAGER),
-    viewStaffAttendance: is(ROLES.MANAGER),
-    // Treasury / Finance
-    viewTreasury:       is(ROLES.MANAGER),
-    viewExpenses:       is(ROLES.MANAGER),
-    viewDebts:          is(ROLES.MANAGER),
-    viewNetworkAccounts: false,
-    viewNetworkAnalytics: false,
-    viewSponsorTreasury: is(ROLES.SPONSOR),
-    // Suppliers
-    viewSuppliers:      is(ROLES.MANAGER, ROLES.SUPPLIER),
-    // Delivery
-    viewDelivery:       is(ROLES.MANAGER),
-    // Brand / Settings
-    viewBrandSettings:  false,
-    viewBilling:        false,
-    // Reports
-    viewReports:        is(ROLES.MANAGER, ROLES.SPONSOR),
-    viewActivityLogs:   false,
-    exportPDF:          false,
-    // Attendance
-    viewAttendance:     is(ROLES.MANAGER, ROLES.EMPLOYEE),
-    // Financials
-    viewFinancials:     false,
-    viewProfitLoss:     false,
-    // Employee Specific
-    recordAttendance:   is(ROLES.MANAGER, ROLES.EMPLOYEE),
-    viewSchedule:       is(ROLES.MANAGER, ROLES.EMPLOYEE),
-    viewTasks:          is(ROLES.MANAGER, ROLES.EMPLOYEE),
-    viewSalary:         is(ROLES.EMPLOYEE),
-    manageLoans:        is(ROLES.EMPLOYEE),
-    viewProfile:        is(ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.CUSTOMER),
-    // Delivery management is available to branch managers.
-    viewDeliveries:     is(ROLES.MANAGER),
-    updateDelivery:     is(ROLES.MANAGER),
-    // Sponsor Specific
-    viewWallet:         is(ROLES.SPONSOR),
-    manageTransactions: is(ROLES.SPONSOR),
-    viewSponsored:      is(ROLES.SPONSOR),
-    // Customer Specific
-    placeOrders:        is(ROLES.CUSTOMER),
-    trackOrders:        is(ROLES.CUSTOMER),
-    // Settings / Management
-    manageSettings:     false,
-    manageBranches:     false,
-    manageUsers:        false,
-    manageRoles:        false,
-    manageCustomers:    false,
-    manageDrivers:      false,
-    manageSponsors:     false,
-    manageDashboardCustomization: false,
-    // Legacy / Misc
-    uploadSales:        is(ROLES.MANAGER),
-    viewAlerts:         is(ROLES.MANAGER),
-    viewSupport:        true,
-  };
+  // Non-owner permissions are never inferred in the browser. The canonical
+  // effective permission object is returned by erp_get_session_context().
+  return { ...PERMISSIONS_LIST };
 }
 const PERMISSIONS_LIST = {
   viewDashboard: false, viewSales: false, viewPurchases: false, viewInventory: false,
@@ -152,13 +70,17 @@ const PERMISSIONS_LIST = {
   placeOrders: false,
   trackOrders: false, manageSettings: false, manageBranches: false, manageUsers: false,
   manageRoles: false, manageCustomers: false, manageDrivers: false,
-  manageSponsors: false, manageDashboardCustomization: false, uploadSales: false, viewAlerts: false, viewSupport: true,
+  manageSponsors: false, manageDashboardCustomization: false, uploadSales: false, viewAlerts: false, viewSupport: false,
   // Additional permissions used in route guards — must be listed here so Owner reduce() grants them
   viewEmployees: false, viewPayroll: false, viewTreasury: false, viewExpenses: false,
   viewDelivery: false, viewBrandSettings: false, viewBilling: false, viewDebts: false,
   viewNetworkAccounts: false, viewNetworkAnalytics: false, viewSponsorTreasury: false,
   viewActivityLogs: false, viewEmployeeControl: false, viewStaffAttendance: false,
   viewSuppliers: false, exportPDF: false,
+  createPurchases: false, approvePurchases: false, viewPurchaseOrders: false,
+  updatePurchaseOrders: false, viewInvoices: false, createInvoices: false,
+  viewPayments: false, viewProducts: false, updateInventory: false,
+  manageSuppliers: false, createExpenses: false, approveExpenses: false,
 };
 // logSecurityEvent is fire-and-forget via auditLogger
 function logSecurityEvent(_user, _type, detail) {
@@ -172,18 +94,19 @@ export function RoleProvider({ children }) {
     if (isLoadingAuth || !user) return ROLES.EMPLOYEE;
     // Normalize role strings to match our ROLES constant
     const r = (user?.role || '').toLowerCase();
-    if (Object.values(ROLES).includes(r)) return r;
+    if (r === ROLES.GENERAL_MANAGER) return ROLES.MANAGER;
+    if ([ROLES.OWNER, ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.SUPPLIER].includes(r)) return r;
     if (r === 'admin' || r === 'restaurant_admin') return ROLES.OWNER;
     if (r === 'staff') return ROLES.EMPLOYEE;
     return ROLES.EMPLOYEE; // Deny by default until a recognized role is available
   }, [user, isLoadingAuth]);
 
   const can = useMemo(() => {
-    // Start with role-based defaults
+    // Start fail-closed; only the server-computed permission object may grant.
     const base = buildCan(role);
     // Merge with per-user DB permissions (from user.permissions JSONB)
     // DB permissions can only GRANT additional permissions, never revoke owner-level
-    const dbPerms = user?.permissions;
+    const dbPerms = user?.effective_permissions || user?.permissions;
     if (!dbPerms || typeof dbPerms !== 'object') return base;
     // For owner: always full access, ignore DB overrides
     if (role === ROLES.OWNER) return base;
@@ -215,7 +138,7 @@ export function useRouteGuard() {
     // Check if the role is allowed to be on this specific dashboard
     if (path.endsWith('-dashboard')) {
       const dashboardRole = path.replace('/', '').replace('-dashboard', '');
-      if (dashboardRole !== role && role !== ROLES.OWNER && role !== ROLES.GENERAL_MANAGER) {
+      if (dashboardRole !== role && role !== ROLES.OWNER) {
         navigate(ROLE_HOME[role] || '/owner-command-center', { replace: true });
       }
     }

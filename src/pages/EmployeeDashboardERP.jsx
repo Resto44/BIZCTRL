@@ -1,58 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useTenant } from '@/lib/TenantContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import BranchSelector from '@/components/shared/BranchSelector';
 import {
-  User, Clock, DollarSign, Calendar, CheckCircle2, XCircle,
-  AlertCircle, LogOut, GitBranch, Bell, ClipboardList, Home
+  User, Clock, CheckCircle2, XCircle,
+  LogOut, GitBranch, Bell, ClipboardList, Home
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 export default function EmployeeDashboardERP() {
   const { user, logout } = useAuth();
+  const { managerBranchObject, loadingRestaurants } = useTenant();
   const qc = useQueryClient();
-  const [activeBranch, setActiveBranch] = useState(null);
-  const [branchSelected, setBranchSelected] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
   const today = format(new Date(), 'yyyy-MM-dd');
-
-  useEffect(() => {
-    const storedBranchId = sessionStorage.getItem('erp_active_branch_id');
-    const storedBranchName = sessionStorage.getItem('erp_active_branch_name');
-    if (storedBranchId && storedBranchName) {
-      setActiveBranch({ id: storedBranchId, name: storedBranchName });
-      setBranchSelected(true);
-    }
-  }, []);
-
-  const handleBranchSelect = (branch) => {
-    setActiveBranch(branch);
-    setBranchSelected(true);
-  };
-
-  if (!branchSelected) {
-    return <BranchSelector onSelect={handleBranchSelect} />;
-  }
-
+  const activeBranch = managerBranchObject || (user?.branch_id
+    ? { id: user.branch_id, name: user.branch_name || 'Assigned Branch' }
+    : null);
   const branchId = activeBranch?.id;
 
   // Employee profile
   const { data: empProfile } = useQuery({
-    queryKey: ['emp-profile', user?.id],
+    queryKey: ['emp-profile', user?.id, user?.linked_entity_id],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('email', user?.email)
-        .single();
+      let query = supabase.from('employees').select('*');
+      if (user?.linked_entity_id) {
+        query = query.eq('id', user.linked_entity_id);
+      } else {
+        query = query
+          .eq('restaurant_id', user?.restaurant_id)
+          .eq('branch_id', branchId)
+          .eq('email', user?.email);
+      }
+      const { data } = await query.maybeSingle();
       return data;
     },
-    enabled: !!user?.email,
+    enabled: !!branchId && (!!user?.linked_entity_id || !!user?.email),
   });
 
   // Today's attendance
@@ -136,6 +124,18 @@ export default function EmployeeDashboardERP() {
     },
     onError: (err) => toast.error(err.message),
   });
+
+  if (!branchId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-center text-white">
+        <div>
+          <GitBranch className="mx-auto mb-3 h-8 w-8 text-slate-500" />
+          <p className="font-semibold">{loadingRestaurants ? 'Loading assigned branch…' : 'No active branch assignment'}</p>
+          <p className="mt-1 text-sm text-slate-400">Ask the Store Owner to assign your employee portal to an active branch.</p>
+        </div>
+      </div>
+    );
+  }
 
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },

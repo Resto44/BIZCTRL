@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useRole, ROLE_HOME, ROLES } from '@/lib/RoleContext';
+import { useRole, ROLE_HOME } from '@/lib/RoleContext';
 import { useAuth } from '@/lib/AuthContext';
 import { ShieldOff, Loader2 } from 'lucide-react';
 
@@ -8,8 +8,8 @@ import { ShieldOff, Loader2 } from 'lucide-react';
  * ERPRoleGuard — strict role-based access control for ERP dashboards.
  *
  * Usage:
- *   <ERPRoleGuard allowedRoles={['general_manager']}>
- *     <GMDashboard />
+ *   <ERPRoleGuard allowedRoles={['manager']}>
+ *     <ManagerDashboard />
  *   </ERPRoleGuard>
  *
  * Rules:
@@ -36,7 +36,7 @@ export default function ERPRoleGuard({ allowedRoles = [], children }) {
   }
 
   // Account suspended or rejected
-  const approvalStatus = user.approval_status;
+  const approvalStatus = user.status || user.approval_status;
   if (approvalStatus === 'suspended' || approvalStatus === 'rejected') {
     return <Navigate to="/erp-login" replace />;
   }

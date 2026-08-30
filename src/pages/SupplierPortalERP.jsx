@@ -7,8 +7,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
-  Package, FileText, CheckCircle2, Clock, XCircle, LogOut,
-  RefreshCw, Search, DollarSign, Calendar, Building2, Home,
+  Package, FileText, CheckCircle2, Clock, LogOut,
+  RefreshCw, Search, Calendar, Building2, Home,
   ShoppingCart, History
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -36,18 +36,18 @@ export default function SupplierPortalERP() {
   const [activeTab, setActiveTab] = useState('home');
   const [search, setSearch] = useState('');
 
-  // ── Supplier profile (matched by auth email) ──────────────────────────────
+  // ── Supplier profile (canonical linked entity from ERP membership) ────────
   const { data: supplierProfile } = useQuery({
-    queryKey: ['supplier-profile', user?.email],
+    queryKey: ['supplier-profile', user?.linked_entity_id, user?.restaurant_id],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('suppliers')
-        .select('*')
-        .eq('email', user?.email)
-        .single();
+      let query = supabase.from('suppliers').select('*').eq('restaurant_id', user?.restaurant_id);
+      query = user?.linked_entity_id
+        ? query.eq('id', user.linked_entity_id)
+        : query.eq('email', user?.email).eq('branch_id', user?.branch_id);
+      const { data } = await query.maybeSingle();
       return data;
     },
-    enabled: !!user?.email,
+    enabled: !!user?.restaurant_id && (!!user?.linked_entity_id || !!user?.email),
   });
 
   // ── Purchase orders for this supplier ─────────────────────────────────────
@@ -68,17 +68,17 @@ export default function SupplierPortalERP() {
     refetchInterval: 60000,
   });
 
-  // ── Supplier invoices — filtered by the logged-in supplier's email ─────────
-  // The RLS policy "supplier_invoices_supplier_self_select" ensures the DB
-  // only returns rows where supplier_email = auth.email(), so no extra
-  // client-side filtering is needed.
+  // ── Supplier invoices — canonical supplier id plus tenant and branch ────────
   const { data: invoices = [], isLoading: invoicesLoading, refetch: refetchInvoices } = useQuery({
-    queryKey: ['supplier-invoices-portal', user?.email],
+    queryKey: ['supplier-invoices-portal', supplierProfile?.id, user?.branch_id],
     queryFn: async () => {
-      if (!user?.email) return [];
+      if (!supplierProfile?.id) return [];
       const { data, error } = await supabase
         .from('supplier_invoices')
         .select('*')
+        .eq('restaurant_id', user.restaurant_id)
+        .eq('branch_id', user.branch_id)
+        .eq('supplier_id', supplierProfile.id)
         .order('created_date', { ascending: false })
         .limit(100);
       if (error) {
@@ -87,7 +87,7 @@ export default function SupplierPortalERP() {
       }
       return data || [];
     },
-    enabled: !!user?.email,
+    enabled: !!supplierProfile?.id && !!user?.restaurant_id && !!user?.branch_id,
     refetchInterval: 30000,
   });
 

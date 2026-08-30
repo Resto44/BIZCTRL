@@ -3,9 +3,9 @@
  *
  * Owner-only page. Features:
  *   1. User list with role, status, branch, last login
- *   2. Role assignment (12 roles)
+ *   2. Role assignment (Branch Manager, Employee, Supplier)
  *   3. Per-module, per-action permission toggles
- *   4. Data scope control (all branches / assigned branch / selected branches)
+ *   4. Branch scope control (one owner-assigned branch per portal)
  *   5. Role templates: create, clone, delete, apply
  *   6. Quick actions: activate, deactivate, transfer, remove
  *   7. Audit log
@@ -13,16 +13,14 @@
  * All mutations go through Supabase SECURITY DEFINER RPCs.
  * Nothing is hardcoded — all permissions come from DB.
  */
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
 import { useRole } from '@/lib/RoleContext';
-import { useAuth } from '@/lib/AuthContext';
-import { useLanguage } from '@/lib/LanguageContext';
 import { cn } from '@/lib/utils';
 import PageHeader from '@/components/shared/PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,12 +30,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Separator } from '@/components/ui/separator';
 import {
-  Shield, Users, Settings2, History, Plus, Copy, Trash2,
-  UserCheck, UserX, ArrowRightLeft, Search, ChevronDown, ChevronUp,
-  CheckCircle2, XCircle, Clock, Eye, RefreshCw, Lock, Unlock,
-  ShieldCheck, ShieldOff, Building2, Mail, Phone, Star, Filter
+  Shield, Users, History, Plus, Copy, Trash2,
+  ArrowRightLeft, Search, ChevronDown, ChevronUp,
+  Clock, Lock, Unlock,
+  ShieldCheck, ShieldOff, Building2, Mail, Phone, Star
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -45,16 +42,9 @@ import { format } from 'date-fns';
 // ─── Constants ────────────────────────────────────────────────────────────────
 export const ALL_ROLES = [
   { value: 'owner',           label: 'Owner',           color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300', description: 'Full access to all features' },
-  { value: 'general_manager', label: 'General Manager', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',         description: 'Multi-branch oversight' },
   { value: 'manager',         label: 'Branch Manager',  color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300', description: 'Single branch management' },
-  { value: 'cashier',         label: 'Cashier',         color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',         description: 'POS and sales only' },
-  { value: 'accountant',      label: 'Accountant',      color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300', description: 'Finance and reports' },
-  { value: 'procurement',     label: 'Procurement',     color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300', description: 'Purchases and suppliers' },
-  { value: 'warehouse',       label: 'Warehouse',       color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',     description: 'Inventory management' },
-  { value: 'delivery',        label: 'Delivery',        color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',             description: 'Delivery orders only' },
-  { value: 'waiter',          label: 'Waiter',          color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',         description: 'Table service' },
-  { value: 'auditor',         label: 'Auditor',         color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300', description: 'Read-only audit access' },
-  { value: 'read_only',       label: 'Read Only',       color: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300',     description: 'View only, no edits' },
+  { value: 'employee',        label: 'Employee',        color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',     description: 'Owner-authorized branch duties' },
+  { value: 'supplier',        label: 'Supplier',        color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',             description: 'Assigned purchase workflow' },
 ];
 
 export const MODULE_PERMISSIONS = [
@@ -126,6 +116,20 @@ function StatusDot({ status }) {
 // ─── Permission matrix for a single user ─────────────────────────────────────
 function PermissionMatrix({ membership, onSave, saving }) {
   const [perms, setPerms] = useState(() => membership.permissions || {});
+  useEffect(() => setPerms(membership.permissions || {}), [membership.id, membership.permissions]);
+  const { data: permissionCatalog = [] } = useQuery({
+    queryKey: ['erp-permission-catalog'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('erp_permission_catalog')
+        .select('permission_key,module_key,label,description,allowed_roles,sort_order')
+        .eq('is_active', true)
+        .order('sort_order');
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 300000,
+  });
 
   const toggle = useCallback((key) => {
     setPerms(p => ({ ...p, [key]: !p[key] }));
@@ -133,12 +137,22 @@ function PermissionMatrix({ membership, onSave, saving }) {
 
   const groups = useMemo(() => {
     const g = {};
-    MODULE_PERMISSIONS.forEach(m => {
-      if (!g[m.group]) g[m.group] = [];
-      g[m.group].push(m);
+    const databaseItems = permissionCatalog
+      .filter((item) => (item.allowed_roles || []).includes(membership.role))
+      .map((item) => ({
+        key: item.permission_key,
+        label: item.label,
+        description: item.description,
+        group: item.module_key,
+      }));
+    const items = databaseItems.length ? databaseItems : MODULE_PERMISSIONS;
+    items.forEach(m => {
+      const group = m.group || 'other';
+      if (!g[group]) g[group] = [];
+      g[group].push(m);
     });
     return g;
-  }, []);
+  }, [membership.role, permissionCatalog]);
 
   const isDirty = JSON.stringify(perms) !== JSON.stringify(membership.permissions || {});
 
@@ -150,7 +164,10 @@ function PermissionMatrix({ membership, onSave, saving }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {items.map(item => (
               <div key={item.key} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/50">
-                <span className="text-sm text-foreground">{item.label}</span>
+                <div className="min-w-0 pr-3">
+                  <span className="text-sm text-foreground">{item.label}</span>
+                  {item.description && <p className="text-[11px] text-muted-foreground">{item.description}</p>}
+                </div>
                 <Switch
                   checked={!!perms[item.key]}
                   onCheckedChange={() => toggle(item.key)}
@@ -318,37 +335,17 @@ function UserCard({ membership, branches, onRoleChange, onStatusChange, onPermis
 
 // ─── Data scope panel ─────────────────────────────────────────────────────────
 function DataScopePanel({ membership }) {
-  const scope = membership.data_scope || 'assigned_branch';
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        Controls which branches this user can see data from.
+        Branch scope is enforced by the database. Use the transfer action above to assign a different branch.
       </p>
-      <div className="space-y-2">
-        {[
-          { value: 'all_branches',       label: 'All Branches',         desc: 'Can see data from every branch' },
-          { value: 'assigned_branch',    label: 'Assigned Branch Only', desc: 'Can only see their assigned branch' },
-          { value: 'selected_branches',  label: 'Selected Branches',    desc: 'Can see specific branches' },
-        ].map(opt => (
-          <div
-            key={opt.value}
-            className={cn(
-              'flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-              scope === opt.value
-                ? 'border-primary bg-primary/5'
-                : 'border-border hover:bg-muted/50'
-            )}
-          >
-            <div className={cn(
-              'w-4 h-4 rounded-full border-2 mt-0.5 shrink-0',
-              scope === opt.value ? 'border-primary bg-primary' : 'border-muted-foreground'
-            )} />
-            <div>
-              <p className="text-sm font-medium">{opt.label}</p>
-              <p className="text-xs text-muted-foreground">{opt.desc}</p>
-            </div>
-          </div>
-        ))}
+      <div className="flex items-start gap-3 rounded-lg border border-primary bg-primary/5 p-3">
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <div>
+          <p className="text-sm font-medium">Assigned Branch Only</p>
+          <p className="text-xs text-muted-foreground">No browser setting can expand this user’s data scope.</p>
+        </div>
       </div>
     </div>
   );
@@ -510,7 +507,7 @@ function RoleTemplatesPanel({ restaurantId }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ALL_ROLES.map(r => (
+                  {ALL_ROLES.filter(r => r.value !== 'owner').map(r => (
                     <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -600,8 +597,7 @@ function AuditLogPanel({ restaurantId }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function RolePermissionCenter() {
-  const { role, can } = useRole();
-  const { user } = useAuth();
+  const { role } = useRole();
   const { activeRestaurant, branches } = useTenant();
   const qc = useQueryClient();
 
@@ -613,21 +609,6 @@ export default function RolePermissionCenter() {
   const [transferBranch, setTransferBranch] = useState('');
 
   const restaurantId = activeRestaurant?.id;
-
-  // Only owner can access this page
-  if (role !== 'owner' && role !== 'general_manager') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center p-8">
-        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-          <ShieldOff className="w-8 h-8 text-muted-foreground" />
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold">Access Restricted</h2>
-          <p className="text-sm text-muted-foreground mt-1">Only the Owner can manage roles and permissions.</p>
-        </div>
-      </div>
-    );
-  }
 
   // Fetch all memberships
   const { data: memberships = [], isLoading } = useQuery({
@@ -751,6 +732,22 @@ export default function RolePermissionCenter() {
     pending:   memberships.filter(m => m.status === 'pending').length,
     suspended: memberships.filter(m => m.status === 'suspended').length,
   }), [memberships]);
+
+  // Keep hook order stable, then enforce the UI guard. RLS and the RPCs repeat
+  // the same owner-only check at the data boundary.
+  if (role !== 'owner') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center p-8">
+        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+          <ShieldOff className="w-8 h-8 text-muted-foreground" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold">Access Restricted</h2>
+          <p className="text-sm text-muted-foreground mt-1">Only the Store Owner can manage roles, permissions, and branch access.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

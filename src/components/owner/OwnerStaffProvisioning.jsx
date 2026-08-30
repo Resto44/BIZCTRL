@@ -11,7 +11,6 @@ import { toast } from 'sonner';
 import { Copy, Link2, Loader2, RefreshCw, ShieldCheck, UserPlus, XCircle } from 'lucide-react';
 
 const STAFF_ROLES = [
-  { value: 'general_manager', label: 'General Manager' },
   { value: 'manager', label: 'Branch Manager' },
   { value: 'employee', label: 'Employee' },
   { value: 'supplier', label: 'Supplier' },

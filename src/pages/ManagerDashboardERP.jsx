@@ -26,7 +26,7 @@
  *   - No backend changes — reads from existing Supabase tables
  *   - Responsive: desktop grid, tablet 2-col, mobile 1-col
  */
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
@@ -36,7 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import BranchSelector from '@/components/shared/BranchSelector';
+import { useTenant } from '@/lib/TenantContext';
 import {
   TrendingUp, DollarSign, ShoppingCart, Package,
   Users, Clock, RefreshCw, BarChart3,
@@ -193,13 +193,13 @@ function ManagerContent({ branchId, branchName, branchKey }) {
   // BUG FIX: expenses table stores branch identity as branch_key (TEXT), not branch_id.
   // The previous query used branch_id which is always NULL for manager-created expenses,
   // causing the Expenses Today KPI to always show 0.
-  // Fix: use branchKey (from sessionStorage) for the primary filter, with branch_id as fallback.
-  // Also resolve branch_key from DB if not available in sessionStorage.
+  // Use the canonical branch key returned by TenantContext, with a database
+  // lookup fallback for older expense rows that only retained branch_key.
   const { data: todayExpenses = [], isLoading: loadingExpenses } = useQuery({
     queryKey: ['mgr-today-expenses', branchId, branchKey, today],
     queryFn: async () => {
       let resolvedKey = branchKey;
-      // If branch_key was not in sessionStorage, resolve it from the branches table
+      // Resolve a missing legacy key from the authorized branch UUID.
       if (!resolvedKey) {
         const { data: branchRow } = await supabase
           .from('branches')
@@ -647,30 +647,23 @@ function ManagerContent({ branchId, branchName, branchKey }) {
 
 // ─── Root export ──────────────────────────────────────────────────────────────
 export default function ManagerDashboardERP() {
-  const [activeBranch, setActiveBranch] = useState(null);
-  const [branchSelected, setBranchSelected] = useState(false);
-
-  React.useEffect(() => {
-    const id   = sessionStorage.getItem('erp_active_branch_id');
-    const name = sessionStorage.getItem('erp_active_branch_name');
-    const key  = sessionStorage.getItem('erp_active_branch_key') || '';
-    if (id && name) {
-      setActiveBranch({ id, name, key });
-      setBranchSelected(true);
-    }
-  }, []);
-
-  const handleBranchSelect = (branch) => {
-    sessionStorage.setItem('erp_active_branch_id',   branch.id);
-    sessionStorage.setItem('erp_active_branch_name', branch.name);
-    sessionStorage.setItem('erp_active_branch_key',  branch.branch_key || branch.key || '');
-    setActiveBranch({ id: branch.id, name: branch.name, key: branch.branch_key || branch.key || '' });
-    setBranchSelected(true);
-  };
-
-  if (!branchSelected) {
-    return <BranchSelector onSelect={handleBranchSelect} />;
+  const { managerBranchObject, loadingRestaurants } = useTenant();
+  if (!managerBranchObject) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center p-6 text-center">
+        <div>
+          <Building2 className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+          <p className="font-semibold">{loadingRestaurants ? 'Loading assigned branch…' : 'No active branch assignment'}</p>
+          <p className="mt-1 text-sm text-muted-foreground">The Store Owner must assign an active branch before this portal can open.</p>
+        </div>
+      </div>
+    );
   }
-
-  return <ManagerContent branchId={activeBranch.id} branchName={activeBranch.name} branchKey={activeBranch.key} />;
+  return (
+    <ManagerContent
+      branchId={managerBranchObject.id}
+      branchName={managerBranchObject.name || managerBranchObject.label}
+      branchKey={managerBranchObject.branch_key || managerBranchObject.key || ''}
+    />
+  );
 }

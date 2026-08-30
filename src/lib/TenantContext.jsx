@@ -24,13 +24,11 @@ export function TenantProvider({ children }) {
     localStorage.getItem(`rc_restaurant_${user?.email || 'default'}`) || null
   );
 
-  // Normalize the raw role string the same way RoleContext does so that
-  // 'admin' / 'restaurant_admin' users are correctly treated as OWNER.
+  // Role, store and branch are returned by erp_get_session_context().
   const normalizedRole = (() => {
     const r = (user?.role || '').toLowerCase();
-    if (Object.values(ROLES).includes(r)) return r;
-    if (r === 'admin' || r === 'restaurant_admin') return ROLES.OWNER;
-    if (r === 'staff') return ROLES.EMPLOYEE;
+    if (r === ROLES.GENERAL_MANAGER) return ROLES.MANAGER;
+    if ([ROLES.OWNER, ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.SUPPLIER].includes(r)) return r;
     return ROLES.EMPLOYEE; // deny data access until a recognized role is available
   })();
   const isOwner = normalizedRole === ROLES.OWNER;
@@ -45,39 +43,26 @@ export function TenantProvider({ children }) {
     queryFn: async () => {
       if (!user?.id) return [];
 
+      // Owners resolve their approved canonical memberships. This keeps the
+      // tenant switcher membership-backed if multi-store ownership is enabled
+      // later, without recovering scope from email or browser storage.
       if (isOwner) {
-        // Owner: resolve every approved tenant membership so the active restaurant
-        // can switch safely without falling back to an unverified client label.
-        const { data: memberships } = await supabase
+        const { data: memberships, error: membershipError } = await supabase
           .from('erp_memberships')
           .select('restaurant_id')
           .eq('user_id', user.id)
-          .eq('role', 'owner')
+          .eq('role', ROLES.OWNER)
           .eq('status', 'approved');
-
-        const restaurantIds = asRecordArray(memberships)
-          .map((membership) => membership.restaurant_id)
-          .filter(Boolean);
-        if (restaurantIds.length > 0) {
-          const { data } = await supabase
-            .from('restaurants')
-            .select('*')
-            .in('id', restaurantIds);
-          return data || [];
-        }
-
-        // Fallback: try org_id = email (legacy)
-        const { data } = await supabase
-          .from('restaurants')
-          .select('*')
-          .eq('org_id', user.email)
-          .limit(10);
+        if (membershipError) throw membershipError;
+        const ids = [...new Set(asRecordArray(memberships).map(item => item.restaurant_id).filter(Boolean))];
+        if (!ids.length) return [];
+        const { data, error } = await supabase.from('restaurants').select('*').in('id', ids);
+        if (error) throw error;
         return data || [];
       }
 
-      // Non-owners: read restaurant_id directly from their profile
-      // This is set atomically by the handle_new_user trigger on registration
-      const restaurantId = user?.restaurant_id || user?.organization_id;
+      // Every non-owner portal resolves one approved canonical membership.
+      const restaurantId = user?.restaurant_id;
       if (restaurantId) {
         const { data } = await supabase
           .from('restaurants')
@@ -342,7 +327,7 @@ export function TenantProvider({ children }) {
 
   // Prefer the legacy branch key, but preserve the canonical branch UUID when
   // the key is absent on an assigned Branch Manager profile.
-  const assignedBranch = isStaffRole ? (user?.branch || user?.branch_id || null) : null;
+  const assignedBranch = isStaffRole ? (user?.branch_id || null) : null;
   const managerBranchObject = React.useMemo(() => {
     if (!isBranchScoped || !assignedBranch) return null;
     return branches.find((branch) =>
