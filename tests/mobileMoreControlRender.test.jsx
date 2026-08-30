@@ -4,8 +4,27 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
+const tenantMocks = vi.hoisted(() => ({
+  setActiveRestaurant: vi.fn(),
+  activeRestaurant: { id: 'store-a', name: 'Test store' },
+  restaurants: [
+    { id: 'store-a', name: 'Test store' },
+    { id: 'store-b', name: 'Second store' },
+  ],
+}));
+
+const supabaseMocks = vi.hoisted(() => {
+  const queryBuilder = {
+    count: 0,
+    error: null,
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+  };
+  return { from: vi.fn(() => queryBuilder) };
+});
+
 vi.mock('@/api/supabaseClient', () => ({
-  supabase: { from: vi.fn() },
+  supabase: { from: supabaseMocks.from },
 }));
 
 vi.mock('@/lib/RoleContext', () => ({
@@ -26,7 +45,7 @@ vi.mock('@/lib/RoleContext', () => ({
 }));
 
 vi.mock('@/lib/TenantContext', () => ({
-  useTenant: () => ({ activeRestaurant: null }),
+  useTenant: () => tenantMocks,
 }));
 
 vi.mock('@/lib/LanguageContext', () => ({
@@ -45,6 +64,7 @@ const { default: BottomNav } = await import('../src/components/layout/BottomNav.
 
 describe('mobile More and Control workspace', () => {
   it('opens safely and exposes permanent quick actions plus grouped ERP modules', async () => {
+    tenantMocks.setActiveRestaurant.mockClear();
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     let renderer;
 
@@ -76,5 +96,44 @@ describe('mobile More and Control workspace', () => {
     expect(renderedText).toContain('All ERP Modules');
     expect(renderedText).toContain('System Status');
     expect(renderedText).not.toContain('approval_center');
+  });
+
+  it('opens the store selector and switches the active ERP workspace', async () => {
+    tenantMocks.setActiveRestaurant.mockClear();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let renderer;
+
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/owner-command-center']}>
+            <BottomNav />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+    });
+
+    const moreButton = renderer.root.findAllByType('button').find((button) =>
+      button.findAllByType('span').some((span) => span.children.includes('more')),
+    );
+    await act(async () => moreButton.props.onClick());
+
+    const selector = renderer.root.findByProps({ 'aria-label': 'Select business store' });
+    expect(selector.props['aria-expanded']).toBe(false);
+
+    await act(async () => selector.props.onClick());
+    expect(renderer.root.findAllByProps({ role: 'listbox' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ role: 'option' })).toHaveLength(2);
+
+    const secondStore = renderer.root.findAllByProps({ role: 'option' })[1];
+    await act(async () => secondStore.props.onClick());
+
+    expect(tenantMocks.setActiveRestaurant).toHaveBeenCalledOnce();
+    expect(tenantMocks.setActiveRestaurant).toHaveBeenCalledWith('store-b');
+    expect(renderer.root.findAllByProps({ role: 'listbox' })).toHaveLength(0);
+
+    const links = renderer.root.findAllByType('a');
+    expect(links.some((link) => link.props.href === '/sales')).toBe(true);
+    expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
   });
 });

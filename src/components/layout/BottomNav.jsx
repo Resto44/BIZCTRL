@@ -336,9 +336,10 @@ function readableLabel(t, labelKey) {
 function MoreMenu({ sections, can, onClose }) {
   const { t } = useLanguage();
   const location = useLocation();
-  const { activeRestaurant } = useTenant();
+  const { activeRestaurant, restaurants, setActiveRestaurant } = useTenant();
   const [searchTerm, setSearchTerm] = useState('');
   const [openSection, setOpenSection] = useState(null);
+  const [storePickerOpen, setStorePickerOpen] = useState(false);
 
   useEffect(() => {
     if (typeof document === 'undefined' || typeof window === 'undefined') return undefined;
@@ -402,6 +403,13 @@ function MoreMenu({ sections, can, onClose }) {
   });
 
   const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
+  const selectableRestaurants = Array.isArray(restaurants)
+    ? restaurants.filter(restaurant => restaurant?.id)
+    : [];
+  const handleStoreSelection = (restaurantId) => {
+    setStorePickerOpen(false);
+    if (restaurantId !== activeRestaurant?.id) setActiveRestaurant(restaurantId);
+  };
   const availablePaths = useMemo(() => new Set(allItems.map(item => item.path)), [allItems]);
   const quickActions = [
     can?.viewSales ? { path: '/sales', label: 'Add Sale', description: 'Create a new sale', icon: ShoppingCart, iconClass: 'bg-blue-50 text-blue-700' } : null,
@@ -432,10 +440,54 @@ function MoreMenu({ sections, can, onClose }) {
         <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3.5 py-3.5 sm:px-5">
           <div className="mx-auto w-full max-w-2xl space-y-4 pb-4">
             <div className="flex gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-                <Building2 className="h-5 w-5 shrink-0 text-blue-600" />
-                <span className="min-w-0 flex-1 truncate text-sm font-bold">{activeRestaurant?.name || 'Restaurant'} · All branches</span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+              <div className="relative min-w-0 flex-1">
+                <button
+                  type="button"
+                  onClick={() => setStorePickerOpen(current => !current)}
+                  disabled={selectableRestaurants.length === 0}
+                  aria-label="Select business store"
+                  aria-haspopup="listbox"
+                  aria-expanded={storePickerOpen}
+                  aria-controls="more-control-store-picker"
+                  className="flex h-11 w-full min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  <Building2 className="h-5 w-5 shrink-0 text-blue-600" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-bold">{activeRestaurant?.name || 'Restaurant'} · All branches</span>
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${storePickerOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {storePickerOpen && (
+                  <div
+                    id="more-control-store-picker"
+                    role="listbox"
+                    aria-label="Business stores"
+                    className="absolute inset-x-0 top-full z-30 mt-2 max-h-60 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl"
+                  >
+                    <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Switch ERP workspace</p>
+                    {selectableRestaurants.map(restaurant => {
+                      const isSelected = restaurant.id === activeRestaurant?.id;
+                      return (
+                        <button
+                          key={restaurant.id}
+                          type="button"
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => handleStoreSelection(restaurant.id)}
+                          className={`flex min-h-12 w-full items-center gap-2.5 rounded-xl px-2.5 text-left transition-colors ${isSelected ? 'bg-blue-50 text-blue-800' : 'text-slate-700 hover:bg-slate-50'}`}
+                        >
+                          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                            <Building2 className="h-4 w-4" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-bold">{restaurant.name || 'Business'}</span>
+                            <span className="block text-[10px] text-slate-500">All branches</span>
+                          </span>
+                          {isSelected && <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-600" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <label className="flex h-11 min-w-11 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 sm:max-w-[15rem]">
                 <Search className="h-5 w-5 shrink-0 text-slate-500" />
