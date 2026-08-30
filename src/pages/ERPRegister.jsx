@@ -102,12 +102,8 @@ export default function ERPRegister() {
     try {
       const { data, error } = await supabase.rpc('activate_erp_invitation', { p_token: token });
       if (error) throw error;
-      // Pre-populate sessionStorage so the dashboard skips BranchSelector on first load
-      if (data?.branch_id) {
-        sessionStorage.setItem('erp_active_branch_id', data.branch_id);
-        if (data?.branch_name) sessionStorage.setItem('erp_active_branch_name', data.branch_name);
-        if (data?.organization_id) sessionStorage.setItem('erp_active_restaurant_id', data.organization_id);
-      }
+      // The database session context is the sole source of role and branch
+      // scope. Never seed authorization scope from browser-controlled storage.
       toast.success('Account activated. Opening your assigned workspace…');
       window.setTimeout(() => navigate(data?.dashboard || ROLE_HOME[data?.role] || '/erp-login', { replace: true }), 600);
     } catch (error) {

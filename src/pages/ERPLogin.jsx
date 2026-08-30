@@ -86,7 +86,7 @@ export default function ERPLogin() {
             const home = context.home_path || ROLE_HOME[context.role] || '/owner-command-center';
             navigate(postAuthenticationDestination || home, { replace: true });
           }
-        } catch (_) {}
+        } catch {}
       }
     });
   }, [navigate, postAuthenticationDestination]);
@@ -157,7 +157,7 @@ export default function ERPLogin() {
       const home = context.home_path || ROLE_HOME[context.role] || '/owner-command-center';
       toast.success(`Welcome back, ${context.full_name || email}!`);
       navigate(postAuthenticationDestination || home, { replace: true });
-    } catch (err) {
+    } catch {
       toast.error('Login failed. Please try again.');
     } finally {
       setLoading(false);
@@ -274,8 +274,14 @@ export default function ERPLogin() {
             </form>
 
             <div className="mt-4 text-center">
-              <p className="text-slate-500 text-sm">Staff accounts are invitation-only. Ask your organization owner for a secure activation link.</p>
-              <button onClick={() => navigate(ownerRegistrationPath)} className="mt-2 text-xs font-medium text-violet-400 hover:text-violet-300">Create a new owner organization account</button>
+              {selectedRole?.role === ROLES.OWNER ? (
+                <>
+                  <p className="text-slate-500 text-sm">New business? Create the first Owner workspace for your organization.</p>
+                  <button onClick={() => navigate(ownerRegistrationPath)} className="mt-2 text-xs font-medium text-violet-400 hover:text-violet-300">Create a new owner organization account</button>
+                </>
+              ) : (
+                <p className="text-slate-500 text-sm">Staff accounts are invitation-only. Ask your organization owner for a secure activation link.</p>
+              )}
             </div>
           </div>
         )}
