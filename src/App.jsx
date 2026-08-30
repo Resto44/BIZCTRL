@@ -86,6 +86,9 @@ const CustomerPortal      = lazy(() => import('@/pages/CustomerPortal'));
 const LoyaltyProgram      = lazy(() => import('@/pages/LoyaltyProgram'));
 
 const SettingsPage        = lazy(() => import('@/pages/SettingsPage'));
+const FinanceTaxSettings  = lazy(() => import('@/pages/FinanceTaxSettings'));
+const UsersAccessSettings = lazy(() => import('@/pages/UsersAccessSettings'));
+const AutomationSecuritySettings = lazy(() => import('@/pages/AutomationSecuritySettings'));
 const CustomizeWorkspace  = lazy(() => import('@/pages/CustomizeWorkspace'));
 const BrandSettings       = lazy(() => import('@/pages/BrandSettings'));
 const BranchManagement    = lazy(() => import('@/pages/BranchManagement'));
@@ -310,6 +313,9 @@ const SubscribedRoutes = () => {
 
         {/* ── Configuration ── */}
         <Route path="/settings" element={<RoleGuard permission="manageSettings"><SettingsPage /></RoleGuard>} />
+        <Route path="/settings/finance" element={<RoleGuard permission="manageSettings"><FinanceTaxSettings /></RoleGuard>} />
+        <Route path="/settings/access" element={<RoleGuard permission="manageSettings"><UsersAccessSettings /></RoleGuard>} />
+        <Route path="/settings/automation" element={<RoleGuard permission="manageSettings"><AutomationSecuritySettings /></RoleGuard>} />
         <Route path="/customize-workspace" element={<CustomizeWorkspace />} />
         <Route path="/brand" element={<RoleGuard permission="viewBrandSettings"><BrandSettings /></RoleGuard>} />
         <Route path="/restaurants" element={<RoleGuard permission="viewBrandSettings"><RestaurantManager /></RoleGuard>} />
