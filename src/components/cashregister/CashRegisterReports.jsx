@@ -5,19 +5,16 @@ import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import {
-  FileText, Download, TrendingDown, TrendingUp, Banknote,
-  BarChart3, Building2, Loader2, ArrowUpRight, ArrowDownRight
+  FileText, TrendingDown, Banknote,
+  BarChart3, Building2, Loader2, ArrowUpRight
 } from 'lucide-react';
-import { format, subDays, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, subDays, parseISO } from 'date-fns';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend
+  ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 
 const REPORT_TYPES = [

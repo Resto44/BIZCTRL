@@ -13,18 +13,15 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Wifi, Plus, Edit2, Trash2, CheckCircle, XCircle, Building2,
-  CreditCard, ArrowLeftRight, BarChart3, LayoutDashboard,
-  TrendingUp, TrendingDown, DollarSign, Activity, AlertTriangle,
-  ChevronDown, ChevronUp, RefreshCw, Search, Filter, X, Save,
-  Smartphone, Network, Layers, FileCheck, Eye
+  Wifi, Plus, Edit2, Trash2, CheckCircle, XCircle, Building2, ArrowLeftRight, BarChart3, LayoutDashboard,
+  TrendingUp, TrendingDown, DollarSign, AlertTriangle, RefreshCw, Search, Save,
+  Smartphone, Network, FileCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

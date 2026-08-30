@@ -5,15 +5,14 @@ import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
-  Wallet, TrendingDown, TrendingUp, AlertTriangle, CheckCircle2,
-  Banknote, Clock, ArrowUpRight, ArrowDownRight, BarChart3, Loader2
+  Wallet, TrendingDown, TrendingUp, AlertTriangle,
+  Banknote, Clock, BarChart3, Loader2
 } from 'lucide-react';
-import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, LineChart, Line, Legend
+  ResponsiveContainer
 } from 'recharts';
 
 function KPICard({ label, value, icon: Icon, color = 'blue', sub, trend }) {

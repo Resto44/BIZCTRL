@@ -12,21 +12,20 @@ import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import {
-  calculateSalesRevenue, calculateERPAccounting,
-  tagExpensesWithCategories, formatDate,
+  calculateSalesRevenue,
+  tagExpensesWithCategories,
 } from '@/lib/helpers';
 import { computeProcurementKPIs } from '@/lib/procurementEngine';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import BranchSelect from '@/components/shared/BranchSelect';
 import {
-  DollarSign, ShoppingCart, TrendingUp, TrendingDown,
+  DollarSign, ShoppingCart, TrendingUp,
   Wallet, Package, CreditCard, Banknote, Activity,
   BarChart3, Target, Zap, ArrowUpRight, ArrowDownRight,
 } from 'lucide-react';
 import {
   format, startOfMonth, endOfMonth, startOfYear, endOfYear,
-  subDays,
 } from 'date-fns';
 
 function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend }) {

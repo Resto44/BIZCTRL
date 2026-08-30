@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDownCircle, ArrowUpCircle, CalendarDays, CheckCircle2, CreditCard, Database, FileText, History, Plus, Search, Users, WalletCards } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Database, History, Plus, Search, Users, WalletCards } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { supabase } from '@/api/supabaseClient';

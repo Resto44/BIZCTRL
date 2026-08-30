@@ -3,7 +3,7 @@
  * total purchase, paid amount, and auto-calculated remaining balance.
  * Creates a SupplierInvoice record for payable tracking.
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -12,11 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
-import { ShoppingCart, Plus, Truck, Receipt, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Truck, Receipt, AlertCircle, CheckCircle2 } from 'lucide-react';
 import BranchSelect from '@/components/shared/BranchSelect';
 
 const LABELS = {

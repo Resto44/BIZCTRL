@@ -3,11 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { formatCurrency, formatPct, getDateRange, formatDate } from '@/lib/helpers';
-import { calculateTotalSales, calculateSalesTrend, calculateDailySalesTrend } from '@/services/analytics/salesAnalytics';
+import { calculateDailySalesTrend } from '@/services/analytics/salesAnalytics';
 import { getProfitAndLoss } from '@/services/analytics/profitAnalytics';
 import { Card } from '@/components/ui/card';
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Bar } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Percent, AlertTriangle } from 'lucide-react';
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Percent } from 'lucide-react';
 
 const KPICard = ({ label, value, trend, trendLabel, icon: Icon, color, sparklineData }) => {
   const isPositiveTrend = trend >= 0;

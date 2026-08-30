@@ -19,9 +19,9 @@ import { useTenant } from '@/lib/TenantContext';
 import { useSalesSources } from '@/hooks/useSalesSources';
 import { format } from 'date-fns';
 import {
-  TrendingUp, DollarSign, Banknote, Users, Truck, Package,
-  AlertTriangle, ShoppingCart, TrendingDown, PiggyBank,
-  Scale, CheckCircle2, Info
+  TrendingUp, DollarSign, Users, Truck, Package,
+  AlertTriangle, ShoppingCart,
+  Scale
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';

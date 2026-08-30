@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Building2, User, Mail, Phone, Package, FileText,
-  CheckCircle2, ArrowLeft, Loader2, Globe
+  Building2, Mail, Package, FileText,
+  CheckCircle2, ArrowLeft, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/api/supabaseClient';

@@ -13,9 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Truck, CreditCard, Plus, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Truck, CreditCard, Plus, AlertCircle } from 'lucide-react';
 
 const LABELS = {
   en: {

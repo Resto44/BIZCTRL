@@ -22,7 +22,7 @@ export default function BranchSelector({ onSelect }) {
       setLoading(true);
       loadAssignedBranches();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [user?.id]);
 
   const loadAssignedBranches = async () => {

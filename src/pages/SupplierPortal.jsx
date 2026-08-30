@@ -4,11 +4,9 @@ import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
-  Building2, FileText, DollarSign, Package, TrendingUp,
-  Clock, CheckCircle2, AlertCircle, ArrowUpRight, Calendar,
-  CreditCard, BarChart3, ShoppingCart, Handshake
+  Building2, FileText, Package, CheckCircle2, AlertCircle,
+  CreditCard, BarChart3, ShoppingCart
 } from 'lucide-react';
 import { format } from 'date-fns';
 

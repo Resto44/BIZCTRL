@@ -57,7 +57,7 @@ export default function NotificationPopups() {
   };
 
   return (
-    <div className="fixed bottom-24 right-3 z-[9999] flex flex-col gap-2 w-[320px] pointer-events-none">
+    <div className="pointer-events-none fixed bottom-24 end-3 z-[9999] flex w-[min(320px,calc(100vw-1.5rem))] max-w-full flex-col gap-2">
       <AnimatePresence mode="popLayout">
         {popups.map((n) => {
           const Icon = typeIcons[n.type] || Activity;

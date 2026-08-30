@@ -64,7 +64,7 @@ export default function ERPLayout({ children }) {
   }, [mobileMenuOpen]);
 
   return (
-    <div className="flex min-h-dvh w-full min-w-0 max-w-full bg-background">
+    <div className="flex h-dvh min-h-0 w-full min-w-0 max-w-full overflow-hidden bg-background">
       {/* Desktop Sidebar */}
       {showSidebar && (
         <ERPSidebar
@@ -94,14 +94,14 @@ export default function ERPLayout({ children }) {
       )}
 
       {/* Main content area */}
-      <div className="flex min-h-dvh min-w-0 max-w-full flex-1 flex-col">
+      <div className="flex h-dvh min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
         <ERPHeader onMobileMenuToggle={() => setMobileMenuOpen(o => !o)} />
 
         {/* Page content */}
         <main
           data-erp-page-viewport="true"
           className={cn(
-            'flex-1 min-w-0 max-w-full overflow-y-auto',
+            'flex-1 min-w-0 max-w-full overflow-y-auto min-h-0 overflow-x-hidden overscroll-y-contain',
             // Bottom padding on mobile accounts for BottomNav and iPhone safe-area.
             'pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+1rem)] lg:pb-0'
           )}

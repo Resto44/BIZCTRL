@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import * as LucideIcons from 'lucide-react';
+import { Search, Star, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Search, X, Star } from 'lucide-react';
 import { ENTERPRISE_ICONS, ICON_CATEGORIES } from './IconCatalog';
+import { iconComponentFor } from './EnterpriseIconRegistry';
 
 // Storage key for frequently used icons
 const FREQUENT_ICONS_KEY = 'resto_frequent_icons';
@@ -64,7 +64,7 @@ export function NewIconPicker({ value, onChange, color }) {
   const renderIconGrid = (icons) => (
     <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2 p-1">
       {icons.map((icon) => {
-        const IconComponent = LucideIcons[icon.name] || LucideIcons.HelpCircle;
+        const IconComponent = iconComponentFor(icon.name);
         const isSelected = value === icon.name;
         
         return (
@@ -121,7 +121,7 @@ export function NewIconPicker({ value, onChange, color }) {
               Recent:
             </div>
             {frequentIcons.map(name => {
-              const IconComp = LucideIcons[name] || LucideIcons.HelpCircle;
+              const IconComp = iconComponentFor(name);
               return (
                 <button
                   key={name}

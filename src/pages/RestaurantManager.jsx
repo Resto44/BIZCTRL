@@ -28,7 +28,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
 import BusinessTypeSelector from '@/components/shared/BusinessTypeSelector';
-import ModeBadge from '@/components/shared/ModeBadge';
 import { supabase } from '@/api/supabaseClient';
 import { cn } from '@/lib/utils';
 

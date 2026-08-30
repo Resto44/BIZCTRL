@@ -10,11 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import {
-  Package, AlertTriangle, TrendingDown, ArrowRight, Search, Plus,
-  BarChart3, RefreshCw, Download, Trash2, ArrowLeftRight, DollarSign
+  Package, AlertTriangle, Search, Plus,
+  BarChart3, Download, Trash2, ArrowLeftRight
 } from 'lucide-react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+import { Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts';
 import { Link } from 'react-router-dom';
@@ -144,13 +143,13 @@ export default function InventoryCommandCenter() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full grid grid-cols-4 h-9">
-          <TabsTrigger value="dashboard" className="text-xs">{t('overview')}</TabsTrigger>
-          <TabsTrigger value="lowstock" className="text-xs">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 sm:grid-cols-4">
+          <TabsTrigger value="dashboard" className="min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:min-h-9 sm:whitespace-nowrap">{t('overview')}</TabsTrigger>
+          <TabsTrigger value="lowstock" className="min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:min-h-9 sm:whitespace-nowrap">
             Low Stock {lowStock.length > 0 && <Badge className="ml-1 h-4 w-4 p-0 text-[9px] bg-amber-500">{lowStock.length}</Badge>}
           </TabsTrigger>
-          <TabsTrigger value="waste" className="text-xs">{t('waste_tracking')}</TabsTrigger>
-          <TabsTrigger value="analytics" className="text-xs">{t('inventory_analytics')}</TabsTrigger>
+          <TabsTrigger value="waste" className="min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:min-h-9 sm:whitespace-nowrap">{t('waste_tracking')}</TabsTrigger>
+          <TabsTrigger value="analytics" className="min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:min-h-9 sm:whitespace-nowrap">{t('inventory_analytics')}</TabsTrigger>
         </TabsList>
 
         {/* Dashboard Tab */}

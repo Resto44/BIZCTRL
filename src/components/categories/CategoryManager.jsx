@@ -8,7 +8,7 @@
  *              sales_categories, online_order_categories
  */
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
@@ -32,12 +32,10 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import * as LucideIcons from 'lucide-react';
 import {
   Plus, Pencil, Trash2, ChevronRight, ChevronDown,
-  Search, GripVertical, Image, X, Check, FolderOpen,
-  Layers, ShoppingCart, DollarSign, TrendingUp, Globe,
-  HelpCircle,
+  Search, GripVertical, X, Check, FolderOpen,
+  Layers, DollarSign, TrendingUp, Globe,
 } from 'lucide-react';
 import { NewIconPicker } from './NewIconPicker';
 import { CategoryIcon } from '@/components/shared/CategoryIcon';

@@ -15,14 +15,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  TrendingUp, TrendingDown, Minus, BarChart3, DollarSign,
-  ArrowUpDown, Calendar, RefreshCw, Package
+  TrendingUp, TrendingDown, BarChart3, DollarSign,
+  ArrowUpDown, RefreshCw, Package
 } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { format, subDays, subWeeks, subMonths, subYears, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function trendIcon(diff) {

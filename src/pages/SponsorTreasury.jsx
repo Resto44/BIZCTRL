@@ -33,20 +33,20 @@ export default function SponsorTreasury() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full grid grid-cols-5 mb-4">
-          <TabsTrigger value="submit" className="text-xs flex items-center gap-1">
+        <TabsList className="mb-4 grid h-auto w-full grid-cols-2 gap-1 p-1 sm:grid-cols-5">
+          <TabsTrigger value="submit" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
             <Send className="w-3 h-3" />Submit
           </TabsTrigger>
-          <TabsTrigger value="review" className="text-xs flex items-center gap-1">
+          <TabsTrigger value="review" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
             <CheckCircle2 className="w-3 h-3" />Review
           </TabsTrigger>
-          <TabsTrigger value="sponsor" className="text-xs flex items-center gap-1">
+          <TabsTrigger value="sponsor" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
             <Wallet className="w-3 h-3" />Sponsor
           </TabsTrigger>
-          <TabsTrigger value="dashboard" className="text-xs flex items-center gap-1">
+          <TabsTrigger value="dashboard" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
             <BarChart2 className="w-3 h-3" />Balances
           </TabsTrigger>
-          <TabsTrigger value="audit" className="text-xs flex items-center gap-1">
+          <TabsTrigger value="audit" className="col-span-2 flex min-h-10 items-center gap-1 text-xs sm:col-span-1 sm:min-h-9">
             <ShieldCheck className="w-3 h-3" />Audit
           </TabsTrigger>
         </TabsList>

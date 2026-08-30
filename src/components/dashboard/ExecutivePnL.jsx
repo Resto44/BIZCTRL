@@ -1,12 +1,12 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { formatCurrency, formatPct } from '@/lib/helpers';
 import { getProfitAndLoss, getProfitAndLossToday, getProfitAndLossThisWeek, getProfitAndLossThisMonth, getProfitAndLossThisQuarter, getProfitAndLossThisYear } from '@/services/analytics/profitAnalytics';
 import { Card } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 
 export default function ExecutivePnL({ branchKey = 'all' }) {

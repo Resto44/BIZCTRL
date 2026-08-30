@@ -11,19 +11,18 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
 import { useBusinessMode } from '@/lib/BusinessModeContext';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
-  Barcode, Search, Package, AlertTriangle, CheckCircle2, ShoppingBag,
-  ScanLine, X, Plus, Minus, Hash, ArrowRight, Boxes,
+  Barcode, Search, Package, AlertTriangle, CheckCircle2,
+  ScanLine, X, Plus, Minus, ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';

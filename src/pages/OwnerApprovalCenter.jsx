@@ -325,7 +325,7 @@ function ApprovalCenterTab() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
           { key: 'pending',   label: 'Pending',   color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/20' },
           { key: 'approved',  label: 'Approved',  color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },

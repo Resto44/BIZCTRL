@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useTenant } from '@/lib/TenantContext';
 import { useAuth } from '@/lib/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
   Tag, Plus, Edit2, Trash2, Gift, Percent, DollarSign,
-  Truck, Star, RefreshCw, Copy, CheckCircle2
+  Truck, RefreshCw, Copy, CheckCircle2
 } from 'lucide-react';
 
 const PROMO_TYPES = [

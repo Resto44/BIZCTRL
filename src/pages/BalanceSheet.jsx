@@ -16,7 +16,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { useState } from 'react';
 import {
-  Wallet, Package, CreditCard, Banknote,
   TrendingUp, TrendingDown, Scale,
 } from 'lucide-react';
 

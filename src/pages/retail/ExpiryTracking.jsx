@@ -22,11 +22,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Calendar, AlertTriangle, CheckCircle2, XCircle, Package,
-  Clock, TrendingDown, AlertCircle, Trash2,
+  Calendar, AlertTriangle, CheckCircle2, XCircle,
+  Clock, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, differenceInDays, isPast, isWithinInterval, addDays } from 'date-fns';
+import { format, differenceInDays, isPast } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 function RetailModeRequired() {

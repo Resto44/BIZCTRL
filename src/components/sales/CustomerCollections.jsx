@@ -4,7 +4,7 @@
  * This component has been merged into the unified Debt Management module.
  * Redirects to /debt-management.
  */
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

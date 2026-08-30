@@ -1,17 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
-import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  LayoutDashboard, TrendingUp, Building2, Users, DollarSign,
+import { TrendingUp, Building2, Users, DollarSign,
   Package, ShoppingCart, AlertTriangle, BarChart3, LogOut,
   RefreshCw, GitBranch, Activity
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { calculateERPAccounting, tagExpensesWithCategories } from '@/lib/helpers';
 

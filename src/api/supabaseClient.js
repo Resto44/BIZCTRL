@@ -396,7 +396,6 @@ const entities = {
   // ── New Enterprise Entities (Phase 2) ──
   Ingredient: createEntity('ingredients'),
   LoyaltyTransaction: createEntity('loyalty_transactions'),
-  Notification: createEntity('notifications'),
   ProductSize: createEntity('product_sizes'),
   CartItem: createEntity('cart_items'),
   OrderTracking: createEntity('order_tracking'),

@@ -1,17 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/AuthContext';
+import React, { useEffect } from 'react';
 import { useRole, ROLES } from '@/lib/RoleContext';
-import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
+import { Card, CardContent } from '@/components/ui/card';
 import { BarChart3, ShoppingCart } from 'lucide-react';
-// SalesForm removed to enforce single ERP workspace entry point
 import { useLanguage } from '@/lib/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function StaffUpload() {
-  const { user } = useAuth();
   const { role } = useRole();
   const navigate = useNavigate();
 
@@ -20,36 +14,8 @@ export default function StaffUpload() {
     if (role === ROLES.OWNER || role === ROLES.RESTAURANT_ADMIN) {
       window.location.replace('/');
     }
-  }, [role]);
-  const { toast } = useToast();
+  }, [navigate, role]);
   const { t } = useLanguage();
-  const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState(null);
-
-  const { data: branches = [] } = useQuery({
-    queryKey: ['branches'],
-    queryFn: () => base44.entities.Restaurant.list(),
-  });
-
-  const userBranch = branches.find(b => b.key === user?.branch)?.key || branches[0]?.key;
-
-  const createSaleMutation = useMutation({
-    mutationFn: (data) => base44.entities.DailySales.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
-      setActiveTab(null);
-      toast({ description: t('Sale recorded successfully') });
-    },
-  });
-
-  const createPurchaseMutation = useMutation({
-    mutationFn: (data) => base44.entities.Purchase.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchases'] });
-      setActiveTab(null);
-      toast({ description: t('Purchase recorded successfully') });
-    },
-  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
@@ -64,36 +30,13 @@ export default function StaffUpload() {
           </p>
         </div>
 
-        {/* Active Form */}
-        {activeTab === 'sales' && (
-          <div className="mb-6">
-            {/* SalesForm removed. Redirecting to central sales workspace. */}
-            {useEffect(() => { navigate('/sales'); }, [])}
-          </div>
-        )}
-
-        {activeTab === 'purchases' && (
-          <div className="mb-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('Record Purchase')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  {t('Purchase recording coming soon')}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
         {/* Main Tiles */}
-        {!activeTab && (
-          <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Sales Tile */}
             <button
-              onClick={() => setActiveTab('sales')}
-              className="block w-full"
+              type="button"
+              onClick={() => navigate('/sales')}
+              className="block w-full text-left"
             >
               <Card className="hover:shadow-lg transition-all cursor-pointer border-2 border-transparent hover:border-primary">
                 <CardContent className="p-8">
@@ -116,8 +59,9 @@ export default function StaffUpload() {
 
             {/* Purchases Tile */}
             <button
-              onClick={() => setActiveTab('purchases')}
-              className="block w-full"
+              type="button"
+              onClick={() => navigate('/purchases')}
+              className="block w-full text-left"
             >
               <Card className="hover:shadow-lg transition-all cursor-pointer border-2 border-transparent hover:border-primary">
                 <CardContent className="p-8">
@@ -138,7 +82,6 @@ export default function StaffUpload() {
               </Card>
             </button>
           </div>
-        )}
       </div>
     </div>
   );

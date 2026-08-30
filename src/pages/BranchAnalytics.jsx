@@ -9,13 +9,12 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
-import { calculateSalesRevenue, tagExpensesWithCategories, formatDate } from '@/lib/helpers';
+import { calculateSalesRevenue, tagExpensesWithCategories } from '@/lib/helpers';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  TrendingUp, TrendingDown, Trophy, AlertTriangle,
-  Building2, Users, DollarSign, ShoppingCart, Activity,
+import { Trophy, AlertTriangle,
+  Building2,
   ArrowUpRight, ArrowDownRight,
 } from 'lucide-react';
 import {

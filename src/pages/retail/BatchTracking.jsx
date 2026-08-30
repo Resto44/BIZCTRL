@@ -26,8 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Tags, Plus, Search, Package, Calendar, AlertTriangle,
-  CheckCircle2, Clock, Trash2, Edit2, Boxes,
+  Tags, Plus, Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays, isPast } from 'date-fns';

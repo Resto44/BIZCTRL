@@ -18,13 +18,12 @@ import PageHeader from '@/components/shared/PageHeader';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
-  BookOpen, Truck, DollarSign, AlertCircle, CheckCircle2, Clock,
-  TrendingDown, TrendingUp, Calendar, ArrowLeft
+  BookOpen, DollarSign, AlertCircle,
+  TrendingDown, TrendingUp
 } from 'lucide-react';
 import { getOverdueInfo } from '@/lib/procurementEngine';
 import { useNavigate } from 'react-router-dom';

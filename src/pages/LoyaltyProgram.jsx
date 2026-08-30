@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
@@ -11,9 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  Award, Star, Crown, Shield, Gift, Users, TrendingUp, Zap,
-  Plus, Edit2, Trash2, Search, ChevronRight, Target, Percent,
-  CheckCircle2, Tag, RefreshCw
+  Award, Star, Crown, Shield, Gift, Users,
+  Plus, Edit2, Trash2, Search,
+  CheckCircle2, Tag
 } from 'lucide-react';
 import { toast } from 'sonner';
 

@@ -4,11 +4,9 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
-import { useRole, ROLES } from '@/lib/RoleContext';
+import { useRole } from '@/lib/RoleContext';
 import PageHeader from '@/components/shared/PageHeader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { BarChart3, TrendingUp, AlertTriangle, Zap } from 'lucide-react';
 
 // Import new analytics components

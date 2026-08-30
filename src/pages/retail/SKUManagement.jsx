@@ -23,7 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Hash, Search, Package, Edit2, RefreshCw, Copy, Check, ShoppingBag } from 'lucide-react';
+import { Hash, Search, Package, Edit2, RefreshCw, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 

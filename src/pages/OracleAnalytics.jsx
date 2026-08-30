@@ -5,20 +5,20 @@
  * KPIs: Sales, Purchases, Fixed Expense, Variable Expense,
  *        Gross Profit, Net Profit, Profit Margin, Growth %
  */
-import React, { useState, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useMemo, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
-import { calculateERPAccounting, tagExpensesWithCategories, calculateSalesRevenue, formatDate } from '@/lib/helpers';
+import { tagExpensesWithCategories, calculateSalesRevenue, formatDate } from '@/lib/helpers';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import BranchSelect from '@/components/shared/BranchSelect';
 import {
-  TrendingUp, TrendingDown, DollarSign, ShoppingCart,
+  TrendingUp, DollarSign, ShoppingCart,
   BarChart3, Activity, ArrowUpRight, ArrowDownRight,
   Target, Zap,
 } from 'lucide-react';
@@ -29,7 +29,7 @@ import {
 } from 'date-fns';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, Area, AreaChart,
+  Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 
 // ── Date range presets ────────────────────────────────────────────────────────

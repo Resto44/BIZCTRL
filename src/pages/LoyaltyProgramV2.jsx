@@ -9,15 +9,14 @@ import { base44 } from '@/api/base44Client';
 import { useTenant } from '@/lib/TenantContext';
 import { useAuth } from '@/lib/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
-  Award, Star, Gift, Users, TrendingUp, Wallet, Crown,
-  RefreshCw, Search, ChevronRight, Zap, RotateCcw
+  Award, Gift,
+  RefreshCw, Search, Zap
 } from 'lucide-react';
 
 // ── VIP Tier Config ────────────────────────────────────────────────────────

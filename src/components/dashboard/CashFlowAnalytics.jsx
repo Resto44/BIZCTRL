@@ -4,11 +4,9 @@ import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { formatCurrency } from '@/lib/helpers';
 import { getDailyCashFlow, getCashFlowSummary, calculateCashBalances } from '@/services/analytics/cashflowAnalytics';
-import { getRevenueForecast, getCashFlowForecast } from '@/services/analytics/forecastAnalytics';
+import { getCashFlowForecast } from '@/services/analytics/forecastAnalytics';
 import { Card } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown } from 'lucide-react';
 
 export default function CashFlowAnalytics({ branchKey = 'all' }) {
   const { ownerFilter, branches } = useTenant();

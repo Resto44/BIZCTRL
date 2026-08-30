@@ -10,10 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Bot, Send, Sparkles, TrendingUp, AlertTriangle, Lightbulb,
-  BarChart3, DollarSign, Package, Users, Zap, ChevronRight,
-  RefreshCw, Star, Target, Brain
+  BarChart3, DollarSign, Package, Zap, Star, Target, Brain
 } from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 
 const QUICK_PROMPTS = [
   { label: 'How is my business doing this month?', icon: TrendingUp },
