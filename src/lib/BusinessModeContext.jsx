@@ -27,6 +27,8 @@
 
 import React, { createContext, useContext, useMemo } from 'react';
 import { useTenant } from '@/lib/TenantContext';
+import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
+import { isWorkspaceModuleEnabled } from '@/lib/workspaceCustomization';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 export const BUSINESS_MODES = {
@@ -82,6 +84,8 @@ export const MODULE_REGISTRY = {
   network_settlement:    { modes: 'all', label: 'Network Settlement' },
   expenses:              { modes: 'all', label: 'Expenses' },
   accounting:            { modes: 'all', label: 'Accounting' },
+  debt_management:       { modes: 'all', label: 'Debts & Receivables' },
+  payroll:               { modes: 'all', label: 'Payroll' },
   reports:               { modes: 'all', label: 'Reports' },
   notifications:         { modes: 'all', label: 'Notifications' },
   ai_analytics:          { modes: 'all', label: 'AI Analytics' },
@@ -119,6 +123,7 @@ const BusinessModeContext = createContext({
 // ── Provider ──────────────────────────────────────────────────────────────────
 export function BusinessModeProvider({ children }) {
   const { activeRestaurant, updateRestaurant } = useTenant();
+  const { configuration } = useWorkspaceCustomization();
 
   const activeMode = useMemo(() => {
     return activeRestaurant?.business_mode || BUSINESS_MODES.RESTAURANT;
@@ -142,6 +147,7 @@ export function BusinessModeProvider({ children }) {
   const isModuleEnabled = (moduleKey) => {
     const mod = MODULE_REGISTRY[moduleKey];
     if (!mod) return false;
+    if (!isWorkspaceModuleEnabled(configuration, moduleKey)) return false;
     if (mod.modes === 'all') return true;
     if (Array.isArray(mod.modes)) return mod.modes.includes(activeMode);
     return mod.modes === activeMode;
@@ -153,7 +159,8 @@ export function BusinessModeProvider({ children }) {
    */
   const getModulesForMode = () => {
     return Object.entries(MODULE_REGISTRY)
-      .filter(([, mod]) => {
+      .filter(([key, mod]) => {
+        if (!isWorkspaceModuleEnabled(configuration, key)) return false;
         if (mod.modes === 'all') return true;
         if (Array.isArray(mod.modes)) return mod.modes.includes(activeMode);
         return mod.modes === activeMode;
@@ -178,7 +185,7 @@ export function BusinessModeProvider({ children }) {
     modeLabel,
     modeIcon,
     modeColor,
-  }), [activeMode, isRestaurant, isRetail, isRestaurantLike, isRetailLike, setMode]);
+  }), [activeMode, configuration, isRestaurant, isRetail, isRestaurantLike, isRetailLike, setMode]);
 
   return (
     <BusinessModeContext.Provider value={value}>

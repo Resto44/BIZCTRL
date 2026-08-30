@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Check, ChevronRight, Building2, GitBranch, Globe, Zap, DollarSign, AlertCircle, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
+import { applyBusinessTemplate, DEFAULT_WORKSPACE_CUSTOMIZATION } from '@/lib/workspaceCustomization';
 
 const CURRENCIES = ['SAR', 'ر.س', 'AED', '$', '€', '£', 'AFN', '؋'];
 
@@ -124,13 +125,10 @@ export default function Onboarding({ onComplete }) {
       if (!user?.email) throw new Error('Not authenticated — please refresh and try again.');
 
       const branchKey = branchLabel.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || 'main';
-      // Persist the canonical portal mode. Pharmacy has a dedicated server-backed
-      // mode and must never be collapsed into Retail during tenant creation.
-      const businessMode = businessType === 'pharmacy'
-        ? 'pharmacy'
-        : ['retail', 'wholesale', 'warehouse'].includes(businessType)
-          ? 'retail'
-          : 'restaurant';
+      // Persist the selected operating model without collapsing distinct
+      // businesses into restaurant or retail. The database enum and workspace
+      // templates use this same canonical value.
+      const businessMode = businessType;
 
       const rest = await base44.entities.Restaurant.create({
         org_id: user.email,
@@ -185,6 +183,20 @@ export default function Onboarding({ onComplete }) {
         });
       } catch (initErr) {
         console.warn('[Onboarding] Tenant init warning (non-fatal):', initErr.message);
+      }
+
+      // New organizations receive the module preset for their selected business.
+      // This is intentionally non-destructive and can be changed later by the owner.
+      try {
+        const initialWorkspace = applyBusinessTemplate(DEFAULT_WORKSPACE_CUSTOMIZATION, businessMode);
+        const { error: workspaceError } = await supabase.rpc('erp_update_business_workspace', {
+          p_restaurant_id: rest.id,
+          p_business_mode: businessMode,
+          p_customization: initialWorkspace,
+        });
+        if (workspaceError) throw workspaceError;
+      } catch (workspaceError) {
+        console.warn('[Onboarding] Workspace template warning (non-fatal):', workspaceError.message);
       }
 
       localStorage.setItem('rc_lang', lang);

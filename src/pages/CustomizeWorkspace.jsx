@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   ArrowDown, ArrowUp, Building2, ChevronRight,
-  Gauge, LayoutDashboard, ListFilter, Palette, Plus,
+  CheckCircle2, Gauge, LayoutDashboard, ListFilter, Palette, Plus,
   RotateCcw, Save, Settings2, ShieldCheck, Trash2,
 } from 'lucide-react';
 import { supabase } from '@/api/supabaseClient';
@@ -14,14 +14,20 @@ import { useTenant } from '@/lib/TenantContext';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import {
   CUSTOM_FIELD_TYPES,
+  BUSINESS_TEMPLATE_PRESETS,
+  DEFAULT_WORKSPACE_CUSTOMIZATION,
   PRODUCT_FIELD_KEYS,
   PRODUCT_TABLE_COLUMNS,
+  WORKSPACE_MODULE_CATALOG,
   WORKSPACE_NAVIGATION_PATHS,
+  applyBusinessTemplate,
+  isWorkspaceModuleEnabled,
   mergeWorkspaceCustomization,
   normalizeWorkspaceCustomization,
   reorderList,
 } from '@/lib/workspaceCustomization';
 import { ERP_NAV_GROUPS } from '@/components/layout/ERPSidebar';
+import { useBusinessMode } from '@/lib/BusinessModeContext';
 import PageHeader from '@/components/shared/PageHeader';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -132,6 +138,61 @@ function NavigationEditor({ draft, setDraft }) {
       </div>
     </SectionCard>
   );
+}
+
+function BusinessTemplateEditor({ draft, setDraft }) {
+  const selectedTemplate = draft.business.template || 'restaurant';
+  const moduleGroups = useMemo(() => {
+    const groups = new Map();
+    WORKSPACE_MODULE_CATALOG.forEach((module) => {
+      const list = groups.get(module.group) || [];
+      list.push(module);
+      groups.set(module.group, list);
+    });
+    return [...groups.entries()];
+  }, []);
+  const selectTemplate = (templateKey) => setDraft((current) => applyBusinessTemplate(current, templateKey));
+  const toggleModule = (moduleKey, enabled) => setDraft((current) => {
+    const disabled = new Set(current.business.disabled_modules || []);
+    if (enabled) disabled.delete(moduleKey);
+    else disabled.add(moduleKey);
+    return mergeWorkspaceCustomization(current, { business: { ...current.business, disabled_modules: [...disabled] } });
+  });
+
+  return <div className="space-y-4">
+    <SectionCard title="Business template" description="Choose the closest operating model, then enable only the modules this organization needs. Applying a template never deletes existing records.">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        {Object.entries(BUSINESS_TEMPLATE_PRESETS).map(([key, template]) => {
+          const selected = selectedTemplate === key;
+          return <button key={key} type="button" onClick={() => selectTemplate(key)} className={`relative min-h-32 rounded-2xl border p-3 text-left transition-all ${selected ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100 dark:bg-blue-950/30' : 'border-border bg-card hover:border-blue-200 hover:bg-muted/40'}`}>
+            {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5 text-blue-600" />}
+            <span className="text-2xl" aria-hidden="true">{template.icon}</span>
+            <span className="mt-2 block text-sm font-black">{template.label}</span>
+            <span className="mt-1 block text-[11px] leading-snug text-muted-foreground">{template.description}</span>
+          </button>;
+        })}
+      </div>
+      <Alert className="mt-4 border-blue-200 bg-blue-50/60 dark:bg-blue-950/20"><Settings2 className="h-4 w-4" /><AlertTitle>Safe template change</AlertTitle><AlertDescription>Saving updates the organization business mode and its visible modules together. Products, sales, invoices, debts, users and accounting records remain unchanged.</AlertDescription></Alert>
+    </SectionCard>
+
+    <SectionCard title="Module builder" description="Turn modules on or off for this organization. Required core controls stay enabled, and role permissions, subscription entitlements and database RLS remain authoritative.">
+      <div className="grid gap-4 lg:grid-cols-2">
+        {moduleGroups.map(([group, modules]) => <div key={group} className="overflow-hidden rounded-2xl border border-border">
+          <div className="border-b border-border bg-muted/50 px-3 py-2 text-xs font-black uppercase tracking-wide text-muted-foreground">{group}</div>
+          <div className="divide-y divide-border">
+            {modules.map((module) => {
+              const enabled = isWorkspaceModuleEnabled(draft, module.key);
+              return <label key={module.key} className="flex min-h-14 items-center gap-3 px-3 py-2.5">
+                <Switch checked={enabled} disabled={module.required} onCheckedChange={(checked) => toggleModule(module.key, checked)} aria-label={`Toggle ${module.label}`} />
+                <span className="min-w-0 flex-1"><span className="block text-sm font-bold">{module.label}</span><span className="block text-[11px] text-muted-foreground">{module.required ? 'Required ERP control' : enabled ? 'Enabled in workspace' : 'Hidden and blocked in workspace'}</span></span>
+                <span className={`h-2.5 w-2.5 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+              </label>;
+            })}
+          </div>
+        </div>)}
+      </div>
+    </SectionCard>
+  </div>;
 }
 
 function ProductFieldsEditor({ draft, setDraft }) {
@@ -267,16 +328,20 @@ function DocumentsEditor({ draft, setDraft }) {
 export default function CustomizeWorkspace() {
   const { lang, setLang } = useLanguage();
   const { activeRestaurant } = useTenant();
-  const { configuration, canCustomize, error, isLoading, isSaving, restoreDefaults, saveConfiguration } = useWorkspaceCustomization();
+  const { activeMode } = useBusinessMode();
+  const { configuration, canCustomize, error, isLoading, isSaving, saveBusinessConfiguration } = useWorkspaceCustomization();
   const [draft, setDraft] = useState(() => normalizeWorkspaceCustomization(configuration));
   const copy = COPY[lang] || COPY.en;
 
-  useEffect(() => setDraft(normalizeWorkspaceCustomization(configuration)), [configuration]);
+  useEffect(() => {
+    const next = normalizeWorkspaceCustomization(configuration);
+    setDraft(mergeWorkspaceCustomization(next, { business: { ...next.business, template: activeMode } }));
+  }, [activeMode, configuration]);
 
   const save = async () => {
     try {
       const next = normalizeWorkspaceCustomization(draft);
-      await saveConfiguration(next);
+      await saveBusinessConfiguration(next.business.template, next);
       setLang(next.regional.language);
       toast.success(copy.saved);
     } catch (saveError) {
@@ -285,7 +350,8 @@ export default function CustomizeWorkspace() {
   };
   const restore = async () => {
     try {
-      await restoreDefaults();
+      const defaults = applyBusinessTemplate(DEFAULT_WORKSPACE_CUSTOMIZATION, activeMode);
+      await saveBusinessConfiguration(activeMode, defaults);
       toast.success(copy.restored);
     } catch (restoreError) {
       toast.error(restoreError?.message || 'Unable to restore workspace defaults.');
@@ -299,7 +365,7 @@ export default function CustomizeWorkspace() {
   return <main className="mx-auto w-full max-w-7xl space-y-4 p-4 pb-28 sm:p-6 lg:p-8">
     <PageHeader title={copy.title} subtitle={activeRestaurant?.name ? `${copy.description} ${activeRestaurant.name}.` : copy.description} icon={Settings2} />
     {error && <Alert variant="destructive"><AlertTitle>Configuration error</AlertTitle><AlertDescription>{error.message}</AlertDescription></Alert>}
-    {isLoading ? <Card className="p-8 text-sm text-muted-foreground">Loading workspace configuration…</Card> : <Tabs defaultValue="navigation" className="space-y-4"><TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-lg bg-muted p-1"><TabsTrigger value="navigation">Navigation</TabsTrigger><TabsTrigger value="dashboard">Dashboard</TabsTrigger><TabsTrigger value="fields">Fields & forms</TabsTrigger><TabsTrigger value="tables">Tables & views</TabsTrigger><TabsTrigger value="reports">Reports & workflows</TabsTrigger><TabsTrigger value="notifications">Notifications</TabsTrigger><TabsTrigger value="regional">Regional</TabsTrigger><TabsTrigger value="documents">Documents</TabsTrigger><TabsTrigger value="administration">Administration</TabsTrigger></TabsList><TabsContent value="navigation"><NavigationEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="dashboard"><SectionCard title="Dashboard widgets" description="Use the existing dashboard customization control to add, remove, show, hide, rename, and describe the supported owner dashboard widgets."><SettingLink to="/owner-command-center" icon={LayoutDashboard} title="Open owner dashboard" description="Open the live dashboard and select Customize Dashboard." /></SectionCard></TabsContent><TabsContent value="fields" className="space-y-4"><ProductFieldsEditor draft={draft} setDraft={setDraft} /><ProductFormEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="tables" className="space-y-4"><ProductTableEditor draft={draft} setDraft={setDraft} /><SavedViewsManager /></TabsContent><TabsContent value="reports"><ReportWorkflowEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="notifications"><NotificationEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="regional"><RegionalEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="documents"><DocumentsEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="administration" className="grid gap-4 lg:grid-cols-2"><SectionCard title="Organization settings" description="Open existing secured settings surfaces. These pages retain their own authorization and data validation."><div className="space-y-3"><SettingLink to="/brand" icon={Palette} title="Branding" description="Manage organization logo, name, invoice and receipt branding." /><SettingLink to="/branch-management" icon={Building2} title="Branches" description="Manage tenant-scoped branch records and assignments." /><SettingLink to="/role-permissions" icon={ShieldCheck} title="Roles & permissions" description="Use the existing RBAC control center for delegated access." /></div></SectionCard><SectionCard title="Configuration safeguards" description="Workspace customization is presentation configuration only. It cannot edit Paddle, billing, plans, entitlements, API routes, permissions, audit records, business data, or executable code."><div className="space-y-2 text-sm text-muted-foreground"><p>All organization-wide changes are written through an authorized server mutation and recorded in the existing audit log.</p><p>Restoring defaults resets configuration only; it does not delete products, invoices, accounting records, users, branches, or other business data.</p></div></SectionCard></TabsContent></Tabs>}
+    {isLoading ? <Card className="p-8 text-sm text-muted-foreground">Loading workspace configuration…</Card> : <Tabs defaultValue="business" className="space-y-4"><TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-lg bg-muted p-1"><TabsTrigger value="business">Business & modules</TabsTrigger><TabsTrigger value="navigation">Navigation</TabsTrigger><TabsTrigger value="dashboard">Dashboard</TabsTrigger><TabsTrigger value="fields">Fields & forms</TabsTrigger><TabsTrigger value="tables">Tables & views</TabsTrigger><TabsTrigger value="reports">Reports & workflows</TabsTrigger><TabsTrigger value="notifications">Notifications</TabsTrigger><TabsTrigger value="regional">Regional</TabsTrigger><TabsTrigger value="documents">Documents</TabsTrigger><TabsTrigger value="administration">Administration</TabsTrigger></TabsList><TabsContent value="business"><BusinessTemplateEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="navigation"><NavigationEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="dashboard"><SectionCard title="Dashboard widgets" description="Use the existing dashboard customization control to add, remove, show, hide, rename, and describe the supported owner dashboard widgets."><SettingLink to="/owner-command-center" icon={LayoutDashboard} title="Open owner dashboard" description="Open the live dashboard and select Customize Dashboard." /></SectionCard></TabsContent><TabsContent value="fields" className="space-y-4"><ProductFieldsEditor draft={draft} setDraft={setDraft} /><ProductFormEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="tables" className="space-y-4"><ProductTableEditor draft={draft} setDraft={setDraft} /><SavedViewsManager /></TabsContent><TabsContent value="reports"><ReportWorkflowEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="notifications"><NotificationEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="regional"><RegionalEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="documents"><DocumentsEditor draft={draft} setDraft={setDraft} /></TabsContent><TabsContent value="administration" className="grid gap-4 lg:grid-cols-2"><SectionCard title="Organization settings" description="Open existing secured settings surfaces. These pages retain their own authorization and data validation."><div className="space-y-3"><SettingLink to="/brand" icon={Palette} title="Branding" description="Manage organization logo, name, invoice and receipt branding." /><SettingLink to="/branch-management" icon={Building2} title="Branches" description="Manage tenant-scoped branch records and assignments." /><SettingLink to="/role-permissions" icon={ShieldCheck} title="Roles & permissions" description="Use the existing RBAC control center for delegated access." /></div></SectionCard><SectionCard title="Configuration safeguards" description="Workspace customization is presentation configuration only. It cannot edit Paddle, billing, plans, entitlements, API routes, permissions, audit records, business data, or executable code."><div className="space-y-2 text-sm text-muted-foreground"><p>All organization-wide changes are written through an authorized server mutation and recorded in the existing audit log.</p><p>Restoring defaults resets configuration only; it does not delete products, invoices, accounting records, users, branches, or other business data.</p></div></SectionCard></TabsContent></Tabs>}
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur sm:left-auto sm:right-6 sm:bottom-6 sm:rounded-xl sm:border sm:shadow-lg"><div className="mx-auto flex max-w-7xl justify-end gap-2"><Button type="button" variant="outline" disabled={isSaving || isLoading} onClick={restore}><RotateCcw className="mr-2 h-4 w-4" />{copy.restore}</Button><Button type="button" disabled={isSaving || isLoading} onClick={save}><Save className="mr-2 h-4 w-4" />{isSaving ? copy.saving : copy.save}</Button></div></div>
   </main>;
 }

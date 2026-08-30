@@ -1,4 +1,57 @@
-export const WORKSPACE_CUSTOMIZATION_VERSION = 1;
+export const WORKSPACE_CUSTOMIZATION_VERSION = 2;
+
+export const BUSINESS_TEMPLATE_KEYS = Object.freeze([
+  'restaurant', 'cafe', 'retail', 'warehouse', 'factory',
+  'pharmacy', 'clinic', 'wholesale', 'services', 'other',
+]);
+
+export const WORKSPACE_MODULE_CATALOG = Object.freeze([
+  { key: 'dashboard', label: 'Dashboard', group: 'Core', required: true, paths: ['/owner-command-center', '/executive-command-center', '/manager-dashboard', '/gm-dashboard', '/dashboard', '/branch-command-center'] },
+  { key: 'sales', label: 'Sales & customers', group: 'Operations', paths: ['/sales', '/sales-sources', '/sales-source-management', '/sales/invoices', '/sales-closing-customization', '/promotions'] },
+  { key: 'cash_register', label: 'Cash register', group: 'Operations', paths: ['/cash-register'] },
+  { key: 'purchase', label: 'Purchases', group: 'Operations', paths: ['/purchases', '/purchase-orders', '/procurement-dashboard', '/enterprise-purchases'] },
+  { key: 'expenses', label: 'Expenses', group: 'Finance', paths: ['/expenses'] },
+  { key: 'inventory', label: 'Inventory', group: 'Inventory', paths: ['/inventory', '/inventory-transfers', '/inventory-waste', '/inventory-forecast', '/inventory-command-center'] },
+  { key: 'product_management', label: 'Products', group: 'Inventory', paths: ['/products', '/product-management'] },
+  { key: 'supplier_management', label: 'Suppliers', group: 'Operations', paths: ['/suppliers', '/supplier-ledger', '/supplier-portal'] },
+  { key: 'treasury', label: 'Treasury', group: 'Finance', paths: ['/treasury', '/sponsor-treasury'] },
+  { key: 'debt_management', label: 'Debts & receivables', group: 'Finance', paths: ['/debts', '/debt-management', '/customer-management', '/loyalty-v2', '/loyalty-program'] },
+  { key: 'network_settlement', label: 'Network settlement', group: 'Finance', paths: ['/network-management', '/network-accounts', '/network-analytics', '/network-hub'] },
+  { key: 'payroll', label: 'Payroll', group: 'People', paths: ['/payroll'] },
+  { key: 'employee_management', label: 'Team management', group: 'People', paths: ['/employees', '/employee-control', '/employee-attendance', '/staff-attendance', '/driver-management', '/staff-invitations', '/staff-upload', '/tasks'] },
+  { key: 'reports', label: 'Reports & analytics', group: 'Analytics', paths: ['/reports', '/sales-dashboard', '/profit-loss', '/cashflow', '/balance-sheet', '/branch-analytics', '/ceo-dashboard', '/price-optimization', '/scheduled-reports', '/bi-center', '/oracle-analytics', '/activity-logs'] },
+  { key: 'ai_analytics', label: 'AI analytics', group: 'Analytics', paths: ['/ai-copilot'] },
+  { key: 'notifications', label: 'Alerts & notifications', group: 'System', paths: ['/alerts', '/notifications'] },
+  { key: 'approval_center', label: 'Approval workflows', group: 'System', paths: ['/approval-center', '/erp-approval-center', '/approval-policy'] },
+  { key: 'barcode', label: 'Barcode', group: 'Retail tools', paths: ['/retail/barcode'] },
+  { key: 'sku_management', label: 'SKU management', group: 'Retail tools', paths: ['/retail/sku'] },
+  { key: 'product_variants', label: 'Product variants', group: 'Retail tools', paths: ['/retail/variants'] },
+  { key: 'batch_lot_tracking', label: 'Batch & lot tracking', group: 'Retail tools', paths: ['/retail/batches'] },
+  { key: 'expiry_tracking', label: 'Expiry tracking', group: 'Retail tools', paths: ['/retail/expiry'] },
+  { key: 'serial_numbers', label: 'Serial numbers', group: 'Retail tools', paths: ['/retail/serials'] },
+  { key: 'settings', label: 'Settings & customization', group: 'Core', required: true, paths: ['/settings', '/customize-workspace', '/branch-management', '/role-permissions', '/restaurants', '/brand', '/billing', '/support'] },
+]);
+
+export const WORKSPACE_MODULE_KEYS = Object.freeze(WORKSPACE_MODULE_CATALOG.map((module) => module.key));
+
+const COMMON_ERP_MODULES = [
+  'dashboard', 'sales', 'purchase', 'expenses', 'inventory', 'product_management',
+  'supplier_management', 'treasury', 'debt_management', 'payroll',
+  'employee_management', 'reports', 'notifications', 'approval_center', 'settings',
+];
+
+export const BUSINESS_TEMPLATE_PRESETS = Object.freeze({
+  restaurant: { label: 'Restaurant', icon: '🍽️', description: 'Sales closing, purchasing, inventory, drivers and finance.', enabled_modules: [...COMMON_ERP_MODULES, 'cash_register', 'network_settlement', 'ai_analytics'] },
+  cafe: { label: 'Café', icon: '☕', description: 'Fast sales, cash register, stock and daily purchasing.', enabled_modules: [...COMMON_ERP_MODULES, 'cash_register', 'network_settlement', 'ai_analytics'] },
+  retail: { label: 'Retail store', icon: '🛍️', description: 'POS, barcode, SKU, variants, batches and expiry.', enabled_modules: [...COMMON_ERP_MODULES, 'cash_register', 'network_settlement', 'ai_analytics', 'barcode', 'sku_management', 'product_variants', 'batch_lot_tracking', 'expiry_tracking', 'serial_numbers'] },
+  warehouse: { label: 'Warehouse', icon: '🏭', description: 'Purchasing, stock, transfers, batches and supplier control.', enabled_modules: ['dashboard', 'purchase', 'expenses', 'inventory', 'product_management', 'supplier_management', 'treasury', 'payroll', 'employee_management', 'reports', 'notifications', 'approval_center', 'barcode', 'sku_management', 'batch_lot_tracking', 'settings'] },
+  factory: { label: 'Factory', icon: '⚙️', description: 'Materials, purchasing, stock, batches, cost and workforce.', enabled_modules: ['dashboard', 'sales', 'purchase', 'expenses', 'inventory', 'product_management', 'supplier_management', 'treasury', 'debt_management', 'payroll', 'employee_management', 'reports', 'notifications', 'approval_center', 'batch_lot_tracking', 'settings'] },
+  pharmacy: { label: 'Pharmacy', icon: '💊', description: 'POS, barcode, batches, expiry and serial tracking.', enabled_modules: [...COMMON_ERP_MODULES, 'cash_register', 'network_settlement', 'barcode', 'sku_management', 'batch_lot_tracking', 'expiry_tracking', 'serial_numbers'] },
+  clinic: { label: 'Clinic', icon: '🏥', description: 'Service billing, receivables, medical stock and staff.', enabled_modules: ['dashboard', 'sales', 'purchase', 'expenses', 'inventory', 'product_management', 'supplier_management', 'treasury', 'debt_management', 'payroll', 'employee_management', 'reports', 'notifications', 'approval_center', 'expiry_tracking', 'serial_numbers', 'settings'] },
+  wholesale: { label: 'Wholesale', icon: '📦', description: 'Bulk sales, purchasing, receivables, variants and batches.', enabled_modules: [...COMMON_ERP_MODULES, 'network_settlement', 'barcode', 'sku_management', 'product_variants', 'batch_lot_tracking', 'expiry_tracking'] },
+  services: { label: 'Service business', icon: '🔧', description: 'Service sales, expenses, receivables, team and reports.', enabled_modules: ['dashboard', 'sales', 'expenses', 'treasury', 'debt_management', 'payroll', 'employee_management', 'reports', 'notifications', 'approval_center', 'ai_analytics', 'settings'] },
+  other: { label: 'Custom business', icon: '🏢', description: 'Start with shared ERP modules and customize every section.', enabled_modules: [...COMMON_ERP_MODULES, 'cash_register', 'network_settlement', 'ai_analytics'] },
+});
 
 export const WORKSPACE_SECTION_KEYS = Object.freeze([
   'navigation',
@@ -56,6 +109,7 @@ export const WORKSPACE_NAVIGATION_PATHS = Object.freeze([
 
 export const DEFAULT_WORKSPACE_CUSTOMIZATION = Object.freeze({
   version: WORKSPACE_CUSTOMIZATION_VERSION,
+  business: { template: 'restaurant', disabled_modules: [] },
   navigation: { hidden_paths: [], order: [] },
   labels: {},
   fields: { products: [] },
@@ -123,6 +177,7 @@ function normalizeCustomField(field, index) {
 
 export function normalizeWorkspaceCustomization(value) {
   const source = safeObject(value);
+  const business = safeObject(source.business);
   const navigation = safeObject(source.navigation);
   const labels = Object.fromEntries(
     Object.entries(safeObject(source.labels))
@@ -154,6 +209,11 @@ export function normalizeWorkspaceCustomization(value) {
 
   return {
     version: WORKSPACE_CUSTOMIZATION_VERSION,
+    business: {
+      template: BUSINESS_TEMPLATE_KEYS.includes(business.template) ? business.template : 'restaurant',
+      disabled_modules: uniqueStrings(business.disabled_modules, WORKSPACE_MODULE_KEYS)
+        .filter((key) => !WORKSPACE_MODULE_CATALOG.some((module) => module.key === key && module.required)),
+    },
     navigation: {
       hidden_paths: uniqueStrings(navigation.hidden_paths, WORKSPACE_NAVIGATION_PATHS),
       order: uniqueStrings(navigation.order, WORKSPACE_NAVIGATION_PATHS),
@@ -208,6 +268,7 @@ export function mergeWorkspaceCustomization(current, patch) {
   const merge = (base, update) => ({ ...safeObject(base), ...safeObject(update) });
   const base = normalizeWorkspaceCustomization(current);
   const next = merge(base, patch);
+  next.business = merge(base.business, patch?.business);
   next.navigation = merge(base.navigation, patch?.navigation);
   next.fields = merge(base.fields, patch?.fields);
   next.forms = merge(base.forms, patch?.forms);
@@ -259,9 +320,38 @@ export function getCustomizedNavigationGroups(groups, config) {
       ...group,
       label: getWorkspaceLabel(config, group.label),
       items: group.items
-        .filter((item) => !hiddenPaths.has(item.path))
+        .filter((item) => !hiddenPaths.has(item.path) && isWorkspacePathEnabled(config, item.path))
         .map((item) => ({ ...item, label: getWorkspaceLabel(config, item.label) }))
         .sort((a, b) => (rank.get(a.path) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.path) ?? Number.MAX_SAFE_INTEGER)),
     }))
     .filter((group) => group.items.length > 0);
+}
+
+export function getWorkspaceModuleForPath(pathname) {
+  if (typeof pathname !== 'string') return null;
+  return WORKSPACE_MODULE_CATALOG.find((module) => module.paths.some((path) => pathname === path || pathname.startsWith(`${path}/`))) || null;
+}
+
+export function isWorkspaceModuleEnabled(config, moduleKey) {
+  const aliases = { customer_management: 'debt_management', supplier_portal: 'supplier_management', accounting: 'treasury', direct_inventory: 'inventory' };
+  const resolvedKey = aliases[moduleKey] || moduleKey;
+  const module = WORKSPACE_MODULE_CATALOG.find((entry) => entry.key === resolvedKey);
+  if (!module || module.required) return true;
+  return !safeArray(config?.business?.disabled_modules).includes(resolvedKey);
+}
+
+export function isWorkspacePathEnabled(config, pathname) {
+  const module = getWorkspaceModuleForPath(pathname);
+  return !module || isWorkspaceModuleEnabled(config, module.key);
+}
+
+export function applyBusinessTemplate(config, templateKey) {
+  const template = BUSINESS_TEMPLATE_PRESETS[templateKey] || BUSINESS_TEMPLATE_PRESETS.other;
+  const enabled = new Set(template.enabled_modules);
+  const disabledModules = WORKSPACE_MODULE_CATALOG
+    .filter((module) => !module.required && !enabled.has(module.key))
+    .map((module) => module.key);
+  return mergeWorkspaceCustomization(config, {
+    business: { template: BUSINESS_TEMPLATE_KEYS.includes(templateKey) ? templateKey : 'other', disabled_modules: disabledModules },
+  });
 }

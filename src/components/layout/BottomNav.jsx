@@ -25,6 +25,7 @@ import { useRole, ROLES } from '@/lib/RoleContext';
 import { useBusinessMode } from '@/lib/BusinessModeContext';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import { useTenant } from '@/lib/TenantContext';
+import { isWorkspacePathEnabled } from '@/lib/workspaceCustomization';
 
 // ── Primary Nav by Role + Mode ────────────────────────────────────────────────
 
@@ -525,7 +526,7 @@ const BottomNav = memo(function BottomNav() {
   const location = useLocation();
   const { t } = useLanguage();
   const { role, can } = useRole();
-  const { isRetail } = useBusinessMode();
+  const { isRetailLike } = useBusinessMode();
   const { configuration } = useWorkspaceCustomization();
   const [showMore, setShowMore] = useState(false);
 
@@ -539,16 +540,16 @@ const BottomNav = memo(function BottomNav() {
     if (role === ROLES.GENERAL_MANAGER) return { visibleNav: PRIMARY_NAV_GENERAL_MANAGER, moreSections: MORE_SECTIONS_OWNER_RESTAURANT };
 
     if (role === ROLES.MANAGER) {
-      return isRetail
+      return isRetailLike
         ? { visibleNav: PRIMARY_NAV_MANAGER_RETAIL, moreSections: MORE_SECTIONS_MANAGER_RETAIL }
         : { visibleNav: PRIMARY_NAV_MANAGER_RESTAURANT, moreSections: MORE_SECTIONS_MANAGER_RESTAURANT };
     }
 
     // OWNER (default)
-    return isRetail
+    return isRetailLike
       ? { visibleNav: PRIMARY_NAV_OWNER_RETAIL, moreSections: MORE_SECTIONS_OWNER_RETAIL }
       : { visibleNav: PRIMARY_NAV_OWNER_RESTAURANT, moreSections: MORE_SECTIONS_OWNER_RESTAURANT };
-  }, [role, isRetail]);
+  }, [role, isRetailLike]);
 
   const { visibleNav, moreSections } = useMemo(() => {
     const hidden = new Set(configuration?.navigation?.hidden_paths || []);
@@ -563,7 +564,7 @@ const BottomNav = memo(function BottomNav() {
         items: section.items
           .filter((item) => {
             const permission = MORE_PERMISSION_BY_PATH[item.path];
-            return (!permission || can[permission]) && !hidden.has(item.path);
+            return (!permission || can[permission]) && !hidden.has(item.path) && isWorkspacePathEnabled(configuration, item.path);
           })
           .sort(compare),
       }))

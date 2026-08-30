@@ -23,11 +23,11 @@ vi.mock('@/lib/LanguageContext', () => ({ useLanguage: () => identityMocks.langu
 const { default: PortalIdentityHeader } = await import('../src/components/layout/PortalIdentityHeader.jsx');
 
 describe('Pharmacy Owner portal resilience', () => {
-  it('persists Pharmacy as its canonical business mode rather than collapsing it into Retail', async () => {
+  it('persists every selected business type as its canonical mode without collapsing Pharmacy or other businesses', async () => {
     const onboarding = await readFile(onboardingPath, 'utf8');
-    expect(onboarding).toContain("businessType === 'pharmacy'");
-    expect(onboarding).toContain("? 'pharmacy'");
-    expect(onboarding).toContain("['retail', 'wholesale', 'warehouse']");
+    expect(onboarding).toContain('const businessMode = businessType;');
+    expect(onboarding).toContain('applyBusinessTemplate(DEFAULT_WORKSPACE_CUSTOMIZATION, businessMode)');
+    expect(onboarding).toContain("supabase.rpc('erp_update_business_workspace'");
     expect(onboarding).not.toContain("['retail', 'wholesale', 'warehouse', 'pharmacy']");
   });
 

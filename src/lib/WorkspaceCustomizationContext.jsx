@@ -22,6 +22,7 @@ const WorkspaceCustomizationContext = createContext({
   error: null,
   canCustomize: false,
   saveConfiguration: async () => {},
+  saveBusinessConfiguration: async () => {},
   savePatch: async () => {},
   restoreDefaults: async () => {},
   label: (value) => value,
@@ -123,9 +124,44 @@ export function WorkspaceCustomizationProvider({ children }) {
     },
   });
 
+  const businessSaveMutation = useMutation({
+    mutationFn: async ({ template, configuration: nextConfiguration }) => {
+      if (!restaurantId) throw new Error('Select an organization before changing its business template.');
+      const payload = normalizeWorkspaceCustomization(nextConfiguration);
+      const { data, error } = await supabase.rpc('erp_update_business_workspace', {
+        p_restaurant_id: restaurantId,
+        p_business_mode: template,
+        p_customization: payload,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData(queryKey, {
+        organization_id: restaurantId,
+        settings: data?.settings || { workspace_customization: data || DEFAULT_WORKSPACE_CUSTOMIZATION },
+        updated_at: data?.updated_at || new Date().toISOString(),
+      });
+      queryClient.setQueriesData({ queryKey: ['restaurants'] }, (current) => (
+        Array.isArray(current)
+          ? current.map((restaurant) => restaurant?.id === restaurantId
+            ? { ...restaurant, business_mode: variables.template }
+            : restaurant)
+          : current
+      ));
+      queryClient.invalidateQueries({ queryKey: ['restaurants'] });
+      queryClient.invalidateQueries({ queryKey: ['portal-identity'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-customization', restaurantId] });
+    },
+  });
+
   const saveConfiguration = useCallback(
     (nextConfiguration) => saveMutation.mutateAsync(nextConfiguration),
     [saveMutation],
+  );
+  const saveBusinessConfiguration = useCallback(
+    (template, nextConfiguration) => businessSaveMutation.mutateAsync({ template, configuration: nextConfiguration }),
+    [businessSaveMutation],
   );
   const savePatch = useCallback(
     (patch) => saveMutation.mutateAsync(mergeWorkspaceCustomization(configuration, patch)),
@@ -145,17 +181,18 @@ export function WorkspaceCustomizationProvider({ children }) {
   const value = useMemo(() => ({
     configuration,
     isLoading: configurationQuery.isLoading,
-    isSaving: saveMutation.isPending,
-    error: configurationQuery.error || saveMutation.error || membershipQuery.error || null,
+    isSaving: saveMutation.isPending || businessSaveMutation.isPending,
+    error: configurationQuery.error || saveMutation.error || businessSaveMutation.error || membershipQuery.error || null,
     canCustomize,
     saveConfiguration,
+    saveBusinessConfiguration,
     savePatch,
     restoreDefaults,
     label: (value) => getWorkspaceLabel(configuration, value),
     isProductFieldVisible: (field) => isProductFieldVisible(configuration, field),
     isProductFieldRequired: (field) => isProductFieldRequired(configuration, field),
     productCustomFields: getProductCustomFields(configuration),
-  }), [canCustomize, configuration, configurationQuery.error, configurationQuery.isLoading, membershipQuery.error, restoreDefaults, saveConfiguration, saveMutation.error, saveMutation.isPending, savePatch]);
+  }), [businessSaveMutation.error, businessSaveMutation.isPending, canCustomize, configuration, configurationQuery.error, configurationQuery.isLoading, membershipQuery.error, restoreDefaults, saveBusinessConfiguration, saveConfiguration, saveMutation.error, saveMutation.isPending, savePatch]);
 
   return (
     <WorkspaceCustomizationContext.Provider value={value}>

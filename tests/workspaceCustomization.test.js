@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import {
+  applyBusinessTemplate,
   DEFAULT_WORKSPACE_CUSTOMIZATION,
   getCustomizedNavigationGroups,
+  isWorkspaceModuleEnabled,
+  isWorkspacePathEnabled,
   mergeWorkspaceCustomization,
   normalizeWorkspaceCustomization,
 } from '../src/lib/workspaceCustomization.js';
 
 const migrationPath = new URL('../src/supabase/20260822_workspace_customization.sql', import.meta.url);
+const businessMigrationPath = new URL('../supabase/migrations/20260829_business_workspace_customization_rpc.sql', import.meta.url);
 
 const nav = [
   {
@@ -54,6 +58,30 @@ describe('Workspace customization runtime', () => {
     ]);
   });
 
+  it('applies a business template without deleting unrelated tenant customization', () => {
+    const configured = mergeWorkspaceCustomization(DEFAULT_WORKSPACE_CUSTOMIZATION, {
+      labels: { Sales: 'Revenue' },
+      fields: { products: [{ id: 'grade', label: 'Grade', type: 'text' }] },
+    });
+    const warehouse = applyBusinessTemplate(configured, 'warehouse');
+
+    expect(warehouse.business.template).toBe('warehouse');
+    expect(isWorkspaceModuleEnabled(warehouse, 'inventory')).toBe(true);
+    expect(isWorkspaceModuleEnabled(warehouse, 'cash_register')).toBe(false);
+    expect(isWorkspacePathEnabled(warehouse, '/cash-register')).toBe(false);
+    expect(warehouse.labels.Sales).toBe('Revenue');
+    expect(warehouse.fields.products[0].id).toBe('grade');
+  });
+
+  it('keeps required ERP controls enabled for every custom business workspace', () => {
+    const unsafe = normalizeWorkspaceCustomization({
+      business: { template: 'services', disabled_modules: ['dashboard', 'settings', 'inventory'] },
+    });
+    expect(unsafe.business.disabled_modules).toEqual(['inventory']);
+    expect(isWorkspacePathEnabled(unsafe, '/owner-command-center')).toBe(true);
+    expect(isWorkspacePathEnabled(unsafe, '/customize-workspace')).toBe(true);
+  });
+
   it('rejects executable text and unrecognized custom field data while keeping valid Unicode field labels', () => {
     const config = normalizeWorkspaceCustomization({
       labels: { Dashboard: '<script>alert(1)</script>', Customer: 'مهمان' },
@@ -79,5 +107,15 @@ describe('Workspace customization runtime', () => {
     expect(migration).not.toContain('custom_plans');
     expect(migration).not.toContain('custom_entitlements');
     expect(migration).not.toContain('custom_paddle');
+  });
+
+  it('updates business mode and workspace configuration through one authorized audited RPC', async () => {
+    const migration = await readFile(businessMigrationPath, 'utf8');
+    expect(migration).toContain('CREATE OR REPLACE FUNCTION public.erp_update_business_workspace');
+    expect(migration).toContain('public.erp_can_manage_workspace_customization');
+    expect(migration).toContain("'business_mode_updated'");
+    expect(migration).toContain("'workspace_customization_updated'");
+    expect(migration).toContain('REVOKE EXECUTE ON FUNCTION public.erp_update_business_workspace');
+    expect(migration).toContain('GRANT EXECUTE ON FUNCTION public.erp_update_business_workspace');
   });
 });
