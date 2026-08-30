@@ -12,7 +12,6 @@ import useERPSettings from '@/hooks/useERPSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   SavedBadge, SettingRow, SettingsCard, SettingsPageFrame, SettingsScopeSelector,
   SettingsSection, SettingsSkeleton,
@@ -165,7 +164,7 @@ export default function UsersAccessSettings() {
             <SettingsCard className="divide-y divide-slate-100 dark:divide-slate-800">
               <SettingRow icon={LockKeyhole} title="Require MFA for managers" description="Managers must use multi-factor authentication"><Switch checked={Boolean(access.requireManagerMfa)} onCheckedChange={(value) => patchAccess({ requireManagerMfa: value })} /></SettingRow>
               <SettingRow icon={Shield} title="Owner approval for role changes" description="Role changes cannot bypass owner review"><Switch checked={Boolean(access.ownerApprovalRoleChanges)} onCheckedChange={(value) => patchAccess({ ownerApprovalRoleChanges: value })} /></SettingRow>
-              <SettingRow icon={Clock3} title="Auto-expire invitations" description="Unused invitations automatically become invalid"><div className="flex shrink-0 items-center gap-2"><Select value={String(access.invitationExpiryHours || 72)} onValueChange={(value) => patchAccess({ invitationExpiryHours: Number(value) })} disabled={!access.autoExpireInvitations}><SelectTrigger className="h-9 w-28 rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="24">24 hours</SelectItem><SelectItem value="48">48 hours</SelectItem><SelectItem value="72">72 hours</SelectItem><SelectItem value="168">7 days</SelectItem></SelectContent></Select><Switch checked={Boolean(access.autoExpireInvitations)} onCheckedChange={(value) => patchAccess({ autoExpireInvitations: value })} /></div></SettingRow>
+              <SettingRow icon={Clock3} title="Invitation expiry" description="Single-use invitation links expire automatically" value="7 days · server enforced" />
             </SettingsCard>
           </SettingsSection>
 

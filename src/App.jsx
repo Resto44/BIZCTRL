@@ -257,7 +257,7 @@ const SubscribedRoutes = () => {
         <Route path="/executive-command-center" element={<RoleGuard permission="viewDashboard"><ExecutiveCommandCenter /></RoleGuard>} />
 
         <Route path="/staff-upload" element={<RoleGuard permission="uploadSales"><StaffUpload /></RoleGuard>} />
-        <Route path="/staff-invitations" element={<RoleGuard permission="viewBrandSettings"><StaffInvitations /></RoleGuard>} />
+        <Route path="/staff-invitations" element={<RoleGuard permission="manageUsers"><StaffInvitations /></RoleGuard>} />
 
         {/* ── Core Operations ── */}
         <Route path="/sales" element={<RoleGuard permission="viewSales"><Sales /></RoleGuard>} />
