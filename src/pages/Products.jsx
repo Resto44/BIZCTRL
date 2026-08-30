@@ -12,6 +12,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 
 export default function Products() {
   const { t, currency } = useLanguage();
@@ -32,14 +33,70 @@ export default function Products() {
     staleTime: 300000,
   });
 
+  const syncInventoryRows = async ({ product, rows, enabled }) => {
+    if (!enabled || !product?.product_id || !Array.isArray(rows) || !rows.length) return [];
+
+    const existingRows = await base44.entities.Inventory.filter(
+      { restaurant_id: activeRestaurant?.id, product_id: product.product_id },
+      '-created_date',
+      1000,
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    const results = await Promise.allSettled(rows.filter((row) => row.branch).map(async (row) => {
+      const existing = existingRows.find((item) => item.id === row.id
+        || (row.branch_id && item.branch_id === row.branch_id)
+        || item.branch === row.branch);
+      const payload = {
+        restaurant_id: activeRestaurant?.id,
+        branch_id: row.branch_id || null,
+        branch: row.branch,
+        product_id: product.product_id,
+        product_name: product.name,
+        unit: product.unit || row.unit || '',
+        opening_stock: Math.max(0, Number(row.opening_stock) || 0),
+        low_stock_threshold: Math.max(0, Number(row.reorder_point) || 0),
+        date: existing?.date || today,
+      };
+      return existing
+        ? base44.entities.Inventory.update(existing.id, payload)
+        : base44.entities.Inventory.create(payload);
+    }));
+
+    return results.filter((result) => result.status === 'rejected').map((result) => result.reason);
+  };
+
   const createMut = useMutation({
-    mutationFn: (data) => base44.entities.Product.create({ ...data, restaurant_id: activeRestaurant?.id }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); setShowForm(false); },
+    mutationFn: async (data) => {
+      const { _inventoryRows, _inventoryEnabled, ...productData } = data;
+      const product = await base44.entities.Product.create({ ...productData, restaurant_id: activeRestaurant?.id });
+      const inventoryErrors = await syncInventoryRows({ product, rows: _inventoryRows, enabled: _inventoryEnabled });
+      return { product, inventoryErrors };
+    },
+    onSuccess: ({ inventoryErrors }) => {
+      qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      setShowForm(false);
+      if (inventoryErrors.length) toast.warning('Product created, but some branch opening-stock rows could not be synchronized.');
+      else toast.success('ERP product created.');
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to create the product.'),
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Product.update(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); setEditing(null); },
+    mutationFn: async ({ id, data }) => {
+      const { _inventoryRows, _inventoryEnabled, ...productData } = data;
+      const product = await base44.entities.Product.update(id, productData);
+      const inventoryErrors = await syncInventoryRows({ product, rows: _inventoryRows, enabled: _inventoryEnabled });
+      return { product, inventoryErrors };
+    },
+    onSuccess: ({ inventoryErrors }) => {
+      qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      setEditing(null);
+      if (inventoryErrors.length) toast.warning('Product updated, but some branch stock rows could not be synchronized.');
+      else toast.success('ERP product updated.');
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to update the product.'),
   });
 
   const deleteMut = useMutation({
@@ -49,10 +106,9 @@ export default function Products() {
 
   const handleSave = (data) => {
     if (editing) {
-      updateMut.mutate({ id: editing.id, data });
-    } else {
-      createMut.mutate(data);
+      return updateMut.mutateAsync({ id: editing.id, data });
     }
+    return createMut.mutateAsync(data);
   };
 
   const filtered = products.filter(p =>
@@ -110,8 +166,8 @@ export default function Products() {
       )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="inset-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-none border-0 p-0 [&>button]:hidden sm:left-1/2 sm:top-1/2 sm:h-[min(92dvh,900px)] sm:max-h-[92dvh] sm:w-[min(94vw,960px)] sm:max-w-[960px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border">
+          <DialogHeader className="sr-only">
             <DialogTitle>{t('add_product')}</DialogTitle>
           </DialogHeader>
           <ProductMasterForm onSubmit={handleSave} onCancel={() => setShowForm(false)} />
@@ -119,8 +175,8 @@ export default function Products() {
       </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(open) => { if (!open) setEditing(null); }}>
-        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="inset-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-none border-0 p-0 [&>button]:hidden sm:left-1/2 sm:top-1/2 sm:h-[min(92dvh,900px)] sm:max-h-[92dvh] sm:w-[min(94vw,960px)] sm:max-w-[960px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border">
+          <DialogHeader className="sr-only">
             <DialogTitle>{t('edit_product')}</DialogTitle>
           </DialogHeader>
           {editing && (
