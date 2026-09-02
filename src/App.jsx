@@ -47,7 +47,6 @@ const Sales               = lazy(() => import('./pages/Sales'));
 const SalesInvoices       = lazy(() => import('./pages/SalesInvoices'));
 const Purchases           = lazy(() => import('./pages/Purchases'));
 const Expenses            = lazy(() => import('@/pages/Expenses'));
-const Products            = lazy(() => import('@/pages/Products'));
 const ProductManagement   = lazy(() => import('@/pages/ProductManagement'));
 const Inventory           = lazy(() => import('@/pages/Inventory'));
 const InventoryTransfer   = lazy(() => import('@/pages/InventoryTransfer'));
@@ -274,7 +273,7 @@ const SubscribedRoutes = () => {
 
         {/* ── Inventory ── */}
         <Route path="/product-management" element={<RoleGuard permission="viewInventory"><ProductManagement /></RoleGuard>} />
-        <Route path="/products" element={<RoleGuard permission="viewInventory"><Products /></RoleGuard>} />
+        <Route path="/products" element={<Navigate to="/product-management" replace />} />
         <Route path="/inventory" element={<RoleGuard permission="viewInventory"><Inventory /></RoleGuard>} />
         <Route path="/inventory-transfers" element={<RoleGuard permission="viewInventory"><InventoryTransfer /></RoleGuard>} />
         <Route path="/inventory-waste" element={<RoleGuard permission="viewInventory"><InventoryWaste /></RoleGuard>} />

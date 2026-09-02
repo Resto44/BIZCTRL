@@ -9,7 +9,7 @@ import {
 } from '../src/lib/productMaster.js';
 
 const formPath = new URL('../src/components/products/ProductMasterForm.jsx', import.meta.url);
-const productsPath = new URL('../src/pages/Products.jsx', import.meta.url);
+const productsPath = new URL('../src/pages/ProductManagement.jsx', import.meta.url);
 
 describe('ERP Product Master', () => {
   it('calculates gross profit, margin and markup without NaN values', () => {

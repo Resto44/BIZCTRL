@@ -8,7 +8,7 @@ import {
 
 const customizationPage = new URL('../src/pages/CustomizeWorkspace.jsx', import.meta.url);
 const masterForm = new URL('../src/components/products/ProductMasterForm.jsx', import.meta.url);
-const productsPage = new URL('../src/pages/Products.jsx', import.meta.url);
+const productsPage = new URL('../src/pages/ProductManagement.jsx', import.meta.url);
 const migration = new URL('../src/supabase/20260823_product_custom_fields_runtime.sql', import.meta.url);
 
 describe('Product Custom Fields runtime', () => {
@@ -53,7 +53,7 @@ describe('Product Custom Fields runtime', () => {
     expect(form).toContain("field.type === 'boolean' && customAttributes[field.id] === undefined");
     expect(form).toContain('setCustomAttribute(field.id, value)');
     expect(products).toContain("import ProductMasterForm from '@/components/products/ProductMasterForm'");
-    expect(products).toContain('<ProductMasterForm onSubmit={handleSave}');
+    expect(products).toContain('<ProductMasterForm onSubmit={handleProductSave}');
   });
 
   it('validates definitions and product values server-side through the existing tenant-scoped organization settings and products columns', async () => {
