@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Package, Ruler } from 'lucide-react';
@@ -7,7 +7,6 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
-import { useAuth } from '@/lib/AuthContext';
 import ProductMasterWorkspace from '@/components/products/ProductMasterWorkspace';
 import ProductMasterForm from '@/components/products/ProductMasterForm';
 import ProductUnitManager from '@/components/products/ProductUnitManager';
@@ -28,67 +27,9 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { buildProductControlSnapshot, productIdentity } from '@/lib/productControlCenter';
 import useProductPriceRules from '@/hooks/useProductPriceRules';
+import { getProductCatalogCounts, setBranchProductAssortment } from '@/lib/productCatalogRepository';
 
 const PRODUCT_QUERY_LIMIT = 2_000;
-const CSV_FIELDS = ['name', 'sku', 'barcode', 'category', 'unit', 'purchase_cost', 'selling_price', 'current_stock', 'status'];
-
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let value = '';
-  let quoted = false;
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text[index];
-    if (character === '"') {
-      if (quoted && text[index + 1] === '"') {
-        value += '"';
-        index += 1;
-      } else quoted = !quoted;
-    } else if (character === ',' && !quoted) {
-      row.push(value.trim());
-      value = '';
-    } else if ((character === '\n' || character === '\r') && !quoted) {
-      if (character === '\r' && text[index + 1] === '\n') index += 1;
-      row.push(value.trim());
-      if (row.some(Boolean)) rows.push(row);
-      row = [];
-      value = '';
-    } else value += character;
-  }
-  row.push(value.trim());
-  if (row.some(Boolean)) rows.push(row);
-  if (rows.length < 2) return [];
-  const headers = rows[0].map((header) => header.toLowerCase().trim().replaceAll(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''));
-  return rows.slice(1).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ''])));
-}
-
-function csvCell(value) {
-  const stringValue = String(value ?? '');
-  return /[",\n\r]/.test(stringValue) ? `"${stringValue.replaceAll('"', '""')}"` : stringValue;
-}
-
-function createCsv(products) {
-  const lines = [CSV_FIELDS.join(',')];
-  products.forEach((product) => {
-    lines.push(CSV_FIELDS.map((field) => csvCell(
-      field === 'selling_price' ? (product.selling_price ?? product.default_price ?? 0)
-        : field === 'purchase_cost' ? (product.purchase_cost ?? product.default_cost ?? 0)
-          : product[field] ?? '',
-    )).join(','));
-  });
-  return lines.join('\n');
-}
-
-function downloadCsv(contents, filename) {
-  const url = URL.createObjectURL(new Blob([contents], { type: 'text/csv;charset=utf-8' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
 
 function matchesLocation(row, branch) {
   if (!branch) return true;
@@ -109,11 +50,9 @@ function ProductDialog({ open, onOpenChange, title, children }) {
 
 export default function ProductManagement() {
   const { activeRestaurant, branches = [] } = useTenant();
-  const { user } = useAuth();
   const { formatMoney } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const fileInputRef = useRef(null);
   const restaurantId = activeRestaurant?.id || null;
 
   const [selectedLocation, setSelectedLocation] = useState('all');
@@ -124,7 +63,9 @@ export default function ProductManagement() {
   const [showStockDialog, setShowStockDialog] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   const [showUnits, setShowUnits] = useState(false);
-  const [importing, setImporting] = useState(false);
+  const selectedBranch = selectedLocation === 'all'
+    ? null
+    : branches.find((branch) => String(branch.id || branch.key || branch.branch_key) === selectedLocation) || null;
 
   const productsQuery = useQuery({
     queryKey: ['products', restaurantId],
@@ -179,6 +120,12 @@ export default function ProductManagement() {
     enabled: Boolean(restaurantId),
     staleTime: 30_000,
   });
+  const catalogCountsQuery = useQuery({
+    queryKey: ['erp-master-catalog-counts', restaurantId, selectedBranch?.id || null],
+    queryFn: () => getProductCatalogCounts({ restaurantId, branchId: selectedBranch?.id || null }),
+    enabled: Boolean(restaurantId),
+    staleTime: 20_000,
+  });
 
   const products = productsQuery.data || [];
   const categories = categoriesQuery.data || [];
@@ -187,16 +134,13 @@ export default function ProductManagement() {
   const analytics = analyticsQuery.data || [];
   const suppliers = suppliersQuery.data || [];
   const priceHistory = priceHistoryQuery.data || [];
-  const selectedBranch = selectedLocation === 'all'
-    ? null
-    : branches.find((branch) => String(branch.id || branch.key || branch.branch_key) === selectedLocation) || null;
   const scopedInventory = selectedBranch ? inventory.filter((row) => matchesLocation(row, selectedBranch)) : inventory;
   const scopedAnalytics = selectedBranch ? analytics.filter((row) => matchesLocation(row, selectedBranch)) : analytics;
   const scopedPriceHistory = selectedBranch ? priceHistory.filter((row) => matchesLocation(row, selectedBranch)) : priceHistory;
   const scopedBranches = selectedBranch ? [selectedBranch] : branches;
 
   const priceControl = useProductPriceRules();
-  const snapshot = useMemo(() => buildProductControlSnapshot({
+  const calculatedSnapshot = useMemo(() => buildProductControlSnapshot({
     products,
     inventory: scopedInventory,
     branches: scopedBranches,
@@ -204,12 +148,31 @@ export default function ProductManagement() {
     priceHistory: scopedPriceHistory,
     priceRules: priceControl.rules,
   }), [products, scopedInventory, scopedBranches, scopedAnalytics, scopedPriceHistory, priceControl.rules]);
+  const snapshot = useMemo(() => {
+    const counts = catalogCountsQuery.data;
+    if (!counts) return calculatedSnapshot;
+    const lowStock = Number(counts.low_stock || 0);
+    const outOfStock = Number(counts.out_of_stock || 0);
+    const activeProducts = Number(counts.active_total || 0);
+    return {
+      ...calculatedSnapshot,
+      totalProducts: Number(counts.master_total || 0),
+      activeProducts,
+      lowStock,
+      outOfStock,
+      trackedProducts: Math.max(activeProducts, calculatedSnapshot.trackedProducts || 0),
+      healthy: Math.max(0, activeProducts - lowStock - outOfStock),
+      inventoryValue: Number(counts.inventory_value || 0),
+    };
+  }, [calculatedSnapshot, catalogCountsQuery.data]);
 
   const invalidateProductData = async () => Promise.all([
     queryClient.invalidateQueries({ queryKey: ['products'] }),
     queryClient.invalidateQueries({ queryKey: ['inventory'] }),
     queryClient.invalidateQueries({ queryKey: ['inventory_transactions'] }),
     queryClient.invalidateQueries({ queryKey: ['product_analytics'] }),
+    queryClient.invalidateQueries({ queryKey: ['erp-master-catalog'] }),
+    queryClient.invalidateQueries({ queryKey: ['erp-master-catalog-counts'] }),
   ]);
 
   const syncInventoryRows = async ({ product, rows, enabled }) => {
@@ -241,12 +204,20 @@ export default function ProductManagement() {
       const { _inventoryRows, _inventoryEnabled, ...productData } = data;
       const product = await base44.entities.Product.create({ ...productData, restaurant_id: restaurantId });
       const inventoryErrors = await syncInventoryRows({ product, rows: _inventoryRows, enabled: _inventoryEnabled });
-      return { product, inventoryErrors };
+      let assortmentError = null;
+      if (selectedBranch?.id) {
+        try {
+          await setBranchProductAssortment({ restaurantId, branchId: selectedBranch.id, productIds: [product.id], active: true });
+        } catch (error) {
+          assortmentError = error;
+        }
+      }
+      return { product, inventoryErrors, assortmentError };
     },
-    onSuccess: async ({ inventoryErrors }) => {
+    onSuccess: async ({ inventoryErrors, assortmentError }) => {
       await invalidateProductData();
       setShowCreate(false);
-      if (inventoryErrors.length) toast.warning('Product saved, but some opening-stock rows could not be synchronized.');
+      if (inventoryErrors.length || assortmentError) toast.warning('Product saved, but one or more branch settings could not be synchronized.');
       else toast.success('Master product created.');
     },
     onError: (error) => toast.error(error?.message || 'Unable to create the product.'),
@@ -278,14 +249,6 @@ export default function ProductManagement() {
     onError: (error) => toast.error(error?.message || 'Unable to delete this product. It may have linked records.'),
   });
 
-  const archiveProducts = async (rows) => {
-    const results = await Promise.allSettled(rows.map((product) => base44.entities.Product.update(product.id, { status: 'discontinued', is_active: false })));
-    await invalidateProductData();
-    const failures = results.filter((result) => result.status === 'rejected').length;
-    if (failures) toast.warning(`${rows.length - failures} products archived; ${failures} failed.`);
-    else toast.success(`${rows.length} products archived.`);
-  };
-
   const handleProductSave = (data) => editing
     ? updateProduct.mutateAsync({ id: editing.id, data })
     : createProduct.mutateAsync(data);
@@ -295,65 +258,11 @@ export default function ProductManagement() {
     setShowStockDialog(true);
   };
 
-  const handleExport = () => {
-    downloadCsv(createCsv(products), `biz-control-products-${new Date().toISOString().slice(0, 10)}.csv`);
-    toast.success(`${products.length} product records exported.`);
-  };
-
-  const handleImport = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file || !restaurantId) return;
-    setImporting(true);
-    try {
-      const rows = parseCsv(await file.text());
-      if (!rows.length) throw new Error('The CSV file does not contain product rows.');
-      if (rows.length > 500) throw new Error('Import a maximum of 500 products at a time.');
-      const existingCodes = new Set(products.flatMap((product) => [product.sku, product.product_id, product.barcode]).filter(Boolean).map((value) => String(value).toLowerCase()));
-      const timestamp = Date.now();
-      const payloads = rows.flatMap((row, index) => {
-        const name = row.name || row.product_name;
-        const code = row.sku || row.product_id || row.barcode;
-        if (!name || (code && existingCodes.has(String(code).toLowerCase()))) return [];
-        if (code) existingCodes.add(String(code).toLowerCase());
-        const productId = row.product_id || row.sku || `PRD-${timestamp}-${String(index + 1).padStart(4, '0')}`;
-        return [{
-          restaurant_id: restaurantId,
-          name,
-          product_id: productId,
-          sku: row.sku || productId,
-          barcode: row.barcode || null,
-          category: row.category || null,
-          unit: row.unit || null,
-          purchase_cost: Math.max(0, Number(row.purchase_cost || row.default_cost) || 0),
-          selling_price: Math.max(0, Number(row.selling_price || row.default_price) || 0),
-          default_cost: Math.max(0, Number(row.purchase_cost || row.default_cost) || 0),
-          default_price: Math.max(0, Number(row.selling_price || row.default_price) || 0),
-          current_stock: Math.max(0, Number(row.current_stock) || 0),
-          status: row.status || 'active',
-          is_active: (row.status || 'active') === 'active',
-          created_by: user?.email || null,
-        }];
-      });
-      if (!payloads.length) throw new Error('All CSV rows are empty or duplicate existing product codes.');
-      const results = await Promise.allSettled(payloads.map((payload) => base44.entities.Product.create(payload)));
-      await invalidateProductData();
-      const succeeded = results.filter((result) => result.status === 'fulfilled').length;
-      const failed = results.length - succeeded;
-      if (failed) toast.warning(`${succeeded} products imported; ${failed} rows failed.`);
-      else toast.success(`${succeeded} products imported.`);
-    } catch (error) {
-      toast.error(error?.message || 'Unable to import products.');
-    } finally {
-      setImporting(false);
-    }
-  };
-
   const refreshAll = async () => {
     await Promise.all([
       productsQuery.refetch(), categoriesQuery.refetch(), inventoryQuery.refetch(),
       transactionQuery.refetch(), analyticsQuery.refetch(), suppliersQuery.refetch(),
-      priceHistoryQuery.refetch(),
+      priceHistoryQuery.refetch(), catalogCountsQuery.refetch(),
     ]);
     toast.success('Product control center refreshed.');
   };
@@ -375,10 +284,9 @@ export default function ProductManagement() {
 
   return (
     <>
-      <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImport} aria-label="Import product CSV" />
       <ProductMasterWorkspace
+        restaurantId={restaurantId}
         snapshot={snapshot}
-        productsLoading={productsQuery.isLoading}
         categories={categories}
         transactions={transactions}
         suppliers={suppliers}
@@ -401,13 +309,11 @@ export default function ProductManagement() {
         onEdit={(product) => { setShowCreate(false); setEditing(product); }}
         onDelete={setDeleting}
         onAdjust={handleAdjust}
-        onArchive={archiveProducts}
-        onImport={() => !importing && fileInputRef.current?.click()}
-        onExport={handleExport}
         onRefresh={refreshAll}
         onNavigate={navigate}
         onManageCategories={() => setShowCategories(true)}
         onManageUnits={() => setShowUnits(true)}
+        onDataChanged={invalidateProductData}
       />
 
       <ProductDialog open={showCreate} onOpenChange={setShowCreate} title="Create master product">

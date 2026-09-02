@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import { buildProductControlSnapshot } from '../src/lib/productControlCenter.js';
 
@@ -27,6 +28,16 @@ vi.mock('@/components/ui/switch', async () => {
   };
 });
 
+vi.mock('@/lib/productCatalogRepository', () => ({
+  EMPTY_COUNTS: { master_total: 1, active_total: 1, branch_assigned: 0, branch_unassigned: 1, low_stock: 0, out_of_stock: 0, inventory_value: 0 },
+  searchMasterProducts: vi.fn().mockResolvedValue({ rows: [], total: 0, page: 1, pageSize: 50 }),
+  getProductCatalogCounts: vi.fn().mockResolvedValue({ master_total: 1, active_total: 1, branch_assigned: 0, branch_unassigned: 1 }),
+  setBranchProductAssortment: vi.fn().mockResolvedValue(1),
+  createProductImportJob: vi.fn().mockResolvedValue('job-1'),
+  updateProductImportJob: vi.fn().mockResolvedValue(undefined),
+  importMasterProducts: vi.fn().mockResolvedValue({ processed: 0, created: 0, updated: 0, failed: 0, branch_added: 0, errors: [] }),
+}));
+
 const { default: ProductMasterWorkspace } = await import('../src/components/products/ProductMasterWorkspace.jsx');
 
 function nodeText(node) {
@@ -47,10 +58,12 @@ describe('Master Product Management workspace', () => {
       branches: [{ id: 'branch-1', name: 'Main Branch' }],
     });
     let renderer;
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     await act(async () => {
       renderer = TestRenderer.create(
-        <ProductMasterWorkspace
+        <QueryClientProvider client={queryClient}><ProductMasterWorkspace
+          restaurantId="restaurant-1"
           snapshot={snapshot}
           productsLoading={false}
           categories={[{ id: 'cat-1', name: 'Food' }]}
@@ -75,7 +88,7 @@ describe('Master Product Management workspace', () => {
           onNavigate={vi.fn()}
           onManageCategories={vi.fn()}
           onManageUnits={vi.fn()}
-        />,
+        /></QueryClientProvider>,
       );
     });
 

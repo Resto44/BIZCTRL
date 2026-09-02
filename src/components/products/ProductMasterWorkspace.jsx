@@ -1,4 +1,4 @@
-import { memo, useDeferredValue, useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Archive,
@@ -8,13 +8,11 @@ import {
   Barcode,
   Boxes,
   Building2,
-  Check,
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
   ClipboardCheck,
   Clock3,
-  Download,
   FileClock,
   History,
   Import,
@@ -26,14 +24,12 @@ import {
   Plus,
   RefreshCw,
   ScanBarcode,
-  Search,
   Settings2,
   ShieldCheck,
   ShoppingCart,
   SlidersHorizontal,
   Sparkles,
   Tag,
-  Trash2,
   TrendingDown,
   TrendingUp,
   Truck,
@@ -48,6 +44,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { productIdentity } from '@/lib/productControlCenter';
+import EnterpriseProductCatalog from '@/components/products/EnterpriseProductCatalog';
 
 const MAIN_PAGES = [
   { id: 'overview', label: 'Overview', icon: SlidersHorizontal },
@@ -139,7 +136,7 @@ function EmptyPanel({ icon: Icon = Package, title, description, action }) {
   );
 }
 
-const OverviewPage = memo(function OverviewPage({ snapshot, money, onAdd, onImport, onExport, onNavigate, onChangePage }) {
+const OverviewPage = memo(function OverviewPage({ snapshot, money, onAdd, onImport, onNavigate, onChangePage }) {
   const tracked = Math.max(1, snapshot.trackedProducts || 0);
   const health = Math.round((snapshot.healthy / tracked) * 100);
   const lowPercent = Math.round((snapshot.lowStock / tracked) * 100);
@@ -249,8 +246,8 @@ const OverviewPage = memo(function OverviewPage({ snapshot, money, onAdd, onImpo
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           {[
             [Plus, 'New Product', onAdd],
-            [Import, 'Import CSV', onImport],
-            [Download, 'Export', onExport],
+            [Import, 'Import Excel', onImport],
+            [Package, 'Master Catalog', () => onChangePage('catalog')],
             [ScanBarcode, 'Scan', () => onNavigate('/retail/barcode')],
             [ArrowLeftRight, 'Transfer', () => onNavigate('/inventory-transfers')],
             [ShoppingCart, 'Purchase Order', () => onNavigate('/purchase-orders')],
@@ -262,180 +259,6 @@ const OverviewPage = memo(function OverviewPage({ snapshot, money, onAdd, onImpo
           ))}
         </div>
       </section>
-    </div>
-  );
-});
-
-const CatalogPage = memo(function CatalogPage({ snapshot, categories, money, loading, onAdd, onEdit, onDelete, onArchive, onNavigate, onManageCategories, onManageUnits }) {
-  const [search, setSearch] = useState('');
-  const deferredSearch = useDeferredValue(search.trim().toLowerCase());
-  const [filter, setFilter] = useState('all');
-  const [category, setCategory] = useState('all');
-  const [sort, setSort] = useState('name');
-  const [selected, setSelected] = useState(() => new Set());
-
-  const rows = useMemo(() => {
-    const result = snapshot.productRows.filter((row) => {
-      const product = row.product;
-      const text = [row.label, product?.sku, product?.barcode, product?.product_id, product?.category, product?.brand]
-        .filter(Boolean).join(' ').toLowerCase();
-      const isActive = product?.status ? product.status === 'active' : product?.is_active !== false;
-      const statusMatches = filter === 'all'
-        || (filter === 'active' && isActive)
-        || (filter === 'low' && ['low', 'out'].includes(row.stockStatus))
-        || (filter === 'draft' && (product?.status === 'draft' || !isActive));
-      const categoryMatches = category === 'all' || product?.category_id === category || product?.category === category;
-      return (!deferredSearch || text.includes(deferredSearch)) && statusMatches && categoryMatches;
-    });
-    return result.sort((left, right) => {
-      if (sort === 'price') return right.price - left.price;
-      if (sort === 'stock') return right.quantity - left.quantity;
-      if (sort === 'margin') return right.margin - left.margin;
-      return left.label.localeCompare(right.label);
-    });
-  }, [category, deferredSearch, filter, snapshot.productRows, sort]);
-
-  const toggleSelection = (key) => {
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const selectedRows = snapshot.productRows.filter((row) => selected.has(getRowKey(row)));
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-black text-slate-950 dark:text-white">Master Catalog</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Stock items, variants, services and digital products</p>
-        </div>
-        <div className="grid grid-cols-3 gap-2 sm:flex">
-          <Button variant="outline" className="h-11 rounded-xl px-3" onClick={onManageCategories}><Tag className="mr-1.5 h-4 w-4" />Categories</Button>
-          <Button variant="outline" className="h-11 rounded-xl px-3" onClick={onManageUnits}><Settings2 className="mr-1.5 h-4 w-4" />Units</Button>
-          <Button onClick={onAdd} className="h-11 rounded-xl px-3 shadow-lg shadow-blue-600/15"><Plus className="mr-1.5 h-4 w-4" />Add</Button>
-        </div>
-      </div>
-
-      <section className={cn(PANEL_CLASS, 'p-3 sm:p-4')} aria-label="Catalog filters">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-            <Input className="h-11 rounded-xl pl-10" placeholder="Search name, SKU or barcode" value={search} onChange={(event) => setSearch(event.target.value)} />
-          </div>
-          <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="All categories" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
-              {categories.map((item) => <SelectItem key={item.id} value={item.id}>{item.name || item.name_en || 'Category'}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={sort} onValueChange={setSort}>
-            <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">Sort: Name</SelectItem>
-              <SelectItem value="price">Sort: Price</SelectItem>
-              <SelectItem value="stock">Sort: Stock</SelectItem>
-              <SelectItem value="margin">Sort: Margin</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="mt-3 grid grid-cols-4 gap-2">
-          {[
-            ['all', 'All', snapshot.totalProducts],
-            ['active', 'Active', snapshot.activeProducts],
-            ['low', 'Low stock', snapshot.lowStock + snapshot.outOfStock],
-            ['draft', 'Draft', Math.max(0, snapshot.totalProducts - snapshot.activeProducts)],
-          ].map(([id, label, count]) => (
-            <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)} className={cn('min-h-10 rounded-xl border px-2 text-xs font-bold transition sm:text-sm', filter === id ? 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/15' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300')}>
-              <span className="block truncate">{label}</span><span className={cn('text-[10px]', filter === id ? 'text-blue-100' : 'text-slate-400')}>{count}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">{rows.length} records</p>
-        <Button variant="outline" size="sm" className="rounded-lg" onClick={() => onNavigate('/retail/barcode')}><ScanBarcode className="mr-1.5 h-4 w-4" />Scan barcode</Button>
-      </div>
-
-      {loading ? (
-        <div className="grid gap-3 lg:grid-cols-2">{[0, 1, 2, 3].map((item) => <div key={item} className="h-52 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-900" />)}</div>
-      ) : rows.length === 0 ? (
-        <EmptyPanel title="No matching products" description="Change the filters or create the first master product record." action={<Button onClick={onAdd}><Plus className="mr-2 h-4 w-4" />Add Product</Button>} />
-      ) : (
-        <div className="grid gap-3 xl:grid-cols-2">
-          {rows.map((row) => {
-            const product = row.product;
-            const key = getRowKey(row);
-            const isSelected = selected.has(key);
-            const isActive = product?.status ? product.status === 'active' : product?.is_active !== false;
-            const branchCount = new Set(row.inventoryRows.map((item) => item.branch_id || item.branch).filter(Boolean)).size;
-            return (
-              <article key={key} className={cn(PANEL_CLASS, 'relative overflow-hidden p-4 transition', isSelected && 'border-blue-500 ring-2 ring-blue-500/10')}>
-                <div className="flex items-start gap-3">
-                  <button type="button" aria-label={`${isSelected ? 'Deselect' : 'Select'} ${row.label}`} onClick={() => toggleSelection(key)} className={cn('mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition', isSelected ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white text-transparent dark:border-slate-700 dark:bg-slate-950')}>
-                    <Check className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                  <ProductThumbnail row={row} size="lg" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h3 className="truncate font-black text-slate-950 dark:text-white">{row.label}</h3>
-                        <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">SKU: {product?.sku || product?.product_id || 'Not assigned'}</p>
-                      </div>
-                      <StatusPill status={isActive ? 'active' : 'inactive'} />
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <Badge variant="secondary" className="rounded-full font-medium">{product?.category || 'Uncategorized'}</Badge>
-                      {!row.tracksInventory ? <Badge className="rounded-full bg-violet-100 text-violet-700 hover:bg-violet-100">Service</Badge> : null}
-                      {row.erp?.unit_conversions?.length ? <Badge variant="outline" className="rounded-full">{row.erp.unit_conversions.length + 1} units</Badge> : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-3 divide-x divide-slate-200 rounded-xl bg-slate-50 p-3 dark:divide-slate-800 dark:bg-slate-900/70 rtl:divide-x-reverse">
-                  <div className="px-2 first:pl-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{row.tracksInventory ? 'Stock' : 'Duration'}</p>
-                    <p className="mt-1 truncate text-sm font-black text-slate-900 dark:text-white">{row.tracksInventory ? `${row.quantity.toLocaleString()} ${product?.unit || ''}` : (row.erp?.service_duration || 'Service')}</p>
-                  </div>
-                  <div className="px-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Price</p>
-                    <p className="mt-1 truncate text-sm font-black text-slate-900 dark:text-white">{money(row.price)}</p>
-                  </div>
-                  <div className="px-2 pr-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Margin</p>
-                    <p className={cn('mt-1 text-sm font-black', row.margin >= 25 ? 'text-emerald-600' : 'text-amber-600')}>{row.margin.toFixed(1)}%</p>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-                  <span className="flex min-w-0 items-center gap-1.5"><Building2 className="h-3.5 w-3.5" />{branchCount ? `${branchCount} locations` : row.tracksInventory ? 'No branch stock' : 'All locations'}</span>
-                  <StatusPill status={row.stockStatus} />
-                </div>
-
-                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-                  <Button variant="ghost" size="sm" className="h-9 rounded-lg" onClick={() => onEdit(product)}><Pencil className="mr-1.5 h-4 w-4" />Edit</Button>
-                  <Button variant="ghost" size="sm" className="h-9 rounded-lg" onClick={() => onNavigate(`/retail/variants?product=${encodeURIComponent(product?.id || '')}`)}><Layers3 className="mr-1.5 h-4 w-4" />Variants</Button>
-                  <Button variant="ghost" size="sm" className="h-9 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => onDelete(product)}><Trash2 className="mr-1.5 h-4 w-4" />Delete</Button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-
-      {selectedRows.length ? (
-        <div className="sticky bottom-20 z-20 flex flex-wrap items-center gap-2 rounded-2xl border border-blue-200 bg-white/95 p-3 shadow-2xl backdrop-blur dark:border-blue-900 dark:bg-slate-950/95 md:bottom-4">
-          <span className="mr-auto rounded-xl bg-blue-600 px-3 py-2 text-sm font-black text-white">{selectedRows.length} selected</span>
-          <Button variant="outline" size="sm" disabled={selectedRows.length !== 1} onClick={() => selectedRows.length === 1 && onEdit(selectedRows[0].product)}><Pencil className="mr-1.5 h-4 w-4" />Edit</Button>
-          <Button variant="outline" size="sm" onClick={() => onNavigate('/inventory-transfers')}><ArrowLeftRight className="mr-1.5 h-4 w-4" />Transfer</Button>
-          <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => { onArchive(selectedRows.map((row) => row.product)); setSelected(new Set()); }}><Archive className="mr-1.5 h-4 w-4" />Archive</Button>
-        </div>
-      ) : null}
     </div>
   );
 });
@@ -669,8 +492,8 @@ const PricingPage = memo(function PricingPage({ snapshot, suppliers, transaction
 });
 
 export default function ProductMasterWorkspace({
+  restaurantId,
   snapshot,
-  productsLoading,
   categories,
   transactions,
   suppliers,
@@ -686,15 +509,19 @@ export default function ProductMasterWorkspace({
   onEdit,
   onDelete,
   onAdjust,
-  onArchive,
-  onImport,
-  onExport,
   onRefresh,
   onNavigate,
   onManageCategories,
   onManageUnits,
+  onDataChanged,
 }) {
   const [activePage, setActivePage] = useState('overview');
+  const [catalogImportSignal, setCatalogImportSignal] = useState(0);
+
+  const openCatalogImport = () => {
+    setActivePage('catalog');
+    setCatalogImportSignal((current) => current + 1);
+  };
 
   return (
     <div className="min-w-0 space-y-4 pb-6">
@@ -742,8 +569,8 @@ export default function ProductMasterWorkspace({
         </nav>
       </header>
 
-      {activePage === 'overview' ? <OverviewPage snapshot={snapshot} money={money} onAdd={onAdd} onImport={onImport} onExport={onExport} onNavigate={onNavigate} onChangePage={setActivePage} /> : null}
-      {activePage === 'catalog' ? <CatalogPage snapshot={snapshot} categories={categories} money={money} loading={productsLoading} onAdd={onAdd} onEdit={onEdit} onDelete={onDelete} onArchive={onArchive} onNavigate={onNavigate} onManageCategories={onManageCategories} onManageUnits={onManageUnits} /> : null}
+      {activePage === 'overview' ? <OverviewPage snapshot={snapshot} money={money} onAdd={onAdd} onImport={openCatalogImport} onNavigate={onNavigate} onChangePage={setActivePage} /> : null}
+      {activePage === 'catalog' ? <EnterpriseProductCatalog restaurantId={restaurantId} branches={branches} selectedLocation={selectedLocation} categories={categories} money={money} onAdd={onAdd} onEdit={onEdit} onDelete={onDelete} onNavigate={onNavigate} onManageCategories={onManageCategories} onManageUnits={onManageUnits} onDataChanged={onDataChanged} openImportSignal={catalogImportSignal} /> : null}
       {activePage === 'inventory' ? <InventoryPage snapshot={snapshot} transactions={transactions} branches={branches} selectedLocation={selectedLocation} money={money} onAdjust={onAdjust} onNavigate={onNavigate} /> : null}
       {activePage === 'pricing' ? <PricingPage snapshot={snapshot} suppliers={suppliers} transactions={transactions} rules={priceRules} setRules={setPriceRules} saveRules={savePriceRules} savingRules={savingPriceRules} money={money} onReview={onEdit} onNavigate={onNavigate} /> : null}
     </div>
