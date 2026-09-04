@@ -88,11 +88,14 @@ describe('Master Product Management workspace', () => {
           onNavigate={vi.fn()}
           onManageCategories={vi.fn()}
           onManageUnits={vi.fn()}
+          canImportProductSpreadsheet={false}
+          canDeleteProducts={false}
         /></QueryClientProvider>,
       );
     });
 
     expect(JSON.stringify(renderer.toJSON())).toContain('AI Insights');
+    expect(JSON.stringify(renderer.toJSON())).not.toContain('Import Excel');
     const openPage = async (label) => {
       const button = renderer.root.findAllByType('button').find((item) => nodeText(item).trim() === label);
       expect(button).toBeTruthy();
