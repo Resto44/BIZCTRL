@@ -7,6 +7,7 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
+import { ROLES, useRole } from '@/lib/RoleContext';
 import ProductMasterWorkspace from '@/components/products/ProductMasterWorkspace';
 import ProductMasterForm from '@/components/products/ProductMasterForm';
 import ProductUnitManager from '@/components/products/ProductUnitManager';
@@ -28,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { buildProductControlSnapshot, productIdentity } from '@/lib/productControlCenter';
 import useProductPriceRules from '@/hooks/useProductPriceRules';
 import { getProductCatalogCounts, setBranchProductAssortment } from '@/lib/productCatalogRepository';
+import { isSupermarketProductPortal } from '@/lib/productImportAccess';
 
 const PRODUCT_QUERY_LIMIT = 2_000;
 
@@ -50,10 +52,13 @@ function ProductDialog({ open, onOpenChange, title, children }) {
 
 export default function ProductManagement() {
   const { activeRestaurant, branches = [] } = useTenant();
+  const { role } = useRole();
   const { formatMoney } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const restaurantId = activeRestaurant?.id || null;
+  const canImportProductSpreadsheet = isSupermarketProductPortal(activeRestaurant);
+  const canDeleteProducts = canImportProductSpreadsheet && role === ROLES.OWNER;
 
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [showCreate, setShowCreate] = useState(false);
@@ -307,13 +312,15 @@ export default function ProductManagement() {
         savingPriceRules={priceControl.isSaving}
         onAdd={() => { setEditing(null); setShowCreate(true); }}
         onEdit={(product) => { setShowCreate(false); setEditing(product); }}
-        onDelete={setDeleting}
+        onDelete={canDeleteProducts ? setDeleting : null}
         onAdjust={handleAdjust}
         onRefresh={refreshAll}
         onNavigate={navigate}
         onManageCategories={() => setShowCategories(true)}
         onManageUnits={() => setShowUnits(true)}
         onDataChanged={invalidateProductData}
+        canImportProductSpreadsheet={canImportProductSpreadsheet}
+        canDeleteProducts={canDeleteProducts}
       />
 
       <ProductDialog open={showCreate} onOpenChange={setShowCreate} title="Create master product">

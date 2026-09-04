@@ -136,7 +136,7 @@ function EmptyPanel({ icon: Icon = Package, title, description, action }) {
   );
 }
 
-const OverviewPage = memo(function OverviewPage({ snapshot, money, onAdd, onImport, onNavigate, onChangePage }) {
+const OverviewPage = memo(function OverviewPage({ snapshot, money, onAdd, onImport, onNavigate, onChangePage, canImportProductSpreadsheet }) {
   const tracked = Math.max(1, snapshot.trackedProducts || 0);
   const health = Math.round((snapshot.healthy / tracked) * 100);
   const lowPercent = Math.round((snapshot.lowStock / tracked) * 100);
@@ -246,7 +246,7 @@ const OverviewPage = memo(function OverviewPage({ snapshot, money, onAdd, onImpo
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           {[
             [Plus, 'New Product', onAdd],
-            [Import, 'Import Excel', onImport],
+            ...(canImportProductSpreadsheet ? [[Import, 'Import Excel', onImport]] : []),
             [Package, 'Master Catalog', () => onChangePage('catalog')],
             [ScanBarcode, 'Scan', () => onNavigate('/retail/barcode')],
             [ArrowLeftRight, 'Transfer', () => onNavigate('/inventory-transfers')],
@@ -514,11 +514,14 @@ export default function ProductMasterWorkspace({
   onManageCategories,
   onManageUnits,
   onDataChanged,
+  canImportProductSpreadsheet = false,
+  canDeleteProducts = false,
 }) {
   const [activePage, setActivePage] = useState('overview');
   const [catalogImportSignal, setCatalogImportSignal] = useState(0);
 
   const openCatalogImport = () => {
+    if (!canImportProductSpreadsheet) return;
     setActivePage('catalog');
     setCatalogImportSignal((current) => current + 1);
   };
@@ -569,8 +572,8 @@ export default function ProductMasterWorkspace({
         </nav>
       </header>
 
-      {activePage === 'overview' ? <OverviewPage snapshot={snapshot} money={money} onAdd={onAdd} onImport={openCatalogImport} onNavigate={onNavigate} onChangePage={setActivePage} /> : null}
-      {activePage === 'catalog' ? <EnterpriseProductCatalog restaurantId={restaurantId} branches={branches} selectedLocation={selectedLocation} categories={categories} money={money} onAdd={onAdd} onEdit={onEdit} onDelete={onDelete} onNavigate={onNavigate} onManageCategories={onManageCategories} onManageUnits={onManageUnits} onDataChanged={onDataChanged} openImportSignal={catalogImportSignal} /> : null}
+      {activePage === 'overview' ? <OverviewPage snapshot={snapshot} money={money} onAdd={onAdd} onImport={openCatalogImport} onNavigate={onNavigate} onChangePage={setActivePage} canImportProductSpreadsheet={canImportProductSpreadsheet} /> : null}
+      {activePage === 'catalog' ? <EnterpriseProductCatalog restaurantId={restaurantId} branches={branches} selectedLocation={selectedLocation} categories={categories} money={money} onAdd={onAdd} onEdit={onEdit} onDelete={onDelete} onNavigate={onNavigate} onManageCategories={onManageCategories} onManageUnits={onManageUnits} onDataChanged={onDataChanged} openImportSignal={catalogImportSignal} canImportProductSpreadsheet={canImportProductSpreadsheet} canDeleteProducts={canDeleteProducts} /> : null}
       {activePage === 'inventory' ? <InventoryPage snapshot={snapshot} transactions={transactions} branches={branches} selectedLocation={selectedLocation} money={money} onAdjust={onAdjust} onNavigate={onNavigate} /> : null}
       {activePage === 'pricing' ? <PricingPage snapshot={snapshot} suppliers={suppliers} transactions={transactions} rules={priceRules} setRules={setPriceRules} saveRules={savePriceRules} savingRules={savingPriceRules} money={money} onReview={onEdit} onNavigate={onNavigate} /> : null}
     </div>

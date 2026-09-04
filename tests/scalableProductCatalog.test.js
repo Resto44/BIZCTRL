@@ -1,10 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { isSupermarketProductPortal, resolveProductImportPortal } from '../src/lib/productImportAccess';
 
 const migration = readFileSync(new URL('../src/supabase/20260902_scalable_product_master_catalog.sql', import.meta.url), 'utf8');
 const catalogUi = readFileSync(new URL('../src/components/products/EnterpriseProductCatalog.jsx', import.meta.url), 'utf8');
 const importUi = readFileSync(new URL('../src/components/products/ProductBulkImportDialog.jsx', import.meta.url), 'utf8');
+const workspaceUi = readFileSync(new URL('../src/components/products/ProductMasterWorkspace.jsx', import.meta.url), 'utf8');
+const productManagementUi = readFileSync(new URL('../src/pages/ProductManagement.jsx', import.meta.url), 'utf8');
 const repository = readFileSync(new URL('../src/lib/productCatalogRepository.js', import.meta.url), 'utf8');
+const supermarketBoundary = readFileSync(new URL('../src/supabase/20260904_supermarket_product_import_boundary.sql', import.meta.url), 'utf8');
 
 describe('scalable Product Master Catalog contract', () => {
   it('uses a tenant master plus a normalized branch assortment instead of copying products', () => {
@@ -42,5 +46,31 @@ describe('scalable Product Master Catalog contract', () => {
     expect(importUi).toContain('Download Excel Template');
     expect(importUi).toContain('Validated preview');
     expect(importUi).toContain('Error report');
+  });
+
+  it('shows product spreadsheet import only in the Supermarket/Retail portal', () => {
+    expect(isSupermarketProductPortal({ business_type: 'retail' })).toBe(true);
+    expect(isSupermarketProductPortal({ business_type: 'supermarket' })).toBe(true);
+    expect(isSupermarketProductPortal({ business_type: '', business_mode: 'retail' })).toBe(true);
+    expect(isSupermarketProductPortal({ business_type: 'restaurant', business_mode: 'retail' })).toBe(false);
+    expect(isSupermarketProductPortal({ business_type: 'pharmacy' })).toBe(false);
+    expect(isSupermarketProductPortal({ business_type: 'wholesale' })).toBe(false);
+    expect(resolveProductImportPortal({ business_type: ' Restaurant ' })).toBe('restaurant');
+
+    expect(productManagementUi).toContain('isSupermarketProductPortal(activeRestaurant)');
+    expect(productManagementUi).toContain('canDeleteProducts = canImportProductSpreadsheet && role === ROLES.OWNER');
+    expect(workspaceUi).toContain("...(canImportProductSpreadsheet ? [[Import, 'Import Excel', onImport]] : [])");
+    expect(catalogUi).toContain('canImportProductSpreadsheet ? <ProductBulkImportDialog');
+    expect(catalogUi).toContain('canDeleteProducts ? <Button');
+    expect(importUi).toContain('if (!isAllowed) return null;');
+  });
+
+  it('rejects direct spreadsheet imports outside the Supermarket portal', () => {
+    expect(supermarketBoundary).toContain('erp_is_supermarket_product_portal');
+    expect(supermarketBoundary).toContain("IN ('retail', 'supermarket')");
+    expect(supermarketBoundary).toContain('Product spreadsheet import is available only in the Supermarket portal');
+    expect(supermarketBoundary).toContain('CREATE OR REPLACE FUNCTION public.erp_validate_product_import_job_scope()');
+    expect(supermarketBoundary).toContain('CREATE OR REPLACE FUNCTION public.erp_bulk_upsert_master_products(');
+    expect(supermarketBoundary).toContain('WHERE branch.id = p_branch_id AND branch.restaurant_id = p_restaurant_id');
   });
 });

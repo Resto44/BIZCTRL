@@ -46,7 +46,7 @@ function SummaryCard({ tone, icon: Icon, label, value }) {
   );
 }
 
-export default function ProductBulkImportDialog({ open, onOpenChange, restaurantId, selectedBranch, onImported }) {
+export default function ProductBulkImportDialog({ open, onOpenChange, restaurantId, selectedBranch, onImported, isAllowed = false }) {
   const fileInputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [validation, setValidation] = useState(null);
@@ -100,6 +100,10 @@ export default function ProductBulkImportDialog({ open, onOpenChange, restaurant
   };
 
   const runImport = async () => {
+    if (!isAllowed) {
+      toast.error('Product spreadsheet import is available only in the Supermarket portal.');
+      return;
+    }
     if (!restaurantId || !file || !validation?.validRows?.length) return;
     setImporting(true);
     setCompleted(false);
@@ -153,6 +157,8 @@ export default function ProductBulkImportDialog({ open, onOpenChange, restaurant
       setImporting(false);
     }
   };
+
+  if (!isAllowed) return null;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
