@@ -120,6 +120,11 @@ const ProductVariants     = lazy(() => import('@/pages/retail/ProductVariants'))
 const BatchTracking       = lazy(() => import('@/pages/retail/BatchTracking'));
 const ExpiryTracking      = lazy(() => import('@/pages/retail/ExpiryTracking'));
 const SerialNumbers       = lazy(() => import('@/pages/retail/SerialNumbers'));
+const POSExecutiveDashboard = lazy(() => import('@/pages/retail/pos/POSExecutiveDashboard'));
+const POSBranchDevices      = lazy(() => import('@/pages/retail/pos/POSBranchDevices'));
+const POSTerminalAccount    = lazy(() => import('@/pages/retail/pos/POSTerminalAccount'));
+const POSAuditCenter        = lazy(() => import('@/pages/retail/pos/POSAuditCenter'));
+const RetailPOSPortalGuard  = lazy(() => import('@/components/retail-pos/RetailPOSPortalGuard'));
 
 // ── Public pages (eager — shown before auth) ─────────────────────────────────
 import LandingPage            from '@/pages/LandingPage';
@@ -374,6 +379,10 @@ const SubscribedRoutes = () => {
         <Route path="/retail/batches"  element={<RoleGuard permission="viewInventory"><BatchTracking /></RoleGuard>} />
         <Route path="/retail/expiry"   element={<RoleGuard permission="viewInventory"><ExpiryTracking /></RoleGuard>} />
         <Route path="/retail/serials"  element={<RoleGuard permission="viewInventory"><SerialNumbers /></RoleGuard>} />
+        <Route path="/retail/pos-control" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSExecutiveDashboard /></RetailPOSPortalGuard></RoleGuard>} />
+        <Route path="/retail/pos-branches" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSBranchDevices /></RetailPOSPortalGuard></RoleGuard>} />
+        <Route path="/retail/pos-device" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSTerminalAccount /></RetailPOSPortalGuard></RoleGuard>} />
+        <Route path="/retail/pos-audit" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSAuditCenter /></RetailPOSPortalGuard></RoleGuard>} />
 
       </Route>
       <Route path="*" element={<PageNotFound />} />

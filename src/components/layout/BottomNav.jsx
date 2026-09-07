@@ -41,7 +41,7 @@ const PRIMARY_NAV_OWNER_RETAIL = [
   { path: '/owner-command-center', icon: LayoutDashboard, labelKey: 'dashboard' },
   { path: '/treasury',              icon: Wallet,           labelKey: 'treasury' },
   { path: '/inventory',            icon: Boxes,            labelKey: 'inventory' },
-  { path: '/retail/barcode',       icon: Barcode,          labelKey: 'barcode' },
+  { path: '/retail/pos-control',   icon: ScanLine,         labelKey: 'pos_control' },
   { path: '/more',                 icon: Grid3x3,          labelKey: 'more', isMore: true },
 ];
 
@@ -57,7 +57,7 @@ const PRIMARY_NAV_MANAGER_RETAIL = [
   { path: '/manager-dashboard',    icon: LayoutDashboard, labelKey: 'dashboard' },
   { path: '/treasury',              icon: Wallet,          labelKey: 'treasury' },
   { path: '/inventory',            icon: Boxes,           labelKey: 'inventory' },
-  { path: '/retail/barcode',       icon: Barcode,         labelKey: 'barcode' },
+  { path: '/retail/pos-control',   icon: ScanLine,        labelKey: 'pos_control' },
   { path: '/more',                 icon: Grid3x3,         labelKey: 'more', isMore: true },
 ];
 
@@ -113,6 +113,10 @@ const MORE_PERMISSION_BY_PATH = {
   '/retail/batches': 'viewInventory',
   '/retail/expiry': 'viewInventory',
   '/retail/serials': 'viewInventory',
+  '/retail/pos-control': 'viewSales',
+  '/retail/pos-branches': 'viewSales',
+  '/retail/pos-device': 'viewSales',
+  '/retail/pos-audit': 'viewSales',
 };
 
 // ── More Menu Sections ────────────────────────────────────────────────────────
@@ -179,6 +183,10 @@ const MORE_SECTIONS_OWNER_RETAIL = [
   {
     title: 'Retail',
     items: [
+      { path: '/retail/pos-control',         icon: ScanLine,     labelKey: 'pos_control' },
+      { path: '/retail/pos-branches',        icon: Building2,    labelKey: 'pos_branches' },
+      { path: '/retail/pos-device',          icon: CreditCard,   labelKey: 'pos_device' },
+      { path: '/retail/pos-audit',           icon: ShieldCheck,  labelKey: 'pos_audit' },
       { path: '/retail/barcode',            icon: Barcode,     labelKey: 'barcode' },
       { path: '/retail/sku',                icon: Hash,        labelKey: 'sku_management' },
       { path: '/retail/variants',           icon: Layers,      labelKey: 'product_variants' },
@@ -253,6 +261,10 @@ const MORE_SECTIONS_MANAGER_RETAIL = [
   {
     title: 'Retail',
     items: [
+      { path: '/retail/pos-control', icon: ScanLine,     labelKey: 'pos_control' },
+      { path: '/retail/pos-branches',icon: Building2,    labelKey: 'pos_branches' },
+      { path: '/retail/pos-device',  icon: CreditCard,   labelKey: 'pos_device' },
+      { path: '/retail/pos-audit',   icon: ShieldCheck,  labelKey: 'pos_audit' },
       { path: '/retail/barcode',    icon: Barcode,     labelKey: 'barcode' },
       { path: '/retail/batches',    icon: Tags,        labelKey: 'batch_tracking' },
       { path: '/retail/expiry',     icon: Calendar,    labelKey: 'expiry_tracking' },
@@ -284,7 +296,7 @@ const CONTROL_GROUPS = [
     title: 'Sales & Revenue',
     icon: TrendingUp,
     iconClass: 'bg-blue-600 text-white',
-    paths: ['/cash-register', '/sales/invoices'],
+    paths: ['/cash-register', '/sales/invoices', '/retail/pos-control', '/retail/pos-branches', '/retail/pos-device', '/retail/pos-audit'],
   },
   {
     key: 'purchasing',

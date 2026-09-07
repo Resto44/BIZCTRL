@@ -29,12 +29,14 @@ import {
   Banknote, Network, UserCheck, GitBranch, Store, Globe,
   PieChart, Target, Layers, ClipboardList, Handshake,
   ArrowLeftRight, ShieldCheck, SlidersHorizontal, Truck, X,
-  Search, Plus, CircleAlert, CheckCircle2, LifeBuoy, MapPinned
+  Search, Plus, CircleAlert, CheckCircle2, LifeBuoy, MapPinned,
+  MonitorSmartphone, ScanLine, FileSearch, ShieldAlert
 } from 'lucide-react';
 import { useERPNavigation } from '@/hooks/useERPNavigation';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import { getCustomizedNavigationGroups } from '@/lib/workspaceCustomization';
 import LogoutButton from './LogoutButton';
+import { isSupermarketProductPortal } from '@/lib/productImportAccess';
 
 // ─── Nav groups definition ────────────────────────────────────────────────────
 export const ERP_NAV_GROUPS = [
@@ -58,6 +60,17 @@ export const ERP_NAV_GROUPS = [
       { path: '/purchases',      label: 'Purchases',      icon: Package,      permission: 'viewPurchases' },
       { path: '/purchase-orders',label: 'Purchase Orders',icon: ClipboardList,permission: 'viewPurchases' },
       { path: '/expenses',       label: 'Expenses',       icon: DollarSign,   permission: 'viewExpenses' },
+    ],
+  },
+  {
+    key: 'retail-pos-control',
+    label: 'Retail POS Control',
+    supermarketOnly: true,
+    items: [
+      { path: '/retail/pos-control',  label: 'Live Command Center', icon: MonitorSmartphone, permission: 'viewSales' },
+      { path: '/retail/pos-branches', label: 'Branches & POS',      icon: ScanLine,          permission: 'viewSales' },
+      { path: '/retail/pos-device',   label: 'POS Device Account',  icon: FileSearch,        permission: 'viewSales' },
+      { path: '/retail/pos-audit',    label: 'POS Audit & Alerts',  icon: ShieldAlert,       permission: 'viewSales' },
     ],
   },
   {
@@ -669,8 +682,11 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
   const { translateLiteral } = useLanguage();
   const { configuration } = useWorkspaceCustomization();
   const navigationGroups = useMemo(
-    () => getCustomizedNavigationGroups(ERP_NAV_GROUPS, configuration),
-    [configuration],
+    () => getCustomizedNavigationGroups(
+      ERP_NAV_GROUPS.filter((group) => !group.supermarketOnly || isSupermarketProductPortal(activeRestaurant)),
+      configuration,
+    ),
+    [activeRestaurant, configuration],
   );
 
   if (mobile) {

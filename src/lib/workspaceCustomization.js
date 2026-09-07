@@ -23,6 +23,7 @@ export const WORKSPACE_MODULE_CATALOG = Object.freeze([
   { key: 'ai_analytics', label: 'AI analytics', group: 'Analytics', paths: ['/ai-copilot'] },
   { key: 'notifications', label: 'Alerts & notifications', group: 'System', paths: ['/alerts', '/notifications'] },
   { key: 'approval_center', label: 'Approval workflows', group: 'System', paths: ['/approval-center', '/erp-approval-center', '/approval-policy'] },
+  { key: 'retail_pos_control', label: 'Retail POS control', group: 'Retail tools', paths: ['/retail/pos-control', '/retail/pos-branches', '/retail/pos-device', '/retail/pos-audit'] },
   { key: 'barcode', label: 'Barcode', group: 'Retail tools', paths: ['/retail/barcode'] },
   { key: 'sku_management', label: 'SKU management', group: 'Retail tools', paths: ['/retail/sku'] },
   { key: 'product_variants', label: 'Product variants', group: 'Retail tools', paths: ['/retail/variants'] },
@@ -43,7 +44,7 @@ const COMMON_ERP_MODULES = [
 export const BUSINESS_TEMPLATE_PRESETS = Object.freeze({
   restaurant: { label: 'Restaurant', icon: '🍽️', description: 'Sales closing, purchasing, inventory, drivers and finance.', enabled_modules: [...COMMON_ERP_MODULES, 'cash_register', 'network_settlement', 'ai_analytics'] },
   cafe: { label: 'Café', icon: '☕', description: 'Fast sales, cash register, stock and daily purchasing.', enabled_modules: [...COMMON_ERP_MODULES, 'cash_register', 'network_settlement', 'ai_analytics'] },
-  retail: { label: 'Retail store', icon: '🛍️', description: 'POS, barcode, SKU, variants, batches and expiry.', enabled_modules: [...COMMON_ERP_MODULES, 'cash_register', 'network_settlement', 'ai_analytics', 'barcode', 'sku_management', 'product_variants', 'batch_lot_tracking', 'expiry_tracking', 'serial_numbers'] },
+  retail: { label: 'Retail store', icon: '🛍️', description: 'POS, barcode, SKU, variants, batches and expiry.', enabled_modules: [...COMMON_ERP_MODULES, 'cash_register', 'network_settlement', 'ai_analytics', 'retail_pos_control', 'barcode', 'sku_management', 'product_variants', 'batch_lot_tracking', 'expiry_tracking', 'serial_numbers'] },
   warehouse: { label: 'Warehouse', icon: '🏭', description: 'Purchasing, stock, transfers, batches and supplier control.', enabled_modules: ['dashboard', 'purchase', 'expenses', 'inventory', 'product_management', 'supplier_management', 'treasury', 'payroll', 'employee_management', 'reports', 'notifications', 'approval_center', 'barcode', 'sku_management', 'batch_lot_tracking', 'settings'] },
   factory: { label: 'Factory', icon: '⚙️', description: 'Materials, purchasing, stock, batches, cost and workforce.', enabled_modules: ['dashboard', 'sales', 'purchase', 'expenses', 'inventory', 'product_management', 'supplier_management', 'treasury', 'debt_management', 'payroll', 'employee_management', 'reports', 'notifications', 'approval_center', 'batch_lot_tracking', 'settings'] },
   pharmacy: { label: 'Pharmacy', icon: '💊', description: 'POS, barcode, batches, expiry and serial tracking.', enabled_modules: [...COMMON_ERP_MODULES, 'cash_register', 'network_settlement', 'barcode', 'sku_management', 'batch_lot_tracking', 'expiry_tracking', 'serial_numbers'] },
@@ -105,6 +106,7 @@ export const WORKSPACE_NAVIGATION_PATHS = Object.freeze([
   '/oracle-analytics', '/branch-analytics', '/alerts', '/branch-management',
   '/role-permissions', '/restaurants', '/settings', '/erp-approval-center',
   '/notifications', '/customize-workspace',
+  '/retail/pos-control', '/retail/pos-branches', '/retail/pos-device', '/retail/pos-audit',
 ]);
 
 export const DEFAULT_WORKSPACE_CUSTOMIZATION = Object.freeze({
