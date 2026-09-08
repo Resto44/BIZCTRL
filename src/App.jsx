@@ -36,6 +36,8 @@ import POSExecutiveDashboard from '@/pages/retail/pos/POSExecutiveDashboard';
 import POSBranchDevices from '@/pages/retail/pos/POSBranchDevices';
 import POSTerminalAccount from '@/pages/retail/pos/POSTerminalAccount';
 import POSAuditCenter from '@/pages/retail/pos/POSAuditCenter';
+import RetailCashier from '@/pages/retail/pos/RetailCashier';
+import CustomerDisplay from '@/pages/retail/pos/CustomerDisplay';
 import RetailPOSPortalGuard from '@/components/retail-pos/RetailPOSPortalGuard';
 
 // ── Lazy-loaded pages (code splitting) ───────────────────────────────────────
@@ -409,6 +411,7 @@ const SubscribedRoutes = () => {
         <Route path="/retail/pos-branches" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSBranchDevices /></RetailPOSPortalGuard></RoleGuard>} />
         <Route path="/retail/pos-device" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSTerminalAccount /></RetailPOSPortalGuard></RoleGuard>} />
         <Route path="/retail/pos-audit" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSAuditCenter /></RetailPOSPortalGuard></RoleGuard>} />
+        <Route path="/retail/cashier" element={<RoleGuard permission="uploadSales"><RetailPOSPortalGuard><RetailCashier /></RetailPOSPortalGuard></RoleGuard>} />
 
       </Route>
       <Route path="*" element={<PageNotFound />} />
@@ -642,6 +645,7 @@ function App() {
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/refund" element={<RefundPage />} />
               <Route path="/contact" element={<ContactPage />} />
+              <Route path="/retail/customer-display" element={<CustomerDisplay />} />
               {/* All authenticated routes */}
               <Route path="*" element={<AuthenticatedApp />} />
             </Routes>

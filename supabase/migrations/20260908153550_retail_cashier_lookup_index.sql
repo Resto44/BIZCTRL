@@ -1,0 +1,1 @@
+create index cashier_carts_device_scope on retail_checkout_private.carts(device_id,restaurant_id,branch_id);

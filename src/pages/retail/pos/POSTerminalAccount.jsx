@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Banknote,
@@ -19,6 +19,8 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis
 import { toast } from 'sonner';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useRole } from '@/lib/RoleContext';
+import { cashierCopy } from '@/components/retail-pos/cashierCopy';
 import { deviceIsLive, paymentLabel, terminalCashDifference, terminalExpectedCash } from '@/lib/retailPosControl';
 import { useRetailPOSControl } from '@/hooks/useRetailPOSControl';
 import {
@@ -43,6 +45,8 @@ function HardwareState({ icon: Icon, label, value }) {
 }
 
 export default function POSTerminalAccount() {
+  const { can } = useRole();
+  const { lang } = useLanguage();
   const [params, setParams] = useSearchParams();
   const selectedDeviceId = params.get('device') || '';
   const [period, setPeriod] = useState('today');
@@ -114,6 +118,7 @@ export default function POSTerminalAccount() {
     if (!device) return <RetailPOSLoading />;
     return (
       <>
+        {can?.uploadSales && <Button asChild className="w-full gap-2 sm:w-auto"><Link to={`/retail/cashier?device=${selectedDeviceId}`}><ScanLine className="h-4 w-4" />{cashierCopy(lang).title} · {device.code}</Link></Button>}
         <section className="rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3"><span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${live ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950' : 'bg-red-50 text-red-700 dark:bg-red-950'}`}><MonitorSmartphone className="h-7 w-7" /></span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-xl font-black">{device.code}</h2><POSStatus live={live} label={live ? translateLiteral('Online') : translateLiteral('Offline')} /></div><p className="truncate text-sm text-muted-foreground">{device.branch_name} · {device.display_name} · {device.serial_number || translateLiteral('No serial registered')}</p></div></div>

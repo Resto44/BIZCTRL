@@ -67,6 +67,7 @@ export const ERP_NAV_GROUPS = [
     label: 'Retail POS Control',
     supermarketOnly: true,
     items: [
+      { path: '/retail/cashier',      label: 'Cashier workspace',  icon: ScanLine,          permission: 'uploadSales' },
       { path: '/retail/pos-control',  label: 'Live Command Center', icon: MonitorSmartphone, permission: 'viewSales' },
       { path: '/retail/pos-branches', label: 'Branches & POS',      icon: ScanLine,          permission: 'viewSales' },
       { path: '/retail/pos-device',   label: 'POS Device Account',  icon: FileSearch,        permission: 'viewSales' },

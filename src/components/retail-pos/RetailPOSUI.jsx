@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useRole } from '@/lib/RoleContext';
+import { cashierCopy } from './cashierCopy';
 
 const EN = {
   executive: 'Executive dashboard', branches: 'Branches & POS', device: 'Device account', audit: 'Audit & alerts',
@@ -67,6 +69,8 @@ export function RetailPOSWorkspace({
   actions = null,
 }) {
   const copy = useRetailPosCopy();
+  const { can } = useRole();
+  const { lang } = useLanguage();
   const subscribed = realtimeStatus === 'SUBSCRIBED';
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-4 pb-28 lg:pb-8">
@@ -93,6 +97,7 @@ export function RetailPOSWorkspace({
               </div>
             ) : null}
             {actions}
+            {can?.uploadSales && <Button asChild className="h-10 gap-2 rounded-xl"><Link to="/retail/cashier"><MonitorSmartphone className="h-4 w-4" />{cashierCopy(lang).title}</Link></Button>}
             {onRefresh ? (
               <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={isFetching} className="h-10 gap-2 rounded-xl">
                 <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />

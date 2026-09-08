@@ -68,12 +68,18 @@ begin
   perform public.erp_retail_inventory_command(r,'save_count',jsonb_build_object('document_id',cnt->>'id','lines',jsonb_build_array(jsonb_build_object('id',v->'lines'->0->>'id','counted_quantity',70))));
   perform public.erp_retail_inventory_command(r,'submit',jsonb_build_object('document_id',cnt->>'id'));
   select id into device from public.erp_retail_pos_seed_branch_devices(b1,1) limit 1;
+  -- Legacy trusted-ledger fixture runs as the backend; browser calls now go
+  -- through the stock-checked cashier command (covered by cashier workflows).
+  reset role;
   select id into shift_id from public.erp_retail_pos_open_shift(device,'Verification cashier',0);
+  set local role authenticated;
   sale:=jsonb_build_object('shift_id',shift_id,'receipt_number','VERIFY-SALE-1','idempotency_key','verify-sale-1','net_total',15,
     'items',jsonb_build_array(jsonb_build_object('product_id',p,'product_name','Verification milk','quantity',3,'unit_price',5,'line_total',15)),
     'payments',jsonb_build_array(jsonb_build_object('payment_method','cash','amount',15)));
+  reset role;
   perform public.erp_retail_pos_record_transaction(sale);
   perform public.erp_retail_pos_record_transaction(sale);
+  set local role authenticated;
   select on_hand into n from public.retail_inventory_stock where warehouse_id=w1 and product_id=p;
   if n is distinct from 67 then raise exception 'POS stock debit/idempotency incorrect: %',n; end if;
   blocked:=false;
@@ -104,7 +110,9 @@ begin
   if exists(select 1 from public.cash_movements where restaurant_id=r and source_module='Purchases') then raise exception 'Goods receipt incorrectly posted a cash payment'; end if;
   -- FEFO consumes the newer purchase with the earlier expiry before LOT-A.
   sale:=jsonb_set(jsonb_set(sale,'{idempotency_key}','"verify-sale-2"'),'{receipt_number}','"VERIFY-SALE-2"');
+  reset role;
   perform public.erp_retail_pos_record_transaction(sale);
+  set local role authenticated;
   select quantity into n from public.retail_inventory_lots where branch_id=b1 and batch_number='LOT-B';
   if n is distinct from 5 then raise exception 'FEFO did not consume earliest expiry: %',n; end if;
   -- Quarantine review leaves physical quantity unchanged and increases sellable quantity.

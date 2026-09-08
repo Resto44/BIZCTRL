@@ -23,7 +23,7 @@ export const WORKSPACE_MODULE_CATALOG = Object.freeze([
   { key: 'ai_analytics', label: 'AI analytics', group: 'Analytics', paths: ['/ai-copilot'] },
   { key: 'notifications', label: 'Alerts & notifications', group: 'System', paths: ['/alerts', '/notifications'] },
   { key: 'approval_center', label: 'Approval workflows', group: 'System', paths: ['/approval-center', '/erp-approval-center', '/approval-policy'] },
-  { key: 'retail_pos_control', label: 'Retail POS control', group: 'Retail tools', paths: ['/retail/pos-control', '/retail/pos-branches', '/retail/pos-device', '/retail/pos-audit'] },
+  { key: 'retail_pos_control', label: 'Retail POS control', group: 'Retail tools', paths: ['/retail/cashier', '/retail/pos-control', '/retail/pos-branches', '/retail/pos-device', '/retail/pos-audit'] },
   { key: 'barcode', label: 'Barcode', group: 'Retail tools', paths: ['/retail/barcode'] },
   { key: 'sku_management', label: 'SKU management', group: 'Retail tools', paths: ['/retail/sku'] },
   { key: 'product_variants', label: 'Product variants', group: 'Retail tools', paths: ['/retail/variants'] },
@@ -106,7 +106,7 @@ export const WORKSPACE_NAVIGATION_PATHS = Object.freeze([
   '/oracle-analytics', '/branch-analytics', '/alerts', '/branch-management',
   '/role-permissions', '/restaurants', '/settings', '/erp-approval-center',
   '/notifications', '/customize-workspace',
-  '/retail/pos-control', '/retail/pos-branches', '/retail/pos-device', '/retail/pos-audit',
+  '/retail/cashier', '/retail/pos-control', '/retail/pos-branches', '/retail/pos-device', '/retail/pos-audit',
 ]);
 
 export const DEFAULT_WORKSPACE_CUSTOMIZATION = Object.freeze({

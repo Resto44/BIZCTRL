@@ -626,6 +626,7 @@ const translations = {
     // Cash Register
     cash_register: 'Cash Register',
     pos_control: 'POS Control',
+    cashier_workspace: 'Cashier workspace',
     pos_branches: 'Branches & POS',
     pos_device: 'POS Device',
     pos_audit: 'POS Audit',
@@ -1872,6 +1873,7 @@ const translations = {
     supplier_payment: 'دفع المورد',
     cash_register: 'صندوق النقد',
     pos_control: 'التحكم في POS',
+    cashier_workspace: 'مساحة الكاشير',
     pos_branches: 'الفروع وأجهزة POS',
     pos_device: 'جهاز POS',
     pos_audit: 'تدقيق POS',
@@ -3188,6 +3190,7 @@ const translations = {
     export_center: 'مرکز خروجی',
     cash_register: 'صندوق نقدی',
     pos_control: 'کنترول POS',
+    cashier_workspace: 'صفحهٔ کاشیر',
     pos_branches: 'فرع‌ها و POS',
     pos_device: 'دستگاه POS',
     pos_audit: 'بررسی POS',

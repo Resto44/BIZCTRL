@@ -26,6 +26,7 @@ import { useBusinessMode } from '@/lib/BusinessModeContext';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import { useTenant } from '@/lib/TenantContext';
 import { isWorkspacePathEnabled } from '@/lib/workspaceCustomization';
+import { isSupermarketProductPortal } from '@/lib/productImportAccess';
 
 // ── Primary Nav by Role + Mode ────────────────────────────────────────────────
 
@@ -114,6 +115,7 @@ const MORE_PERMISSION_BY_PATH = {
   '/retail/expiry': 'viewInventory',
   '/retail/serials': 'viewInventory',
   '/retail/pos-control': 'viewSales',
+  '/retail/cashier': 'uploadSales',
   '/retail/pos-branches': 'viewSales',
   '/retail/pos-device': 'viewSales',
   '/retail/pos-audit': 'viewSales',
@@ -183,6 +185,7 @@ const MORE_SECTIONS_OWNER_RETAIL = [
   {
     title: 'Retail',
     items: [
+      { path: '/retail/cashier',             icon: ScanLine,     labelKey: 'cashier_workspace' },
       { path: '/retail/pos-control',         icon: ScanLine,     labelKey: 'pos_control' },
       { path: '/retail/pos-branches',        icon: Building2,    labelKey: 'pos_branches' },
       { path: '/retail/pos-device',          icon: CreditCard,   labelKey: 'pos_device' },
@@ -261,6 +264,7 @@ const MORE_SECTIONS_MANAGER_RETAIL = [
   {
     title: 'Retail',
     items: [
+      { path: '/retail/cashier',     icon: ScanLine,     labelKey: 'cashier_workspace' },
       { path: '/retail/pos-control', icon: ScanLine,     labelKey: 'pos_control' },
       { path: '/retail/pos-branches',icon: Building2,    labelKey: 'pos_branches' },
       { path: '/retail/pos-device',  icon: CreditCard,   labelKey: 'pos_device' },
@@ -296,7 +300,7 @@ const CONTROL_GROUPS = [
     title: 'Sales & Revenue',
     icon: TrendingUp,
     iconClass: 'bg-blue-600 text-white',
-    paths: ['/cash-register', '/sales/invoices', '/retail/pos-control', '/retail/pos-branches', '/retail/pos-device', '/retail/pos-audit'],
+    paths: ['/cash-register', '/sales/invoices', '/retail/cashier', '/retail/pos-control', '/retail/pos-branches', '/retail/pos-device', '/retail/pos-audit'],
   },
   {
     key: 'purchasing',
@@ -591,11 +595,13 @@ const BottomNav = memo(function BottomNav() {
   const { t } = useLanguage();
   const { role, can } = useRole();
   const { isRetailLike } = useBusinessMode();
+  const { activeRestaurant } = useTenant();
+  const supermarket = isSupermarketProductPortal(activeRestaurant);
   const { configuration } = useWorkspaceCustomization();
   const [showMore, setShowMore] = useState(false);
 
   const { visibleNav: baseNav, moreSections: baseMoreSections } = useMemo(() => {
-    if (role === ROLES.EMPLOYEE) return { visibleNav: PRIMARY_NAV_EMPLOYEE, moreSections: [] };
+    if (role === ROLES.EMPLOYEE) return { visibleNav: [...PRIMARY_NAV_EMPLOYEE, ...(supermarket && can.uploadSales ? [{ path: '/retail/cashier', icon: ScanLine, labelKey: 'cashier_workspace' }] : [])], moreSections: [] };
     if (role === ROLES.SPONSOR) return { visibleNav: PRIMARY_NAV_SPONSOR, moreSections: [] };
     if (role === ROLES.CUSTOMER) return { visibleNav: PRIMARY_NAV_CUSTOMER, moreSections: [] };
     if (role === ROLES.SUPPLIER) return { visibleNav: [
@@ -613,7 +619,7 @@ const BottomNav = memo(function BottomNav() {
     return isRetailLike
       ? { visibleNav: PRIMARY_NAV_OWNER_RETAIL, moreSections: MORE_SECTIONS_OWNER_RETAIL }
       : { visibleNav: PRIMARY_NAV_OWNER_RESTAURANT, moreSections: MORE_SECTIONS_OWNER_RESTAURANT };
-  }, [role, isRetailLike]);
+  }, [role, isRetailLike, can.uploadSales, supermarket]);
 
   const { visibleNav, moreSections } = useMemo(() => {
     const hidden = new Set(configuration?.navigation?.hidden_paths || []);
@@ -628,13 +634,13 @@ const BottomNav = memo(function BottomNav() {
         items: section.items
           .filter((item) => {
             const permission = MORE_PERMISSION_BY_PATH[item.path];
-            return (!permission || can[permission]) && !hidden.has(item.path) && isWorkspacePathEnabled(configuration, item.path);
+            return (item.path !== '/retail/cashier' || supermarket) && (!permission || can[permission]) && !hidden.has(item.path) && isWorkspacePathEnabled(configuration, item.path);
           })
           .sort(compare),
       }))
       .filter((section) => section.items.length > 0);
     return { visibleNav, moreSections };
-  }, [baseMoreSections, baseNav, can, configuration]);
+  }, [baseMoreSections, baseNav, can, configuration, supermarket]);
 
   return (
     <>
