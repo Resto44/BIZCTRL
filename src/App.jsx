@@ -399,7 +399,7 @@ const SubscribedRoutes = () => {
             These routes are accessible to all authenticated users but the pages
             themselves enforce Retail Mode via useBusinessMode() guard.
         ══════════════════════════════════════════════════════════════════════ */}
-        <Route path="/retail/barcode"  element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="stock" fallback={<BarcodeScanner />} /></RoleGuard>} />
+        <Route path="/retail/barcode"  element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="stock" scanOnOpen fallback={<BarcodeScanner />} /></RoleGuard>} />
         <Route path="/retail/sku"      element={<RoleGuard permission="viewInventory"><SKUManagement /></RoleGuard>} />
         <Route path="/retail/variants" element={<RoleGuard permission="viewInventory"><ProductVariants /></RoleGuard>} />
         <Route path="/retail/batches"  element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="control" fallback={<BatchTracking />} /></RoleGuard>} />

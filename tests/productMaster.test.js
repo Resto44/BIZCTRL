@@ -61,7 +61,7 @@ describe('ERP Product Master', () => {
     expect(source).toContain('Product Master');
     expect(source).toContain('Step {step + 1} of');
     expect(source).toContain('Product draft saved on this device.');
-    expect(source).toContain("'BarcodeDetector' in window");
+    expect(source).toContain('BarcodeScanDialog');
     expect(source).toContain('Branch opening stock');
     expect(source).toContain('Accounting mapping');
     expect(source).toContain('pb-[calc(0.75rem+env(safe-area-inset-bottom))]');

@@ -24,6 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import BarcodeScanDialog from '@/components/shared/BarcodeScanDialog';
 
 function nanoid8() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -131,7 +132,8 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
   const retailInventory = isSupermarketProductPortal(activeRestaurant);
   const { t, currency } = useLanguage();
   const { isProductFieldVisible, isProductFieldRequired, productCustomFields } = useWorkspaceCustomization();
-  const barcodeInputRef = useRef(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  useEffect(() => { setScannerOpen(false); }, [activeRestaurant?.id]);
   const stockSeedRef = useRef('');
   const [localDraft] = useState(() => (!initial ? readDraft(activeRestaurant?.id) : null));
 
@@ -234,25 +236,6 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
     setStep((current) => Math.min(3, current + 1));
   };
 
-  const scanBarcodeImage = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    if (!('BarcodeDetector' in window)) return toast.error('Barcode scanning is not supported by this browser. Enter it manually.');
-    try {
-      const bitmap = await createImageBitmap(file);
-      const detector = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e', 'qr_code'] });
-      const results = await detector.detect(bitmap);
-      bitmap.close?.();
-      if (!results.length) return toast.error('No barcode was detected. Try a clearer photo.');
-      set('barcode', results[0].rawValue);
-      toast.success('Barcode captured.');
-    } catch (error) {
-      console.error('[ProductMaster] Barcode scan failed:', error);
-      toast.error('Unable to scan this image. Enter the barcode manually.');
-    }
-  };
-
   const addConversion = () => setErpValue('unit_conversions', [...(erp.unit_conversions || []), { from_unit: form.unit || '', factor: '1', to_unit: '', barcode: '' }]);
   const updateConversion = (index, field, value) => setErpValue('unit_conversions', erp.unit_conversions.map((conversion, conversionIndex) => conversionIndex === index ? { ...conversion, [field]: value } : conversion));
   const removeConversion = (index) => setErpValue('unit_conversions', erp.unit_conversions.filter((_, conversionIndex) => conversionIndex !== index));
@@ -309,7 +292,7 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
           <Field label={t('name_fa')}><Input value={form.name_fa || ''} onChange={(event) => set('name_fa', event.target.value)} placeholder="نام محصول" dir="rtl" /></Field>
           <Field label={t('name_en')} className="sm:col-span-2"><Input value={form.name_en || ''} onChange={(event) => set('name_en', event.target.value)} placeholder="English product name" /></Field>
           {isProductFieldVisible('sku') && <Field label={t('sku')} required={isProductFieldRequired('sku')}><div className="flex gap-2"><Input value={form.sku || ''} onChange={(event) => set('sku', event.target.value)} placeholder="SKU-001" /><Button type="button" variant="outline" size="icon" onClick={() => set('sku', `SKU-${nanoid8()}`)} aria-label="Generate SKU"><Calculator className="h-4 w-4" /></Button></div></Field>}
-          {isProductFieldVisible('barcode') && <Field label={t('barcode')} required={isProductFieldRequired('barcode')}><div className="flex gap-2"><Input value={form.barcode || ''} onChange={(event) => set('barcode', event.target.value)} inputMode="numeric" placeholder="1234567890" /><Button type="button" variant="outline" size="icon" onClick={() => barcodeInputRef.current?.click()} aria-label="Scan barcode"><ScanLine className="h-4 w-4" /></Button><input ref={barcodeInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={scanBarcodeImage} /></div></Field>}
+          {isProductFieldVisible('barcode') && <Field label={t('barcode')} required={isProductFieldRequired('barcode')}><div className="flex gap-2"><Input value={form.barcode || ''} onChange={(event) => set('barcode', event.target.value)} inputMode="numeric" placeholder="1234567890" /><Button type="button" variant="outline" size="icon" onClick={() => setScannerOpen(true)} aria-label="Scan barcode"><ScanLine className="h-4 w-4" /></Button></div></Field>}
           <Field label="Product image URL" className="sm:col-span-2"><div className="relative"><ImagePlus className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input className="pl-9" value={form.image_url || ''} onChange={(event) => set('image_url', event.target.value)} placeholder="https://…" /></div></Field>
         </div>
       </SectionCard>
@@ -389,11 +372,12 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
   );
 
   return (
-    <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col bg-slate-50 dark:bg-slate-900">
+    <><form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col bg-slate-50 dark:bg-slate-900">
       <header className="flex shrink-0 items-center gap-3 bg-white px-4 py-3 dark:bg-slate-950 sm:px-6 sm:py-4"><Button type="button" variant="ghost" size="icon" onClick={onCancel} aria-label="Close product form"><X className="h-5 w-5" /></Button><div className="min-w-0 flex-1"><h2 className="truncate text-lg font-black text-slate-950 sm:text-xl dark:text-white">{initial ? 'Edit Product' : 'New Product'}</h2><p className="text-xs text-slate-500">Step {step + 1} of {PRODUCT_MASTER_STEPS.length} · Product Master</p></div><span className={cn('rounded-full px-3 py-1 text-xs font-bold', initial ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300')}>{initial ? 'Editing' : 'Draft'}</span></header>
       <Stepper step={step} onStepChange={setStep} />
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-6 sm:py-5"><div className="mx-auto max-w-4xl">{step === 0 ? renderIdentity() : step === 1 ? renderPricing() : step === 2 ? renderInventory() : renderAdvanced()}</div></main>
       <footer className="shrink-0 border-t border-slate-200 bg-white px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 dark:border-slate-800 dark:bg-slate-950 sm:px-6"><div className="mx-auto flex max-w-4xl gap-2">{step > 0 && <Button type="button" variant="outline" className="h-11 px-3 sm:px-5" onClick={() => setStep((current) => current - 1)}><ArrowLeft className="mr-1.5 h-4 w-4" /><span className="hidden sm:inline">Back</span></Button>}<Button type="button" variant="outline" className="h-11 flex-1 sm:flex-none sm:px-6" onClick={saveDraft}><Save className="mr-2 h-4 w-4" />Save draft</Button>{step < 3 ? <Button type="button" className="h-11 flex-[1.35] sm:ml-auto sm:flex-none sm:px-7" onClick={goNext}>Continue <ArrowRight className="ml-2 h-4 w-4" /></Button> : <Button type="submit" className="h-11 flex-[1.35] sm:ml-auto sm:flex-none sm:px-7" disabled={isSubmitting}>{isSubmitting ? 'Saving…' : initial ? 'Update Product' : 'Create Product'}{!isSubmitting && <ChevronRight className="ml-1.5 h-4 w-4" />}</Button>}</div></footer>
     </form>
+    {scannerOpen && <BarcodeScanDialog open onOpenChange={setScannerOpen} onScan={(barcode) => set('barcode', barcode)} />}</>
   );
 }

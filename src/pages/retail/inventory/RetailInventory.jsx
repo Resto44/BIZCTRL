@@ -9,6 +9,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { useRetailInventory, useInventoryList } from '@/hooks/useRetailInventory';
 import { csvCell, inventoryRPC, productName } from '@/lib/retailInventory';
 import { Button } from '@/components/ui/button';
+import BarcodeScanDialog from '@/components/shared/BarcodeScanDialog';
 import { useInventoryCopy } from '@/components/retail-inventory/inventoryCopy';
 import { InventoryWorkspace, Panel, Metric, Empty, ErrorNotice, Status, Pagination, ProductIdentity, Field, fieldClass } from '@/components/retail-inventory/InventoryUI';
 import { ProductPicker } from '@/components/retail-inventory/ProductPicker';
@@ -36,13 +37,17 @@ function Overview({ ctx, onAction }) {
 }
 function Stock({ ctx, onAction, onDetail }) {
   const c = useInventoryCopy(); const { formatMoney, formatNumber } = useLanguage(); const location = useLocation(); const { can } = useRole();
-  const searchRef = useRef(null);
+  const searchRef = useRef(null); const stockPath = useRef(location.pathname);
   const [search, setSearch] = useState(''); const [query, setQuery] = useState(''); const [page, setPage] = useState(1);
   const [filter, setFilter] = useState(() => new URLSearchParams(location.search).get('filter') || 'all'); const [exporting, setExporting] = useState(false);
   useEffect(() => { const timer = setTimeout(() => { setQuery(search); setPage(1); }, 250); return () => clearTimeout(timer); }, [search]);
   useEffect(() => { setPage(1); }, [ctx.branchId, ctx.warehouseId, filter]);
   useEffect(() => { if (location.pathname === '/inventory/stock') { const f = new URLSearchParams(location.search).get('filter'); if (['all', 'low', 'expiry', 'blocked'].includes(f)) setFilter(f); } }, [location.pathname, location.search]);
-  useEffect(() => { if (location.pathname === '/inventory/stock' && new URLSearchParams(location.search).get('scan') === '1') searchRef.current?.focus(); }, [location.pathname, location.search]);
+  useEffect(() => {
+    if (location.pathname !== stockPath.current) return;
+    const barcode = new URLSearchParams(location.search).get('barcode');
+    if (barcode !== null) { setSearch(barcode); setQuery(barcode); setFilter('all'); setPage(1); }
+  }, [location.pathname, location.search, location.key]);
   const data = useInventoryList(ctx, 'stock', { p_query: query, p_filter: filter, p_page: page });
   const exportCSV = async () => {
     setExporting(true); try {
@@ -78,17 +83,21 @@ function Control({ ctx, onAction, onDocument }) {
     <Panel title={c.history} subtitle={c.ownerReview}>{audit.error ? <ErrorNotice error={audit.error} retry={audit.refetch} /> : <div className="divide-y">{audit.data?.data.map((entry) => <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-xs"><div><b>{c[entry.action] || entry.action}</b><p className="mt-1 text-muted-foreground">{entry.detail}</p></div><span className="text-muted-foreground">{formatDate(entry.created_at)}</span></div>)}</div>}{!audit.isFetching && !audit.data?.count && <Empty />}<Pagination page={auditPage} total={audit.data?.count || 0} size={20} onChange={setAuditPage} busy={audit.isFetching} /></Panel>
   </>;
 }
-export default function RetailInventory({ page = 'overview' }) {
+export default function RetailInventory({ page = 'overview', scanOnOpen = false }) {
   const ctx = useRetailInventory(); const c = useInventoryCopy(); const { role, can } = useRole(); const navigate = useNavigate();
   const location = useLocation(); const entryPath = useRef(location.pathname);
   const [action, setAction] = useState(null); const [document, setDocument] = useState(null); const [product, setProduct] = useState(null);
-  const onAction = (config) => { if (config.kind === 'scan') return navigate('/inventory/stock?scan=1'); if (config.kind === 'add' && !ctx.branchId) { toast.info(c.requiredBranch); return; } setAction(config); };
+  const onAction = (config) => { if (config.kind === 'add' && !ctx.branchId) { toast.info(c.requiredBranch); return; } setAction(config); };
   useEffect(() => { if (location.pathname !== entryPath.current) { setAction(null); setDocument(null); setProduct(null); } }, [location.pathname]);
   // Changing business scope must not leave an old tenant's editable modal open.
   useEffect(() => { setAction(null); setDocument(null); setProduct(null); }, [ctx.restaurantId]);
+  useEffect(() => {
+    if (location.pathname === entryPath.current && (scanOnOpen || (page === 'stock' && new URLSearchParams(location.search).get('scan') === '1'))) setAction({ kind: 'scan' });
+  }, [scanOnOpen, page, location.pathname, location.search, location.key]);
   return <><InventoryWorkspace ctx={ctx} active={page} actions={<QuickActions edit={can?.updateInventory} purchase={can?.createPurchases} onAction={onAction} />}>
     {page === 'overview' && <Overview ctx={ctx} onAction={onAction} />}{page === 'stock' && <Stock ctx={ctx} onAction={onAction} onDetail={setProduct} />}{page === 'operations' && <Operations ctx={ctx} onAction={onAction} onDocument={setDocument} />}{page === 'control' && <Control ctx={ctx} onAction={onAction} onDocument={setDocument} />}
   </InventoryWorkspace>
+  {action?.kind === 'scan' && <BarcodeScanDialog open onOpenChange={(open) => !open && setAction(null)} onScan={(barcode) => navigate(`/inventory/stock?barcode=${encodeURIComponent(barcode)}`)} />}
   {action?.kind === 'add' && <ProductPicker ctx={ctx} open onClose={() => setAction(null)} onSelect={async (products) => { try { await ctx.run({ command: 'assign', payload: { branch_id: ctx.branchId, warehouse_id: ctx.warehouseId, product_ids: products.map((p) => p.id) } }); toast.success(c.success); } catch (err) { toast.error(err.message); throw err; } }} />}
   {action?.kind === 'import' && can?.updateInventory && <Suspense fallback={null}><ProductBulkImportDialog open isAllowed={ctx.enabled} onOpenChange={(v) => !v && setAction(null)} restaurantId={ctx.restaurantId} selectedBranch={ctx.selectedBranch} onImported={ctx.refresh} /></Suspense>}
   {['warehouse', 'release'].includes(action?.kind) && role === 'owner' && <InventorySettingsDialog ctx={ctx} config={action} onClose={() => setAction(null)} />}
