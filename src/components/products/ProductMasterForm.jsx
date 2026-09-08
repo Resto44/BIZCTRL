@@ -1,3 +1,5 @@
+import { isSupermarketProductPortal } from '@/lib/productImportAccess';
+import { Link } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -126,6 +128,7 @@ function ProductContext({ form, erp, onEdit }) {
 
 export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
   const { activeRestaurant, branches } = useTenant();
+  const retailInventory = isSupermarketProductPortal(activeRestaurant);
   const { t, currency } = useLanguage();
   const { isProductFieldVisible, isProductFieldRequired, productCustomFields } = useWorkspaceCustomization();
   const barcodeInputRef = useRef(null);
@@ -284,6 +287,7 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
       },
       erp: erpForSave, categories, restaurantId: activeRestaurant?.id, customFields: productCustomFields,
     });
+    if (retailInventory) delete payload.current_stock;
     setIsSubmitting(true);
     try {
       await onSubmit({ ...payload, _inventoryEnabled: erp.track_inventory, _inventoryRows: branchStocks.map((row) => ({ ...row, product_id: productId, product_name: payload.name, unit: payload.unit })) });
@@ -362,10 +366,11 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
           <div className="mb-4 inline-flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">Base unit <span className="rounded-lg bg-white px-2 py-1 dark:bg-slate-900">{form.unit || 'Not selected'}</span></div>
           <div className="space-y-3">{(erp.unit_conversions || []).map((conversion, index) => <div key={`${index}-${conversion.to_unit}`} className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_90px_1fr_1fr_auto] dark:border-slate-700"><Input value={conversion.from_unit || form.unit || ''} onChange={(event) => updateConversion(index, 'from_unit', event.target.value)} placeholder="From unit" aria-label="From unit" /><Input type="number" min="0.0001" step="0.0001" value={conversion.factor} onChange={(event) => updateConversion(index, 'factor', event.target.value)} placeholder="Qty" aria-label="Conversion factor" /><Input value={conversion.to_unit} onChange={(event) => updateConversion(index, 'to_unit', event.target.value)} placeholder="To unit" aria-label="To unit" /><Input value={conversion.barcode || ''} onChange={(event) => updateConversion(index, 'barcode', event.target.value)} placeholder="Unit barcode" aria-label="Unit barcode" /><Button type="button" variant="ghost" size="icon" className="text-red-600" onClick={() => removeConversion(index)} aria-label="Remove conversion"><Trash2 className="h-4 w-4" /></Button></div>)}<Button type="button" variant="outline" className="w-full border-dashed text-blue-600" onClick={addConversion}><Plus className="mr-2 h-4 w-4" />Add unit conversion</Button></div>
         </SectionCard>
+        {retailInventory ? <SectionCard icon={Building2} title="Branch inventory" description="Receive opening stock and manage branch quantities in Inventory control."><Button asChild type="button" variant="outline"><Link to="/inventory/stock">Open inventory control</Link></Button></SectionCard> : (
         <SectionCard icon={Building2} title="Branch opening stock" description="Opening quantities are synchronized with the ERP Inventory ledger when the product is saved.">
           {!branches.length && <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-900">No active branch is available. Create a branch before setting opening stock.</p>}
           <div className="space-y-3">{branchStocks.map((row, index) => <div key={row.branch_id || row.branch} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><div className="mb-3 flex items-center gap-2"><Store className="h-4 w-4 text-blue-600" /><p className="min-w-0 flex-1 truncate text-sm font-bold">{row.branch_name}</p>{toFiniteNumber(row.reorder_point) > 0 && toFiniteNumber(row.opening_stock) <= toFiniteNumber(row.reorder_point) ? <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700">LOW</span> : <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700">HEALTHY</span>}</div><div className="grid grid-cols-3 gap-2"><Field label="Opening"><Input type="number" min="0" step="0.001" value={row.opening_stock} onChange={(event) => setStockValue(index, 'opening_stock', event.target.value)} disabled={!erp.track_inventory} /></Field><Field label="Reorder"><Input type="number" min="0" step="0.001" value={row.reorder_point} onChange={(event) => setStockValue(index, 'reorder_point', event.target.value)} disabled={!erp.track_inventory} /></Field><Field label="Par level"><Input type="number" min="0" step="0.001" value={row.par_level} onChange={(event) => setStockValue(index, 'par_level', event.target.value)} disabled={!erp.track_inventory} /></Field></div></div>)}</div>
-        </SectionCard>
+        </SectionCard>) }
         <SectionCard icon={ClipboardCheck} title="Replenishment"><div className="grid gap-4 sm:grid-cols-3"><Field label="Preferred supplier"><Select value={form.supplier_id || '__none__'} onValueChange={(value) => set('supplier_id', value === '__none__' ? '' : value)}><SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger><SelectContent><SelectItem value="__none__">— None —</SelectItem>{suppliers.map((supplier) => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent></Select></Field><Field label="Lead time (days)"><Input type="number" min="0" value={erp.lead_time_days} onChange={(event) => setErpValue('lead_time_days', event.target.value)} /></Field><Field label="Minimum order"><Input type="number" min="0" step="0.001" value={erp.minimum_order_qty} onChange={(event) => setErpValue('minimum_order_qty', event.target.value)} /></Field></div><div className="mt-3"><ToggleRow label="Automatic purchase suggestion" checked={erp.automatic_purchase_suggestion} onCheckedChange={(value) => setErpValue('automatic_purchase_suggestion', value)} /></div></SectionCard>
         <div className="grid grid-cols-3 divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm dark:divide-slate-700 dark:border-slate-800 dark:bg-slate-950"><div><p className="text-[10px] text-slate-500">ON HAND</p><p className="mt-1 text-sm font-bold">{totalStock} {form.unit}</p></div><div><p className="text-[10px] text-slate-500">STOCK VALUE</p><p className="mt-1 text-sm font-bold text-emerald-600">{currency}{(totalStock * pricing.cost).toFixed(2)}</p></div><div><p className="text-[10px] text-slate-500">LOW BRANCHES</p><p className={cn('mt-1 text-sm font-bold', lowBranches ? 'text-amber-600' : 'text-emerald-600')}>{lowBranches}</p></div></div>
       </div>

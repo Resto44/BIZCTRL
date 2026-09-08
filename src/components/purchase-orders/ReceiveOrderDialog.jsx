@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,24 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { format } from 'date-fns';
 import { PackageCheck } from 'lucide-react';
+import { isSupermarketProductPortal } from '@/lib/productImportAccess';
+import { useRetailInventory } from '@/hooks/useRetailInventory';
+import InventoryDocumentForm from '@/components/retail-inventory/InventoryDocumentForm';
+import InventoryDocumentDetail from '@/components/retail-inventory/InventoryDocumentDetail';
 
-export default function ReceiveOrderDialog({ order, open, onClose }) {
+export default function ReceiveOrderDialog(props) {
+  const { activeRestaurant } = useTenant();
+  return isSupermarketProductPortal(activeRestaurant) ? <RetailReceiveOrder {...props} /> : <LegacyReceiveOrder {...props} />;
+}
+function RetailReceiveOrder({ order, open, onClose }) {
+  const ctx = useRetailInventory();
+  const [document, setDocument] = useState(null);
+  const [draft, setDraft] = useState(true);
+  const createdRef = useRef(false);
+  if (!open) return null;
+  return <>{draft && <InventoryDocumentForm ctx={ctx} config={{ kind: 'receipt', order_id: order.id, branch_id: order.branch_id }} onCreated={(doc) => { createdRef.current = true; setDocument(doc); setDraft(false); }} onClose={() => { if (!createdRef.current) onClose(); }} />}{document && <InventoryDocumentDetail ctx={ctx} document={document} onClose={onClose} />}</>;
+}
+function LegacyReceiveOrder({ order, open, onClose }) {
   const { currency } = useLanguage();
   const queryClient = useQueryClient();
   const { activeRestaurantId, branches } = useTenant();

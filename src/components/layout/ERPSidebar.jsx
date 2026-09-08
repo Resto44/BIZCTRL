@@ -74,6 +74,16 @@ export const ERP_NAV_GROUPS = [
     ],
   },
   {
+    key: 'retail-inventory', label: 'Retail Inventory', supermarketOnly: true,
+    items: [
+      { path: '/inventory', label: 'Inventory overview', icon: Layers, permission: 'viewInventory' },
+      { path: '/inventory/stock', label: 'Stock & availability', icon: Store, permission: 'viewInventory' },
+      { path: '/inventory/operations', label: 'Stock operations', icon: ArrowLeftRight, permission: 'viewInventory' },
+      { path: '/inventory/control', label: 'Inventory assurance', icon: ShieldAlert, permission: 'viewInventory' },
+      { path: '/products', label: 'Products', icon: Store, permission: 'viewInventory' },
+    ],
+  },
+  {
     key: 'inventory',
     label: 'Inventory',
     items: [
@@ -683,7 +693,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
   const { configuration } = useWorkspaceCustomization();
   const navigationGroups = useMemo(
     () => getCustomizedNavigationGroups(
-      ERP_NAV_GROUPS.filter((group) => !group.supermarketOnly || isSupermarketProductPortal(activeRestaurant)),
+      ERP_NAV_GROUPS.filter((group) => (!group.supermarketOnly || isSupermarketProductPortal(activeRestaurant)) && !(group.key === 'inventory' && isSupermarketProductPortal(activeRestaurant))),
       configuration,
     ),
     [activeRestaurant, configuration],

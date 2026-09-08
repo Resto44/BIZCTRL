@@ -12,6 +12,8 @@ import RoleGuard from '@/components/rbac/RoleGuard';
 import ERPRoleGuard from '@/components/rbac/ERPRoleGuard';
 import { TenantProvider, useTenant } from '@/lib/TenantContext';
 import { BranchScopeProvider } from '@/lib/BranchScopeContext';
+import { RetailInventoryScopeProvider } from '@/lib/RetailInventoryScopeContext';
+import RetailInventoryRoute from '@/components/retail-inventory/RetailInventoryRoute';
 import { WorkspaceCustomizationProvider } from '@/lib/WorkspaceCustomizationContext';
 import { SalesClosingCustomizationProvider } from '@/lib/SalesClosingCustomizationContext';
 import { BusinessModeProvider } from '@/lib/BusinessModeContext';
@@ -300,10 +302,13 @@ const SubscribedRoutes = () => {
         {/* ── Inventory ── */}
         <Route path="/product-management" element={<RoleGuard permission="viewInventory"><ProductManagement /></RoleGuard>} />
         <Route path="/products" element={<Navigate to="/product-management" replace />} />
-        <Route path="/inventory" element={<RoleGuard permission="viewInventory"><Inventory /></RoleGuard>} />
-        <Route path="/inventory-transfers" element={<RoleGuard permission="viewInventory"><InventoryTransfer /></RoleGuard>} />
-        <Route path="/inventory-waste" element={<RoleGuard permission="viewInventory"><InventoryWaste /></RoleGuard>} />
-        <Route path="/inventory-forecast" element={<InventoryForecast />} />
+        <Route path="/inventory" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="overview" fallback={<Inventory />} /></RoleGuard>} />
+        <Route path="/inventory/stock" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="stock" /></RoleGuard>} />
+        <Route path="/inventory/operations" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="operations" /></RoleGuard>} />
+        <Route path="/inventory/control" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="control" /></RoleGuard>} />
+        <Route path="/inventory-transfers" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="operations" fallback={<InventoryTransfer />} /></RoleGuard>} />
+        <Route path="/inventory-waste" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="control" fallback={<InventoryWaste />} /></RoleGuard>} />
+        <Route path="/inventory-forecast" element={<RetailInventoryRoute page="operations" fallback={<InventoryForecast />} />} />
 
         {/* ── Analytics & Reports ── */}
         <Route path="/reports" element={<RoleGuard permission="viewReports"><Reports /></RoleGuard>} />
@@ -378,7 +383,7 @@ const SubscribedRoutes = () => {
         <Route path="/driver-management" element={<RoleGuard permission="viewEmployees"><FeatureRouteGuard feature="driver_analytics"><DriverManagement /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/customer-management" element={<RoleGuard permission="viewDebts"><CustomerManagement /></RoleGuard>} />
         <Route path="/branch-command-center" element={<RoleGuard permission="viewDashboard"><BranchCommandCenter /></RoleGuard>} />
-        <Route path="/inventory-command-center" element={<RoleGuard permission="viewInventory"><InventoryCommandCenter /></RoleGuard>} />
+        <Route path="/inventory-command-center" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="overview" fallback={<InventoryCommandCenter />} /></RoleGuard>} />
         <Route path="/smart-alerts" element={<Navigate to="/alerts" replace />} />
         <Route path="/ai-copilot" element={<RoleGuard permission="viewDashboard"><FeatureRouteGuard feature="ai_copilot"><AIBusinessCopilot /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/bi-center" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="advanced_analytics"><BICenter /></FeatureRouteGuard></RoleGuard>} />
@@ -394,11 +399,11 @@ const SubscribedRoutes = () => {
             These routes are accessible to all authenticated users but the pages
             themselves enforce Retail Mode via useBusinessMode() guard.
         ══════════════════════════════════════════════════════════════════════ */}
-        <Route path="/retail/barcode"  element={<RoleGuard permission="viewInventory"><BarcodeScanner /></RoleGuard>} />
+        <Route path="/retail/barcode"  element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="stock" fallback={<BarcodeScanner />} /></RoleGuard>} />
         <Route path="/retail/sku"      element={<RoleGuard permission="viewInventory"><SKUManagement /></RoleGuard>} />
         <Route path="/retail/variants" element={<RoleGuard permission="viewInventory"><ProductVariants /></RoleGuard>} />
-        <Route path="/retail/batches"  element={<RoleGuard permission="viewInventory"><BatchTracking /></RoleGuard>} />
-        <Route path="/retail/expiry"   element={<RoleGuard permission="viewInventory"><ExpiryTracking /></RoleGuard>} />
+        <Route path="/retail/batches"  element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="control" fallback={<BatchTracking />} /></RoleGuard>} />
+        <Route path="/retail/expiry"   element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="control" fallback={<ExpiryTracking />} /></RoleGuard>} />
         <Route path="/retail/serials"  element={<RoleGuard permission="viewInventory"><SerialNumbers /></RoleGuard>} />
         <Route path="/retail/pos-control" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSExecutiveDashboard /></RetailPOSPortalGuard></RoleGuard>} />
         <Route path="/retail/pos-branches" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSBranchDevices /></RetailPOSPortalGuard></RoleGuard>} />
@@ -583,6 +588,7 @@ const AuthenticatedApp = () => {
     <RoleProvider>
       <TenantProvider>
         <BranchScopeProvider>
+        <RetailInventoryScopeProvider>
           <SubscriptionProvider>
             <WorkspaceCustomizationProvider>
               <SalesClosingCustomizationProvider>
@@ -595,6 +601,7 @@ const AuthenticatedApp = () => {
               </SalesClosingCustomizationProvider>
             </WorkspaceCustomizationProvider>
           </SubscriptionProvider>
+        </RetailInventoryScopeProvider>
         </BranchScopeProvider>
       </TenantProvider>
     </RoleProvider>

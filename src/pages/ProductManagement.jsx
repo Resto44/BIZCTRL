@@ -86,7 +86,12 @@ export default function ProductManagement() {
   });
   const inventoryQuery = useQuery({
     queryKey: ['inventory', restaurantId],
-    queryFn: () => base44.entities.Inventory.filter({ restaurant_id: restaurantId }, '-created_date', 5_000),
+    queryFn: async () => {
+      if (!canImportProductSpreadsheet) return base44.entities.Inventory.filter({ restaurant_id: restaurantId }, '-created_date', 5_000);
+      const { data, error } = await supabase.from('retail_inventory_stock').select('*').eq('restaurant_id', restaurantId).order('product_id').limit(5_000);
+      if (error) throw error;
+      return (data || []).map((row) => ({ ...row, quantity: row.on_hand, opening_stock: row.on_hand, low_stock_threshold: row.min_stock }));
+    },
     enabled: Boolean(restaurantId),
     staleTime: 30_000,
   });
@@ -172,6 +177,7 @@ export default function ProductManagement() {
   }, [calculatedSnapshot, catalogCountsQuery.data]);
 
   const invalidateProductData = async () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['retail-inventory'] }),
     queryClient.invalidateQueries({ queryKey: ['products'] }),
     queryClient.invalidateQueries({ queryKey: ['inventory'] }),
     queryClient.invalidateQueries({ queryKey: ['inventory_transactions'] }),
@@ -181,6 +187,7 @@ export default function ProductManagement() {
   ]);
 
   const syncInventoryRows = async ({ product, rows, enabled }) => {
+    if (canImportProductSpreadsheet) return [];
     if (!enabled || !product?.product_id || !Array.isArray(rows) || !rows.length) return [];
     const existingRows = await base44.entities.Inventory.filter({ restaurant_id: restaurantId, product_id: product.product_id }, '-created_date', 1_000);
     const today = new Date().toISOString().slice(0, 10);
@@ -259,6 +266,7 @@ export default function ProductManagement() {
     : createProduct.mutateAsync(data);
 
   const handleAdjust = (product) => {
+    if (canImportProductSpreadsheet) { navigate('/inventory/operations'); return; }
     setAdjustTarget(product || null);
     setShowStockDialog(true);
   };
