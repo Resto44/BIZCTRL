@@ -5,11 +5,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({
+  businessType: '',
+  createBarcode: vi.fn(),
   branches: [
     { id: 'branch-1', branch_key: 'main', name: 'Main Branch' },
     { id: 'branch-2', branch_key: 'warehouse', name: 'Warehouse' },
   ],
 }));
+
+vi.mock('@/lib/productBarcodeRepository', () => ({ createProductBarcode: fixture.createBarcode }));
 
 vi.mock('@/api/base44Client', () => ({
   base44: {
@@ -23,7 +27,7 @@ vi.mock('@/api/base44Client', () => ({
 }));
 
 vi.mock('@/lib/TenantContext', () => ({
-  useTenant: () => ({ activeRestaurant: { id: 'restaurant-1' }, branches: fixture.branches }),
+  useTenant: () => ({ activeRestaurant: { id: 'restaurant-1', business_type: fixture.businessType }, branches: fixture.branches }),
 }));
 
 vi.mock('@/lib/LanguageContext', () => ({
@@ -103,4 +107,25 @@ describe('ProductMasterForm runtime render', () => {
     expect(advancedJson).toContain('Accounting mapping');
     expect(advancedJson).toContain('Create Product');
   });
+});
+
+it('generates a retail draft barcode, keeps it in the form payload, and never overwrites an entered code', async () => {
+  storage.clear();
+  fixture.businessType = 'retail';
+  fixture.createBarcode.mockResolvedValue({ barcode: 'BC-000000000017', saved: false });
+  const onSubmit = vi.fn();
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  let renderer;
+  await act(async () => { renderer = TestRenderer.create(<QueryClientProvider client={client}><ProductMasterForm onSubmit={onSubmit} onCancel={vi.fn()} /></QueryClientProvider>); });
+  const button = (label) => renderer.root.findAllByType('button').find((item) => nodeText(item).trim() === label);
+  await act(async () => button('Generate barcode').props.onClick());
+  expect(fixture.createBarcode).toHaveBeenCalledWith({ restaurantId: 'restaurant-1' });
+  expect(renderer.root.findByProps({ placeholder: 'Barcode' }).props.value).toBe('BC-000000000017');
+  expect(button('Generate barcode').props.disabled).toBe(true);
+  await act(async () => renderer.root.findByProps({ placeholder: 'Main display name' }).props.onChange({ target: { value: 'Test rice' } }));
+  await act(async () => renderer.root.findAllByType('button').find((item) => nodeText(item).includes('Advanced')).props.onClick());
+  await act(async () => renderer.root.findByType('form').props.onSubmit({ preventDefault: vi.fn() }));
+  expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ barcode: 'BC-000000000017', name: 'Test rice' }));
+  await act(async () => renderer.unmount());
+  fixture.businessType = '';
 });

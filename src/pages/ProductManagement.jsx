@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Package, Ruler } from 'lucide-react';
 import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
@@ -9,6 +9,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { ROLES, useRole } from '@/lib/RoleContext';
 import ProductMasterWorkspace from '@/components/products/ProductMasterWorkspace';
+import ProductBarcodeDialog from '@/components/products/ProductBarcodeDialog';
 import ProductMasterForm from '@/components/products/ProductMasterForm';
 import ProductUnitManager from '@/components/products/ProductUnitManager';
 import InventoryTransactionForm from '@/components/products/InventoryTransactionForm';
@@ -55,6 +56,7 @@ export default function ProductManagement() {
   const { role } = useRole();
   const { formatMoney } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const restaurantId = activeRestaurant?.id || null;
   const canImportProductSpreadsheet = isSupermarketProductPortal(activeRestaurant);
@@ -62,6 +64,8 @@ export default function ProductManagement() {
 
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [showCreate, setShowCreate] = useState(false);
+  const [barcodeRequest, setBarcodeRequest] = useState(null);
+  useEffect(() => { setBarcodeRequest(null); }, [restaurantId, location.key]);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [adjustTarget, setAdjustTarget] = useState(null);
@@ -319,6 +323,7 @@ export default function ProductManagement() {
         }}
         savingPriceRules={priceControl.isSaving}
         onAdd={() => { setEditing(null); setShowCreate(true); }}
+        onBarcode={canImportProductSpreadsheet ? (product = null) => setBarcodeRequest({ product, restaurantId, locationKey: location.key }) : null}
         onEdit={(product) => { setShowCreate(false); setEditing(product); }}
         onDelete={canDeleteProducts ? setDeleting : null}
         onAdjust={handleAdjust}
@@ -331,12 +336,14 @@ export default function ProductManagement() {
         canDeleteProducts={canDeleteProducts}
       />
 
+      {barcodeRequest && barcodeRequest.restaurantId === restaurantId && barcodeRequest.locationKey === location.key && canImportProductSpreadsheet && <ProductBarcodeDialog key={`${restaurantId}:${barcodeRequest.product?.id || 'picker'}`} restaurantId={restaurantId} initialProduct={barcodeRequest.product} onClose={() => setBarcodeRequest(null)} onChanged={invalidateProductData} />}
+
       <ProductDialog open={showCreate} onOpenChange={setShowCreate} title="Create master product">
-        <ProductMasterForm onSubmit={handleProductSave} onCancel={() => setShowCreate(false)} />
+        <ProductMasterForm onSubmit={handleProductSave} key={restaurantId} onCancel={() => setShowCreate(false)} />
       </ProductDialog>
 
       <ProductDialog open={Boolean(editing)} onOpenChange={(open) => { if (!open) setEditing(null); }} title="Edit master product">
-        {editing ? <ProductMasterForm initial={editing} onSubmit={handleProductSave} onCancel={() => setEditing(null)} /> : null}
+        {editing ? <ProductMasterForm key={`${restaurantId}:${editing.id}`} initial={editing} onSubmit={handleProductSave} onCancel={() => setEditing(null)} /> : null}
       </ProductDialog>
 
       <Dialog open={showStockDialog} onOpenChange={(open) => { setShowStockDialog(open); if (!open) setAdjustTarget(null); }}>

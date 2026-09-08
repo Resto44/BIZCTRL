@@ -58,6 +58,17 @@ describe('Retail inventory cached navigation', () => {
     expect(second.stop).toHaveBeenCalled();
     expect(realtime.getChannels()).toHaveLength(1);
   });
+  it('opens barcode creation from inventory and closes it when navigating cached pages', async () => {
+    await render();
+    await click([...visible().querySelectorAll('button')].find((el) => el.textContent === 'Create Barcode'));
+    expect(document.querySelector('[role=dialog]').textContent).toContain('Choose a product');
+    expect(state.client.rpc).toHaveBeenCalledWith('erp_search_master_products', expect.objectContaining({ p_restaurant_id: 'tenant-a', p_branch_id: null }));
+    await click(visible().querySelector('a[href="/inventory/stock"]'));
+    expect(document.querySelector('[role=dialog]')).toBeNull();
+    await click([...visible().querySelectorAll('button')].find((el) => el.textContent === 'Create Barcode'));
+    expect(document.querySelector('[role=dialog]').textContent).toContain('Create Barcode');
+    expect(realtime.getChannels()).toHaveLength(1);
+  });
   it('opens Scan / search directly on an already cached stock screen', async () => {
     await render(); await click(visible().querySelector('a[href="/inventory/stock"]'));
     await click([...visible().querySelectorAll('button')].find((el) => el.textContent === 'Scan / search'));

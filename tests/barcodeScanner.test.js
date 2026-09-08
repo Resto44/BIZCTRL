@@ -28,7 +28,7 @@ const callbacks = () => ({ onState: vi.fn(), onResult: vi.fn(), onError: vi.fn()
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('software barcode decoding without a native BarcodeDetector', () => {
-  it.each([['4006381333931', 'EAN13'], ['000742', 'CODE128'], ['0036000291452', 'EAN13', '036000291452']])('reads actual %s pixels', async (code, format, expected = code) => {
+  it.each([['BC-000000000017', 'CODE128'], ['4006381333931', 'EAN13'], ['000742', 'CODE128'], ['0036000291452', 'EAN13', '036000291452']])('reads actual %s pixels', async (code, format, expected = code) => {
     vi.stubGlobal('BarcodeDetector', undefined);
     const source = barcodePixels(code, format);
     const reader = await createBarcodeReader();

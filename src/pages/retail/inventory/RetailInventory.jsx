@@ -1,7 +1,7 @@
 import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, ArrowDownToLine, ArrowLeftRight, ArrowUpRight, Boxes, Building2, CalendarClock, ClipboardCheck, Download, FileSpreadsheet, Plus, ScanLine, Search, ShieldCheck, TriangleAlert, Wallet, Warehouse } from 'lucide-react';
+import { Activity, ArrowDownToLine, ArrowLeftRight, ArrowUpRight, Barcode, Boxes, Building2, CalendarClock, ClipboardCheck, Download, FileSpreadsheet, Plus, ScanLine, Search, ShieldCheck, TriangleAlert, Wallet, Warehouse } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/api/supabaseClient';
 import { useRole } from '@/lib/RoleContext';
@@ -9,6 +9,8 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { useRetailInventory, useInventoryList } from '@/hooks/useRetailInventory';
 import { csvCell, inventoryRPC, productName } from '@/lib/retailInventory';
 import { Button } from '@/components/ui/button';
+import ProductBarcodeDialog from '@/components/products/ProductBarcodeDialog';
+import { barcodeText } from '@/lib/barcodeCopy';
 import BarcodeScanDialog from '@/components/shared/BarcodeScanDialog';
 import { useInventoryCopy } from '@/components/retail-inventory/inventoryCopy';
 import { InventoryWorkspace, Panel, Metric, Empty, ErrorNotice, Status, Pagination, ProductIdentity, Field, fieldClass } from '@/components/retail-inventory/InventoryUI';
@@ -17,10 +19,10 @@ import InventoryDocumentForm from '@/components/retail-inventory/InventoryDocume
 import InventoryDocumentDetail from '@/components/retail-inventory/InventoryDocumentDetail';
 import { InventorySettingsDialog, InventoryStockDetail } from '@/components/retail-inventory/InventoryStockDetail';
 const ProductBulkImportDialog = lazy(() => import('@/components/products/ProductBulkImportDialog'));
-const QUICK = [['receipt', ArrowDownToLine], ['transfer', ArrowLeftRight], ['count', ClipboardCheck], ['scan', ScanLine]];
+const QUICK = [['receipt', ArrowDownToLine], ['transfer', ArrowLeftRight], ['count', ClipboardCheck], ['scan', ScanLine], ['barcode', Barcode]];
 
 function QuickActions({ edit, purchase, onAction }) {
-  const c = useInventoryCopy(); return <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">{QUICK.filter(([key]) => key === 'scan' || (edit && (key !== 'receipt' || purchase))).map(([key, Icon]) => <Button key={key} variant={key === 'receipt' ? 'default' : 'outline'} className="min-h-14 gap-2 rounded-2xl text-xs sm:text-sm" onClick={() => onAction({ kind: key })}><Icon className="h-5 w-5" />{c[key]}</Button>)}</div>;
+  const c = useInventoryCopy(); const { lang } = useLanguage(); return <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">{QUICK.filter(([key]) => key === 'scan' || (edit && (key !== 'receipt' || purchase))).map(([key, Icon]) => <Button key={key} variant={key === 'receipt' ? 'default' : 'outline'} className="min-h-14 gap-2 rounded-2xl text-xs sm:text-sm" onClick={() => onAction({ kind: key })}><Icon className="h-5 w-5" />{key === 'barcode' ? barcodeText(lang).create : c[key]}</Button>)}</div>;
 }
 function MovementList({ rows }) {
   const c = useInventoryCopy(); const { formatNumber, formatDate, lang } = useLanguage();
@@ -97,6 +99,7 @@ export default function RetailInventory({ page = 'overview', scanOnOpen = false 
   return <><InventoryWorkspace ctx={ctx} active={page} actions={<QuickActions edit={can?.updateInventory} purchase={can?.createPurchases} onAction={onAction} />}>
     {page === 'overview' && <Overview ctx={ctx} onAction={onAction} />}{page === 'stock' && <Stock ctx={ctx} onAction={onAction} onDetail={setProduct} />}{page === 'operations' && <Operations ctx={ctx} onAction={onAction} onDocument={setDocument} />}{page === 'control' && <Control ctx={ctx} onAction={onAction} onDocument={setDocument} />}
   </InventoryWorkspace>
+  {action?.kind === 'barcode' && ctx.enabled && can?.updateInventory && location.pathname === entryPath.current && <ProductBarcodeDialog key={ctx.restaurantId} restaurantId={ctx.restaurantId} onClose={() => setAction(null)} onChanged={ctx.refresh} />}
   {action?.kind === 'scan' && <BarcodeScanDialog open onOpenChange={(open) => !open && setAction(null)} onScan={(barcode) => navigate(`/inventory/stock?barcode=${encodeURIComponent(barcode)}`)} />}
   {action?.kind === 'add' && <ProductPicker ctx={ctx} open onClose={() => setAction(null)} onSelect={async (products) => { try { await ctx.run({ command: 'assign', payload: { branch_id: ctx.branchId, warehouse_id: ctx.warehouseId, product_ids: products.map((p) => p.id) } }); toast.success(c.success); } catch (err) { toast.error(err.message); throw err; } }} />}
   {action?.kind === 'import' && can?.updateInventory && <Suspense fallback={null}><ProductBulkImportDialog open isAllowed={ctx.enabled} onOpenChange={(v) => !v && setAction(null)} restaurantId={ctx.restaurantId} selectedBranch={ctx.selectedBranch} onImported={ctx.refresh} /></Suspense>}

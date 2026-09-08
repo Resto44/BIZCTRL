@@ -1,3 +1,5 @@
+import { createProductBarcode } from '@/lib/productBarcodeRepository';
+import { barcodeText } from '@/lib/barcodeCopy';
 import { isSupermarketProductPortal } from '@/lib/productImportAccess';
 import { Link } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -130,7 +132,11 @@ function ProductContext({ form, erp, onEdit }) {
 export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
   const { activeRestaurant, branches } = useTenant();
   const retailInventory = isSupermarketProductPortal(activeRestaurant);
-  const { t, currency } = useLanguage();
+  const { t, currency, lang } = useLanguage();
+  const barcodeCopy = barcodeText(lang);
+  const [generatingBarcode, setGeneratingBarcode] = useState(false);
+  const barcodeRequestRef = useRef(0);
+  useEffect(() => { barcodeRequestRef.current += 1; setGeneratingBarcode(false); return () => { barcodeRequestRef.current += 1; }; }, [activeRestaurant?.id]);
   const { isProductFieldVisible, isProductFieldRequired, productCustomFields } = useWorkspaceCustomization();
   const [scannerOpen, setScannerOpen] = useState(false);
   useEffect(() => { setScannerOpen(false); }, [activeRestaurant?.id]);
@@ -195,6 +201,20 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
   }, [branches, erp.branch_par_levels, existingInventory, initial?.id, initial?.product_id, inventoryFetched]);
 
   const set = (field, value) => setForm((previous) => ({ ...previous, [field]: value }));
+  const generateBarcode = async () => {
+    if (generatingBarcode || form.barcode?.trim()) return;
+    const request = ++barcodeRequestRef.current;
+    setGeneratingBarcode(true);
+    try {
+      const result = await createProductBarcode({ restaurantId: activeRestaurant?.id });
+      if (barcodeRequestRef.current === request) setForm((previous) => previous.barcode?.trim() ? previous : { ...previous, barcode: result.barcode });
+    } catch (error) {
+      if (barcodeRequestRef.current === request) toast.error(error.message);
+    } finally {
+      if (barcodeRequestRef.current === request) setGeneratingBarcode(false);
+    }
+  };
+
   const setErpValue = (field, value) => setErp((previous) => ({ ...previous, [field]: value }));
   const setCustomAttribute = (field, value) => setForm((previous) => ({ ...previous, custom_attributes: { ...(previous.custom_attributes || {}), [field]: value } }));
   const setStockValue = (index, field, value) => setBranchStocks((previous) => previous.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row));
@@ -292,7 +312,7 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
           <Field label={t('name_fa')}><Input value={form.name_fa || ''} onChange={(event) => set('name_fa', event.target.value)} placeholder="نام محصول" dir="rtl" /></Field>
           <Field label={t('name_en')} className="sm:col-span-2"><Input value={form.name_en || ''} onChange={(event) => set('name_en', event.target.value)} placeholder="English product name" /></Field>
           {isProductFieldVisible('sku') && <Field label={t('sku')} required={isProductFieldRequired('sku')}><div className="flex gap-2"><Input value={form.sku || ''} onChange={(event) => set('sku', event.target.value)} placeholder="SKU-001" /><Button type="button" variant="outline" size="icon" onClick={() => set('sku', `SKU-${nanoid8()}`)} aria-label="Generate SKU"><Calculator className="h-4 w-4" /></Button></div></Field>}
-          {isProductFieldVisible('barcode') && <Field label={t('barcode')} required={isProductFieldRequired('barcode')}><div className="flex gap-2"><Input value={form.barcode || ''} onChange={(event) => set('barcode', event.target.value)} inputMode="numeric" placeholder="1234567890" /><Button type="button" variant="outline" size="icon" onClick={() => setScannerOpen(true)} aria-label="Scan barcode"><ScanLine className="h-4 w-4" /></Button></div></Field>}
+          {isProductFieldVisible('barcode') && <Field label={t('barcode')} required={isProductFieldRequired('barcode')}><div className="flex gap-2"><Input value={form.barcode || ''} disabled={generatingBarcode} onChange={(event) => set('barcode', event.target.value)} placeholder="Barcode" aria-label={t('barcode')} dir="ltr" /><Button type="button" variant="outline" size="icon" disabled={generatingBarcode} onClick={() => setScannerOpen(true)} aria-label="Scan barcode"><ScanLine className="h-4 w-4" /></Button></div>{retailInventory && <div className="mt-2 space-y-1"><Button type="button" variant="outline" className="min-h-11 w-full" disabled={generatingBarcode || Boolean(form.barcode?.trim())} onClick={generateBarcode}><Barcode className="mr-2 h-4 w-4" />{generatingBarcode ? barcodeCopy.busy : barcodeCopy.generate}</Button><p className="text-xs text-muted-foreground">{barcodeCopy.draft}</p></div>}</Field>}
           <Field label="Product image URL" className="sm:col-span-2"><div className="relative"><ImagePlus className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input className="pl-9" value={form.image_url || ''} onChange={(event) => set('image_url', event.target.value)} placeholder="https://…" /></div></Field>
         </div>
       </SectionCard>
@@ -376,7 +396,7 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
       <header className="flex shrink-0 items-center gap-3 bg-white px-4 py-3 dark:bg-slate-950 sm:px-6 sm:py-4"><Button type="button" variant="ghost" size="icon" onClick={onCancel} aria-label="Close product form"><X className="h-5 w-5" /></Button><div className="min-w-0 flex-1"><h2 className="truncate text-lg font-black text-slate-950 sm:text-xl dark:text-white">{initial ? 'Edit Product' : 'New Product'}</h2><p className="text-xs text-slate-500">Step {step + 1} of {PRODUCT_MASTER_STEPS.length} · Product Master</p></div><span className={cn('rounded-full px-3 py-1 text-xs font-bold', initial ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300')}>{initial ? 'Editing' : 'Draft'}</span></header>
       <Stepper step={step} onStepChange={setStep} />
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-6 sm:py-5"><div className="mx-auto max-w-4xl">{step === 0 ? renderIdentity() : step === 1 ? renderPricing() : step === 2 ? renderInventory() : renderAdvanced()}</div></main>
-      <footer className="shrink-0 border-t border-slate-200 bg-white px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 dark:border-slate-800 dark:bg-slate-950 sm:px-6"><div className="mx-auto flex max-w-4xl gap-2">{step > 0 && <Button type="button" variant="outline" className="h-11 px-3 sm:px-5" onClick={() => setStep((current) => current - 1)}><ArrowLeft className="mr-1.5 h-4 w-4" /><span className="hidden sm:inline">Back</span></Button>}<Button type="button" variant="outline" className="h-11 flex-1 sm:flex-none sm:px-6" onClick={saveDraft}><Save className="mr-2 h-4 w-4" />Save draft</Button>{step < 3 ? <Button type="button" className="h-11 flex-[1.35] sm:ml-auto sm:flex-none sm:px-7" onClick={goNext}>Continue <ArrowRight className="ml-2 h-4 w-4" /></Button> : <Button type="submit" className="h-11 flex-[1.35] sm:ml-auto sm:flex-none sm:px-7" disabled={isSubmitting}>{isSubmitting ? 'Saving…' : initial ? 'Update Product' : 'Create Product'}{!isSubmitting && <ChevronRight className="ml-1.5 h-4 w-4" />}</Button>}</div></footer>
+      <footer className="shrink-0 border-t border-slate-200 bg-white px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 dark:border-slate-800 dark:bg-slate-950 sm:px-6"><div className="mx-auto flex max-w-4xl gap-2">{step > 0 && <Button type="button" variant="outline" className="h-11 px-3 sm:px-5" onClick={() => setStep((current) => current - 1)}><ArrowLeft className="mr-1.5 h-4 w-4" /><span className="hidden sm:inline">Back</span></Button>}<Button type="button" variant="outline" className="h-11 flex-1 sm:flex-none sm:px-6" onClick={saveDraft}><Save className="mr-2 h-4 w-4" />Save draft</Button>{step < 3 ? <Button type="button" className="h-11 flex-[1.35] sm:ml-auto sm:flex-none sm:px-7" onClick={goNext}>Continue <ArrowRight className="ml-2 h-4 w-4" /></Button> : <Button type="submit" className="h-11 flex-[1.35] sm:ml-auto sm:flex-none sm:px-7" disabled={isSubmitting || generatingBarcode}>{isSubmitting ? 'Saving…' : initial ? 'Update Product' : 'Create Product'}{!isSubmitting && <ChevronRight className="ml-1.5 h-4 w-4" />}</Button>}</div></footer>
     </form>
     {scannerOpen && <BarcodeScanDialog open onOpenChange={setScannerOpen} onScan={(barcode) => set('barcode', barcode)} />}</>
   );
