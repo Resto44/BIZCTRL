@@ -20,6 +20,16 @@ describe('Retail POS Control Center contract', () => {
     expect(sidebar).toContain('supermarketOnly: true');
   });
 
+  it('keeps all four POS pages navigation-safe inside one authenticated shell bundle', async () => {
+    const app = await source('../src/App.jsx');
+    for (const page of ['POSExecutiveDashboard', 'POSBranchDevices', 'POSTerminalAccount', 'POSAuditCenter']) {
+      expect(app).toContain(`import ${page} from '@/pages/retail/pos/${page}'`);
+      expect(app).not.toContain(`const ${page} = lazy(`);
+    }
+    expect(app).toContain("import RetailPOSPortalGuard from '@/components/retail-pos/RetailPOSPortalGuard'");
+    expect(app).not.toContain('const RetailPOSPortalGuard  = lazy(');
+  });
+
   it('defines independent device, shift, receipt, item, payment, approval, event and command ledgers', async () => {
     const sql = await source('../supabase/migrations/20260904143721_retail_pos_control_center.sql');
     for (const table of [

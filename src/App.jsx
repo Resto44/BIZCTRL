@@ -26,6 +26,16 @@ import PaywallScreen from '@/components/subscription/PaywallScreen';
 import FeatureRouteGuard from '@/components/subscription/FeatureRouteGuard';
 import SubscriptionErrorBoundary from '@/components/subscription/SubscriptionErrorBoundary';
 
+// Keep the four Retail POS pages in the authenticated shell bundle. They form
+// one control workspace and must switch without fetching a second route chunk;
+// otherwise a tab left open across a production deploy can request an obsolete
+// hashed chunk and fall into the route error boundary until the user refreshes.
+import POSExecutiveDashboard from '@/pages/retail/pos/POSExecutiveDashboard';
+import POSBranchDevices from '@/pages/retail/pos/POSBranchDevices';
+import POSTerminalAccount from '@/pages/retail/pos/POSTerminalAccount';
+import POSAuditCenter from '@/pages/retail/pos/POSAuditCenter';
+import RetailPOSPortalGuard from '@/components/retail-pos/RetailPOSPortalGuard';
+
 // ── Lazy-loaded pages (code splitting) ───────────────────────────────────────
 const Dashboard           = lazy(() => import('./pages/Dashboard'));
 // Legacy role portals removed — replaced by ERP dashboards
@@ -120,11 +130,6 @@ const ProductVariants     = lazy(() => import('@/pages/retail/ProductVariants'))
 const BatchTracking       = lazy(() => import('@/pages/retail/BatchTracking'));
 const ExpiryTracking      = lazy(() => import('@/pages/retail/ExpiryTracking'));
 const SerialNumbers       = lazy(() => import('@/pages/retail/SerialNumbers'));
-const POSExecutiveDashboard = lazy(() => import('@/pages/retail/pos/POSExecutiveDashboard'));
-const POSBranchDevices      = lazy(() => import('@/pages/retail/pos/POSBranchDevices'));
-const POSTerminalAccount    = lazy(() => import('@/pages/retail/pos/POSTerminalAccount'));
-const POSAuditCenter        = lazy(() => import('@/pages/retail/pos/POSAuditCenter'));
-const RetailPOSPortalGuard  = lazy(() => import('@/components/retail-pos/RetailPOSPortalGuard'));
 
 // ── Public pages (eager — shown before auth) ─────────────────────────────────
 import LandingPage            from '@/pages/LandingPage';
