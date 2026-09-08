@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
 import {
   buildRetailPosPeriod,
   normalizeRetailPosSnapshot,
-  RETAIL_POS_REALTIME_TABLES,
 } from '@/lib/retailPosControl';
+import { subscribeRetailPosRealtime } from '@/lib/retailPosRealtime';
 
 const EMPTY_SNAPSHOT = normalizeRetailPosSnapshot(null);
 
@@ -21,7 +21,6 @@ export function useRetailPOSControl({ period = 'today', branchId = null, deviceI
   const range = useMemo(() => buildRetailPosPeriod(period), [period]);
   const [realtimeStatus, setRealtimeStatus] = useState('CONNECTING');
   const [lastEventAt, setLastEventAt] = useState(null);
-  const refreshTimerRef = useRef(null);
   const queryKey = useMemo(
     () => ['retail-pos-control', restaurantId, range.from, range.to, branchId || 'all', deviceId || 'all'],
     [branchId, deviceId, range.from, range.to, restaurantId],
@@ -46,33 +45,22 @@ export function useRetailPOSControl({ period = 'today', branchId = null, deviceI
     retry: (failureCount, error) => !nonRetryable(error) && failureCount < 2,
   });
 
-  const queueRefresh = useCallback(() => {
-    setLastEventAt(new Date());
-    if (refreshTimerRef.current) return;
-    refreshTimerRef.current = window.setTimeout(() => {
-      refreshTimerRef.current = null;
-      queryClient.invalidateQueries({ queryKey: ['retail-pos-control', restaurantId], exact: false });
-    }, 600);
-  }, [queryClient, restaurantId]);
-
   useEffect(() => {
-    if (!restaurantId) return undefined;
-    let channel = supabase.channel(`retail-pos-control-${restaurantId}`);
-    RETAIL_POS_REALTIME_TABLES.forEach((table) => {
-      channel = channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table, filter: `restaurant_id=eq.${restaurantId}` },
-        queueRefresh,
-      );
-    });
-    channel.subscribe((status) => setRealtimeStatus(status));
-    return () => {
-      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
-      refreshTimerRef.current = null;
-      supabase.removeChannel(channel);
+    if (!restaurantId) {
       setRealtimeStatus('CLOSED');
-    };
-  }, [queueRefresh, restaurantId]);
+      setLastEventAt(null);
+      return undefined;
+    }
+    return subscribeRetailPosRealtime({
+      client: supabase,
+      queryClient,
+      restaurantId,
+      onChange: ({ status, lastEventAt: eventAt }) => {
+        setRealtimeStatus(status);
+        setLastEventAt(eventAt);
+      },
+    });
+  }, [queryClient, restaurantId]);
 
   const invalidate = useCallback(
     () => queryClient.invalidateQueries({ queryKey: ['retail-pos-control', restaurantId], exact: false }),

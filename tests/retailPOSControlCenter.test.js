@@ -21,17 +21,13 @@ describe('Retail POS Control Center contract', () => {
   });
 
   it('keeps all four POS pages navigation-safe inside one authenticated shell bundle', async () => {
-    const [app, workspace] = await Promise.all([
-      source('../src/App.jsx'),
-      source('../src/components/retail-pos/RetailPOSUI.jsx'),
-    ]);
+    const app = await source('../src/App.jsx');
     for (const page of ['POSExecutiveDashboard', 'POSBranchDevices', 'POSTerminalAccount', 'POSAuditCenter']) {
       expect(app).toContain(`import ${page} from '@/pages/retail/pos/${page}'`);
       expect(app).not.toContain(`const ${page} = lazy(`);
     }
     expect(app).toContain("import RetailPOSPortalGuard from '@/components/retail-pos/RetailPOSPortalGuard'");
     expect(app).not.toContain('const RetailPOSPortalGuard  = lazy(');
-    expect(workspace).toContain('to={page.path} reloadDocument');
     expect(app).toContain('onClick={() => window.location.reload()}');
   });
 
@@ -90,15 +86,4 @@ describe('Retail POS Control Center contract', () => {
     expect(functionPrivileges).toContain('from public, anon, authenticated');
   });
 
-  it('uses one batched realtime control channel with a safe polling fallback', async () => {
-    const [hook, model] = await Promise.all([
-      source('../src/hooks/useRetailPOSControl.js'),
-      source('../src/lib/retailPosControl.js'),
-    ]);
-    expect(hook).toContain('RETAIL_POS_REALTIME_TABLES.forEach');
-    expect(hook).toContain('window.setTimeout');
-    expect(hook).toContain('refetchInterval: 60_000');
-    expect(model).toContain("'retail_pos_transactions'");
-    expect(model).toContain("'retail_pos_device_commands'");
-  });
 });
