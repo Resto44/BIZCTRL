@@ -105,7 +105,7 @@ export function RetailPOSWorkspace({
           {POS_PAGES.map((page) => {
             const Icon = page.icon;
             return (
-              <Link key={page.key} to={page.path} className={cn('flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-center text-xs font-bold transition-all sm:text-sm', activePage === page.key ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-primary/40 hover:text-primary dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300')}>
+              <Link key={page.key} to={page.path} reloadDocument className={cn('flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-center text-xs font-bold transition-all sm:text-sm', activePage === page.key ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-primary/40 hover:text-primary dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300')}>
                 <Icon className="h-4 w-4 shrink-0" />
                 <span>{copy[page.key]}</span>
               </Link>

@@ -21,13 +21,18 @@ describe('Retail POS Control Center contract', () => {
   });
 
   it('keeps all four POS pages navigation-safe inside one authenticated shell bundle', async () => {
-    const app = await source('../src/App.jsx');
+    const [app, workspace] = await Promise.all([
+      source('../src/App.jsx'),
+      source('../src/components/retail-pos/RetailPOSUI.jsx'),
+    ]);
     for (const page of ['POSExecutiveDashboard', 'POSBranchDevices', 'POSTerminalAccount', 'POSAuditCenter']) {
       expect(app).toContain(`import ${page} from '@/pages/retail/pos/${page}'`);
       expect(app).not.toContain(`const ${page} = lazy(`);
     }
     expect(app).toContain("import RetailPOSPortalGuard from '@/components/retail-pos/RetailPOSPortalGuard'");
     expect(app).not.toContain('const RetailPOSPortalGuard  = lazy(');
+    expect(workspace).toContain('to={page.path} reloadDocument');
+    expect(app).toContain('onClick={() => window.location.reload()}');
   });
 
   it('defines independent device, shift, receipt, item, payment, approval, event and command ledgers', async () => {

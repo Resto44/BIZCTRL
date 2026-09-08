@@ -155,9 +155,20 @@ const PageLoader = () => (
 
 // ── Route-level error boundary ────────────────────────────────────────────────
 class RouteErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { hasError: false }; }
-  static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(e, info) { console.error('[RouteErrorBoundary]', e, info); }
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) {
+    console.error('[RouteErrorBoundary]', error, info);
+    try {
+      sessionStorage.setItem('bizctrl:last-route-error', JSON.stringify({
+        message: error?.message || String(error),
+        path: window.location.pathname,
+        occurredAt: new Date().toISOString(),
+      }));
+    } catch {
+      // Diagnostics must never replace the original recovery screen.
+    }
+  }
   render() {
     if (this.state.hasError) {
       return (
@@ -165,8 +176,13 @@ class RouteErrorBoundary extends React.Component {
           <p className="text-muted-foreground mb-4">This page failed to load.</p>
           <button
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium"
-            onClick={() => this.setState({ hasError: false })}
+            onClick={() => window.location.reload()}
           >Try Again</button>
+          {this.state.error?.message ? (
+            <p className="mt-4 max-w-lg break-words text-xs text-muted-foreground" role="alert">
+              {this.state.error.message}
+            </p>
+          ) : null}
         </div>
       );
     }
