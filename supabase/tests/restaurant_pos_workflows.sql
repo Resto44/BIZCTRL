@@ -3,7 +3,7 @@ begin;
 do $$
 declare owner_id uuid:=gen_random_uuid(); other_id uuid:=gen_random_uuid(); staff_id uuid:=gen_random_uuid();
  r uuid; b uuid; other_b uuid:=gen_random_uuid(); p uuid:=gen_random_uuid(); dish uuid; stock uuid:=gen_random_uuid(); menu uuid:=gen_random_uuid();
- d uuid; d2 uuid; v jsonb; c jsonb; h jsonb; receipt jsonb; pair jsonb; pair2 jsonb; request uuid:=gen_random_uuid(); payload jsonb; n numeric; denied boolean;
+ d uuid; d2 uuid; whole_menu uuid:=gen_random_uuid(); v jsonb; c jsonb; h jsonb; receipt jsonb; pair jsonb; pair2 jsonb; request uuid:=gen_random_uuid(); payload jsonb; n numeric; denied boolean;
 begin
  insert into auth.users(id,email,raw_user_meta_data) values
  (owner_id,'restaurant-pos-'||owner_id||'@example.invalid','{"role":"owner","business_type":"restaurant","full_name":"POS fixture","company_name":"POS test","branch_name":"Test branch"}'),
@@ -24,7 +24,7 @@ begin
  v:=public.erp_restaurant_pos_workspace(r,b,current_date);
  assert jsonb_array_length(v->'devices')=2,'Device creation is not idempotent';
  d:=(v->'devices'->0->>'id')::uuid;d2:=(v->'devices'->1->>'id')::uuid;
- payload:=jsonb_build_object('id',menu,'name','Half chicken','name_ar','نصف دجاج','price',11.5,'tax_rate',15,'stock_mode','recipe','recipe',jsonb_build_array(jsonb_build_object('inventory_id',stock,'quantity',0.25)));
+ payload:=jsonb_build_object('id',menu,'option_group','Roast chicken','option_key','half_rice','name','Half chicken with rice','name_ar','نصف دجاج','price',11.5,'tax_rate',15,'stock_mode','recipe','recipe',jsonb_build_array(jsonb_build_object('inventory_id',stock,'quantity',0.25)));
  denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'menu',payload||jsonb_build_object('product_id',p));exception when check_violation then denied:=true;end;
  assert denied,'Raw material accepted as a dish';
  perform public.erp_restaurant_pos_setup(r,b,'menu',payload);
@@ -43,6 +43,15 @@ begin
  set local role authenticated;
  v:=public.erp_restaurant_pos_catalog(r,b,'');
  assert jsonb_array_length(v->'menu')=1 and jsonb_array_length(v->'inventory')=1,'Separated catalog missing dishes or ingredients';
+ assert v->'menu'->0->>'option_key'='half_rice','Serving key missing from catalog';
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'menu',payload||jsonb_build_object('id',gen_random_uuid()));exception when unique_violation then denied:=true;end;
+ assert denied,'Duplicate serving allowed in branch';
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'menu',payload||jsonb_build_object('id',gen_random_uuid(),'option_key','invalid'));exception when check_violation then denied:=true;end;
+ assert denied,'Invalid serving key allowed';
+ perform public.erp_restaurant_pos_setup(r,b,'menu',payload||jsonb_build_object('id',whole_menu,'option_key','whole_rice','name','Whole chicken with rice','name_ar','حبة شواية مع الرز','price',40,'recipe',jsonb_build_array(jsonb_build_object('inventory_id',stock,'quantity',0.5))));
+ v:=public.erp_restaurant_pos_workspace(r,b,current_date);
+ assert jsonb_array_length(v->'menu')=2,'Grouped choices missing from POS workspace';
+
  denied:=false;begin perform public.erp_restaurant_pos_setup(r,other_b,'menu',payload);exception when others then denied:=true;end;
  assert denied,'Cross-branch ingredient configuration allowed';
  v:=public.erp_restaurant_cashier_command(d,'open_shift','{"cashier_name":"Fixture","opening_cash":100}',gen_random_uuid());
@@ -97,7 +106,17 @@ begin
  denied:=false;begin perform public.erp_restaurant_cashier_command(d,'send_kitchen',jsonb_build_object('cart_id',c->'id','revision',c->'revision'),gen_random_uuid());exception when check_violation then denied:=true;end;assert denied,'Ingredient overselling allowed';
  v:=public.erp_restaurant_cashier_command(d,'quantity',jsonb_build_object('cart_id',c->'id','revision',c->'revision','menu_id',menu,'quantity',1),gen_random_uuid());c:=v->'cart';
  v:=public.erp_restaurant_cashier_command(d,'send_kitchen',jsonb_build_object('cart_id',c->'id','revision',c->'revision'),gen_random_uuid());c:=v->'cart';
- denied:=false;begin perform public.erp_restaurant_cashier_command(d,'close_shift','{"counted_cash":114.5}',gen_random_uuid());exception when check_violation then denied:=true;end;assert denied,'Shift closed with unpaid food';
+ denied:=false;begin
+ v:=public.erp_restaurant_cashier_command(d,'new_sale','{}',gen_random_uuid());c:=v->'cart';
+ v:=public.erp_restaurant_cashier_command(d,'quantity',jsonb_build_object('cart_id',c->'id','revision',c->'revision','menu_id',whole_menu,'quantity',2,'unit_price',1),gen_random_uuid());c:=v->'cart';
+ assert (c->>'net_total')::numeric=80,'Whole serving did not use its independent price';
+ assert c->'lines'->0->>'name'='Whole chicken with rice','Serving name missing from invoice line';
+ v:=public.erp_restaurant_cashier_command(d,'send_kitchen',jsonb_build_object('cart_id',c->'id','revision',c->'revision'),gen_random_uuid());c:=v->'cart';
+ reset role;
+ select quantity into n from public.inventory where id=stock;assert n=8,'Whole serving used the wrong ingredient quantity';
+ set local role authenticated;
+ v:=public.erp_restaurant_cashier_command(d,'cancel',jsonb_build_object('cart_id',c->'id','revision',c->'revision','reason','Synthetic variant check'),gen_random_uuid());
+ perform public.erp_restaurant_cashier_command(d,'close_shift','{"counted_cash":114.5}',gen_random_uuid());exception when check_violation then denied:=true;end;assert denied,'Shift closed with unpaid food';
  v:=public.erp_restaurant_cashier_command(d,'cancel',jsonb_build_object('cart_id',c->'id','revision',c->'revision','reason','Synthetic prepared cancellation'),gen_random_uuid());
  reset role;
  select quantity into n from public.inventory where id=stock;assert n=9,'Prepared cancellation restored raw stock';

@@ -1,3 +1,4 @@
+import {SERVING_KEYS,servingCopy} from '@/lib/restaurantServingOptions';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,7 +15,7 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
  const {activeRestaurant,branches=[]}=useTenant();
  const {lang,formatMoney}=useLanguage();
  const {can,role}=useRole();
- const labels=restaurantProductCopy(lang);
+ const labels=restaurantProductCopy(lang);const serving=servingCopy(lang);
  const [params,setParams]=useSearchParams();
  const raw=params.get('product_view')==='raw';
  const [choice,setChoice]=useState('');
@@ -27,6 +28,12 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
  const q=useQuery({queryKey:['restaurant-menu-catalog',tenant,branch],enabled:Boolean(tenant&&branch&&manage&&!raw),
   queryFn:()=>restaurantRpc('pos_catalog',{p_restaurant_id:tenant,p_branch_id:branch,p_search:''})});
  const menu=(q.data?.menu||[]).filter(m=>[m.name,m.name_ar,m.name_fa,m.category].join(' ').toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+ const addChoice=m=>{
+  const key=SERVING_KEYS.find(k=>!(q.data?.menu||[]).some(v=>v.option_group===m.option_group&&v.option_key===k));
+  if(!key)return;
+  const arabic=m.option_group+' · '+servingCopy('ar')[key];
+  setEditing({option_group:m.option_group,option_key:key,name:arabic,name_ar:arabic,name_fa:m.option_group+' · '+servingCopy('fa')[key],image_url:m.image_url||'',category:m.category,station:m.station});
+ };
  const refresh=async()=>{await Promise.all([qc.invalidateQueries({queryKey:['restaurant-menu-catalog']}),qc.invalidateQueries({queryKey:['restaurant-pos']}),qc.invalidateQueries({queryKey:['restaurant-pos-setup']}),qc.invalidateQueries({queryKey:['products']})]);};
  return <main className="space-y-4 pb-24" dir={lang==='en'?'ltr':'rtl'}>
   <header className={panel}>
@@ -48,12 +55,14 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
     <h2 className="text-lg font-black">{restaurantProductName(m,lang)}</h2><p className="mt-1 text-sm text-slate-500">{m.category} · {m.station}</p>
     <p className="my-3 text-xl font-black text-blue-600">{formatMoney(m.price)}</p>
     <div className="mb-4 flex flex-wrap gap-2 text-xs font-bold"><span className={m.active?'rounded-full bg-emerald-50 px-3 py-2 text-emerald-700':'rounded-full bg-slate-100 px-3 py-2 text-slate-600'}>{m.active?labels.active:labels.inactive}</span><span className={m.stock_mode==='recipe'?'rounded-full bg-blue-50 px-3 py-2 text-blue-700':'rounded-full bg-amber-50 px-3 py-2 text-amber-800'}>{m.stock_mode==='recipe'?labels.recipe:labels.untracked}</span></div>
+    {m.option_group&&<p className="mb-3 text-sm text-blue-600">{m.option_group} · {serving[m.option_key]}</p>}
+    {m.option_group&&SERVING_KEYS.some(k=>!(q.data?.menu||[]).some(v=>v.option_group===m.option_group&&v.option_key===k))&&<button type="button" className={button+' mb-2 w-full'} onClick={()=>addChoice(m)}><Plus size={16}/>{serving.add}</button>}
     <button type="button" className={button+' w-full'} onClick={()=>setEditing(m)}><Pencil size={16}/>{labels.edit}</button>
    </article>)}</div>}
    {manage&&!q.isLoading&&!q.error&&!menu.length&&<p className={panel}>{labels.empty}</p>}
    <p className="px-2 text-sm leading-6 text-slate-500">{labels.rawConflict}</p>
   </>}
-  {editing&&branch&&manage&&!raw&&<Setup key={tenant+':'+branch+':'+(editing.id||'new')} tenant={tenant} branch={branch} c={restaurantCopy(lang)} initial={editing.id?editing:null} menuOnly close={()=>setEditing(null)} refresh={refresh}/>}
+  {editing&&branch&&manage&&!raw&&<Setup key={tenant+':'+branch+':'+(editing.id||editing.option_key||'new')} tenant={tenant} branch={branch} c={restaurantCopy(lang)} initial={editing} menuOnly close={()=>setEditing(null)} refresh={refresh}/>}
  </main>;
 }
 
