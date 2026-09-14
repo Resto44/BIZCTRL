@@ -13,6 +13,10 @@
  * - Audit Log: Every cash movement tracked with source module + record ID
  */
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { isRestaurantPOSPortal } from '@/lib/productImportAccess';
+import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
+import { isWorkspacePathEnabled } from '@/lib/workspaceCustomization';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -34,8 +38,9 @@ import OwnerCashInjectionForm from '@/components/cashregister/OwnerCashInjection
 import CashRegisterReports from '@/components/cashregister/CashRegisterReports';
 
 export default function CashRegisterCenter() {
-  const { currency } = useLanguage();
-  const { branches, activeRestaurantId } = useTenant();
+  const { currency, t } = useLanguage();
+  const { branches, activeRestaurantId, activeRestaurant } = useTenant();
+  const { configuration } = useWorkspaceCustomization();
   const { user } = useAuth();
   const qc = useQueryClient();
 
@@ -68,6 +73,11 @@ export default function CashRegisterCenter() {
 
   return (
     <div className="space-y-4 pb-24">
+      {isRestaurantPOSPortal(activeRestaurant) && isWorkspacePathEnabled(configuration, '/restaurant/pos') && (
+        <Link to="/restaurant/pos" className="flex min-h-14 items-center justify-between rounded-2xl bg-blue-600 px-5 py-4 font-bold text-white shadow-sm hover:bg-blue-700">
+          <span>{t('restaurant_pos')}</span><span aria-hidden="true">←</span>
+        </Link>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-2">

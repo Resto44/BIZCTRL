@@ -304,7 +304,7 @@ const CONTROL_GROUPS = [
     title: 'Sales & Revenue',
     icon: TrendingUp,
     iconClass: 'bg-blue-600 text-white',
-    paths: ['/cash-register', '/sales/invoices', '/retail/cashier', '/retail/pos-control', '/retail/pos-branches', '/retail/pos-device', '/retail/pos-audit'],
+    paths: ['/restaurant/pos', '/cash-register', '/sales/invoices', '/retail/cashier', '/retail/pos-control', '/retail/pos-branches', '/retail/pos-device', '/retail/pos-audit'],
   },
   {
     key: 'purchasing',
@@ -434,7 +434,7 @@ function MoreMenu({ sections, can, onClose }) {
   const quickActions = [
     can?.viewSales ? { path: '/sales', label: 'Add Sale', description: 'Create a new sale', icon: ShoppingCart, iconClass: 'bg-blue-50 text-blue-700' } : null,
     can?.viewPurchases ? { path: '/purchases?create=1', label: 'Add Purchase', description: 'Create a purchase invoice', icon: Package, iconClass: 'bg-emerald-50 text-emerald-700' } : null,
-    availablePaths.has('/cash-register') ? { path: '/cash-register', label: 'Cash Register', description: 'Open the register', icon: CreditCard, iconClass: 'bg-violet-50 text-violet-700' } : null,
+    availablePaths.has('/restaurant/pos') ? { path: '/restaurant/pos', label: readableLabel(t, 'restaurant_pos'), description: 'Open POS', icon: ScanLine, iconClass: 'bg-violet-50 text-violet-700' } : availablePaths.has('/cash-register') ? { path: '/cash-register', label: 'Cash Register', description: 'Open the register', icon: CreditCard, iconClass: 'bg-violet-50 text-violet-700' } : null,
     can?.viewReports ? { path: '/reports', label: 'Reports', description: 'Analyze performance', icon: BarChart3, iconClass: 'bg-sky-50 text-sky-700' } : null,
   ].filter(Boolean);
 
@@ -631,6 +631,10 @@ const BottomNav = memo(function BottomNav() {
     const rank = new Map((configuration?.navigation?.order || []).map((path, index) => [path, index]));
     const compare = (a, b) => (rank.get(a.path) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.path) ?? Number.MAX_SAFE_INTEGER);
     const visibleNav = baseNav
+      .map(item => restaurant && can.viewSales && isWorkspacePathEnabled(configuration, '/restaurant/pos') && !hidden.has('/restaurant/pos') && item.path === '/debt-management'
+        ? { path: '/restaurant/pos', icon: ScanLine, labelKey: 'restaurant_pos' }
+        : item)
+      .filter(item => item.path !== '/restaurant/pos' || (restaurant && can.viewSales && isWorkspacePathEnabled(configuration, item.path)))
       .filter((item) => item.isMore || !hidden.has(item.path))
       .sort((a, b) => a.isMore ? 1 : b.isMore ? -1 : compare(a, b));
     const moreSections = baseMoreSections

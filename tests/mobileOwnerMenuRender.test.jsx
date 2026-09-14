@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({
   failMenu: false,
+  portal: 'restaurant',
   can: {
     viewDashboard: true,
     viewReports: true,
@@ -39,7 +40,7 @@ vi.mock('@/lib/AuthContext', () => ({
 }));
 
 vi.mock('@/lib/TenantContext', () => ({
-  useTenant: () => ({ activeRestaurant: { id: 'restaurant-1', name: 'Restaurant' } }),
+  useTenant: () => ({ activeRestaurant: { id: 'restaurant-1', name: 'Restaurant', business_type: fixture.portal } }),
 }));
 
 vi.mock('@/lib/LanguageContext', () => ({
@@ -69,6 +70,15 @@ window.top = window;
 const { default: ERPSidebar } = await import('../src/components/layout/ERPSidebar.jsx');
 
 describe('mobile owner ERP menu render', () => {
+  it.each(['restaurant', 'retail'])('keeps the POS sales entry discoverable only for %s scope', async portal => {
+    fixture.portal = portal;
+    const client = new QueryClient(); let renderer;
+    await act(async () => { renderer = TestRenderer.create(<QueryClientProvider client={client}><MemoryRouter><ERPSidebar collapsed={false} mobile onToggle={() => {}} onNavigate={() => {}} /></MemoryRouter></QueryClientProvider>); });
+    const section = renderer.root.findAllByType('button').find(button => button.findAllByType('span').some(span => span.children.includes('Sales & Customers')));
+    await act(async () => section.props.onClick());
+    expect(renderer.root.findAllByType('a').some(link => link.props.href === '/restaurant/pos')).toBe(portal === 'restaurant');
+    await act(async () => renderer.unmount()); client.clear(); fixture.portal = 'restaurant';
+  });
   it('opens without throwing and keeps the two quick-entry actions available', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },

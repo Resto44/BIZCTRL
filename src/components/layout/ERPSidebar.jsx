@@ -177,7 +177,7 @@ const MOBILE_NAV_SECTIONS = [
     description: 'Sales, customers & closing',
     icon: ShoppingCart,
     paths: [
-      '/sales', '/sales-sources', '/sales/invoices', '/cash-register',
+      '/restaurant/pos', '/sales', '/sales-sources', '/sales/invoices', '/cash-register',
       '/customer-management',
     ],
   },
