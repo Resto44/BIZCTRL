@@ -19,10 +19,20 @@ export function groupRestaurantFoods(menu,{search='',category=''}={}) {
   groups.get(key).items.push(item);
  }
  const term=String(search).trim().toLocaleLowerCase();
- return [...groups.values()].filter(group=>group.items.some(item=>item.active&&(!category||item.category===category)&&
+ return [...groups.values()].filter(group=>group.items.some(item=>item.active&&(!category||(item.category_id||item.category)===category)&&
   [group.title,item.name,item.name_ar,item.name_fa,item.name_en].join(' ').toLocaleLowerCase().includes(term)));
 }
 export function servingSlots(group) {
  const keys=SERVING_KEYS.filter((key,index)=>index<4||group.items.some(item=>item.option_key===key));
  return keys.map(key=>({key,item:group.items.find(item=>item.option_key===key)||null}));
+}
+
+export const PORTIONS = ['whole','half','quarter'];
+export const SIDES = ['rice','plain'];
+export function touchCopy(lang='en') {
+ return ({
+  ar:{size:'اختر الحجم',side:'طريقة التقديم',whole:'حبة',half:'نص',quarter:'ربع',rice:'مع الرز',plain:'سادة بدون الرز',add:'إضافة إلى الطلب',quantity:'الكمية',increase:'زيادة الكمية',decrease:'تقليل الكمية',edit:'الأحجام والأسعار',group:'اسم الطعام',name:'اسم الوجبة',price:'السعر شامل الضريبة',save:'حفظ جميع الخيارات',category:'اختر من إدارة الفئات',manage:'إدارة الفئات',recipe:'الوصفة والمخزون',enable:'تفعيل',new:'طعام بأحجام متعددة',busy:'جارٍ الإضافة…',choose:'اختر الفئة',stock:'تأكيد عدم خصم مخزون للخيارات غير المتتبعة'},
+  fa:{size:'اندازه را انتخاب کنید',side:'نوع غذا',whole:'حبه',half:'نص',quarter:'ربع',rice:'همراه برنج',plain:'ساده بدون برنج',add:'افزودن به سفارش',quantity:'تعداد',increase:'افزایش تعداد',decrease:'کاهش تعداد',edit:'اندازه‌ها و قیمت‌ها',group:'نام غذا',name:'نام گزینهٔ غذا',price:'قیمت با مالیات',save:'ذخیرهٔ همه گزینه‌ها',category:'انتخاب از مدیریت کتگوری',manage:'مدیریت کتگوری',recipe:'دستور پخت و موجودی',enable:'فعال',new:'غذا با چند اندازه',busy:'در حال افزودن…',choose:'کتگوری را انتخاب کنید',stock:'تأیید عدم کسر موجودی برای گزینه‌های بدون پیگیری'},
+  en:{size:'Choose size',side:'Serving style',whole:'Whole',half:'Half',quarter:'Quarter',rice:'With rice',plain:'Plain · no rice',add:'Add to order',quantity:'Quantity',increase:'Increase quantity',decrease:'Decrease quantity',edit:'Sizes & prices',group:'Food name',name:'Serving name',price:'Price including tax',save:'Save all choices',category:'Select from Category Management',manage:'Category Management',recipe:'Recipe & stock',enable:'Enabled',new:'Food with sizes',busy:'Adding…',choose:'Choose a category',stock:'Confirm no stock deduction for untracked choices'}
+ })[lang]||touchCopy('en');
 }
