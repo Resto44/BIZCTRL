@@ -1,3 +1,4 @@
+import { restaurantMaterialFilter } from '@/lib/restaurantProducts';
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -17,7 +18,7 @@ const emptyItem = { product_id: '', product_name: '', qty: 1, unit: '', unit_pri
 
 export default function PurchaseOrderForm({ order, onClose, onSaved }) {
   const { currency } = useLanguage();
-  const { activeRestaurantId } = useTenant();
+  const { activeRestaurantId, activeRestaurant } = useTenant();
   const [form, setForm] = useState({
     supplier_id: order?.supplier_id || '',
     supplier_name: order?.supplier_name || '',
@@ -34,7 +35,7 @@ export default function PurchaseOrderForm({ order, onClose, onSaved }) {
   });
 
   const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: () => base44.entities.Supplier.list('name', 200) });
-  const { data: products = [] } = useQuery({ queryKey: ['products'], queryFn: () => base44.entities.Product.list('name', 500) });
+  const { data: products = [] } = useQuery({ queryKey: ['products', activeRestaurantId, 'purchase-materials'], queryFn: () => base44.entities.Product.filter({ restaurant_id: activeRestaurantId, ...restaurantMaterialFilter(activeRestaurant) }, 'name', 500), enabled: Boolean(activeRestaurantId) });
 
   const saveMutation = useMutation({
     mutationFn: (data) => order ? base44.entities.PurchaseOrder.update(order.id, data) : base44.entities.PurchaseOrder.create(data),

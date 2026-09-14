@@ -11,6 +11,7 @@ import { useRetailCashier } from '@/hooks/useRetailCashier';
 import { subscribeCashierBroadcast } from '@/lib/cashierBroadcast';
 import { money, paymentBreakdown, printCashierReceipt } from '@/lib/retailCashier';
 import { isRestaurantPOSPortal, restaurantRpc, restaurantProductName as nameOf, restaurantBusinessDate, kitchenNextState, parseRecipeRows } from '@/lib/restaurantPOS';
+import { restaurantProductCopy } from '@/lib/restaurantProducts';
 import { restaurantCopy } from '@/components/restaurant-pos/copy';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -27,22 +28,23 @@ export function useRestaurantWorkspace(tenant,branch,date,active=true) {
  return q;
 }
 
-function Setup({tenant,branch,c,close,refresh}) {
- const [search,setSearch]=useState('');const [count,setCount]=useState(10);const [error,setError]=useState('');const [busy,setBusy]=useState(false);
- const [form,setForm]=useState({id:crypto.randomUUID(),product_id:'',name:'',name_ar:'',price:'',tax_rate:'0',category:'Food',station:'Kitchen',stock_mode:'recipe',confirm_untracked:false});
- const [recipe,setRecipe]=useState([{inventory_id:'',quantity:''}]);
- const data=useQuery({queryKey:['restaurant-pos-setup',tenant,branch,search],queryFn:()=>restaurantRpc('pos_catalog',{p_restaurant_id:tenant,p_branch_id:branch,p_search:search}),enabled:Boolean(branch)});
+export function Setup({tenant,branch,c,close,refresh,initial=null,menuOnly=false}) {
+ const {lang}=useLanguage();const labels=restaurantProductCopy(lang);
+ const [count,setCount]=useState(10);const [error,setError]=useState('');const [busy,setBusy]=useState(false);
+ const [form,setForm]=useState(()=>({id:crypto.randomUUID(),product_id:'',name:'',name_ar:'',name_fa:'',image_url:'',price:'',tax_rate:'0',category:'Food',station:'Kitchen',stock_mode:'recipe',active:true,...initial,confirm_untracked:false}));
+ const [recipe,setRecipe]=useState(()=>initial?.recipe?.length?initial.recipe:[{inventory_id:'',quantity:''}]);
+ const data=useQuery({queryKey:['restaurant-pos-setup',tenant,branch],queryFn:()=>restaurantRpc('pos_catalog',{p_restaurant_id:tenant,p_branch_id:branch,p_search:''}),enabled:Boolean(tenant&&branch)});
  const set=(key,value)=>setForm(s=>({...s,[key]:value}));
  const submit=async(command,payload)=>{setBusy(true);setError('');try{await restaurantRpc('pos_setup',{p_restaurant_id:tenant,p_branch_id:branch,p_command:command,p_payload:payload});await refresh();if(command==='menu')close();}catch(e){setError(e.message);}finally{setBusy(false);}};
- return <Dialog open onOpenChange={v=>{if(!v&&!busy)close();}}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{c.setup}</DialogTitle><DialogDescription>{c.settingsHint}</DialogDescription></DialogHeader>
-  <div className="flex items-end gap-2"><Field label={c.count}><input className={input} type="number" min="1" max="100" value={count} onChange={e=>setCount(e.target.value)}/></Field><button className={button} disabled={busy} onClick={()=>void submit('devices',{count:Number(count)})}>{c.createDevices}</button></div>
+ return <Dialog open onOpenChange={v=>{if(!v&&!busy)close();}}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{menuOnly?labels.setup:c.setup}</DialogTitle><DialogDescription>{labels.recipeHint}</DialogDescription></DialogHeader>
+  {!menuOnly&&<div className="flex items-end gap-2"><Field label={c.count}><input className={input} type="number" min="1" max="100" value={count} onChange={e=>setCount(e.target.value)}/></Field><button className={button} disabled={busy} onClick={()=>void submit('devices',{count:Number(count)})}>{c.createDevices}</button></div>}
   <form className="grid gap-4 border-t pt-4" onSubmit={e=>{e.preventDefault();try{void submit('menu',{...form,price:Number(form.price),tax_rate:Number(form.tax_rate),recipe:parseRecipeRows(recipe)});}catch(e){setError(e.message);}}}>
-   <Field label={c.search}><input className={input} value={search} onChange={e=>setSearch(e.target.value)}/></Field>
-   <Field label={c.product}><select className={input} required value={form.product_id} onChange={e=>{const p=data.data?.products.find(p=>p.id===e.target.value);setForm(s=>({...s,product_id:e.target.value,name:p?.name||'',name_ar:p?.name_ar||'',price:String(p?.selling_price||p?.default_price||''),tax_rate:String(p?.tax_rate||0)}));}}><option value="">—</option>{data.data?.products.map(p=><option key={p.id} value={p.id}>{p.name_ar||p.name}</option>)}</select></Field>
-   <div className="grid gap-3 sm:grid-cols-2">{[['name',c.name],['name_ar',c.arabic],['price',c.price],['tax_rate',c.taxRate],['category',c.category],['station',c.station]].map(([k,label])=><Field key={k} label={label}><input className={input} required={k!=='name_ar'} type={['price','tax_rate'].includes(k)?'number':'text'} step="0.01" min={k==='price'?'0.01':'0'} max={k==='tax_rate'?'100':undefined} value={form[k]} onChange={e=>set(k,e.target.value)}/></Field>)}</div>
+   <div className="grid gap-3 sm:grid-cols-2">{[['name',c.name],['name_ar',c.arabic],['name_fa',labels.persian],['price',c.price],['tax_rate',c.taxRate],['category',c.category],['station',c.station]].map(([k,label])=><Field key={k} label={label}><input className={input} required={!['name_ar','name_fa'].includes(k)} type={['price','tax_rate'].includes(k)?'number':'text'} step="0.01" min={k==='price'?'0.01':'0'} max={k==='tax_rate'?'100':undefined} value={form[k]??''} onChange={e=>set(k,e.target.value)}/></Field>)}</div>
+   <Field label={labels.image}><input className={input} type="url" pattern="https://.*" value={form.image_url||''} onChange={e=>set('image_url',e.target.value)}/></Field>
+   <label className="flex items-center gap-3"><input type="checkbox" checked={form.active} onChange={e=>set('active',e.target.checked)}/>{labels.active}</label>
    <Field label={c.stockMode}><select className={input} value={form.stock_mode} onChange={e=>set('stock_mode',e.target.value)}><option value="recipe">{c.recipe}</option><option value="untracked">{c.untracked}</option></select></Field>
    {form.stock_mode==='recipe'?<div className="space-y-3">{recipe.map((r,i)=><div key={i} className="grid grid-cols-[minmax(0,1fr)_100px_48px] items-end gap-2"><Field label={c.ingredient}><select className={input} required value={r.inventory_id} onChange={e=>setRecipe(rows=>rows.map((v,j)=>j===i?{...v,inventory_id:e.target.value}:v))}><option value="">—</option>{data.data?.inventory.map(s=><option key={s.id} value={s.id}>{s.product_name} · {s.quantity} {s.unit}</option>)}</select></Field><Field label={c.quantity}><input className={input} required type="number" min="0.000001" step="any" value={r.quantity} onChange={e=>setRecipe(rows=>rows.map((v,j)=>j===i?{...v,quantity:e.target.value}:v))}/></Field><button type="button" className={button} aria-label={c.remove} onClick={()=>setRecipe(rows=>rows.filter((_,j)=>j!==i))}><X size={18}/></button></div>)}<button type="button" className={button} onClick={()=>setRecipe(rows=>[...rows,{inventory_id:'',quantity:''}])}><Plus size={18}/>{c.addIngredient}</button></div>:<label className="flex gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-950"><input type="checkbox" required checked={form.confirm_untracked} onChange={e=>set('confirm_untracked',e.target.checked)}/>{c.untrackedConfirm}</label>}
-   {(error||data.error)&&<p role="alert" className="text-red-600">{error||data.error.message}</p>}<button className={primary} disabled={busy||data.isLoading}>{c.createMenu}</button>
+   {(error||data.error)&&<p role="alert" className="text-red-600">{error||data.error.message}</p>}<button className={primary} disabled={busy||data.isLoading||data.isError}>{labels.save}</button>
   </form>
  </DialogContent></Dialog>;
 }

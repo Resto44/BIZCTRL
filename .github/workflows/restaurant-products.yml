@@ -1,0 +1,24 @@
+name: Restaurant products validation
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'supabase/**'
+      - 'package*.json'
+      - '.github/workflows/restaurant-products.yml'
+permissions:
+  contents: read
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global pnpm@11.19.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run tests/restaurantPOS.test.jsx tests/restaurantProducts.test.jsx
+      - run: pnpm run build

@@ -1,3 +1,4 @@
+import { restaurantMaterialFilter } from '@/lib/restaurantProducts';
 import React, { useState, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -97,7 +98,7 @@ export default function QuickPurchaseModal({ open, onOpenChange }) {
   const u = UI[lang] || UI.en;
   const qc = useQueryClient();
   const notif = useNotify();
-  const { ownerFilter, activeRestaurantId, branches } = useTenant();
+  const { ownerFilter, activeRestaurantId, activeRestaurant, branches } = useTenant();
   const qtyRef = useRef(null);
 
   const [form, setForm] = useState(defaultForm());
@@ -109,8 +110,8 @@ export default function QuickPurchaseModal({ open, onOpenChange }) {
   const [creatingCat, setCreatingCat] = useState(false);
 
   const { data: products = [] } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => base44.entities.Product.list('name', 10000),
+    queryKey: ['products', activeRestaurantId, 'purchase-materials'],
+    queryFn: () => base44.entities.Product.filter({ restaurant_id: activeRestaurantId, ...restaurantMaterialFilter(activeRestaurant) }, 'name', 10000), enabled: Boolean(activeRestaurantId),
     staleTime: 300000,
   });
 
