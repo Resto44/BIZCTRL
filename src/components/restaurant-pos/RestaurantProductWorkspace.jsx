@@ -1,3 +1,4 @@
+import RestaurantSalesCategories from './RestaurantSalesCategories';
 import RestaurantMenuGroupEditor from './RestaurantMenuGroupEditor';
 import {servingCopy,touchCopy} from '@/lib/restaurantServingOptions';
 import { useState } from 'react';
@@ -25,6 +26,7 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
  const manage=['owner','manager'].includes(role)&&Boolean(can.uploadSales);
  const [search,setSearch]=useState('');
  const [editing,setEditing]=useState(null);
+ const [categoryOpen,setCategoryOpen]=useState(false);
  const [groupEditing,setGroupEditing]=useState(null);const touch=touchCopy(lang);
  const qc=useQueryClient();
  const q=useQuery({queryKey:['restaurant-menu-catalog',tenant,branch],enabled:Boolean(tenant&&branch&&manage&&!raw),
@@ -35,13 +37,13 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
   <header className={panel}>
    <h1 className="text-2xl font-black">{labels.title}</h1><p className="mt-2 text-sm leading-6 text-slate-500">{labels.hint}</p>
    <nav className="mt-4 grid grid-cols-2 gap-2" aria-label={labels.title}>
-    {[[false,labels.menu,ChefHat],[true,labels.raw,Package]].map(([isRaw,label,Icon])=><button type="button" key={label} className={raw===isRaw?primary:button} aria-pressed={raw===isRaw} onClick={()=>{setEditing(null);setGroupEditing(null);setParams(prev=>{const next=new URLSearchParams(prev);next.set('product_view',isRaw?'raw':'menu');return next;});}}><Icon size={20}/>{label}</button>)}
+    {[[false,labels.menu,ChefHat],[true,labels.raw,Package]].map(([isRaw,label,Icon])=><button type="button" key={label} className={raw===isRaw?primary:button} aria-pressed={raw===isRaw} onClick={()=>{setEditing(null);setGroupEditing(null);setCategoryOpen(false);setParams(prev=>{const next=new URLSearchParams(prev);next.set('product_view',isRaw?'raw':'menu');return next;});}}><Icon size={20}/>{label}</button>)}
    </nav>
   </header>
   {raw?rawMaterials:<>
    <section className={panel}>
-    <div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-2 text-sm font-bold">{labels.branch}<select className={input} value={branch} onChange={e=>{setChoice(e.target.value);setEditing(null);setGroupEditing(null);}}><option value="" disabled>{labels.choose}</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name||b.label}</option>)}</select></label><label className="grid gap-2 text-sm font-bold">{labels.search}<input className={input} type="search" value={search} onChange={e=>setSearch(e.target.value)}/></label></div>
-    <div className="mt-4 flex flex-wrap gap-2">{manage&&<button type="button" className={primary} disabled={!branch} onClick={()=>setEditing({})}><Plus size={18}/>{labels.add}</button>}<>{manage&&<button type="button" className={button} disabled={!branch||!q.data} onClick={()=>setGroupEditing([])}><Plus size={18}/>{touch.new}</button>}</><Link className={button} to="/restaurant/pos">{labels.pos}</Link><button type="button" aria-label="Refresh" className={button} disabled={q.isFetching} onClick={()=>void refresh()}><RefreshCw size={18}/></button></div>
+    <div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-2 text-sm font-bold">{labels.branch}<select className={input} value={branch} onChange={e=>{setChoice(e.target.value);setEditing(null);setGroupEditing(null);setCategoryOpen(false);}}><option value="" disabled>{labels.choose}</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name||b.label}</option>)}</select></label><label className="grid gap-2 text-sm font-bold">{labels.search}<input className={input} type="search" value={search} onChange={e=>setSearch(e.target.value)}/></label></div>
+    <div className="mt-4 flex flex-wrap gap-2">{manage&&<button type="button" className={primary} disabled={!branch} onClick={()=>setEditing({})}><Plus size={18}/>{labels.add}</button>}<>{manage&&<button type="button" className={button} disabled={!branch||!q.data} onClick={()=>setGroupEditing([])}><Plus size={18}/>{touch.new}</button>}</><>{manage&&<button type="button" className={button} disabled={!branch} onClick={()=>setCategoryOpen(true)}>{touch.manage}</button>}</><Link className={button} to="/restaurant/pos">{labels.pos}</Link><button type="button" aria-label="Refresh" className={button} disabled={q.isFetching} onClick={()=>void refresh()}><RefreshCw size={18}/></button></div>
    </section>
    {q.error&&<p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{q.error.message}</p>}
    {q.isLoading&&manage&&branch&&<p role="status" className={panel}>{labels.loading}</p>}
@@ -58,6 +60,7 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
    {manage&&!q.isLoading&&!q.error&&!menu.length&&<p className={panel}>{labels.empty}</p>}
    <p className="px-2 text-sm leading-6 text-slate-500">{labels.rawConflict}</p>
   </>}
+  {categoryOpen&&branch&&manage&&!raw&&<RestaurantSalesCategories key={tenant+':'+branch} tenant={tenant} branch={branch} lang={lang} close={()=>setCategoryOpen(false)} refresh={refresh}/>}
   {groupEditing&&branch&&manage&&!raw&&<RestaurantMenuGroupEditor key={tenant+':'+branch+':group'} tenant={tenant} branch={branch} initial={groupEditing} catalog={q.data} reload={q.refetch} refresh={refresh} close={()=>setGroupEditing(null)}/>}
   {editing&&branch&&manage&&!raw&&<Setup key={tenant+':'+branch+':'+(editing.id||editing.option_key||'new')} tenant={tenant} branch={branch} c={restaurantCopy(lang)} initial={editing} menuOnly close={()=>setEditing(null)} refresh={refresh}/>}
  </main>;

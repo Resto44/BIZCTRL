@@ -3,7 +3,7 @@ begin;
 do $$
 declare owner_id uuid:=gen_random_uuid(); other_id uuid:=gen_random_uuid(); staff_id uuid:=gen_random_uuid();
  r uuid; b uuid; other_b uuid:=gen_random_uuid(); p uuid:=gen_random_uuid(); dish uuid; stock uuid:=gen_random_uuid(); menu uuid:=gen_random_uuid();
- category uuid:=gen_random_uuid(); foreign_category uuid:=gen_random_uuid(); batch jsonb; batch_item jsonb; keys text[]:=array['whole_rice','whole_plain','half_rice','half_plain','quarter_rice','quarter_plain']; ix integer; d uuid; d2 uuid; whole_menu uuid:=gen_random_uuid(); v jsonb; c jsonb; h jsonb; receipt jsonb; pair jsonb; pair2 jsonb; request uuid:=gen_random_uuid(); payload jsonb; n numeric; denied boolean;
+ purchase_category uuid:=gen_random_uuid(); category uuid:=gen_random_uuid(); foreign_category uuid:=gen_random_uuid(); batch jsonb; batch_item jsonb; keys text[]:=array['whole_rice','whole_plain','half_rice','half_plain','quarter_rice','quarter_plain']; ix integer; d uuid; d2 uuid; whole_menu uuid:=gen_random_uuid(); v jsonb; c jsonb; h jsonb; receipt jsonb; pair jsonb; pair2 jsonb; request uuid:=gen_random_uuid(); payload jsonb; n numeric; denied boolean;
 begin
  insert into auth.users(id,email,raw_user_meta_data) values
  (owner_id,'restaurant-pos-'||owner_id||'@example.invalid','{"role":"owner","business_type":"restaurant","full_name":"POS fixture","company_name":"POS test","branch_name":"Test branch"}'),
@@ -18,14 +18,18 @@ begin
  insert into public.products(id,restaurant_id,product_id,name,name_ar,is_active) values(p,r,'FOOD-'||p,'Raw chicken','دجاج خام',true);
  insert into public.inventory(id,restaurant_id,branch_id,branch,product_id,product_name,quantity,unit,average_cost) values(stock,r,b,b::text,p::text,'Raw chicken',10,'kg',8);
  perform set_config('request.jwt.claims',jsonb_build_object('sub',owner_id,'role','authenticated')::text,true);
- insert into public.product_categories(id,restaurant_id,branch_id,name,is_active) values(category,r,b,'Chicken',true),(foreign_category,r,other_b,'Other branch',true);
+ insert into public.product_categories(id,restaurant_id,branch_id,name,is_active) values(purchase_category,r,b,'Supplier materials',true);
  set local role authenticated;
+ perform public.erp_restaurant_pos_setup(r,b,'category_save',jsonb_build_object('id',category,'name','Chicken'));
+ perform public.erp_restaurant_pos_setup(r,other_b,'category_save',jsonb_build_object('id',foreign_category,'name','Other branch'));
  perform public.erp_restaurant_pos_setup(r,b,'devices','{"count":2}');
  perform public.erp_restaurant_pos_setup(r,b,'devices','{"count":2}');
  v:=public.erp_restaurant_pos_workspace(r,b,current_date);
  assert jsonb_array_length(v->'devices')=2,'Device creation is not idempotent';
  d:=(v->'devices'->0->>'id')::uuid;d2:=(v->'devices'->1->>'id')::uuid;
  payload:=jsonb_build_object('category_id',category,'id',menu,'option_group','Roast chicken','option_key','half_rice','name','Half chicken with rice','name_ar','نصف دجاج','price',11.5,'tax_rate',15,'stock_mode','recipe','recipe',jsonb_build_array(jsonb_build_object('inventory_id',stock,'quantity',0.25)));
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'menu',payload||jsonb_build_object('category_id',purchase_category));exception when check_violation then denied:=true;end;
+ assert denied,'Purchase category accepted in POS menu';
  denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'menu',payload||jsonb_build_object('product_id',p));exception when check_violation then denied:=true;end;
  assert denied,'Raw material accepted as a dish';
  perform public.erp_restaurant_pos_setup(r,b,'menu',payload);
@@ -76,11 +80,25 @@ begin
   assert (batch_item->'recipe'->0->>'quantity')::numeric=ix*0.1,'Independent recipe lost';
  end loop;
  reset role;
- update public.product_categories set name='Managed chicken renamed' where id=category;
+ update restaurant_pos_private.categories set name='Managed chicken renamed' where id=category;
  select count(*) into n from restaurant_pos_private.menu mm where mm.restaurant_id=r;assert n=8,'Batch retry duplicated dishes';
  set local role authenticated;
  v:=public.erp_restaurant_pos_workspace(r,b,current_date);
  assert v->'menu'->0->>'category'='Managed chicken renamed','POS ignored managed category rename';
+ v:=public.erp_restaurant_pos_setup(r,b,'category_list','{}');
+ assert jsonb_array_length(v->'categories')=1 and v->'categories'->0->>'name'='Managed chicken renamed','POS category list mixed scopes';
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,other_b,'category_save',jsonb_build_object('id',category,'name','Foreign overwrite'));exception when insufficient_privilege then denied:=true;end;
+ assert denied,'Cross-branch category overwrite allowed';
+ perform public.erp_restaurant_pos_setup(r,b,'category_save',jsonb_build_object('id',category,'name','Archived chicken','is_active',false));
+ v:=public.erp_restaurant_pos_catalog(r,b,'');assert jsonb_array_length(v->'categories')=0,'Inactive POS category offered for selection';
+ v:=public.erp_restaurant_pos_setup(r,b,'category_list','{}');assert jsonb_array_length(v->'categories')=1,'Inactive category missing from management';
+ perform public.erp_restaurant_pos_setup(r,b,'category_save',jsonb_build_object('id',category,'name','Managed chicken renamed','is_active',true));
+ reset role;
+ select count(*) into n from public.product_categories pc where pc.restaurant_id=r;assert n=1,'POS category save created purchasing categories';
+ select count(*) into n from public.product_categories pc where pc.id=purchase_category and pc.name='Supplier materials';assert n=1,'POS category edit changed purchasing category';
+ select count(*) into n from public.products pp where pp.restaurant_id=r and pp.restaurant_product_type='menu_item' and pp.category_id is not null;assert n=0,'Menu dishes retained purchasing category links';
+ set local role authenticated;
+
 
  denied:=false;begin perform public.erp_restaurant_pos_setup(r,other_b,'menu',payload);exception when others then denied:=true;end;
  assert denied,'Cross-branch ingredient configuration allowed';
@@ -127,6 +145,7 @@ begin
  set local role authenticated;
  denied:=false;begin update public.daily_sales set restaurant_cash=0 where id=(receipt->>'id')::uuid;exception when insufficient_privilege then denied:=true;end;assert denied,'POS sales editable through legacy closing';
  perform set_config('request.jwt.claims',jsonb_build_object('sub',staff_id,'role','authenticated')::text,true);
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,other_b,'category_save',jsonb_build_object('id',gen_random_uuid(),'name','Employee category'));exception when insufficient_privilege then denied:=true;end;assert denied,'Cashier edited owner sales categories';
  denied:=false;begin perform public.erp_restaurant_cashier_snapshot(d);exception when insufficient_privilege then denied:=true;end;assert denied,'Cross-branch access';
  perform set_config('request.jwt.claims',jsonb_build_object('sub',other_id,'role','authenticated')::text,true);
  denied:=false;begin perform public.erp_restaurant_pos_workspace(r,b,current_date);exception when insufficient_privilege then denied:=true;end;assert denied,'Cross-tenant access';

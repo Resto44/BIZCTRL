@@ -17,6 +17,7 @@ vi.mock('@/components/ui/dialog',()=>({
  DialogDescription:({children})=><p>{children}</p>
 }));
 import RestaurantProductWorkspace from '../src/components/restaurant-pos/RestaurantProductWorkspace.jsx';
+import RestaurantSalesCategories from '../src/components/restaurant-pos/RestaurantSalesCategories.jsx';
 import RestaurantMenuGroupEditor from '../src/components/restaurant-pos/RestaurantMenuGroupEditor.jsx';
 import {Setup} from '../src/pages/restaurant/RestaurantPOS.jsx';
 import {restaurantCopy} from '../src/components/restaurant-pos/copy.js';
@@ -81,6 +82,26 @@ describe('owner serving editor',()=>{
   expect(payload.p_payload.items).toHaveLength(2);
   expect(payload.p_payload.items.find(r=>r.option_key==='half_plain')).toMatchObject({name:'My half plain',price:17.5,recipe:[],stock_mode:'untracked'});
   expect(payload.p_payload.items.find(r=>r.option_key==='whole_rice')).toMatchObject({id:'old',price:40,recipe:[{inventory_id:'stock',quantity:0.5}]});
+  await close();
+ });
+});
+
+describe('separate POS sales category management',()=>{
+ it('lists and saves restaurant POS categories only, without submitting the surrounding menu form',async()=>{
+  fixture.rpc.mockReset();fixture.rpc.mockImplementation(async(name,args)=>({data:args?.p_command==='category_list'?{categories:[{id:'sales-cat',name:'Grills',is_active:true,sort_order:0}]}:{ok:true}}));
+  const saved=vi.fn();
+  const {view,close}=await render(<RestaurantSalesCategories tenant="tenant" branch="branch" lang="en" close={vi.fn()} refresh={vi.fn()} onSaved={saved}/>);
+  expect(fixture.rpc).toHaveBeenCalledWith('erp_restaurant_pos_setup',expect.objectContaining({p_restaurant_id:'tenant',p_branch_id:'branch',p_command:'category_list'}));
+  expect(view.root.findAllByType('strong').some(n=>text(n)==='Grills')).toBe(true);
+  await act(async()=>view.root.findAllByType('button').find(n=>text(n).trim()==='Add sales category').props.onClick());
+  const field=label=>view.root.findAllByType('label').find(n=>text(n).trim()===label).findByType('input');
+  act(()=>field('Category name').props.onChange({target:{value:'Rice dishes'}}));
+  act(()=>field('Arabic name').props.onChange({target:{value:'أطباق الأرز'}}));
+  const stopped=vi.fn();await act(async()=>view.root.findByType('form').props.onSubmit({preventDefault(){},stopPropagation:stopped}));
+  const calls=fixture.rpc.mock.calls.filter(([,args])=>args.p_command==='category_save');expect(calls).toHaveLength(1);
+  expect(calls[0][1]).toMatchObject({p_restaurant_id:'tenant',p_branch_id:'branch',p_payload:{name:'Rice dishes',name_ar:'أطباق الأرز',is_active:true}});
+  expect(stopped).toHaveBeenCalledOnce();expect(saved).toHaveBeenCalledWith(calls[0][1].p_payload.id);
+  expect(fixture.rpc.mock.calls.every(([name])=>name==='erp_restaurant_pos_setup')).toBe(true);
   await close();
  });
 });
