@@ -13,3 +13,5 @@ export function resolveProductImportPortal(organization) {
 export function isSupermarketProductPortal(organization) {
   return SUPERMARKET_PORTALS.has(resolveProductImportPortal(organization));
 }
+
+export const isRestaurantPOSPortal = organization => ['restaurant', 'cafe'].includes(resolveProductImportPortal(organization));

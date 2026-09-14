@@ -25,7 +25,8 @@ describe('production audit remediation contract', () => {
     expect(navigation).toContain('const permission = MORE_PERMISSION_BY_PATH[item.path];');
     expect(navigation).toContain("'/retail/cashier': 'uploadSales'");
     expect(navigation).toContain("return (item.path !== '/retail/cashier' || supermarket) && (!permission || can[permission]) && !hidden.has(item.path) && isWorkspacePathEnabled(configuration, item.path);");
-    expect(navigation).toContain('}, [baseMoreSections, baseNav, can, configuration, supermarket]);');
+    expect(navigation).toContain("if (item.path === '/restaurant/pos' && !restaurant) return false;");
+    expect(navigation).toContain('}, [baseMoreSections, baseNav, can, configuration, supermarket, restaurant]);');
   });
 
   it('renders the compact More and Control workspace with real scoped metrics and permanent quick actions', async () => {

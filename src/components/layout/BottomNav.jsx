@@ -27,6 +27,7 @@ import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import { useTenant } from '@/lib/TenantContext';
 import { isWorkspacePathEnabled } from '@/lib/workspaceCustomization';
 import { isSupermarketProductPortal } from '@/lib/productImportAccess';
+import { isRestaurantPOSPortal } from '@/lib/productImportAccess';
 
 // ── Primary Nav by Role + Mode ────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ const PRIMARY_NAV_CUSTOMER = [];
 // Route guards and RLS remain authoritative; this prevents navigation to pages a role
 // cannot use in the first place, especially when General Manager shares Owner sections.
 const MORE_PERMISSION_BY_PATH = {
+  '/restaurant/pos': 'viewSales',
   '/erp-approval-center': 'manageSettings',
   '/cash-register': 'viewSales',
   '/sales/invoices': 'viewSales',
@@ -124,6 +126,7 @@ const MORE_PERMISSION_BY_PATH = {
 // ── More Menu Sections ────────────────────────────────────────────────────────
 
 const MORE_SECTIONS_OWNER_RESTAURANT = [
+  { title: 'Restaurant POS', items: [{ path: '/restaurant/pos', icon: ScanLine, labelKey: 'restaurant_pos' }] },
   {
     title: 'Approvals',
     items: [
@@ -241,6 +244,7 @@ const MORE_SECTIONS_OWNER_RETAIL = [
 ];
 
 const MORE_SECTIONS_MANAGER_RESTAURANT = [
+  { title: 'Restaurant POS', items: [{ path: '/restaurant/pos', icon: ScanLine, labelKey: 'restaurant_pos' }] },
   {
     title: 'Operations',
     items: [
@@ -597,11 +601,12 @@ const BottomNav = memo(function BottomNav() {
   const { isRetailLike } = useBusinessMode();
   const { activeRestaurant } = useTenant();
   const supermarket = isSupermarketProductPortal(activeRestaurant);
+  const restaurant = isRestaurantPOSPortal(activeRestaurant);
   const { configuration } = useWorkspaceCustomization();
   const [showMore, setShowMore] = useState(false);
 
   const { visibleNav: baseNav, moreSections: baseMoreSections } = useMemo(() => {
-    if (role === ROLES.EMPLOYEE) return { visibleNav: [...PRIMARY_NAV_EMPLOYEE, ...(supermarket && can.uploadSales ? [{ path: '/retail/cashier', icon: ScanLine, labelKey: 'cashier_workspace' }] : [])], moreSections: [] };
+    if (role === ROLES.EMPLOYEE) return { visibleNav: [...PRIMARY_NAV_EMPLOYEE, ...(restaurant && can.viewSales ? [{ path: '/restaurant/pos', icon: ScanLine, labelKey: 'restaurant_pos' }] : []), ...(supermarket && can.uploadSales ? [{ path: '/retail/cashier', icon: ScanLine, labelKey: 'cashier_workspace' }] : [])], moreSections: [] };
     if (role === ROLES.SPONSOR) return { visibleNav: PRIMARY_NAV_SPONSOR, moreSections: [] };
     if (role === ROLES.CUSTOMER) return { visibleNav: PRIMARY_NAV_CUSTOMER, moreSections: [] };
     if (role === ROLES.SUPPLIER) return { visibleNav: [
@@ -619,7 +624,7 @@ const BottomNav = memo(function BottomNav() {
     return isRetailLike
       ? { visibleNav: PRIMARY_NAV_OWNER_RETAIL, moreSections: MORE_SECTIONS_OWNER_RETAIL }
       : { visibleNav: PRIMARY_NAV_OWNER_RESTAURANT, moreSections: MORE_SECTIONS_OWNER_RESTAURANT };
-  }, [role, isRetailLike, can.uploadSales, supermarket]);
+  }, [role, isRetailLike, can.uploadSales, can.viewSales, supermarket, restaurant]);
 
   const { visibleNav, moreSections } = useMemo(() => {
     const hidden = new Set(configuration?.navigation?.hidden_paths || []);
@@ -633,6 +638,7 @@ const BottomNav = memo(function BottomNav() {
         ...section,
         items: section.items
           .filter((item) => {
+            if (item.path === '/restaurant/pos' && !restaurant) return false;
             const permission = MORE_PERMISSION_BY_PATH[item.path];
             return (item.path !== '/retail/cashier' || supermarket) && (!permission || can[permission]) && !hidden.has(item.path) && isWorkspacePathEnabled(configuration, item.path);
           })
@@ -640,7 +646,7 @@ const BottomNav = memo(function BottomNav() {
       }))
       .filter((section) => section.items.length > 0);
     return { visibleNav, moreSections };
-  }, [baseMoreSections, baseNav, can, configuration, supermarket]);
+  }, [baseMoreSections, baseNav, can, configuration, supermarket, restaurant]);
 
   return (
     <>

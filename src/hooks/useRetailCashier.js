@@ -3,7 +3,7 @@ import { supabase } from '@/api/supabaseClient';
 import { cashierRpc, isDefiniteRejection } from '@/lib/retailCashier';
 import { subscribeCashierBroadcast } from '@/lib/cashierBroadcast';
 
-export function useRetailCashier(deviceId, scope, active = true) {
+export function useRetailCashier(deviceId, scope, active = true, rpc = cashierRpc) {
   const storageKey = `cashier-pending:${scope}:${deviceId}`;
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState(null);
@@ -33,17 +33,17 @@ export function useRetailCashier(deviceId, scope, active = true) {
     fetching.current = true;
     const version = generation.current;
     try {
-      const data = await cashierRpc('cashier_snapshot', { p_device_id: deviceId });
+      const data = await rpc('cashier_snapshot', { p_device_id: deviceId });
       if (version === generation.current && !inFlight.current) apply(data);
       if (mounted.current) setConnected(true);
     } catch (e) {
       if (mounted.current) { setConnected(false); setError(e.message); if (e.code === '42501') { current.current = null; setSnapshot(null); } }
     } finally { fetching.current = false; }
-  }, [apply, deviceId]);
+  }, [apply, deviceId, rpc]);
   const execute = useCallback(async request => {
     savePending(request);
     try {
-      const data = await cashierRpc('cashier_command', { p_device_id: deviceId, p_command: request.command, p_payload: request.payload, p_request_id: request.id });
+      const data = await rpc('cashier_command', { p_device_id: deviceId, p_command: request.command, p_payload: request.payload, p_request_id: request.id });
       savePending(null); apply(data);
       if (mounted.current) { setError(null); setConnected(true); }
       return data;
@@ -52,7 +52,7 @@ export function useRetailCashier(deviceId, scope, active = true) {
       if (mounted.current) { setError(e.message || 'Connection interrupted'); if (!isDefiniteRejection(e)) setConnected(false); }
       throw e;
     }
-  }, [apply, deviceId, savePending]);
+  }, [apply, deviceId, rpc, savePending]);
   const command = useCallback((name, payload = {}) => {
     inFlight.current++; generation.current++;
     if (mounted.current) setBusy(inFlight.current);

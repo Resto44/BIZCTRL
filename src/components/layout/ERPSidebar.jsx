@@ -37,9 +37,13 @@ import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import { getCustomizedNavigationGroups } from '@/lib/workspaceCustomization';
 import LogoutButton from './LogoutButton';
 import { isSupermarketProductPortal } from '@/lib/productImportAccess';
+import { isRestaurantPOSPortal } from '@/lib/productImportAccess';
 
 // ─── Nav groups definition ────────────────────────────────────────────────────
 export const ERP_NAV_GROUPS = [
+  { key: 'restaurant-pos', label: 'Restaurant POS', restaurantOnly: true, items: [
+    { path: '/restaurant/pos', label: 'Restaurant POS', icon: MonitorSmartphone, permission: 'viewSales' },
+  ] },
   {
     key: 'overview',
     label: 'Overview',
@@ -694,7 +698,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
   const { configuration } = useWorkspaceCustomization();
   const navigationGroups = useMemo(
     () => getCustomizedNavigationGroups(
-      ERP_NAV_GROUPS.filter((group) => (!group.supermarketOnly || isSupermarketProductPortal(activeRestaurant)) && !(group.key === 'inventory' && isSupermarketProductPortal(activeRestaurant))),
+      ERP_NAV_GROUPS.filter((group) => (!group.restaurantOnly || isRestaurantPOSPortal(activeRestaurant)) && (!group.supermarketOnly || isSupermarketProductPortal(activeRestaurant)) && !(group.key === 'inventory' && isSupermarketProductPortal(activeRestaurant))),
       configuration,
     ),
     [activeRestaurant, configuration],

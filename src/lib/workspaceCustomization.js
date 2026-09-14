@@ -8,7 +8,7 @@ export const BUSINESS_TEMPLATE_KEYS = Object.freeze([
 export const WORKSPACE_MODULE_CATALOG = Object.freeze([
   { key: 'dashboard', label: 'Dashboard', group: 'Core', required: true, paths: ['/owner-command-center', '/executive-command-center', '/manager-dashboard', '/gm-dashboard', '/dashboard', '/branch-command-center'] },
   { key: 'sales', label: 'Sales & customers', group: 'Operations', paths: ['/sales', '/sales-sources', '/sales-source-management', '/sales/invoices', '/sales-closing-customization', '/promotions'] },
-  { key: 'cash_register', label: 'Cash register', group: 'Operations', paths: ['/cash-register'] },
+  { key: 'cash_register', label: 'Cash register', group: 'Operations', paths: ['/cash-register', '/restaurant/pos'] },
   { key: 'purchase', label: 'Purchases', group: 'Operations', paths: ['/purchases', '/purchase-orders', '/procurement-dashboard', '/enterprise-purchases'] },
   { key: 'expenses', label: 'Expenses', group: 'Finance', paths: ['/expenses'] },
   { key: 'inventory', label: 'Inventory', group: 'Inventory', paths: ['/inventory', '/inventory-transfers', '/inventory-waste', '/inventory-forecast', '/inventory-command-center'] },
