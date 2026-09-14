@@ -1,3 +1,4 @@
+import { restaurantMaterialFilter } from '@/lib/restaurantProducts';
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -56,11 +57,11 @@ const UI = {
 export default function PurchaseForm({ initial, onSubmit, onCancel }) {
   const { lang, currency } = useLanguage();
   const u = UI[lang] || UI.en;
-  const { managerBranch, branches } = useTenant();
+  const { managerBranch, branches, activeRestaurant, activeRestaurantId } = useTenant();
 
   const { data: products = [] } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => base44.entities.Product.list('name', 10000),
+    queryKey: ['products', activeRestaurantId, 'purchase-materials'],
+    queryFn: () => base44.entities.Product.filter({ restaurant_id: activeRestaurantId, ...restaurantMaterialFilter(activeRestaurant) }, 'name', 10000), enabled: Boolean(activeRestaurantId),
   });
 
   const { options: categoryOptions, isLoading: loadingCats } = usePurchaseCategories();

@@ -2,7 +2,7 @@
 begin;
 do $$
 declare owner_id uuid:=gen_random_uuid(); other_id uuid:=gen_random_uuid(); staff_id uuid:=gen_random_uuid();
- r uuid; b uuid; other_b uuid:=gen_random_uuid(); p uuid:=gen_random_uuid(); stock uuid:=gen_random_uuid(); menu uuid:=gen_random_uuid();
+ r uuid; b uuid; other_b uuid:=gen_random_uuid(); p uuid:=gen_random_uuid(); dish uuid; stock uuid:=gen_random_uuid(); menu uuid:=gen_random_uuid();
  d uuid; d2 uuid; v jsonb; c jsonb; h jsonb; receipt jsonb; pair jsonb; pair2 jsonb; request uuid:=gen_random_uuid(); payload jsonb; n numeric; denied boolean;
 begin
  insert into auth.users(id,email,raw_user_meta_data) values
@@ -15,7 +15,7 @@ begin
  perform set_config('request.jwt.claims',jsonb_build_object('sub',owner_id,'role','authenticated')::text,true);
  insert into public.branches(id,restaurant_id,branch_key,name) values(other_b,r,other_b::text,'Second branch');
  update public.erp_memberships set restaurant_id=r,branch_id=other_b,role='employee',permissions='{"viewSales":true,"uploadSales":true,"viewOrders":true}' where user_id=staff_id;
- insert into public.products(id,restaurant_id,product_id,name,name_ar,is_active) values(p,r,'FOOD-'||p,'Half chicken','نصف دجاج',true);
+ insert into public.products(id,restaurant_id,product_id,name,name_ar,is_active) values(p,r,'FOOD-'||p,'Raw chicken','دجاج خام',true);
  insert into public.inventory(id,restaurant_id,branch_id,branch,product_id,product_name,quantity,unit,average_cost) values(stock,r,b,b::text,p::text,'Raw chicken',10,'kg',8);
  perform set_config('request.jwt.claims',jsonb_build_object('sub',owner_id,'role','authenticated')::text,true);
  set local role authenticated;
@@ -24,8 +24,25 @@ begin
  v:=public.erp_restaurant_pos_workspace(r,b,current_date);
  assert jsonb_array_length(v->'devices')=2,'Device creation is not idempotent';
  d:=(v->'devices'->0->>'id')::uuid;d2:=(v->'devices'->1->>'id')::uuid;
- payload:=jsonb_build_object('id',menu,'product_id',p,'name','Half chicken','name_ar','نصف دجاج','price',11.5,'tax_rate',15,'stock_mode','recipe','recipe',jsonb_build_array(jsonb_build_object('inventory_id',stock,'quantity',0.25)));
+ payload:=jsonb_build_object('id',menu,'name','Half chicken','name_ar','نصف دجاج','price',11.5,'tax_rate',15,'stock_mode','recipe','recipe',jsonb_build_array(jsonb_build_object('inventory_id',stock,'quantity',0.25)));
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'menu',payload||jsonb_build_object('product_id',p));exception when check_violation then denied:=true;end;
+ assert denied,'Raw material accepted as a dish';
  perform public.erp_restaurant_pos_setup(r,b,'menu',payload);
+ perform public.erp_restaurant_pos_setup(r,b,'menu',payload);
+ reset role;
+ select product_id into dish from restaurant_pos_private.menu where id=menu;
+ assert dish<>p,'Dish and material share identity';
+ select count(*) into n from public.products where restaurant_id=r and restaurant_product_type='menu_item';
+ assert n=1,'Menu retry created duplicate products';
+ denied:=false;begin insert into public.inventory(restaurant_id,branch_id,product_id) values(r,b,dish::text);exception when check_violation then denied:=true;end;
+ assert denied,'Menu dish accepted into raw inventory';
+ denied:=false;begin insert into public.purchases(restaurant_id,branch_id,product_id) values(r,b,dish::text);exception when check_violation then denied:=true;end;
+ assert denied,'Menu dish accepted in supplier purchasing';
+ denied:=false;begin update public.products set restaurant_product_type='menu_item' where id=p;exception when check_violation then denied:=true;end;
+ assert denied,'Material retyped despite stock references';
+ set local role authenticated;
+ v:=public.erp_restaurant_pos_catalog(r,b,'');
+ assert jsonb_array_length(v->'menu')=1 and jsonb_array_length(v->'inventory')=1,'Separated catalog missing dishes or ingredients';
  denied:=false;begin perform public.erp_restaurant_pos_setup(r,other_b,'menu',payload);exception when others then denied:=true;end;
  assert denied,'Cross-branch ingredient configuration allowed';
  v:=public.erp_restaurant_cashier_command(d,'open_shift','{"cashier_name":"Fixture","opening_cash":100}',gen_random_uuid());

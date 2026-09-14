@@ -1,3 +1,4 @@
+import { restaurantMaterialFilter } from '@/lib/restaurantProducts';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useTenant } from '@/lib/TenantContext';
@@ -10,15 +11,16 @@ import { useTenant } from '@/lib/TenantContext';
  * are not yet mapped to it (subcategory_id is NULL on Product record).
  */
 export function usePurchaseProductsByCategory(productCategoryId, supplierId, subcategoryId) {
-  const { activeRestaurantId } = useTenant();
+  const { activeRestaurantId, activeRestaurant } = useTenant();
 
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ['purchase_products_filtered', productCategoryId, supplierId, subcategoryId, activeRestaurantId],
+    queryKey: ['purchase_products_filtered', productCategoryId, supplierId, subcategoryId, activeRestaurantId, activeRestaurant?.business_type, activeRestaurant?.business_mode],
     queryFn: async () => {
       // If no category or supplier, return empty
-      if (!productCategoryId && !supplierId) return [];
+      if (!activeRestaurantId || (!productCategoryId && !supplierId)) return [];
 
       const filter = {
+        ...restaurantMaterialFilter(activeRestaurant),
         ...(activeRestaurantId && { restaurant_id: activeRestaurantId }),
         ...(supplierId && { supplier_id: supplierId }),
       };
@@ -49,7 +51,7 @@ export function usePurchaseProductsByCategory(productCategoryId, supplierId, sub
 
       return base44.entities.Product.filter(filter, 'name', 1000);
     },
-    enabled: !!(productCategoryId || supplierId),
+    enabled: !!activeRestaurantId && !!(productCategoryId || supplierId),
     staleTime: 30000,
   });
 

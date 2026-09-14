@@ -30,7 +30,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { buildProductControlSnapshot, productIdentity } from '@/lib/productControlCenter';
 import useProductPriceRules from '@/hooks/useProductPriceRules';
 import { getProductCatalogCounts, setBranchProductAssortment } from '@/lib/productCatalogRepository';
-import { isSupermarketProductPortal } from '@/lib/productImportAccess';
+import RestaurantProductWorkspace, { RawMaterialCatalog } from '@/components/restaurant-pos/RestaurantProductWorkspace';
+import { restaurantMaterialFilter } from '@/lib/restaurantProducts';
+import { isRestaurantPOSPortal, isSupermarketProductPortal } from '@/lib/productImportAccess';
 
 const PRODUCT_QUERY_LIMIT = 2_000;
 
@@ -52,6 +54,13 @@ function ProductDialog({ open, onOpenChange, title, children }) {
 }
 
 export default function ProductManagement() {
+ const {activeRestaurant}=useTenant();
+ return isRestaurantPOSPortal(activeRestaurant)
+  ? <RestaurantProductWorkspace key={activeRestaurant.id} rawMaterials={<GeneralProductManagement/>}/>
+  : <GeneralProductManagement/>;
+}
+
+function GeneralProductManagement() {
   const { activeRestaurant, branches = [] } = useTenant();
   const { role } = useRole();
   const { formatMoney } = useLanguage();
@@ -60,6 +69,7 @@ export default function ProductManagement() {
   const queryClient = useQueryClient();
   const restaurantId = activeRestaurant?.id || null;
   const canImportProductSpreadsheet = isSupermarketProductPortal(activeRestaurant);
+  const restaurantPortal = isRestaurantPOSPortal(activeRestaurant);
   const canDeleteProducts = canImportProductSpreadsheet && role === ROLES.OWNER;
 
   const [selectedLocation, setSelectedLocation] = useState('all');
@@ -77,8 +87,8 @@ export default function ProductManagement() {
     : branches.find((branch) => String(branch.id || branch.key || branch.branch_key) === selectedLocation) || null;
 
   const productsQuery = useQuery({
-    queryKey: ['products', restaurantId],
-    queryFn: () => base44.entities.Product.filter({ restaurant_id: restaurantId }, '-created_date', PRODUCT_QUERY_LIMIT),
+    queryKey: ['products', restaurantId, restaurantPortal ? 'raw' : 'all'],
+    queryFn: () => base44.entities.Product.filter({ restaurant_id: restaurantId, ...restaurantMaterialFilter(activeRestaurant) }, '-created_date', PRODUCT_QUERY_LIMIT),
     enabled: Boolean(restaurantId),
     staleTime: 30_000,
   });
@@ -137,7 +147,7 @@ export default function ProductManagement() {
   const catalogCountsQuery = useQuery({
     queryKey: ['erp-master-catalog-counts', restaurantId, selectedBranch?.id || null],
     queryFn: () => getProductCatalogCounts({ restaurantId, branchId: selectedBranch?.id || null }),
-    enabled: Boolean(restaurantId),
+    enabled: Boolean(restaurantId) && !restaurantPortal,
     staleTime: 20_000,
   });
 
@@ -163,7 +173,7 @@ export default function ProductManagement() {
     priceRules: priceControl.rules,
   }), [products, scopedInventory, scopedBranches, scopedAnalytics, scopedPriceHistory, priceControl.rules]);
   const snapshot = useMemo(() => {
-    const counts = catalogCountsQuery.data;
+    const counts = restaurantPortal ? null : catalogCountsQuery.data;
     if (!counts) return calculatedSnapshot;
     const lowStock = Number(counts.low_stock || 0);
     const outOfStock = Number(counts.out_of_stock || 0);
@@ -178,7 +188,7 @@ export default function ProductManagement() {
       healthy: Math.max(0, activeProducts - lowStock - outOfStock),
       inventoryValue: Number(counts.inventory_value || 0),
     };
-  }, [calculatedSnapshot, catalogCountsQuery.data]);
+  }, [calculatedSnapshot, catalogCountsQuery.data, restaurantPortal]);
 
   const invalidateProductData = async () => Promise.all([
     queryClient.invalidateQueries({ queryKey: ['retail-inventory'] }),
@@ -221,7 +231,7 @@ export default function ProductManagement() {
       const product = await base44.entities.Product.create({ ...productData, restaurant_id: restaurantId });
       const inventoryErrors = await syncInventoryRows({ product, rows: _inventoryRows, enabled: _inventoryEnabled });
       let assortmentError = null;
-      if (selectedBranch?.id) {
+      if (canImportProductSpreadsheet && selectedBranch?.id) {
         try {
           await setBranchProductAssortment({ restaurantId, branchId: selectedBranch.id, productIds: [product.id], active: true });
         } catch (error) {
@@ -279,7 +289,7 @@ export default function ProductManagement() {
     await Promise.all([
       productsQuery.refetch(), categoriesQuery.refetch(), inventoryQuery.refetch(),
       transactionQuery.refetch(), analyticsQuery.refetch(), suppliersQuery.refetch(),
-      priceHistoryQuery.refetch(), catalogCountsQuery.refetch(),
+      priceHistoryQuery.refetch(), ...(!restaurantPortal ? [catalogCountsQuery.refetch()] : []),
     ]);
     toast.success('Product control center refreshed.');
   };
@@ -303,6 +313,8 @@ export default function ProductManagement() {
     <>
       <ProductMasterWorkspace
         restaurantId={restaurantId}
+        restaurantPortal={restaurantPortal}
+        catalogContent={restaurantPortal ? <RawMaterialCatalog products={products} onEdit={setEditing} onAdd={() => setShowCreate(true)} onManageCategories={() => setShowCategories(true)} onManageUnits={() => setShowUnits(true)} money={formatMoney}/> : null}
         snapshot={snapshot}
         categories={categories}
         transactions={transactions}

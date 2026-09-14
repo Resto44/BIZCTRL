@@ -494,6 +494,8 @@ const PricingPage = memo(function PricingPage({ snapshot, suppliers, transaction
 
 export default function ProductMasterWorkspace({
   restaurantId,
+  restaurantPortal = false,
+  catalogContent = null,
   snapshot,
   categories,
   transactions,
@@ -538,8 +540,8 @@ export default function ProductMasterWorkspace({
                 <PackageCheck className="h-6 w-6" aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-xl font-black tracking-tight text-slate-950 dark:text-white sm:text-2xl">Master Product Management</h1>
-                <p className="truncate text-sm text-slate-500 dark:text-slate-400">Universal product, service, inventory and pricing control</p>
+                <h1 className="truncate text-xl font-black tracking-tight text-slate-950 dark:text-white sm:text-2xl">{restaurantPortal ? 'Raw materials & purchases' : 'Master Product Management'}</h1>
+                <p className="truncate text-sm text-slate-500 dark:text-slate-400">{restaurantPortal ? 'Supplier materials, stock and purchasing' : 'Universal product, service, inventory and pricing control'}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -549,7 +551,7 @@ export default function ProductMasterWorkspace({
           </div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <div className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"><Building2 className="h-4 w-4 text-blue-600" /><span className="truncate">All Business Types</span></div>
+            <div className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"><Building2 className="h-4 w-4 text-blue-600" /><span className="truncate">{restaurantPortal ? 'Restaurant · Raw materials' : 'All Business Types'}</span></div>
             <Select value={selectedLocation} onValueChange={onSelectedLocationChange}>
               <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white px-3 text-sm font-semibold shadow-sm dark:border-slate-800 dark:bg-slate-950">
                 <div className="flex min-w-0 items-center gap-2"><MapPin className="h-4 w-4 shrink-0 text-blue-600" /><SelectValue placeholder="All Locations" /></div>
@@ -575,7 +577,7 @@ export default function ProductMasterWorkspace({
       </header>
 
       {activePage === 'overview' ? <OverviewPage snapshot={snapshot} money={money} onAdd={onAdd} onImport={openCatalogImport} onBarcode={onBarcode} onNavigate={onNavigate} onChangePage={setActivePage} canImportProductSpreadsheet={canImportProductSpreadsheet} /> : null}
-      {activePage === 'catalog' ? <EnterpriseProductCatalog restaurantId={restaurantId} branches={branches} selectedLocation={selectedLocation} categories={categories} money={money} onAdd={onAdd} onEdit={onEdit} onBarcode={onBarcode} onDelete={onDelete} onNavigate={onNavigate} onManageCategories={onManageCategories} onManageUnits={onManageUnits} onDataChanged={onDataChanged} openImportSignal={catalogImportSignal} canImportProductSpreadsheet={canImportProductSpreadsheet} canDeleteProducts={canDeleteProducts} /> : null}
+      {activePage === 'catalog' ? (catalogContent || <EnterpriseProductCatalog restaurantId={restaurantId} branches={branches} selectedLocation={selectedLocation} categories={categories} money={money} onAdd={onAdd} onEdit={onEdit} onBarcode={onBarcode} onDelete={onDelete} onNavigate={onNavigate} onManageCategories={onManageCategories} onManageUnits={onManageUnits} onDataChanged={onDataChanged} openImportSignal={catalogImportSignal} canImportProductSpreadsheet={canImportProductSpreadsheet} canDeleteProducts={canDeleteProducts} />) : null}
       {activePage === 'inventory' ? <InventoryPage snapshot={snapshot} transactions={transactions} branches={branches} selectedLocation={selectedLocation} money={money} onAdjust={onAdjust} onNavigate={onNavigate} /> : null}
       {activePage === 'pricing' ? <PricingPage snapshot={snapshot} suppliers={suppliers} transactions={transactions} rules={priceRules} setRules={setPriceRules} saveRules={savePriceRules} savingRules={savingPriceRules} money={money} onReview={onEdit} onNavigate={onNavigate} /> : null}
     </div>

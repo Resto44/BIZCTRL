@@ -1,3 +1,4 @@
+import { restaurantMaterialFilter } from '@/lib/restaurantProducts';
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -69,8 +70,8 @@ export default function Inventory() {
     enabled: Boolean(activeRestaurant?.id),
   });
   const { data: products = [] } = useQuery({
-    queryKey: ['products', activeRestaurant?.id, selectedBranchId],
-    queryFn: () => base44.entities.Product.filter({ restaurant_id: activeRestaurant.id }, 'name', 500),
+    queryKey: ['products', activeRestaurant?.id, selectedBranchId, 'inventory-materials'],
+    queryFn: () => base44.entities.Product.filter({ restaurant_id: activeRestaurant.id, ...restaurantMaterialFilter(activeRestaurant) }, 'name', 500),
     enabled: Boolean(activeRestaurant?.id),
   });
   const { data: purchases = [] } = useQuery({
