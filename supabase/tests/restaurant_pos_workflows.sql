@@ -3,7 +3,7 @@ begin;
 do $$
 declare owner_id uuid:=gen_random_uuid(); other_id uuid:=gen_random_uuid(); staff_id uuid:=gen_random_uuid();
  r uuid; b uuid; other_b uuid:=gen_random_uuid(); p uuid:=gen_random_uuid(); dish uuid; stock uuid:=gen_random_uuid(); menu uuid:=gen_random_uuid();
- d uuid; d2 uuid; whole_menu uuid:=gen_random_uuid(); v jsonb; c jsonb; h jsonb; receipt jsonb; pair jsonb; pair2 jsonb; request uuid:=gen_random_uuid(); payload jsonb; n numeric; denied boolean;
+ category uuid:=gen_random_uuid(); foreign_category uuid:=gen_random_uuid(); batch jsonb; batch_item jsonb; keys text[]:=array['whole_rice','whole_plain','half_rice','half_plain','quarter_rice','quarter_plain']; ix integer; d uuid; d2 uuid; whole_menu uuid:=gen_random_uuid(); v jsonb; c jsonb; h jsonb; receipt jsonb; pair jsonb; pair2 jsonb; request uuid:=gen_random_uuid(); payload jsonb; n numeric; denied boolean;
 begin
  insert into auth.users(id,email,raw_user_meta_data) values
  (owner_id,'restaurant-pos-'||owner_id||'@example.invalid','{"role":"owner","business_type":"restaurant","full_name":"POS fixture","company_name":"POS test","branch_name":"Test branch"}'),
@@ -18,13 +18,14 @@ begin
  insert into public.products(id,restaurant_id,product_id,name,name_ar,is_active) values(p,r,'FOOD-'||p,'Raw chicken','دجاج خام',true);
  insert into public.inventory(id,restaurant_id,branch_id,branch,product_id,product_name,quantity,unit,average_cost) values(stock,r,b,b::text,p::text,'Raw chicken',10,'kg',8);
  perform set_config('request.jwt.claims',jsonb_build_object('sub',owner_id,'role','authenticated')::text,true);
+ insert into public.product_categories(id,restaurant_id,branch_id,name,is_active) values(category,r,b,'Chicken',true),(foreign_category,r,other_b,'Other branch',true);
  set local role authenticated;
  perform public.erp_restaurant_pos_setup(r,b,'devices','{"count":2}');
  perform public.erp_restaurant_pos_setup(r,b,'devices','{"count":2}');
  v:=public.erp_restaurant_pos_workspace(r,b,current_date);
  assert jsonb_array_length(v->'devices')=2,'Device creation is not idempotent';
  d:=(v->'devices'->0->>'id')::uuid;d2:=(v->'devices'->1->>'id')::uuid;
- payload:=jsonb_build_object('id',menu,'option_group','Roast chicken','option_key','half_rice','name','Half chicken with rice','name_ar','نصف دجاج','price',11.5,'tax_rate',15,'stock_mode','recipe','recipe',jsonb_build_array(jsonb_build_object('inventory_id',stock,'quantity',0.25)));
+ payload:=jsonb_build_object('category_id',category,'id',menu,'option_group','Roast chicken','option_key','half_rice','name','Half chicken with rice','name_ar','نصف دجاج','price',11.5,'tax_rate',15,'stock_mode','recipe','recipe',jsonb_build_array(jsonb_build_object('inventory_id',stock,'quantity',0.25)));
  denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'menu',payload||jsonb_build_object('product_id',p));exception when check_violation then denied:=true;end;
  assert denied,'Raw material accepted as a dish';
  perform public.erp_restaurant_pos_setup(r,b,'menu',payload);
@@ -51,6 +52,35 @@ begin
  perform public.erp_restaurant_pos_setup(r,b,'menu',payload||jsonb_build_object('id',whole_menu,'option_key','whole_rice','name','Whole chicken with rice','name_ar','حبة شواية مع الرز','price',40,'recipe',jsonb_build_array(jsonb_build_object('inventory_id',stock,'quantity',0.5))));
  v:=public.erp_restaurant_pos_workspace(r,b,current_date);
  assert jsonb_array_length(v->'menu')=2,'Grouped choices missing from POS workspace';
+
+ -- Owner-defined six-choice batch is atomic, idempotent and scoped to managed categories.
+ batch:='[]'::jsonb;
+ for ix in 1..6 loop
+  batch:=batch||jsonb_build_array(jsonb_build_object('id',gen_random_uuid(),'option_key',keys[ix],'name','Owner choice '||ix,'price',10+ix,'tax_rate',0,'stock_mode','recipe','recipe',jsonb_build_array(jsonb_build_object('inventory_id',stock,'quantity',ix*0.1))));
+ end loop;
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'menu_batch',jsonb_build_object('option_group','Batch fixture','category_id',foreign_category,'items',batch));exception when check_violation then denied:=true;end;
+ assert denied,'Other branch category accepted';
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'menu_batch',jsonb_build_object('option_group','Batch fixture','category_id',category,'items',jsonb_set(batch,'{5,price}','0')));exception when check_violation then denied:=true;end;
+ assert denied,'Invalid batch price accepted';
+ reset role;
+ select count(*) into n from restaurant_pos_private.menu mm where mm.restaurant_id=r;assert n=2,'Invalid batch partially saved';
+ select count(*) into n from public.products pp where pp.restaurant_id=r and pp.restaurant_product_type='menu_item';assert n=2,'Failed batch leaked products';
+ set local role authenticated;
+ perform public.erp_restaurant_pos_setup(r,b,'menu_batch',jsonb_build_object('option_group','Batch fixture','category_id',category,'items',batch));
+ perform public.erp_restaurant_pos_setup(r,b,'menu_batch',jsonb_build_object('option_group','Batch fixture','category_id',category,'items',batch));
+ v:=public.erp_restaurant_pos_catalog(r,b,'');
+ assert jsonb_array_length(v->'categories')=1,'Catalog leaked other branch categories';
+ for ix in 1..6 loop
+  select value into batch_item from jsonb_array_elements(v->'menu') where value->>'id'=batch->(ix-1)->>'id';
+  assert (batch_item->>'price')::numeric=10+ix and batch_item->>'name'='Owner choice '||ix,'Independent name/price lost';
+  assert (batch_item->'recipe'->0->>'quantity')::numeric=ix*0.1,'Independent recipe lost';
+ end loop;
+ reset role;
+ update public.product_categories set name='Managed chicken renamed' where id=category;
+ select count(*) into n from restaurant_pos_private.menu mm where mm.restaurant_id=r;assert n=8,'Batch retry duplicated dishes';
+ set local role authenticated;
+ v:=public.erp_restaurant_pos_workspace(r,b,current_date);
+ assert v->'menu'->0->>'category'='Managed chicken renamed','POS ignored managed category rename';
 
  denied:=false;begin perform public.erp_restaurant_pos_setup(r,other_b,'menu',payload);exception when others then denied:=true;end;
  assert denied,'Cross-branch ingredient configuration allowed';
