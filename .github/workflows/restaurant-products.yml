@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: npm
-      - run: npm ci
-      - run: npx vitest run tests/restaurantPOS.test.jsx tests/restaurantProducts.test.jsx
-      - run: npm run build
+      - run: npm install --global pnpm@11.19.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run tests/restaurantPOS.test.jsx tests/restaurantProducts.test.jsx
+      - run: pnpm run build

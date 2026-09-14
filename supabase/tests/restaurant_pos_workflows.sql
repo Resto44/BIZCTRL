@@ -30,7 +30,7 @@ begin
  perform public.erp_restaurant_pos_setup(r,b,'menu',payload);
  perform public.erp_restaurant_pos_setup(r,b,'menu',payload);
  reset role;
- select product_id into dish from restaurant_pos_private.menu where id=menu;
+ select product_id into dish from restaurant_pos_private.menu mm where mm.id=menu;
  assert dish<>p,'Dish and material share identity';
  select count(*) into n from public.products where restaurant_id=r and restaurant_product_type='menu_item';
  assert n=1,'Menu retry created duplicate products';
