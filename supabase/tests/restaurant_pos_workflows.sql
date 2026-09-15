@@ -22,8 +22,11 @@ begin
  set local role authenticated;
  perform public.erp_restaurant_pos_setup(r,b,'category_save',jsonb_build_object('id',category,'name','Chicken'));
  perform public.erp_restaurant_pos_setup(r,other_b,'category_save',jsonb_build_object('id',foreign_category,'name','Other branch'));
- perform public.erp_restaurant_pos_setup(r,b,'devices','{"count":2}');
- perform public.erp_restaurant_pos_setup(r,b,'devices','{"count":2}');
+ d:=gen_random_uuid();d2:=gen_random_uuid();
+ perform public.erp_restaurant_pos_setup(r,b,'device_save',jsonb_build_object('id',d,'code','Front counter'));
+ perform public.erp_restaurant_pos_setup(r,b,'device_save',jsonb_build_object('id',d2,'code','Takeaway'));
+ perform public.erp_restaurant_pos_setup(r,b,'device_save',jsonb_build_object('id',d,'code','Front counter'));
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'devices','{"count":10}');exception when check_violation then denied:=true;end;assert denied,'Bulk test devices still enabled';
  v:=public.erp_restaurant_pos_workspace(r,b,current_date);
  assert jsonb_array_length(v->'devices')=2,'Device creation is not idempotent';
  d:=(v->'devices'->0->>'id')::uuid;d2:=(v->'devices'->1->>'id')::uuid;
@@ -100,6 +103,24 @@ begin
  set local role authenticated;
 
 
+ batch:='[]'::jsonb;
+ for ix in 1..2 loop
+  batch_item:=jsonb_build_object('id',gen_random_uuid(),'option_key','custom_'||gen_random_uuid(),'variant_options',jsonb_build_array(jsonb_build_object('label','Size','value',case when ix=1 then 'Small' else 'Large' end),jsonb_build_object('label','Milk','value','Oat')),'name','Owner latte '||ix,'price',ix*12,'tax_rate',0,'stock_mode','recipe','recipe',jsonb_build_array(jsonb_build_object('inventory_id',stock,'quantity',ix*0.1)));
+  batch:=batch||jsonb_build_array(batch_item);
+ end loop;
+ perform public.erp_restaurant_pos_setup(r,b,'menu_batch',jsonb_build_object('option_group','Latte','category_id',category,'items',batch));
+ perform public.erp_restaurant_pos_setup(r,b,'menu_batch',jsonb_build_object('option_group','Latte','category_id',category,'items',batch));
+ v:=public.erp_restaurant_pos_catalog(r,b,'Latte');assert jsonb_array_length(v->'menu')=2,'Custom menu retry duplicated choices';
+ assert v->'menu'->1->'variant_options'->0->>'value'='Large','Custom dimensions lost';
+ assert (v->'menu'->1->>'price')::numeric=24,'Custom price lost';
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'menu_batch',jsonb_build_object('option_group','Latte','category_id',category,'items',jsonb_set(batch,'{1,variant_options}',batch->0->'variant_options')));exception when check_violation then denied:=true;end;assert denied,'Duplicate combinations accepted';
+ v:=public.erp_restaurant_pos_catalog(r,b,'Latte');assert (v->'menu'->1->>'price')::numeric=24,'Failed batch changed existing menu';
+ perform public.erp_restaurant_pos_setup(r,b,'device_archive',jsonb_build_object('id',d2,'active',false));
+ denied:=false;begin perform public.erp_restaurant_cashier_command(d2,'open_shift','{"cashier_name":"Test","opening_cash":0}',gen_random_uuid());exception when insufficient_privilege then denied:=true;end;assert denied,'Archived POS accepted sales commands';
+ perform public.erp_restaurant_pos_setup(r,b,'device_archive',jsonb_build_object('id',d2,'active',true));
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,other_b,'device_save',jsonb_build_object('id',d2,'code','Wrong branch'));exception when insufficient_privilege then denied:=true;end;assert denied,'Device moved across branches';
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'device_save',jsonb_build_object('id',gen_random_uuid(),'code','front COUNTER'));exception when check_violation then denied:=true;end;assert denied,'Duplicate device names accepted';
+
  denied:=false;begin perform public.erp_restaurant_pos_setup(r,other_b,'menu',payload);exception when others then denied:=true;end;
  assert denied,'Cross-branch ingredient configuration allowed';
  v:=public.erp_restaurant_cashier_command(d,'open_shift','{"cashier_name":"Fixture","opening_cash":100}',gen_random_uuid());
@@ -175,5 +196,17 @@ begin
  denied:=false;begin perform public.erp_restaurant_customer_display(pair2->>'token');exception when insufficient_privilege then denied:=true;end;assert denied,'Closed shift display still visible';
  reset role;
  select count(*) into n from public.daily_sales where restaurant_id=r::text and reference_id like 'restaurant-pos:%';assert n=1,'Shift closing posted duplicate sales';
+
+ -- A custom combination follows the same canonical invoice and ingredient path as fixed servings.
+ set local role authenticated;
+ v:=public.erp_restaurant_cashier_command(d2,'open_shift','{"cashier_name":"Custom cashier","opening_cash":0}',gen_random_uuid());
+ denied:=false;begin perform public.erp_restaurant_pos_setup(r,b,'device_archive',jsonb_build_object('id',d2,'active',false));exception when check_violation then denied:=true;end;assert denied,'POS with an open shift archived';
+ v:=public.erp_restaurant_cashier_command(d2,'new_sale','{}',gen_random_uuid());c:=v->'cart';
+ v:=public.erp_restaurant_cashier_command(d2,'quantity',jsonb_build_object('cart_id',c->'id','revision',c->'revision','menu_id',batch->1->>'id','quantity',1,'price',0.01),gen_random_uuid());c:=v->'cart';
+ assert (c->>'net_total')::numeric=24,'Cashier overrode the configured custom price';
+ v:=public.erp_restaurant_cashier_command(d2,'checkout',jsonb_build_object('cart_id',c->'id','revision',c->'revision','payment_confirmed',true,'payments',jsonb_build_array(jsonb_build_object('payment_method','cash','amount',24))),gen_random_uuid());
+ assert (v->'receipt'->>'total')::numeric=24 or (v->'receipt'->>'net_total')::numeric=24,'Custom invoice price missing';
+ reset role;
+ select quantity into n from public.inventory where id=stock;assert n=8.8,'Custom recipe quantity was not deducted exactly once';
 end $$;
 rollback;

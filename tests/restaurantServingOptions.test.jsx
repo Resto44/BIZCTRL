@@ -51,3 +51,17 @@ describe('touch serving choices',()=>{
   expect(groupRestaurantFoods([whole,half],{search:'special'})).toHaveLength(1);
  });
 });
+
+describe('custom food business choices',()=>{
+ it('selects arbitrary size and milk options with the exact configured price and blocks unavailable combinations',async()=>{
+  const small={...whole,id:'latte-small',option_group:'Latte',option_key:'custom_small',variant_options:[{label:'Size',value:'Small'},{label:'Milk',value:'Regular'}],name:'Small latte',price:12};
+  const large={...small,id:'latte-large',option_key:'custom_large',variant_options:[{label:'Size',value:'Large'},{label:'Milk',value:'Oat'}],name:'Large oat latte',price:19};
+  const choose=vi.fn().mockResolvedValue({});const {view,add}=render(choose,true,[small,large]);
+  expect(view.root.findAll(n=>n.type==='button'&&n.props['data-portion'])).toHaveLength(0);
+  act(()=>view.root.findByProps({'data-option':'Size:Large'}).props.onClick());expect(add().props.disabled).toBe(true);
+  act(()=>view.root.findByProps({'data-option':'Milk:Oat'}).props.onClick());expect(add().props.disabled).toBe(false);
+  expect(view.root.findByProps({'data-selected-price':true}).props.children).toBe('SAR 19');
+  await act(async()=>add().props.onClick());expect(choose).toHaveBeenCalledWith(large,1);
+  act(()=>view.unmount());
+ });
+});
