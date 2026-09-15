@@ -13,7 +13,7 @@ export function canSellServing(item) {
 export function groupRestaurantFoods(menu,{search='',category=''}={}) {
  const groups=new Map();
  for(const item of menu||[]) {
-  const grouped=Boolean(item.option_group&&SERVING_KEYS.includes(item.option_key));
+  const grouped=Boolean(item.option_group&&(SERVING_KEYS.includes(item.option_key)||item.variant_options?.length));
   const key=grouped?JSON.stringify([item.restaurant_id,item.branch_id,item.option_group]):item.id;
   if(!groups.has(key))groups.set(key,{id:key,grouped,title:grouped?item.option_group:'',items:[]});
   groups.get(key).items.push(item);

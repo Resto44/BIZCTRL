@@ -17,6 +17,7 @@ vi.mock('@/components/ui/dialog',()=>({
  DialogDescription:({children})=><p>{children}</p>
 }));
 import RestaurantProductWorkspace from '../src/components/restaurant-pos/RestaurantProductWorkspace.jsx';
+import RestaurantDevices from '../src/components/restaurant-pos/RestaurantDevices.jsx';
 import RestaurantSalesCategories from '../src/components/restaurant-pos/RestaurantSalesCategories.jsx';
 import RestaurantMenuGroupEditor from '../src/components/restaurant-pos/RestaurantMenuGroupEditor.jsx';
 import {Setup} from '../src/pages/restaurant/RestaurantPOS.jsx';
@@ -102,6 +103,45 @@ describe('separate POS sales category management',()=>{
   expect(calls[0][1]).toMatchObject({p_restaurant_id:'tenant',p_branch_id:'branch',p_payload:{name:'Rice dishes',name_ar:'أطباق الأرز',is_active:true}});
   expect(stopped).toHaveBeenCalledOnce();expect(saved).toHaveBeenCalledWith(calls[0][1].p_payload.id);
   expect(fixture.rpc.mock.calls.every(([name])=>name==='erp_restaurant_pos_setup')).toBe(true);
+  await close();
+ });
+});
+
+describe('customizable food owner setup',()=>{
+ it('generates a café menu with editable option groups and saves only owner-priced choices',async()=>{
+  fixture.rpc.mockReset();fixture.rpc.mockResolvedValue({data:{ok:true}});
+  const {view,close}=await render(<RestaurantMenuGroupEditor tenant="tenant" branch="branch" catalog={{categories:[{id:'cat',name:'Drinks',is_active:true}]}} refresh={vi.fn()} close={vi.fn()}/>);
+  act(()=>view.root.findByProps({'data-template':'cafe'}).props.onClick());
+  expect(view.root.findAllByType('textarea')).toHaveLength(3);
+  act(()=>view.root.findByProps({'data-generate-options':true}).props.onClick());
+  const rows=view.root.findAll(n=>n.type==='section'&&n.props['data-owner-serving']);expect(rows).toHaveLength(12);
+  const title=view.root.findAllByType('input').find(n=>n.props.maxLength===80);act(()=>title.props.onChange({target:{value:'Latte'}}));
+  const category=view.root.findAllByType('select').find(n=>n.findAllByType('option').some(o=>o.props.value==='cat'));act(()=>category.props.onChange({target:{value:'cat'}}));
+  const key=rows[0].props['data-owner-serving'];const row=()=>view.root.findByProps({'data-owner-serving':key});
+  act(()=>row().findByProps({type:'checkbox'}).props.onChange({target:{checked:true}}));
+  act(()=>row().findByProps({'data-field':'name'}).props.onChange({target:{value:'My small latte'}}));
+  act(()=>row().findByProps({'data-field':'price'}).props.onChange({target:{value:'14'}}));
+  act(()=>row().findAllByType('select').find(n=>n.props.value==='recipe').props.onChange({target:{value:'untracked'}}));
+  act(()=>view.root.findAllByType('input').find(n=>n.props.type==='checkbox'&&n.props.required).props.onChange({target:{checked:true}}));
+  await act(async()=>view.root.findByType('form').props.onSubmit({preventDefault(){}}));
+  const call=fixture.rpc.mock.calls.find(([,args])=>args.p_command==='menu_batch');
+  expect(call[1].p_payload.items).toHaveLength(1);expect(call[1].p_payload.items[0]).toMatchObject({name:'My small latte',price:14,variant_options:[{label:'Size',value:'Small'},{label:'Milk',value:'Regular'},{label:'Sugar',value:'No sugar'}]});
+  await close();
+ });
+});
+
+
+describe('manual POS registration',()=>{
+ it('starts empty and creates exactly one named branch device with a stable retry ID',async()=>{
+  fixture.rpc.mockReset();fixture.rpc.mockResolvedValue({data:{ok:true}});
+  const {view,close}=await render(<RestaurantDevices tenant="tenant" branch="branch" branches={[{id:'branch',name:'Main'}]} devices={[]} close={vi.fn()} refresh={vi.fn()}/>);
+  expect(view.root.findAllByType('h3').some(n=>text(n)==='No POS devices added')).toBe(true);
+  expect(fixture.rpc).not.toHaveBeenCalled();
+  act(()=>view.root.findAllByType('button').find(n=>text(n).includes('Add POS')).props.onClick());
+  act(()=>view.root.findByType('input').props.onChange({target:{value:'Front counter'}}));
+  await act(async()=>view.root.findByType('form').props.onSubmit({preventDefault(){},stopPropagation(){}}));
+  expect(fixture.rpc).toHaveBeenCalledOnce();expect(fixture.rpc.mock.calls[0][1]).toMatchObject({p_branch_id:'branch',p_command:'device_save',p_payload:{code:'Front counter'}});
+  expect(fixture.rpc.mock.calls[0][1].p_payload.id).toBeTruthy();
   await close();
  });
 });

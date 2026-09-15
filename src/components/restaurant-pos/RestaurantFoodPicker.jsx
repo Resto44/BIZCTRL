@@ -1,3 +1,4 @@
+import {customizationCopy,axesFromItems} from '@/lib/restaurantCustomization';
 import {useRef,useState} from 'react';
 import {ChefHat,ChevronDown,CheckCircle2,ShoppingCart,Plus,Minus} from 'lucide-react';
 import {groupRestaurantFoods,servingCopy,touchCopy,canSellServing,PORTIONS,SIDES} from '@/lib/restaurantServingOptions';
@@ -9,11 +10,14 @@ const choiceClass=selected=>'flex min-h-14 items-center justify-center gap-2 rou
 function ServingConfigurator({group,lang,currency,editable,onChoose}) {
  const c=servingCopy(lang),t=touchCopy(lang);
  const first=group.items.find(canSellServing)||group.items[0];
+ const custom=Boolean(first.variant_options?.length);
+ const [selected,setSelected]=useState(()=>Object.fromEntries((first.variant_options||[]).map(o=>[o.label,o.value])));
+ const axes=custom?axesFromItems(group.items):[];
  const [portion,setPortion]=useState(first.option_key?.split('_')[0]||'whole');
  const [side,setSide]=useState(first.option_key?.split('_')[1]||'rice');
  const [quantity,setQuantity]=useState(1),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const inFlight=useRef(false);
- const item=group.items.find(m=>m.option_key===`${portion}_${side}`);
+ const item=custom?group.items.find(m=>m.active&&m.variant_options?.length===axes.length&&m.variant_options.every(o=>selected[o.label]===o.value)):group.items.find(m=>m.option_key===`${portion}_${side}`);
  const sellable=canSellServing(item);
  const add=async()=>{
   if(!editable||!sellable||inFlight.current)return;
@@ -21,10 +25,12 @@ function ServingConfigurator({group,lang,currency,editable,onChoose}) {
   try {const result=await onChoose(item,quantity);if(result!==null)setQuantity(1);} catch(e) {setError(e.message);} finally {inFlight.current=false;setBusy(false);}
  };
  return <div className="space-y-4 border-t border-slate-100 p-4 sm:p-5" aria-label={group.title+' · '+c.choose}>
+  {custom?axes.map(axis=><fieldset key={axis.label} disabled={busy}><legend className="mb-2 text-lg font-bold">{axis.label}</legend><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{axis.values.split('\n').map(value=><button type="button" key={value} data-option={axis.label+':'+value} aria-pressed={selected[axis.label]===value} className={choiceClass(selected[axis.label]===value)} onClick={()=>{setSelected(v=>({...v,[axis.label]:value}));setQuantity(1);}}>{selected[axis.label]===value&&<CheckCircle2 size={19}/>} {value}</button>)}</div></fieldset>):<>
   <fieldset disabled={busy}><legend className="mb-2 text-lg font-bold">{t.size}</legend><div className="grid grid-cols-3 gap-2">{PORTIONS.map(key=><button type="button" data-portion={key} aria-pressed={portion===key} key={key} className={choiceClass(portion===key)} onClick={()=>{setPortion(key);setQuantity(1);}}>{portion===key&&<CheckCircle2 size={19}/>} {t[key]}</button>)}</div></fieldset>
   <fieldset disabled={busy}><legend className="mb-2 text-lg font-bold">{t.side}</legend><div className="grid grid-cols-2 gap-2">{SIDES.map(key=><button type="button" data-side={key} aria-pressed={side===key} key={key} className={choiceClass(side===key)} onClick={()=>{setSide(key);setQuantity(1);}}>{side===key&&<CheckCircle2 size={19}/>} {t[key]}</button>)}</div></fieldset>
+  </>}
   <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-center dark:border-slate-800 dark:bg-slate-900" aria-live="polite">
-   <h3 className="text-lg font-black">{item?restaurantProductName(item,lang):c[`${portion}_${side}`]}</h3>
+   <h3 className="text-lg font-black">{item?restaurantProductName(item,lang):custom?customizationCopy(lang).options:c[`${portion}_${side}`]}</h3>
    <p className={'text-2xl font-black '+(sellable?'text-slate-950 dark:text-white':'text-amber-700')} data-selected-price>{sellable?money(item.price,currency):item?c.unavailable:c.missing}</p>
    {!sellable&&<p className="text-sm text-slate-500">{c.configure}</p>}
    <div className="mx-auto mt-3 flex w-fit items-center overflow-hidden rounded-xl border border-slate-200 bg-white dark:bg-slate-950" dir="ltr">
