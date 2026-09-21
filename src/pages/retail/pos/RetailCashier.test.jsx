@@ -39,9 +39,10 @@ beforeEach(() => {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
 });
 afterEach(async () => { await act(async () => root.unmount()); queryClient.clear(); container.remove(); });
-async function render() {
+async function render(legacy=true) {
   await act(async () => root.render(<StrictMode><QueryClientProvider client={queryClient}><MemoryRouter initialEntries={['/retail/cashier']}><RetailCashier /></MemoryRouter></QueryClientProvider></StrictMode>));
   await flush(); await flush();
+  if(legacy){await act(async()=>document.querySelector('.touch-top button').click());await flush();}
 }
 describe('cashier screen integration', () => {
   it('scans with a keyboard, updates the invoice and posts a confirmed card payment', async () => {
@@ -74,7 +75,7 @@ describe('Windows touch layout payment',()=>{
  it('uses the same confirmed payment command after the paged touch form',async()=>{
   const original=window.matchMedia;window.matchMedia=()=>({matches:true,addEventListener(){},removeEventListener(){}});
   try{
-   await render();expect(document.querySelector('[data-touch-pos="retail"]')).toBeTruthy();
+   await render(false);expect(document.querySelector('[data-touch-pos="retail"]')).toBeTruthy();
    const scan=document.querySelector('.touch-search input[aria-label="Scan barcode"]');await input(scan,'0012345678905');await act(async()=>scan.form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));await flush();
    await click('Take payment');await click('Mada');
    for(let i=0;i<6;i++){

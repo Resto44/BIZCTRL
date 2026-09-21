@@ -21,9 +21,11 @@ function Variant({group,lang,currency,onAdd,close,editable}){
 export default function TouchWorkspace({kind,api,lang='en',c,menu=[],search,setSearch,catalogPage=1,setCatalogPage,hasMore=false,catalogLoading=false,catalogError,editable,canPay,canStart,onAdd,onQuantity,onScan,onAction,onExit,actions=[],held=[],receipts=[],onResume,onReceipt,selection}){
  const t=touchCopy(lang),restaurant=kind==='restaurant';const s=api.snapshot,cart=s?.cart,currency=s?.business?.currency||'SAR';
  const [size,setSize]=useState(()=>({w:window.innerWidth,h:window.innerHeight}));
+ const [mobileView,setMobileView]=useState('products');
  const [category,setCategory]=useState(''),[overlay,setOverlay]=useState(null),[scan,setScan]=useState(''),[dismissed,setDismissed]=useState('');const scanner=useRef(null),root=useRef(null);
  useEffect(()=>{const update=()=>setSize({w:window.innerWidth,h:window.innerHeight});window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update);},[]);
- const pageSize=(size.w>=1450?4:3)*(size.h>=850?3:2),lineSize=size.h>=850?5:3;
+ const compact=size.w<1000;const pageSize=compact?(size.h<600?2:4):(size.w>=1450?4:3)*(size.h>=850?3:2),lineSize=size.h<600?2:size.h>=850?5:3;
+ useEffect(()=>{const body=document.body.style.overflow,html=document.documentElement.style.overflow;document.body.classList.add('touch-cashier-open');document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';return()=>{document.body.classList.remove('touch-cashier-open');document.body.style.overflow=body;document.documentElement.style.overflow=html;};},[]);
  const groups=restaurant?groupRestaurantFoods(menu,{search,category}):menu.map(m=>({id:m.id,items:[m],grouped:false}));
  const products=usePage(groups,pageSize,search+category+catalogPage);const lines=usePage(cart?.lines||[],lineSize,cart?.id||'');
  const categories=[...new Map(menu.filter(m=>m.active&&(m.category_id||m.category)).map(m=>[m.category_id||m.category,m])).entries()];
@@ -33,8 +35,9 @@ export default function TouchWorkspace({kind,api,lang='en',c,menu=[],search,setS
  const error=catalogError||api.error;const showError=error&&error!==dismissed;
  const add=async(item,quantity=1)=>{const result=await onAdd(item,quantity);if(!restaurant)scanner.current?.focus();return result;};
  const layer=overlay&&typeof overlay==='object';
- return createPortal(<div className="touch-pos" ref={root} dir={lang==='en'?'ltr':'rtl'} data-touch-pos={kind}>
+ return createPortal(<div className="touch-pos" ref={root} dir={lang==='en'?'ltr':'rtl'} data-touch-pos={kind} data-mobile-view={mobileView}>
   <header className="touch-top"><button onClick={onExit} aria-label={t.exit}><ArrowLeft size={20}/></button><strong>{s?.business?.branch_name} · {s?.device?.code}<small>{s?.shift?.cashier_name} · {api.connected?c.live:c.offline}</small></strong>{selection}<button aria-label={c.refresh} onClick={()=>void api.refresh()}><RefreshCw size={20}/></button><button aria-label={t.full} onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen?.().catch(()=>{});else void document.documentElement.requestFullscreen?.().catch(()=>{});}}><Maximize size={20}/></button><button onClick={()=>setOverlay('actions')}>{t.more}</button></header>
+  {compact&&<nav className="touch-mobile-tabs"><button aria-pressed={mobileView==='products'} onClick={()=>setMobileView('products')}>{t.products}</button><button aria-pressed={mobileView==='invoice'} onClick={()=>setMobileView('invoice')}>{t.invoice} ({cart?.lines?.length||0}) · {money(cart?.net_total,currency)}</button></nav>}
   <div className="touch-columns" aria-hidden={overlay?true:undefined} inert={overlay?'':undefined}>
    <section className="touch-catalog"><div className="touch-search"><input aria-label={c.search} placeholder={c.search} value={search} onChange={e=>setSearch(e.target.value)}/>{restaurant&&<button onClick={()=>setOverlay('categories')}>{categoryActions.find(a=>a.id===category)?.label||c.food}</button>}</div>
     {!restaurant&&<form className="touch-search" onSubmit={e=>{e.preventDefault();if(editable&&scan){onScan(scan);setScan('');}}}><input ref={scanner} aria-label={c.scan} placeholder={c.scan} value={scan} disabled={!editable} onChange={e=>setScan(e.target.value)} autoComplete="off"/><button type="submit" disabled={!editable||!scan}>{c.add}</button></form>}

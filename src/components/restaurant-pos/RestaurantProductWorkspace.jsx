@@ -1,3 +1,4 @@
+import RestaurantFoodDelete,{foodDeleteCopy} from './RestaurantFoodDelete';
 import RestaurantFoodImport,{foodImportCopy} from './RestaurantFoodImport';
 import {customizationCopy} from '@/lib/restaurantCustomization';
 import RestaurantSalesCategories from './RestaurantSalesCategories';
@@ -27,6 +28,9 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
  const tenant=activeRestaurant?.id;
  const manage=['owner','manager'].includes(role)&&Boolean(can.uploadSales);
  const [search,setSearch]=useState('');
+ const [selected,setSelected]=useState([]),[showInactive,setShowInactive]=useState(false),[deleting,setDeleting]=useState(null);const del=foodDeleteCopy(lang);
+ const selectionScope=tenant+':'+branch;const selectedIds=selected.filter(s=>s.scope===selectionScope).map(s=>s.id);
+ const toggle=id=>setSelected(rows=>selectedIds.includes(id)?rows.filter(r=>r.id!==id):[...rows,{id,scope:selectionScope}]);
  const [editing,setEditing]=useState(null);
  const [categoryOpen,setCategoryOpen]=useState(false);
  const [importOpen,setImportOpen]=useState(false);
@@ -34,7 +38,7 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
  const qc=useQueryClient();
  const q=useQuery({queryKey:['restaurant-menu-catalog',tenant,branch],enabled:Boolean(tenant&&branch&&manage&&!raw),
   queryFn:()=>restaurantRpc('pos_catalog',{p_restaurant_id:tenant,p_branch_id:branch,p_search:''})});
- const menu=(q.data?.menu||[]).filter(m=>[m.name,m.name_ar,m.name_fa,m.category].join(' ').toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+ const menu=(q.data?.menu||[]).filter(m=>(showInactive||m.active)&&[m.name,m.name_ar,m.name_fa,m.category].join(' ').toLocaleLowerCase().includes(search.toLocaleLowerCase()));
  const refresh=async()=>{await Promise.all([qc.invalidateQueries({queryKey:['restaurant-menu-catalog']}),qc.invalidateQueries({queryKey:['restaurant-pos']}),qc.invalidateQueries({queryKey:['restaurant-pos-setup']}),qc.invalidateQueries({queryKey:['products']})]);};
  return <main className="space-y-4 pb-24" dir={lang==='en'?'ltr':'rtl'}>
   <header className={panel}>
@@ -48,21 +52,25 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
     <div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-2 text-sm font-bold">{labels.branch}<select className={input} value={branch} onChange={e=>{setChoice(e.target.value);setEditing(null);setGroupEditing(null);setCategoryOpen(false);}}><option value="" disabled>{labels.choose}</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name||b.label}</option>)}</select></label><label className="grid gap-2 text-sm font-bold">{labels.search}<input className={input} type="search" value={search} onChange={e=>setSearch(e.target.value)}/></label></div>
     <div className="mt-4 flex flex-wrap gap-2">{manage&&<button type="button" className={primary} disabled={!branch} onClick={()=>setEditing({})}><Plus size={18}/>{labels.add}</button>}<>{manage&&<button type="button" className={button} disabled={!branch||!q.data} onClick={()=>setGroupEditing([])}><Plus size={18}/>{customizationCopy(lang).new}</button>}</><>{manage&&<button type="button" className={button} disabled={!branch} onClick={()=>setCategoryOpen(true)}>{touch.manage}</button>}</><>{manage&&<button type="button" className={button} disabled={!branch||!q.data||q.isFetching} onClick={()=>setImportOpen(true)}>{foodImportCopy(lang).title}</button>}</><Link className={button} to="/restaurant/pos">{labels.pos}</Link><button type="button" aria-label="Refresh" className={button} disabled={q.isFetching} onClick={()=>void refresh()}><RefreshCw size={18}/></button></div>
    </section>
+   {manage&&<div className={panel+' flex flex-wrap items-center gap-3'}><label className="flex min-h-12 items-center gap-2"><input type="checkbox" checked={menu.length>0&&menu.every(m=>selectedIds.includes(m.id))} onChange={e=>setSelected(e.target.checked?menu.map(m=>({id:m.id,scope:selectionScope})):[])}/>{del.all} ({menu.length})</label><button type="button" className={button+' text-red-600'} disabled={!selectedIds.length} onClick={()=>setDeleting((q.data?.menu||[]).filter(m=>selectedIds.includes(m.id)))}>{del.selected} ({selectedIds.length})</button><label className="flex min-h-12 items-center gap-2"><input type="checkbox" checked={showInactive} onChange={e=>{setShowInactive(e.target.checked);setSelected([]);}}/>{del.show}</label></div>}
    {q.error&&<p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{q.error.message}</p>}
    {q.isLoading&&manage&&branch&&<p role="status" className={panel}>{labels.loading}</p>}
    {!manage&&<p className={panel}>{labels.pos}: <Link className="text-blue-600 underline" to="/restaurant/pos">{labels.menu}</Link></p>}
    {manage&&!q.isLoading&&!q.error&&<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{menu.map(m=><article key={m.id} className={panel}>
     {m.image_url&&/^https:\/\//.test(m.image_url)?<img src={m.image_url} alt="" loading="lazy" className="mb-3 h-40 w-full rounded-xl object-cover"/>:<div className="mb-3 flex h-32 items-center justify-center rounded-xl bg-blue-50 text-blue-500"><ChefHat size={40}/></div>}
+    <label className="mb-2 flex min-h-11 items-center gap-2"><input type="checkbox" aria-label={del.select+' '+restaurantProductName(m,lang)} checked={selectedIds.includes(m.id)} onChange={()=>toggle(m.id)}/>{del.select}</label>
     <h2 className="text-lg font-black">{restaurantProductName(m,lang)}</h2><p className="mt-1 text-sm text-slate-500">{m.category} · {m.station}</p>
     <p className="my-3 text-xl font-black text-blue-600">{formatMoney(m.price)}</p>
     <div className="mb-4 flex flex-wrap gap-2 text-xs font-bold"><span className={m.active?'rounded-full bg-emerald-50 px-3 py-2 text-emerald-700':'rounded-full bg-slate-100 px-3 py-2 text-slate-600'}>{m.active?labels.active:labels.inactive}</span><span className={m.stock_mode==='recipe'?'rounded-full bg-blue-50 px-3 py-2 text-blue-700':'rounded-full bg-amber-50 px-3 py-2 text-amber-800'}>{m.stock_mode==='recipe'?labels.recipe:labels.untracked}</span></div>
     {m.option_group&&<p className="mb-3 text-sm text-blue-600">{m.option_group} · {m.variant_options?.length?m.variant_options.map(o=>o.value).join(' · '):serving[m.option_key]}</p>}
     {m.option_group&&<button type="button" className={button+' mb-2 w-full'} onClick={()=>setGroupEditing((q.data?.menu||[]).filter(v=>v.option_group===m.option_group))}><Pencil size={16}/>{touch.edit}</button>}
     <button type="button" className={button+' w-full'} onClick={()=>m.variant_options?.length?setGroupEditing((q.data?.menu||[]).filter(v=>v.option_group===m.option_group)):setEditing(m)}><Pencil size={16}/>{labels.edit}</button>
+    <button type="button" className={button+' mt-2 w-full text-red-600'} onClick={()=>setDeleting([m])}>{del.remove}</button>
    </article>)}</div>}
    {manage&&!q.isLoading&&!q.error&&!menu.length&&<p className={panel}>{labels.empty}</p>}
    <p className="px-2 text-sm leading-6 text-slate-500">{labels.rawConflict}</p>
   </>}
+  {deleting&&branch&&manage&&!raw&&<RestaurantFoodDelete key={selectionScope} tenant={tenant} branch={branch} items={deleting} lang={lang} close={()=>{setDeleting(null);setSelected([]);}} refresh={refresh}/>}
   {importOpen&&branch&&manage&&!raw&&<RestaurantFoodImport key={tenant+':'+branch+':import'} tenant={tenant} branch={branch} catalog={q.data} lang={lang} close={()=>setImportOpen(false)} refresh={refresh}/>}
   {categoryOpen&&branch&&manage&&!raw&&<RestaurantSalesCategories key={tenant+':'+branch} tenant={tenant} branch={branch} lang={lang} close={()=>setCategoryOpen(false)} refresh={refresh}/>}
   {groupEditing&&branch&&manage&&!raw&&<RestaurantMenuGroupEditor key={tenant+':'+branch+':group'} tenant={tenant} branch={branch} initial={groupEditing} catalog={q.data} reload={q.refetch} refresh={refresh} close={()=>setGroupEditing(null)}/>}
