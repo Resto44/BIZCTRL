@@ -62,15 +62,15 @@ export function Setup({tenant,branch,c,close,refresh,initial=null,menuOnly=false
  </DialogContent></Dialog>;
 }
 
-function ActionDialog({kind,api,c,close,currency,onResult,touch=false,lang='en'}) {
- const Form=touch?TouchForm:'form';
+export function ActionDialog({kind,api,c,close,currency,onResult,touch=false,lang='en'}) {
+ const wizard=touch&&kind!=='payment';const Form=wizard?TouchForm:'form';
  const cart=api.snapshot?.cart;
  const [v,setV]=useState({cashier_name:'',opening_cash:'0',counted_cash:'',reason:'',notes:cart?.notes||'',order_type:cart?.order_type||'takeaway',table_label:cart?.table_label||'',mode:'cash',cash:String(cart?.net_total||0),card:'0',confirmed:false});
  const [error,setError]=useState('');const set=(k,value)=>setV(s=>({...s,[k]:value}));const p=paymentBreakdown(cart?.net_total,v.mode,v.cash,v.card);
  const text=(key,label,type='text')=><Field label={label}><input className={input} type={type} min="0" step="0.01" value={v[key]} required={!['table_label','notes'].includes(key)} onChange={e=>set(key,e.target.value)}/></Field>;
  const titles={payment:c.pay,open:c.openShift,close:c.closeShift,cancel:c.cancel,details:c.details};
- const submit=async e=>{e.preventDefault();setError('');try{const payload=kind==='payment'?{payment_confirmed:v.confirmed,payments:p.payments}:kind==='open'?{cashier_name:v.cashier_name,opening_cash:Number(v.opening_cash)}:kind==='close'?{counted_cash:Number(v.counted_cash),notes:v.notes}:kind==='cancel'?{reason:v.reason}:{order_type:v.order_type,table_label:v.table_label,notes:v.notes};const r=await api.command({payment:'checkout',open:'open_shift',close:'close_shift',cancel:'cancel',details:'details'}[kind],payload);onResult(r);close();}catch(e){setError(e.message);}};
- return <Dialog open onOpenChange={v=>{if(!v&&!api.busy)close();}}><DialogContent className={touch?"touch-dialog sm:max-w-xl":"max-h-[90dvh] overflow-y-auto"}><DialogHeader><DialogTitle>{titles[kind]}</DialogTitle><DialogDescription>{kind==='close'?c.closeHint:kind==='cancel'?c.cancelHint:c.stockHint}</DialogDescription></DialogHeader><Form {...(touch?{lang}:{})} onSubmit={submit} className="grid gap-4">
+ const submit=async e=>{e.preventDefault();if(api.busy||(kind==='payment'&&(!v.confirmed||!p.valid)))return;setError('');try{const payload=kind==='payment'?{payment_confirmed:v.confirmed,payments:p.payments}:kind==='open'?{cashier_name:v.cashier_name,opening_cash:Number(v.opening_cash)}:kind==='close'?{counted_cash:Number(v.counted_cash),notes:v.notes}:kind==='cancel'?{reason:v.reason}:{order_type:v.order_type,table_label:v.table_label,notes:v.notes};const r=await api.command({payment:'checkout',open:'open_shift',close:'close_shift',cancel:'cancel',details:'details'}[kind],payload);onResult(r);close();}catch(e){setError(e.message);}};
+ return <Dialog open onOpenChange={v=>{if(!v&&!api.busy)close();}}><DialogContent className={touch?"touch-dialog sm:max-w-xl":"max-h-[90dvh] overflow-y-auto"}><DialogHeader><DialogTitle>{titles[kind]}</DialogTitle><DialogDescription>{kind==='close'?c.closeHint:kind==='cancel'?c.cancelHint:c.stockHint}</DialogDescription></DialogHeader><Form {...(wizard?{lang}:{})} onSubmit={submit} className={touch&&kind==='payment'?"touch-quick-payment":"grid gap-4"}>
   {kind==='open'&&<>{text('cashier_name',c.cashier)}{text('opening_cash',c.opening,'number')}</>}
   {kind==='close'&&<><strong>{c.expected}: {money(api.snapshot?.expected_cash,currency)}</strong>{text('counted_cash',c.counted,'number')}{text('notes',c.notes)}</>}
   {kind==='cancel'&&text('reason',c.reason)}
