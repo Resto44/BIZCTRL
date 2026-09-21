@@ -1,3 +1,5 @@
+// Management navigation after exiting the fixed cashier; portal rendering is covered in touchWorkspace.
+vi.mock('@/components/pos-touch/TouchPrimitives',async importOriginal=>({...await importOriginal(),useTouchMode:()=>({enabled:false,supported:true,enable:()=>{},exit:()=>{}})}));
 // @vitest-environment jsdom
 import React from 'react';
 import TestRenderer, {act} from 'react-test-renderer';

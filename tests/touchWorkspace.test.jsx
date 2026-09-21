@@ -2,6 +2,7 @@
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
+import {useTouchMode} from '../src/components/pos-touch/TouchPrimitives';
 import TouchWorkspace from '../src/components/pos-touch/TouchWorkspace';
 import {cashierCopy} from '../src/components/retail-pos/cashierCopy';
 let root,host;globalThis.IS_REACT_ACT_ENVIRONMENT=true;
@@ -34,4 +35,17 @@ describe('fixed touch cashier',()=>{
   await act(async()=>root.render(<TouchWorkspace {...p}/>));await click(document.querySelector('.touch-catalog .touch-pager button:last-child'));await click(document.querySelector('.touch-catalog .touch-pager button:last-child'));
   expect(p.setCatalogPage).toHaveBeenCalledWith(4);
  });
+});
+it('uses compact paged mobile panes and locks the underlying page',async()=>{
+ Object.defineProperty(window,'innerWidth',{value:390,configurable:true});Object.defineProperty(window,'innerHeight',{value:900,configurable:true});const p=props();
+ await act(async()=>root.render(<TouchWorkspace {...p}/>));expect(document.querySelectorAll('.touch-product')).toHaveLength(4);expect(document.querySelectorAll('.touch-line')).toHaveLength(3);expect(document.body.style.overflow).toBe('hidden');expect(document.body.classList.contains('touch-cashier-open')).toBe(true);
+ expect(document.querySelector('.touch-pos').dataset.mobileView).toBe('products');await click(document.querySelector('.touch-mobile-tabs button:last-child'));expect(document.querySelector('.touch-pos').dataset.mobileView).toBe('invoice');
+ await click(document.querySelector('.touch-invoice>.touch-primary'));expect(p.onAction).toHaveBeenCalledWith('payment');
+ await act(async()=>root.render(null));expect(document.body.classList.contains('touch-cashier-open')).toBe(false);expect(document.body.style.overflow).not.toBe('hidden');
+});
+
+it('enables fixed cashier on phones without a media-query threshold',async()=>{
+ Object.defineProperty(window,'innerWidth',{value:390,configurable:true});
+ function Probe(){const t=useTouchMode();return <button data-enabled={t.enabled} onClick={t.exit}>Exit</button>;}
+ await act(async()=>root.render(<Probe/>));expect(host.querySelector('button').dataset.enabled).toBe('true');await click(host.querySelector('button'));expect(host.querySelector('button').dataset.enabled).toBe('false');
 });

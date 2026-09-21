@@ -1,11 +1,9 @@
-import {Children,Fragment,isValidElement,useEffect,useRef,useState} from 'react';
+import {Children,Fragment,isValidElement,useRef,useState} from 'react';
 import './touch.css';
 export function touchCopy(lang='en') {return ({en:{categories:'Categories',title:'Touch screen POS',exit:'Back to workspace',next:'Next',previous:'Previous',more:'Actions',products:'Products',invoice:'Invoice',choose:'Choose',back:'Back',add:'Add to order',quantity:'Quantity',hold:'Held orders',receipts:'Receipts',empty:'No items',cancel:'Close',full:'Full screen'},ar:{categories:'الفئات',title:'كاشير باللمس',exit:'العودة للإدارة',next:'التالي',previous:'السابق',more:'الإجراءات',products:'المنتجات',invoice:'الفاتورة',choose:'اختر',back:'رجوع',add:'إضافة للطلب',quantity:'الكمية',hold:'طلبات معلقة',receipts:'الفواتير',empty:'لا توجد أصناف',cancel:'إغلاق',full:'ملء الشاشة'},fa:{categories:'کتگوری‌ها',title:'کاشیر تاچ‌اسکرین',exit:'بازگشت به مدیریت',next:'بعدی',previous:'قبلی',more:'عملیات',products:'محصولات',invoice:'فاکتور',choose:'انتخاب',back:'برگشت',add:'افزودن به سفارش',quantity:'تعداد',hold:'سفارش‌های معلق',receipts:'فاکتورها',empty:'موردی نیست',cancel:'بستن',full:'تمام صفحه'}})[lang]||touchCopy('en');}
 export function useTouchMode(){
- const [supported,setSupported]=useState(()=>Boolean(window.matchMedia?.('(min-width: 1000px) and (min-height: 580px)').matches));
  const [off,setOff]=useState(false);
- useEffect(()=>{const mq=window.matchMedia?.('(min-width: 1000px) and (min-height: 580px)');if(!mq)return;const change=()=>setSupported(mq.matches);mq.addEventListener('change',change);return()=>mq.removeEventListener('change',change);},[]);
- return {enabled:supported&&!off,supported,enable:()=>setOff(false),exit:()=>setOff(true)};
+ return {enabled:!off,supported:true,enable:()=>setOff(false),exit:()=>setOff(true)};
 }
 export function Pager({page,pages,onChange,lang}){const t=touchCopy(lang);return <nav className="touch-pager" aria-label={t.next}><button type="button" disabled={page<=0} onClick={()=>onChange(page-1)}>{t.previous}</button><output>{page+1} / {Math.max(1,pages)}</output><button type="button" disabled={page>=pages-1} onClick={()=>onChange(page+1)}>{t.next}</button></nav>;}
 export function usePage(items,size,resetKey=''){
