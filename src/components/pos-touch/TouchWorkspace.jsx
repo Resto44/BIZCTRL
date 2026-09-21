@@ -2,20 +2,20 @@ import {useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Package,Maximize,ArrowLeft,RefreshCw,UtensilsCrossed,ChefHat,Printer,Pause} from 'lucide-react';
 import {money} from '@/lib/retailCashier';
-import {groupRestaurantFoods,canSellServing,PORTIONS,SIDES,touchCopy as servingCopy} from '@/lib/restaurantServingOptions';
-import {axesFromItems} from '@/lib/restaurantCustomization';
+import {groupRestaurantFoods,canSellServing} from '@/lib/restaurantServingOptions';
 import {Pager,touchCopy,usePage} from './TouchPrimitives';
 
 function Variant({group,lang,currency,onAdd,close,editable}){
- const t=touchCopy(lang),s=servingCopy(lang);const first=group.items.find(canSellServing)||group.items[0];
- const custom=Boolean(first.variant_options?.length);
- const axes=custom?axesFromItems(group.items).map(a=>({label:a.label,values:a.values.split('\n')})):[{label:s.size,values:PORTIONS},{label:s.side,values:SIDES}];
- const [selected,setSelected]=useState(()=>custom?first.variant_options.map(o=>o.value):first.option_key.split('_'));
- const [step,setStep]=useState(0),[quantity,setQuantity]=useState(1),[busy,setBusy]=useState(false),[error,setError]=useState('');const inFlight=useRef(false);
- const item=group.items.find(m=>custom?m.variant_options?.length===axes.length&&m.variant_options.every((o,i)=>o.value===selected[i]):m.option_key===selected.join('_'));
- const options=usePage(axes[step]?.values||[],6,step);const summary=step===axes.length;
- const add=async()=>{if(!editable||!canSellServing(item)||inFlight.current)return;inFlight.current=true;setBusy(true);try{const result=await onAdd(item,quantity);if(result!==null)close();}catch(e){setError(e.message);}finally{inFlight.current=false;setBusy(false);}};
- return <section className="touch-layer" role="dialog" aria-modal="true" aria-label={group.title}><header><h2>{group.title}</h2><button disabled={busy} onClick={close}>{t.cancel}</button></header><div className="touch-layer-body">{!summary?<><h2>{axes[step].label}</h2><div className="touch-options">{options.items.map(value=><button key={value} aria-pressed={selected[step]===value} onClick={()=>setSelected(a=>a.map((v,i)=>i===step?value:v))}>{custom?value:s[value]}</button>)}</div>{options.pages>1&&<Pager {...options} onChange={options.setPage} lang={lang}/>}</>:<><h2>{item?.['name_'+lang]||item?.name||t.empty}</h2><strong className="text-3xl">{canSellServing(item)?money(item.price,currency):t.empty}</strong><div className="touch-line-controls"><button aria-label="−" disabled={quantity<=1||busy} onClick={()=>setQuantity(q=>q-1)}>−</button><output>{quantity}</output><button aria-label="+" disabled={quantity>=99||busy} onClick={()=>setQuantity(q=>q+1)}>+</button></div></>}{error&&<p role="alert">{error}</p>}</div><footer className="touch-footer"><button disabled={step===0||busy} onClick={()=>setStep(p=>p-1)}>{t.previous}</button>{summary?<button className="touch-primary" disabled={!editable||!canSellServing(item)||busy} onClick={add}>{t.add} · {money(Number(item?.price||0)*quantity,currency)}</button>:<button className="touch-primary" onClick={()=>setStep(p=>p+1)}>{t.next} ({step+1}/{axes.length+1})</button>}</footer></section>;
+ const t=touchCopy(lang);
+ const [quantity,setQuantity]=useState(1),[busy,setBusy]=useState(false),[error,setError]=useState('');const inFlight=useRef(false);
+ const options=usePage(group.items,8,group.id);
+ const add=async item=>{if(!editable||!canSellServing(item)||inFlight.current)return;inFlight.current=true;setBusy(true);setError('');try{const result=await onAdd(item,quantity);if(result!==null)close();}catch(e){setError(e.message);}finally{inFlight.current=false;setBusy(false);}};
+ return <section className="touch-layer touch-variant" role="dialog" aria-modal="true" aria-label={group.title}>
+  <header><h2>{group.title}</h2><button disabled={busy} onClick={close}>{t.cancel}</button></header>
+  <div className="touch-variant-heading"><strong>{t.choose} · {t.add}</strong><div className="touch-line-controls"><button aria-label="−" disabled={quantity<=1||busy} onClick={()=>setQuantity(q=>q-1)}>−</button><output>{quantity}</output><button aria-label="+" disabled={quantity>=99||busy} onClick={()=>setQuantity(q=>q+1)}>+</button></div></div>
+  <div className="touch-variant-grid">{options.items.map(item=><button key={item.id} disabled={!editable||!canSellServing(item)||busy} onClick={()=>void add(item)}><strong>{item['name_'+lang]||item.name}</strong><span dir="ltr">{money(Number(item.price)*quantity,currency)}</span></button>)}</div>
+  {error&&<p role="alert">{error}</p>}{options.pages>1&&<Pager page={options.page} pages={options.pages} onChange={options.setPage} lang={lang}/>}
+ </section>;
 }
 
 export default function TouchWorkspace({kind,api,lang='en',c,menu=[],search,setSearch,catalogPage=1,setCatalogPage,hasMore=false,catalogLoading=false,catalogError,editable,canPay,canStart,onAdd,onQuantity,onScan,onAction,onExit,actions=[],held=[],receipts=[],onResume,onReceipt,selection}){
@@ -24,7 +24,7 @@ export default function TouchWorkspace({kind,api,lang='en',c,menu=[],search,setS
  const [mobileView,setMobileView]=useState('products');
  const [category,setCategory]=useState(''),[overlay,setOverlay]=useState(null),[scan,setScan]=useState(''),[dismissed,setDismissed]=useState('');const scanner=useRef(null),root=useRef(null);
  useEffect(()=>{const update=()=>setSize({w:window.innerWidth,h:window.innerHeight});window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update);},[]);
- const compact=size.w<1000;const pageSize=compact?(size.h<600?2:4):(size.w>=1450?4:3)*(size.h>=850?3:2),lineSize=size.h<600?2:!compact&&size.h>=850?5:3;
+ const compact=size.w<1000;const pageSize=!compact&&size.h>=850?12:8,lineSize=size.h<600?2:!compact&&size.h>=850?5:3;
  useEffect(()=>{const body=document.body.style.overflow,html=document.documentElement.style.overflow;document.body.classList.add('touch-cashier-open');document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';return()=>{document.body.classList.remove('touch-cashier-open');document.body.style.overflow=body;document.documentElement.style.overflow=html;};},[]);
  const groups=restaurant?groupRestaurantFoods(menu,{search,category}):menu.map(m=>({id:m.id,items:[m],grouped:false}));
  const products=usePage(groups,pageSize,search+category+catalogPage);const lines=usePage(cart?.lines||[],lineSize,cart?.id||'');
@@ -38,7 +38,7 @@ export default function TouchWorkspace({kind,api,lang='en',c,menu=[],search,setS
  const layer=overlay&&typeof overlay==='object';
  return createPortal(<div className="touch-pos" ref={root} dir={lang==='en'?'ltr':'rtl'} data-touch-pos={kind} data-mobile-view={mobileView}>
   <header className="touch-top"><button onClick={onExit} aria-label={t.exit}><ArrowLeft size={20}/></button><span className="touch-brand">Biz <b>Control</b></span><strong>{s?.business?.branch_name} · {s?.device?.code}<small><i className={api.connected?'touch-online':'touch-offline'}/>{s?.shift?.cashier_name} · {api.connected?c.live:c.offline}</small></strong>{selection}<button aria-label={c.refresh} onClick={()=>void api.refresh()}><RefreshCw size={20}/></button><button aria-label={t.full} onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen?.().catch(()=>{});else void document.documentElement.requestFullscreen?.().catch(()=>{});}}><Maximize size={20}/></button><button onClick={()=>setOverlay('actions')}>{t.more}</button></header>
-  {compact&&<nav className="touch-mobile-tabs"><button aria-pressed={mobileView==='products'} onClick={()=>setMobileView('products')}>{t.products}</button><button aria-pressed={mobileView==='invoice'} onClick={()=>setMobileView('invoice')}>{t.invoice} ({cart?.lines?.length||0}) · {money(cart?.net_total,currency)}</button></nav>}
+  {compact&&<nav className="touch-mobile-tabs"><button aria-pressed={mobileView==='products'} onClick={()=>setMobileView('products')}>{t.products}</button><button aria-pressed={mobileView==='invoice'} onClick={()=>setMobileView('invoice')}>{t.invoice} ({cart?.lines?.length||0}) · {money(cart?.net_total,currency)}</button><button className="touch-primary" disabled={!canPay} onClick={()=>onAction('payment')}>{c.pay}</button></nav>}
   <div className="touch-columns" aria-hidden={overlay?true:undefined} inert={overlay?'':undefined}>
    <section className="touch-catalog"><div className="touch-search"><input aria-label={c.search} placeholder={c.search} value={search} onChange={e=>setSearch(e.target.value)}/>{restaurant&&<button className="touch-category-trigger" onClick={()=>setOverlay('categories')}>{categoryActions.find(a=>a.id===category)?.label||c.food}</button>}</div>
     {!restaurant&&<form className="touch-search" onSubmit={e=>{e.preventDefault();if(editable&&scan){onScan(scan);setScan('');}}}><input ref={scanner} aria-label={c.scan} placeholder={c.scan} value={scan} disabled={!editable} onChange={e=>setScan(e.target.value)} autoComplete="off"/><button type="submit" disabled={!editable||!scan}>{c.add}</button></form>}

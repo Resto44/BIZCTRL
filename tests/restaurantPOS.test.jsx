@@ -14,7 +14,8 @@ vi.mock('@/lib/AuthContext',()=>({useAuth:()=>({user:{id:'owner'}})}));
 vi.mock('@/lib/RoleContext',()=>({useRole:()=>({role:'owner',can:{viewSales:true,uploadSales:true,viewOrders:true,viewExpenses:true}})}));
 vi.mock('@/lib/LanguageContext',()=>({useLanguage:()=>({lang:'en'})}));
 vi.mock('@/hooks/useRetailCashier',()=>({useRetailCashier:()=>({snapshot:{device:{id:'device',locked:false},shift:{cashier_name:'Cashier'},cart:{id:'cart',number:1,lines:[],net_total:0,tax_total:0},business:{branch_name:'Main',currency:'SAR'},receipts:[],held:[]},connected:true,command:fixture.command,refresh:vi.fn()})}));
-import RestaurantPOS from '../src/pages/restaurant/RestaurantPOS.jsx';
+import {createRoot} from 'react-dom/client';
+import RestaurantPOS, {ActionDialog} from '../src/pages/restaurant/RestaurantPOS.jsx';
 import {isRestaurantPOSPortal,restaurantRpc,parseRecipeRows,kitchenNextState,restaurantProductName} from '../src/lib/restaurantPOS.js';
 import {restaurantCopy} from '../src/components/restaurant-pos/copy.js';
 const nodeText = node => typeof node === 'string' ? node : Array.isArray(node) ? node.map(nodeText).join(' ') : node?.props ? nodeText(node.props.children) : '';
@@ -56,4 +57,22 @@ describe('restaurant POS',()=>{
   expect(renderer.root.findByProps({role:'alert'})).toBeTruthy();expect(fixture.rpc).not.toHaveBeenCalled();
   await act(async()=>renderer.unmount());client.clear();
  });
+});
+
+it('takes restaurant payment on one screen with confirmation and canonical checkout',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const api={snapshot:{cart:{net_total:22}},command:vi.fn().mockResolvedValue({receipt:{id:'r'}})},close=vi.fn(),result=vi.fn(),c=restaurantCopy('en');
+ try{
+  await React.act(async()=>root.render(<ActionDialog touch kind="payment" api={api} c={c} currency="SAR" close={close} onResult={result}/>));
+  const form=document.querySelector('.touch-quick-payment');expect(form).toBeTruthy();expect(document.querySelector('.touch-form')).toBeNull();
+  expect(form.querySelector('input[type=number]')).toBeTruthy();expect(form.querySelector('input[type=checkbox]').required).toBe(true);
+  await React.act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));expect(api.command).not.toHaveBeenCalled();
+  await React.act(async()=>[...form.querySelectorAll('button')].find(b=>b.textContent===c.card).click());
+  expect(form.querySelector('input[type=number]')).toBeNull();
+  await React.act(async()=>form.querySelector('input[type=checkbox]').click());
+  await React.act(async()=>form.querySelector(':scope > button:last-child').click());
+  expect(api.command).toHaveBeenCalledWith('checkout',{payment_confirmed:true,payments:[{payment_method:'card',amount:22}]});
+  expect(close).toHaveBeenCalledTimes(1);expect(result).toHaveBeenCalledWith({receipt:{id:'r'}});
+ }finally{await React.act(async()=>root.unmount());host.remove();}
 });

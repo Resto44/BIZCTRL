@@ -13,21 +13,21 @@ function props(){return {kind:'restaurant',lang:'en',c:{...cashierCopy('en'),foo
 describe('fixed touch cashier',()=>{
  it('makes every catalog item and invoice line reachable through buttons at 1024×600',async()=>{
   const p=props();await act(async()=>root.render(<TouchWorkspace {...p}/>));
-  expect(document.querySelectorAll('.touch-product')).toHaveLength(6);expect(document.querySelectorAll('.touch-line')).toHaveLength(3);
-  for(let page=0;page<3;page++)await click(document.querySelector('.touch-catalog .touch-pager button:last-child'));
-  expect(document.querySelector('.touch-product strong').textContent).toBe('Food 18');await click(document.querySelector('.touch-product'));expect(p.onAdd).toHaveBeenCalledWith(p.menu[18],1);
+  expect(document.querySelectorAll('.touch-product')).toHaveLength(8);expect(document.querySelectorAll('.touch-line')).toHaveLength(3);
+  for(let page=0;page<2;page++)await click(document.querySelector('.touch-catalog .touch-pager button:last-child'));
+  expect(document.querySelector('.touch-product strong').textContent).toBe('Food 16');await click(document.querySelector('.touch-product'));expect(p.onAdd).toHaveBeenCalledWith(p.menu[16],1);
   for(let page=0;page<3;page++)await click(document.querySelector('.touch-invoice .touch-pager button:last-child'));
   expect(document.querySelector('.touch-line strong').textContent).toBe('Line 9');
   await click(document.querySelector('.touch-line-controls button:last-child'));expect(p.onQuantity).toHaveBeenCalledWith(p.api.snapshot.cart.lines[9],1);
   expect(document.querySelector('.touch-invoice>.touch-primary').disabled).toBe(false);
  });
- it('walks custom food options without losing the exact owner price or quantity',async()=>{
+ it('adds custom food options directly without losing the exact owner price or quantity',async()=>{
   const p=props();p.menu=[{id:'small',name:'Small oat coffee',option_group:'Coffee',option_key:'custom_small',active:true,price:12,variant_options:[{label:'Size',value:'Small'},{label:'Milk',value:'Oat'}]},{id:'large',name:'Large oat coffee',option_group:'Coffee',option_key:'custom_large',active:true,price:19,variant_options:[{label:'Size',value:'Large'},{label:'Milk',value:'Oat'}]}];
   await act(async()=>root.render(<TouchWorkspace {...p}/>));await click(document.querySelector('.touch-product'));
-  await click([...document.querySelectorAll('.touch-options button')].find(b=>b.textContent==='Large'));
-  await click(document.querySelector('.touch-layer footer button:last-child'));await click(document.querySelector('.touch-layer footer button:last-child'));
   expect(document.querySelector('.touch-layer').textContent).toContain('SAR 19.00');
-  await click(document.querySelector('.touch-layer button[aria-label="+"]'));await click(document.querySelector('.touch-layer footer button:last-child'));
+  expect(document.querySelector('.touch-layer .touch-pager')).toBeNull();
+  await click(document.querySelector('.touch-layer button[aria-label="+"]'));
+  await click([...document.querySelectorAll('.touch-variant-grid button')].find(b=>b.textContent.includes('Large oat coffee')));
   expect(p.onAdd).toHaveBeenCalledWith(p.menu[1],2);expect(document.querySelector('.touch-layer')).toBeNull();
  });
  it('continues retail server pagination after the last visible product page',async()=>{
@@ -38,8 +38,8 @@ describe('fixed touch cashier',()=>{
 });
 it('uses compact paged mobile panes and locks the underlying page',async()=>{
  Object.defineProperty(window,'innerWidth',{value:390,configurable:true});Object.defineProperty(window,'innerHeight',{value:900,configurable:true});const p=props();
- await act(async()=>root.render(<TouchWorkspace {...p}/>));expect(document.querySelectorAll('.touch-product')).toHaveLength(4);expect(document.querySelectorAll('.touch-line')).toHaveLength(3);expect(document.body.style.overflow).toBe('hidden');expect(document.body.classList.contains('touch-cashier-open')).toBe(true);
- expect(document.querySelector('.touch-pos').dataset.mobileView).toBe('products');await click(document.querySelector('.touch-mobile-tabs button:last-child'));expect(document.querySelector('.touch-pos').dataset.mobileView).toBe('invoice');
+ await act(async()=>root.render(<TouchWorkspace {...p}/>));expect(document.querySelectorAll('.touch-product')).toHaveLength(8);expect(document.querySelectorAll('.touch-line')).toHaveLength(3);expect(document.body.style.overflow).toBe('hidden');expect(document.body.classList.contains('touch-cashier-open')).toBe(true);
+ expect(document.querySelector('.touch-pos').dataset.mobileView).toBe('products');await click(document.querySelector('.touch-mobile-tabs button:last-child'));expect(p.onAction).toHaveBeenCalledWith('payment');expect(document.querySelector('.touch-pos').dataset.mobileView).toBe('products');await click(document.querySelector('.touch-mobile-tabs button:nth-child(2)'));expect(document.querySelector('.touch-pos').dataset.mobileView).toBe('invoice');
  await click(document.querySelector('.touch-invoice>.touch-primary'));expect(p.onAction).toHaveBeenCalledWith('payment');
  await act(async()=>root.render(null));expect(document.body.classList.contains('touch-cashier-open')).toBe(false);expect(document.body.style.overflow).not.toBe('hidden');
 });
