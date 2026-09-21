@@ -148,12 +148,16 @@ describe('manual POS registration',()=>{
 describe('restaurant food removal',()=>{
  it('selects all and individually deactivates dishes without deleting invoice records',async()=>{
   fixture.rpc.mockClear();const dishes=[{id:'a',name:'Food A',price:20,tax_rate:0,active:true,stock_mode:'untracked',category_id:'cat',recipe:[]},{id:'b',name:'Food B',price:10,tax_rate:0,active:true,stock_mode:'untracked',category_id:'cat',recipe:[]}];
-  fixture.rpc.mockImplementation(async(name,args)=>{if(args?.p_command==='menu_archive'){dishes.filter(d=>args.p_payload.ids.includes(d.id)).forEach(d=>{d.active=false;});return {data:{ok:true}};}return {data:{menu:dishes.map(d=>({...d})),categories:[],inventory:[]}};});
+  let catalogReads=0;
+  fixture.rpc.mockImplementation(async(name,args)=>{if(args?.p_command==='menu_archive'){dishes.filter(d=>args.p_payload.ids.includes(d.id)).forEach(d=>{d.active=false;});return {data:{ok:true}};}if(++catalogReads>1)return new Promise(()=>{});return {data:{menu:dishes.map(d=>({...d})),categories:[],inventory:[]}};});
   const {view,close}=await render(<RestaurantProductWorkspace rawMaterials={<p>RAW</p>}/>);
   const all=view.root.findAllByType('input').find(n=>n.props.type==='checkbox'&&!n.props['aria-label']);await act(async()=>all.props.onChange({target:{checked:true}}));
   const bulk=view.root.findAllByType('button').find(n=>text(n).includes('Delete selected'));expect(bulk.props.disabled).toBe(false);expect(view.root.findAllByType('input').filter(n=>n.props['aria-label']?.startsWith('Select ')&&n.props.checked)).toHaveLength(2);await act(async()=>bulk.props.onClick());
   await act(async()=>view.root.findAllByType('button').find(n=>text(n)==='Confirm removal').props.onClick());
   const mutations=fixture.rpc.mock.calls.filter(([,a])=>a?.p_command==='menu_archive');expect(mutations).toHaveLength(1);expect(mutations[0][1]).toMatchObject({p_restaurant_id:'tenant',p_branch_id:'branch',p_payload:{ids:['a','b']}});
+  expect(view.root.findAllByType('button').some(n=>text(n)==='Confirm removal')).toBe(false);
+  expect(view.root.findAllByType('h2').some(n=>text(n)==='Food A'||text(n)==='Food B')).toBe(false);
+  expect(view.root.findAll(n=>n.props.role==='status').some(n=>text(n).includes('Removed: 2'))).toBe(true);
   await close();
  });
 });

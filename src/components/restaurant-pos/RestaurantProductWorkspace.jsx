@@ -28,6 +28,7 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
  const tenant=activeRestaurant?.id;
  const manage=['owner','manager'].includes(role)&&Boolean(can.uploadSales);
  const [search,setSearch]=useState('');
+ const [removedNotice,setRemovedNotice]=useState('');
  const [selected,setSelected]=useState([]),[showInactive,setShowInactive]=useState(false),[deleting,setDeleting]=useState(null);const del=foodDeleteCopy(lang);
  const selectionScope=tenant+':'+branch;const selectedIds=selected.filter(s=>s.scope===selectionScope).map(s=>s.id);
  const toggle=id=>setSelected(rows=>selectedIds.includes(id)?rows.filter(r=>r.id!==id):[...rows,{id,scope:selectionScope}]);
@@ -39,6 +40,11 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
  const q=useQuery({queryKey:['restaurant-menu-catalog',tenant,branch],enabled:Boolean(tenant&&branch&&manage&&!raw),
   queryFn:()=>restaurantRpc('pos_catalog',{p_restaurant_id:tenant,p_branch_id:branch,p_search:''})});
  const menu=(q.data?.menu||[]).filter(m=>(showInactive||m.active)&&[m.name,m.name_ar,m.name_fa,m.category].join(' ').toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+ const onRemoved=ids=>{
+  qc.setQueryData(['restaurant-menu-catalog',tenant,branch],current=>current?{...current,menu:(current.menu||[]).map(m=>ids.includes(m.id)?{...m,active:false}:m)}:current);
+  setShowInactive(false);setSelected([]);setDeleting(null);setRemovedNotice(del.saved+': '+ids.length);
+  void refresh().catch(()=>{});
+ };
  const refresh=async()=>{await Promise.all([qc.invalidateQueries({queryKey:['restaurant-menu-catalog']}),qc.invalidateQueries({queryKey:['restaurant-pos']}),qc.invalidateQueries({queryKey:['restaurant-pos-setup']}),qc.invalidateQueries({queryKey:['products']})]);};
  return <main className="space-y-4 pb-24" dir={lang==='en'?'ltr':'rtl'}>
   <header className={panel}>
@@ -53,6 +59,7 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
     <div className="mt-4 flex flex-wrap gap-2">{manage&&<button type="button" className={primary} disabled={!branch} onClick={()=>setEditing({})}><Plus size={18}/>{labels.add}</button>}<>{manage&&<button type="button" className={button} disabled={!branch||!q.data} onClick={()=>setGroupEditing([])}><Plus size={18}/>{customizationCopy(lang).new}</button>}</><>{manage&&<button type="button" className={button} disabled={!branch} onClick={()=>setCategoryOpen(true)}>{touch.manage}</button>}</><>{manage&&<button type="button" className={button} disabled={!branch||!q.data||q.isFetching} onClick={()=>setImportOpen(true)}>{foodImportCopy(lang).title}</button>}</><Link className={button} to="/restaurant/pos">{labels.pos}</Link><button type="button" aria-label="Refresh" className={button} disabled={q.isFetching} onClick={()=>void refresh()}><RefreshCw size={18}/></button></div>
    </section>
    {manage&&<div className={panel+' flex flex-wrap items-center gap-3'}><label className="flex min-h-12 items-center gap-2"><input type="checkbox" checked={menu.length>0&&menu.every(m=>selectedIds.includes(m.id))} onChange={e=>setSelected(e.target.checked?menu.map(m=>({id:m.id,scope:selectionScope})):[])}/>{del.all} ({menu.length})</label><button type="button" className={button+' text-red-600'} disabled={!selectedIds.length} onClick={()=>setDeleting((q.data?.menu||[]).filter(m=>selectedIds.includes(m.id)))}>{del.selected} ({selectedIds.length})</button><label className="flex min-h-12 items-center gap-2"><input type="checkbox" checked={showInactive} onChange={e=>{setShowInactive(e.target.checked);setSelected([]);}}/>{del.show}</label></div>}
+   {removedNotice&&<p role="status" className="rounded-xl bg-emerald-50 p-4 text-emerald-800">{removedNotice}</p>}
    {q.error&&<p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{q.error.message}</p>}
    {q.isLoading&&manage&&branch&&<p role="status" className={panel}>{labels.loading}</p>}
    {!manage&&<p className={panel}>{labels.pos}: <Link className="text-blue-600 underline" to="/restaurant/pos">{labels.menu}</Link></p>}
@@ -70,7 +77,7 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
    {manage&&!q.isLoading&&!q.error&&!menu.length&&<p className={panel}>{labels.empty}</p>}
    <p className="px-2 text-sm leading-6 text-slate-500">{labels.rawConflict}</p>
   </>}
-  {deleting&&branch&&manage&&!raw&&<RestaurantFoodDelete key={selectionScope} tenant={tenant} branch={branch} items={deleting} lang={lang} close={()=>{setDeleting(null);setSelected([]);}} refresh={refresh}/>}
+  {deleting&&branch&&manage&&!raw&&<RestaurantFoodDelete key={selectionScope} tenant={tenant} branch={branch} items={deleting} lang={lang} close={()=>{setDeleting(null);setSelected([]);}} onRemoved={onRemoved}/>}
   {importOpen&&branch&&manage&&!raw&&<RestaurantFoodImport key={tenant+':'+branch+':import'} tenant={tenant} branch={branch} catalog={q.data} lang={lang} close={()=>setImportOpen(false)} refresh={refresh}/>}
   {categoryOpen&&branch&&manage&&!raw&&<RestaurantSalesCategories key={tenant+':'+branch} tenant={tenant} branch={branch} lang={lang} close={()=>setCategoryOpen(false)} refresh={refresh}/>}
   {groupEditing&&branch&&manage&&!raw&&<RestaurantMenuGroupEditor key={tenant+':'+branch+':group'} tenant={tenant} branch={branch} initial={groupEditing} catalog={q.data} reload={q.refetch} refresh={refresh} close={()=>setGroupEditing(null)}/>}

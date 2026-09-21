@@ -17,3 +17,23 @@
 @media(max-width:999px) and (max-height:599px){.touch-grid{grid-template-rows:minmax(0,1fr)}.touch-product img{height:40px}}
 /* Keep management headers and bottom navigation behind the cashier portal. */
 body.touch-cashier-open #root{visibility:hidden}
+/* Approved light restaurant cashier: invoice, food photography and category rail. */
+.touch-brand{font-weight:900;color:#075ef2;font-size:18px;white-space:nowrap}.touch-brand b{color:#152847}.touch-online,.touch-offline{display:inline-block;width:8px;height:8px;border-radius:50%;margin-inline-end:5px;background:#0ca477}.touch-offline{background:#f59e0b}
+.touch-pos[data-touch-pos=restaurant]{background:#f0f5fb}
+.touch-pos[data-touch-pos=restaurant] .touch-product{position:relative;border-radius:14px;border-color:#dce8f6;background:#f8fbff;box-shadow:0 3px 10px #14385e08}
+.touch-pos[data-touch-pos=restaurant] .touch-product-photo{isolation:isolate;padding:12px;justify-content:flex-end;align-items:stretch;color:white;background:#142239}
+.touch-pos[data-touch-pos=restaurant] .touch-product-photo img{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;z-index:-2}
+.touch-pos[data-touch-pos=restaurant] .touch-product-photo:after{content:'';position:absolute;inset:0;background:linear-gradient(transparent 30%,#081426e8);z-index:-1}
+.touch-pos[data-touch-pos=restaurant] .touch-product-photo strong{text-align:start;font-size:19px}.touch-pos[data-touch-pos=restaurant] .touch-product-photo span{text-align:start;color:white;font-weight:800;font-size:17px}
+.touch-pos[data-touch-pos=restaurant] .touch-product:disabled{opacity:.65}
+.touch-quick-actions{display:flex;gap:8px;flex-shrink:0}.touch-quick-actions button{display:flex;align-items:center;justify-content:center;gap:8px;flex:1;font-size:13px;background:#edf4fd}
+.touch-category-rail{min-height:0;display:flex;flex-direction:column;gap:8px;background:#e6effb;border:1px solid #d8e6f7;border-radius:14px;padding:8px}.touch-category-rail h2{font-size:14px;font-weight:800;text-align:center}.touch-category-list{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}.touch-category-list button{flex:1;min-height:44px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;overflow:hidden}.touch-category-list button span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.touch-category-list [aria-pressed=true]{background:#0961ee;color:white;border-color:#0961ee;box-shadow:0 4px 14px #0961ee30}.touch-category-rail .touch-pager{gap:3px}.touch-category-rail .touch-pager button{padding:4px;font-size:11px}.touch-category-rail .touch-pager output{font-size:11px}
+@media(min-width:1000px){
+ .touch-pos[data-touch-pos=restaurant] .touch-columns{direction:ltr;grid-template-columns:320px minmax(0,1fr) 150px;grid-template-areas:'invoice catalog categories'}
+ .touch-pos[data-touch-pos=restaurant] .touch-invoice{grid-area:invoice}.touch-pos[data-touch-pos=restaurant] .touch-catalog{grid-area:catalog}.touch-category-rail{grid-area:categories}
+ .touch-pos[data-touch-pos=restaurant][dir=rtl] .touch-columns>*{direction:rtl}
+ .touch-pos[data-touch-pos=restaurant] .touch-category-trigger{display:none}
+ .touch-pos[data-touch-pos=restaurant] .touch-total{background:#e5f0ff}.touch-pos[data-touch-pos=restaurant] .touch-invoice>.touch-primary{min-height:56px;font-size:20px}
+}
+@media(min-width:1450px){.touch-pos[data-touch-pos=restaurant] .touch-columns{grid-template-columns:370px minmax(0,1fr) 180px}}
+@media(max-width:999px){.touch-brand{display:none}.touch-quick-actions{gap:4px}.touch-quick-actions button{font-size:11px;padding:4px;gap:4px}.touch-pos[data-touch-pos=restaurant] .touch-product-photo strong{font-size:16px}}
