@@ -37,8 +37,8 @@ describe('fixed touch cashier',()=>{
  });
 });
 it('uses compact paged mobile panes and locks the underlying page',async()=>{
- Object.defineProperty(window,'innerWidth',{value:390,configurable:true});Object.defineProperty(window,'innerHeight',{value:700,configurable:true});const p=props();
- await act(async()=>root.render(<TouchWorkspace {...p}/>));expect(document.querySelectorAll('.touch-product')).toHaveLength(4);expect(document.body.style.overflow).toBe('hidden');expect(document.body.classList.contains('touch-cashier-open')).toBe(true);
+ Object.defineProperty(window,'innerWidth',{value:390,configurable:true});Object.defineProperty(window,'innerHeight',{value:900,configurable:true});const p=props();
+ await act(async()=>root.render(<TouchWorkspace {...p}/>));expect(document.querySelectorAll('.touch-product')).toHaveLength(4);expect(document.querySelectorAll('.touch-line')).toHaveLength(3);expect(document.body.style.overflow).toBe('hidden');expect(document.body.classList.contains('touch-cashier-open')).toBe(true);
  expect(document.querySelector('.touch-pos').dataset.mobileView).toBe('products');await click(document.querySelector('.touch-mobile-tabs button:last-child'));expect(document.querySelector('.touch-pos').dataset.mobileView).toBe('invoice');
  await click(document.querySelector('.touch-invoice>.touch-primary'));expect(p.onAction).toHaveBeenCalledWith('payment');
  await act(async()=>root.render(null));expect(document.body.classList.contains('touch-cashier-open')).toBe(false);expect(document.body.style.overflow).not.toBe('hidden');

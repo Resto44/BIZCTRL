@@ -24,7 +24,7 @@ export default function TouchWorkspace({kind,api,lang='en',c,menu=[],search,setS
  const [mobileView,setMobileView]=useState('products');
  const [category,setCategory]=useState(''),[overlay,setOverlay]=useState(null),[scan,setScan]=useState(''),[dismissed,setDismissed]=useState('');const scanner=useRef(null),root=useRef(null);
  useEffect(()=>{const update=()=>setSize({w:window.innerWidth,h:window.innerHeight});window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update);},[]);
- const compact=size.w<1000;const pageSize=compact?(size.h<600?2:4):(size.w>=1450?4:3)*(size.h>=850?3:2),lineSize=size.h<600?2:size.h>=850?5:3;
+ const compact=size.w<1000;const pageSize=compact?(size.h<600?2:4):(size.w>=1450?4:3)*(size.h>=850?3:2),lineSize=size.h<600?2:!compact&&size.h>=850?5:3;
  useEffect(()=>{const body=document.body.style.overflow,html=document.documentElement.style.overflow;document.body.classList.add('touch-cashier-open');document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';return()=>{document.body.classList.remove('touch-cashier-open');document.body.style.overflow=body;document.documentElement.style.overflow=html;};},[]);
  const groups=restaurant?groupRestaurantFoods(menu,{search,category}):menu.map(m=>({id:m.id,items:[m],grouped:false}));
  const products=usePage(groups,pageSize,search+category+catalogPage);const lines=usePage(cart?.lines||[],lineSize,cart?.id||'');
