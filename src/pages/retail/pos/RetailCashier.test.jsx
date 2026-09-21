@@ -84,6 +84,12 @@ describe('Windows touch layout payment',()=>{
     await act(async()=>document.querySelector('.touch-form .touch-pager button:last-child').click());
    }
    await flush();expect(mocks.rpc.mock.calls.filter(([,a])=>a.p_command==='checkout')).toHaveLength(1);expect(state.cart).toBeNull();
+   const printButton=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Print / Save PDF');
+   expect(printButton).toBeTruthy();expect(printButton.closest('.touch-form')).toBeNull();
+   const popup={document:{open:vi.fn(),write:vi.fn(),close:vi.fn()},focus:vi.fn(),print:vi.fn(),setTimeout:fn=>fn()};
+   const open=vi.spyOn(window,'open').mockReturnValue(popup);
+   try{await act(async()=>printButton.click());expect(popup.print).toHaveBeenCalledTimes(1);expect(popup.document.write.mock.calls[0][0]).toContain('POS-01-SALE');}finally{open.mockRestore();}
+
   }finally{window.matchMedia=original;}
  });
 });

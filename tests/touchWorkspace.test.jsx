@@ -57,3 +57,12 @@ it('pages the approved category rail and routes kitchen action to the existing c
  expect(document.querySelectorAll('.touch-product')).toHaveLength(1);expect(document.querySelector('.touch-product strong').textContent).toBe('Food 4');
  await click([...document.querySelectorAll('.touch-quick-actions button')].find(b=>b.textContent==='Send to kitchen'));expect(p.onAction).toHaveBeenCalledWith('send_kitchen');
 });
+
+it('prints the latest restaurant receipt directly and keeps history separate',async()=>{
+ const p=props();p.receipts=[{id:'latest',receipt_number:'R-2'},{id:'older',receipt_number:'R-1'}];p.onReceipt=vi.fn();
+ await act(async()=>root.render(<TouchWorkspace {...p}/>));
+ await click([...document.querySelectorAll('.touch-quick-actions button')].find(b=>b.textContent===p.c.print));
+ expect(p.onReceipt).toHaveBeenCalledWith(p.receipts[0]);expect(document.querySelector('.touch-layer')).toBeNull();
+ await click(document.querySelector('.touch-invoice .touch-footer button:last-child'));
+ expect(document.querySelector('.touch-layer').textContent).toContain('R-1');
+});
