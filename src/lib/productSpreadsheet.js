@@ -121,16 +121,16 @@ function extractSharedStrings(entries) {
   const xml = readZipEntry(entries, 'xl/sharedStrings.xml', false);
   if (!xml) return [];
   const document = parseXml(xml, 'Shared strings');
-  return [...document.getElementsByTagName('si')].map((item) => item.textContent || '');
+  return [...document.getElementsByTagNameNS('*', 'si')].map((item) => item.textContent || '');
 }
 
 function extractFirstWorksheetPath(entries) {
   const workbook = parseXml(readZipEntry(entries, 'xl/workbook.xml'), 'Workbook');
-  const sheet = workbook.getElementsByTagName('sheet')[0];
+  const sheet = workbook.getElementsByTagNameNS('*', 'sheet')[0];
   if (!sheet) throw new Error('The Excel workbook does not contain a worksheet.');
   const relationshipId = sheet.getAttribute('r:id') || sheet.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
   const relationships = parseXml(readZipEntry(entries, 'xl/_rels/workbook.xml.rels'), 'Workbook relationships');
-  const relationship = [...relationships.getElementsByTagName('Relationship')]
+  const relationship = [...relationships.getElementsByTagNameNS('*', 'Relationship')]
     .find((item) => item.getAttribute('Id') === relationshipId);
   const target = relationship?.getAttribute('Target');
   if (!target) throw new Error('The first worksheet could not be resolved.');
@@ -141,14 +141,14 @@ function extractWorksheetMatrix(entries) {
   const sharedStrings = extractSharedStrings(entries);
   const sheetPath = extractFirstWorksheetPath(entries);
   const worksheet = parseXml(readZipEntry(entries, sheetPath), 'Worksheet');
-  return [...worksheet.getElementsByTagName('row')].map((rowElement) => {
+  return [...worksheet.getElementsByTagNameNS('*', 'row')].map((rowElement) => {
     const row = [];
-    [...rowElement.getElementsByTagName('c')].forEach((cell) => {
+    [...rowElement.getElementsByTagNameNS('*', 'c')].forEach((cell) => {
       const index = columnIndexFromReference(cell.getAttribute('r'));
       const type = cell.getAttribute('t');
-      const raw = cell.getElementsByTagName('v')[0]?.textContent ?? '';
+      const raw = cell.getElementsByTagNameNS('*', 'v')[0]?.textContent ?? '';
       if (type === 's') row[index] = sharedStrings[Number(raw)] ?? '';
-      else if (type === 'inlineStr') row[index] = cell.getElementsByTagName('is')[0]?.textContent ?? '';
+      else if (type === 'inlineStr') row[index] = cell.getElementsByTagNameNS('*', 'is')[0]?.textContent ?? '';
       else if (type === 'b') row[index] = raw === '1' ? 'true' : 'false';
       else row[index] = raw;
     });

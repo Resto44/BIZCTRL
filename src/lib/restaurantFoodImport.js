@@ -1,7 +1,7 @@
 import {createProductImportTemplate} from './productSpreadsheet';
 
-export const FOOD_HEADERS=['food_code','name','name_ar','name_fa','selling_price','tax_rate','category_id','image_url','station','stock_mode','recipe_json','status'];
-export function foodTemplate(){return createProductImportTemplate({sheetName:'Restaurant Foods',headers:FOOD_HEADERS,example:['FOOD-001','Example dish','','','22','0','','','Kitchen','untracked','','inactive']});}
+export const FOOD_HEADERS=['food_code','name','name_ar','name_fa','selling_price','tax_rate','category_id','image_url','station','stock_mode','recipe_json','status','option_group','size','serving_style','option_3_name','option_3_value','option_4_name','option_4_value'];
+export function foodTemplate(){return createProductImportTemplate({sheetName:'Restaurant Foods',headers:FOOD_HEADERS,example:['FOOD-001','Example dish','','','22','0','','','Kitchen','untracked','','inactive','Roast chicken','Half','With rice','','','','']});}
 export function downloadFoodFile(data,name,type='text/csv;charset=utf-8'){
  const url=URL.createObjectURL(new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
@@ -34,19 +34,46 @@ export async function prepareFoodImport(records,{tenant,branch,categories=[],inv
     const seen=new Set();recipe=recipe.map(r=>{if(!r||!inventory.some(v=>v.id===r.inventory_id)||seen.has(r.inventory_id)||!Number.isFinite(Number(r.quantity))||Number(r.quantity)<0.000001||Number(r.quantity)>1000000)throw new Error('recipe_json: invalid branch ingredient, duplicate ingredient or quantity.');seen.add(r.inventory_id);return {inventory_id:r.inventory_id,quantity:Number(r.quantity)};});
    }else if(text('recipe_json')&&text('recipe_json')!=='[]')throw new Error('recipe_json: use recipe stock mode to deduct ingredients.');
    const id=await foodImportId(tenant,branch,code);const old=menu.find(m=>m.id===id);
-   // Grouped choices must be edited together in the existing group editor.
-   if(old?.option_group)throw new Error('This food now has options. Edit it using the food options editor.');
-   rows.push({row,code,update:Boolean(old),payload:{id,name,name_ar:text('name_ar'),name_fa:text('name_fa'),price,tax_rate:tax,category_id:category.id,image_url:text('image_url'),station:text('station')||'Kitchen',stock_mode:mode,recipe,active:status==='active'}});
+   const group=text('option_group'),choices=[];
+   if(text('size'))choices.push({label:'Size',value:text('size')});
+   if(text('serving_style'))choices.push({label:'Serving',value:text('serving_style')});
+   for(const n of [3,4]){
+    const label=text(`option_${n}_name`),value=text(`option_${n}_value`);
+    if(Boolean(label)!==Boolean(value))throw new Error(`option_${n}: enter both name and value.`);
+    if(label)choices.push({label,value});
+   }
+   if(Boolean(group)!==Boolean(choices.length)||group.length>80)throw new Error('option_group: enter a food group and at least one size or option; leave all blank for a standalone dish.');
+   if(choices.some(o=>o.label.length>60||o.value.length>60)||new Set(choices.map(o=>o.label)).size!==choices.length)throw new Error('Options must have distinct names and values of 1–60 characters.');
+   if(old?.option_group&&old.option_group!==group)throw new Error('Keep the existing option_group. Rename or separate this food in the food editor.');
+   rows.push({row,code,update:Boolean(old),payload:{id,name,name_ar:text('name_ar'),name_fa:text('name_fa'),price,tax_rate:tax,category_id:category.id,image_url:text('image_url'),station:text('station')||'Kitchen',stock_mode:mode,recipe,active:status==='active',option_group:group||null,option_key:group?'custom_'+id:null,variant_options:choices}});
   }catch(e){errors.push({row,code,message:e.message});}
  }
- return {rows,errors};
+ // Validate whole groups before any write; missing rows must not silently alter an existing group.
+ const groups=new Map();for(const r of rows)if(r.payload.option_group){const group=r.payload.option_group;if(!groups.has(group))groups.set(group,[]);groups.get(group).push(r);}
+ const invalid=new Set();
+ for(const [group,items] of groups){
+  let message='';const active=items.filter(r=>r.payload.active),labels=active.map(r=>JSON.stringify(r.payload.variant_options.map(o=>o.label))),combinations=items.map(r=>JSON.stringify(r.payload.variant_options));
+  if(items.length>100)message='At most 100 choices per food group.';
+  else if(new Set(items.map(r=>r.payload.category_id)).size!==1)message='Use the same POS sales category for every choice in a group.';
+  else if(new Set(labels).size>1)message='Use the same option names and order for every active choice.';
+  else if(new Set(combinations).size!==combinations.length)message='Duplicate size/serving combination in this group.';
+  else if(menu.some(m=>m.option_group===group&&!items.some(r=>r.payload.id===m.id)))message='Include every existing choice of this group with its original food_code, or use the food editor.';
+  if(message)for(const r of items){invalid.add(r);errors.push({row:r.row,code:r.code,message});}
+ }
+ return {rows:rows.filter(r=>!invalid.has(r)),errors};
 }
 export async function runFoodImport(rows,{tenant,branch,confirmUntracked,rpc,onProgress=()=>{}}){
  if(rows.some(r=>r.payload.stock_mode==='untracked')&&!confirmUntracked)throw new Error('Confirm foods without automatic stock deduction.');
  const results=[];
- for(const row of rows){
-  try{await rpc('pos_setup',{p_restaurant_id:tenant,p_branch_id:branch,p_command:'menu',p_payload:{...row.payload,confirm_untracked:confirmUntracked}});results.push({...row,ok:true});}
-  catch(e){results.push({...row,ok:false,message:e.message});}
+ const batches=new Map();
+ for(const row of rows){const key=row.payload.option_group?'group:'+row.payload.option_group:'row:'+row.code;if(!batches.has(key))batches.set(key,[]);batches.get(key).push(row);}
+ for(const batch of batches.values()){
+  const first=batch[0],group=first.payload.option_group;
+  try{
+   const items=batch.map(row=>({...row.payload,confirm_untracked:confirmUntracked}));
+   await rpc('pos_setup',{p_restaurant_id:tenant,p_branch_id:branch,p_command:group?'menu_batch':'menu',p_payload:group?{option_group:group,category_id:first.payload.category_id,items}:items[0]});
+   results.push(...batch.map(row=>({...row,ok:true})));
+  }catch(e){results.push(...batch.map(row=>({...row,ok:false,message:e.message})));}
   onProgress([...results]);
  }
  return results;

@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { describe, expect, it } from 'vitest';
+import {zipSync,unzipSync,strFromU8,strToU8} from 'fflate';
 import {
   createProductImportTemplate,
   parseProductSpreadsheet,
@@ -73,4 +74,16 @@ describe('product spreadsheet import', () => {
       category: 'Grocery',
     });
   });
+});
+
+it('reads prefixed SpreadsheetML elements from standard Excel exporters',async()=>{
+ const entries=unzipSync(createProductImportTemplate());
+ for(const path of ['xl/workbook.xml','xl/worksheets/sheet1.xml']){
+  let xml=strFromU8(entries[path]);
+  xml=xml.replace('xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"','xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"');
+  xml=xml.replace(/<(\/?)([A-Za-z][A-Za-z0-9]*)(?=[\s/>])/g,'<$1x:$2');
+  entries[path]=strToU8(xml);
+ }
+ const records=await parseProductSpreadsheet(xlsxFile(zipSync(entries)));
+ expect(records).toHaveLength(1);expect(records[0].name).toBeTruthy();
 });

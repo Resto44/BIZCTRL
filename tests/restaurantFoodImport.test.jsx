@@ -28,3 +28,33 @@ describe('restaurant food import',()=>{
   expect(rpc.mock.calls[0][1].p_payload.id).toBe(rpc.mock.calls[2][1].p_payload.id);expect(rpc.mock.calls[0][1]).toMatchObject({p_restaurant_id:'restaurant-a',p_branch_id:'branch-a',p_command:'menu'});
  });
 });
+
+describe('customizable food spreadsheet import',()=>{
+ const choice=(code,size,style='With rice',extra={})=>row({food_code:code,option_group:'Roast chicken',size,serving_style:style,...extra});
+ it('round trips size columns and groups canonical priced choices for POS',async()=>{
+  const bytes=foodTemplate(),records=await parseProductSpreadsheet({name:'foods.xlsx',size:bytes.length,arrayBuffer:async()=>bytes.buffer});
+  expect(records[0]).toMatchObject({option_group:'Roast chicken',size:'Half',serving_style:'With rice'});
+  const p=await prepareFoodImport([choice('WHOLE','Whole'),choice('HALF','Half','Plain',{selling_price:14})],scope);
+  expect(p.errors).toEqual([]);expect(p.rows[1].payload).toMatchObject({price:14,option_group:'Roast chicken',variant_options:[{label:'Size',value:'Half'},{label:'Serving',value:'Plain'}]});
+  const rpc=vi.fn().mockResolvedValue({});await runFoodImport(p.rows,{...scope,rpc,confirmUntracked:false});
+  expect(rpc).toHaveBeenCalledTimes(1);expect(rpc.mock.calls[0][1]).toMatchObject({p_command:'menu_batch',p_payload:{option_group:'Roast chicken',items:p.rows.map(r=>({...r.payload,confirm_untracked:false}))}});
+ });
+ it('rejects duplicate combinations, inconsistent axes and incomplete existing groups',async()=>{
+  expect((await prepareFoodImport([choice('A','Half'),choice('B','Half')],scope)).errors).toHaveLength(2);
+  expect((await prepareFoodImport([choice('A','Half'),choice('B','Whole','')],scope)).errors).toHaveLength(2);
+  const p=await prepareFoodImport([choice('A','Half')],{...scope,menu:[{id:'manual-choice',option_group:'Roast chicken'}]});expect(p.rows).toHaveLength(0);expect(p.errors[0].message).toContain('every existing');
+  expect((await prepareFoodImport([choice('A','Half','With rice',{option_3_name:'Sauce'})],scope)).errors).toHaveLength(1);
+ });
+ it('retries the complete failed group without repeating a successful standalone food',async()=>{
+  const p=await prepareFoodImport([choice('A','Whole'),choice('B','Half'),row({food_code:'drink'})],scope);
+  const rpc=vi.fn().mockRejectedValueOnce(new Error('Failure')).mockResolvedValue({});
+  const results=await runFoodImport(p.rows,{...scope,rpc,confirmUntracked:false});expect(results.map(r=>r.ok)).toEqual([false,false,true]);
+  await runFoodImport(results.filter(r=>!r.ok),{...scope,rpc,confirmUntracked:false});
+  expect(rpc).toHaveBeenCalledTimes(3);expect(rpc.mock.calls[0][1]).toEqual(rpc.mock.calls[2][1]);
+ });
+ it('updates imported groups with stable identifiers and supports extra options',async()=>{
+  const inputs=[choice('A','Large','',{option_3_name:'Milk',option_3_value:'Oat'})];
+  const first=await prepareFoodImport(inputs,scope);const again=await prepareFoodImport(inputs,{...scope,menu:first.rows.map(r=>r.payload)});
+  expect(again.errors).toEqual([]);expect(again.rows[0].update).toBe(true);expect(again.rows[0].payload).toEqual(first.rows[0].payload);
+ });
+});
