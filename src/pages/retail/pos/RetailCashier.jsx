@@ -58,6 +58,10 @@ function CashierDialog({ modal, close, api, lang, c, currency, onReceipt, onPair
   return <Dialog open onOpenChange={open => { if (!open && !api.busy) close(); }}>
     <DialogContent className={touch?"touch-dialog sm:max-w-xl":"max-h-[90dvh] overflow-y-auto sm:max-w-xl"} dir={lang === 'en' ? 'ltr' : 'rtl'}>
       <DialogHeader><DialogTitle>{titles[modal.type]}</DialogTitle><DialogDescription>{modal.type === 'display' ? c.pairHint : modal.type === 'close' ? c.closeHint : modal.type === 'refund' ? c.refundHint : modal.type === 'discount' ? c.discountHint : modal.type === 'payment' ? c.reserve : modal.type === 'cancel' ? c.confirmCancel : c.title}</DialogDescription></DialogHeader>
+      {modal.type === 'receipt' && <div className="grid grid-cols-2 items-end gap-2 shrink-0">
+          <Field label={c.paper}><select className={field} value={paper} onChange={e => setPaper(e.target.value)}><option value="80mm">80 mm</option><option value="A4">A4</option></select></Field>
+          <button className={primary} type="button" onClick={() => { try { printCashierReceipt(modal.receipt, lang, paper); } catch (e) { setLocalError(e.message); } }}><Printer size={20} />{c.print}</button>
+      </div>}
       <Form {...(touch?{lang}:{})} onSubmit={submit} className="grid gap-4">
         {modal.type === 'open' && <>{textInput('cashier_name', c.cashier)}{textInput('opening_cash', c.opening, 'number')}</>}
         {modal.type === 'close' && <><div className="rounded-xl bg-blue-50 p-4 text-blue-900">{c.expected}: {money(api.snapshot?.expected_cash, currency)}</div>{textInput('counted_cash', c.counted, 'number')}{values.counted_cash !== '' && <p>{c.difference}: {money(Number(values.counted_cash) - Number(api.snapshot?.expected_cash), currency)}</p>}{textInput('notes', c.notes, 'text', false)}</>}
@@ -80,8 +84,7 @@ function CashierDialog({ modal, close, api, lang, c, currency, onReceipt, onPair
           {touch?<TouchReceiptLines lines={modal.receipt.lines} lang={lang} render={line=><div key={line.product_id} className="flex items-start justify-between gap-3 py-3 text-sm"><div>{productName(line, lang)}<p className="text-slate-500">{line.quantity} × {money(line.unit_price, currency)}</p></div><strong dir="ltr">{money(line.line_total, currency)}</strong></div>}/>:<div className="max-h-56 overflow-auto divide-y">{modal.receipt.lines?.map(line => <div key={line.product_id} className="flex items-start justify-between gap-3 py-3 text-sm"><div>{productName(line, lang)}<p className="text-slate-500">{line.quantity} × {money(line.unit_price, currency)}</p></div><strong dir="ltr">{money(line.line_total, currency)}</strong></div>)}</div>}
           <Totals cart={modal.receipt} c={c} currency={currency} />
           <p>{c.change}: {money(modal.receipt.change, currency)}</p>
-          <Field label={c.paper}><select className={field} value={paper} onChange={e => setPaper(e.target.value)}><option value="80mm">80 mm</option><option value="A4">A4</option></select></Field>
-          <button className={primary} type="button" onClick={() => { try { printCashierReceipt(modal.receipt, lang, paper); } catch (e) { setLocalError(e.message); } }}><Printer size={20} />{c.print}</button>
+
           {api.snapshot?.can_manage && api.snapshot?.shift?.status === 'open' && modal.receipt.transaction_type === 'sale' && !modal.receipt.refunded && <button className={secondary} type="button" onClick={() => onReceipt(modal.receipt, 'refund')}>{c.refund}</button>}
           {modal.receipt.refunded && <p className="text-amber-700">{c.refunded}</p>}
           <button className={secondary} type="button" disabled={Boolean(api.busy || api.pending)} onClick={async () => { try { await onNew(); close(); } catch (e) { setLocalError(e.message); } }}>{c.newSale}</button>
