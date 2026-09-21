@@ -1,3 +1,5 @@
+import TouchWorkspace from '@/components/pos-touch/TouchWorkspace';
+import {useTouchMode,TouchForm,touchCopy as fixedCopy} from '@/components/pos-touch/TouchPrimitives';
 import RestaurantDevices from '@/components/restaurant-pos/RestaurantDevices';
 import {customizationCopy} from '@/lib/restaurantCustomization';
 import RestaurantCategorySelect from '@/components/restaurant-pos/RestaurantCategorySelect';
@@ -60,30 +62,38 @@ export function Setup({tenant,branch,c,close,refresh,initial=null,menuOnly=false
  </DialogContent></Dialog>;
 }
 
-function ActionDialog({kind,api,c,close,currency,onResult}) {
+function ActionDialog({kind,api,c,close,currency,onResult,touch=false,lang='en'}) {
+ const Form=touch?TouchForm:'form';
  const cart=api.snapshot?.cart;
  const [v,setV]=useState({cashier_name:'',opening_cash:'0',counted_cash:'',reason:'',notes:cart?.notes||'',order_type:cart?.order_type||'takeaway',table_label:cart?.table_label||'',mode:'cash',cash:String(cart?.net_total||0),card:'0',confirmed:false});
  const [error,setError]=useState('');const set=(k,value)=>setV(s=>({...s,[k]:value}));const p=paymentBreakdown(cart?.net_total,v.mode,v.cash,v.card);
  const text=(key,label,type='text')=><Field label={label}><input className={input} type={type} min="0" step="0.01" value={v[key]} required={!['table_label','notes'].includes(key)} onChange={e=>set(key,e.target.value)}/></Field>;
  const titles={payment:c.pay,open:c.openShift,close:c.closeShift,cancel:c.cancel,details:c.details};
  const submit=async e=>{e.preventDefault();setError('');try{const payload=kind==='payment'?{payment_confirmed:v.confirmed,payments:p.payments}:kind==='open'?{cashier_name:v.cashier_name,opening_cash:Number(v.opening_cash)}:kind==='close'?{counted_cash:Number(v.counted_cash),notes:v.notes}:kind==='cancel'?{reason:v.reason}:{order_type:v.order_type,table_label:v.table_label,notes:v.notes};const r=await api.command({payment:'checkout',open:'open_shift',close:'close_shift',cancel:'cancel',details:'details'}[kind],payload);onResult(r);close();}catch(e){setError(e.message);}};
- return <Dialog open onOpenChange={v=>{if(!v&&!api.busy)close();}}><DialogContent className="max-h-[90dvh] overflow-y-auto"><DialogHeader><DialogTitle>{titles[kind]}</DialogTitle><DialogDescription>{kind==='close'?c.closeHint:kind==='cancel'?c.cancelHint:c.stockHint}</DialogDescription></DialogHeader><form onSubmit={submit} className="grid gap-4">
+ return <Dialog open onOpenChange={v=>{if(!v&&!api.busy)close();}}><DialogContent className={touch?"touch-dialog sm:max-w-xl":"max-h-[90dvh] overflow-y-auto"}><DialogHeader><DialogTitle>{titles[kind]}</DialogTitle><DialogDescription>{kind==='close'?c.closeHint:kind==='cancel'?c.cancelHint:c.stockHint}</DialogDescription></DialogHeader><Form {...(touch?{lang}:{})} onSubmit={submit} className="grid gap-4">
   {kind==='open'&&<>{text('cashier_name',c.cashier)}{text('opening_cash',c.opening,'number')}</>}
   {kind==='close'&&<><strong>{c.expected}: {money(api.snapshot?.expected_cash,currency)}</strong>{text('counted_cash',c.counted,'number')}{text('notes',c.notes)}</>}
   {kind==='cancel'&&text('reason',c.reason)}
   {kind==='details'&&<><Field label={c.details}><select className={input} value={v.order_type} onChange={e=>set('order_type',e.target.value)}>{['dine_in','takeaway','delivery'].map(t=><option key={t} value={t}>{c[t]}</option>)}</select></Field>{text('table_label',c.table)}{text('notes',c.notes)}</>}
   {kind==='payment'&&<><strong className="text-3xl" dir="ltr">{money(cart?.net_total,currency)}</strong><div className="grid grid-cols-3 gap-2">{['cash','card','mixed'].map(m=><button className={v.mode===m?primary:button} type="button" key={m} onClick={()=>set('mode',m)}>{c[m]}</button>)}</div>{v.mode!=='card'&&text('cash',c.tendered,'number')}{v.mode==='mixed'&&text('card',c.cardAmount,'number')}<p>{c.change}: {money(p.change,currency)}</p><label className="flex items-start gap-3 text-sm"><input type="checkbox" required checked={v.confirmed} onChange={e=>set('confirmed',e.target.checked)}/>{c.confirmed}</label></>}
   {error&&<p className="text-red-600" role="alert">{error}</p>}<button className={primary} disabled={Boolean(api.busy)||(kind==='payment'&&!p.valid)}>{titles[kind]}</button>
- </form></DialogContent></Dialog>;
+ </Form></DialogContent></Dialog>;
 }
 
 function Station({device,scope,active,c,lang,menu,page,canSell}) {
+ const touch=useTouchMode();
  const api=useRetailCashier(device.id,scope,active,restaurantRpc);const s=api.snapshot;const cart=s?.cart;const currency=s?.business?.currency||'SAR';
  const [modal,setModal]=useState(null);const [error,setError]=useState('');const [search,setSearch]=useState('');const [category,setCategory]=useState('');const [link,setLink]=useState('');const [copied,setCopied]=useState(false);const [receipt,setReceipt]=useState(null);
  const fresh=api.connected;const editable=Boolean(canSell&&s?.shift&&cart&&!cart.submitted_at&&!s.device.locked&&!api.pending&&!api.busy);
  const perform=async fn=>{try{setError('');const r=await fn();if(r?.receipt)setReceipt(r.receipt);return r;}catch(e){setError(e.message);return null;}};
  const qty=(m,delta)=>perform(()=>api.command('quantity',current=>({menu_id:m.id||m.menu_id,quantity:Number(current?.lines?.find(l=>l.menu_id===(m.id||m.menu_id))?.quantity||0)+delta})));
+ if(touch.enabled&&active&&page==='sell')return <><TouchWorkspace kind="restaurant" api={api} lang={lang} c={c} menu={menu} search={search} setSearch={setSearch} editable={editable&&fresh} canPay={Boolean(canSell&&fresh&&cart?.lines?.length&&s?.shift&&!s.device.locked&&!api.busy&&!api.pending)} canStart={Boolean(canSell&&s&&!s.device.locked)} catalogError={error} onAdd={(m,n)=>qty(m,n)} onQuantity={qty} onExit={touch.exit}
+  actions={[{id:'open',label:c.openShift,disabled:!canSell||!s||Boolean(s.shift)||s?.device.locked},{id:'close',label:c.closeShift,disabled:!canSell||!s?.shift||Boolean(api.busy)||Boolean(api.pending)},{id:'new_sale',label:c.newSale,disabled:!canSell||Boolean(cart)||!s?.shift},{id:'details',label:c.details,disabled:!editable},{id:'send_kitchen',label:c.send,disabled:!editable||!cart?.lines?.length},{id:'hold',label:c.hold,disabled:!canSell||!cart||Boolean(api.busy)||Boolean(api.pending)},{id:'cancel',label:c.cancel,disabled:!canSell||!cart||Boolean(api.busy)||Boolean(api.pending)}]}
+  onAction={key=>{if(['open','close','details','cancel','payment'].includes(key))setModal(key);else void perform(key==='retry'?api.retry:()=>api.command(key));}}
+  held={s?.held||[]} receipts={receipt?[receipt,...(s?.receipts||[]).filter(r=>r.id!==receipt.id)]:s?.receipts||[]} onResume={o=>perform(()=>api.command('resume',{cart_id:o.id,revision:o.revision}))} onReceipt={r=>perform(()=>printCashierReceipt(r,lang,'80mm'))}/>
+  {modal&&<ActionDialog touch lang={lang} key={modal} kind={modal} api={api} c={c} currency={currency} close={()=>setModal(null)} onResult={r=>{if(r.receipt)setReceipt(r.receipt);}}/>}</>;
  return <div className="space-y-4">
+  {touch.supported&&page==='sell'&&<button className={primary} onClick={touch.enable}>{fixedCopy(lang).title}</button>}
   <div className={`${panel} flex flex-wrap items-center justify-between gap-3`}><div><strong>{s?.business?.branch_name} · {device.code}</strong><p className="text-sm text-slate-500">{s?.shift?.cashier_name}</p></div><div className="flex flex-wrap gap-2"><Status fresh={fresh} c={c}/><button className={button} aria-label={c.refresh} onClick={()=>void api.refresh()}><RefreshCw size={18}/></button>{canSell&&s&&!s.shift&&<button className={primary} disabled={Boolean(api.pending)||s.device.locked} onClick={()=>setModal('open')}>{c.openShift}</button>}{canSell&&s?.shift&&<><button className={button} disabled={Boolean(api.busy)||Boolean(api.pending)} onClick={()=>setModal('close')}>{c.closeShift}</button>{!cart&&<button className={primary} disabled={Boolean(api.busy)||Boolean(api.pending)||s.device.locked} onClick={()=>void perform(()=>api.command('new_sale'))}><Plus size={18}/>{c.newSale}</button>}</>}</div></div>
   {api.pending&&<div className="rounded-xl bg-amber-50 p-4 text-amber-950" role="alert">{c.pending}<button className={button} onClick={()=>void perform(api.retry)}>{c.retry}</button></div>}
   {(error||api.error)&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-red-700">{error||api.error}</p>}
