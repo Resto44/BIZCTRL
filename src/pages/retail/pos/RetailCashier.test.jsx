@@ -69,3 +69,20 @@ describe('cashier screen integration', () => {
     mocks.lang = 'fa'; await render(); expect(container.textContent).toContain('صفحهٔ کاشیر'); expect(container.textContent).toContain('حليب'); expect(container.querySelector('[dir="rtl"]')).toBeTruthy();
   });
 });
+
+describe('Windows touch layout payment',()=>{
+ it('uses the same confirmed payment command after the paged touch form',async()=>{
+  const original=window.matchMedia;window.matchMedia=()=>({matches:true,addEventListener(){},removeEventListener(){}});
+  try{
+   await render();expect(document.querySelector('[data-touch-pos="retail"]')).toBeTruthy();
+   const scan=document.querySelector('.touch-search input[aria-label="Scan barcode"]');await input(scan,'0012345678905');await act(async()=>scan.form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));await flush();
+   await click('Take payment');await click('Mada');
+   for(let i=0;i<6;i++){
+    const checkbox=document.querySelector('.touch-form input[type="checkbox"]');if(checkbox&&!checkbox.checked)await act(async()=>checkbox.click());
+    const submit=document.querySelector('.touch-form button[type="submit"]');if(submit){expect(submit.disabled).toBe(false);await act(async()=>submit.closest('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));break;}
+    await act(async()=>document.querySelector('.touch-form .touch-pager button:last-child').click());
+   }
+   await flush();expect(mocks.rpc.mock.calls.filter(([,a])=>a.p_command==='checkout')).toHaveLength(1);expect(state.cart).toBeNull();
+  }finally{window.matchMedia=original;}
+ });
+});

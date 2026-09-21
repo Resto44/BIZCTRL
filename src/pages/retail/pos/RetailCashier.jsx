@@ -1,3 +1,5 @@
+import TouchWorkspace from '@/components/pos-touch/TouchWorkspace';
+import {useTouchMode,TouchForm,TouchReceiptLines,touchCopy as fixedCopy} from '@/components/pos-touch/TouchPrimitives';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -28,7 +30,8 @@ function Totals({ cart, c, currency }) {
   </div>;
 }
 
-function CashierDialog({ modal, close, api, lang, c, currency, onReceipt, onPair, onNew }) {
+function CashierDialog({ modal, close, api, lang, c, currency, onReceipt, onPair, onNew, touch=false }) {
+  const Form=touch?TouchForm:'form';
   const [values, setValues] = useState({ cashier_name: '', opening_cash: '0', counted_cash: '', notes: '', reason: '', percent: '0', quantity: String(modal.line?.quantity ?? 1), mode: 'cash', cash: String(modal.cart?.net_total ?? 0), card: '0', confirmed: false, reference: '' });
   const [localError, setLocalError] = useState(null);
   const [paper, setPaper] = useState('80mm');
@@ -53,9 +56,9 @@ function CashierDialog({ modal, close, api, lang, c, currency, onReceipt, onPair
     } catch (error) { setLocalError(error.message); }
   };
   return <Dialog open onOpenChange={open => { if (!open && !api.busy) close(); }}>
-    <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl" dir={lang === 'en' ? 'ltr' : 'rtl'}>
+    <DialogContent className={touch?"touch-dialog sm:max-w-xl":"max-h-[90dvh] overflow-y-auto sm:max-w-xl"} dir={lang === 'en' ? 'ltr' : 'rtl'}>
       <DialogHeader><DialogTitle>{titles[modal.type]}</DialogTitle><DialogDescription>{modal.type === 'display' ? c.pairHint : modal.type === 'close' ? c.closeHint : modal.type === 'refund' ? c.refundHint : modal.type === 'discount' ? c.discountHint : modal.type === 'payment' ? c.reserve : modal.type === 'cancel' ? c.confirmCancel : c.title}</DialogDescription></DialogHeader>
-      <form onSubmit={submit} className="grid gap-4">
+      <Form {...(touch?{lang}:{})} onSubmit={submit} className="grid gap-4">
         {modal.type === 'open' && <>{textInput('cashier_name', c.cashier)}{textInput('opening_cash', c.opening, 'number')}</>}
         {modal.type === 'close' && <><div className="rounded-xl bg-blue-50 p-4 text-blue-900">{c.expected}: {money(api.snapshot?.expected_cash, currency)}</div>{textInput('counted_cash', c.counted, 'number')}{values.counted_cash !== '' && <p>{c.difference}: {money(Number(values.counted_cash) - Number(api.snapshot?.expected_cash), currency)}</p>}{textInput('notes', c.notes, 'text', false)}</>}
         {modal.type === 'quantity' && <><p className="font-bold">{productName(modal.line, lang)}</p>{textInput('quantity', c.quantity, 'number')}</>}
@@ -74,7 +77,7 @@ function CashierDialog({ modal, close, api, lang, c, currency, onReceipt, onPair
         {modal.type === 'receipt' && <>
           <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-4 font-bold text-emerald-800"><CheckCircle2 />{modal.receipt.transaction_type === 'refund' ? c.refundReceipt : c.paid}</div>
           <div className="text-sm text-slate-500"><p className="break-all">{modal.receipt.receipt_number}</p><p>{modal.receipt.business?.branch_name} · {modal.receipt.device_code} · {modal.receipt.cashier_name}</p><p>{new Date(modal.receipt.occurred_at).toLocaleString()}</p></div>
-          <div className="max-h-56 overflow-auto divide-y">{modal.receipt.lines?.map(line => <div key={line.product_id} className="flex items-start justify-between gap-3 py-3 text-sm"><div>{productName(line, lang)}<p className="text-slate-500">{line.quantity} × {money(line.unit_price, currency)}</p></div><strong dir="ltr">{money(line.line_total, currency)}</strong></div>)}</div>
+          {touch?<TouchReceiptLines lines={modal.receipt.lines} lang={lang} render={line=><div key={line.product_id} className="flex items-start justify-between gap-3 py-3 text-sm"><div>{productName(line, lang)}<p className="text-slate-500">{line.quantity} × {money(line.unit_price, currency)}</p></div><strong dir="ltr">{money(line.line_total, currency)}</strong></div>}/>:<div className="max-h-56 overflow-auto divide-y">{modal.receipt.lines?.map(line => <div key={line.product_id} className="flex items-start justify-between gap-3 py-3 text-sm"><div>{productName(line, lang)}<p className="text-slate-500">{line.quantity} × {money(line.unit_price, currency)}</p></div><strong dir="ltr">{money(line.line_total, currency)}</strong></div>)}</div>}
           <Totals cart={modal.receipt} c={c} currency={currency} />
           <p>{c.change}: {money(modal.receipt.change, currency)}</p>
           <Field label={c.paper}><select className={field} value={paper} onChange={e => setPaper(e.target.value)}><option value="80mm">80 mm</option><option value="A4">A4</option></select></Field>
@@ -90,12 +93,13 @@ function CashierDialog({ modal, close, api, lang, c, currency, onReceipt, onPair
         </>}
         {localError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{localError}</p>}
         {!['receipt', 'display'].includes(modal.type) && <button className={primary} type="submit" disabled={Boolean(api.busy || api.pending || !api.connected || (modal.type === 'payment' && (!values.confirmed || !payment.valid)))}>{api.busy ? '…' : modal.type === 'payment' ? c.confirmSale : modal.type === 'refund' ? c.refund : modal.type === 'cancel' ? c.cancel : c.save}</button>}
-      </form>
+      </Form>
     </DialogContent>
   </Dialog>;
 }
 
 function CashierStation({ deviceId, scope, active, lang, c }) {
+  const touch=useTouchMode();
   const api = useRetailCashier(deviceId, scope, active);
   const [tab, setTab] = useState('sell');
   const [scan, setScan] = useState('');
@@ -131,7 +135,14 @@ function CashierStation({ deviceId, scope, active, lang, c }) {
     void perform(() => api.command('scan', { code: normalized }));
     inputRef.current?.focus();
   };
+  if(touch.enabled&&active)return <><TouchWorkspace kind="retail" api={api} lang={lang} c={c} menu={catalog.data?.rows||[]} search={search} setSearch={setSearch} catalogPage={page} setCatalogPage={setPage} hasMore={Boolean(catalog.data?.has_more)} catalogLoading={catalog.isFetching} catalogError={message||catalog.error?.message} editable={Boolean(editable&&!api.busy)} canPay={Boolean(editable&&!api.busy&&cart?.lines?.length)} canStart={!locked&&Boolean(snapshot)} onScan={scanCode} onExit={touch.exit}
+   onAdd={(product,n)=>perform(()=>api.command('quantity',latest=>({product_id:product.id,quantity:Number(latest?.lines?.find(l=>l.product_id===product.id)?.quantity||0)+n})))} onQuantity={(line,n)=>perform(()=>api.command('quantity',latest=>({product_id:line.product_id,quantity:Math.max(0,Number(latest?.lines?.find(l=>l.product_id===line.product_id)?.quantity||0)+n)})))}
+   actions={[{id:'open',label:c.openShift,disabled:locked||!snapshot||Boolean(snapshot.shift)},{id:'close',label:c.closeShift,disabled:!ready||Boolean(api.busy)},{id:'new_sale',label:c.newSale,disabled:!ready||Boolean(cart)},{id:'hold',label:c.hold,disabled:!editable||Boolean(api.busy)||!cart?.lines?.length},{id:'discount',label:c.discount,disabled:!editable||!snapshot?.can_manage||Boolean(api.busy)},{id:'cancel',label:c.cancel,disabled:!editable||Boolean(api.busy)},{id:'display',label:c.display,disabled:!ready||Boolean(api.busy)}]}
+   onAction={key=>{if(['open','close','discount','cancel','display','payment'].includes(key))setModal({type:key,...(key==='payment'?{cart}:{})});else void perform(async()=>{const result=await(key==='retry'?api.retry():api.command(key));if(result?.receipt)showReceipt(result.receipt);if(key==='hold')await newSale();return result;});}}
+   held={snapshot?.held||[]} receipts={snapshot?.receipts||[]} onResume={held=>perform(()=>api.command('resume',{cart_id:held.id,revision:held.cart.revision}))} onReceipt={receipt=>perform(async()=>showReceipt(await cashierRpc('cashier_receipt',{p_device_id:deviceId,p_transaction_id:receipt.id})))}/>
+   {modal&&<CashierDialog touch key={`${modal.type}:${modal.receipt?.id||''}`} modal={modal} close={()=>setModal(null)} api={api} lang={lang} c={c} currency={currency} onReceipt={showReceipt} onPair={pair} onNew={newSale}/>}</>;
   return <>
+    {touch.supported&&<button className={primary} onClick={touch.enable}>{fixedCopy(lang).title}</button>}
     <section className={cn(panel, 'space-y-4')}>
       <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-xl font-black sm:text-2xl">{c.title}</h1><p className="mt-1 text-sm text-slate-500">{snapshot?.business?.branch_name} · {snapshot?.device?.code} · {snapshot?.shift?.cashier_name}</p></div><div className="flex flex-wrap items-center gap-2"><span role="status" className={cn('rounded-full px-3 py-2 text-xs font-semibold', api.connected ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800')}>{api.connected ? c.live : c.offline}</span><button type="button" className={secondary} onClick={() => void api.refresh()} aria-label={c.refresh}><RefreshCw size={18} /></button><button type="button" className={secondary} disabled={!ready || Boolean(api.busy)} onClick={() => setModal({ type: 'display' })}><Monitor size={18} /><span>{c.display}</span>{snapshot?.display_connected && <span className="h-2 w-2 rounded-full bg-emerald-500" />}</button></div></div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[['sell', ScanLine], ['orders', Receipt], ['stock', Package], ['shift', Banknote]].map(([key, Icon]) => <button type="button" key={key} className={cn(secondary, tab === key && 'border-blue-500 bg-blue-50 text-blue-700')} aria-pressed={tab === key} onClick={() => setTab(key)}><Icon size={18} />{c[key]}</button>)}</div>
