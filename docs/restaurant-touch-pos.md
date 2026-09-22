@@ -33,3 +33,9 @@ Private tables deny direct browser access. Narrow RPCs enforce subscription, por
 This release does not charge bank cards, provide silent printer drivers, offline transaction posting, ZATCA certification, paid-refund/partial-bill workflows, discount approval, graphical table plans or modifier groups. Printing uses the browser's receipt/PDF flow. Real printer/bank/customer hardware requires on-site acceptance. No synthetic devices, recipes or sales are seeded into an existing customer workspace. Initial setup must use that restaurant's real menu and stock.
 
 Do not delete the operating schema to roll back a UI release once sales exist. Revert the frontend commit if necessary and retain the immutable financial records; database changes require a forward migration.
+
+## Product master from the touchscreen
+
+Owners/managers with `can_manage` can open **Master / Add product** directly above the food cards, or from the standard POS header. The selected branch stays in scope and the active cart is retained. The dialog provides single-food creation, sizes/custom options, bulk Excel/CSV import with preview, an Excel template, and full Excel export (including inactive foods). Existing server authorization is used for catalog reads and every write.
+
+Exports retain menu IDs in `food_id`; reimport accepts these IDs only from the selected branch's authorized catalog, rejects repeated IDs, and updates existing foods. Do not remove `food_id` when updating an export. Custom option names/order and recipes round-trip; fixed serving keys also retain their original representation, IDs, prices and recipes. Import remains limited to 500 rows per file; keep each complete food group together. Old import templates without the added ID/option-name columns remain supported.

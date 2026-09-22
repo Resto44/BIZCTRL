@@ -76,3 +76,25 @@ it('takes restaurant payment on one screen with confirmation and canonical check
   expect(close).toHaveBeenCalledTimes(1);expect(result).toHaveBeenCalledWith({receipt:{id:'r'}});
  }finally{await React.act(async()=>root.unmount());host.remove();}
 });
+
+it('opens branch-scoped product tools for managers and hides them without manage permission',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;fixture.portal='restaurant';
+ const workspace={devices:[{id:'device',branch_id:'branch',code:'POS-01'}],menu:[],orders:[],events:[],can_manage:true};
+ fixture.rpc.mockImplementation(async name=>({data:name==='erp_restaurant_pos_catalog'?{menu:[],categories:[],inventory:[]}:workspace}));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{
+  await React.act(async()=>root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/restaurant/pos']}><RestaurantPOS/></MemoryRouter></QueryClientProvider>));
+  await React.act(async()=>{await new Promise(r=>setTimeout(r,30));});
+  const find=label=>[...document.querySelectorAll('button')].find(b=>b.textContent.includes(label));
+  await React.act(async()=>find('Master / Add product').click());
+  await React.act(async()=>{await new Promise(r=>setTimeout(r,30));});
+  expect(fixture.rpc).toHaveBeenCalledWith('erp_restaurant_pos_catalog',{p_restaurant_id:'tenant',p_branch_id:'branch',p_search:''});
+  expect(find('Bulk import').disabled).toBe(false);expect(find('Export all products').disabled).toBe(true);
+  await React.act(async()=>find('Bulk import').click());
+  expect(document.querySelector('input[type=file]').accept).toBe('.xlsx,.csv');
+  await React.act(async()=>{client.setQueriesData({queryKey:['restaurant-pos']},old=>({...old,can_manage:false}));});
+  await React.act(async()=>{await new Promise(r=>setTimeout(r,30));});
+  expect(find('Master / Add product')).toBeUndefined();expect(document.querySelector('input[type=file]')).toBeNull();
+ }finally{await React.act(async()=>root.unmount());host.remove();client.clear();}
+});
