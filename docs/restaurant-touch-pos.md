@@ -39,3 +39,9 @@ Do not delete the operating schema to roll back a UI release once sales exist. R
 Owners/managers with `can_manage` can open **Master / Add product** directly above the food cards, or from the standard POS header. The selected branch stays in scope and the active cart is retained. The dialog provides single-food creation, sizes/custom options, bulk Excel/CSV import with preview, an Excel template, and full Excel export (including inactive foods). Existing server authorization is used for catalog reads and every write.
 
 Exports retain menu IDs in `food_id`; reimport accepts these IDs only from the selected branch's authorized catalog, rejects repeated IDs, and updates existing foods. Do not remove `food_id` when updating an export. Custom option names/order and recipes round-trip; fixed serving keys also retain their original representation, IDs, prices and recipes. Import remains limited to 500 rows per file; keep each complete food group together. Old import templates without the added ID/option-name columns remain supported.
+
+## Category image links
+
+Open **Master / Add product → POS Sales Category Management** to create or edit a sales category. Its optional HTTPS image URL supports a preview and explicit removal. Artwork appears on desktop category buttons and the mobile category picker; missing or failed images fall back to the category icon. Saving refreshes the POS/catalog queries. Category image writes retain the existing manager and branch authorization. Older clients that omit image_url preserve the saved image.
+
+Verification: category form save/removal/invalid URL and desktop/mobile rendering tests; `supabase/tests/restaurant_category_images.sql` tests save, preservation, removal, catalog/workspace projection, invalid links and cross-branch/anonymous rejection with synthetic fixtures inside a rollback transaction.

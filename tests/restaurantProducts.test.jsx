@@ -98,9 +98,11 @@ describe('separate POS sales category management',()=>{
   const field=label=>view.root.findAllByType('label').find(n=>text(n).trim()===label).findByType('input');
   act(()=>field('Category name').props.onChange({target:{value:'Rice dishes'}}));
   act(()=>field('Arabic name').props.onChange({target:{value:'أطباق الأرز'}}));
+  act(()=>field('Category image URL').props.onChange({target:{value:'https://example.com/rice.jpg'}}));
+  expect(view.root.findByType('img').props.src).toBe('https://example.com/rice.jpg');
   const stopped=vi.fn();await act(async()=>view.root.findByType('form').props.onSubmit({preventDefault(){},stopPropagation:stopped}));
   const calls=fixture.rpc.mock.calls.filter(([,args])=>args.p_command==='category_save');expect(calls).toHaveLength(1);
-  expect(calls[0][1]).toMatchObject({p_restaurant_id:'tenant',p_branch_id:'branch',p_payload:{name:'Rice dishes',name_ar:'أطباق الأرز',is_active:true}});
+  expect(calls[0][1]).toMatchObject({p_restaurant_id:'tenant',p_branch_id:'branch',p_payload:{name:'Rice dishes',name_ar:'أطباق الأرز',is_active:true,image_url:'https://example.com/rice.jpg'}});
   expect(stopped).toHaveBeenCalledOnce();expect(saved).toHaveBeenCalledWith(calls[0][1].p_payload.id);
   expect(fixture.rpc.mock.calls.every(([name])=>name==='erp_restaurant_pos_setup')).toBe(true);
   await close();
@@ -160,4 +162,20 @@ describe('restaurant food removal',()=>{
   expect(view.root.findAll(n=>n.props.role==='status').some(n=>text(n).includes('Removed: 2'))).toBe(true);
   await close();
  });
+});
+
+
+it('rejects unsafe category image links and allows removing an existing image',async()=>{
+ fixture.rpc.mockReset();fixture.rpc.mockImplementation(async(name,args)=>({data:args?.p_command==='category_list'?{categories:[{id:'sales-cat',name:'Grills',is_active:true,sort_order:0,image_url:'https://example.com/grills.jpg'}]}:{ok:true}}));
+ const {view,close}=await render(<RestaurantSalesCategories tenant="tenant" branch="branch" lang="en" close={vi.fn()}/>);
+ await act(async()=>view.root.findAllByType('button').find(n=>n.props['aria-label']==='Edit Grills').props.onClick());
+ const image=()=>view.root.findByProps({type:'url'});
+ act(()=>image().props.onChange({target:{value:'javascript:alert(1)'}}));
+ await act(async()=>view.root.findByType('form').props.onSubmit({preventDefault(){},stopPropagation(){}}));
+ expect(fixture.rpc.mock.calls.filter(([,args])=>args.p_command==='category_save')).toHaveLength(0);
+ expect(view.root.findByProps({role:'alert'}).children.join('')).toContain('HTTPS');
+ act(()=>view.root.findAllByType('button').find(n=>text(n)==='Remove image').props.onClick());
+ await act(async()=>view.root.findByType('form').props.onSubmit({preventDefault(){},stopPropagation(){}}));
+ expect(fixture.rpc.mock.calls.find(([,args])=>args.p_command==='category_save')[1].p_payload.image_url).toBeNull();
+ await close();
 });
