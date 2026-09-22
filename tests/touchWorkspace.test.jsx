@@ -76,3 +76,19 @@ it('keeps the product master action directly reachable on mobile without changin
  await act(async()=>root.render(<TouchWorkspace {...p} catalogActions={null}/>));
  expect(document.querySelector('.touch-catalog-actions')).toBeNull();
 });
+
+
+it('shows category artwork on desktop and mobile, with a fallback for broken links',async()=>{
+ const p=props();p.menu=[{id:'food',name:'Grill',price:22,active:true,category_id:'grills',category:'Grills',category_image_url:'https://example.com/grills.jpg'}];
+ await act(async()=>root.render(<TouchWorkspace {...p}/>));
+ const image=document.querySelector('.touch-category-list img');expect(image.src).toBe('https://example.com/grills.jpg');
+ await act(async()=>image.dispatchEvent(new Event('error')));
+ expect(document.querySelector('.touch-category-list img')).toBeNull();
+ const category=[...document.querySelectorAll('.touch-category-list button')].find(b=>b.textContent==='Grills');expect(category.querySelector('svg')).toBeTruthy();
+ await click(category);expect(document.querySelector('.touch-product strong').textContent).toBe('Grill');
+ await act(async()=>{Object.defineProperty(window,'innerWidth',{value:390,configurable:true});window.dispatchEvent(new Event('resize'));});
+ await click(document.querySelector('.touch-category-trigger'));
+ expect(document.querySelector('.touch-options img').src).toBe('https://example.com/grills.jpg');
+ await click([...document.querySelectorAll('.touch-options button')].find(b=>b.textContent==='Grills'));
+ expect(document.querySelector('.touch-layer')).toBeNull();
+});

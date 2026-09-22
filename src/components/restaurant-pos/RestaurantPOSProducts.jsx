@@ -1,3 +1,5 @@
+import RestaurantSalesCategories from './RestaurantSalesCategories';
+import {touchCopy} from '@/lib/restaurantServingOptions';
 import {useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle} from '@/components/ui/dialog';
@@ -19,6 +21,7 @@ export default function RestaurantPOSProducts({tenant,branch,lang,c,close}){
  const t=posProductsCopy(lang),qc=useQueryClient();const [mode,setMode]=useState('home');
  const q=useQuery({queryKey:['restaurant-menu-catalog',tenant,branch],queryFn:()=>restaurantRpc('pos_catalog',{p_restaurant_id:tenant,p_branch_id:branch,p_search:''}),enabled:Boolean(tenant&&branch)});
  const refresh=()=>Promise.all(['restaurant-menu-catalog','restaurant-pos','restaurant-pos-setup','products'].map(key=>qc.invalidateQueries({queryKey:[key]})));
+ if(mode==='categories')return <RestaurantSalesCategories tenant={tenant} branch={branch} lang={lang} close={close} refresh={refresh}/>;
  if(mode==='add')return <Setup tenant={tenant} branch={branch} c={c} menuOnly close={close} refresh={refresh}/>;
  if(mode==='sizes'&&q.data)return <RestaurantMenuGroupEditor tenant={tenant} branch={branch} catalog={q.data} reload={q.refetch} refresh={refresh} close={close}/>;
  if(mode==='import'&&q.data)return <RestaurantFoodImport tenant={tenant} branch={branch} catalog={q.data} lang={lang} close={close} refresh={refresh}/>;
@@ -28,6 +31,7 @@ export default function RestaurantPOSProducts({tenant,branch,lang,c,close}){
    <button type="button" className={button} disabled={!q.data||q.isFetching||q.isError} onClick={()=>setMode('sizes')}>{customizationCopy(lang).new}</button>
    <button type="button" className={button} disabled={!q.data||q.isFetching||q.isError} onClick={()=>setMode('import')}>{t.import}</button>
    <button type="button" className={button} disabled={!q.data?.menu?.length||q.isFetching||q.isError} onClick={()=>downloadFoodFile(foodExport(q.data.menu),'restaurant-products-'+branch+'.xlsx',xlsx)}>{t.export}</button>
+   <button type="button" className={button+' sm:col-span-2'} onClick={()=>setMode('categories')}>{touchCopy(lang).manage}</button>
    <button type="button" className={button+' sm:col-span-2'} onClick={()=>downloadFoodFile(foodTemplate(),'restaurant-food-import.xlsx',xlsx)}>{t.template}</button>
   </div>
   <p className="text-sm leading-6 text-slate-500">{t.notice}</p>
