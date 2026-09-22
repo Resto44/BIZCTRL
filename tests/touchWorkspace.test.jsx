@@ -66,3 +66,13 @@ it('prints the latest restaurant receipt directly and keeps history separate',as
  await click(document.querySelector('.touch-invoice .touch-footer button:last-child'));
  expect(document.querySelector('.touch-layer').textContent).toContain('R-1');
 });
+
+it('keeps the product master action directly reachable on mobile without changing the cart',async()=>{
+ Object.defineProperty(window,'innerWidth',{value:390,configurable:true});
+ const p=props(),open=vi.fn();p.catalogActions=<button onClick={open}>Master / Add product</button>;
+ await act(async()=>root.render(<TouchWorkspace {...p}/>));
+ await click(document.querySelector('.touch-catalog-actions button'));
+ expect(open).toHaveBeenCalledTimes(1);expect(p.onAdd).not.toHaveBeenCalled();expect(p.onAction).not.toHaveBeenCalled();
+ await act(async()=>root.render(<TouchWorkspace {...p} catalogActions={null}/>));
+ expect(document.querySelector('.touch-catalog-actions')).toBeNull();
+});

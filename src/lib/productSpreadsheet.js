@@ -294,13 +294,14 @@ export function createProductImportTemplate(options = {}) {
     'Basmati Rice 5kg', 'SUP-000001', '6281000000012', 'أرز بسمتي ٥ كغ', 'Basmati Rice 5kg', 'برنج باسمتی ۵ کیلو',
     'Grocery', 'Example Brand', 'bag', '42.50', '55.00', '15', '5', '40', '8', '20', '', '', 'A-03', 'S-02', 'B-08', 'active',
   ];
+  const rows = options.rows || [example];
   const widths = headers.map((_, index) => `<col min="${index + 1}" max="${index + 1}" width="${index === 0 ? 28 : index < 9 ? 18 : 16}" customWidth="1"/>`).join('');
   const worksheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
   <cols>${widths}</cols>
-  <sheetData>${worksheetRow(headers, 1, 1)}${worksheetRow(example, 2, 0)}</sheetData>
-  <autoFilter ref="A1:${columnReference(headers.length - 1)}2"/>
+  <sheetData>${worksheetRow(headers, 1, 1)}${rows.map((row, index) => worksheetRow(row, index + 2, 0)).join('')}</sheetData>
+  <autoFilter ref="A1:${columnReference(headers.length - 1)}${rows.length + 1}"/>
 </worksheet>`;
 
   const files = {

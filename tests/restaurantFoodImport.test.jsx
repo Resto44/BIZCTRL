@@ -58,3 +58,26 @@ describe('customizable food spreadsheet import',()=>{
   expect(again.errors).toEqual([]);expect(again.rows[0].update).toBe(true);expect(again.rows[0].payload).toEqual(first.rows[0].payload);
  });
 });
+
+describe('exported branch foods',()=>{
+ it('exports every row and reimports edits without duplicates, preserving recipes and four custom axes',async()=>{
+  const {foodExport}=await import('../src/lib/restaurantFoodImport');
+  const menu=[{id:'existing-a',name:'قهوه',name_ar:'قهوة',price:22,tax_rate:15,category_id:'sales',stock_mode:'recipe',recipe:[{inventory_id:'rice',quantity:0.5}],active:true,option_group:'Coffee',variant_options:[{label:'Milk',value:'Oat'},{label:'Temperature',value:'Cold'},{label:'Size',value:'Large'},{label:'Sugar',value:'None'}]},
+   {id:'existing-b',name:'Inactive meal',price:14,tax_rate:0,category_id:'sales',stock_mode:'untracked',active:false,recipe:[]}];
+  const bytes=foodExport(menu);const records=await parseProductSpreadsheet({name:'foods.xlsx',size:bytes.length,arrayBuffer:async()=>bytes.buffer});
+  expect(records).toHaveLength(2);records[0].selling_price='25';
+  const result=await prepareFoodImport(records,{...scope,menu});expect(result.errors).toEqual([]);
+  expect(result.rows.every(r=>r.update)).toBe(true);
+  expect(result.rows[0].payload).toMatchObject({id:'existing-a',price:25,name_ar:'قهوة',recipe:menu[0].recipe,variant_options:menu[0].variant_options});
+  expect(result.rows[1].payload).toMatchObject({id:'existing-b',active:false});
+  const wrongBranch=await prepareFoodImport(records,{...scope,branch:'other',menu:[]});expect(wrongBranch.rows).toHaveLength(0);expect(wrongBranch.errors).toHaveLength(2);
+  const duplicate=await prepareFoodImport([records[1],{...records[1],food_code:'another-code'}],{...scope,menu});expect(duplicate.errors[0].message).toContain('duplicate food');
+ });
+ it('preserves fixed serving keys and IDs during a round trip',async()=>{
+  const {foodExport}=await import('../src/lib/restaurantFoodImport');
+  const menu=['half_plain','whole_rice'].map((key,i)=>({id:'manual-'+i,name:key,option_group:'Chicken',option_key:key,price:20,tax_rate:0,stock_mode:'untracked',category_id:'sales',active:true,variant_options:[]}));
+  const bytes=foodExport(menu),records=await parseProductSpreadsheet({name:'foods.xlsx',size:bytes.length,arrayBuffer:async()=>bytes.buffer});
+  const result=await prepareFoodImport(records,{...scope,menu});expect(result.errors).toEqual([]);
+  expect(result.rows[0].payload).toMatchObject({id:'manual-0',option_key:'half_plain',variant_options:[]});
+ });
+});
