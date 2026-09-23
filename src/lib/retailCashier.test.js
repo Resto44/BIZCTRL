@@ -20,6 +20,24 @@ describe('cashier payment and receipt boundaries', () => {
     expect(html).toContain('Print / Save PDF'); expect(html).not.toContain('ZATCA');
     expect(money(11.5)).toBe('SAR 11.50');
   });
+  it('prints compact item details without empty SKU lines and retains long Arabic names and amounts', () => {
+    const receipt = {business: {currency: 'SAR'}, occurred_at: '2026-09-23T10:44:18Z', lines: [
+      {name_ar: 'نصف دجاج شواية مع الأرز والسلطة', quantity: 2, unit_price: 22, line_total: 44, unit: 'portion'},
+      {name_ar: 'مشروب', sku: 'SKU-10', quantity: 1, unit_price: 9, line_total: 9},
+    ], net_total: 53};
+    const html = receiptHtml(receipt, 'ar');
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const rows = doc.querySelectorAll('tbody tr');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].querySelector('.item-name').textContent).toBe(receipt.lines[0].name_ar);
+    expect(rows[0].querySelector('.item-meta').textContent).toBe('SAR 22.00 / portion');
+    expect(rows[0].querySelectorAll('br')).toHaveLength(0);
+    expect(rows[0].cells[1].textContent).toBe('2');
+    expect(rows[0].cells[2].textContent).toBe('44.00');
+    expect(rows[1].querySelector('.item-meta').textContent).toBe('SKU-10 · SAR 9.00 / pc');
+    expect(html).toContain('td,th{padding:3px 2px;line-height:1.25}');
+    expect(receiptHtml(receipt, 'ar', 'A4')).not.toContain('td,th{padding:3px 2px;line-height:1.25}');
+  });
   it('keeps ambiguous network failures pending, but clears definite DB rejections', () => {
     expect(isDefiniteRejection({ message: 'Failed to fetch' })).toBe(false);
     expect(isDefiniteRejection({ code: '40001' })).toBe(true);
