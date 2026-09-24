@@ -8,7 +8,7 @@ vi.mock('@/api/supabaseClient', () => ({ supabase: { rpc: mocks.rpc } }));
 vi.mock('@/lib/cashierBroadcast', () => ({ subscribeCashierBroadcast: mocks.subscribe }));
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let api; let root; let container; let state;
-function Harness({ active = true }) { api = useRetailCashier('lane-1', 'tenant:owner', active); return <div>{api.snapshot?.cart?.revision}</div>; }
+function Harness({ active = true, autoOrder = false }) { api = useRetailCashier('lane-1', 'tenant:owner', active, undefined, autoOrder); return <div>{api.snapshot?.cart?.revision}</div>; }
 const flush = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 beforeEach(() => {
   sessionStorage.clear(); vi.clearAllMocks();
@@ -54,4 +54,44 @@ describe('cashier mutation queue', () => {
     await act(async () => { await expect(api.command('scan', { code: '001' })).rejects.toThrow('inactive'); });
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
+});
+
+it('starts an order with the first food and prepares the next only after confirmed checkout', async () => {
+ state = {device:{id:'lane-1'},cart:null};
+ mocks.rpc.mockImplementation(async (name,args) => {
+  if(args.p_command==='new_sale') state={...state,cart:{id:'next',revision:0,lines:[]}};
+  if(args.p_command==='checkout') {state={...state,cart:null};return {data:{...state,receipt:{id:'paid'}},error:null};}
+  return {data:structuredClone(state),error:null};
+ });
+ await act(async()=>root.render(<Harness autoOrder/>));await flush();
+ await act(async()=>{await Promise.all([api.command('quantity',{}),api.command('quantity',{})]);});
+ expect(mocks.rpc.mock.calls.filter(([,a])=>a.p_command==='new_sale')).toHaveLength(1);
+ await act(async()=>{const result=await api.command('checkout',{});expect(result.receipt.id).toBe('paid');});
+ expect(api.snapshot.cart.id).toBe('next');
+ expect(mocks.rpc.mock.calls.filter(([,a])=>a.p_command==='new_sale')).toHaveLength(2);
+});
+it('recovers an uncertain checkout then retries only the interrupted next order', async () => {
+ let failPayment=true, failOrder=true;
+ mocks.rpc.mockImplementation(async(name,args)=>{
+  if(args.p_command==='checkout') {
+   if(failPayment){failPayment=false;return {error:{message:'Failed to fetch'}};}
+   state={...state,cart:null};return {data:{...state,receipt:{id:'paid'}},error:null};
+  }
+  if(args.p_command==='new_sale') {
+   if(failOrder){failOrder=false;return {error:{message:'Failed to fetch'}};}
+   state={...state,cart:{id:'next',revision:0,lines:[]}};
+  }
+  return {data:structuredClone(state),error:null};
+ });
+ await act(async()=>root.render(<Harness autoOrder/>));await flush();
+ await act(async()=>{await expect(api.command('checkout',{})).rejects.toThrow();});
+ expect(mocks.rpc.mock.calls.filter(([,a])=>a.p_command==='new_sale')).toHaveLength(0);
+ await act(async()=>{expect((await api.retry()).receipt.id).toBe('paid');});
+ expect(api.pending.command).toBe('new_sale');
+ const request=api.pending.id;
+ await act(async()=>{await api.retry();});
+ expect(api.pending).toBeNull();expect(api.snapshot.cart.id).toBe('next');
+ const payments=mocks.rpc.mock.calls.filter(([,a])=>a.p_command==='checkout');
+ expect(payments).toHaveLength(2);expect(payments[0][1]).toEqual(payments[1][1]);
+ expect(mocks.rpc.mock.calls.filter(([,a])=>a.p_command==='new_sale').map(([,a])=>a.p_request_id)).toEqual([request,request]);
 });

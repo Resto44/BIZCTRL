@@ -3,7 +3,7 @@ import { supabase } from '@/api/supabaseClient';
 import { cashierRpc, isDefiniteRejection } from '@/lib/retailCashier';
 import { subscribeCashierBroadcast } from '@/lib/cashierBroadcast';
 
-export function useRetailCashier(deviceId, scope, active = true, rpc = cashierRpc) {
+export function useRetailCashier(deviceId, scope, active = true, rpc = cashierRpc, autoOrder = false) {
   const storageKey = `cashier-pending:${scope}:${deviceId}`;
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState(null);
@@ -53,6 +53,15 @@ export function useRetailCashier(deviceId, scope, active = true, rpc = cashierRp
       throw e;
     }
   }, [apply, deviceId, rpc, savePending]);
+  const finish = useCallback(async request => {
+    const data = await execute(request);
+    if (autoOrder && request.command === 'checkout' && data?.receipt && !data.cart) {
+      // Checkout is already confirmed. A failed next order must never replay payment.
+      try { return { ...await execute({ id: crypto.randomUUID(), command: 'new_sale', payload: {} }), receipt: data.receipt }; }
+      catch { return data; }
+    }
+    return data;
+  }, [autoOrder, execute]);
   const command = useCallback((name, payload = {}) => {
     inFlight.current++; generation.current++;
     if (mounted.current) setBusy(inFlight.current);
@@ -60,9 +69,10 @@ export function useRetailCashier(deviceId, scope, active = true, rpc = cashierRp
       if (!mounted.current || !activeRef.current) throw new Error('Cashier page is inactive');
       if (uncertain.current) throw new Error('Check or retry the previous action first.');
       if (navigator.onLine === false) throw new Error('Offline: reconnect before changing or paying a sale.');
+      if (autoOrder && name === 'quantity' && !current.current?.cart) await execute({ id: crypto.randomUUID(), command: 'new_sale', payload: {} });
       const cart = current.current?.cart;
       const values = typeof payload === 'function' ? payload(cart) : payload;
-      return execute({ id: crypto.randomUUID(), command: name, payload: { ...(cart ? { cart_id: cart.id, revision: cart.revision } : {}), ...values } });
+      return finish({ id: crypto.randomUUID(), command: name, payload: { ...(cart ? { cart_id: cart.id, revision: cart.revision } : {}), ...values } });
     });
     const result = job.finally(() => {
       inFlight.current--;
@@ -71,13 +81,13 @@ export function useRetailCashier(deviceId, scope, active = true, rpc = cashierRp
     });
     queue.current = result.catch(() => {});
     return result;
-  }, [execute, refresh]);
+  }, [autoOrder, execute, finish, refresh]);
   const retry = useCallback(async () => {
     if (!uncertain.current || inFlight.current) return null;
     inFlight.current++; generation.current++; setBusy(1);
-    try { return await execute(uncertain.current); }
+    try { return await finish(uncertain.current); }
     finally { inFlight.current--; if (mounted.current) setBusy(0); void refresh(); }
-  }, [execute, refresh]);
+  }, [finish, refresh]);
   useEffect(() => {
     mounted.current = true;
     return () => { mounted.current = false; };

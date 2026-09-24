@@ -28,7 +28,9 @@ describe('fixed touch cashier',()=>{
   expect(document.querySelector('.touch-layer .touch-pager')).toBeNull();
   await click(document.querySelector('.touch-layer button[aria-label="+"]'));
   await click([...document.querySelectorAll('.touch-variant-grid button')].find(b=>b.textContent.includes('Large oat coffee')));
-  expect(p.onAdd).toHaveBeenCalledWith(p.menu[1],2);expect(document.querySelector('.touch-layer')).toBeNull();
+  expect(p.onAdd).toHaveBeenCalledWith(p.menu[1],2);expect(document.querySelector('.touch-layer')).not.toBeNull();
+  await click(document.querySelector('.touch-variant-grid button'));expect(p.onAdd).toHaveBeenCalledWith(p.menu[0],2);
+  await click(document.querySelector('.touch-variant>.touch-primary'));expect(p.onAction).toHaveBeenCalledWith('payment');expect(document.querySelector('.touch-layer')).toBeNull();
  });
  it('continues retail server pagination after the last visible product page',async()=>{
   const p=props();p.kind='retail';p.menu=p.menu.slice(0,12).map(m=>({...m,available:5}));p.hasMore=true;p.setCatalogPage=vi.fn();p.catalogPage=3;
