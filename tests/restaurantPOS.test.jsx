@@ -66,11 +66,9 @@ it('takes restaurant payment on one screen with confirmation and canonical check
  try{
   await React.act(async()=>root.render(<ActionDialog touch kind="payment" api={api} c={c} currency="SAR" close={close} onResult={result}/>));
   const form=document.querySelector('.touch-quick-payment');expect(form).toBeTruthy();expect(document.querySelector('.touch-form')).toBeNull();
-  expect(form.querySelector('input[type=number]')).toBeTruthy();expect(form.querySelector('input[type=checkbox]').required).toBe(true);
-  await React.act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));expect(api.command).not.toHaveBeenCalled();
+  expect(form.querySelector('input[type=number]')).toBeTruthy();expect(form.querySelector('input[type=checkbox]')).toBeNull();
   await React.act(async()=>[...form.querySelectorAll('button')].find(b=>b.textContent===c.card).click());
   expect(form.querySelector('input[type=number]')).toBeNull();
-  await React.act(async()=>form.querySelector('input[type=checkbox]').click());
   await React.act(async()=>form.querySelector(':scope > button:last-child').click());
   expect(api.command).toHaveBeenCalledWith('checkout',{payment_confirmed:true,payments:[{payment_method:'card',amount:22}]});
   expect(close).toHaveBeenCalledTimes(1);expect(result).toHaveBeenCalledWith({receipt:{id:'r'}});
