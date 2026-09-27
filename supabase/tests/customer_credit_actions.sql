@@ -30,6 +30,16 @@ begin
  denied:=false;
  begin perform public.erp_record_customer_receivable_payment(payload||jsonb_build_object('amount',100,'request_id',gen_random_uuid()));exception when others then if sqlerrm='CUSTOMER_DEBT_PAYMENT_EXCEEDS_REMAINING' then denied:=true;else raise;end if;end;
  assert denied,'Excess repayment accepted';
+ reset role;
+ insert into public.debt_records(restaurant_id,branch_id,branch,customer_id,type,party_type,party_name,total_amount,paid_amount,status,date,created_by) values(r,b,branch_key,c,'liability','customer','Credit fixture',110,0,'open',current_date,u::text);
+ set local role authenticated;
+ -- The UI filters each report view by restaurant_id. Verify real aggregates under RLS.
+ assert (select sum(outstanding_balance) from public.v_customer_summary where restaurant_id=r)=30,'Customer summary remaining balance incorrect';
+ assert (select sum(total_outstanding) from public.v_customer_aging where restaurant_id=r)=30,'Aging report remaining balance incorrect';
+ assert (select sum(collected_today) from public.v_collection_dashboard where restaurant_id=r)=5,'Collection dashboard amount incorrect';
+ assert not exists(select 1 from public.v_customer_summary where restaurant_id<>r),'Summary exposed another tenant';
+ assert not exists(select 1 from public.v_customer_aging where restaurant_id<>r),'Aging exposed another tenant';
+ assert not exists(select 1 from public.v_collection_dashboard where restaurant_id<>r),'Collections exposed another tenant';
  perform set_config('request.jwt.claims','{}',true);
  denied:=false;
  begin perform public.erp_record_customer_receivable_payment(payload);exception when others then if sqlerrm='SALES_CLOSING_AUTH_REQUIRED' then denied:=true;else raise;end if;end;

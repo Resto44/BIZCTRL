@@ -28,6 +28,7 @@ import { useTenant } from '@/lib/TenantContext';
 import { useRole } from '@/lib/RoleContext';
 import { createCustomerReceivable, customerDebtPaymentErrorMessage, invalidateCustomerReceivableQueries, newReceivableRequestId, recordCustomerDebtPayment } from '@/lib/debt/customerReceivableRepository';
 import { toast } from 'sonner';
+import { mergeCustomerReportSummary } from '@/lib/debt/customerReportSummary';
 import { format, parseISO } from 'date-fns';
 
 // UI Components
@@ -265,6 +266,7 @@ export default function CustomerManagement() {
       const q = supabase.from('debt_records').select('*')
         .eq('restaurant_id', activeRestaurantId)
         .eq('party_type', 'customer')
+        .eq('type', 'receivable')
         .order('date', { ascending: false })
         .limit(500);
       const { data, error } = await q;
@@ -326,34 +328,10 @@ export default function CustomerManagement() {
   });
 
   // ── Merged customer list ───────────────────────────────────────────────
-  const mergedCustomers = useMemo(() => {
-    const map = new Map();
-    // Filter customers by current restaurant and active status only
-    const activeCustomers = registeredCustomers.filter(c => 
-      c.is_active !== false && 
-      (!activeRestaurantId || c.restaurant_id === activeRestaurantId)
-    );
-    customerSummary.forEach(c => {
-      if (c.is_active !== false && (!activeRestaurantId || c.restaurant_id === activeRestaurantId)) {
-        map.set(c.customer_name, { ...c, source: 'summary' });
-      }
-    });
-    activeCustomers.forEach(rc => {
-      const key = rc.name;
-      if (map.has(key)) {
-        map.set(key, { ...map.get(key), ...rc, customer_name: rc.name, source: 'both' });
-      } else {
-        map.set(key, {
-          ...rc, customer_name: rc.name,
-          outstanding_balance: rc.outstanding_balance || 0,
-          total_credit_sales: rc.total_credit_sales || 0,
-          total_collected: rc.total_collected || 0,
-          overdue_count: 0, source: 'registered',
-        });
-      }
-    });
-    return Array.from(map.values());
-  }, [customerSummary, registeredCustomers, activeRestaurantId]);
+  const mergedCustomers = useMemo(
+    () => mergeCustomerReportSummary(customerSummary, registeredCustomers, activeRestaurantId),
+    [customerSummary, registeredCustomers, activeRestaurantId],
+  );
 
   // ── Filtered customers ────────────────────────────────────────────────
   const filteredCustomers = useMemo(() => {

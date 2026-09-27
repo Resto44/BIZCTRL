@@ -725,7 +725,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
       className={cn(
         mobile
           ? 'flex h-dvh max-h-dvh w-full min-w-0 max-w-full flex-col overflow-x-hidden overflow-y-auto overscroll-contain box-border bg-sidebar border-r border-sidebar-border shadow-2xl'
-          : 'hidden lg:flex h-screen sticky top-0 bg-sidebar border-r border-sidebar-border transition-all duration-200 ease-in-out overflow-hidden',
+          : 'hidden lg:flex flex-col h-screen sticky top-0 bg-sidebar border-r border-sidebar-border transition-all duration-200 ease-in-out overflow-hidden',
         !mobile && (collapsed ? 'w-[var(--erp-sidebar-collapsed)]' : 'w-[var(--erp-sidebar-width)]')
       )}
       style={{
