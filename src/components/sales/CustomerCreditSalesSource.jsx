@@ -87,6 +87,7 @@ export default function CustomerCreditSalesSource({
   onCustomerSearch,
   onSelectCustomer,
   onRecordPayment,
+  onReviewCreditSale,
   isRecordingPayment = false,
   paymentMethods = [],
   disabled = false,
@@ -317,8 +318,11 @@ export default function CustomerCreditSalesSource({
                 </Button>
               </div>
             ) : (
-              <div className={`flex min-h-14 items-center justify-center gap-2 rounded-2xl px-4 text-center text-sm font-black text-white ${transactionAmount > 0 && !saleExceedsLimit ? 'bg-blue-600' : 'bg-blue-400'}`} aria-live="polite">
-                <ClipboardCheck className="h-5 w-5" />{transactionAmount > 0 && !saleExceedsLimit ? 'Credit Sale Ready — Save with Closing' : 'Credit Sale Saves with Sales Closing'}
+              <div className="space-y-2">
+                <Button type="button" className="min-h-14 w-full rounded-2xl bg-blue-600 text-sm font-black hover:bg-blue-700" disabled={disabled || isRecordingPayment || transactionAmount <= 0 || saleExceedsLimit || !onReviewCreditSale} onClick={() => onReviewCreditSale(entry)}>
+                  <ClipboardCheck className="h-5 w-5" />Review & Save with Closing
+                </Button>
+                <p className="text-center text-xs text-slate-600" aria-live="polite">Credit Sale Saves with Sales Closing. Finalize Closing to record the debt.</p>
               </div>
             )}
           </>

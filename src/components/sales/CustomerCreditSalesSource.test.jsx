@@ -145,10 +145,15 @@ describe('CustomerCreditSalesSource', () => {
   });
 
   it('shows the selected-design closing status and a Debt Management fallback', () => {
+    const onReviewCreditSale = vi.fn();
     const tree = renderSource({
+      onReviewCreditSale,
       entry: { id: '1', customer_id: 'c1', amount: '50', payment_amount: '', transaction_type: 'credit_sale' },
     });
-    expect(JSON.stringify(tree.toJSON())).toContain('Credit Sale Ready — Save with Closing');
+    const review = tree.root.findAllByType('button').find(node => textOf(node).includes('Review & Save with Closing'));
+    expect(review.props.disabled).toBe(false);
+    act(() => review.props.onClick());
+    expect(onReviewCreditSale).toHaveBeenCalledWith(expect.objectContaining({customer_id:'c1',amount:'50'}));
 
     const emptyTree = renderSource({
       entry: { id: '2', customer_id: '', amount: '', payment_amount: '' },
