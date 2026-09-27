@@ -1589,9 +1589,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Save returns immediately to Daily Sales via onSubmit callback.
 
   return (
-    <form onSubmit={handleSubmit} className="flex h-full min-h-0 min-w-0 flex-col">
-      <div id="sales-closing-workspace" className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
-        <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-[calc(env(safe-area-inset-bottom)+7rem)] sm:space-y-4 sm:p-4 sm:pb-8">
+    <form onSubmit={handleSubmit} className="min-w-0">
+      {/* Embedded in the ERP page scroller: a second momentum scroller with
+          percentage height can clip expanded content on iOS after keyboard use. */}
+      <div id="sales-closing-workspace" className="min-w-0">
+        <div className="mx-auto w-full max-w-4xl space-y-3 p-3 sm:space-y-4 sm:p-4">
           {runtimeError && (
             <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-red-950">
               <p className="text-sm font-bold">Save failed</p>
