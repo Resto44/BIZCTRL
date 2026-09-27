@@ -1,0 +1,20 @@
+/* Scoped to the mounted ERP shell; public and sign-in pages retain normal scrolling. */
+html[data-erp-document="true"] {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+html[data-erp-document="true"] body {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+html[data-erp-document="true"] #root {
+  height: 100%;
+  overflow: hidden;
+}
