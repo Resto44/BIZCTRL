@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import CustomerCreditSalesSource from './CustomerCreditSalesSource';
 
 vi.mock('@/components/ui/button', () => ({ Button: ({ children, ...props }) => React.createElement('button', props, children) }));
-vi.mock('@/components/ui/input', () => ({ Input: (props) => React.createElement('input', props) }));
+vi.mock('@/components/ui/input', () => ({ Input: React.forwardRef((props, ref) => React.createElement('input', { ...props, ref })) }));
 vi.mock('@/components/ui/label', () => ({ Label: ({ children, ...props }) => React.createElement('label', props, children) }));
 vi.mock('@/components/ui/select', () => ({
   Select: ({ children, ...props }) => React.createElement('div', props, children),
@@ -47,7 +47,7 @@ const textOf = (node) => node.children.map((child) => (
   typeof child === 'string' ? child : textOf(child)
 )).join(' ');
 
-const renderSource = (overrides = {}) => TestRenderer.create(React.createElement(CustomerCreditSalesSource, {
+const renderSource = (overrides = {}, options) => TestRenderer.create(React.createElement(CustomerCreditSalesSource, {
   entry: { id: '1', customer_id: 'c1', amount: '', payment_amount: '', payment_method: 'cash', transaction_type: 'credit_sale' },
   idx: 0,
   onRemove: vi.fn(),
@@ -58,7 +58,7 @@ const renderSource = (overrides = {}) => TestRenderer.create(React.createElement
   customerSearch: '',
   currency: 'SAR',
   ...overrides,
-}));
+}), options);
 
 describe('CustomerCreditSalesSource', () => {
   it('shows identity only inside the one-field customer search results', () => {
@@ -92,6 +92,22 @@ describe('CustomerCreditSalesSource', () => {
       payment_amount: '',
       payment_method: 'cash',
     });
+  });
+
+  it('dismisses the search keyboard before expanding the selected customer', () => {
+    const blur = vi.fn();
+    const onUpdate = vi.fn();
+    const tree = renderSource({
+      entry: { id: '1', customer_id: '' },
+      customerSearch: 'Ghana',
+      onUpdate,
+    }, { createNodeMock: (element) => element.props.role === 'combobox' ? { blur } : null });
+    const option = tree.root.findByProps({ role: 'option' });
+    act(() => option.props.onPointerDown({ preventDefault: vi.fn() }));
+    expect(blur).toHaveBeenCalledOnce();
+    expect(blur.mock.invocationCallOrder[0]).toBeLessThan(onUpdate.mock.invocationCallOrder[0]);
+    expect(onUpdate).toHaveBeenCalledOnce();
+    tree.unmount();
   });
 
   it('selects a customer on pointer down before iOS blur closes the results', () => {

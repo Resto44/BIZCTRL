@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils';
 import ERPSidebar from './ERPSidebar';
 import ERPHeader from './ERPHeader';
 import BottomNav from './BottomNav';
+import { useErpDocumentScrollLock } from './useErpDocumentScrollLock';
+import './erp-document.css';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import { getWorkspaceModuleForPath, isWorkspacePathEnabled } from '@/lib/workspaceCustomization';
@@ -31,6 +33,7 @@ const ERP_SIDEBAR_ROLES = [
 ];
 
 export default function ERPLayout({ children }) {
+  useErpDocumentScrollLock();
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle, ArrowDownLeft, Check, CircleCheck, ClipboardCheck, CreditCard,
   ExternalLink, Info, Loader2, Pencil, Search, ShoppingCart, Trash2,
@@ -92,6 +92,7 @@ export default function CustomerCreditSalesSource({
   paymentMethods = [],
   disabled = false,
 }) {
+  const searchInputRef = useRef(null);
   const [localSearch, setLocalSearch] = useState(customerSearch || '');
   const [searchOpen, setSearchOpen] = useState(Boolean(customerSearch.trim()));
   const selectedCustomer = customers.find((customer) => String(customer.id) === String(entry.customer_id));
@@ -151,6 +152,8 @@ export default function CustomerCreditSalesSource({
   };
 
   const selectCustomer = (customer) => {
+    // Dismiss the iOS keyboard in the selection gesture, before expanding the form.
+    searchInputRef.current?.blur();
     onUpdate(entry.id, {
       customer_id: customer.id,
       customer_name_snapshot: customer.customer_name || customer.name || '',
@@ -219,6 +222,7 @@ export default function CustomerCreditSalesSource({
           <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
             <Input
+              ref={searchInputRef}
               value={localSearch}
               onChange={(event) => updateSearch(event.target.value)}
               onFocus={() => setSearchOpen(true)}
