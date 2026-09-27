@@ -19,10 +19,10 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('Verified automatically');
     expect(workspace).not.toContain('CLOSING_WORKFLOW_STEP_IDS');
     expect(workspace).not.toContain('closing-workflow-stepper');
-    expect(workspace).toContain('touch-pan-y overflow-y-auto overscroll-contain');
+    expect(workspace).toContain('id="sales-closing-workspace" className="min-w-0"');
     expect(workspace).toContain('<CashReconciliationPanel');
     expect(reconciliationPanel).toContain('grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)]');
-    expect(workspace).toContain('pb-[calc(env(safe-area-inset-bottom)+7rem)]');
+    expect(workspace).not.toContain('pb-[calc(env(safe-area-inset-bottom)+7rem)]');
     expect(workspace).toContain('env(safe-area-inset-bottom)+0.75rem');
     expect(workspace).not.toContain('100vw');
   });

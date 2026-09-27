@@ -595,7 +595,7 @@ export default function Sales() {
   ].filter(Boolean).length;
 
   return (
-    <div className="max-w-full overflow-x-hidden">
+    <div className="min-w-0 max-w-full">
       <PageHeader
         title="Sales Closing"
         action={
@@ -627,7 +627,7 @@ export default function Sales() {
       />
 
       {(showForm || editing) && (
-        <section aria-label="Sales Closing" className="mb-4 overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
+        <section aria-label="Sales Closing" className="mb-4 min-w-0 rounded-2xl border border-border bg-background shadow-sm">
           <UnifiedSalesClosing
             key={editing?.id || `new-closing-${newClosingInstance}-${selectedBranchId || 'none'}-${selectedBranchKey || 'none'}`}
             initial={editing || newClosingDefaults || undefined}
