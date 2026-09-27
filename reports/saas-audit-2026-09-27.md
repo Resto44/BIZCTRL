@@ -6,6 +6,7 @@
 - Owner cash contribution: reproduced SQLSTATE 42703 (`v_row.branch_key` absent), changed optional branch extraction to JSON, and verified insert/update/delete and settlement reversal. Contributions do not create sales revenue.
 
 - Customer reporting: three SECURITY INVOKER views lacked `restaurant_id`, although Customer Management filters on it. Appended the tenant column and included it in GROUP BY without changing privileges or removing RLS. Extended the synthetic credit workflow to assert summary/aging=30, collections=5, and no other-tenant rows in each view. Applied and passed.
+- Customer receivable totals: exclude liability records from customer credit/aging; preserve customer IDs in aggregates; use ledger totals over stale profile caches and sum branch/creator groups without merging customers who share a name. Five helper tests and the synthetic liability/receivable SQL case passed.
 - Desktop sidebar: live computed layout had `flex-direction: row` and a zero-width navigation region. Restored column layout.
 - Shared dialogs: constrain width and dynamic viewport height and enable vertical scrolling for long forms on short/mobile screens.
 
