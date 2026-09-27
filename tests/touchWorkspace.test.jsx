@@ -94,3 +94,30 @@ it('shows category artwork on desktop and mobile, with a fallback for broken lin
  await click([...document.querySelectorAll('.touch-options button')].find(b=>b.textContent==='Grills'));
  expect(document.querySelector('.touch-layer')).toBeNull();
 });
+
+
+it('fits compact invoice rows to available space and keeps all lines reachable after resize',async()=>{
+ let resize;
+ const disconnect=vi.fn();
+ vi.stubGlobal('ResizeObserver',class {
+  constructor(callback){resize=callback;}
+  observe(){}
+  disconnect(){disconnect();}
+ });
+ try {
+  const p=props();
+  await act(async()=>root.render(<TouchWorkspace {...p}/>));
+  await act(async()=>resize([{contentRect:{height:420}}]));
+  expect(document.querySelectorAll('.touch-line')).toHaveLength(7);
+  await click(document.querySelector('.touch-invoice .touch-pager button:last-child'));
+  expect(document.querySelector('.touch-line strong').textContent).toBe('Line 7');
+  await act(async()=>resize([{contentRect:{height:180}}]));
+  expect(document.querySelectorAll('.touch-line')).toHaveLength(3);
+  await act(async()=>resize([{contentRect:{height:0}}]));
+  expect(document.querySelectorAll('.touch-line')).toHaveLength(3);
+  for(let i=0;i<2;i++)await click(document.querySelector('.touch-invoice .touch-pager button:last-child'));
+  expect(document.querySelector('.touch-line strong').textContent).toBe('Line 9');
+  await act(async()=>root.render(null));
+  expect(disconnect).toHaveBeenCalledOnce();
+ } finally {vi.unstubAllGlobals();}
+});
