@@ -1,6 +1,7 @@
+import BrandLogo from '@/components/BrandLogo';
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Menu, X, Zap } from 'lucide-react';
+import { ArrowRight, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export const PRODUCT_DESCRIPTION = 'BizCTRL is a multi-tenant ERP SaaS built for restaurants, retail stores, pharmacies, warehouses, factories, and more. Manage inventory, sales, purchasing, HR, finance, and suppliers — all in one place.';
@@ -63,13 +64,7 @@ function handlePublicHashLink(event, href) {
 function BrandMark() {
   return (
     <Link to="/" className="flex items-center gap-3 text-white" aria-label="BizCTRL home">
-      <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 shadow-lg shadow-cyan-500/20">
-        <Zap className="h-5 w-5" aria-hidden="true" />
-      </span>
-      <span className="leading-none">
-        <span className="block text-lg font-black tracking-tight">Biz<span className="text-cyan-400">CTRL</span></span>
-        <span className="mt-1 block text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-500">Business ERP</span>
-      </span>
+      <BrandLogo className="h-12 w-auto" />
     </Link>
   );
 }
