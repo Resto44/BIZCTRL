@@ -252,7 +252,7 @@ function MobileMenuFallback({ can, role, onNavigate, onToggle }) {
           <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-[11px] font-bold text-amber-200">Safe menu</span>
         </div>
         <div className="mt-3 flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600"><BrandLogo icon className="h-12 w-auto" /></span>
+          <span className="flex h-12 w-12 items-center justify-center"><BrandLogo icon className="h-12 w-auto" /></span>
           <div>
             <h2 className="text-xl font-black">ERP Navigation</h2>
             <p className="text-sm text-blue-100/75">Core actions remain available</p>
@@ -395,7 +395,7 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
         </div>
 
         <div className="mt-2 flex min-w-0 items-center gap-3">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-950/40">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center">
             <BrandLogo icon className="h-14 w-auto" />
           </div>
           <div className="min-w-0">
@@ -739,7 +739,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
         'flex min-w-0 max-w-full items-center gap-3 px-4 h-[60px] border-b border-sidebar-border shrink-0 box-border',
         collapsed && 'justify-center px-0'
       )}>
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+        <div className="w-8 h-8 flex items-center justify-center shrink-0">
           <BrandLogo icon className="h-8 w-auto" />
         </div>
         {!collapsed && (
