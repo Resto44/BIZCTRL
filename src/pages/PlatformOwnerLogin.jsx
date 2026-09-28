@@ -1,3 +1,4 @@
+import BrandLogo from '@/components/BrandLogo';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
@@ -309,7 +310,7 @@ export default function PlatformOwnerLogin() {
   return <main className="min-h-screen bg-slate-950 text-slate-100 grid lg:grid-cols-[1.1fr_.9fr]" dir={lang === 'en' ? 'ltr' : 'rtl'}>
     <section className="hidden lg:flex relative overflow-hidden p-12 bg-gradient-to-br from-cyan-950 via-slate-950 to-indigo-950 flex-col justify-between">
       <div className="absolute inset-0 opacity-30 [background-image:radial-gradient(#22d3ee_1px,transparent_1px)] [background-size:26px_26px]" />
-      <div className="relative flex items-center gap-3 font-black text-xl"><span className="grid size-11 place-items-center rounded-2xl bg-cyan-400 text-slate-950"><ShieldCheck /></span> BizCTRL <span className="text-cyan-300">Platform</span></div>
+      <div className="relative flex items-center gap-3 font-black text-xl"><BrandLogo className="h-12 w-auto" /> <span className="text-cyan-300">Platform</span></div>
       <div className="relative max-w-lg"><p className="inline-flex rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200">{text.badge}</p><h1 className="mt-6 text-5xl font-black leading-tight">{text.heroTitle} <span className="text-cyan-300">{text.heroAccent}</span></h1><p className="mt-5 text-slate-300 leading-7">{text.heroDescription}</p></div>
       <p className="relative text-xs text-slate-400">{text.boundary}</p>
     </section>

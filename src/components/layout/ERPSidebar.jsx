@@ -1,3 +1,4 @@
+import BrandLogo from '@/components/BrandLogo';
 /**
  * ERPSidebar — Enterprise ERP sidebar navigation.
  *
@@ -24,7 +25,7 @@ import { Separator } from '@/components/ui/separator';
 import {
   LayoutDashboard, TrendingUp, ShoppingCart, Package, Users,
   DollarSign, Wallet, BarChart3, Settings, Bell, Building2,
-  ChefHat, Shield, Star, Clock, ChevronLeft, ChevronRight,
+  Shield, Star, Clock, ChevronLeft, ChevronRight,
   Receipt, FileText, AlertTriangle, Zap, Activity, CreditCard,
   Banknote, Network, UserCheck, GitBranch, Store, Globe,
   PieChart, Target, Layers, ClipboardList, Handshake,
@@ -251,7 +252,7 @@ function MobileMenuFallback({ can, role, onNavigate, onToggle }) {
           <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-[11px] font-bold text-amber-200">Safe menu</span>
         </div>
         <div className="mt-3 flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600"><ChefHat className="h-6 w-6" /></span>
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600"><BrandLogo icon className="h-12 w-auto" /></span>
           <div>
             <h2 className="text-xl font-black">ERP Navigation</h2>
             <p className="text-sm text-blue-100/75">Core actions remain available</p>
@@ -395,7 +396,7 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
 
         <div className="mt-2 flex min-w-0 items-center gap-3">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-950/40">
-            <ChefHat className="h-7 w-7" />
+            <BrandLogo icon className="h-14 w-auto" />
           </div>
           <div className="min-w-0">
             <h2 className="truncate text-xl font-black tracking-tight">
@@ -739,7 +740,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
         collapsed && 'justify-center px-0'
       )}>
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-          <ChefHat className="w-4 h-4 text-primary-foreground" />
+          <BrandLogo icon className="h-8 w-auto" />
         </div>
         {!collapsed && (
           <div className="flex flex-col min-w-0">

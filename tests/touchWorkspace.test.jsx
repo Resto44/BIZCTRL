@@ -53,7 +53,7 @@ it('enables fixed cashier on phones without a media-query threshold',async()=>{
 });
 it('pages the approved category rail and routes kitchen action to the existing command',async()=>{
  const p=props();p.menu=p.menu.slice(0,9).map((m,i)=>({...m,category_id:'c'+i,category:'Category '+i}));p.actions=[{id:'send_kitchen',label:'Send to kitchen',disabled:false}];
- await act(async()=>root.render(<TouchWorkspace {...p}/>));expect(document.querySelector('.touch-brand').textContent).toBe('Biz Control');
+ await act(async()=>root.render(<TouchWorkspace {...p}/>));expect(document.querySelector('.touch-brand svg').getAttribute('aria-label')).toBe('BizCTRL');
  await click(document.querySelector('.touch-category-rail .touch-pager button:last-child'));
  await click([...document.querySelectorAll('.touch-category-list button')].find(b=>b.textContent==='Category 4'));
  expect(document.querySelectorAll('.touch-product')).toHaveLength(1);expect(document.querySelector('.touch-product strong').textContent).toBe('Food 4');

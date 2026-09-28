@@ -1,3 +1,4 @@
+import BrandLogo from '@/components/BrandLogo';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
@@ -176,6 +177,7 @@ export default function ERPLogin() {
 
       <div className="relative w-full max-w-2xl">
         {/* Header */}
+        <BrandLogo className="mx-auto mb-6 h-20 w-auto max-w-full" />
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-4">
             <ShieldCheck className="w-4 h-4 text-violet-400" />
