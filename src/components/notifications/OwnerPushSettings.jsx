@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BellRing, Smartphone } from 'lucide-react';
+import PushCustomization from './PushCustomization';
 import { Button } from '@/components/ui/button';
 import { useRole } from '@/lib/RoleContext';
 import { useTenant } from '@/lib/TenantContext';
@@ -9,7 +10,7 @@ import { applicationKey, currentPushSubscription, disableDevicePush, pushRequest
 
 export default function OwnerPushSettings() {
  const {role}=useRole();
- const {activeRestaurant}=useTenant();
+ const {activeRestaurant,allBranches}=useTenant();
  const {lang}=useLanguage();
  const rtl=['ar','fa','ps','ur'].includes(lang);
  const tr=(en,fa)=>rtl?fa:en;
@@ -64,6 +65,7 @@ export default function OwnerPushSettings() {
   <div className="flex flex-wrap gap-2">{enabled?<><Button disabled={busy} onClick={()=>act(true)}>{tr('Send test notification','ارسال اعلان آزمایشی')}</Button><Button variant="outline" disabled={busy} onClick={()=>act(false)}>{tr('Turn off on this device','خاموش‌کردن در این دستگاه')}</Button></>:<Button disabled={busy || !supported || !key || !restaurantId} onClick={enable}>{busy?tr('Connecting…','در حال اتصال…'):tr('Enable notifications','فعال‌کردن اعلان‌ها')}</Button>}</div>
   {!supported&&<p className="text-sm text-amber-700">{tr('Background notifications are not available in this browser. On iPhone, open the Home Screen app first.','این مرورگر فعلاً اعلان پس‌زمینه را پشتیبانی نمی‌کند. در آیفون ابتدا برنامه را از صفحهٔ اصلی باز کنید.')}</p>}
   {message&&<p role="status" className="text-sm break-words">{message}</p>}
+  {restaurantId && <PushCustomization key={restaurantId} restaurant={activeRestaurant} branches={allBranches || []} onTest={()=>act(true)} testEnabled={enabled} testing={busy} />}
   <details className="border-t pt-3"><summary className="cursor-pointer font-medium">{tr('Recent business records · last 30 days','رویدادهای اخیر کسب‌وکار · ۳۰ روز اخیر')}</summary><div className="mt-3 max-h-80 overflow-y-auto divide-y">{events.length?events.map(e=><div key={e.id} className="py-2 text-sm"><p className="font-medium break-words">{({insert:tr('Created','ثبت'),update:tr('Updated','تغییر'),delete:tr('Deleted','حذف')})[e.action]} · {e.entity.replaceAll('_',' ')} · {e.reference}</p><p className="text-xs text-muted-foreground">{new Date(e.created_at).toLocaleString()} {e.branch&&`· ${e.branch}`}</p></div>):<p className="text-sm text-muted-foreground">{tr('New business activity will appear here.','رویدادهای جدید کسب‌وکار اینجا نمایش داده می‌شود.')}</p>}</div></details>
  </section>;
 }
