@@ -1,5 +1,5 @@
 // Service Worker — network-first for JS/CSS, cache-first for images/fonts only
-const CACHE_VERSION = 'v10';
+const CACHE_VERSION = 'v11';
 const CACHE_NAME = `app-cache-${CACHE_VERSION}`;
 
 // On install: skip waiting so the new SW activates immediately
@@ -62,4 +62,27 @@ self.addEventListener('fetch', (event) => {
 
   // Everything else — network
   event.respondWith(fetch(request));
+});
+
+
+// Encrypted Web Push wakes this worker even with no open application window.
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try { payload = event.data?.json() || {}; } catch { /* Always display a notification. */ }
+  event.waitUntil(self.registration.showNotification(payload.title || 'BizCTRL', {
+    body: payload.body || 'New business activity · رویداد جدید کسب‌وکار',
+    icon: '/icons/icon-192.png', badge: '/icons/icon-96.png',
+    tag: payload.tag || undefined,
+    data: { url: '/notifications' },
+  }));
+});
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const target = new URL('/notifications', self.location.origin).href;
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const existing = windows.find(client => new URL(client.url).origin === self.location.origin);
+    if (existing) { await existing.navigate(target); await existing.focus(); }
+    else await self.clients.openWindow(target);
+  })());
 });

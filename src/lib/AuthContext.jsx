@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useRef } from 'r
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
+import { disableDevicePush } from '@/lib/ownerPush';
 
 const AuthContext = createContext();
 
@@ -27,6 +28,9 @@ export const AuthProvider = ({ children }) => {
     let initialFired = false;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted.current) return;
+      if (_event === 'SIGNED_OUT' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration('/').then(reg => reg?.pushManager?.getSubscription()).then(sub => sub?.unsubscribe()).catch(() => {});
+      }
       if (_event === 'INITIAL_SESSION') { initialFired = true; return; }
       if (session) {
         checkAppState();
@@ -103,7 +107,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
-    supabase.auth.signOut().then(() => { navigate('/erp-login', { replace: true }); });
+    disableDevicePush().catch(() => {}).then(() => supabase.auth.signOut()).then(() => { navigate('/erp-login', { replace: true }); });
   };
 
   const navigateToLogin = () => {
