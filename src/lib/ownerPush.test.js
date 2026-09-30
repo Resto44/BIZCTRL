@@ -18,3 +18,43 @@ describe('owner push delivery boundaries',()=>{
   expect(eventMessage({action:'insert',entity:'products',reference:'x'.repeat(500)}).length).toBeLessThanOrEqual(350);
  });
 });
+
+import { DEFAULT_PREFERENCES, renderNotification, shouldDeliver, moduleFor, validTemplate, resolveBranch } from '../../supabase/functions/owner-push/preferences.ts';
+describe('ERP push customization',()=>{
+ const event={action:'insert',entity:'sales_invoices',reference:'INV-77',branch:'north',created_at:'2026-10-01T10:00:00Z'};
+ const branch={id:'branch-1',name:'North',branch_key:'north'};
+ it('preserves delivery defaults without a saved preference',()=>{
+  expect(shouldDeliver(null,event,branch)).toBe(true);
+ });
+ it('honors pause, operations, sections and branch restrictions independently',()=>{
+  for(const p of [{enabled:false},{actions:['delete']},{modules:['inventory']},{branch_ids:['branch-2']}])expect(shouldDeliver({...DEFAULT_PREFERENCES,...p},event,branch)).toBe(false);
+  expect(shouldDeliver({...DEFAULT_PREFERENCES,branch_ids:['branch-1']},event,branch)).toBe(true);
+  expect(shouldDeliver({...DEFAULT_PREFERENCES,branch_ids:['branch-1']},event,null)).toBe(false);
+  expect(shouldDeliver({...DEFAULT_PREFERENCES,actions:[]},event,branch)).toBe(false);
+ });
+ it('resolves legacy branch keys but does not guess ambiguous names',()=>{
+  expect(resolveBranch(event,[branch])).toEqual(branch);
+  expect(resolveBranch({branch:'branch-1'},[branch])).toEqual(branch);
+  expect(resolveBranch({branch:'North'},[branch,{...branch,id:'branch-2',branch_key:'other'}])).toBeUndefined();
+ });
+ it('renders custom text literally, localizes actions and hides the reference when requested',()=>{
+  const p={...DEFAULT_PREFERENCES,language:'fa',title_template:'{business} / {branch}',body_template:'{action}: {reference}',show_reference:false};
+  const text=renderNotification(p,event,{name:'My {reference}'},branch);
+  expect(text.title).toBe('My {reference} / North');
+  expect(text.body).toBe('ثبت شد: ');
+  expect(renderNotification({...p,show_reference:true},event,{},branch).body).toContain('INV-77');
+ });
+ it('rejects unsupported tokens and blank templates and bounds rendered output',()=>{
+  expect(validTemplate('{business} {time}',100)).toBe(true);
+  for(const value of ['','   ','{password}','{business','x'.repeat(101)])expect(validTemplate(value,100)).toBe(false);
+  expect(renderNotification(DEFAULT_PREFERENCES,event,{name:'x'.repeat(300)},branch).title.length).toBe(100);
+ });
+ it('categorizes the main ERP record types including supermarket POS',()=>{
+  expect(moduleFor('retail_pos_transactions')).toBe('sales');
+  expect(moduleFor('supplier_payments')).toBe('purchases');
+  expect(moduleFor('inventory_batches')).toBe('inventory');
+  expect(moduleFor('customer_collections')).toBe('finance');
+  expect(moduleFor('staff_attendance')).toBe('people');
+  expect(moduleFor('workspace_settings')).toBe('other');
+ });
+});

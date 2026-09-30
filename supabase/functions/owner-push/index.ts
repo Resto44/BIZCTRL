@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.106.1';
 import webpush from 'npm:web-push@3.6.7';
-import { validSubscription, eventMessage } from './policy.ts';
+import { validSubscription } from './policy.ts';
+import { DEFAULT_PREFERENCES, renderNotification, shouldDeliver, resolveBranch } from './preferences.ts';
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
@@ -13,6 +14,15 @@ async function config() {
 async function owner(userId: string, restaurantId: string) {
  const { data, error } = await db.from('erp_memberships').select('id').eq('user_id', userId).eq('restaurant_id', restaurantId).eq('role', 'owner').eq('status', 'approved').limit(1);
  return !error && Boolean(data?.length);
+}
+async function presentation(restaurantId: string) {
+ const [settings, business, branches] = await Promise.all([
+  db.from('owner_push_preferences').select('*').eq('restaurant_id',restaurantId).maybeSingle(),
+  db.from('restaurants').select('name,timezone').eq('id',restaurantId).single(),
+  db.from('branches').select('id,name,branch_key').eq('restaurant_id',restaurantId),
+ ]);
+ if(settings.error || business.error || branches.error) throw new Error('Notification settings unavailable');
+ return {settings:settings.data || DEFAULT_PREFERENCES,business:business.data,branches:branches.data || []};
 }
 async function send(device: any, payload: any, keys: any) {
  if (!validSubscription({ endpoint: device.endpoint, keys: { p256dh: device.p256dh, auth: device.auth_key } })) throw new Error('Invalid push provider');
@@ -35,8 +45,13 @@ async function dispatch(keys: any) {
     const { data: event } = await db.from('owner_record_events').select('*').eq('id',job.event_id).single();
     if (!device?.enabled || !event || device.restaurant_id!==event.restaurant_id || !await owner(device.user_id,event.restaurant_id)) state='cancelled';
     else {
-     await send(device,{ title:'BizCTRL · Business activity', body:eventMessage(event), tag:event.id, url:'/notifications', eventId:event.id },keys);
-     sent++;
+     const view=await presentation(event.restaurant_id);
+     const branch=resolveBranch(event,view.branches);
+     if(!shouldDeliver(view.settings,event,branch)) state='cancelled';
+     else {
+      await send(device,{...renderNotification(view.settings,event,view.business,branch),tag:event.id,url:'/notifications',eventId:event.id},keys);
+      sent++;
+     }
     }
    } catch (err: any) {
     last_error = err.statusCode ? `Push provider HTTP ${err.statusCode}` : 'Push delivery temporarily unavailable';
@@ -80,7 +95,11 @@ Deno.serve(async (req) => {
   if(action==='test') {
    const {data:device}=await db.from('owner_push_devices').select('*').eq('user_id',user.id).eq('restaurant_id',body.restaurantId).eq('endpoint',body.endpoint).eq('enabled',true).maybeSingle();
    if(!device) return reply({error:'Enable this device first'},400);
-   await send(device,{title:'BizCTRL',body:'Notifications are connected · اعلان‌ها فعال است',tag:'bizctrl-push-test',url:'/notifications'},await config());
+   const view=await presentation(body.restaurantId);
+   const branch=view.branches.find(b=>view.settings.branch_ids.includes(b.id)) || (view.settings.branch_ids.length ? undefined : view.branches[0]);
+   const samples: Record<string,string>={sales:'sales_invoices',purchases:'purchases',inventory:'products',finance:'expenses',people:'employees',other:'tasks'};
+   const sample={action:view.settings.actions[0] || 'insert',entity:samples[view.settings.modules[0]] || 'sales_invoices',reference:'TEST-001',created_at:new Date().toISOString()};
+   await send(device,{...renderNotification(view.settings,sample,view.business,branch),tag:'bizctrl-push-test',url:'/notifications'},await config());
    return reply({accepted:true});
   }
   return reply({error:'Not found'},404);
