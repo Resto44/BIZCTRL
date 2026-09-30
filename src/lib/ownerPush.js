@@ -25,6 +25,8 @@ export async function currentPushSubscription() {
 export async function disableDevicePush() {
  const sub=await currentPushSubscription();
  if(!sub) return;
- // Revoke server delivery first. If network is unavailable, provider unsubscribe still revokes delivery.
- try { await supabase.from('owner_push_devices').delete().eq('endpoint',sub.endpoint); } finally { await sub.unsubscribe(); }
+ // Revoke the provider immediately; a slow network must not delay sign-out.
+ try { await sub.unsubscribe(); } finally {
+  await supabase.from('owner_push_devices').delete().eq('endpoint',sub.endpoint).abortSignal(AbortSignal.timeout(3000));
+ }
 }
