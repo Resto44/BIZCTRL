@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import NotificationList from '@/components/notifications/NotificationList';
 import LiveOperationsCenter from '@/components/notifications/LiveOperationsCenter';
 import SoundSettings from '@/components/notifications/SoundSettings';
+import OwnerPushSettings from '@/components/notifications/OwnerPushSettings';
 
 export default function NotificationCenter() {
   const { notifications, unreadCount, markAllRead } = useNotifications();
@@ -56,6 +57,8 @@ export default function NotificationCenter() {
           )}
         </div>
       </div>
+
+      <OwnerPushSettings />
 
       <Tabs defaultValue="history">
         <TabsList className="w-full">
