@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ENTERPRISE_ICONS, ICON_CATEGORIES } from './IconCatalog';
-import { iconComponentFor } from './EnterpriseIconRegistry';
+import { iconComponentFor, ENTERPRISE_ICON_COMPONENTS } from './EnterpriseIconRegistry';
 
 // Storage key for frequently used icons
 const FREQUENT_ICONS_KEY = 'resto_frequent_icons';
@@ -21,14 +21,10 @@ export function NewIconPicker({ value, onChange, color }) {
 
   // Load frequent icons from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem(FREQUENT_ICONS_KEY);
-    if (stored) {
-      try {
-        setFrequentIcons(JSON.parse(stored));
-      } catch (e) {
-        console.error('Failed to parse frequent icons', e);
-      }
-    }
+    try {
+      const stored = JSON.parse(localStorage.getItem(FREQUENT_ICONS_KEY) || '[]');
+      if (Array.isArray(stored)) setFrequentIcons(stored.filter(name => typeof name === 'string' && Object.hasOwn(ENTERPRISE_ICON_COMPONENTS, name)).slice(0, 10));
+    } catch { /* Icon history is optional when storage is blocked or invalid. */ }
   }, []);
 
   const handleIconSelect = (iconName) => {
@@ -39,7 +35,7 @@ export function NewIconPicker({ value, onChange, color }) {
     // Update frequent icons
     const updated = [iconName, ...frequentIcons.filter(i => i !== iconName)].slice(0, 10);
     setFrequentIcons(updated);
-    localStorage.setItem(FREQUENT_ICONS_KEY, JSON.stringify(updated));
+    try { localStorage.setItem(FREQUENT_ICONS_KEY, JSON.stringify(updated)); } catch { /* Keep selection usable without storage. */ }
   };
 
   const filteredIcons = useMemo(() => {
@@ -105,7 +101,7 @@ export function NewIconPicker({ value, onChange, color }) {
             autoFocus
           />
           {search && (
-            <button 
+            <button type="button"
               onClick={() => setSearch('')} 
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
@@ -176,7 +172,7 @@ export function NewIconPicker({ value, onChange, color }) {
       
       {!isMobile && (
         <div className="p-3 border-t bg-muted/10 flex justify-end">
-          <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
             Cancel
           </Button>
         </div>
@@ -184,8 +180,8 @@ export function NewIconPicker({ value, onChange, color }) {
     </div>
   );
 
-  const CurrentIcon = LucideIcons[value] || LucideIcons.HelpCircle;
-  const isEmoji = !LucideIcons[value] && typeof value === 'string' && value.length <= 2;
+  const CurrentIcon = iconComponentFor(value);
+  const isEmoji = !Object.hasOwn(ENTERPRISE_ICON_COMPONENTS, value) && typeof value === 'string' && value.length <= 2;
 
   const trigger = (
     <button
