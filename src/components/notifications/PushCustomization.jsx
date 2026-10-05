@@ -43,7 +43,7 @@ export default function PushCustomization({ restaurant, branches = [], onTest, t
  const valid=validTemplate(draft.title_template,100)&&validTemplate(draft.body_template,500);
  const sampleBranch=branches.find(b=>draft.branch_ids.includes(b.id)) || (!draft.branch_ids.length?branches[0]:null);
  const examples={sales:'sales_invoices',purchases:'purchases',inventory:'products',finance:'expenses',people:'employees',other:'tasks'};
- const preview=renderNotification(draft,{action:draft.actions[0] || 'insert',entity:examples[draft.modules[0]] || 'sales_invoices',reference:'TEST-001',created_at:new Date().toISOString()},restaurant,sampleBranch?{...sampleBranch,name:sampleBranch.name || sampleBranch.label}:null,{date:'2026-10-05',currency:restaurant.currency || 'SAR',sales:5000,purchases:2000,expenses:750,net_profit:2250});
+ const preview=renderNotification(draft,{action:draft.actions[0] || 'insert',entity:examples[draft.modules[0]] || 'sales_invoices',reference:'TEST-001',created_at:new Date().toISOString()},restaurant,sampleBranch?{...sampleBranch,name:sampleBranch.name || sampleBranch.label}:null,{date:'2026-10-05',currency:restaurant.currency || 'SAR',network_sales:2000,pos_sales:3500,source_sales:1500,sales:5000,purchases:2000,expenses:750,net_profit:2250});
  const checkbox=(checked,onChange,text)=> <label className="flex items-center gap-2 py-2 text-sm cursor-pointer"><input type="checkbox" className="size-4 shrink-0 accent-blue-600" checked={checked} onChange={onChange} disabled={busy}/><span>{text}</span></label>;
  return <details className="border-t pt-4" open>
   <summary className="font-semibold cursor-pointer">{t.heading}</summary>

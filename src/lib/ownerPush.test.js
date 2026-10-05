@@ -61,12 +61,12 @@ describe('ERP push customization',()=>{
 
 import { financialTemplate, needsFinancialSummary } from '../../supabase/functions/owner-push/preferences.ts';
 describe('financial push layout',()=>{
- const financial={date:'2026-10-05',currency:'SAR',sales:5000,purchases:2000,expenses:750,net_profit:2250};
+ const financial={date:'2026-10-05',currency:'SAR',network_sales:2000,pos_sales:3500,source_sales:1500,sales:5000,purchases:2000,expenses:750,net_profit:2250};
  it('renders business, branch and daily amounts with a localized editable preset',()=>{
   const p={...DEFAULT_PREFERENCES,title_template:'{business}',body_template:financialTemplate('en')};
   const result=renderNotification(p,{}, {name:'Market'}, {name:'North'},financial);
   expect(result.title).toBe('Market');
-  expect(result.body).toBe('North · 2026-10-05\nSales: 5,000.00 SAR\nExpenses: 750.00 SAR\nNet profit: 2,250.00 SAR');
+  expect(result.body).toBe('North · 2026-10-05\nSales: 5,000.00 SAR\nPurchases: 2,000.00 SAR\nExpenses: 750.00 SAR\nNetwork sales: 2,000.00 SAR\nPOS sales: 3,500.00 SAR\nSales Sources: 1,500.00 SAR\nNet profit: 2,250.00 SAR');
  });
  it('appends summary to existing custom templates without duplicating financial templates',()=>{
   const result=renderNotification({...DEFAULT_PREFERENCES,body_template:'Record saved'}, {},{}, {name:'North'},financial);
@@ -79,9 +79,16 @@ describe('financial push layout',()=>{
   expect(renderNotification(p,{}, {},{}, null).body).toBe('—');
  });
  it('supports financial tokens, disabled summary and explicit custom financial fields',()=>{
-  expect(validTemplate('{sales} {expenses} {net_profit} {purchases} {date} {currency}',500)).toBe(true);
+  expect(validTemplate('{sales} {expenses} {net_profit} {purchases} {date} {currency} {network_sales} {pos_sales} {source_sales}',500)).toBe(true);
   const p={...DEFAULT_PREFERENCES,financial_summary:false,body_template:'Record saved'};
   expect(needsFinancialSummary(p)).toBe(false);
   expect(needsFinancialSummary({...p,body_template:'{sales}'})).toBe(true);
  });
+});
+
+it('loads totals for channel-only custom templates and renders zero distinctly from unavailable',()=>{
+ const p={...DEFAULT_PREFERENCES,financial_summary:false,body_template:'{network_sales} / {pos_sales} / {source_sales}'};
+ expect(needsFinancialSummary(p)).toBe(true);
+ expect(renderNotification(p,{}, {},null,{currency:'SAR',network_sales:0,pos_sales:150,source_sales:-5}).body).toBe('0.00 SAR / 150.00 SAR / -5.00 SAR');
+ expect(renderNotification(p,{}, {},null,null).body).toBe('— / — / —');
 });
