@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
+import { deleteExpenseRecord } from '@/lib/expenseDeletion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44, supabase } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -239,26 +240,7 @@ export default function Expenses() {
   });
   const deleteMut = useMutation({
     mutationFn: async (expense) => {
-      if (!expense?.id) throw new Error('Cannot delete expense: missing id');
-      const expenseId = expense.id;
-      console.log('Attempting to delete expense:', expenseId);
-      const { data, error, status } = await supabase
-        .from("expenses")
-        .delete()
-        .eq("id", expenseId)
-        .select();
-
-      console.log("REAL DELETE RESULT", {
-        expenseId,
-        data,
-        error,
-        status
-      });
-
-      if (error) {
-        console.error('Delete expense error:', error);
-        throw error;
-      }
+      await deleteExpenseRecord(supabase, expense?.id);
       try {
         await notif.expense({ branch: expense.branch_key, amount: expense.amount, category: expense.category_id, action: 'delete' });
       } catch (notifErr) {
@@ -283,7 +265,7 @@ export default function Expenses() {
       setDeleting(null);
     },
     onError: (err) => {
-      console.error('[Expenses] deleteMut error:', err?.code, err?.message, err?.details, err);
+      toast.error(err?.message || 'Expense could not be deleted');
     },
   });
 
@@ -406,7 +388,7 @@ export default function Expenses() {
           <AlertDialogHeader><AlertDialogTitle>{t('confirm_delete')}</AlertDialogTitle><AlertDialogDescription /></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteMut.mutate(deleting)}>{t('delete')}</AlertDialogAction>
+            <AlertDialogAction disabled={deleteMut.isPending} onClick={event => { event.preventDefault(); deleteMut.mutate(deleting); }}>{t('delete')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
