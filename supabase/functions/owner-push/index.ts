@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.106.1';
 import webpush from 'npm:web-push@3.6.7';
 import { validSubscription } from './policy.ts';
-import { DEFAULT_PREFERENCES, renderNotification, shouldDeliver, resolveBranch, needsFinancialSummary } from './preferences.ts';
+import { DEFAULT_PREFERENCES, renderNotification, shouldDeliver, resolveBranch, needsFinancialSummary, preferencesForLanguage, appPushLanguage } from './preferences.ts';
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
@@ -57,6 +57,7 @@ async function dispatch(keys: any) {
     if (!device?.enabled || !event || device.restaurant_id!==event.restaurant_id || !await owner(device.user_id,event.restaurant_id)) state='cancelled';
     else {
      const view=await presentation(event.restaurant_id);
+     view.settings=preferencesForLanguage(view.settings,device.language);
      const branch=resolveBranch(event,view.branches);
      if(!shouldDeliver(view.settings,event,branch)) state='cancelled';
      else {
@@ -93,13 +94,22 @@ Deno.serve(async (req) => {
   const {data:{user},error}=await db.auth.getUser(token);
   if(error || !user) return reply({error:'Sign in required'},401);
   const body=await req.json();
+  if(action==='language') {
+   if(!['en','ar','fa'].includes(body.language)) return reply({error:'Unsupported language'},400);
+   const {data:device,error}=await db.from('owner_push_devices').select('id,restaurant_id').eq('endpoint',body.endpoint).eq('user_id',user.id).eq('enabled',true).maybeSingle();
+   if(error) throw error;
+   if(!device || !await owner(user.id,device.restaurant_id)) return reply({synced:false});
+   const result=await db.from('owner_push_devices').update({language:body.language}).eq('id',device.id).eq('user_id',user.id);
+   if(result.error) throw result.error;
+   return reply({synced:true});
+  }
   if(!body.restaurantId || !await owner(user.id,body.restaurantId)) return reply({error:'Owner access required'},403);
   if(action==='subscribe') {
    if(!validSubscription(body.subscription)) return reply({error:'Invalid browser subscription'},400);
    const sub=body.subscription;
    const {data:existing}=await db.from('owner_push_devices').select('user_id').eq('endpoint',sub.endpoint).maybeSingle();
    if(existing && existing.user_id!==user.id) return reply({error:'Disable notifications for the previous account on this device first'},409);
-   const {error}=await db.from('owner_push_devices').upsert({user_id:user.id,restaurant_id:body.restaurantId,endpoint:sub.endpoint,p256dh:sub.keys.p256dh,auth_key:sub.keys.auth,enabled:true},{onConflict:'endpoint'});
+   const {error}=await db.from('owner_push_devices').upsert({user_id:user.id,restaurant_id:body.restaurantId,endpoint:sub.endpoint,p256dh:sub.keys.p256dh,auth_key:sub.keys.auth,enabled:true,language:appPushLanguage(body.language)},{onConflict:'endpoint'});
    if(error) throw error;
    return reply({enabled:true});
   }
@@ -107,6 +117,10 @@ Deno.serve(async (req) => {
    const {data:device}=await db.from('owner_push_devices').select('*').eq('user_id',user.id).eq('restaurant_id',body.restaurantId).eq('endpoint',body.endpoint).eq('enabled',true).maybeSingle();
    if(!device) return reply({error:'Enable this device first'},400);
    const view=await presentation(body.restaurantId);
+   const language=appPushLanguage(body.language || device.language || view.settings.language);
+   const updated=await db.from('owner_push_devices').update({language}).eq('id',device.id).eq('user_id',user.id);
+   if(updated.error) throw updated.error;
+   view.settings=preferencesForLanguage(view.settings,language);
    const branch=view.branches.find(b=>view.settings.branch_ids.includes(b.id)) || (view.settings.branch_ids.length ? undefined : view.branches[0]);
    const samples: Record<string,string>={sales:'sales_invoices',purchases:'purchases',inventory:'products',finance:'expenses',people:'employees',other:'tasks'};
    const sample={action:view.settings.actions[0] || 'insert',entity:samples[view.settings.modules[0]] || 'sales_invoices',reference:'TEST-001',created_at:new Date().toISOString()};

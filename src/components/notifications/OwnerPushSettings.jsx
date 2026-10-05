@@ -47,14 +47,14 @@ export default function OwnerPushSettings() {
    const reg=await navigator.serviceWorker.ready;
    let sub=await reg.pushManager.getSubscription();
    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:applicationKey(key)});
-   await pushRequest('subscribe',{restaurantId,subscription:sub.toJSON()});
+   await pushRequest('subscribe',{restaurantId,language:lang,subscription:sub.toJSON()});
    setEnabled(true);setMessage(tr('This device will receive new business records while BizCTRL is closed.','این دستگاه رویدادهای جدید کسب‌وکار را حتی هنگام بسته‌بودن BizCTRL دریافت می‌کند.'));
   }catch(e){setMessage(e.message);}finally{setBusy(false);}
  };
  const act=async(test)=>{
   setBusy(true);setMessage('');
   try{
-   if(test){const sub=await currentPushSubscription();await pushRequest('test',{restaurantId,endpoint:sub?.endpoint});setMessage(tr('Test accepted by the push service. Check your device notifications.','اعلان آزمایشی ارسال شد. اعلان‌های دستگاه را بررسی کنید.'));}
+   if(test){const sub=await currentPushSubscription();await pushRequest('test',{restaurantId,language:lang,endpoint:sub?.endpoint});setMessage(tr('Test accepted by the push service. Check your device notifications.','اعلان آزمایشی ارسال شد. اعلان‌های دستگاه را بررسی کنید.'));}
    else{await disableDevicePush();setEnabled(false);}
   }catch(e){setMessage(e.message);}finally{setBusy(false);}
  };
