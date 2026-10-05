@@ -86,6 +86,7 @@ function PurchaseInvoiceItemRow({
   categories,
   categoriesTree
 }) {
+  const subcategories = categories.filter(category => category.parent_id === item.category_id);
   const [expanded, setExpanded] = useState(() => !item.product_name && !item.product_id);
   // Fetch products for this item's category/subcategory and supplier
   // Calling hook here is safe because it's the top level of this component
@@ -156,7 +157,7 @@ function PurchaseInvoiceItemRow({
               {categoriesTree.map(rootCat => (
                 <div key={rootCat.id}>
                   <SelectItem value={rootCat.id}>
-                    {rootCat.icon || '📦'} {rootCat.name}
+                    {rootCat.icon || '📦'} {rootCat.name}{rootCat.branch_id ? ' · Branch' : ''}
                   </SelectItem>
                   {rootCat.children && rootCat.children.length > 0 && (
                     rootCat.children.map(childCat => (
@@ -174,12 +175,12 @@ function PurchaseInvoiceItemRow({
           <Label className="text-[10px] text-muted-foreground">Sub-category</Label>
           <Select value={item.subcategory_id} onValueChange={v => {
             updateItem(item._id, 'subcategory_id', v);
-          }} disabled={!item.category_id}>
-            <SelectTrigger className="h-8 text-xs w-full min-w-0" disabled={!item.category_id}>
-              <SelectValue placeholder={item.category_id ? "Select..." : "Select category first"} />
+          }} disabled={!item.category_id || subcategories.length === 0}>
+            <SelectTrigger className="h-8 text-xs w-full min-w-0" disabled={!item.category_id || subcategories.length === 0}>
+              <SelectValue placeholder={item.category_id ? (subcategories.length ? "Select..." : "No sub-categories") : "Select category first"} />
             </SelectTrigger>
             <SelectContent>
-              {item.category_id && categoriesTree.find(c => c.id === item.category_id)?.children?.map(subCat => (
+              {subcategories.map(subCat => (
                 <SelectItem key={subCat.id} value={subCat.id}>
                   {subCat.icon || '📦'} {subCat.name}
                 </SelectItem>
