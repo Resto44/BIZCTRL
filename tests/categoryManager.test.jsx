@@ -5,7 +5,7 @@ import {Simulate} from 'react-dom/test-utils';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {beforeEach,afterEach,describe,it,expect,vi} from 'vitest';
 const fixture=vi.hoisted(()=>({filter:vi.fn(),create:vi.fn(),tenant:{activeRestaurantId:'tenant-1'}}));
-vi.mock('@/api/supabaseClient',()=>({base44:{entities:{ProductCategory:fixture}}}));
+vi.mock('@/api/supabaseClient',()=>({base44:{entities:{ProductCategory:fixture,ExpenseCategory:fixture,SalesCategory:fixture,OnlineOrderCategory:fixture}}}));
 vi.mock('@/lib/TenantContext',()=>({useTenant:()=>fixture.tenant}));
 import {Dialog,DialogContent,DialogTitle} from '@/components/ui/dialog';
 import CategoryManager from '@/components/categories/CategoryManager';
@@ -52,6 +52,20 @@ describe('category editor regression',()=>{
   await act(async()=>Simulate.change(input,{target:{value:'Rice'}}));
   await act(async()=>Simulate.submit(input.closest('form')));
   expect(fixture.create).not.toHaveBeenCalled();
+ });
+ it.each(['Expense','Sales','Online Order'])('submits schema-compatible fields for %s categories',async(module)=>{
+  await render(<CategoryManager/>);
+  await act(async()=>button(module).click());
+  await act(async()=>button('Add Category').click());
+  const input=document.querySelector('input[placeholder="Category name"]');
+  await act(async()=>Simulate.change(input,{target:{value:'Monthly costs'}}));
+  if(module==='Expense') expect(document.querySelector('input[placeholder="https://..."]')).toBeNull();
+  await act(async()=>Simulate.submit(input.closest('form')));
+  const payload=fixture.create.mock.calls[0][0];
+  expect(payload.name).toBe('Monthly costs');
+  expect(payload).not.toHaveProperty('parent_id');
+  if(module==='Expense') expect(payload).not.toHaveProperty('image_url');
+  else expect(payload).toHaveProperty('image_url',null);
  });
  it('opens Create First Category with malformed icon history',async()=>{
   localStorage.setItem('resto_frequent_icons','{"length":4}');

@@ -379,7 +379,7 @@ function GeneralProductManagement() {
       </Dialog>
 
       <Dialog open={showCategories} onOpenChange={setShowCategories}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl p-3 sm:p-6 sm:max-w-3xl">
+        <DialogContent className="grid-cols-[minmax(0,1fr)] max-h-[calc(100dvh-2rem)] overflow-x-hidden overflow-y-auto rounded-2xl p-3 sm:p-6 sm:max-w-3xl">
           <DialogHeader><DialogTitle>Product Categories</DialogTitle></DialogHeader>
           <EnterpriseCategoryManager />
         </DialogContent>

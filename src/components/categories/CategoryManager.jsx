@@ -57,6 +57,7 @@ export const CATEGORY_MODULES = {
   },
   expense: {
     key: 'expense',
+    supportsImage: false,
     label: 'Expense Categories',
     table: 'expense_categories',
     entity: 'ExpenseCategory',
@@ -284,7 +285,7 @@ function CategoryForm({ initial, parentOptions, onSubmit, onCancel, mod, isLoadi
       is_active: form.is_active,
     };
     if (mod.hierarchical) payload.parent_id = form.parent_id || null;
-    if ('image_url' in form) payload.image_url = form.image_url || null;
+    if (mod.supportsImage !== false) payload.image_url = form.image_url || null;
     onSubmit(payload);
   };
 
@@ -355,8 +356,8 @@ function CategoryForm({ initial, parentOptions, onSubmit, onCancel, mod, isLoadi
         </div>
       )}
 
-      {/* Image URL */}
-      <div>
+      {/* Only send fields supported by this category table. */}
+      {mod.supportsImage !== false && <div>
         <Label className="text-xs font-medium">Image URL (optional)</Label>
         <div className="flex gap-2 mt-1">
           <Input
@@ -374,7 +375,7 @@ function CategoryForm({ initial, parentOptions, onSubmit, onCancel, mod, isLoadi
             />
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Sort order & Active */}
       <div className="flex items-center gap-4">
@@ -425,7 +426,7 @@ function CategoryTreeNode({
         onDragStart={() => onDragStart(node)}
         onDragOver={e => { e.preventDefault(); onDragOver(node); }}
         onDrop={() => onDrop(node)}
-        className={`group flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all cursor-grab active:cursor-grabbing
+        className={`group flex flex-wrap sm:flex-nowrap min-w-0 items-center gap-2 px-2 py-1.5 rounded-lg border transition-all cursor-grab active:cursor-grabbing
           ${dragState?.over?.id === node.id ? 'border-primary bg-primary/5 scale-[1.01]' : 'border-transparent hover:border-border hover:bg-muted/50'}
           ${!node.is_active ? 'opacity-50' : ''}
         `}
@@ -467,7 +468,7 @@ function CategoryTreeNode({
         )}
 
         {/* Name */}
-        <span className="flex-1 text-sm font-medium truncate">{node.name}</span>
+        <span className="min-w-0 flex-1 text-sm font-medium truncate">{node.name}</span>
 
         {/* Level badge */}
         <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">
@@ -545,7 +546,7 @@ function CategoryFlatRow({ node, onEdit, onDelete, dragState, onDragStart, onDra
       onDragStart={() => onDragStart(node)}
       onDragOver={e => { e.preventDefault(); onDragOver(node); }}
       onDrop={() => onDrop(node)}
-      className={`group flex items-center gap-2 px-3 py-2 rounded-lg border transition-all cursor-grab active:cursor-grabbing
+      className={`group flex flex-wrap sm:flex-nowrap min-w-0 items-center gap-2 px-3 py-2 rounded-lg border transition-all cursor-grab active:cursor-grabbing
         ${dragState?.over?.id === node.id ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50 bg-card'}
         ${!node.is_active ? 'opacity-50' : ''}
       `}
@@ -557,14 +558,14 @@ function CategoryFlatRow({ node, onEdit, onDelete, dragState, onDragStart, onDra
         <img src={node.image_url} alt="" className="w-6 h-6 rounded object-cover shrink-0"
           onError={e => { e.target.style.display = 'none'; }} />
       )}
-      <span className="flex-1 text-sm font-medium">{node.name}</span>
+      <span className="min-w-0 flex-1 break-words text-sm font-medium">{node.name}</span>
       {node.name_ar && (
-        <span className="text-xs text-muted-foreground shrink-0" dir="rtl">{node.name_ar}</span>
+        <span className="text-xs text-muted-foreground min-w-0 max-w-full break-words" dir="rtl">{node.name_ar}</span>
       )}
       {!node.is_active && (
         <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">Inactive</Badge>
       )}
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-0.5 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(node)}>
           <Pencil className="w-3 h-3" />
         </Button>
@@ -777,7 +778,7 @@ function CategoryModulePanel({ moduleKey }) {
 
       {/* Create dialog */}
       <Dialog open={showForm} onOpenChange={open => { if (!open) { setShowForm(false); setAddChildOf(null); } }}>
-        <DialogContent className="max-w-md rounded-xl p-4 sm:p-6" onOpenAutoFocus={e => e.preventDefault()}>
+        <DialogContent className="max-w-md grid-cols-[minmax(0,1fr)] overflow-x-hidden rounded-xl p-4 sm:p-6" onOpenAutoFocus={e => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>
               {addChildOf
@@ -798,7 +799,7 @@ function CategoryModulePanel({ moduleKey }) {
 
       {/* Edit dialog */}
       <Dialog open={!!editing} onOpenChange={open => { if (!open) setEditing(null); }}>
-        <DialogContent className="max-w-md rounded-xl p-4 sm:p-6" onOpenAutoFocus={e => e.preventDefault()}>
+        <DialogContent className="max-w-md grid-cols-[minmax(0,1fr)] overflow-x-hidden rounded-xl p-4 sm:p-6" onOpenAutoFocus={e => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Edit Category</DialogTitle>
           </DialogHeader>
@@ -846,7 +847,7 @@ export default function CategoryManager() {
   const [activeModule, setActiveModule] = useState('product');
 
   return (
-    <div className="min-w-0 p-0 sm:p-4 max-w-4xl mx-auto space-y-4">
+    <div className="w-full min-w-0 max-w-full p-0 sm:p-4 sm:max-w-4xl mx-auto space-y-4">
       {/* Page header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -855,20 +856,20 @@ export default function CategoryManager() {
         <div>
           <h1 className="text-base sm:text-xl font-bold">Enterprise Category Manager</h1>
           <p className="text-sm text-muted-foreground">
-            Manage all category modules — fully isolated, no cross-contamination
+            Organize your product, expense, sales and online order categories.
           </p>
         </div>
       </div>
 
       {/* Module tabs */}
-      <div className="flex gap-1 p-1 bg-muted rounded-xl overflow-x-auto">
+      <div className="grid grid-cols-2 sm:grid-cols-4 min-w-0 gap-1 p-1 bg-muted rounded-xl">
         {Object.values(CATEGORY_MODULES).map(mod => {
           const Icon = mod.icon;
           return (
             <button
               key={mod.key}
               onClick={() => setActiveModule(mod.key)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-w-0 whitespace-normal break-words transition-all
                 ${activeModule === mod.key
                   ? 'bg-background shadow-sm text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
