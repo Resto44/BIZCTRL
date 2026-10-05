@@ -28,6 +28,11 @@ const englishPhraseIndex = createEnglishPhraseIndex(translations);
 
 export function LanguageProvider({ children }) {
   const [lang, setLanguage] = useState(() => normalizeLanguage(safeGet(LANGUAGE_STORAGE_KEY, 'en')));
+  useEffect(()=>{
+    let stopped=false,cleanup;
+    import('./ownerPush').then(({watchPushLanguage})=>{if(!stopped)cleanup=watchPushLanguage(lang);}).catch(()=>{});
+    return()=>{stopped=true;cleanup?.();};
+  },[lang]);
   const [currency, setCurrency] = useState(() => safeGet('rc_currency', 'SAR'));
   const [regionalPreferences, setRegionalPreferences] = useState(() => {
     try {

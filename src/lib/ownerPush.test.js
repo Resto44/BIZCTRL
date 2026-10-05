@@ -92,3 +92,26 @@ it('loads totals for channel-only custom templates and renders zero distinctly f
  expect(renderNotification(p,{}, {},null,{currency:'SAR',network_sales:0,pos_sales:150,source_sales:-5}).body).toBe('0.00 SAR / 150.00 SAR / -5.00 SAR');
  expect(renderNotification(p,{}, {},null,null).body).toBe('— / — / —');
 });
+
+import { preferencesForLanguage, appPushLanguage } from '../../supabase/functions/owner-push/preferences.ts';
+describe('push follows each device app language',()=>{
+ it.each(['en','ar','fa'])('translates a saved English financial preset into %s',language=>{
+  const p=preferencesForLanguage({...DEFAULT_PREFERENCES,title_template:'مطاعم شمعة الريان'},language);
+  expect(p.body_template).toBe(financialTemplate(language));
+  expect(p.title_template).toBe('مطاعم شمعة الريان');
+  expect(p.language).toBe(language);
+ });
+ it('switches an Arabic template to Persian and back without changing placeholders or custom names',()=>{
+  const p=preferencesForLanguage({...DEFAULT_PREFERENCES,body_template:financialTemplate('ar')},'fa');
+  expect(p.body_template).toBe(financialTemplate('fa'));
+  expect(preferencesForLanguage(p,'en').body_template).toBe(financialTemplate('en'));
+  expect(preferencesForLanguage({...p,body_template:'My custom message: {sales}'},'ar').body_template).toBe('My custom message: {sales}');
+ });
+ it('localizes actions and dates while different devices keep their own language',()=>{
+  const saved={...DEFAULT_PREFERENCES,financial_summary:false,body_template:'{action}'};
+  expect(renderNotification(preferencesForLanguage(saved,'fa'),{action:'insert'},{},null).body).toBe('ثبت شد');
+  expect(renderNotification(preferencesForLanguage(saved,'ar'),{action:'insert'},{},null).body).toBe('تمت الإضافة');
+  expect(saved.language).toBe('en');
+  expect(appPushLanguage('invalid')).toBe('en');
+ });
+});

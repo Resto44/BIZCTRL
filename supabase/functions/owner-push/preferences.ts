@@ -79,3 +79,18 @@ export function renderNotification(settings: any, event: any, business: any, bra
  const body=p.financial_summary !== false && !hasAmounts ? `${base.slice(0,Math.max(0,499-summary.length))}\n${summary}` : base;
  return {title:fill(p.title_template,100),body};
 }
+
+export function appPushLanguage(language: unknown) {
+ return ['en','ar','fa'].includes(String(language)) ? String(language) : 'en';
+}
+export function preferencesForLanguage(settings: any, language: unknown) {
+ const p=settings || DEFAULT_PREFERENCES;
+ const lang=appPushLanguage(language || p.language);
+ const labels=FINANCIAL_LABELS[lang];
+ const fields: Record<string,string>={sales:'sales',purchases:'purchases',expenses:'expenses',network_sales:'network',pos_sales:'pos',source_sales:'sources',net_profit:'profit'};
+ const localize=(template: string)=>template.replace(/([^\n:]+):\s*\{(sales|purchases|expenses|network_sales|pos_sales|source_sales|net_profit)\}/g,(match,label,key)=>{
+  const known=Object.values(FINANCIAL_LABELS).some(l=>l[fields[key]]===label.trim());
+  return known ? `${labels[fields[key]]}: {${key}}` : match;
+ });
+ return {...p,language:lang,title_template:localize(p.title_template),body_template:localize(p.body_template)};
+}

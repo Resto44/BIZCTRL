@@ -30,3 +30,27 @@ export async function disableDevicePush() {
   await supabase.from('owner_push_devices').delete().eq('endpoint',sub.endpoint).abortSignal(AbortSignal.timeout(3000));
  }
 }
+
+// Serialize changes so a slow previous-language request cannot win a later change.
+let languageQueue=Promise.resolve();
+export function syncPushLanguage(language) {
+ languageQueue=languageQueue.catch(()=>{}).then(async()=>{
+  if(!pushSupported()) return;
+  const {data:{session}}=await supabase.auth.getSession();
+  if(!session) return;
+  const sub=await currentPushSubscription();
+  if(sub) await pushRequest('language',{endpoint:sub.endpoint,language:['en','ar','fa'].includes(language)?language:'en'});
+ });
+ return languageQueue;
+}
+export function watchPushLanguage(language) {
+ let stopped=false;
+ const sync=()=>{if(!stopped)void syncPushLanguage(language).catch(()=>{});};
+ const visible=()=>{if(document.visibilityState==='visible')sync();};
+ // Defer auth callbacks to avoid awaiting Supabase auth inside its own lock.
+ const {data}=supabase.auth.onAuthStateChange(()=>{setTimeout(sync,0);});
+ window.addEventListener('online',sync);
+ document.addEventListener('visibilitychange',visible);
+ sync();
+ return()=>{stopped=true;data?.subscription?.unsubscribe();window.removeEventListener('online',sync);document.removeEventListener('visibilitychange',visible);};
+}
