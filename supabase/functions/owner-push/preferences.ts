@@ -1,9 +1,10 @@
 export const MODULES = ['sales', 'purchases', 'inventory', 'finance', 'people', 'other'];
-export const TOKENS = ['business', 'branch', 'action', 'entity', 'reference', 'time'];
+export const TOKENS = ['business', 'branch', 'action', 'entity', 'reference', 'time', 'sales', 'expenses', 'purchases', 'net_profit', 'date', 'currency'];
 export const DEFAULT_PREFERENCES = {
  enabled: true,
- title_template: 'BizCTRL · {business}',
- body_template: '{action} · {entity} · {reference} · {branch}',
+ financial_summary: true,
+ title_template: '{business}',
+ body_template: '{branch} · {date}\nSales: {sales}\nExpenses: {expenses}\nNet profit: {net_profit}',
  language: 'en',
  actions: ['insert', 'update', 'delete'],
  modules: [...MODULES],
@@ -19,7 +20,7 @@ export function moduleFor(entity: string): string {
  return 'other';
 }
 export function validTemplate(value: unknown, max: number): boolean {
- return typeof value === 'string' && value.trim().length > 0 && value.length <= max && !/[{}]/.test(value.replace(/\{(business|branch|action|entity|reference|time)\}/g, ''));
+ return typeof value === 'string' && value.trim().length > 0 && value.length <= max && !/[{}]/.test(value.replace(/\{(business|branch|action|entity|reference|time|sales|expenses|purchases|net_profit|date|currency)\}/g, ''));
 }
 export function resolveBranch(event: any, branches: any[]) {
  const exact = branches.find(b => b.id === event.branch) || branches.find(b => b.branch_key === event.branch);
@@ -37,7 +38,19 @@ const ACTIONS: Record<string, Record<string,string>> = {
  fa: {insert:'ثبت شد',update:'تغییر کرد',delete:'حذف شد'},
  ar: {insert:'تمت الإضافة',update:'تم التعديل',delete:'تم الحذف'},
 };
-export function renderNotification(settings: any, event: any, business: any, branch: any) {
+export const FINANCIAL_LABELS: Record<string, any> = {
+ en: {heading:'Append financial summary to custom text',sales:'Sales',expenses:'Expenses',profit:'Net profit',preset:'Use financial layout',help:'Daily totals at delivery time. Net profit = sales − approved purchases − variable expenses − allocated fixed expenses. Amounts appear on the lock screen. Preview uses example amounts.'},
+ fa: {heading:'افزودن خلاصهٔ مالی به متن سفارشی',sales:'فروشات',expenses:'مصارف',profit:'فایدهٔ خالص',preset:'استفاده از قالب مالی',help:'جمع روز در زمان ارسال. فایدهٔ خالص = فروشات − خریدهای تأییدشده − مصارف متغیر − سهم روزانهٔ مصارف ثابت. ارقام روی صفحهٔ قفل دیده می‌شوند. پیش‌نمایش ارقام نمونه دارد.'},
+ ar: {heading:'إضافة الملخص المالي إلى النص المخصص',sales:'المبيعات',expenses:'المصروفات',profit:'صافي الربح',preset:'استخدام القالب المالي',help:'إجماليات اليوم عند الإرسال. صافي الربح = المبيعات − المشتريات المعتمدة − المصروفات المتغيرة − الحصة اليومية للمصروفات الثابتة. تظهر المبالغ على شاشة القفل. المعاينة بأرقام تجريبية.'},
+};
+export function financialTemplate(language: string) {
+ const t=FINANCIAL_LABELS[language] || FINANCIAL_LABELS.en;
+ return `{branch} · {date}\n${t.sales}: {sales}\n${t.expenses}: {expenses}\n${t.profit}: {net_profit}`;
+}
+export function needsFinancialSummary(settings: any) {
+ return settings?.financial_summary !== false || /\{(sales|expenses|purchases|net_profit|date|currency)\}/.test((settings?.title_template || '')+(settings?.body_template || ''));
+}
+export function renderNotification(settings: any, event: any, business: any, branch: any, financial: any = null) {
  const p = settings || DEFAULT_PREFERENCES;
  const language = ACTIONS[p.language] ? p.language : 'en';
  const globalBranch = {en:'All business',fa:'سطح کسب‌وکار',ar:'على مستوى المنشأة'}[language];
@@ -46,7 +59,11 @@ export function renderNotification(settings: any, event: any, business: any, bra
   try { time = new Intl.DateTimeFormat(language, {timeZone:business?.timezone || 'Asia/Riyadh',dateStyle:'short',timeStyle:'short'}).format(new Date(event.created_at)); }
   catch { time = new Date(event.created_at).toISOString(); }
  }
+ const money=(key: string) => financial && Number.isFinite(Number(financial[key]))
+  ? `${new Intl.NumberFormat(language, {minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(financial[key]))} ${financial.currency || business?.currency || 'SAR'}` : '—';
  const values: Record<string,string> = {
+  sales:money('sales'),expenses:money('expenses'),purchases:money('purchases'),net_profit:money('net_profit'),
+  date: financial?.date || '—',currency:financial?.currency || business?.currency || '',
   business: business?.name || 'BizCTRL',
   branch: branch?.name || event.branch || globalBranch || '',
   action: ACTIONS[language][event.action] || event.action || '',
@@ -55,5 +72,9 @@ export function renderNotification(settings: any, event: any, business: any, bra
   time,
  };
  const fill = (template: string, max: number) => template.replace(/\{(\w+)\}/g, (_, key) => values[key] || '').slice(0, max);
- return {title:fill(p.title_template,100),body:fill(p.body_template,500)};
+ const hasAmounts=/\{(sales|expenses|purchases|net_profit)\}/.test(p.body_template);
+ const summary=fill(financialTemplate(language),400);
+ const base=fill(p.body_template,500);
+ const body=p.financial_summary !== false && !hasAmounts ? `${base.slice(0,Math.max(0,499-summary.length))}\n${summary}` : base;
+ return {title:fill(p.title_template,100),body};
 }

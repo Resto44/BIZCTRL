@@ -38,7 +38,7 @@ describe('ERP push customization',()=>{
   expect(resolveBranch({branch:'North'},[branch,{...branch,id:'branch-2',branch_key:'other'}])).toBeUndefined();
  });
  it('renders custom text literally, localizes actions and hides the reference when requested',()=>{
-  const p={...DEFAULT_PREFERENCES,language:'fa',title_template:'{business} / {branch}',body_template:'{action}: {reference}',show_reference:false};
+  const p={...DEFAULT_PREFERENCES,language:'fa',financial_summary:false,title_template:'{business} / {branch}',body_template:'{action}: {reference}',show_reference:false};
   const text=renderNotification(p,event,{name:'My {reference}'},branch);
   expect(text.title).toBe('My {reference} / North');
   expect(text.body).toBe('ثبت شد: ');
@@ -56,5 +56,32 @@ describe('ERP push customization',()=>{
   expect(moduleFor('customer_collections')).toBe('finance');
   expect(moduleFor('staff_attendance')).toBe('people');
   expect(moduleFor('workspace_settings')).toBe('other');
+ });
+});
+
+import { financialTemplate, needsFinancialSummary } from '../../supabase/functions/owner-push/preferences.ts';
+describe('financial push layout',()=>{
+ const financial={date:'2026-10-05',currency:'SAR',sales:5000,purchases:2000,expenses:750,net_profit:2250};
+ it('renders business, branch and daily amounts with a localized editable preset',()=>{
+  const p={...DEFAULT_PREFERENCES,title_template:'{business}',body_template:financialTemplate('en')};
+  const result=renderNotification(p,{}, {name:'Market'}, {name:'North'},financial);
+  expect(result.title).toBe('Market');
+  expect(result.body).toBe('North · 2026-10-05\nSales: 5,000.00 SAR\nExpenses: 750.00 SAR\nNet profit: 2,250.00 SAR');
+ });
+ it('appends summary to existing custom templates without duplicating financial templates',()=>{
+  const result=renderNotification({...DEFAULT_PREFERENCES,body_template:'Record saved'}, {},{}, {name:'North'},financial);
+  expect(result.body).toContain('Record saved\nNorth');
+  expect(result.body.match(/Net profit/g)).toHaveLength(1);
+ });
+ it('preserves losses and never substitutes a fake zero for unavailable totals',()=>{
+  const p={...DEFAULT_PREFERENCES,body_template:'{net_profit}'};
+  expect(renderNotification(p,{}, {},{}, {...financial,net_profit:-150}).body).toBe('-150.00 SAR');
+  expect(renderNotification(p,{}, {},{}, null).body).toBe('—');
+ });
+ it('supports financial tokens, disabled summary and explicit custom financial fields',()=>{
+  expect(validTemplate('{sales} {expenses} {net_profit} {purchases} {date} {currency}',500)).toBe(true);
+  const p={...DEFAULT_PREFERENCES,financial_summary:false,body_template:'Record saved'};
+  expect(needsFinancialSummary(p)).toBe(false);
+  expect(needsFinancialSummary({...p,body_template:'{sales}'})).toBe(true);
  });
 });

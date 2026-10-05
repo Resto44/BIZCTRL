@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.106.1';
 import webpush from 'npm:web-push@3.6.7';
 import { validSubscription } from './policy.ts';
-import { DEFAULT_PREFERENCES, renderNotification, shouldDeliver, resolveBranch } from './preferences.ts';
+import { DEFAULT_PREFERENCES, renderNotification, shouldDeliver, resolveBranch, needsFinancialSummary } from './preferences.ts';
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
@@ -18,11 +18,22 @@ async function owner(userId: string, restaurantId: string) {
 async function presentation(restaurantId: string) {
  const [settings, business, branches] = await Promise.all([
   db.from('owner_push_preferences').select('*').eq('restaurant_id',restaurantId).maybeSingle(),
-  db.from('restaurants').select('name,timezone').eq('id',restaurantId).single(),
+  db.from('restaurants').select('name,timezone,currency').eq('id',restaurantId).single(),
   db.from('branches').select('id,name,branch_key').eq('restaurant_id',restaurantId),
  ]);
  if(settings.error || business.error || branches.error) throw new Error('Notification settings unavailable');
  return {settings:settings.data || DEFAULT_PREFERENCES,business:business.data,branches:branches.data || []};
+}
+async function financialSummary(restaurantId: string, view: any, branch: any, event: any) {
+ if(!needsFinancialSummary(view.settings)) return null;
+ // Never substitute another branch or business-wide totals for an unresolved branch.
+ if(!branch) return null;
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:view.business.timezone || 'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+ const day=Object.fromEntries(parts.map(p=>[p.type,p.value]));
+ const date=`${day.year}-${day.month}-${day.day}`;
+ const {data,error}=await db.rpc('owner_push_financial_summary',{p_restaurant_id:restaurantId,p_branch_id:branch?.id || null,p_date:date});
+ if(error) throw new Error('Financial summary unavailable');
+ return data;
 }
 async function send(device: any, payload: any, keys: any) {
  if (!validSubscription({ endpoint: device.endpoint, keys: { p256dh: device.p256dh, auth: device.auth_key } })) throw new Error('Invalid push provider');
@@ -49,7 +60,7 @@ async function dispatch(keys: any) {
      const branch=resolveBranch(event,view.branches);
      if(!shouldDeliver(view.settings,event,branch)) state='cancelled';
      else {
-      await send(device,{...renderNotification(view.settings,event,view.business,branch),tag:event.id,url:'/notifications',eventId:event.id},keys);
+      await send(device,{...renderNotification(view.settings,event,view.business,branch,await financialSummary(event.restaurant_id,view,branch,event)),tag:event.id,url:'/notifications',eventId:event.id},keys);
       sent++;
      }
     }
@@ -99,7 +110,7 @@ Deno.serve(async (req) => {
    const branch=view.branches.find(b=>view.settings.branch_ids.includes(b.id)) || (view.settings.branch_ids.length ? undefined : view.branches[0]);
    const samples: Record<string,string>={sales:'sales_invoices',purchases:'purchases',inventory:'products',finance:'expenses',people:'employees',other:'tasks'};
    const sample={action:view.settings.actions[0] || 'insert',entity:samples[view.settings.modules[0]] || 'sales_invoices',reference:'TEST-001',created_at:new Date().toISOString()};
-   await send(device,{...renderNotification(view.settings,sample,view.business,branch),tag:'bizctrl-push-test',url:'/notifications'},await config());
+   await send(device,{...renderNotification(view.settings,sample,view.business,branch,await financialSummary(body.restaurantId,view,branch,sample)),tag:'bizctrl-push-test',url:'/notifications'},await config());
    return reply({accepted:true});
   }
   return reply({error:'Not found'},404);
