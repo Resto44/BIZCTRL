@@ -4,9 +4,9 @@ import {createRoot} from 'react-dom/client';
 import {Simulate} from 'react-dom/test-utils';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {beforeEach,afterEach,describe,it,expect,vi} from 'vitest';
-const fixture=vi.hoisted(()=>({filter:vi.fn(),create:vi.fn()}));
+const fixture=vi.hoisted(()=>({filter:vi.fn(),create:vi.fn(),tenant:{activeRestaurantId:'tenant-1'}}));
 vi.mock('@/api/supabaseClient',()=>({base44:{entities:{ProductCategory:fixture}}}));
-vi.mock('@/lib/TenantContext',()=>({useTenant:()=>({activeRestaurantId:'tenant-1'})}));
+vi.mock('@/lib/TenantContext',()=>({useTenant:()=>fixture.tenant}));
 import {Dialog,DialogContent,DialogTitle} from '@/components/ui/dialog';
 import CategoryManager from '@/components/categories/CategoryManager';
 import {NewIconPicker} from '@/components/categories/NewIconPicker';
@@ -17,6 +17,7 @@ beforeEach(()=>{
  window.matchMedia=vi.fn(()=>({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()}));
  Object.defineProperty(window,'innerWidth',{value:390,configurable:true});
  localStorage.clear();
+ fixture.tenant={activeRestaurantId:'tenant-1'};fixture.create.mockClear();
  fixture.filter.mockResolvedValue([]);fixture.create.mockResolvedValue({id:'new-category'});
  qc=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
  qc.setQueryData(['product_categories','tenant-1'],[]);
@@ -33,6 +34,24 @@ describe('category editor regression',()=>{
   await act(async()=>Simulate.change(input,{target:{value:'Rice'}}));
   await act(async()=>Simulate.submit(input.closest('form')));
   expect(fixture.create).toHaveBeenCalledWith(expect.objectContaining({name:'Rice',restaurant_id:'tenant-1',icon:'📦',parent_id:null}));
+ });
+ it('submits the canonical assigned branch for managers',async()=>{
+  fixture.tenant={activeRestaurantId:'tenant-1',isBranchScoped:true,managerBranchObject:{id:'63a92c99-c4c8-4831-8e7f-33c8e0a6e653'},managerBranch:'legacy-key'};
+  await render(<CategoryManager/>);
+  await act(async()=>button('Add Category').click());
+  const input=document.querySelector('input[placeholder="Category name"]');
+  await act(async()=>Simulate.change(input,{target:{value:'Branch rice'}}));
+  await act(async()=>Simulate.submit(input.closest('form')));
+  expect(fixture.create).toHaveBeenCalledWith(expect.objectContaining({restaurant_id:'tenant-1',branch_id:'63a92c99-c4c8-4831-8e7f-33c8e0a6e653'}));
+ });
+ it('blocks manager creation without a resolved branch',async()=>{
+  fixture.tenant={activeRestaurantId:'tenant-1',isBranchScoped:true,managerBranch:'legacy-key'};
+  await render(<CategoryManager/>);
+  await act(async()=>button('Add Category').click());
+  const input=document.querySelector('input[placeholder="Category name"]');
+  await act(async()=>Simulate.change(input,{target:{value:'Rice'}}));
+  await act(async()=>Simulate.submit(input.closest('form')));
+  expect(fixture.create).not.toHaveBeenCalled();
  });
  it('opens Create First Category with malformed icon history',async()=>{
   localStorage.setItem('resto_frequent_icons','{"length":4}');

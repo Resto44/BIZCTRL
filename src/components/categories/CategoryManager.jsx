@@ -118,7 +118,8 @@ const COLOR_PALETTE = [
 // ── Hooks ─────────────────────────────────────────────────────────────────────
 export function useCategoryModule(moduleKey) {
   const mod = CATEGORY_MODULES[moduleKey];
-  const { activeRestaurantId } = useTenant();
+  const { activeRestaurantId, isBranchScoped, managerBranchObject, managerBranch } = useTenant();
+  const branchId = isBranchScoped ? (managerBranchObject?.id || managerBranch) : null;
   const qc = useQueryClient();
 
   const { data: categories = [], isLoading } = useQuery({
@@ -128,14 +129,21 @@ export function useCategoryModule(moduleKey) {
       'sort_order',
       500
     ),
-    enabled: !!mod.entity,
+    enabled: !!mod.entity && !!activeRestaurantId,
   });
 
   const createMut = useMutation({
-    mutationFn: (data) => base44.entities[mod.entity].create({
-      ...data,
-      restaurant_id: activeRestaurantId,
-    }),
+    mutationFn: (data) => {
+      if (!activeRestaurantId) throw new Error('Select a business first');
+      if (isBranchScoped && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId || '')) {
+        throw new Error('Your branch assignment is not ready. Reopen this page.');
+      }
+      return base44.entities[mod.entity].create({
+        ...data,
+        restaurant_id: activeRestaurantId,
+        ...(isBranchScoped ? { branch_id: branchId } : {}),
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [mod.queryKey] });
       toast.success('Category created');
@@ -201,7 +209,7 @@ function ColorPicker({ value, onChange }) {
         />
         <span className="text-xs font-mono text-muted-foreground">{value}</span>
       </div>
-      <Button size="sm" variant="ghost" className="w-full mt-2 text-xs" onClick={() => setOpen(false)}>
+      <Button type="button" size="sm" variant="ghost" className="w-full mt-2 text-xs" onClick={() => setOpen(false)}>
         <Check className="w-3 h-3 mr-1" /> Done
       </Button>
     </div>
@@ -281,17 +289,16 @@ function CategoryForm({ initial, parentOptions, onSubmit, onCancel, mod, isLoadi
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="min-w-0 space-y-4 [&_input]:text-base sm:[&_input]:text-sm">
       {/* Name row with color + icon */}
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
           <Label className="text-xs font-medium">Name (English) *</Label>
           <Input
             value={form.name}
             onChange={e => set('name', e.target.value)}
             placeholder="Category name"
             className="h-9 mt-1"
-            autoFocus
           />
         </div>
         <div className="flex flex-col items-center gap-1">
@@ -305,7 +312,7 @@ function CategoryForm({ initial, parentOptions, onSubmit, onCancel, mod, isLoadi
       </div>
 
       {/* Arabic & Farsi */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label className="text-xs font-medium">Arabic (اسم)</Label>
           <Input
@@ -391,7 +398,7 @@ function CategoryForm({ initial, parentOptions, onSubmit, onCancel, mod, isLoadi
         </div>
       </div>
 
-      <DialogFooter>
+      <DialogFooter className="gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
         <Button type="submit" disabled={isLoading}>
           {isLoading ? 'Saving...' : (initial ? 'Save Changes' : 'Add Category')}
@@ -475,7 +482,7 @@ function CategoryTreeNode({
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
           {mod.hierarchical && level < 2 && (
             <Button
               variant="ghost" size="icon"
@@ -666,7 +673,7 @@ function CategoryModulePanel({ moduleKey }) {
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: mod.color + '20' }}>
             <ModIcon className="w-4 h-4" style={{ color: mod.color }} />
@@ -683,8 +690,8 @@ function CategoryModulePanel({ moduleKey }) {
       </div>
 
       {/* Search & Filter bar */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+        <div className="relative min-w-0 flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
             value={search}
@@ -770,7 +777,7 @@ function CategoryModulePanel({ moduleKey }) {
 
       {/* Create dialog */}
       <Dialog open={showForm} onOpenChange={open => { if (!open) { setShowForm(false); setAddChildOf(null); } }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-xl p-4 sm:p-6" onOpenAutoFocus={e => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>
               {addChildOf
@@ -791,7 +798,7 @@ function CategoryModulePanel({ moduleKey }) {
 
       {/* Edit dialog */}
       <Dialog open={!!editing} onOpenChange={open => { if (!open) setEditing(null); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-xl p-4 sm:p-6" onOpenAutoFocus={e => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Edit Category</DialogTitle>
           </DialogHeader>
@@ -839,14 +846,14 @@ export default function CategoryManager() {
   const [activeModule, setActiveModule] = useState('product');
 
   return (
-    <div className="p-4 max-w-4xl mx-auto space-y-4">
+    <div className="min-w-0 p-0 sm:p-4 max-w-4xl mx-auto space-y-4">
       {/* Page header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
           <Layers className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-xl font-bold">Enterprise Category Manager</h1>
+          <h1 className="text-base sm:text-xl font-bold">Enterprise Category Manager</h1>
           <p className="text-sm text-muted-foreground">
             Manage all category modules — fully isolated, no cross-contamination
           </p>
@@ -875,7 +882,7 @@ export default function CategoryManager() {
       </div>
 
       {/* Active module panel */}
-      <div className="bg-card border border-border rounded-xl p-4">
+      <div className="min-w-0 bg-card border border-border rounded-xl p-3 sm:p-4">
         <CategoryModulePanel key={activeModule} moduleKey={activeModule} />
       </div>
     </div>
