@@ -271,6 +271,13 @@ function createEntity(tableName) {
     },
 
     async delete(id) {
+      // Category RLS can turn DELETE into a successful request affecting zero rows.
+      if (['product_categories', 'expense_categories', 'sales_categories', 'online_order_categories'].includes(tableName)) {
+        const { data, error } = await supabase.from(tableName).delete().eq('id', id).select('id');
+        if (error) throw error;
+        if (!data?.length) throw new Error('Category was not deleted. You may only delete categories you can manage in your own branch.');
+        return { success: true };
+      }
       const { error } = await supabase.from(tableName).delete().eq('id', id);
       if (error) throw error;
       return { success: true };
