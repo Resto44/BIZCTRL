@@ -18,7 +18,7 @@ export function usePurchaseCategoriesHierarchy() {
         'sort_order',
         500
       ),
-    enabled: true,
+    enabled: !!activeRestaurantId,
     staleTime: 30000,
   });
 
