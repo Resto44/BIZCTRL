@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44, supabase } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -24,9 +25,9 @@ import { useNotify } from '@/lib/useNotify';
 import { useTenant } from '@/lib/TenantContext';
 import { useBranchScope } from '@/lib/BranchScopeContext';
 
-function ExpenseForm({ initial, onSubmit, onCancel, categories }) {
+function ExpenseForm({ initial, onSubmit, onCancel, categories, isSaving = false }) {
   const { t } = useLanguage();
-  const { branches, managerBranch } = useTenant();
+  const { branches, managerBranch, isBranchScoped } = useTenant();
   const { selectedBranchId, selectedBranchKey, isAllBranches } = useBranchScope();
   const defaultBranch = !isAllBranches ? (selectedBranchKey || '') : (managerBranch || branches[0]?.key || branches[0]?.branch_key || '');
   // Resolve branch_key: use stored value only if it matches a known branch or is 'all';
@@ -54,7 +55,7 @@ function ExpenseForm({ initial, onSubmit, onCancel, categories }) {
         <Select value={form.branch_key} onValueChange={v => set('branch_key', v)}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t('all_branches')}</SelectItem>
+            {!isBranchScoped && <SelectItem value="all">{t('all_branches')}</SelectItem>}
             {branches.map(b => <SelectItem key={b.key} value={b.key}>{b.label}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -104,7 +105,7 @@ function ExpenseForm({ initial, onSubmit, onCancel, categories }) {
       <div><Label>{t('description')}</Label><Input value={form.description} onChange={e => set('description', e.target.value)} /></div>
       <div><Label>{t('amount')}</Label><Input type="number" value={form.amount} onChange={e => set('amount', e.target.value)} /></div>
       <div className="flex gap-2 pt-2">
-        <Button className="flex-1" onClick={() => onSubmit({
+        <Button disabled={isSaving} className="flex-1" onClick={() => onSubmit({
           ...form,
           branch_id: branches.find((branch) => (branch.key || branch.branch_key) === form.branch_key)?.id || form.branch_id || null,
           amount: Number(form.amount) || 0,
@@ -207,6 +208,7 @@ export default function Expenses() {
       }
       return exp;
     },
+    onError: error => toast.error(error?.message || 'Expense could not be saved'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses'] });
       qc.invalidateQueries({ queryKey: ['expenses_today'] });
@@ -374,7 +376,7 @@ export default function Expenses() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>{t('add_expense')}</DialogTitle></DialogHeader>
-          <ExpenseForm initial={scannedData} categories={categories} onSubmit={d => createMut.mutate(d)} onCancel={() => setShowForm(false)} />
+          <ExpenseForm isSaving={createMut.isPending} initial={scannedData} categories={categories} onSubmit={d => createMut.mutate(d)} onCancel={() => setShowForm(false)} />
         </DialogContent>
       </Dialog>
 

@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -122,7 +123,7 @@ export default function ExpenseCategoryManager({ onClose }) {
 
   const { data: categories = [], isLoading } = useExpenseCategories();
 
-  const { activeRestaurantId } = useTenant();
+  const { activeRestaurantId, isBranchScoped, managerBranchObject, managerBranch } = useTenant();
   const createMut = useMutation({
     mutationFn: async (d) => {
       const payload = { 
@@ -131,10 +132,12 @@ export default function ExpenseCategoryManager({ onClose }) {
         is_fixed: !!d.is_fixed,
         expense_type: d.is_fixed ? 'fixed' : 'variable',
         is_active: d.is_active,
-        restaurant_id: activeRestaurantId 
+        restaurant_id: activeRestaurantId,
+        ...(isBranchScoped ? { branch_id: managerBranchObject?.id || managerBranch } : {}),
       };
       return base44.entities.ExpenseCategory.create(payload);
     },
+    onError: error => toast.error(error.message),
     onSuccess: () => { 
       qc.invalidateQueries({ queryKey: ['expense_categories'] }); 
       qc.invalidateQueries({ queryKey: ['expense_categories_dash'] });
@@ -151,6 +154,7 @@ export default function ExpenseCategoryManager({ onClose }) {
         is_active: data.is_active
       });
     },
+    onError: error => toast.error(error.message),
     onSuccess: () => { 
       qc.invalidateQueries({ queryKey: ['expense_categories'] }); 
       qc.invalidateQueries({ queryKey: ['expense_categories_dash'] });
@@ -159,6 +163,7 @@ export default function ExpenseCategoryManager({ onClose }) {
   });
   const deleteMut = useMutation({
     mutationFn: id => base44.entities.ExpenseCategory.delete(id),
+    onError: error => toast.error(error.message),
     onSuccess: () => { 
       qc.invalidateQueries({ queryKey: ['expense_categories'] }); 
       qc.invalidateQueries({ queryKey: ['expense_categories_dash'] });
