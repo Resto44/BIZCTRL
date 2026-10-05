@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
-import { DEFAULT_PREFERENCES, MODULES, TOKENS, renderNotification, validTemplate } from '../../../supabase/functions/owner-push/preferences.ts';
+import { FINANCIAL_LABELS, financialTemplate, DEFAULT_PREFERENCES, MODULES, TOKENS, renderNotification, validTemplate } from '../../../supabase/functions/owner-push/preferences.ts';
 
 const labels = {
  en: {heading:'Customize ERP push notifications',scope:'Applies to all owner devices for this business. Save before sending a test.',enabled:'Send business notifications',title:'Notification title',body:'Notification text',language:'Language of action labels and dates',actions:'Operations',insert:'Created',update:'Updated',delete:'Deleted',modules:'ERP sections',sales:'Sales & POS',purchases:'Purchases & suppliers',inventory:'Products & inventory',finance:'Finance & debts',people:'Customers & employees',other:'Other business records',branches:'Branches',all:'All branches and business-wide records',branchHelp:'With specific branches selected, records without an identifiable branch are excluded.',reference:'Include record name / number',privacy:'Notification text may appear on the lock screen. Turning this off hides the {reference} variable.',tokens:'Variables: business, branch, operation, record type, reference, time',preview:'Preview · example record',test:'Test saved notification',save:'Save notification settings',reset:'Restore defaults in editor',saved:'Saved. All owner devices now use these settings.',loading:'Loading settings…',error:'Could not load settings. Try again.',retry:'Retry',invalid:'Use non-empty text and only the variables listed below.',empty:'No operations or sections selected: business notifications will not be sent.',paused:'Business notifications are paused. The test button still works.',dirty:'Unsaved changes — the test button uses the last saved settings.'},
@@ -38,17 +38,23 @@ export default function PushCustomization({ restaurant, branches = [], onTest, t
   }catch(e){setMessage(e.message);}finally{setBusy(false);}
  };
  if(!draft)return <div className="border-t pt-4"><h3 className="font-semibold">{t.heading}</h3><p role="status" className="text-sm mt-2">{error?t.error:t.loading}</p>{error&&<Button variant="outline" onClick={()=>setRetry(n=>n+1)}>{t.retry}</Button>}</div>;
+ const ft=FINANCIAL_LABELS[draft.language] || FINANCIAL_LABELS.en;
  const dirty=JSON.stringify(draft)!==JSON.stringify(loaded);
  const valid=validTemplate(draft.title_template,100)&&validTemplate(draft.body_template,500);
  const sampleBranch=branches.find(b=>draft.branch_ids.includes(b.id)) || (!draft.branch_ids.length?branches[0]:null);
  const examples={sales:'sales_invoices',purchases:'purchases',inventory:'products',finance:'expenses',people:'employees',other:'tasks'};
- const preview=renderNotification(draft,{action:draft.actions[0] || 'insert',entity:examples[draft.modules[0]] || 'sales_invoices',reference:'TEST-001',created_at:new Date().toISOString()},restaurant,sampleBranch?{...sampleBranch,name:sampleBranch.name || sampleBranch.label}:null);
+ const preview=renderNotification(draft,{action:draft.actions[0] || 'insert',entity:examples[draft.modules[0]] || 'sales_invoices',reference:'TEST-001',created_at:new Date().toISOString()},restaurant,sampleBranch?{...sampleBranch,name:sampleBranch.name || sampleBranch.label}:null,{date:'2026-10-05',currency:restaurant.currency || 'SAR',sales:5000,purchases:2000,expenses:750,net_profit:2250});
  const checkbox=(checked,onChange,text)=> <label className="flex items-center gap-2 py-2 text-sm cursor-pointer"><input type="checkbox" className="size-4 shrink-0 accent-blue-600" checked={checked} onChange={onChange} disabled={busy}/><span>{text}</span></label>;
  return <details className="border-t pt-4" open>
   <summary className="font-semibold cursor-pointer">{t.heading}</summary>
   <div className="space-y-4 mt-3">
    <p className="text-sm text-muted-foreground">{t.scope}</p>
    {checkbox(draft.enabled,()=>set('enabled',!draft.enabled),t.enabled)}
+   <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-2 min-w-0">
+    {checkbox(draft.financial_summary,()=>set('financial_summary',!draft.financial_summary),ft.heading)}
+    <p className="text-xs text-muted-foreground leading-relaxed">{ft.help}</p>
+    <Button type="button" variant="outline" disabled={busy} className="max-w-full whitespace-normal h-auto py-2" onClick={()=>{setDraft(d=>({...d,financial_summary:true,title_template:'{business}',body_template:financialTemplate(d.language)}));setMessage('');}}>{ft.preset}</Button>
+   </div>
    <div className="grid gap-4 sm:grid-cols-2">
     <label className="text-sm space-y-1"><span>{t.title} ({draft.title_template.length}/100)</span><Input value={draft.title_template} maxLength={100} disabled={busy} onChange={e=>set('title_template',e.target.value)}/></label>
     <label className="text-sm space-y-1"><span>{t.language}</span><select className="block w-full border rounded-md bg-background p-2" value={draft.language} disabled={busy} onChange={e=>set('language',e.target.value)}><option value="en">English</option><option value="ar">العربية</option><option value="fa">فارسی</option></select></label>
@@ -61,7 +67,7 @@ export default function PushCustomization({ restaurant, branches = [], onTest, t
    <fieldset><legend className="text-sm font-medium">{t.branches}</legend>{checkbox(draft.branch_ids.length===0,()=>set('branch_ids',[]),t.all)}<div className="grid grid-cols-1 sm:grid-cols-2 max-h-48 overflow-y-auto">{branches.filter(b=>b.id).map(b=><React.Fragment key={b.id}>{checkbox(draft.branch_ids.includes(b.id),()=>toggle('branch_ids',b.id),b.name || b.label || b.branch_key)}</React.Fragment>)}</div><p className="text-xs text-muted-foreground">{t.branchHelp}</p></fieldset>
    <div>{checkbox(draft.show_reference,()=>set('show_reference',!draft.show_reference),t.reference)}<p className="text-xs text-muted-foreground">{t.privacy}</p></div>
    {!draft.enabled?<p className="text-sm text-amber-700">{t.paused}</p>:(!draft.actions.length || !draft.modules.length)&&<p className="text-sm text-amber-700">{t.empty}</p>}
-   <div className="rounded-xl border bg-muted/40 p-4 space-y-1 break-words" aria-label={t.preview}><p className="text-xs text-muted-foreground">{t.preview}</p><p className="font-semibold">{preview.title}</p><p className="text-sm whitespace-pre-wrap">{preview.body}</p></div>
+   <div className="rounded-xl border bg-muted/40 p-4 space-y-1 break-words" dir={draft.language==='en'?'ltr':'rtl'} aria-label={t.preview}><p className="text-xs text-muted-foreground">{t.preview}</p><p className="font-semibold">{preview.title}</p><p className="text-sm whitespace-pre-wrap">{preview.body}</p></div>
    {dirty&&<p className="text-sm text-amber-700">{t.dirty}</p>}
    <div className="flex flex-wrap gap-2"><Button disabled={busy || !valid || !dirty} onClick={save}>{t.save}</Button><Button variant="outline" disabled={busy || testing || dirty || !testEnabled} onClick={onTest}>{t.test}</Button><Button variant="outline" disabled={busy} onClick={()=>{setDraft({...DEFAULT_PREFERENCES});setMessage('');}}>{t.reset}</Button></div>
    {message&&<p role="status" className="text-sm break-words">{message}</p>}
