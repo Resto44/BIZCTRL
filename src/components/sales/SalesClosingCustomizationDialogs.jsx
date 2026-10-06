@@ -118,11 +118,11 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
 
   if (!editor) return null;
   const set = (patch) => setDraft((current) => ({ ...current, ...patch }));
-  const toggleBranch = (branchId) => set((current) => {
+  const toggleBranch = (branchId) => setDraft((current) => {
     const selected = new Set(asArray(current.branch_ids).map(String));
     if (selected.has(String(branchId))) selected.delete(String(branchId));
     else selected.add(String(branchId));
-    return { branch_ids: Array.from(selected) };
+    return { ...current, branch_ids: Array.from(selected) };
   });
   const save = () => {
     const source = {
