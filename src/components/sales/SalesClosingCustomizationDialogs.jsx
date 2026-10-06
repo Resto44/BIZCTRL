@@ -1,3 +1,4 @@
+import { salesPaymentOptions, validPaymentCode } from '@/lib/salesPaymentMethods';
 import { useEffect, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -138,6 +139,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
       allows_driver_entries: Boolean(draft.allows_driver_entries),
       branch_ids: draft.is_global === false ? Array.from(new Set(asArray(draft.branch_ids).map(String).filter(Boolean))) : [],
     };
+    if (!validPaymentCode(source.default_payment_method)) return setError('Select a valid payment method. For network sales choose Card / Network.');
     if (!source.name_en) return setError(t('salesClosing.dialog.sourceNameRequired'));
     if (source.is_global === false && !source.branch_ids.length && !source.branch_id) return setError(t('salesSourceManagement.branchRequired'));
     onSave(source);
@@ -165,7 +167,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
             <div className="grid gap-3 sm:grid-cols-3">
               <div><Label>{t('salesSourceManagement.category')}</Label><Select value={draft.category || 'other'} onValueChange={(category) => set({ category })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SOURCE_CATEGORIES.map((category) => <SelectItem key={category} value={category}>{t(`salesSourceManagement.category.${category}`)}</SelectItem>)}</SelectContent></Select></div>
               <div><Label>Optional Subcategory</Label><Input value={draft.subcategory || ''} onChange={(event) => set({ subcategory: event.target.value })} placeholder="e.g. Drivers" maxLength={120} /></div>
-              <div><Label>{t('salesClosing.dialog.defaultPayment')}</Label><Select value={draft.default_payment_method || 'cash'} onValueChange={(default_payment_method) => set({ default_payment_method })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{paymentMethods.filter((method) => method.is_active !== false).map((method) => <SelectItem key={method.id} value={method.code}>{localizedDataName(method, lang)}</SelectItem>)}</SelectContent></Select></div>
+              <div><Label>{t('salesClosing.dialog.defaultPayment')}</Label><Select value={draft.default_payment_method || 'cash'} onValueChange={(default_payment_method) => set({ default_payment_method })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{salesPaymentOptions(paymentMethods).map((method) => <SelectItem key={method.id} value={method.code}>{localizedDataName(method, lang)}</SelectItem>)}</SelectContent></Select></div>
               <div><Label>{t('salesClosing.dialog.displayOrder')}</Label><Input type="number" min="0" value={draft.sort_order ?? 0} onChange={(event) => set({ sort_order: Number(event.target.value) || 0 })} /></div>
             </div>
             <div className="grid gap-4 rounded-xl border bg-background p-3">

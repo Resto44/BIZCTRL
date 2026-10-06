@@ -144,6 +144,7 @@ export default function Sales() {
       ['daily_sales'],
       ['quick_closing_automatic_sources'],
       ['daily_sales_history'],
+      ['daily_sales_network'],
       ['sales_dashboard'],
     ].forEach((queryKey) => qc.invalidateQueries({ queryKey }));
   }, [qc]);

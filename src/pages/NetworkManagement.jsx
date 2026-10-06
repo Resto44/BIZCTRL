@@ -27,6 +27,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -1017,7 +1018,7 @@ function AnalyticsTab({ accounts, branches, currency, salesData }) {
     const map = {};
     (salesData || []).forEach(s => {
       const entries = (() => {
-        try { return JSON.parse(s.pos_entries_json || '[]'); } catch { return []; }
+        try { const value = typeof s.pos_entries_json === 'string' ? JSON.parse(s.pos_entries_json) : s.pos_entries_json; return Array.isArray(value) ? value : []; } catch { return []; }
       })();
       entries.forEach(e => {
         const id = e.device_id || e.account_id || 'unknown';
@@ -1037,7 +1038,7 @@ function AnalyticsTab({ accounts, branches, currency, salesData }) {
     const map = {};
     (salesData || []).forEach(s => {
       const branch = s.branch || 'Unknown';
-      const net = Number(s.restaurant_network || s.network || 0);
+      const net = Number(s.reported_network_sales ?? s.restaurant_network ?? s.network ?? 0);
       map[branch] = (map[branch] || 0) + net;
     });
     return Object.entries(map)
@@ -1142,15 +1143,15 @@ function DashboardTab({ accounts, currency, salesData, recons }) {
   const todaySales = useMemo(() =>
     (salesData || [])
       .filter(s => s.date === todayStr)
-      .reduce((sum, s) => sum + Number(s.restaurant_network || s.network || 0), 0),
+      .reduce((sum, s) => sum + Number(s.reported_network_sales ?? s.restaurant_network ?? s.network ?? 0), 0),
     [salesData, todayStr]
   );
 
   const monthlySales = useMemo(() =>
     (salesData || [])
-      .filter(s => s.date >= monthStr)
-      .reduce((sum, s) => sum + Number(s.restaurant_network || s.network || 0), 0),
-    [salesData, monthStr]
+      .filter(s => s.date >= monthStr && s.date <= todayStr)
+      .reduce((sum, s) => sum + Number(s.reported_network_sales ?? s.restaurant_network ?? s.network ?? 0), 0),
+    [salesData, monthStr, todayStr]
   );
 
   const pendingRecons = (recons || []).filter(r => r.status === 'pending').length;
@@ -1182,6 +1183,19 @@ function DashboardTab({ accounts, currency, salesData, recons }) {
           </div>
         </Card>
       )}
+
+      <Card className="p-4 min-w-0">
+        <h3 className="font-bold text-sm mb-3">Recent Network Sales</h3>
+        <div className="divide-y">
+          {salesData.filter(s => Number(s.reported_network_sales) > 0).slice(0, 20).map(sale => (
+            <div key={sale.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
+              <div className="min-w-0"><p>{sale.date}</p><p className="break-words text-xs text-muted-foreground">{sale.branch || '—'}</p></div>
+              <span className="font-semibold tabular-nums">{fmtAmt(sale.reported_network_sales, currency)}</span>
+            </div>
+          ))}
+          {!salesData.some(s => Number(s.reported_network_sales) > 0) && <p className="py-3 text-sm text-muted-foreground">No network sales recorded.</p>}
+        </div>
+      </Card>
 
       {/* Recent Accounts */}
       <Card className="p-4">
@@ -1232,20 +1246,24 @@ export default function NetworkManagement() {
   });
 
   // ── Fetch sales data for analytics/dashboard
-  const { data: salesData = [] } = useQuery({
+  const { data: salesData = [], error: salesError, refetch: refetchSales } = useQuery({
     queryKey: ['daily_sales_network', activeRestaurant?.id],
-    queryFn: () => {
-      const filter = activeRestaurant?.id
-        ? { restaurant_id: activeRestaurant.id }
-        : { created_by: ownerFilter?.created_by || '__none__' };
-      return base44.entities.DailySales.filter(filter, '-date', 500);
+    queryFn: async () => {
+      const { data, error } = await supabase.from('daily_sales_network_report')
+        .select('id,date,branch,branch_id,reference_id,restaurant_network,network,reported_network_sales,pos_entries_json')
+        .eq('restaurant_id', activeRestaurant.id)
+        .or('closing_state.is.null,closing_state.in.(finalized,locked)')
+        .order('date', { ascending: false }).limit(500);
+      if (error) throw error;
+      return data || [];
     },
-    staleTime: 60000,
-    enabled: !!(ownerFilter?.created_by || activeRestaurant?.id),
+    staleTime: 15000,
+    refetchInterval: 30000,
+    enabled: Boolean(activeRestaurant?.id),
   });
 
   // ── Fetch reconciliations for dashboard alerts
-  const { data: recons = [] } = useQuery({
+  const { data: recons = [], refetch: refetchRecons } = useQuery({
     queryKey: ['network_reconciliations_dash', activeRestaurant?.id],
     queryFn: () => base44.entities.NetworkReconciliation.filter({ restaurant_id: activeRestaurant?.id || '' }, '-created_at', 100),
     enabled: !!activeRestaurant?.id,
@@ -1266,11 +1284,13 @@ export default function NetworkManagement() {
       <PageHeader
         title="Network Management"
         action={
-          <Button variant="outline" size="sm" onClick={() => refetchAccounts()}>
+          <Button variant="outline" size="sm" aria-label="Refresh network data" onClick={() => Promise.all([refetchAccounts(), refetchSales(), refetchRecons()])}>
             <RefreshCw className="w-4 h-4" />
           </Button>
         }
       />
+
+      {salesError && <p role="alert" className="mb-4 rounded-lg border border-destructive p-3 text-sm text-destructive">Unable to load network sales. Please refresh or try again.</p>}
 
       {/* Tab Navigation — horizontal scroll on mobile */}
       <div className="overflow-x-auto -mx-4 px-4 mb-4">
