@@ -7,6 +7,8 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { useSalesClosingCustomization } from '@/lib/SalesClosingCustomizationContext';
 import { newSalesClosingCustomField, normalizeSalesClosingConfig } from '@/lib/salesClosingCustomization';
 import { SalesClosingFieldDialog, SalesSourceDialog, newSalesClosingSource } from '@/components/sales/SalesClosingCustomizationDialogs';
+import { validPaymentCode } from '@/lib/salesPaymentMethods';
+import { paymentMethodForCode } from '@/lib/closing/CashReconciliationLedger';
 import { supabase } from '@/api/supabaseClient';
 import PageHeader from '@/components/shared/PageHeader';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -34,11 +36,12 @@ function PaymentMethodDialog({ editor, onClose, onSave, isSaving }) {
   if (!editor) return null;
   const set = (patch) => setDraft((current) => ({ ...current, ...patch }));
   const save = () => {
-    const method = { ...draft, code: String(draft.code || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'), name_en: String(draft.name_en || '').trim(), name_ar: String(draft.name_ar || '').trim() || null };
-    if (!method.code || !method.name_en) return setError('Code and English name are required.');
+    const method = { ...draft, code: String(draft.code || '').trim().toLowerCase(), name_en: String(draft.name_en || '').trim(), name_ar: String(draft.name_ar || '').trim() || null };
+    if (!validPaymentCode(method.code)) return setError('Use a code with English letters, numbers and underscores, such as card or bank_transfer. Names can be Arabic or Farsi.');
+    if (!method.name_en) return setError('A display name is required.');
     onSave(method);
   };
-  return <Dialog open={Boolean(editor)} onOpenChange={(open) => !open && onClose()}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>{editor.mode === 'create' ? 'Add Payment Method' : 'Edit Payment Method'}</DialogTitle><DialogDescription>Active methods are immediately available for future sales closings.</DialogDescription></DialogHeader><div className="grid gap-4"><div className="grid gap-3 sm:grid-cols-2"><div><Label>Code</Label><Input value={draft.code || ''} disabled={Boolean(editor.method.is_system)} onChange={(event) => set({ code: event.target.value })} placeholder="online_payment" maxLength={64} /></div><div><Label>Display order</Label><Input type="number" min="0" value={draft.sort_order ?? 0} onChange={(event) => set({ sort_order: Number(event.target.value) || 0 })} /></div></div><div className="grid gap-3 sm:grid-cols-2"><div><Label>English name</Label><Input value={draft.name_en || ''} onChange={(event) => set({ name_en: event.target.value })} placeholder="Online Payment" /></div><div><Label>Arabic name</Label><Input dir="rtl" value={draft.name_ar || ''} onChange={(event) => set({ name_ar: event.target.value })} placeholder="دفع إلكتروني" /></div></div><label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">Active for new closings<Switch checked={draft.is_active !== false} onCheckedChange={(is_active) => set({ is_active })} /></label>{error && <Alert variant="destructive"><AlertTitle>Unable to save payment method</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}</div><DialogFooter className="gap-2 sm:gap-0"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="button" disabled={isSaving} onClick={save}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save payment method'}</Button></DialogFooter></DialogContent></Dialog>;
+  return <Dialog open={Boolean(editor)} onOpenChange={(open) => !open && onClose()}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>{editor.mode === 'create' ? 'Add Payment Method' : 'Edit Payment Method'}</DialogTitle><DialogDescription>Active methods are immediately available for future sales closings.</DialogDescription></DialogHeader><div className="grid gap-4"><div className="grid gap-3 sm:grid-cols-2"><div><Label>Code</Label><Input value={draft.code || ''} disabled={Boolean(editor.method.is_system)} onChange={(event) => set({ code: event.target.value })} placeholder="card" maxLength={64} /></div><div><Label>Display order</Label><Input type="number" min="0" value={draft.sort_order ?? 0} onChange={(event) => set({ sort_order: Number(event.target.value) || 0 })} /></div></div><div className="grid gap-3 sm:grid-cols-2"><div><Label>English name</Label><Input value={draft.name_en || ''} onChange={(event) => set({ name_en: event.target.value })} placeholder="Online Payment" /></div><div><Label>Arabic name</Label><Input dir="rtl" value={draft.name_ar || ''} onChange={(event) => set({ name_ar: event.target.value })} placeholder="دفع إلكتروني" /></div></div><p className="text-sm text-muted-foreground">Accounting channel: {paymentMethodForCode(draft.code)}. Use card or mada for network sales; custom codes are reported as other.</p><label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">Active for new closings<Switch checked={draft.is_active !== false} onCheckedChange={(is_active) => set({ is_active })} /></label>{error && <Alert variant="destructive"><AlertTitle>Unable to save payment method</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}</div><DialogFooter className="gap-2 sm:gap-0"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="button" disabled={isSaving} onClick={save}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save payment method'}</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function Preview({ fields, sources, paymentMethods, config, currency }) {
@@ -100,6 +103,7 @@ export default function SalesClosingCustomization() {
   const savePaymentMethod = useMutation({
     mutationFn: async (method) => {
       if (!restaurantId) throw new Error('Select an active restaurant before saving a payment method.');
+      if (!validPaymentCode(method.code)) throw new Error('Correct the payment code before saving. Use English letters, numbers and underscores.');
       const payload = { ...method, restaurant_id: restaurantId };
       if (method.id) { const { data, error: mutationError } = await supabase.from('payment_methods').update(payload).eq('id', method.id).select().single(); if (mutationError) throw mutationError; return data; }
       const { data, error: mutationError } = await supabase.from('payment_methods').insert(payload).select().single(); if (mutationError) throw mutationError; return data;

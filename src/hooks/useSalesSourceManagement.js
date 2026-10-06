@@ -1,3 +1,4 @@
+import { salesPaymentOptions } from '@/lib/salesPaymentMethods';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfMonth, subDays } from 'date-fns';
@@ -127,8 +128,7 @@ export function useSalesSourceManagement({ filters, page = 0 } = {}) {
     ...row,
     source: sourceById.get(String(row.source_id)) || null,
   })), [history, sourceById]);
-  const paymentOptions = useMemo(() => asArray(paymentMethods)
-    .filter((method) => method.is_active !== false)
+  const paymentOptions = useMemo(() => salesPaymentOptions(paymentMethods)
     .map((method) => method.code)
     .filter(Boolean), [paymentMethods]);
 
