@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useNotificationRecord } from '@/components/notifications/NotificationRecordLink';
 import PageHeader from '@/components/shared/PageHeader';
 // SalesForm removed to enforce single ERP workspace entry point
 import UnifiedSalesClosing from '@/components/sales/UnifiedSalesClosing';
@@ -78,7 +79,9 @@ export default function Sales() {
   const canManageDriverSales = role === ROLES.OWNER || isBranchManager;
   const isDriverSale = (sale) => Boolean(sale?.driver_id || sale?.drivers_json);
   const { autoSettle } = useNetworkSettlement({ orgId, user, currency });
-  const [showForm, setShowForm] = useState(true);
+  const linked=useNotificationRecord();
+  const [showForm, setShowForm] = useState(!new URLSearchParams(window.location.search).has('notification'));
+  useEffect(()=>{if(linked?.event) setShowForm(false);},[linked?.event?.id]);
   const [editing, setEditing] = useState(null);
   const [newClosingDefaults, setNewClosingDefaults] = useState(null);
   const [newClosingInstance, setNewClosingInstance] = useState(0);
@@ -651,6 +654,8 @@ export default function Sales() {
           <POSReconciliation date={todayStr} branch={isAllBranches ? filters.branch : selectedBranchKey} />
         </div>
       )}
+
+      {linked?.event?.entity==='daily_sales' && linked.record && <SalesListItem key={`notification-${linked.event.id}`} sale={toDailySalesCardRecord(linked.record)} record={linked.record} expanded onToggleExpanded={null} onEdit={(sale)=>{if(isDriverSale(sale) && !canManageDriverSales) return;setNewClosingDefaults(null);setEditing(sale);setShowForm(false);}} onExport={()=>setShowExport(true)} onDelete={null} selected={false} onToggleSelect={null}/>}
 
       <div className="flex flex-col md:flex-row gap-4">
         {showFilters && (

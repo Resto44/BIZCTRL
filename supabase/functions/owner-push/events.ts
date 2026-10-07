@@ -71,3 +71,5 @@ export function recordDetails(event: any, language: string, currency: string, sh
  if(c.status) lines.push(`${t.status}: ${t[c.status] || String(c.status).slice(0,40)}`);
  return lines;
 }
+
+export const isKnownEntity=(entity: string)=>Object.prototype.hasOwnProperty.call(entities,entity);

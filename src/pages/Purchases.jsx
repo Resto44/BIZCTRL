@@ -1,10 +1,11 @@
+import { useNotificationRecord } from '@/components/notifications/NotificationRecordLink';
 /**
  * Purchases — Enterprise Procurement & Accounts Payable
  * Full invoice-based workflow with overdue detection, multi-line items,
  * branch/status filtering, and supplier ledger integration.
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -43,6 +44,12 @@ export default function Purchases() {
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [bulkDeletingIds, setBulkDeletingIds] = useState(null);
+  const linked=useNotificationRecord();
+  const openedNotification=useRef(null);
+  useEffect(()=>{
+    if(linked?.event?.entity!=='supplier_invoices' || !linked.record || openedNotification.current===linked.event.id) return;
+    openedNotification.current=linked.event.id;setEditing(linked.record);setShowForm(true);
+  },[linked]);
   const filterBranch = isAllBranches ? 'all' : (selectedBranchKey || 'all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');

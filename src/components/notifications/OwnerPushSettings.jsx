@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { notificationTarget } from '../../../supabase/functions/owner-push/navigation.ts';
 import React, { useEffect, useState } from 'react';
 import { BellRing, Smartphone } from 'lucide-react';
 import { DEFAULT_PREFERENCES, renderNotification, resolveBranch } from '../../../supabase/functions/owner-push/preferences.ts';
@@ -69,7 +71,7 @@ export default function OwnerPushSettings() {
   {restaurantId && <PushCustomization key={restaurantId} restaurant={activeRestaurant} branches={allBranches || []} onTest={sample=>act(true,sample)} testEnabled={enabled} testing={busy} />}
   <details className="border-t pt-3"><summary className="cursor-pointer font-medium">{tr('Recent business records · last 30 days','رویدادهای اخیر کسب‌وکار · ۳۰ روز اخیر')}</summary><div className="mt-3 max-h-80 overflow-y-auto divide-y">{events.length?events.map(e=>{
    const rendered=renderNotification({...DEFAULT_PREFERENCES,language:lang,financial_summary:false,body_template:'{branch} · {time}'},e,activeRestaurant,resolveBranch(e,allBranches || []));
-   return <div key={e.id} className="py-2 text-sm whitespace-pre-wrap break-words">{rendered.body}</div>;
+   return <Link key={e.id} to={notificationTarget(e)} className="block py-2 text-sm whitespace-pre-wrap break-words hover:underline">{rendered.body}</Link>;
   }):<p className="text-sm text-muted-foreground">{tr('New business activity will appear here.','رویدادهای جدید کسب‌وکار اینجا نمایش داده می‌شود.')}</p>}</div></details>
  </section>;
 }

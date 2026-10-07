@@ -1,3 +1,4 @@
+import { notificationTarget } from './navigation.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.106.1';
 import webpush from 'npm:web-push@3.6.7';
 import { validSubscription } from './policy.ts';
@@ -62,7 +63,7 @@ async function dispatch(keys: any) {
      const branch=resolveBranch(event,view.branches);
      if(!shouldDeliver(view.settings,event,branch)) state='cancelled';
      else {
-      await send(device,{...renderNotification(view.settings,event,view.business,branch,await financialSummary(event.restaurant_id,view,branch,event)),tag:event.id,url:'/notifications',eventId:event.id},keys);
+      await send(device,{...renderNotification(view.settings,event,view.business,branch,await financialSummary(event.restaurant_id,view,branch,event)),tag:event.id,url:notificationTarget(event),eventId:event.id},keys);
       sent++;
      }
     }
@@ -126,7 +127,7 @@ Deno.serve(async (req) => {
    const samples: Record<string,string>={sales:'sales_invoices',purchases:'purchases',inventory:'products',finance:'expenses',people:'employees',other:'tasks'};
    const sampleEntities=['sales_invoices','supplier_invoices','expenses','driver_sales_entries','products','product_categories','customers','debt_payments'];
    const sample={action:['insert','update','delete'].includes(body.sample?.action)?body.sample.action:(view.settings.actions[0] || 'insert'),entity:sampleEntities.includes(body.sample?.entity)?body.sample.entity:(samples[view.settings.modules[0]] || 'sales_invoices'),reference:'TEST-001',created_at:new Date().toISOString()};
-   await send(device,{...renderNotification(view.settings,sample,view.business,branch,await financialSummary(body.restaurantId,view,branch,sample)),tag:'bizctrl-push-test',url:'/notifications'},await config());
+   await send(device,{...renderNotification(view.settings,sample,view.business,branch,await financialSummary(body.restaurantId,view,branch,sample)),tag:'bizctrl-push-test',url:notificationTarget(sample)},await config());
    return reply({accepted:true});
   }
   return reply({error:'Not found'},404);
