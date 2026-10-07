@@ -37,6 +37,7 @@ import {
   createPurchaseInvoice, updatePurchaseInvoice, addInvoicePayment
 } from '@/lib/procurementEngine';
 import OcrScanDialog from './OcrScanDialog';
+import { resumePurchaseSubmission } from '@/lib/purchaseSubmission';
 
 const CURRENCIES = ['SAR', 'USD', 'AED', 'EGP', 'KWD', 'QAR', 'BHD', 'OMR', 'EUR', 'GBP'];
 const PAYMENT_METHODS = ['cash', 'bank', 'pos', 'transfer'];
@@ -336,6 +337,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
   const [saving, setSaving] = useState(false);
   const [submitMode, setSubmitMode] = useState(null);
   const savingRef = useRef(false);
+  const submissionRef = useRef({ invoice: null, completedPayments: new Set() });
   // activeRestaurantId already destructured above as restaurantId
 
   // ── Auto-numbering ─────────────────────────────────────────────────────
@@ -570,38 +572,16 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
         branch_id: branchId,
       };
 
-      let savedInvoice;
-      if (isEdit) {
-        savedInvoice = await updatePurchaseInvoice({
-          invoiceId: invoice.id,
-          invoiceData: invoicePayload,
-          items: cleanItems,
-          additionalCosts: cleanCosts,
-          createdBy: user?.email,
-          mode,
-        });
-      } else {
-        savedInvoice = await createPurchaseInvoice({
-          invoiceData: invoicePayload,
-          items: cleanItems,
-          additionalCosts: cleanCosts,
-          createdBy: user?.email,
-          mode,
-        });
-      }
-
-      // Process payments if any have amounts
       const validPayments = isDraft ? [] : payments.filter(p => parseFloat(p.amount) > 0);
-      for (const pmt of validPayments) {
-        await addInvoicePayment({
-          invoiceId: savedInvoice.id,
-          amount: parseFloat(pmt.amount),
-          paymentMethod: pmt.payment_method,
-          notes: pmt.notes,
-          date: pmt.date,
-          createdBy: user?.email,
-        });
-      }
+      const savedInvoice = await resumePurchaseSubmission({
+        state: submissionRef.current,
+        saveInvoice: () => isEdit
+          ? updatePurchaseInvoice({ invoiceId: invoice.id, invoiceData: invoicePayload, items: cleanItems, additionalCosts: cleanCosts, createdBy: user?.email, mode })
+          : createPurchaseInvoice({ invoiceData: invoicePayload, items: cleanItems, additionalCosts: cleanCosts, createdBy: user?.email, mode }),
+        payments: validPayments,
+        savePayment: (saved, pmt) => addInvoicePayment({ invoiceId: saved.id, amount: parseFloat(pmt.amount), paymentMethod: pmt.payment_method, notes: pmt.notes, date: pmt.date, createdBy: user?.email }),
+        onInvoiceSaved: saved => setForm(current => ({ ...current, status: saved.status })),
+      });
 
       qc.invalidateQueries({ queryKey: ['supplier_invoices'] });
       qc.invalidateQueries({ queryKey: ['supplier_invoices_dash'] });
@@ -617,7 +597,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
 
       onSuccess?.(savedInvoice);
     } catch (err) {
-      setError(err.message || 'Failed to save invoice');
+      setError(submissionRef.current.invoice ? `Invoice ${submissionRef.current.invoice.invoice_number || submissionRef.current.invoice.id} is saved. Payment failed; retry the remaining payments. ${err.message || ''}` : err.message || 'Failed to save invoice');
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -637,16 +617,16 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
           <div className="mt-0.5 flex min-w-0 items-center gap-2">
             <span className="truncate text-sm text-slate-500">{form.invoice_number || 'Invoice number pending'}</span>
             <span className="inline-flex flex-none items-center gap-1.5 rounded-full bg-orange-50 px-2 py-1 text-[11px] font-bold capitalize text-orange-600">
-              <span className="h-2 w-2 rounded-full bg-orange-500" />{isEdit ? form.status : 'Draft'}
+              <span className="h-2 w-2 rounded-full bg-orange-500" />{form.status}
             </span>
           </div>
         </div>
-        <Button type="button" variant="outline" onClick={() => setShowOcr(true)} className="h-10 flex-none gap-2 rounded-lg border-blue-500 px-3 font-bold text-blue-700 hover:bg-blue-50">
+        <Button type="button" variant="outline" disabled={!!submissionRef.current.invoice} onClick={() => setShowOcr(true)} className="h-10 flex-none gap-2 rounded-lg border-blue-500 px-3 font-bold text-blue-700 hover:bg-blue-50">
           <ScanLine className="h-4 w-4" /> Scan
         </Button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4">
+      <div inert={submissionRef.current.invoice ? '' : undefined} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4">
         <div className="mx-auto max-w-3xl space-y-3.5 pb-4">
           {error && (
             <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700" role="alert">
@@ -709,11 +689,11 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
       </div>
 
       <footer className="grid flex-none grid-cols-2 gap-3 border-t border-slate-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.06)] sm:px-5">
-        <Button type="button" variant="outline" disabled={saving} onClick={e => handleSubmit(e, 'draft')} className="h-12 gap-2 rounded-xl border-blue-300 font-bold text-blue-700">
+        <Button type="button" variant="outline" disabled={saving || !!submissionRef.current.invoice} onClick={e => handleSubmit(e, 'draft')} className="h-12 gap-2 rounded-xl border-blue-300 font-bold text-blue-700">
           <Save className="h-4 w-4" />{saving && submitMode === 'draft' ? 'Saving...' : 'Save Draft'}
         </Button>
         <Button type="submit" disabled={saving} className="h-12 gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-blue-600 font-bold shadow-lg shadow-blue-200 hover:from-blue-800 hover:to-blue-700">
-          <ClipboardCheck className="h-4 w-4" />{saving && submitMode === 'post' ? 'Posting...' : isEdit ? 'Review & Update' : 'Review & Post'}
+          <ClipboardCheck className="h-4 w-4" />{saving && submitMode === 'post' ? 'Posting...' : submissionRef.current.invoice ? 'Retry remaining payments' : isEdit ? 'Review & Update' : 'Review & Post'}
         </Button>
       </footer>
 
