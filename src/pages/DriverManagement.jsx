@@ -19,6 +19,12 @@ import { Switch } from '@/components/ui/switch';
 import { Search, Plus, Truck, Users, Activity, ReceiptText, Pencil, Phone, BarChart3, WalletCards, Award, CreditCard, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 
+const deliveryAccountCopy = {
+ en: {title:'Delivery accounting',help:'Record the cash and network amounts collected from customers under Add Sales → driver source. Finalized entries appear here by driver and branch. Only cash belongs in the physical cash count; network payments remain separate. Delivery totals are already included in sales.',cash:'Cash collected',network:'Network collected',total:'Delivery sales',driver:'Driver',records:'Records',empty:'No finalized delivery sales for this period.'},
+ ar: {title:'حسابات التوصيل',help:'سجّل النقد والشبكة المحصلين من العملاء في إضافة مبيعات ← مصدر السائقين. تظهر القيود المعتمدة حسب السائق والفرع. يُحتسب النقد فقط في عدّ الصندوق؛ تبقى الشبكة منفصلة. إجمالي التوصيل مُدرج بالفعل ضمن المبيعات.',cash:'النقد المحصل',network:'الشبكة المحصلة',total:'مبيعات التوصيل',driver:'السائق',records:'السجلات',empty:'لا توجد مبيعات توصيل معتمدة لهذه الفترة.'},
+ fa: {title:'حساب‌دهی دلیوری',help:'نقد و شبکهٔ دریافت‌شده از مشتری را در افزودن فروش ← منبع راننده ثبت کنید. رکوردهای نهایی به تفکیک راننده و شعبه نمایش داده می‌شوند. فقط نقد در شمارش صندوق حساب می‌شود؛ شبکه جدا می‌ماند. جمع دلیوری از قبل در فروشات شامل است.',cash:'نقد دریافت‌شده',network:'شبکه دریافت‌شده',total:'فروش دلیوری',driver:'راننده',records:'رکوردها',empty:'در این دوره فروش نهایی دلیوری وجود ندارد.'},
+};
+
 const emptyForm = {
   full_name: '',
   phone: '',
@@ -138,7 +144,8 @@ function ProfileLine({ label, value }) {
 }
 
 export default function DriverManagement() {
-  const { currency } = useLanguage();
+  const { currency, lang } = useLanguage();
+  const accountCopy = deliveryAccountCopy[lang] || deliveryAccountCopy.en;
   const { user } = useAuth();
   const { activeRestaurant, branches: tenantBranches, isManager, managerBranch } = useTenant();
   const queryClient = useQueryClient();
@@ -197,7 +204,7 @@ export default function DriverManagement() {
         .select('id, closing_id, date, branch, branch_id, driver_id, sales_source_id, subcategory, shift, amount, cash_amount, network_amount, total_amount, payment_method, notes, status, finalized_at, daily_sales!inner(closing_state)')
         .eq('restaurant_id', activeRestaurant.id)
         .eq('status', 'finalized')
-        .eq('daily_sales.closing_state', 'finalized')
+        .in('daily_sales.closing_state', ['finalized', 'locked'])
         .gte('date', dateRange.startDate)
         .lte('date', dateRange.endDate)
         .order('date', { ascending: false })
@@ -332,7 +339,7 @@ export default function DriverManagement() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Driver Management</h1>
-          <p className="text-sm text-muted-foreground">Canonical branch-scoped driver directory, sales history, and performance.</p>
+          <p className="text-sm text-muted-foreground">{accountCopy.title}</p>
         </div>
         <Button onClick={openCreate} disabled={!canLoad} className="gap-2"><Plus className="h-4 w-4" />Add Driver</Button>
       </div>
@@ -370,6 +377,22 @@ export default function DriverManagement() {
         <MetricCard label="Credit Sales" value={money(analytics.totals.credit, currency)} icon={CreditCard} />
         <MetricCard label="Total Revenue" value={money(analytics.totals.revenue, currency)} icon={BarChart3} />
       </div>
+
+      <Card data-testid="delivery-accounting">
+        <CardHeader className="pb-2"><CardTitle>{accountCopy.title}</CardTitle><p className="text-sm text-muted-foreground">{accountCopy.help}</p></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <MetricCard label={accountCopy.cash} value={money(analytics.totals.cash,currency)} icon={DollarSign}/>
+            <MetricCard label={accountCopy.network} value={money(analytics.totals.network,currency)} icon={CreditCard}/>
+            <MetricCard label={accountCopy.total} value={money(analytics.totals.revenue,currency)} icon={Truck}/>
+          </div>
+          {analytics.driverRows.filter(row=>row.orders>0).map(row=><div key={row.driverId} className="rounded-xl border p-3 min-w-0">
+            <div className="flex flex-wrap justify-between gap-2"><span className="font-semibold break-words">{row.name}</span><span className="text-xs text-muted-foreground">{accountCopy.records}: {row.orders}</span></div>
+            <dl className="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">{[[accountCopy.cash,row.cash],[accountCopy.network,row.network],[accountCopy.total,row.revenue]].map(([label,value])=><div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="font-semibold break-words">{money(value,currency)}</dd></div>)}</dl>
+          </div>)}
+          {!analytics.totals.orders && <p className="text-sm text-muted-foreground">{accountCopy.empty}</p>}
+        </CardContent>
+      </Card>
 
       <DriverTrendAnalytics
         drivers={drivers}

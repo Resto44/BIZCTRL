@@ -150,7 +150,11 @@ export function canonicalDriverSaleAmounts(entry = {}) {
 export function isFinalizedDriverSale(entry = {}) {
   const status = String(entry.status || '').toLowerCase();
   const closingState = String(entry.closing_state || '').toLowerCase();
-  return status === 'finalized' || closingState === 'finalized' || Boolean(entry.finalized_at);
+  // A historical finalized_at must not bring a cancelled/draft entry back into revenue.
+  const posted = ['finalized', 'locked'];
+  if (status && !posted.includes(status)) return false;
+  if (closingState && !posted.includes(closingState)) return false;
+  return posted.includes(status) || posted.includes(closingState) || Boolean(entry.finalized_at);
 }
 
 function buildRows(drivers, branchKey, branchId) {

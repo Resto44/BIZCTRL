@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
+import { entityLabel } from '../../../supabase/functions/owner-push/events.ts';
 import { preferencesForLanguage, FINANCIAL_LABELS, financialTemplate, DEFAULT_PREFERENCES, MODULES, TOKENS, renderNotification, validTemplate } from '../../../supabase/functions/owner-push/preferences.ts';
 
 const labels = {
@@ -12,6 +13,8 @@ const labels = {
 };
 export default function PushCustomization({ restaurant, branches = [], onTest, testEnabled, testing }) {
  const {lang}=useLanguage();
+ const [previewEntity,setPreviewEntity]=useState('sales_invoices');
+ const [previewAction,setPreviewAction]=useState('insert');
  const latestLanguage=useRef(lang);
  latestLanguage.current=lang;
  const t=labels[lang] || labels.en;
@@ -45,8 +48,7 @@ export default function PushCustomization({ restaurant, branches = [], onTest, t
  const dirty=JSON.stringify(draft)!==JSON.stringify(loaded);
  const valid=validTemplate(draft.title_template,100)&&validTemplate(draft.body_template,500);
  const sampleBranch=branches.find(b=>draft.branch_ids.includes(b.id)) || (!draft.branch_ids.length?branches[0]:null);
- const examples={sales:'sales_invoices',purchases:'purchases',inventory:'products',finance:'expenses',people:'employees',other:'tasks'};
- const preview=renderNotification(draft,{action:draft.actions[0] || 'insert',entity:examples[draft.modules[0]] || 'sales_invoices',reference:'TEST-001',created_at:new Date().toISOString()},restaurant,sampleBranch?{...sampleBranch,name:sampleBranch.name || sampleBranch.label}:null,{date:'2026-10-05',currency:restaurant.currency || 'SAR',network_sales:2000,pos_sales:3500,source_sales:1500,sales:5000,purchases:2000,expenses:750,net_profit:2250});
+ const preview=renderNotification(draft,{action:previewAction,entity:previewEntity,context:{amount:300,...(previewEntity==='driver_sales_entries'?{cash:100,network:200,status:'finalized'}:{})},reference:'TEST-001',created_at:new Date().toISOString()},restaurant,sampleBranch?{...sampleBranch,name:sampleBranch.name || sampleBranch.label}:null,{date:'2026-10-05',currency:restaurant.currency || 'SAR',delivery_sales:300,delivery_cash:100,delivery_network:200,network_sales:2000,pos_sales:3500,source_sales:1500,sales:5000,purchases:2000,expenses:750,net_profit:2250});
  const checkbox=(checked,onChange,text)=> <label className="flex items-center gap-2 py-2 text-sm cursor-pointer"><input type="checkbox" className="size-4 shrink-0 accent-blue-600" checked={checked} onChange={onChange} disabled={busy}/><span>{text}</span></label>;
  return <details className="border-t pt-4" open>
   <summary className="font-semibold cursor-pointer">{t.heading}</summary>
@@ -70,9 +72,13 @@ export default function PushCustomization({ restaurant, branches = [], onTest, t
    <fieldset><legend className="text-sm font-medium">{t.branches}</legend>{checkbox(draft.branch_ids.length===0,()=>set('branch_ids',[]),t.all)}<div className="grid grid-cols-1 sm:grid-cols-2 max-h-48 overflow-y-auto">{branches.filter(b=>b.id).map(b=><React.Fragment key={b.id}>{checkbox(draft.branch_ids.includes(b.id),()=>toggle('branch_ids',b.id),b.name || b.label || b.branch_key)}</React.Fragment>)}</div><p className="text-xs text-muted-foreground">{t.branchHelp}</p></fieldset>
    <div>{checkbox(draft.show_reference,()=>set('show_reference',!draft.show_reference),t.reference)}<p className="text-xs text-muted-foreground">{t.privacy}</p></div>
    {!draft.enabled?<p className="text-sm text-amber-700">{t.paused}</p>:(!draft.actions.length || !draft.modules.length)&&<p className="text-sm text-amber-700">{t.empty}</p>}
+   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <label className="text-sm">{t.preview}<select className="mt-1 w-full min-w-0 rounded-lg border bg-background p-2" value={previewEntity} onChange={e=>setPreviewEntity(e.target.value)}>{['sales_invoices','supplier_invoices','expenses','driver_sales_entries','products','product_categories','customers','debt_payments'].map(entity=><option key={entity} value={entity}>{entityLabel(entity,lang)}</option>)}</select></label>
+    <label className="text-sm">{t.actions}<select className="mt-1 w-full rounded-lg border bg-background p-2" value={previewAction} onChange={e=>setPreviewAction(e.target.value)}>{['insert','update','delete'].map(action=><option key={action} value={action}>{t[action]}</option>)}</select></label>
+   </div>
    <div className="rounded-xl border bg-muted/40 p-4 space-y-1 break-words" dir={draft.language==='en'?'ltr':'rtl'} aria-label={t.preview}><p className="text-xs text-muted-foreground">{t.preview}</p><p className="font-semibold">{preview.title}</p><p className="text-sm whitespace-pre-wrap">{preview.body}</p></div>
    {dirty&&<p className="text-sm text-amber-700">{t.dirty}</p>}
-   <div className="flex flex-wrap gap-2"><Button disabled={busy || !valid || !dirty} onClick={save}>{t.save}</Button><Button variant="outline" disabled={busy || testing || dirty || !testEnabled} onClick={onTest}>{t.test}</Button><Button variant="outline" disabled={busy} onClick={()=>{setDraft({...DEFAULT_PREFERENCES});setMessage('');}}>{t.reset}</Button></div>
+   <div className="flex flex-wrap gap-2"><Button disabled={busy || !valid || !dirty} onClick={save}>{t.save}</Button><Button variant="outline" disabled={busy || testing || dirty || !testEnabled} onClick={()=>onTest({entity:previewEntity,action:previewAction})}>{t.test}</Button><Button variant="outline" disabled={busy} onClick={()=>{setDraft({...DEFAULT_PREFERENCES});setMessage('');}}>{t.reset}</Button></div>
    {message&&<p role="status" className="text-sm break-words">{message}</p>}
   </div>
  </details>;

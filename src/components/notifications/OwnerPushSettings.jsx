@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BellRing, Smartphone } from 'lucide-react';
+import { DEFAULT_PREFERENCES, renderNotification, resolveBranch } from '../../../supabase/functions/owner-push/preferences.ts';
 import PushCustomization from './PushCustomization';
 import { Button } from '@/components/ui/button';
 import { useRole } from '@/lib/RoleContext';
@@ -22,7 +23,7 @@ export default function OwnerPushSettings() {
   let live=true;
   setEnabled(false); setEvents([]); setMessage('');
   const load=async()=>{
-   const {data,error}=await supabase.from('owner_record_events').select('id,entity,action,reference,branch,created_at').eq('restaurant_id',restaurantId).order('created_at',{ascending:false}).limit(30);
+   const {data,error}=await supabase.from('owner_record_events').select('id,entity,action,reference,branch,created_at,context').eq('restaurant_id',restaurantId).order('created_at',{ascending:false}).limit(30);
    if(live && !error) setEvents(data || []);
   };
   load(); const timer=setInterval(load,30000);
@@ -51,10 +52,10 @@ export default function OwnerPushSettings() {
    setEnabled(true);setMessage(tr('This device will receive new business records while BizCTRL is closed.','این دستگاه رویدادهای جدید کسب‌وکار را حتی هنگام بسته‌بودن BizCTRL دریافت می‌کند.'));
   }catch(e){setMessage(e.message);}finally{setBusy(false);}
  };
- const act=async(test)=>{
+ const act=async(test,sample)=>{
   setBusy(true);setMessage('');
   try{
-   if(test){const sub=await currentPushSubscription();await pushRequest('test',{restaurantId,language:lang,endpoint:sub?.endpoint});setMessage(tr('Test accepted by the push service. Check your device notifications.','اعلان آزمایشی ارسال شد. اعلان‌های دستگاه را بررسی کنید.'));}
+   if(test){const sub=await currentPushSubscription();await pushRequest('test',{restaurantId,language:lang,endpoint:sub?.endpoint,sample});setMessage(tr('Test accepted by the push service. Check your device notifications.','اعلان آزمایشی ارسال شد. اعلان‌های دستگاه را بررسی کنید.'));}
    else{await disableDevicePush();setEnabled(false);}
   }catch(e){setMessage(e.message);}finally{setBusy(false);}
  };
@@ -65,7 +66,10 @@ export default function OwnerPushSettings() {
   <div className="flex flex-wrap gap-2">{enabled?<><Button disabled={busy} onClick={()=>act(true)}>{tr('Send test notification','ارسال اعلان آزمایشی')}</Button><Button variant="outline" disabled={busy} onClick={()=>act(false)}>{tr('Turn off on this device','خاموش‌کردن در این دستگاه')}</Button></>:<Button disabled={busy || !supported || !key || !restaurantId} onClick={enable}>{busy?tr('Connecting…','در حال اتصال…'):tr('Enable notifications','فعال‌کردن اعلان‌ها')}</Button>}</div>
   {!supported&&<p className="text-sm text-amber-700">{tr('Background notifications are not available in this browser. On iPhone, open the Home Screen app first.','این مرورگر فعلاً اعلان پس‌زمینه را پشتیبانی نمی‌کند. در آیفون ابتدا برنامه را از صفحهٔ اصلی باز کنید.')}</p>}
   {message&&<p role="status" className="text-sm break-words">{message}</p>}
-  {restaurantId && <PushCustomization key={restaurantId} restaurant={activeRestaurant} branches={allBranches || []} onTest={()=>act(true)} testEnabled={enabled} testing={busy} />}
-  <details className="border-t pt-3"><summary className="cursor-pointer font-medium">{tr('Recent business records · last 30 days','رویدادهای اخیر کسب‌وکار · ۳۰ روز اخیر')}</summary><div className="mt-3 max-h-80 overflow-y-auto divide-y">{events.length?events.map(e=><div key={e.id} className="py-2 text-sm"><p className="font-medium break-words">{({insert:tr('Created','ثبت'),update:tr('Updated','تغییر'),delete:tr('Deleted','حذف')})[e.action]} · {e.entity.replaceAll('_',' ')} · {e.reference}</p><p className="text-xs text-muted-foreground">{new Date(e.created_at).toLocaleString()} {e.branch&&`· ${e.branch}`}</p></div>):<p className="text-sm text-muted-foreground">{tr('New business activity will appear here.','رویدادهای جدید کسب‌وکار اینجا نمایش داده می‌شود.')}</p>}</div></details>
+  {restaurantId && <PushCustomization key={restaurantId} restaurant={activeRestaurant} branches={allBranches || []} onTest={sample=>act(true,sample)} testEnabled={enabled} testing={busy} />}
+  <details className="border-t pt-3"><summary className="cursor-pointer font-medium">{tr('Recent business records · last 30 days','رویدادهای اخیر کسب‌وکار · ۳۰ روز اخیر')}</summary><div className="mt-3 max-h-80 overflow-y-auto divide-y">{events.length?events.map(e=>{
+   const rendered=renderNotification({...DEFAULT_PREFERENCES,language:lang,financial_summary:false,body_template:'{branch} · {time}'},e,activeRestaurant,resolveBranch(e,allBranches || []));
+   return <div key={e.id} className="py-2 text-sm whitespace-pre-wrap break-words">{rendered.body}</div>;
+  }):<p className="text-sm text-muted-foreground">{tr('New business activity will appear here.','رویدادهای جدید کسب‌وکار اینجا نمایش داده می‌شود.')}</p>}</div></details>
  </section>;
 }

@@ -41,7 +41,9 @@ describe('ERP push customization',()=>{
   const p={...DEFAULT_PREFERENCES,language:'fa',financial_summary:false,title_template:'{business} / {branch}',body_template:'{action}: {reference}',show_reference:false};
   const text=renderNotification(p,event,{name:'My {reference}'},branch);
   expect(text.title).toBe('My {reference} / North');
-  expect(text.body).toBe('ثبت شد: ');
+  expect(text.body).toContain('فاکتور فروش · ثبت شد');
+  expect(text.body).not.toContain('INV-77');
+  expect(text.body).toContain('ثبت شد: ');
   expect(renderNotification({...p,show_reference:true},event,{},branch).body).toContain('INV-77');
  });
  it('rejects unsupported tokens and blank templates and bounds rendered output',()=>{
@@ -66,7 +68,7 @@ describe('financial push layout',()=>{
   const p={...DEFAULT_PREFERENCES,title_template:'{business}',body_template:financialTemplate('en')};
   const result=renderNotification(p,{}, {name:'Market'}, {name:'North'},financial);
   expect(result.title).toBe('Market');
-  expect(result.body).toBe('North · 2026-10-05\nSales: 5,000.00 SAR\nPurchases: 2,000.00 SAR\nExpenses: 750.00 SAR\nNetwork sales: 2,000.00 SAR\nPOS sales: 3,500.00 SAR\nSales Sources: 1,500.00 SAR\nNet profit: 2,250.00 SAR');
+  expect(result.body).toBe('North · 2026-10-05\nSales: 5,000.00 SAR\nPurchases: 2,000.00 SAR\nExpenses: 750.00 SAR\nNetwork sales: 2,000.00 SAR\nPOS sales: 3,500.00 SAR\nSales Sources: 1,500.00 SAR\nDelivery sales: —\nNet profit: 2,250.00 SAR');
  });
  it('appends summary to existing custom templates without duplicating financial templates',()=>{
   const result=renderNotification({...DEFAULT_PREFERENCES,body_template:'Record saved'}, {},{}, {name:'North'},financial);

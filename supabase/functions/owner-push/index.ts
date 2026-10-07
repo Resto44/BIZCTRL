@@ -25,14 +25,15 @@ async function presentation(restaurantId: string) {
  return {settings:settings.data || DEFAULT_PREFERENCES,business:business.data,branches:branches.data || []};
 }
 async function financialSummary(restaurantId: string, view: any, branch: any, event: any) {
- if(!needsFinancialSummary(view.settings)) return null;
+ if(!needsFinancialSummary(view.settings,event)) return null;
  // Never substitute another branch or business-wide totals for an unresolved branch.
  if(!branch) return null;
  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:view.business.timezone || 'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
  const day=Object.fromEntries(parts.map(p=>[p.type,p.value]));
- const date=`${day.year}-${day.month}-${day.day}`;
+ const recordedDate=event.context?.date;
+ const date=typeof recordedDate==='string' && /^\d{4}-\d{2}-\d{2}$/.test(recordedDate) ? recordedDate : `${day.year}-${day.month}-${day.day}`;
  const {data,error}=await db.rpc('owner_push_financial_summary',{p_restaurant_id:restaurantId,p_branch_id:branch?.id || null,p_date:date});
- if(error) throw new Error('Financial summary unavailable');
+ if(error) { console.error('Optional financial summary unavailable'); return null; }
  return data;
 }
 async function send(device: any, payload: any, keys: any) {
@@ -123,7 +124,8 @@ Deno.serve(async (req) => {
    view.settings=preferencesForLanguage(view.settings,language);
    const branch=view.branches.find(b=>view.settings.branch_ids.includes(b.id)) || (view.settings.branch_ids.length ? undefined : view.branches[0]);
    const samples: Record<string,string>={sales:'sales_invoices',purchases:'purchases',inventory:'products',finance:'expenses',people:'employees',other:'tasks'};
-   const sample={action:view.settings.actions[0] || 'insert',entity:samples[view.settings.modules[0]] || 'sales_invoices',reference:'TEST-001',created_at:new Date().toISOString()};
+   const sampleEntities=['sales_invoices','supplier_invoices','expenses','driver_sales_entries','products','product_categories','customers','debt_payments'];
+   const sample={action:['insert','update','delete'].includes(body.sample?.action)?body.sample.action:(view.settings.actions[0] || 'insert'),entity:sampleEntities.includes(body.sample?.entity)?body.sample.entity:(samples[view.settings.modules[0]] || 'sales_invoices'),reference:'TEST-001',created_at:new Date().toISOString()};
    await send(device,{...renderNotification(view.settings,sample,view.business,branch,await financialSummary(body.restaurantId,view,branch,sample)),tag:'bizctrl-push-test',url:'/notifications'},await config());
    return reply({accepted:true});
   }
