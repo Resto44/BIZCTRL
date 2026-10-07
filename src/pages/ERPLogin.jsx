@@ -59,7 +59,7 @@ const ROLE_CONFIG = [
 export default function ERPLogin() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const postAuthenticationDestination = safeInternalReturnTo(searchParams.get('returnTo'), '');
+  const postAuthenticationDestination = safeInternalReturnTo(searchParams.get('returnTo') || searchParams.get('next'), '');
   const ownerRegistrationPath = `/erp-register?owner=1${postAuthenticationDestination ? `&returnTo=${encodeURIComponent(postAuthenticationDestination)}` : ''}`;
   const [selectedRole, setSelectedRole] = useState(null);
   const [email, setEmail] = useState('');

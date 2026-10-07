@@ -1,8 +1,9 @@
+import { useNotificationRecord } from '@/components/notifications/NotificationRecordLink';
 /**
  * SalesInvoices — Invoice Archive
  * Features: Search, Filter by Date, Filter by Branch, View, Download, Reprint, Reshare
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -103,6 +104,12 @@ export default function SalesInvoices() {
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
   const [viewInvoice, setViewInvoice] = useState(null);
+  const linked=useNotificationRecord();
+  const openedNotification=useRef(null);
+  useEffect(()=>{
+    if(linked?.event?.entity!=='sales_invoices' || !linked.record || openedNotification.current===linked.event.id) return;
+    openedNotification.current=linked.event.id;setViewInvoice(linked.record);
+  },[linked]);
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ['sales_invoices', ownerFilter, activeRestaurant?.id],
