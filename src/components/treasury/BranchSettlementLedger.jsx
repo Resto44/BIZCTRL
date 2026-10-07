@@ -4,7 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Building2, TrendingUp, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
-import { formatCurrency } from '@/lib/helpers';
+import { useLanguage } from '@/lib/LanguageContext';
+import { formatLocalizedCurrency } from '@/lib/localization';
+import { treasuryText } from '@/lib/treasuryLocalization';
 import { format } from 'date-fns';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend
@@ -88,7 +90,10 @@ const MONTH_OPTIONS = Array.from({ length: 6 }, (_, i) => {
 export default function BranchSettlementLedger({ transactions = [], branches = [], currency = 'SAR', onRecord }) {
   const [expandedBranch, setExpandedBranch] = useState(null);
   const [statementMonth, setStatementMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const fmt = (v) => formatCurrency(v, currency);
+  const { lang, locale, formatDate } = useLanguage();
+  const tr = value => treasuryText(value, lang);
+  const fmt = value => formatLocalizedCurrency(value, lang, currency);
+  const monthLabel = value => new Intl.DateTimeFormat(locale.locale, { month: 'short', year: 'numeric', calendar: 'gregory' }).format(new Date(`${value}-01T12:00:00`));
 
   const settlements = useMemo(() =>
     computeBranchSettlements(transactions, branches),
@@ -140,28 +145,28 @@ export default function BranchSettlementLedger({ transactions = [], branches = [
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-0" data-i18n-skip="true">
       {/* Summary header */}
       <Card className="p-4 border-indigo-200 bg-indigo-50 dark:bg-indigo-950/20">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-indigo-600" />
-            <p className="text-sm font-semibold text-indigo-700">Branch Settlement Overview</p>
+            <p className="text-sm font-semibold text-indigo-700">{tr("Branch Settlement Overview")}</p>
           </div>
           <Button size="sm" variant="outline" className="text-xs h-7" onClick={onRecord}>
-            + Record Transfer
+            {tr('+ Record Transfer')}
           </Button>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-white dark:bg-background rounded-lg p-2 text-center">
-            <p className="text-xs text-muted-foreground">Total Held by Owner</p>
+            <p className="text-xs text-muted-foreground">{tr("Total Held by Owner")}</p>
             <p className={`text-base font-bold ${totalHeldByOwner >= 0 ? 'text-indigo-600' : 'text-red-500'}`}>{fmt(totalHeldByOwner)}</p>
-            <p className="text-xs text-muted-foreground">Across all branches</p>
+            <p className="text-xs text-muted-foreground">{tr("Across all branches")}</p>
           </div>
           <div className="bg-white dark:bg-background rounded-lg p-2 text-center">
-            <p className="text-xs text-muted-foreground">Active Branches</p>
+            <p className="text-xs text-muted-foreground">{tr("Active Branches")}</p>
             <p className="text-base font-bold text-indigo-600">{Object.keys(settlements).length}</p>
-            <p className="text-xs text-muted-foreground">With settlement history</p>
+            <p className="text-xs text-muted-foreground">{tr("With settlement history")}</p>
           </div>
         </div>
       </Card>
@@ -187,14 +192,14 @@ export default function BranchSettlementLedger({ transactions = [], branches = [
                   {isNegative && (
                     <p className="text-xs text-red-500 flex items-center gap-1">
                       <AlertTriangle className="w-3 h-3" />
-                      مصارف اونر بیشتر از مبلغ ارسالی است
+                      {tr('Owner spending and returns exceed the amount received.')}
                     </p>
                   )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Remaining w/ Owner</p>
+                <div className="text-end">
+                  <p className="text-xs text-muted-foreground">{tr("Remaining w/ Owner")}</p>
                   <p className={`text-sm font-bold ${isNegative ? 'text-red-500' : 'text-emerald-600'}`}>{fmt(s.remaining)}</p>
                 </div>
                 {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
@@ -205,19 +210,19 @@ export default function BranchSettlementLedger({ transactions = [], branches = [
             <div className="grid grid-cols-3 gap-2 mt-3">
               <div className="bg-blue-50 dark:bg-blue-950/20 rounded p-2 text-center">
                 <ArrowUpRight className="w-3 h-3 text-blue-500 mx-auto mb-0.5" />
-                <p className="text-xs text-muted-foreground">Sent to Owner</p>
+                <p className="text-xs text-muted-foreground">{tr("Sent to Owner")}</p>
                 <p className="text-xs font-bold text-blue-600">{fmt(s.sentToOwner)}</p>
-                {s.lastSentDate && <p className="text-xs text-muted-foreground">{s.lastSentDate}</p>}
+                {s.lastSentDate && <p className="text-xs text-muted-foreground">{formatDate(s.lastSentDate)}</p>}
               </div>
               <div className="bg-amber-50 dark:bg-amber-950/20 rounded p-2 text-center">
                 <ArrowDownLeft className="w-3 h-3 text-amber-500 mx-auto mb-0.5" />
-                <p className="text-xs text-muted-foreground">Owner Spent</p>
+                <p className="text-xs text-muted-foreground">{tr("Owner Spent")}</p>
                 <p className="text-xs font-bold text-amber-600">{fmt(s.ownerExpenseForBranch + s.returnedToBranch)}</p>
-                {s.lastExpenseDate && <p className="text-xs text-muted-foreground">{s.lastExpenseDate}</p>}
+                {s.lastExpenseDate && <p className="text-xs text-muted-foreground">{formatDate(s.lastExpenseDate)}</p>}
               </div>
               <div className={`rounded p-2 text-center ${isNegative ? 'bg-red-50 dark:bg-red-950/20' : 'bg-emerald-50 dark:bg-emerald-950/20'}`}>
                 <TrendingUp className={`w-3 h-3 mx-auto mb-0.5 ${isNegative ? 'text-red-500' : 'text-emerald-500'}`} />
-                <p className="text-xs text-muted-foreground">Balance</p>
+                <p className="text-xs text-muted-foreground">{tr("Balance")}</p>
                 <p className={`text-xs font-bold ${isNegative ? 'text-red-500' : 'text-emerald-600'}`}>{fmt(s.remaining)}</p>
               </div>
             </div>
@@ -225,16 +230,16 @@ export default function BranchSettlementLedger({ transactions = [], branches = [
             {/* Expanded: full history */}
             {expanded && s.history.length > 0 && (
               <div className="mt-3 border-t border-border pt-3">
-                <p className="text-xs font-semibold mb-2 text-muted-foreground">Settlement History</p>
+                <p className="text-xs font-semibold mb-2 text-muted-foreground">{tr("Settlement History")}</p>
                 <div className="space-y-1.5 max-h-52 overflow-y-auto">
                   {s.history.map((tx, i) => {
                     const roleColor = tx.ledgerRole === 'sent' ? 'text-blue-600' : tx.ledgerRole === 'returned' ? 'text-emerald-600' : 'text-amber-600';
-                    const roleLabel = tx.ledgerRole === 'sent' ? 'Sent →' : tx.ledgerRole === 'returned' ? '← Returned' : 'Owner Expense';
+                    const roleLabel = tx.ledgerRole === 'sent' ? tr('Sent →') : tx.ledgerRole === 'returned' ? tr('← Returned') : tr('Owner Expense');
                     return (
                       <div key={i} className="flex items-center justify-between text-xs py-0.5 border-b border-border/50 last:border-0">
                         <div className="flex items-center gap-1.5">
                           <Badge variant="outline" className={`text-xs py-0 px-1 ${roleColor}`}>{roleLabel}</Badge>
-                          <span className="text-muted-foreground">{transactionDate(tx)}</span>
+                          <span className="text-muted-foreground">{formatDate(transactionDate(tx))}</span>
                           {tx.description && <span className="text-muted-foreground truncate max-w-24">{tx.description}</span>}
                         </div>
                         <span className={`font-semibold ${tx.ledgerRole === 'sent' ? 'text-blue-600' : 'text-red-500'}`}>
@@ -253,16 +258,16 @@ export default function BranchSettlementLedger({ transactions = [], branches = [
       {/* Settlement comparison chart */}
       {chartData.length > 0 && (
         <Card className="p-4">
-          <p className="text-sm font-semibold mb-3">Branch Settlement Comparison</p>
+          <p className="text-sm font-semibold mb-3">{tr("Branch Settlement Comparison")}</p>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={chartData}>
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${v / 1000}k`} />
               <Tooltip formatter={v => fmt(v)} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Bar dataKey="Sent to Owner" fill="#3b82f6" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="Owner Expenses" fill="#f59e0b" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="Remaining" fill="#10b981" radius={[3, 3, 0, 0]} />
+              <Bar name={tr('Sent to Owner')} dataKey="Sent to Owner" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+              <Bar name={tr('Owner Expenses')} dataKey="Owner Expenses" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+              <Bar name={tr('Remaining')} dataKey="Remaining" fill="#10b981" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -270,40 +275,40 @@ export default function BranchSettlementLedger({ transactions = [], branches = [
 
       {/* Monthly statements */}
       <Card className="p-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-primary" />
-            <p className="text-sm font-semibold">Monthly Settlement Statements</p>
+            <p className="text-sm font-semibold">{tr("Monthly Settlement Statements")}</p>
           </div>
           <Select value={statementMonth} onValueChange={setStatementMonth}>
             <SelectTrigger className="w-32 h-7 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {MONTH_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              {MONTH_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{monthLabel(o.value)}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
 
         {monthlyStatement.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-3">No settlement activity for this month</p>
+          <p className="text-xs text-muted-foreground text-center py-3">{tr("No settlement activity for this month")}</p>
         ) : (
           <div className="space-y-3">
             {monthlyStatement.map(({ branch: b, openingBalance, sentThisMonth, ownerExpensesThisMonth, closingBalance }) => (
               <div key={b.key} className="border border-border rounded-lg p-3">
                 <p className="text-xs font-semibold mb-2">{b.label}</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  <span className="text-muted-foreground">Opening Balance</span>
-                  <span className="font-medium text-right">{fmt(openingBalance)}</span>
-                  <span className="text-muted-foreground">+ Sent to Owner</span>
-                  <span className="font-medium text-blue-600 text-right">+{fmt(sentThisMonth)}</span>
-                  <span className="text-muted-foreground">– Owner Spending</span>
-                  <span className="font-medium text-amber-600 text-right">-{fmt(ownerExpensesThisMonth)}</span>
-                  <span className="font-semibold border-t border-border pt-1">Closing Balance</span>
-                  <span className={`font-bold text-right border-t border-border pt-1 ${closingBalance < 0 ? 'text-red-500' : 'text-emerald-600'}`}>{fmt(closingBalance)}</span>
+                  <span className="text-muted-foreground">{tr("Opening Balance")}</span>
+                  <span className="font-medium text-end">{fmt(openingBalance)}</span>
+                  <span className="text-muted-foreground">{tr("+ Sent to Owner")}</span>
+                  <span className="font-medium text-blue-600 text-end">+{fmt(sentThisMonth)}</span>
+                  <span className="text-muted-foreground">{tr("– Owner Spending")}</span>
+                  <span className="font-medium text-amber-600 text-end">-{fmt(ownerExpensesThisMonth)}</span>
+                  <span className="font-semibold border-t border-border pt-1">{tr("Closing Balance")}</span>
+                  <span className={`font-bold text-end border-t border-border pt-1 ${closingBalance < 0 ? 'text-red-500' : 'text-emerald-600'}`}>{fmt(closingBalance)}</span>
                 </div>
                 {closingBalance < 0 && (
                   <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
-                    باقی‌مانده هر فرع نزد اونر به عنوان موجودی عملیاتی ثبت می‌شود، نه سود جدید.
+                    {tr('Each branch’s balance held by the owner is an operating balance, not additional profit.')}
                   </p>
                 )}
               </div>
@@ -313,7 +318,7 @@ export default function BranchSettlementLedger({ transactions = [], branches = [
 
         {/* Footer note */}
         <p className="text-xs text-muted-foreground italic mt-3 pt-3 border-t border-border">
-          باقی‌مانده هر فرع نزد اونر به عنوان موجودی عملیاتی ثبت می‌شود، نه سود جدید.
+          {tr('Each branch’s balance held by the owner is an operating balance, not additional profit.')}
         </p>
       </Card>
     </div>
