@@ -25,7 +25,6 @@ const OWNER_EXPENSE_FOR_BRANCH_TYPES = [
   'owner_expense',
   'owner_salary_payment',
   'owner_external_payment',
-  'branch_purchase_payment',
 ];
 
 const transactionDate = (transaction) => transaction?.transaction_date || transaction?.date || '';
@@ -53,18 +52,22 @@ export function computeBranchSettlements(transactions, _branches) {
 
   transactions.forEach(tx => {
     if (!tx.branch) return;
+    const type = transactionType(tx);
+    if (![...SENT_TO_OWNER_TYPES, ...RETURNED_TO_BRANCH_TYPES, ...OWNER_EXPENSE_FOR_BRANCH_TYPES].includes(type)) return;
+    const amount = Number(tx.amount ?? 0);
+    if (!Number.isFinite(amount)) return;
     ensureBranch(tx.branch);
     const entry = ledger[tx.branch];
 
     if (SENT_TO_OWNER_TYPES.includes(transactionType(tx))) {
-      entry.sentToOwner += tx.amount || 0;
+      entry.sentToOwner += amount;
       if (!entry.lastSentDate || transactionDate(tx) > entry.lastSentDate) entry.lastSentDate = transactionDate(tx);
       entry.history.push({ ...tx, ledgerRole: 'sent' });
     } else if (RETURNED_TO_BRANCH_TYPES.includes(transactionType(tx))) {
-      entry.returnedToBranch += tx.amount || 0;
+      entry.returnedToBranch += amount;
       entry.history.push({ ...tx, ledgerRole: 'returned' });
     } else if (OWNER_EXPENSE_FOR_BRANCH_TYPES.includes(transactionType(tx))) {
-      entry.ownerExpenseForBranch += tx.amount || 0;
+      entry.ownerExpenseForBranch += amount;
       if (!entry.lastExpenseDate || transactionDate(tx) > entry.lastExpenseDate) entry.lastExpenseDate = transactionDate(tx);
       entry.history.push({ ...tx, ledgerRole: 'expense' });
     }
@@ -110,9 +113,9 @@ export default function BranchSettlementLedger({ transactions = [], branches = [
         'Sent to Owner': s.sentToOwner,
         'Owner Expenses': s.ownerExpenseForBranch,
         'Returned': s.returnedToBranch,
-        'Remaining': Math.max(0, s.remaining),
+        'Remaining': s.remaining,
       };
-    }).filter(d => d['Sent to Owner'] > 0 || d['Remaining'] > 0),
+    }).filter(d => ['Sent to Owner', 'Owner Expenses', 'Returned', 'Remaining'].some(key => d[key] !== 0)),
     [settlements, branches]
   );
 
