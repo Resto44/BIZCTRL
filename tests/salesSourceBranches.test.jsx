@@ -40,3 +40,20 @@ it('retains an existing selection and prevents saving after all branches are unc
   expect(onSave).not.toHaveBeenCalled();
   expect(document.body.textContent).toContain('salesSourceManagement.branchRequired');
 });
+it('enables customer credit entries, replaces driver mode and saves the linked accounting settings',async()=>{
+  const onSave=vi.fn();
+  const source={...newSalesClosingSource(),name_en:'Corporate credit',allows_driver_entries:true,requires_pos_device:true};
+  await act(async()=>root.render(<SalesSourceDialog editor={{mode:'create',source}} branches={branches} onSave={onSave} onClose={()=>{}}/>));
+  await act(async()=>document.querySelector('[aria-label="Customer credit-linked entries"]').click());
+  expect(document.querySelector('[aria-label="Customer credit-linked entries"]').getAttribute('aria-checked')).toBe('true');
+  await act(async()=>button('salesClosing.dialog.saveSource').click());
+  expect(onSave).toHaveBeenCalledWith(expect.objectContaining({name_en:'Corporate credit',requires_customer:true,default_payment_method:'credit',allows_driver_entries:false,included_in_cash_register:false,requires_pos_device:false}));
+});
+it('can turn customer credit mode off on a custom source',async()=>{
+  const onSave=vi.fn();
+  const source={...newSalesClosingSource(),name_en:'Corporate credit',requires_customer:true,default_payment_method:'credit'};
+  await act(async()=>root.render(<SalesSourceDialog editor={{mode:'edit',source}} branches={branches} onSave={onSave} onClose={()=>{}}/>));
+  await act(async()=>document.querySelector('[aria-label="Customer credit-linked entries"]').click());
+  await act(async()=>button('salesClosing.dialog.saveSource').click());
+  expect(onSave).toHaveBeenCalledWith(expect.objectContaining({requires_customer:false,default_payment_method:'cash'}));
+});

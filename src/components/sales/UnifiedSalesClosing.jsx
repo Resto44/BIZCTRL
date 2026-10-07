@@ -1,3 +1,4 @@
+import { creditEntrySourceId, customerCreditSnapshots } from '@/lib/customerCreditSources';
 /**
  * UnifiedSalesClosing — Canonical ERP Sales Closing module
  *
@@ -572,7 +573,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   }));
 
   // ── Dynamic Sales Sources ───────────────────────────────────────────────────────────────
-  const { customSources: customSourcesData, creditSource, isLoading: sourcesLoading } = useSalesSources({ branchId: selectedBranchId });
+  const { customSources: customSourcesData, creditSource, creditSources = [], isLoading: sourcesLoading } = useSalesSources({ branchId: selectedBranchId });
   const customSources = asRecordArray(customSourcesData);
   const { data: driverSourceDriversData = [], isLoading: driverSourceDriversLoading } = useQuery({
     queryKey: ['sales-closing-driver-source-drivers', activeRestaurant?.id, selectedBranchId],
@@ -1385,27 +1386,12 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       // The credit source is saved as a regular sales-source snapshot for audit
       // and revenue presentation; the corresponding outstanding balance is
       // created only by the server as a customer receivable.
-      const customerCreditSourceSnapshot = creditSource && manualCreditTotal > 0 ? {
-        source_id: creditSource.id,
-        source_key: creditSource.system_key || 'credit',
-        name_en: creditSource.name_en || 'Customer Credit',
-        name_ar: creditSource.name_ar || null,
-        subcategory: creditSource.subcategory || creditSource.category || null,
-        amount: manualCreditTotal,
-        today_amount: manualCreditTotal,
-        previous_amount: 0,
-        total_amount: manualCreditTotal,
-        default_payment_method: 'credit',
-        payment_method: 'credit',
-        payment_bucket: 'credit',
-        included_in_revenue: true,
+      const customerCreditSourceSnapshots = customerCreditSnapshots(creditSources, customerCreditSales).map(snapshot => ({
+        ...snapshot,
         branch_id: branchId,
         branch: selectedBranch?.key || selectedBranch?.branch_key || form.branch,
-        date: form.date,
-        shift: form.shift,
-        cashier_id: cashierId,
-        cashier_name: cashierDisplayName,
-      } : null;
+        date: form.date, shift: form.shift, cashier_id: cashierId, cashier_name: cashierDisplayName,
+      }));
       const payload = {
         date: form.date,
         branch: selectedBranch?.key || selectedBranch?.branch_key || form.branch,
@@ -1475,7 +1461,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             ...snapshot,
             payment_bucket: snapshot.allows_driver_entries === true ? 'other' : paymentBucketForCode(snapshot.default_payment_method),
           })),
-          ...(customerCreditSourceSnapshot ? [customerCreditSourceSnapshot] : []),
+          ...customerCreditSourceSnapshots,
         ],
         custom_sources_total: Math.max(0, otherPaymentTotal - driverSourcePaymentTotals.other),
         sales_closing_custom_fields: customClosingFields
@@ -1679,7 +1665,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               {!useAutomaticSales && <div className="border-t border-amber-200 bg-amber-50 p-3"><p className="text-xs font-bold text-amber-900">No posted ERP cash sales were found. Record sales at POS first.</p><div className="mt-3"><NumInput id="quick-closing-cashSales" label="Exceptional Cash Adjustment" value={cashSalesInput} onChange={updateCashSales} prefix={currency} helpText="Use only for an offline sale that cannot be posted before closing" /></div></div>}
             </section>
 
-            {creditSource && <section className="space-y-3" data-testid="customer-credit-closing-section" data-i18n-skip="true">{custLoading ? <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">Loading Debt Management customers…</div> : <><div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{customerCreditSales.map((entry, index) => <CustomerCreditSalesSource key={entry.id} entry={entry} idx={index} onRemove={removeCustomerCreditSale} onUpdate={updateCustomerCreditSale} customers={customers} currency={currency} customerSearch={customerSearch} onCustomerSearch={setCustomerSearch} onSelectCustomer={refetchCustomers} onReviewCreditSale={() => { const target = document.getElementById('sales-closing-actions'); target?.scrollIntoView({ behavior: 'smooth', block: 'center' }); target?.focus({ preventScroll: true }); }} onRecordPayment={recordCustomerCreditPayment} isRecordingPayment={isRecordingCustomerDebtPayment} paymentMethods={configuredPaymentMethods} disabled={isSubmitting} />)}</div>{customerCreditSales.length > 0 && customerCreditSales.every((entry) => entry.customer_id) && <div className="flex justify-end"><Button type="button" size="sm" variant="outline" className="min-h-10 rounded-xl bg-white" onClick={addCustomerCreditSale} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />Add Another Customer</Button></div>}</>}{inlineErrors.credit && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}</section>}
+            {creditSource && <section className="space-y-3" data-testid="customer-credit-closing-section" data-i18n-skip="true">{custLoading ? <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">Loading Debt Management customers…</div> : <><div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{customerCreditSales.map((entry, index) => <div key={entry.id} className="min-w-0 space-y-2"><label className="block text-sm font-semibold">{lang === 'fa' ? 'منبع فروش قرضه' : lang === 'ar' ? 'مصدر البيع الآجل' : 'Customer credit sales source'}<select aria-label="Customer credit sales source" className="mt-1 min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3" value={creditEntrySourceId(entry, creditSources)} onChange={event => updateCustomerCreditSale(entry.id, 'source_id', event.target.value)} disabled={isSubmitting}>{creditSources.map(source => <option key={source.id} value={source.id}>{lang === 'ar' ? source.name_ar || source.name_en : lang === 'fa' ? source.name_fa || source.name_ar || source.name_en : source.name_en}</option>)}</select></label><CustomerCreditSalesSource entry={entry} idx={index} onRemove={removeCustomerCreditSale} onUpdate={updateCustomerCreditSale} customers={customers} currency={currency} customerSearch={customerSearch} onCustomerSearch={setCustomerSearch} onSelectCustomer={refetchCustomers} onReviewCreditSale={() => { const target = document.getElementById('sales-closing-actions'); target?.scrollIntoView({ behavior: 'smooth', block: 'center' }); target?.focus({ preventScroll: true }); }} onRecordPayment={recordCustomerCreditPayment} isRecordingPayment={isRecordingCustomerDebtPayment} paymentMethods={configuredPaymentMethods} disabled={isSubmitting} /></div>)}</div>{customerCreditSales.length > 0 && customerCreditSales.every((entry) => entry.customer_id) && <div className="flex justify-end"><Button type="button" size="sm" variant="outline" className="min-h-10 rounded-xl bg-white" onClick={addCustomerCreditSale} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />Add Another Customer</Button></div>}</>}{inlineErrors.credit && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}</section>}
 
             {customClosingFields.length > 0 && <section id="closing-control-fields" className="rounded-2xl border border-slate-200 bg-background p-3 shadow-sm sm:p-4"><div className="mb-3"><h2 className="text-sm font-black text-slate-950">Closing fields</h2><p className="mt-0.5 text-[11px] text-slate-500">Only values for this closing are stored here.</p></div><div className="space-y-2">{customClosingFields.map((field) => <ClosingFieldControlRow key={field.id} field={field} label={closingFieldNameForLanguage(field)} value={customClosingFieldValues[field.id] ?? ''} error={inlineErrors[`custom_${field.id}`]} onChange={(value) => updateCustomClosingField(field.id, value)} />)}</div></section>}
 
