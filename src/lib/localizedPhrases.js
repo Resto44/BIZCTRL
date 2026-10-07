@@ -1,3 +1,4 @@
+import erpWorkflowPhrases from './erpWorkflowPhrases.js';
 /**
  * Centrally managed translations for audited ERP interface phrases.
  * Source phrases remain stable lookup keys; database IDs and business values are never modified.
@@ -5775,4 +5776,5 @@ export const localizedPhrases = {
   "Accounts with transactions are protected and can be deactivated instead.": { "fa": "حساب‌های دارای تراکنش محافظت می‌شوند و می‌توان آنها را غیرفعال کرد.", "ar": "الحسابات ذات المعاملات محمية ويمكن تعطيلها بدلًا من حذفها." }
 };
 
+Object.assign(localizedPhrases, erpWorkflowPhrases);
 export default localizedPhrases;

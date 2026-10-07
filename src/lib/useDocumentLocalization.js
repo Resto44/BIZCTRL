@@ -14,14 +14,14 @@ function preserveWhitespace(source, translated) {
 // the original source only while the node still contains its expected localized
 // value; otherwise adopt the newly rendered value as the source before applying
 // localization. This keeps reactive totals from being reset to their first value.
-export function resolveTextNodeSource({ textSources, node, current, lang, translateLiteral }) {
+export function resolveTextNodeSource({ textSources, textOutputs, node, current, lang, translateLiteral }) {
   const cachedSource = textSources.get(node);
   if (cachedSource === undefined) {
     textSources.set(node, current);
     return current;
   }
 
-  const expectedLocalizedValue = preserveWhitespace(
+  const expectedLocalizedValue = textOutputs?.get(node) ?? preserveWhitespace(
     cachedSource,
     lang === 'en' ? cachedSource : translateLiteral(cachedSource),
   );
@@ -52,6 +52,8 @@ function canTranslateAttribute(element, name) {
 export function useDocumentLocalization({ lang, translateLiteral }) {
   const textSources = useRef(new WeakMap());
   const attributeSources = useRef(new WeakMap());
+  const textOutputs = useRef(new WeakMap());
+  const attributeOutputs = useRef(new WeakMap());
 
   useEffect(() => {
     if (typeof document === 'undefined' || !document.body) return undefined;
@@ -62,6 +64,7 @@ export function useDocumentLocalization({ lang, translateLiteral }) {
       const current = node.nodeValue || '';
       const source = resolveTextNodeSource({
         textSources: textSources.current,
+        textOutputs: textOutputs.current,
         node,
         current,
         lang,
@@ -69,6 +72,7 @@ export function useDocumentLocalization({ lang, translateLiteral }) {
       });
       const translated = lang === 'en' ? source : translateLiteral(source);
       const next = preserveWhitespace(source, translated);
+      textOutputs.current.set(node, next);
       if (node.nodeValue !== next) node.nodeValue = next;
     };
 
@@ -79,15 +83,22 @@ export function useDocumentLocalization({ lang, translateLiteral }) {
         attributes = new Map();
         attributeSources.current.set(element, attributes);
       }
-      if (!attributes.has(name)) attributes.set(name, element.getAttribute(name) || '');
+      let outputs = attributeOutputs.current.get(element);
+      if (!outputs) { outputs = new Map(); attributeOutputs.current.set(element, outputs); }
+      const current = element.getAttribute(name) || '';
+      if (!attributes.has(name) || (outputs.has(name) && current !== outputs.get(name))) attributes.set(name, current);
       const source = attributes.get(name);
       const translated = lang === 'en' ? source : translateLiteral(source);
-      if (element.getAttribute(name) !== translated) element.setAttribute(name, translated);
+      outputs.set(name, translated);
+      if (current !== translated) element.setAttribute(name, translated);
     };
 
     const localizeElement = (element) => {
       if (!element || element.nodeType !== ELEMENT_NODE || element.closest?.('[data-i18n-skip="true"]')) return;
       LOCALIZABLE_ATTRIBUTES.forEach((name) => localizeAttribute(element, name));
+      element.querySelectorAll('[placeholder], [title], [aria-label], [alt], input[type="button"], input[type="submit"], input[type="reset"]').forEach(child => {
+        LOCALIZABLE_ATTRIBUTES.forEach(name => localizeAttribute(child, name));
+      });
       const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
       let node;
       while ((node = walker.nextNode())) localizeTextNode(node);

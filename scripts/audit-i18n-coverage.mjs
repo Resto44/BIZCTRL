@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import translations from '../src/lib/i18n.js';
+import localizedPhrases from '../src/lib/localizedPhrases.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceRoot = path.join(root, 'src');
@@ -33,21 +34,24 @@ const englishCatalogValues = new Set(
     .filter((value) => typeof value === 'string' && /[A-Za-z]/.test(value))
 );
 
+Object.keys(localizedPhrases).forEach(phrase => englishCatalogValues.add(phrase));
+
 const files = walk(sourceRoot).filter((file) => /\.(jsx?|tsx?)$/.test(file));
 const report = [];
 for (const file of files) {
   const content = fs.readFileSync(file, 'utf8');
   const relative = path.relative(root, file);
+  if (/src\/lib\/(i18n|localizedPhrases|treasuryLocalization|erpWorkflowPhrases)\.js$/.test(relative)) continue;
   const literals = new Set();
   const add = (raw) => {
     const value = raw.replace(/\\["'`]/g, (m) => m.slice(1)).replace(/\s+/g, ' ').trim();
-    if (!value || value.length < 2 || !/[A-Za-z]/.test(value)) return;
+    if (!value || value.length < 2 || !/[A-Za-z\u0600-\u06ff]/.test(value)) return;
     if (/^(?:[\w./@:-]+|[A-Z_]+)$/.test(value)) return;
     if (value.startsWith('http') || value.startsWith('/') || value.includes('=>')) return;
     literals.add(value);
   };
-  for (const match of content.matchAll(/>([^<>{}\n]*[A-Za-z][^<>{}\n]*)</g)) add(match[1]);
-  for (const match of content.matchAll(/(?:placeholder|title|aria-label|alt)=['"]([^'"]*[A-Za-z][^'"]*)['"]/g)) add(match[1]);
+  for (const match of content.matchAll(/>([^<>{}\n]*[A-Za-z\u0600-\u06ff][^<>{}\n]*)</g)) add(match[1]);
+  for (const match of content.matchAll(/(?:placeholder|title|aria-label|alt)=['"]([^'"]*[A-Za-z\u0600-\u06ff][^'"]*)['"]/g)) add(match[1]);
   for (const match of content.matchAll(/(?:label|title|description|message|text):\s*['"`]([^'"`\n]*[A-Za-z][^'"`\n]*)['"`]/g)) add(match[1]);
   const hardcoded = [...literals].filter((value) => !englishCatalogValues.has(value));
   if (hardcoded.length) report.push({ file: relative, phrases: hardcoded.sort() });
@@ -69,3 +73,7 @@ for (const lang of languages) {
 }
 console.log(`Candidate literals: ${output.candidatePhraseCount} across ${output.candidateFileCount} files.`);
 console.log(`Report: ${path.join(reportRoot, 'i18n-coverage-audit.json')}`);
+
+console.log('Largest candidate files (manual review required):');
+console.log(JSON.stringify(report.slice().sort((a,b)=>b.phrases.length-a.phrases.length).slice(0,20).map(entry=>({file:entry.file,count:entry.phrases.length})),null,2));
+console.log('Untranslated catalog keys:', JSON.stringify(parity));

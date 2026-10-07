@@ -50,7 +50,7 @@ describe('public plan checkout canonical flow', () => {
     expect(registration).toContain('emailRedirectTo: `${window.location.origin}${ownerRegistrationPath}`');
     expect(registration).toContain('navigate(signInPath)');
     expect(registration).toContain('navigate(postAuthenticationDestination, { replace: true });');
-    expect(login).toContain("safeInternalReturnTo(searchParams.get('returnTo'), '')");
+    expect(login).toContain("safeInternalReturnTo(searchParams.get('returnTo') || searchParams.get('next'), '')");
     expect(login).toContain('navigate(postAuthenticationDestination || home, { replace: true });');
     expect(checkout).toContain("if (!candidate.startsWith('/') || candidate.startsWith('//') || candidate.includes('\\\\')) return fallback;");
   });
