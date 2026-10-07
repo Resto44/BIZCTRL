@@ -41,7 +41,7 @@ const report = [];
 for (const file of files) {
   const content = fs.readFileSync(file, 'utf8');
   const relative = path.relative(root, file);
-  if (/src\/lib\/(i18n|localizedPhrases|treasuryLocalization)\.js$/.test(relative)) continue;
+  if (/src\/lib\/(i18n|localizedPhrases|treasuryLocalization|erpWorkflowPhrases)\.js$/.test(relative)) continue;
   const literals = new Set();
   const add = (raw) => {
     const value = raw.replace(/\\["'`]/g, (m) => m.slice(1)).replace(/\s+/g, ' ').trim();

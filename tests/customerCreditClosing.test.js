@@ -36,7 +36,8 @@ describe('Customer Credit Sales Source runtime', () => {
     expect(workspace).toContain('customerCreditSourceSnapshot');
     expect(workspace).toContain('manualCreditTotal');
     expect(workspace).not.toContain('function CustomerCreditEntry');
-    expect(workspace).not.toContain('customerCreditSnapshot');
+    expect(workspace).not.toMatch(/\bcustomerCreditSnapshot\b/);
+    expect(workspace).toContain('customerCreditSnapshots');
     expect(workspace).not.toContain('creditEntryRequiresCustomer');
   });
 
