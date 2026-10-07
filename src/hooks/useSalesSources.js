@@ -1,3 +1,4 @@
+import { isCustomerCreditSource } from '@/lib/customerCreditSources';
 /*
  * useSalesSources — canonical active Sales Sources query for Sales Closing,
  * dashboards, history, and management views.
@@ -51,10 +52,11 @@ export function useSalesSources({ branchId, branchKey, includeInactive = false }
 
   const activeSources = useMemo(() => allSources.filter((source) => source.is_active !== false), [allSources]);
   const cashSource = activeSources.find((source) => source.system_key === 'cash');
-  const creditSource = activeSources.find((source) => source.system_key === 'credit');
+  const creditSources = activeSources.filter(isCustomerCreditSource).sort((a, b) => Number(b.system_key === 'credit') - Number(a.system_key === 'credit'));
+  const creditSource = creditSources[0];
   const networkSource = activeSources.find((source) => source.system_key === 'network');
   const otherSource = activeSources.find((source) => source.system_key === 'other');
-  const customSources = activeSources.filter((source) => !source.is_system);
+  const customSources = activeSources.filter((source) => !source.is_system && !isCustomerCreditSource(source));
   const kpiSources = activeSources.filter((source) => source.included_in_dashboard_kpi !== false);
   const revenueSources = activeSources.filter((source) => source.included_in_revenue !== false);
   const cashRegisterSources = activeSources.filter((source) => source.included_in_cash_register !== false);
@@ -68,6 +70,7 @@ export function useSalesSources({ branchId, branchKey, includeInactive = false }
     refetch: reload,
     cashSource,
     creditSource,
+    creditSources,
     networkSource,
     otherSource,
     customSources,

@@ -1,3 +1,4 @@
+import { isCustomerCreditSource, customerCreditSourcePatch } from '@/lib/customerCreditSources';
 import { salesPaymentOptions, validPaymentCode } from '@/lib/salesPaymentMethods';
 import { useEffect, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -112,7 +113,8 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setDraft({ ...newSalesClosingSource(), ...(editor?.source || {}) });
+    const source = { ...newSalesClosingSource(), ...(editor?.source || {}) };
+    setDraft({ ...source, ...(isCustomerCreditSource(source) ? customerCreditSourcePatch(true) : {}) });
     setError('');
   }, [editor]);
 
@@ -139,6 +141,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
       allows_driver_entries: Boolean(draft.allows_driver_entries),
       branch_ids: draft.is_global === false ? Array.from(new Set(asArray(draft.branch_ids).map(String).filter(Boolean))) : [],
     };
+    if (isCustomerCreditSource(source)) Object.assign(source, customerCreditSourcePatch(true));
     if (!validPaymentCode(source.default_payment_method)) return setError('Select a valid payment method. For network sales choose Card / Network.');
     if (!source.name_en) return setError(t('salesClosing.dialog.sourceNameRequired'));
     if (source.is_global === false && !source.branch_ids.length && !source.branch_id) return setError(t('salesSourceManagement.branchRequired'));
@@ -167,7 +170,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
             <div className="grid gap-3 sm:grid-cols-3">
               <div><Label>{t('salesSourceManagement.category')}</Label><Select value={draft.category || 'other'} onValueChange={(category) => set({ category })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SOURCE_CATEGORIES.map((category) => <SelectItem key={category} value={category}>{t(`salesSourceManagement.category.${category}`)}</SelectItem>)}</SelectContent></Select></div>
               <div><Label>Optional Subcategory</Label><Input value={draft.subcategory || ''} onChange={(event) => set({ subcategory: event.target.value })} placeholder="e.g. Drivers" maxLength={120} /></div>
-              <div><Label>{t('salesClosing.dialog.defaultPayment')}</Label><Select value={draft.default_payment_method || 'cash'} onValueChange={(default_payment_method) => set({ default_payment_method })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{salesPaymentOptions(paymentMethods).map((method) => <SelectItem key={method.id} value={method.code}>{localizedDataName(method, lang)}</SelectItem>)}</SelectContent></Select></div>
+              <div><Label>{t('salesClosing.dialog.defaultPayment')}</Label><Select disabled={isCustomerCreditSource(draft)} value={draft.default_payment_method || 'cash'} onValueChange={(default_payment_method) => set({ default_payment_method })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{salesPaymentOptions(paymentMethods).map((method) => <SelectItem key={method.id} value={method.code}>{localizedDataName(method, lang)}</SelectItem>)}</SelectContent></Select></div>
               <div><Label>{t('salesClosing.dialog.displayOrder')}</Label><Input type="number" min="0" value={draft.sort_order ?? 0} onChange={(event) => set({ sort_order: Number(event.target.value) || 0 })} /></div>
             </div>
             <div className="grid gap-4 rounded-xl border bg-background p-3">
@@ -195,7 +198,12 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
                 </div>
               </div>
             </div>
-            <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm"><span><span className="block font-medium">Driver-linked entries</span><span className="mt-0.5 block text-xs text-muted-foreground">Allow this source to collect branch-scoped Driver Master records. Its today total will be derived from those entries.</span></span><Switch checked={Boolean(draft.allows_driver_entries)} onCheckedChange={(allows_driver_entries) => set({ allows_driver_entries })} /></label>
+            <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm"><span><span className="block font-medium">Driver-linked entries</span><span className="mt-0.5 block text-xs text-muted-foreground">Allow this source to collect branch-scoped Driver Master records. Its today total will be derived from those entries.</span></span><Switch checked={Boolean(draft.allows_driver_entries)} disabled={draft.system_key === 'credit'} onCheckedChange={(allows_driver_entries) => set({ ...(allows_driver_entries && isCustomerCreditSource(draft) ? customerCreditSourcePatch(false) : {}), allows_driver_entries })} /></label>
+            <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm">
+              <span className="min-w-0"><span className="block font-medium">{lang === 'fa' ? 'ثبت قرضهٔ مشتری' : lang === 'ar' ? 'إدخالات مرتبطة بائتمان العملاء' : 'Customer credit-linked entries'}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">{lang === 'fa' ? 'مشتری و مبلغ قرضه را انتخاب کنید. با نهایی‌شدن فروش، بدهی مشتری ثبت می‌شود؛ دریافت بدهی فروش تازه حساب نمی‌شود.' : lang === 'ar' ? 'اختر العميل ومبلغ البيع الآجل. يُسجل الدين عند اعتماد المبيعات؛ سداد الدين ليس مبيعات جديدة.' : 'Select customers and credit sale amounts. Finalizing creates customer receivables; debt payments are not new sales.'}</span></span>
+              <Switch aria-label="Customer credit-linked entries" checked={isCustomerCreditSource(draft)} disabled={draft.system_key === 'credit'} onCheckedChange={enabled => set(customerCreditSourcePatch(enabled))} />
+            </label>
             <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm"><span><span className="block font-medium">{t('salesSourceManagement.allBranches')}</span><span className="mt-0.5 block text-xs text-muted-foreground">{t('salesSourceManagement.allBranchesHelp')}</span></span><Switch checked={draft.is_global !== false} onCheckedChange={(is_global) => set({ is_global, branch_ids: is_global ? [] : draft.branch_ids || [] })} /></label>
             {draft.is_global === false && <div className="grid gap-2 rounded-lg border bg-background p-3 sm:grid-cols-2">{branches.map((branch) => { const id = String(branch.id); const checked = asArray(draft.branch_ids).map(String).includes(id); return <label key={id} className="flex min-h-10 items-center gap-2 rounded-md px-2 text-sm hover:bg-muted"><input type="checkbox" checked={checked} onChange={() => toggleBranch(id)} className="h-4 w-4 accent-primary" /><span className="truncate">{branch.name || branch.label || branch.branch_key || branch.key}</span></label>; })}</div>}
           </section>
@@ -203,14 +211,14 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('salesSourceManagement.accountingBehavior')}</p>
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesClosing.dialog.activeForNew')}<Switch checked={draft.is_active !== false} onCheckedChange={(is_active) => set({ is_active })} /></label>
-              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesClosing.dialog.includeRevenue')}<Switch checked={draft.included_in_revenue !== false} onCheckedChange={(included_in_revenue) => set({ included_in_revenue })} /></label>
-              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.includeCashRegister')}<Switch checked={draft.included_in_cash_register !== false} onCheckedChange={(included_in_cash_register) => set({ included_in_cash_register })} /></label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesClosing.dialog.includeRevenue')}<Switch disabled={isCustomerCreditSource(draft)} checked={draft.included_in_revenue !== false} onCheckedChange={(included_in_revenue) => set({ included_in_revenue })} /></label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.includeCashRegister')}<Switch disabled={isCustomerCreditSource(draft)} checked={draft.included_in_cash_register !== false} onCheckedChange={(included_in_cash_register) => set({ included_in_cash_register })} /></label>
               <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.includeDashboard')}<Switch checked={draft.included_in_dashboard_kpi !== false} onCheckedChange={(included_in_dashboard_kpi) => set({ included_in_dashboard_kpi })} /></label>
-              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.includeProfit')}<Switch checked={draft.included_in_profit_calc !== false} onCheckedChange={(included_in_profit_calc) => set({ included_in_profit_calc })} /></label>
-              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.requireCustomer')}<Switch checked={Boolean(draft.requires_customer)} onCheckedChange={(requires_customer) => set({ requires_customer })} /></label>
-              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.requirePos')}<Switch checked={Boolean(draft.requires_pos_device)} onCheckedChange={(requires_pos_device) => set({ requires_pos_device })} /></label>
-              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.requireReference')}<Switch checked={Boolean(draft.requires_reference)} onCheckedChange={(requires_reference) => set({ requires_reference })} /></label>
-              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.requireWallet')}<Switch checked={Boolean(draft.requires_wallet)} onCheckedChange={(requires_wallet) => set({ requires_wallet })} /></label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.includeProfit')}<Switch disabled={isCustomerCreditSource(draft)} checked={draft.included_in_profit_calc !== false} onCheckedChange={(included_in_profit_calc) => set({ included_in_profit_calc })} /></label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.requireCustomer')}<Switch disabled={isCustomerCreditSource(draft)} checked={Boolean(draft.requires_customer)} onCheckedChange={(requires_customer) => set({ requires_customer })} /></label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.requirePos')}<Switch disabled={isCustomerCreditSource(draft)} checked={Boolean(draft.requires_pos_device)} onCheckedChange={(requires_pos_device) => set({ requires_pos_device })} /></label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.requireReference')}<Switch disabled={isCustomerCreditSource(draft)} checked={Boolean(draft.requires_reference)} onCheckedChange={(requires_reference) => set({ requires_reference })} /></label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">{t('salesSourceManagement.requireWallet')}<Switch disabled={isCustomerCreditSource(draft)} checked={Boolean(draft.requires_wallet)} onCheckedChange={(requires_wallet) => set({ requires_wallet })} /></label>
             </div>
           </section>
           {error && <Alert variant="destructive"><AlertTitle>{t('salesClosing.dialog.unableSaveSource')}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
