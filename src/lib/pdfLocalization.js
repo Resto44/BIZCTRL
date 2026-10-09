@@ -19,12 +19,14 @@ export function isPdfRTL(language, direction) {
 export function prepareLocalizedPdf(doc, { lang = 'en', dir = 'ltr' } = {}) {
   const rtl = isPdfRTL(lang, dir);
   doc.__erpPdfRTL = rtl;
-  if (rtl) {
-    doc.addFileToVFS('NotoNaskhArabic-Regular.ttf', NOTO_NASKH_ARABIC_REGULAR_BASE64);
-    doc.addFont('NotoNaskhArabic-Regular.ttf', FONT_FAMILY, 'normal');
-    doc.addFileToVFS('NotoNaskhArabic-Bold.ttf', NOTO_NASKH_ARABIC_BOLD_BASE64);
-    doc.addFont('NotoNaskhArabic-Bold.ttf', FONT_FAMILY, 'bold');
-  }
+  // Dataset text can be Arabic/Persian even when the report UI is English.
+  // Always register the script font; keep layout direction controlled by lang.
+  // Otherwise jsPDF falls back to WinAnsi Helvetica and turns Arabic database
+  // names into unreadable mojibake in English report exports.
+  doc.addFileToVFS('NotoNaskhArabic-Regular.ttf', NOTO_NASKH_ARABIC_REGULAR_BASE64);
+  doc.addFont('NotoNaskhArabic-Regular.ttf', FONT_FAMILY, 'normal');
+  doc.addFileToVFS('NotoNaskhArabic-Bold.ttf', NOTO_NASKH_ARABIC_BOLD_BASE64);
+  doc.addFont('NotoNaskhArabic-Bold.ttf', FONT_FAMILY, 'bold');
   // The renderer changes text direction per string. This prevents IDs, dates,
   // Latin currency symbols, and numeric values from being reversed in RTL PDFs.
   doc.setR2L(false);
@@ -47,7 +49,10 @@ export function drawLocalizedPdfText(doc, value, x, y, {
   maxWidth,
 } = {}) {
   const text = String(value ?? '');
-  const arabicScriptText = rtl && ARABIC_SCRIPT.test(text);
+  // Rendering script depends on each field's actual characters, not on the
+  // selected report language. English headers stay Helvetica while Arabic
+  // company, branch, stock, expense and customer names use embedded Noto.
+  const arabicScriptText = ARABIC_SCRIPT.test(text);
   // jsPDF's built-in Arabic preprocessor already shapes contextual glyphs.
   // Keeping the document RTL flag off avoids reversing those shaped words;
   // right alignment provides the correct report layout for Arabic/Persian.
