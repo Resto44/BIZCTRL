@@ -220,8 +220,8 @@ function OwnerDashboardContent() {
     return uniqueRecords([...(canonical.data || []), ...(legacy.data || [])]);
   }, [activeRestaurant?.id, isAllBranches, period.currentEndIso, period.currentStartIso, selectedBranchId, selectedBranchKey]);
 
-  const periodSalesQuery = useQuery({ queryKey: ['sales_report_period', activeRestaurant?.id, selectedBranchId, period.currentStart, period.currentEnd], queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: period.currentStart, dateTo: period.currentEnd, limit: 10000 }), staleTime: 15000, enabled });
-  const previousPeriodSalesQuery = useQuery({ queryKey: ['sales_report_previous_period', activeRestaurant?.id, selectedBranchId, period.previousStart, period.previousEnd], queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: period.previousStart, dateTo: period.previousEnd, limit: 10000 }), staleTime: 60000, enabled });
+  const periodSalesQuery = useQuery({ queryKey: ['sales_report_period', 'finalized', activeRestaurant?.id, selectedBranchId, period.currentStart, period.currentEnd], queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: period.currentStart, dateTo: period.currentEnd, filters: { closing_state: 'finalized' }, limit: 10000 }), staleTime: 15000, enabled });
+  const previousPeriodSalesQuery = useQuery({ queryKey: ['sales_report_previous_period', 'finalized', activeRestaurant?.id, selectedBranchId, period.previousStart, period.previousEnd], queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: period.previousStart, dateTo: period.previousEnd, filters: { closing_state: 'finalized' }, limit: 10000 }), staleTime: 60000, enabled });
   const periodExpensesQuery = useQuery({ queryKey: ['expenses_report_period', activeRestaurant?.id, selectedBranchId, period.currentStart, period.currentEnd], queryFn: () => fetchBranchScopedRows('expenses', { legacyColumn: 'branch_key', dateColumn: 'date', dateFrom: period.currentStart, dateTo: period.currentEnd, limit: 10000 }), staleTime: 30000, enabled });
   const previousPeriodExpensesQuery = useQuery({ queryKey: ['expenses_report_previous_period', activeRestaurant?.id, selectedBranchId, period.previousStart, period.previousEnd], queryFn: () => fetchBranchScopedRows('expenses', { legacyColumn: 'branch_key', dateColumn: 'date', dateFrom: period.previousStart, dateTo: period.previousEnd, limit: 10000 }), staleTime: 60000, enabled });
   const currentFixedExpensePoolQuery = useQuery({ queryKey: ['expenses_report_fixed_pool', activeRestaurant?.id, selectedBranchId, currentReferenceMonthStart, period.currentEnd], queryFn: () => fetchBranchScopedRows('expenses', { legacyColumn: 'branch_key', dateColumn: 'date', dateFrom: currentReferenceMonthStart, dateTo: period.currentEnd, limit: 5000 }), staleTime: 60000, enabled: enabled && usesAllocatedFixedCosts });
@@ -375,8 +375,8 @@ function OwnerDashboardContent() {
     consumption, priceReport, supplierComparisons, branchPriceInconsistencies, priceHistory,
     expenseGroups, revenueTrend, periodPurchaseQuantity, periodPurchaseCost: periodMetrics.totalPurchaseCost,
     supplierCount, selectBranch: setSelectedBranchId, canAddBranch: role === 'owner',
-    openQuickAddBranch: () => setQuickAddBranchOpen(true), loadingActiveAlerts,
-  }), [branchPriceInconsistencies, branchRankings, cashRegister, consumption, expenseGroups, formatMoney, inventoryOverview, loadingActiveAlerts, payables, periodLabel, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount]);
+    openQuickAddBranch: () => setQuickAddBranchOpen(true), loadingActiveAlerts, hasQueryError,
+  }), [branchPriceInconsistencies, branchRankings, cashRegister, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, loadingActiveAlerts, payables, periodLabel, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount]);
 
   if (loading) return <DashboardSkeleton />;
 
