@@ -52,7 +52,7 @@ export const EVENT_LABELS: Record<string,Record<string,string>> = {
  fa:{amount:'مبلغ رکورد',cash:'نقد دریافت‌شده',network:'شبکه دریافت‌شده',status:'وضعیت',draft:'پیش‌نویس',finalized:'نهایی',locked:'قفل‌شده',approved:'تأییدشده',posted:'ثبت نهایی',cancelled:'لغوشده',pending:'در انتظار',paid:'پرداخت‌شده',deleted:'حذف‌شده',record:'رکورد'},
 };
 export function isFinancialEvent(event: any) {
- return !event?.entity || /^(daily_sales|sales_invoices|purchases|supplier_invoices|supplier_payments|expenses|driver_sales_entries|driver_settlements|delivery_orders|orders|payments|debt_records|debt_invoices|debt_payments|debt_receipts|cash_movements|daily_cash_settlements|retail_pos_transactions|retail_pos_transaction_payments)$/.test(event.entity);
+ return !event?.entity || /^(daily_sales|sales_invoices|purchases|supplier_invoices|supplier_payments|expenses|driver_sales_entries|driver_settlements|delivery_orders|orders|payments|debt_records|debt_invoices|debt_payments|debt_receipts|cash_movements|cash_register_entries|daily_cash_settlements|wallet_transactions|network_transfers|retail_pos_transactions|retail_pos_transaction_payments)$/.test(event.entity);
 }
 // Keep internal UUIDs and machine keys out of iOS lock-screen text.
 // They remain available through the notification's authenticated deep link.
