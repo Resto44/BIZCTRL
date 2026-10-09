@@ -2,9 +2,9 @@ import jsPDF from 'jspdf';
 import { prepareLocalizedPdf, drawLocalizedPdfText, safePdfFilename } from './pdfLocalization';
 
 const L={
- en:{title:'ERP Sales Analytics',branch:'Branch',range:'Reporting period',sales:'Verified sales',purchase:'Approved purchases',gross:'Gross profit',net:'Net profit / loss',expenses:'Expenses incl. fixed allocation',margin:'Net margin',payments:'Payment channels',cash:'Cash sales',network:'Network sales',credit:'Credit sales',other:'Other revenue',comparison:'Previous comparable period',growth:'Sales change',noCompare:'No previous sales data',trend:'Sales trend',details:'Period breakdown',date:'Date',gp:'Gross P/L',note:'Confirmed closings only. Cash sales are not the physical drawer balance. Payment channels are included in sales, not added again.',generated:'Generated',page:'Page',of:'of',periodDays:'Reported days',grossMargin:'Gross margin'},
- ar:{title:'تحليلات المبيعات ERP',branch:'الفرع',range:'فترة التقرير',sales:'المبيعات المعتمدة',purchase:'المشتريات المعتمدة',gross:'الربح الإجمالي',net:'صافي الربح / الخسارة',expenses:'المصروفات مع حصة الثابتة',margin:'هامش صافي الربح',payments:'طرق الدفع',cash:'مبيعات النقد',network:'مبيعات الشبكة',credit:'مبيعات الآجل',other:'مصادر إضافية',comparison:'الفترة السابقة المماثلة',growth:'تغير المبيعات',noCompare:'لا توجد مبيعات سابقة',trend:'اتجاه المبيعات',details:'تفاصيل الفترة',date:'التاريخ',gp:'الربح الإجمالي',note:'فقط الإقفالات المعتمدة. المبيعات النقدية ليست رصيد الصندوق الفعلي. طرق الدفع جزء من المبيعات ولا تُضاف مرة أخرى.',generated:'تاريخ الإنشاء',page:'صفحة',of:'من',periodDays:'أيام التقرير',grossMargin:'هامش الربح الإجمالي'},
- fa:{title:'تحلیل فروشات ERP',branch:'شعبه',range:'دوره گزارش',sales:'فروشات تأییدشده',purchase:'خریدهای تأییدشده',gross:'فایده ناخالص',net:'فایده / نقصان خالص',expenses:'مصارف با سهم ثابت',margin:'حاشیه فایده خالص',payments:'روش‌های پرداخت',cash:'فروشات نقد',network:'فروشات شبکه',credit:'فروشات نسیه',other:'منابع اضافی',comparison:'دوره مشابه قبلی',growth:'تغییر فروشات',noCompare:'فروشات قبلی ثبت نشده',trend:'روند فروشات',details:'جزئیات دوره',date:'تاریخ',gp:'فایده ناخالص',note:'فقط فروشات نهایی. فروشات نقد موجودی واقعی صندوق نیست. روش‌های پرداخت در مجموع فروش شامل‌اند و دوباره اضافه نمی‌شوند.',generated:'تاریخ تولید',page:'صفحه',of:'از',periodDays:'روزهای دوره',grossMargin:'حاشیه فایده ناخالص'},
+ en:{title:'ERP Sales Analytics',branch:'Branch',range:'Reporting period',sales:'Verified sales',purchase:'Approved purchases',gross:'Gross profit',net:'Net profit / loss',expenses:'Total expenses',margin:'Net margin',payments:'Payment channels',cash:'Cash sales',network:'Network sales',credit:'Credit sales',other:'Other revenue',comparison:'Previous comparable period',growth:'Sales change',noCompare:'No previous sales data',trend:'Sales trend',details:'Period breakdown',date:'Date',gp:'Gross P/L',note:'Confirmed closings only. Cash sales are not the physical drawer balance. Payment channels are included in sales, not added again.',generated:'Generated',page:'Page',of:'of',periodDays:'Reported days',grossMargin:'Gross margin'},
+ ar:{title:'تحليلات المبيعات ERP',branch:'الفرع',range:'فترة التقرير',sales:'المبيعات المعتمدة',purchase:'المشتريات المعتمدة',gross:'الربح الإجمالي',net:'صافي الربح / الخسارة',expenses:'إجمالي المصروفات',margin:'هامش صافي الربح',payments:'طرق الدفع',cash:'مبيعات النقد',network:'مبيعات الشبكة',credit:'مبيعات الآجل',other:'مصادر إضافية',comparison:'الفترة السابقة المماثلة',growth:'تغير المبيعات',noCompare:'لا توجد مبيعات سابقة',trend:'اتجاه المبيعات',details:'تفاصيل الفترة',date:'التاريخ',gp:'الربح الإجمالي',note:'فقط الإقفالات المعتمدة. المبيعات النقدية ليست رصيد الصندوق الفعلي. طرق الدفع جزء من المبيعات ولا تُضاف مرة أخرى.',generated:'تاريخ الإنشاء',page:'صفحة',of:'من',periodDays:'أيام التقرير',grossMargin:'هامش الربح الإجمالي'},
+ fa:{title:'تحلیل فروشات ERP',branch:'شعبه',range:'دوره گزارش',sales:'فروشات تأییدشده',purchase:'خریدهای تأییدشده',gross:'فایده ناخالص',net:'فایده / نقصان خالص',expenses:'مجموع مصارف',margin:'حاشیه فایده خالص',payments:'روش‌های پرداخت',cash:'فروشات نقد',network:'فروشات شبکه',credit:'فروشات نسیه',other:'منابع اضافی',comparison:'دوره مشابه قبلی',growth:'تغییر فروشات',noCompare:'فروشات قبلی ثبت نشده',trend:'روند فروشات',details:'جزئیات دوره',date:'تاریخ',gp:'فایده ناخالص',note:'فقط فروشات نهایی. فروشات نقد موجودی واقعی صندوق نیست. روش‌های پرداخت در مجموع فروش شامل‌اند و دوباره اضافه نمی‌شوند.',generated:'تاریخ تولید',page:'صفحه',of:'از',periodDays:'روزهای دوره',grossMargin:'حاشیه فایده ناخالص'},
 };
 const navy=[15,23,42],blue=[37,99,235],muted=[100,116,139],green=[5,150,105],red=[225,29,72];
 const money=(value,currency)=>`${new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(Number(value)||0)} ${currency}`;
@@ -78,7 +78,7 @@ export async function generateSalesAnalyticsPDF({
  leftLabel(t.note,266,{size:7,color:muted});
  leftLabel(`${t.periodDays}: ${snapshot.days} · ${t.grossMargin}: ${snapshot.grossMargin===null?'—':snapshot.grossMargin.toFixed(1)+'%'}`,273,{size:7,color:muted});
 
- const headers=[t.date,t.sales,t.cash,t.network,t.credit,t.purchase,t.gp];
+ const headers=[t.date,t.sales,t.cash,t.network,t.credit,t.purchase,t.net];
  const cols=[29,28,22,23,22,29,29];
  const drawTableHeader=(top)=>{
   doc.setFillColor(239,246,255);doc.roundedRect(M,top,CW,11,1.5,1.5,'F');
@@ -88,9 +88,9 @@ export async function generateSalesAnalyticsPDF({
  for(const row of rows){
   if(y>269){doc.addPage();addHeader(t.details);y=48;drawTableHeader(y);y+=12;}
   if(Math.floor((y-60)/9)%2===0){doc.setFillColor(248,250,252);doc.rect(M,y-1,CW,9,'F');}
-  const cells=[row.date,number(row.sales),number(row.cash),number(row.network),number(row.credit),number(row.purchases),number(row.grossProfit)];
+  const cells=[row.date,number(row.sales),number(row.cash),number(row.network),number(row.credit),number(row.purchases),number(row.netProfit)];
   let x=M;
-  cells.forEach((v,i)=>{label(v,x+cols[i]-2,y+5.5,{size:7,color:i===6&&row.grossProfit<0?red:navy,align:'right'});x+=cols[i]});
+  cells.forEach((v,i)=>{label(v,x+cols[i]-2,y+5.5,{size:7,color:i===6&&row.netProfit<0?red:navy,align:'right'});x+=cols[i]});
   y+=9;
  }
  if(y<260) {
