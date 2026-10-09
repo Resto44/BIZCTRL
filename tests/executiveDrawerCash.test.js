@@ -67,8 +67,7 @@ describe('Executive drawer cash — physical closing balance only', () => {
     expect(report).toContain('<ExecutiveSnapshotV2 model={model} copy={copy} />');
     expect(owner).toContain('summarizeDrawerCash(periodSales)');
     expect(executive).toContain('data-testid="snapshot-drawer-cash"');
-    expect(executive).toContain('data-testid="snapshot-network-sales"');
-    expect(executive).toContain('data-testid="snapshot-credit-sales"');
+    expect(executive).toContain("key: 'network'").toBeUndefined();
     expect(executive).toContain('data-testid="snapshot-payment-mix"');
     expect(executive).toContain('Cash sales and cash remaining in drawer are separate.');
     expect(executive).not.toContain('periodMetrics.totalCash');
