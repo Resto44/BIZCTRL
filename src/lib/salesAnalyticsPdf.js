@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import { prepareLocalizedPdf, drawLocalizedPdfText, safePdfFilename } from './pdfLocalization';
-import { appendOperationsPdfPages } from './operationsPdfPages';
+import { drawSinglePageERPReport } from './singlePageERPReport';
 
 const L={
  en:{title:'ERP Sales Analytics',branch:'Branch',range:'Reporting period',sales:'Verified sales',purchase:'Approved purchases',gross:'Gross profit',net:'Net profit / loss',expenses:'Total expenses',margin:'Net margin',payments:'Payment channels',cash:'Cash sales',network:'Network sales',credit:'Credit sales',other:'Other revenue',comparison:'Previous comparable period',growth:'Sales change',noCompare:'No previous sales data',trend:'Sales trend',details:'Period breakdown',date:'Date',gp:'Gross P/L',note:'Confirmed closings only. Cash sales are not the physical drawer balance. Payment channels are included in sales, not added again.',generated:'Generated',page:'Page',of:'of',periodDays:'Reported days',grossMargin:'Gross margin'},
@@ -20,6 +20,18 @@ export async function generateSalesAnalyticsPDF({
  const language=L[lang]?lang:'en',t=L[language],rtl=language!=='en' || dir==='rtl';
  const doc=new jsPDF({unit:'mm',format:'a4',putOnlyUsedFonts:true});
  prepareLocalizedPdf(doc,{lang:language,dir:rtl?'rtl':'ltr'});
+ // Operations ERP report is a deliberately single-page A4 management dashboard.
+ // Do not generate the older two-page sales report before this page; that was
+ // causing the 6-page output which did not match the owner's reference layout.
+ if(operationsReport){
+  drawSinglePageERPReport(doc,{
+   snapshot,report:operationsReport,range,branchLabel,businessName,currency,lang:language,
+  });
+  if(doc.getNumberOfPages()!==1)throw new Error('ERP single-page PDF did not fit A4');
+  if(download)doc.save(safePdfFilename('BizCTRL-ERP-One-Page-'+range.type+'-'+range.from+'-'+range.to,language));
+  return doc;
+ }
+
  const W=210,M=14,CW=W-2*M;
  const label=(value,x,y,{bold=false,size=9,color=navy,align=rtl?'right':'left'}={})=>{
   drawLocalizedPdfText(doc,String(value??''),x,y,{rtl,bold,size,color,align,maxWidth:CW});
@@ -98,7 +110,6 @@ export async function generateSalesAnalyticsPDF({
   doc.setDrawColor(203,213,225);doc.line(M,y+3,W-M,y+3);
   label(`${t.sales}: ${money(snapshot.sales,currency)}   |   ${t.net}: ${money(snapshot.netProfit,currency)}`,rtl?W-M:M,y+12,{bold:true,size:9});
  }
- if(operationsReport)appendOperationsPdfPages(doc,{report:operationsReport,range,branchLabel,businessName,currency,lang:language});
  footer();
  if(download)doc.save(safePdfFilename(`BizCTRL-Sales-Analytics-${range.type}-${range.from}-${range.to}`,language));
  return doc;
