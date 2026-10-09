@@ -66,9 +66,10 @@ describe('ERP Executive Snapshot V2',()=>{
     ]);
     expect(dashboard).toContain('periodKey: activePeriod');
     expect(report).toContain('<ExecutiveSnapshotV2 model={model} copy={copy} />');
-    for(const id of ['snapshot-sales','snapshot-profit','snapshot-margin','snapshot-drawer-cash',
-       'snapshot-payment-mix','snapshot-purchases','snapshot-receivables','snapshot-payables','snapshot-active-risks'])
+    for(const id of ['snapshot-sales','snapshot-margin','snapshot-drawer-cash','snapshot-payment-mix'])
        expect(card).toContain(`data-testid="${id}"`);
+    for(const id of ['snapshot-profit','snapshot-purchases','snapshot-receivables','snapshot-payables','snapshot-active-risks'])
+       expect(card).toContain(`testId="${id}"`);
     expect(card).toContain('periodMetrics.totalPurchaseCost');
     expect(card).toContain('presentation.methods');
     expect(card).toContain("navigate('/reports')");
