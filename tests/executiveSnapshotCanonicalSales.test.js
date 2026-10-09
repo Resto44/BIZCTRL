@@ -76,7 +76,7 @@ describe('Executive snapshot canonical finalized Sales Closing accounting', () =
     expect(dashboard.match(/filters: \{ closing_state: 'finalized' \}/g)).toHaveLength(2);
     expect(card).toContain('<ExecutiveSnapshotV2 model={model} copy={copy} />');
     expect(snapshot).toContain('data-testid="snapshot-sales"');
-    expect(snapshot).toContain('data-testid="snapshot-profit"');
+    expect(snapshot).toContain('testId="snapshot-profit"');
     expect(snapshot).toContain('data-testid="snapshot-margin"');
     expect(snapshot).toContain('data-testid="snapshot-drawer-cash"');
     expect(snapshot).toContain('buildExecutiveSnapshotPresentation');
