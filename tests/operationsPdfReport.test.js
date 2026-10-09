@@ -89,7 +89,7 @@ describe('Operations, Branches & Inventory ERP PDF',()=>{
    expect(empty.stockCount).toBe(0);
    expect(empty.hasDebtData).toBe(false);
  });
- it('renders downloadable-quality A4 operational pages in all three SaaS languages from the same reporting period',async()=>{
+ it('renders EXACTLY one reference-layout A4 page in each SaaS language',async()=>{
   const snapshot=buildSalesReportSnapshot({sales,purchases,expenses,expenseCategories:categories,from:range.from,to:range.to});
   for(const lang of ['en','ar','fa']){
    const doc=await generateSalesAnalyticsPDF({
@@ -97,11 +97,29 @@ describe('Operations, Branches & Inventory ERP PDF',()=>{
     operationsReport:run(),businessName:'مطاعم شمعة الريان',
     branchLabel:'فرع الريان',currency:'SAR',lang,download:false,
    });
-   expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(5);
+   expect(doc.getNumberOfPages()).toBe(1);
    expect(Buffer.from(doc.output('arraybuffer')).subarray(0,8).toString()).toContain('%PDF-');
    expect(doc.__erpPdfRTL).toBe(lang!=='en');
   }
  });
+ it('never appends pages with extra branches, inventory or operating risks',async()=>{
+  const branchCopies=Array.from({length:19},(_,i)=>({id:'branch-'+i,branch_key:'b'+i,name:'Branch '+(i+1)}));
+  const moreSales=branchCopies.map((b,i)=>({
+    id:'sale-'+i,date:'2026-10-09',branch_id:b.id,closing_state:'finalized',restaurant_cash:100+i*25,
+  }));
+  const hugeReport=run({
+    branches:branchCopies,sales:moreSales,purchases:[],expenses:[],
+    inventory:Array.from({length:90},(_,i)=>({id:'inv'+i,product_id:'prod'+i,product_name:'Product '+i,quantity:i%5,
+      low_stock_threshold:2,unit:'carton'})),
+  });
+  const hugeSnapshot=buildSalesReportSnapshot({sales:moreSales,purchases:[],expenses:[],from:range.from,to:range.to});
+  const doc=await generateSalesAnalyticsPDF({
+    snapshot:hugeSnapshot,operationsReport:hugeReport,range,branchLabel:'All branches',
+    lang:'en',download:false,
+  });
+  expect(doc.getNumberOfPages()).toBe(1);
+ });
+
  it('fetches inventory, movement and debt under tenant and branch access and blocks incomplete PDF',async()=>{
   const reports=await file('../src/pages/Reports.jsx');
   expect(reports).toContain("queryKey:['report_inventory_snapshot',activeRestaurant?.id,selectedBranchId]");
