@@ -59,16 +59,18 @@ describe('Executive drawer cash — physical closing balance only', () => {
   });
 
   it('renders cash in drawer as a balance, not a contribution to sales composition', async () => {
-    const [owner, report] = await Promise.all([
+    const [owner, report, executive] = await Promise.all([
       source('../src/pages/OwnerDashboard.jsx'),
       source('../src/components/dashboard/OwnerReportCenter.jsx'),
+      source('../src/components/dashboard/ExecutiveSnapshotV2.jsx'),
     ]);
-    const executive = report.split('function ExecutiveReport')[1].split('function FinancialReport')[0];
+    expect(report).toContain('<ExecutiveSnapshotV2 model={model} copy={copy} />');
     expect(owner).toContain('summarizeDrawerCash(periodSales)');
     expect(executive).toContain('data-testid="snapshot-drawer-cash"');
-    expect(executive).toContain('data-testid="snapshot-network-sales"');
-    expect(executive).toContain('data-testid="snapshot-credit-sales"');
-    expect(executive).not.toContain('data-testid="snapshot-payment-mix"');
+    expect(executive).toContain('methods.map(method=>');
+    expect(executive).toContain('presentation.reconciled');
+    expect(executive).toContain('data-testid="snapshot-payment-mix"');
+    expect(executive).toContain('Cash sales and cash left in drawer are different figures.');
     expect(executive).not.toContain('periodMetrics.totalCash');
     expect(executive).toContain('drawerCash?.complete');
     expect(executive).toContain("drawerCash.amount");

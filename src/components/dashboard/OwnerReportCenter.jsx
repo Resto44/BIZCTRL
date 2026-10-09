@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import ExecutiveSnapshotV2 from './ExecutiveSnapshotV2';
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -155,76 +156,13 @@ function TrendChart({ data, copy, formatMoney }) {
 
 function ExecutiveReport({ model, copy }) {
   const {
-    formatMoney, periodMetrics, periodSalesChange, periodLabel, branchRankings,
-    scopedAlerts, inventoryOverview, receivables, payables, openQuickAddBranch, hasQueryError, drawerCash,
+    formatMoney, periodMetrics, periodLabel, branchRankings,
+    scopedAlerts, inventoryOverview, receivables, payables, openQuickAddBranch,
   } = model;
   const navigate = useNavigate();
   return (
     <div data-testid="report-executive" className="w-full min-w-0 max-w-full overflow-x-hidden space-y-4">
-      <section data-testid="executive-snapshot" className="w-full min-w-0 overflow-hidden rounded-[1.55rem] border border-slate-200 bg-card shadow-[0_12px_35px_-25px_rgba(15,23,42,.35)] dark:border-slate-700">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-slate-50/80 px-4 py-3 dark:bg-slate-900/60 sm:px-5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-600 text-white shadow-sm"><BarChart3 className="h-4 w-4" aria-hidden="true" /></span>
-            <div className="min-w-0">
-              <h2 className="text-sm font-black tracking-tight text-foreground sm:text-base">{text(copy, 'executiveSnapshot', 'Executive snapshot')}</h2>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">{periodLabel}</p>
-            </div>
-          </div>
-          <span data-testid="snapshot-verification" className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold ${hasQueryError ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300'}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${hasQueryError ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-            {hasQueryError ? text(copy, 'syncRequired', 'Sync required') : text(copy, 'verifiedERP', 'VERIFIED ERP')}
-          </span>
-        </div>
-
-        <div className="space-y-3 p-3 sm:p-5">
-          <div className="grid min-w-0 grid-cols-2 gap-2.5 sm:grid-cols-4">
-            <div data-testid="snapshot-sales" className="col-span-2 min-w-0 rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-blue-900 px-4 py-3.5 text-white sm:col-span-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-blue-100"><BarChart3 className="h-4 w-4" aria-hidden="true" />{text(copy, 'sales', 'Sales')}</div>
-              <p className="mt-2 break-words text-2xl font-black tracking-tight tabular-nums sm:text-3xl" dir="ltr">{formatMoney(periodMetrics.totalSales)}</p>
-              {periodSalesChange != null && <p className={`mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold ${periodSalesChange >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>{periodSalesChange >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}{periodSalesChange >= 0 ? '+' : ''}{periodSalesChange.toFixed(1)}% {text(copy, 'vsPreviousPeriod', 'vs previous period')}</p>}
-            </div>
-            <div data-testid="snapshot-profit" className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/25">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300"><BadgeDollarSign className="h-4 w-4" aria-hidden="true" />{text(copy, 'netProfit', 'Net profit')}</div>
-              <p className="mt-2 break-words text-lg font-black tabular-nums text-foreground sm:text-xl" dir="ltr">{formatMoney(periodMetrics.netProfit)}</p>
-            </div>
-            <div data-testid="snapshot-margin" className="min-w-0 rounded-2xl border border-violet-100 bg-violet-50/70 p-3.5 dark:border-violet-900/60 dark:bg-violet-950/25">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-violet-700 dark:text-violet-300"><TrendingUp className="h-4 w-4" aria-hidden="true" />{text(copy, 'netMargin', 'Net margin')}</div>
-              <p className="mt-2 text-xl font-black tabular-nums text-foreground" dir="ltr">{periodMetrics.netMargin.toFixed(1)}%</p>
-            </div>
-          </div>
-
-          <div className="min-w-0 rounded-2xl border border-border/80 bg-muted/25 p-3 sm:p-4">
-            <h3 className="text-xs font-black text-foreground">{text(copy, 'paymentOverview', 'Cash position & payments')}</h3>
-            <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{text(copy, 'paymentOverviewHint', 'Drawer balance is separate from sales; no handovers added')}</p>
-            <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3">
-              <div data-testid="snapshot-drawer-cash" className="col-span-2 min-w-0 rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/70 dark:bg-emerald-950/40 sm:col-span-1">
-                <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 dark:text-emerald-300"><Banknote className="h-4 w-4" aria-hidden="true" />{text(copy, 'drawerCash', 'Cash in drawer')}</div>
-                <p className="mt-2 text-lg font-black tabular-nums text-emerald-900 dark:text-emerald-100" dir="ltr">{drawerCash?.complete ? formatMoney(drawerCash.amount) : '—'}</p>
-                <p className="mt-1 text-[10px] leading-4 text-emerald-800/75 dark:text-emerald-200/75">{drawerCash?.complete ? text(copy, 'drawerCashHint', 'Recorded physical cash remaining') : (drawerCash?.missingBranches ? text(copy, 'partialDrawerCash', 'Incomplete cash counts across branches') : text(copy, 'drawerCashMissing', 'Not recorded'))}</p>
-              </div>
-              <div data-testid="snapshot-network-sales" className="min-w-0 rounded-xl border border-blue-100 bg-background p-3 dark:border-blue-900/60">
-                <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground"><CreditCard className="h-4 w-4 text-blue-600" aria-hidden="true" />{text(copy, 'network', 'Network')}</div>
-                <p className="mt-2 break-words text-base font-black tabular-nums text-foreground" dir="ltr">{formatMoney(periodMetrics.totalNetwork)}</p>
-              </div>
-              <div data-testid="snapshot-credit-sales" className="min-w-0 rounded-xl border border-violet-100 bg-background p-3 dark:border-violet-900/60">
-                <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground"><Landmark className="h-4 w-4 text-violet-600" aria-hidden="true" />{text(copy, 'credit', 'Credit')}</div>
-                <p className="mt-2 break-words text-base font-black tabular-nums text-foreground" dir="ltr">{formatMoney(periodMetrics.totalCredit)}</p>
-              </div>
-              {periodMetrics.totalAdditionalSources > 0 && <div className="col-span-2 rounded-xl border border-amber-100 bg-background p-3 text-xs dark:border-amber-900/60 sm:col-span-3">
-                <span className="font-bold text-muted-foreground">{text(copy, 'otherSources', 'Other sources')}</span>
-                <strong className="ms-2 tabular-nums text-foreground" dir="ltr">{formatMoney(periodMetrics.totalAdditionalSources)}</strong>
-              </div>}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <MetricCard label={text(copy, 'purchases', 'Purchases')} value={formatMoney(periodMetrics.totalPurchaseCost)} icon={ShoppingBasket} tone="blue" />
-        <MetricCard label={text(copy, 'receivables', 'Receivables')} value={formatMoney(receivables)} icon={Landmark} tone="green" />
-        <MetricCard label={text(copy, 'payables', 'Payables')} value={formatMoney(payables)} icon={ReceiptText} tone="amber" />
-        <MetricCard label={text(copy, 'activeRisks', 'Active risks')} value={compactNumber(scopedAlerts.length)} icon={ShieldAlert} tone={scopedAlerts.length ? 'rose' : 'green'} />
-      </div>
+      <ExecutiveSnapshotV2 model={model} copy={copy} />
 
       <Panel>
         <SectionTitle icon={Building2} title={text(copy, 'branchCommand', 'Branch command board')} subtitle={text(copy, 'branchCommandHint', "Ranked by today's verified sales")} badge={`${branchRankings.length}`} />
