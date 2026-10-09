@@ -54,13 +54,22 @@ export const EVENT_LABELS: Record<string,Record<string,string>> = {
 export function isFinancialEvent(event: any) {
  return !event?.entity || /^(daily_sales|sales_invoices|purchases|supplier_invoices|supplier_payments|expenses|driver_sales_entries|driver_settlements|delivery_orders|orders|payments|debt_records|debt_invoices|debt_payments|debt_receipts|cash_movements|daily_cash_settlements|retail_pos_transactions|retail_pos_transaction_payments)$/.test(event.entity);
 }
+// Keep internal UUIDs and machine keys out of iOS lock-screen text.
+// They remain available through the notification's authenticated deep link.
+export function readablePushReference(value: unknown): string {
+ const v=String(value ?? '').trim();
+ if (!v || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+   || /^[0-9a-f]{24,}$/i.test(v) || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(v)) return '';
+ return v.length <= 55 ? v : '';
+}
 export function recordDetails(event: any, language: string, currency: string, showReference: boolean) {
  const c=event.context || {};
  const t=EVENT_LABELS[language] || EVENT_LABELS.en;
  const money=(value: any)=>value!==null && value!==undefined && value!=='' && Number.isFinite(Number(value))
   ? `${new Intl.NumberFormat(language,{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value))} ${currency}` : null;
  const lines:string[]=[];
- if(showReference && event.reference) lines.push(String(event.reference).slice(0,100));
+ const reference=showReference ? readablePushReference(event.reference) : '';
+ if(reference) lines.push(reference);
  const amount=money(c.amount);
  if(amount!==null) lines.push(`${t.amount}: ${amount}`);
  if(event.entity==='driver_sales_entries' || event.entity==='driver_settlements') {
