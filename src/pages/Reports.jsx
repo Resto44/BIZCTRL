@@ -39,15 +39,16 @@ import {
   computeProfitAnalysis,
   generateRecommendations,
 } from '@/services/salesAnalyticsEngine';
-import { generateUltimatePDF } from '@/lib/pdfGenerator';
-import { formatCurrency, formatPct, formatDate, getDateRange, computeProductQuantityAnalytics } from '@/lib/helpers';
+import { generateSalesAnalyticsPDF } from '@/lib/salesAnalyticsPdf';
+import { SALES_REPORT_PERIODS, salesReportDateRange, buildSalesReportSnapshot, salesReportGrowth } from '@/lib/salesReportPeriod';
+import { formatCurrency, formatPct, computeProductQuantityAnalytics } from '@/lib/helpers';
 import { format, startOfMonth } from 'date-fns';
 
 // ─── Color palette ────────────────────────────────────────────────────────────
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function fmtC(val, currency) { return formatCurrency(val, currency); }
+function fmtC(val, currency) { return `${currency} ${Number(val || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`; }
 function fmtP(val) { return formatPct(val); }
 function growthColor(v) {
   if (v === null || v === undefined) return 'text-muted-foreground';
@@ -126,9 +127,18 @@ export default function Reports() {
     selectedBranchKey,
     selectedBranchLabel,
     isAllBranches,
-    branchFilter,
     setSelectedBranchId,
   } = useBranchScope();
+  const [reportPeriod, setReportPeriod] = useState('today');
+  const reportRange = useMemo(() => salesReportDateRange(reportPeriod), [reportPeriod]);
+  const earliestReportDate = useMemo(() => `${new Date().getFullYear() - 1}-01-01`, []);
+  const todayReportDate = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  const ui = ({
+    en: {branch:'Branch', all:'All branches', selected:'Showing data for', period:'Report period', today:'Today', yesterday:'Yesterday', week:'This week', month:'This month', year:'This year', from:'From', to:'To', confirmed:'Finalized sales only', netMargin:'Net margin', grossMargin:'Gross margin', cost:'Approved purchases', variable:'Variable expenses', fixed:'Allocated fixed costs', transactions:'Finalized closings', average:'Average daily sales', sales:'Sales', cash:'Cash sales', network:'Network sales', credit:'Credit sales', other:'Other revenue', growth:'Compared with prior period', noGrowth:'No comparable previous sales', warning:'This report excludes drafts and cash handovers. Network and credit are part of sales, not additional revenue.', reference:'More sections below show calendar-based historical analytics.', error:'Report data could not be loaded. Export is disabled until data is available.', periodTitle:'Selected period summary'},
+    ar: {branch:'الفرع',all:'جميع الفروع',selected:'عرض بيانات',period:'فترة التقرير',today:'اليوم',yesterday:'أمس',week:'هذا الأسبوع',month:'هذا الشهر',year:'هذه السنة',from:'من',to:'إلى',confirmed:'مبيعات معتمدة فقط',netMargin:'هامش الربح الصافي',grossMargin:'هامش الربح الإجمالي',cost:'المشتريات المعتمدة',variable:'المصروفات المتغيرة',fixed:'المصاريف الثابتة الموزعة',transactions:'الإقفالات المعتمدة',average:'متوسط المبيعات اليومية',sales:'المبيعات',cash:'المبيعات النقدية',network:'مبيعات الشبكة',credit:'المبيعات الآجلة',other:'مصادر أخرى',growth:'مقارنة بالفترة السابقة',noGrowth:'لا توجد مبيعات سابقة للمقارنة',warning:'يستبعد التقرير المسودات والتسويات النقدية. الشبكة والآجل ضمن المبيعات وليسا دخلاً إضافياً.',reference:'الأقسام أدناه تعرض تحليلات تاريخية حسب التقويم.',error:'تعذر تحميل بيانات التقرير. تم تعطيل التصدير مؤقتًا.',periodTitle:'ملخص الفترة المحددة'},
+    fa: {branch:'شعبه',all:'تمام شعبه‌ها',selected:'نمایش اطلاعات',period:'دوره گزارش',today:'امروز',yesterday:'دیروز',week:'این هفته',month:'این ماه',year:'امسال',from:'از',to:'تا',confirmed:'فقط فروشات نهایی',netMargin:'حاشیه فایده خالص',grossMargin:'حاشیه فایده ناخالص',cost:'خریدهای تأییدشده',variable:'مصارف متغیر',fixed:'سهم مصارف ثابت',transactions:'بستن‌های نهایی فروش',average:'میانگین روزانه فروش',sales:'فروشات',cash:'فروشات نقد',network:'فروشات شبکه',credit:'فروشات نسیه',other:'منابع دیگر',growth:'مقایسه با دوره پیشین',noGrowth:'فروشات قابل مقایسه موجود نیست',warning:'پیش‌نویس و تحویل وجه نقد در فروش شامل نیست. شبکه و نسیه بخشی از فروش‌اند.',reference:'بخش‌های پایین تحلیل تاریخی ماه و سال تقویمی را نشان می‌دهند.',error:'اطلاعات گزارش کامل بارگذاری نشد. خروجی PDF موقتاً غیرفعال است.',periodTitle:'خلاصه دوره انتخاب‌شده'},
+  })[lang] || null;
+  const copy = ui || {branch:'Branch', all:'All branches', selected:'Showing data for', period:'Report period', today:'Today', yesterday:'Yesterday', week:'This week', month:'This month', year:'This year', from:'From', to:'To', confirmed:'Finalized sales only', netMargin:'Net margin', grossMargin:'Gross margin', cost:'Approved purchases', variable:'Variable expenses', fixed:'Allocated fixed costs', transactions:'Finalized closings', average:'Average daily sales', sales:'Sales', cash:'Cash sales', network:'Network sales', credit:'Credit sales', other:'Other revenue', growth:'Compared with prior period', noGrowth:'No comparable previous sales', warning:'Confirmed closings only.', reference:'Historical calendar views below.', error:'Report data unavailable', periodTitle:'Selected period summary'};
   const { revenueSources, isLoading: loadingSources } = useSalesSources({
     branchId: isAllBranches ? undefined : selectedBranchId,
   });
@@ -137,36 +147,38 @@ export default function Reports() {
   // A branch UUID is always combined with the active restaurant ID; there is no
   // branch-name fallback and no independent report-page selection state.
   const hasScope = Boolean(activeRestaurant?.id);
-  const salesFilter = branchFilter || {};
-  const expenseFilter = branchFilter || {};
-  const walletFilter = branchFilter || {};
-
+  // Every page is tenant + authorized branch scoped. The old 2,000-row limit
+  // silently truncated year reports; page by 500 and fail closed on errors.
   const fetchReportRows = async (table, legacyColumn = 'branch', orderColumn = 'date') => {
     if (!activeRestaurant?.id) return [];
-    const createQuery = () => {
-      let query = supabase.from(table).select('*').eq('restaurant_id', activeRestaurant.id);
-      if (orderColumn) query = query.order(orderColumn, { ascending: false });
-      return query.limit(2000);
+    const load = async applyScope => {
+      const all = [];
+      for (let offset = 0; offset < 50000; offset += 500) {
+        const end = orderColumn === 'transaction_date' ? `${todayReportDate}T23:59:59.999` : todayReportDate;
+        let q = supabase.from(table).select('*').eq('restaurant_id', activeRestaurant.id)
+          .gte(orderColumn, earliestReportDate).lte(orderColumn, end)
+          .order(orderColumn, { ascending: false }).order('id', { ascending: false });
+        q = applyScope(q).range(offset, offset + 499);
+        const { data, error } = await q;
+        if (error) throw error;
+        all.push(...(data || []));
+        if ((data || []).length < 500) return all;
+      }
+      throw new Error('Report row limit reached. Narrow the selected branch or date range.');
     };
-    if (isAllBranches) {
-      const { data, error } = await createQuery();
-      if (error) throw error;
-      return data || [];
-    }
+    if (isAllBranches) return load(q=>q);
     if (!selectedBranchId || !selectedBranchKey) return [];
     const [canonical, legacy] = await Promise.all([
-      createQuery().eq('branch_id', selectedBranchId),
-      createQuery().is('branch_id', null).eq(legacyColumn, selectedBranchKey),
+      load(q=>q.eq('branch_id',selectedBranchId)),
+      load(q=>q.is('branch_id',null).eq(legacyColumn,selectedBranchKey)),
     ]);
-    if (canonical.error || legacy.error) throw canonical.error || legacy.error;
-    return Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
-      .map((record) => [record.id, record])).values());
+    return Array.from(new Map([...canonical,...legacy].map(row=>[row.id,row])).values());
   };
 
   // ── Data fetching ──────────────────────────────────────────────────────────
   const { data: sales = [], isLoading: loadingSales } = useQuery({
     queryKey: ['sales', 'reports', activeRestaurant?.id, selectedBranchId],
-    queryFn: () => fetchReportRows('daily_sales'),
+    queryFn: async () => (await fetchReportRows('daily_sales')).filter(row => ['finalized','locked'].includes(row.closing_state)),
     staleTime: 120000,
     enabled: hasScope,
   });
@@ -175,24 +187,10 @@ export default function Reports() {
     queryKey: ['purchases_erp', activeRestaurant?.id, selectedBranchId],
     queryFn: async () => {
       if (!activeRestaurant?.id) return [];
-      const buildQuery = () => supabase
-        .from('supplier_invoices')
-        .select('*')
-        .eq('restaurant_id', activeRestaurant.id)
-        .in('status', ['approved', 'partial', 'paid'])
-        .order('date', { ascending: false })
-        .limit(2000);
-      if (isAllBranches) {
-        const { data, error } = await buildQuery();
-        return error ? [] : (data || []);
-      }
-      const [canonicalResult, legacyResult] = await Promise.all([
-        buildQuery().eq('branch_id', selectedBranchId),
-        selectedBranchKey ? buildQuery().is('branch_id', null).eq('branch', selectedBranchKey) : Promise.resolve({ data: [] }),
-      ]);
-      if (canonicalResult.error || legacyResult.error) return [];
-      return Array.from(new Map([...(canonicalResult.data || []), ...(legacyResult.data || [])]
-        .map((record) => [record.id, record])).values());
+      return (await fetchReportRows('supplier_invoices')).filter(invoice =>
+        ['approved','auto_approved'].includes(invoice.approval_status)
+          || (!invoice.approval_status && ['approved','paid','partial'].includes(invoice.status))
+      );
     },
     staleTime: 120000,
     enabled: hasScope,
@@ -228,6 +226,28 @@ export default function Reports() {
   });
 
   const isLoading = loadingSales || loadingPurchases || loadingExpenses || loadingSources;
+
+  const reportFailed = [
+    loadingSales,loadingPurchases,loadingExpenses,
+  ].some(Boolean); // Used for the export guard in addition to query errors.
+
+  const periodSnapshot = useMemo(() => buildSalesReportSnapshot({
+    sales,purchases,expenses,expenseCategories,revenueSources,
+    from:reportRange.from,to:reportRange.to,
+    groupBy:reportRange.type==='year'?'month':'day',
+  }),[sales,purchases,expenses,expenseCategories,revenueSources,reportRange]);
+  const previousSnapshot = useMemo(() => buildSalesReportSnapshot({
+    sales,purchases,expenses,expenseCategories,revenueSources,
+    from:reportRange.previousFrom,to:reportRange.previousTo,
+    groupBy:reportRange.type==='year'?'month':'day',
+  }),[sales,purchases,expenses,expenseCategories,revenueSources,reportRange]);
+  const periodGrowth = salesReportGrowth(periodSnapshot,previousSnapshot);
+  const selectedPeriodSales = useMemo(() => SALES_REPORT_PERIODS.map(period=>{
+    const dateRange=salesReportDateRange(period);
+    return {period,total:buildSalesReportSnapshot({
+      sales, purchases:[],expenses:[],revenueSources:[],from:dateRange.from,to:dateRange.to,
+    }).sales};
+  }),[sales]);
 
   // ── Analytics computations (all from engine) ───────────────────────────────
   const executive = useMemo(
