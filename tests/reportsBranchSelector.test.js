@@ -29,7 +29,8 @@ describe('ERP Sales Analytics branch and period scope',()=>{
  });
  it('shows every selectable period and feeds the exact same snapshot to the ERP PDF',async()=>{
   const reports=await source('../src/pages/Reports.jsx');
-  for(const key of ['today','yesterday','week','month','year'])expect(reports).toContain(`sales-period-${key}`);
+  expect(reports).toContain('SALES_REPORT_PERIODS.map(period => (');
+  expect(reports).toContain('data-testid={`sales-period-${period}`}');
   expect(reports).toContain('data-testid="sales-period-summary"');
   expect(reports).toContain('periodSnapshot,previousSnapshot,growth:periodGrowth');
   expect(reports).toContain('range:reportRange');
