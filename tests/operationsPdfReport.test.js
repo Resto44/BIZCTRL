@@ -87,6 +87,7 @@ describe('Operations, Branches & Inventory ERP PDF',()=>{
    expect(empty.hasInventoryData).toBe(false);
    expect(empty.hasConsumptionData).toBe(false);
    expect(empty.stockCount).toBe(0);
+   expect(empty.hasDebtData).toBe(false);
  });
  it('renders downloadable-quality A4 operational pages in all three SaaS languages from the same reporting period',async()=>{
   const snapshot=buildSalesReportSnapshot({sales,purchases,expenses,expenseCategories:categories,from:range.from,to:range.to});
