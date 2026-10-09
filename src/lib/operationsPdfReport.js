@@ -120,7 +120,7 @@ export function buildOperationsPdfReport({
   range,asOfDate:asOfDate||asDay(new Date()),branches:branchReports,
   best,worst,stockCount:stock.length,stocks:stock.slice(0,30),lowStock:lowStock.slice(0,15),noStock:noStock.length,
   consumption:usage,wasteCost,wasteQuantity,costGroups:costs,
-  debts,risks,hasInventoryData:stock.length>0,hasConsumptionData:consumption.size>0,
+  debts,risks,hasDebtData:customerDebts.length>0,hasInventoryData:stock.length>0,hasConsumptionData:consumption.size>0,
   branchProfitUnallocated:Math.abs(unassignedCosts)>0.01 ? unassignedCosts:0,
  };
 }
