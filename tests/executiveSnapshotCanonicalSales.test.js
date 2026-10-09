@@ -76,7 +76,7 @@ describe('Executive snapshot canonical finalized Sales Closing accounting', () =
     expect(card).toContain('data-testid="snapshot-sales"');
     expect(card).toContain('data-testid="snapshot-profit"');
     expect(card).toContain('data-testid="snapshot-margin"');
-    expect(card).toContain('data-testid="snapshot-payment-mix"');
+    expect(card).toContain('data-testid="snapshot-drawer-cash"');
     expect(card).toContain('periodMetrics.totalAdditionalSources');
     expect(card).not.toContain('SAR 885');
   });
