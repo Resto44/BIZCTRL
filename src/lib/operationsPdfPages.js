@@ -160,7 +160,7 @@ export function appendOperationsPdfPages(doc,{
  startPage(t.inventory,t.asOf+' '+report.asOfDate);
  const stockRows=report.stocks||[];
  const cGap=4,cW=(CW-8)/3;
- card(M,47,cW,29,t.skus,report.hasInventoryData?String(stockRows.length):'—');
+ card(M,47,cW,29,t.skus,report.hasInventoryData?String(report.stockCount):'—');
  card(M+cW+4,47,cW,29,t.lowStock,report.hasInventoryData?String(report.lowStock.length):'—',
   {tone:report.lowStock.length?'red':'green'});
  card(M+2*(cW+4),47,cW,29,t.outStock,report.hasInventoryData?String(report.noStock):'—',
