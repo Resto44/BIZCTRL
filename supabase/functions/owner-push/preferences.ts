@@ -78,13 +78,13 @@ function isStockFinancialLayout(template: string): boolean {
   && ['{sales}','{purchases}','{net_profit}','{network_sales}'].every(token=>template.includes(token));
 }
 export const FINANCIAL_LABELS: Record<string, any> = {
- en: {heading:'Append financial summary to custom text',sales:'Sales',purchases:'Purchases',network:'Network sales',pos:'POS sales',sources:'Sales Sources',delivery:'Delivery sales',cash:'Delivery cash',deliveryNetwork:'Delivery network',expenses:'Expenses',profit:'Net profit',preset:'Use financial layout',help:'Totals for the record’s business date; drafts are excluded. Delivery = driver cash + network, already included in sales. Net profit = sales − approved purchases − variable expenses − allocated fixed expenses. Amounts appear on the lock screen. Network, POS and Sales Sources may overlap; do not add them together. Preview uses example amounts.'},
- fa: {heading:'افزودن خلاصهٔ مالی به متن سفارشی',sales:'فروشات',purchases:'خرید',network:'فروشات شبکه',pos:'فروشات POS',sources:'فروشات منابع فروش',delivery:'فروش دلیوری',cash:'نقد دلیوری',deliveryNetwork:'شبکهٔ دلیوری',expenses:'مصارف',profit:'فایدهٔ خالص',preset:'استفاده از قالب مالی',help:'جمع تاریخ رکورد؛ پیش‌نویس حساب نمی‌شود. دلیوری = نقد + شبکهٔ راننده و قبلاً در فروشات شامل است. فایدهٔ خالص = فروشات − خریدهای تأییدشده − مصارف متغیر − سهم روزانهٔ مصارف ثابت. ارقام روی صفحهٔ قفل دیده می‌شوند. شبکه، POS و Sales Sources ممکن است هم‌پوشانی داشته باشند؛ باهم جمع نکنید. پیش‌نمایش ارقام نمونه دارد.'},
- ar: {heading:'إضافة الملخص المالي إلى النص المخصص',sales:'المبيعات',purchases:'المشتريات',network:'مبيعات الشبكة',pos:'مبيعات POS',sources:'مصادر المبيعات',delivery:'مبيعات التوصيل',cash:'نقد التوصيل',deliveryNetwork:'شبكة التوصيل',expenses:'المصروفات',profit:'صافي الربح',preset:'استخدام القالب المالي',help:'إجماليات تاريخ السجل دون المسودات. التوصيل = نقد السائق + الشبكة، وهو ضمن المبيعات. صافي الربح = المبيعات − المشتريات المعتمدة − المصروفات المتغيرة − الحصة اليومية للمصروفات الثابتة. تظهر المبالغ على شاشة القفل. قد تتداخل مبيعات الشبكة وPOS والمصادر؛ لا تجمعها معًا. المعاينة بأرقام تجريبية.'},
+ en: {heading:'Append financial summary to custom text',sales:'Sales',purchases:'Purchases',network:'Network sales',pos:'POS sales',sources:'Sales Sources',delivery:'Delivery sales',cash:'Delivery cash',deliveryNetwork:'Delivery network',expenses:'Expenses',profit:'Net profit',creditSales:'Credit sales',receivables:'Customer debt',preset:'Use financial layout',help:'Totals for the record’s business date; drafts are excluded. Delivery = driver cash + network, already included in sales. Net profit = sales − approved purchases − variable expenses − allocated fixed expenses. Amounts appear on the lock screen. Network, POS and Sales Sources may overlap; do not add them together. Preview uses example amounts.'},
+ fa: {heading:'افزودن خلاصهٔ مالی به متن سفارشی',sales:'فروشات',purchases:'خرید',network:'فروشات شبکه',pos:'فروشات POS',sources:'فروشات منابع فروش',delivery:'فروش دلیوری',cash:'نقد دلیوری',deliveryNetwork:'شبکهٔ دلیوری',expenses:'مصارف',profit:'فایدهٔ خالص',creditSales:'فروشات نسیه',receivables:'طلب مشتری',preset:'استفاده از قالب مالی',help:'جمع تاریخ رکورد؛ پیش‌نویس حساب نمی‌شود. دلیوری = نقد + شبکهٔ راننده و قبلاً در فروشات شامل است. فایدهٔ خالص = فروشات − خریدهای تأییدشده − مصارف متغیر − سهم روزانهٔ مصارف ثابت. ارقام روی صفحهٔ قفل دیده می‌شوند. شبکه، POS و Sales Sources ممکن است هم‌پوشانی داشته باشند؛ باهم جمع نکنید. پیش‌نمایش ارقام نمونه دارد.'},
+ ar: {heading:'إضافة الملخص المالي إلى النص المخصص',sales:'المبيعات',purchases:'المشتريات',network:'مبيعات الشبكة',pos:'مبيعات POS',sources:'مصادر المبيعات',delivery:'مبيعات التوصيل',cash:'نقد التوصيل',deliveryNetwork:'شبكة التوصيل',expenses:'المصروفات',profit:'صافي الربح',creditSales:'الآجل',receivables:'ديون العملاء',preset:'استخدام القالب المالي',help:'إجماليات تاريخ السجل دون المسودات. التوصيل = نقد السائق + الشبكة، وهو ضمن المبيعات. صافي الربح = المبيعات − المشتريات المعتمدة − المصروفات المتغيرة − الحصة اليومية للمصروفات الثابتة. تظهر المبالغ على شاشة القفل. قد تتداخل مبيعات الشبكة وPOS والمصادر؛ لا تجمعها معًا. المعاينة بأرقام تجريبية.'},
 };
 export function financialTemplate(language: string) {
  const t=FINANCIAL_LABELS[language] || FINANCIAL_LABELS.en;
- return `{branch} · {date}\n${t.sales}: {sales}\n${t.purchases}: {purchases}\n${t.expenses}: {expenses}\n${t.network}: {network_sales}\n${t.pos}: {pos_sales}\n${t.sources}: {source_sales}\n${t.delivery}: {delivery_sales}\n${t.profit}: {net_profit}`;
+ return `{branch} · {date}\n${t.sales}: {sales} · ${t.purchases}: {purchases}\n${t.network}: {network_sales} · ${t.creditSales}: {credit_sales}\n${t.profit}: {net_profit} · ${t.receivables}: {receivables}`;
 }
 export function needsFinancialSummary(settings: any, event: any = {}) {
  if (!isFinancialEvent(event)) return false;
@@ -103,7 +103,7 @@ export function renderNotification(settings: any, event: any, business: any, bra
   ? `${new Intl.NumberFormat(language, {minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(financial[key]))} ${pushCurrency(financial.currency || business?.currency || 'SAR')}` : '—';
  const values: Record<string,string> = {
   delivery_sales:money('delivery_sales'),delivery_cash:money('delivery_cash'),delivery_network:money('delivery_network'),
-  network_sales:money('network_sales'),pos_sales:money('pos_sales'),source_sales:money('source_sales'),
+  network_sales:money('network_sales'),pos_sales:money('pos_sales'),source_sales:money('source_sales'),credit_sales:money('credit_sales'),receivables:money('receivables'),
   sales:money('sales'),expenses:money('expenses'),purchases:money('purchases'),net_profit:money('net_profit'),
   date: financial?.date || '—',currency:pushCurrency(financial?.currency || business?.currency),
   business: business?.name || 'BizCTRL',
@@ -149,10 +149,10 @@ export function preferencesForLanguage(settings: any, language: unknown) {
  const p=settings || DEFAULT_PREFERENCES;
  const lang=appPushLanguage(language || p.language);
  const labels=FINANCIAL_LABELS[lang];
- const fields: Record<string,string>={sales:'sales',purchases:'purchases',expenses:'expenses',network_sales:'network',pos_sales:'pos',source_sales:'sources',delivery_sales:'delivery',delivery_cash:'cash',delivery_network:'deliveryNetwork',net_profit:'profit'};
+ const fields: Record<string,string>={sales:'sales',purchases:'purchases',expenses:'expenses',network_sales:'network',pos_sales:'pos',source_sales:'sources',delivery_sales:'delivery',delivery_cash:'cash',delivery_network:'deliveryNetwork',net_profit:'profit',credit_sales:'creditSales',receivables:'receivables'};
  const localize=(template: string)=>template.replace(/([^\n:]+):\s*\{(sales|purchases|expenses|network_sales|pos_sales|source_sales|delivery_sales|delivery_cash|delivery_network|net_profit)\}/g,(match,label,key)=>{
   const known=(key==='source_sales' && label.trim()==='فروشات Sales Sources') || Object.values(FINANCIAL_LABELS).some(l=>l[fields[key]]===label.trim());
   return known ? `${labels[fields[key]]}: {${key}}` : match;
  });
- return {...p,language:lang,title_template:localize(p.title_template),body_template:localize(p.body_template)};
+ return {...p,language:lang,title_template:localize(p.title_template),body_template:isStockFinancialLayout(p.body_template) ? financialTemplate(lang) : localize(p.body_template)};
 }
