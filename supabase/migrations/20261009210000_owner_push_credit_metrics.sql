@@ -48,3 +48,14 @@ begin
 end $$;
 revoke all on function public.owner_push_credit_metrics(uuid,uuid,date) from public,anon,authenticated;
 grant execute on function public.owner_push_credit_metrics(uuid,uuid,date) to service_role;
+
+-- Make the new fields editable in owner notification templates. Keep existing
+-- preferences unchanged and reject unknown template expressions.
+alter table public.owner_push_preferences drop constraint if exists owner_push_preferences_title_template_check;
+alter table public.owner_push_preferences add constraint owner_push_preferences_title_template_check
+ check (length(btrim(title_template)) between 1 and 100 and
+ regexp_replace(title_template,'[{](business|branch|action|entity|reference|time|sales|expenses|purchases|net_profit|date|currency|network_sales|pos_sales|source_sales|delivery_sales|delivery_cash|delivery_network|credit_sales|receivables)[}]','','g') !~ '[{}]');
+alter table public.owner_push_preferences drop constraint if exists owner_push_preferences_body_template_check;
+alter table public.owner_push_preferences add constraint owner_push_preferences_body_template_check
+ check (length(btrim(body_template)) between 1 and 500 and
+ regexp_replace(body_template,'[{](business|branch|action|entity|reference|time|sales|expenses|purchases|net_profit|date|currency|network_sales|pos_sales|source_sales|delivery_sales|delivery_cash|delivery_network|credit_sales|receivables)[}]','','g') !~ '[{}]');
