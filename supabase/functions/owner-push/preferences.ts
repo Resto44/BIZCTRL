@@ -138,7 +138,10 @@ export function renderNotification(settings: any, event: any, business: any, bra
   const deliveryDetails=['driver_sales_entries','driver_settlements'].includes(event.entity)
    ? recordDetails({...event,reference:'',context:{cash:event.context?.cash,network:event.context?.network,status:event.context?.status}},language,currency,false)
    : [];
-  const body=[eventLine,details,...deliveryDetails,...lines].filter(Boolean).join('\n').slice(0,500);
+  const deliveryTotal=financialValue(financial,'delivery_sales');
+  const deliverySummary=['driver_sales_entries','driver_settlements'].includes(event.entity) && deliveryTotal!==null
+   ? `${(FINANCIAL_LABELS[language] || FINANCIAL_LABELS.en).delivery}: ${new Intl.NumberFormat(language,{minimumFractionDigits:2,maximumFractionDigits:2}).format(deliveryTotal)} ${currency}` : '';
+  const body=[eventLine,details,...deliveryDetails,deliverySummary,...lines].filter(Boolean).join('\n').slice(0,500);
   return {title:fill(p.title_template,100),body};
  }
  const body=[header,context,tail].filter(Boolean).join('\n').slice(0,1000);
