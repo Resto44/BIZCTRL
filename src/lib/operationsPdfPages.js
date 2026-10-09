@@ -215,10 +215,10 @@ export function appendOperationsPdfPages(doc,{
  if(costs.length>8)write(`${t.showMore}: ${costs.length-8}`,rtl?W-M:M,194,{size:7,color:MUTED});
  section(t.balanceHint,202);
  card(M,218,(CW-4)/2,31,t.customerDebt,
-  report.debts.unknown>0?money(report.debts.receivables)+'*':money(report.debts.receivables),
+  !report.hasDebtData?'—':money(report.debts.receivables),
   {tone:'green',sub:t.asOf+' '+report.asOfDate});
  card(M+CW/2+2,218,(CW-4)/2,31,t.supplierDebt,
-  report.debts.unknown>0?money(report.debts.payables)+'*':money(report.debts.payables),
+  !report.hasDebtData?'—':money(report.debts.payables),
   {tone:'red',sub:t.asOf+' '+report.asOfDate});
  section(t.risks,255);
  const risks=[];
