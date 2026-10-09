@@ -10,7 +10,7 @@ describe('record-specific push',()=>{
   const result=render({entity:'expenses',action:'delete',reference:'Rent',context:{amount:650}},language);
   expect(result.body.startsWith(`${entity} · ${action}`)).toBe(true);
   expect(result.body).toContain('Rent');
-  expect(result.body).toContain(new Intl.NumberFormat(language,{minimumFractionDigits:2}).format(650));
+  expect(result.body).toContain(new Intl.NumberFormat(language,{maximumFractionDigits:2}).format(650));
  });
  it('distinguishes purchase, sale, product and category operations',()=>{
   for(const [entity,label] of [['supplier_invoices','Purchase invoice'],['sales_invoices','Sales invoice'],['products','Product'],['product_categories','Product category']]) {

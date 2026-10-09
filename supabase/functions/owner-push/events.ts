@@ -47,12 +47,20 @@ export function entityLabel(entity: string, language: string) {
  return entities[entity]?.[language==='fa'?2:language==='ar'?1:0] || String(entity || '').replaceAll('_',' ');
 }
 export const EVENT_LABELS: Record<string,Record<string,string>> = {
- en:{amount:'Record amount',cash:'Cash collected',network:'Network collected',status:'Status',draft:'Draft',finalized:'Finalized',locked:'Locked',approved:'Approved',posted:'Posted',cancelled:'Cancelled',pending:'Pending',paid:'Paid',deleted:'Deleted',record:'Record'},
- ar:{amount:'مبلغ السجل',cash:'النقد المحصل',network:'الشبكة المحصلة',status:'الحالة',draft:'مسودة',finalized:'معتمد',locked:'مقفل',approved:'موافق عليه',posted:'مرحّل',cancelled:'ملغى',pending:'قيد الانتظار',paid:'مدفوع',deleted:'محذوف',record:'سجل'},
- fa:{amount:'مبلغ رکورد',cash:'نقد دریافت‌شده',network:'شبکه دریافت‌شده',status:'وضعیت',draft:'پیش‌نویس',finalized:'نهایی',locked:'قفل‌شده',approved:'تأییدشده',posted:'ثبت نهایی',cancelled:'لغوشده',pending:'در انتظار',paid:'پرداخت‌شده',deleted:'حذف‌شده',record:'رکورد'},
+ en:{amount:'Record amount',cash:'Cash collected',network:'Network collected',status:'Status',draft:'Draft',finalized:'Finalized',locked:'Locked',approved:'Approved',auto_approved:'Auto-approved',posted:'Posted',cancelled:'Cancelled',pending:'Pending',paid:'Paid',deleted:'Deleted',record:'Record'},
+ ar:{amount:'مبلغ السجل',cash:'النقد المحصل',network:'الشبكة المحصلة',status:'الحالة',draft:'مسودة',finalized:'معتمد',locked:'مقفل',approved:'موافق عليه',auto_approved:'معتمد تلقائيًا',posted:'مرحّل',cancelled:'ملغى',pending:'قيد الانتظار',paid:'مدفوع',deleted:'محذوف',record:'سجل'},
+ fa:{amount:'مبلغ رکورد',cash:'نقد دریافت‌شده',network:'شبکه دریافت‌شده',status:'وضعیت',draft:'پیش‌نویس',finalized:'نهایی',locked:'قفل‌شده',approved:'تأییدشده',auto_approved:'تأیید خودکار',posted:'ثبت نهایی',cancelled:'لغوشده',pending:'در انتظار',paid:'پرداخت‌شده',deleted:'حذف‌شده',record:'رکورد'},
 };
 export function isFinancialEvent(event: any) {
- return !event?.entity || /^(daily_sales|sales_invoices|purchases|supplier_invoices|supplier_payments|expenses|driver_sales_entries|driver_settlements|delivery_orders|orders|payments|debt_records|debt_invoices|debt_payments|debt_receipts|cash_movements|daily_cash_settlements|retail_pos_transactions|retail_pos_transaction_payments)$/.test(event.entity);
+ return !event?.entity || /^(daily_sales|sales_invoices|purchases|supplier_invoices|supplier_payments|expenses|driver_sales_entries|driver_settlements|delivery_orders|orders|payments|debt_records|debt_invoices|debt_payments|debt_receipts|cash_movements|cash_register_entries|daily_cash_settlements|wallet_transactions|network_transfers|retail_pos_transactions|retail_pos_transaction_payments)$/.test(event.entity);
+}
+// Keep internal UUIDs and machine keys out of iOS lock-screen text.
+// They remain available through the notification's authenticated deep link.
+export function readablePushReference(value: unknown): string {
+ const v=String(value ?? '').trim();
+ if (!v || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+   || /^[0-9a-f]{24,}$/i.test(v) || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(v)) return '';
+ return v.length <= 55 ? v : '';
 }
 export function recordDetails(event: any, language: string, currency: string, showReference: boolean) {
  const c=event.context || {};
@@ -60,7 +68,8 @@ export function recordDetails(event: any, language: string, currency: string, sh
  const money=(value: any)=>value!==null && value!==undefined && value!=='' && Number.isFinite(Number(value))
   ? `${new Intl.NumberFormat(language,{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value))} ${currency}` : null;
  const lines:string[]=[];
- if(showReference && event.reference) lines.push(String(event.reference).slice(0,100));
+ const reference=showReference ? readablePushReference(event.reference) : '';
+ if(reference) lines.push(reference);
  const amount=money(c.amount);
  if(amount!==null) lines.push(`${t.amount}: ${amount}`);
  if(event.entity==='driver_sales_entries' || event.entity==='driver_settlements') {

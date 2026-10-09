@@ -68,7 +68,7 @@ describe('financial push layout',()=>{
   const p={...DEFAULT_PREFERENCES,title_template:'{business}',body_template:financialTemplate('en')};
   const result=renderNotification(p,{}, {name:'Market'}, {name:'North'},financial);
   expect(result.title).toBe('Market');
-  expect(result.body).toBe('North · 2026-10-05\nSales: 5,000.00 SAR\nPurchases: 2,000.00 SAR\nExpenses: 750.00 SAR\nNetwork sales: 2,000.00 SAR\nPOS sales: 3,500.00 SAR\nSales Sources: 1,500.00 SAR\nDelivery sales: —\nNet profit: 2,250.00 SAR');
+  expect(result.body).toBe('North\nSales: 5,000 · Purchases: 2,000\nNetwork: 2,000 · Credit sales: —\nProfit: 2,250 · Customer debt: — SAR');
  });
  it('appends summary to existing custom templates without duplicating financial templates',()=>{
   const result=renderNotification({...DEFAULT_PREFERENCES,body_template:'Record saved'}, {},{}, {name:'North'},financial);

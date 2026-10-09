@@ -33,9 +33,17 @@ async function financialSummary(restaurantId: string, view: any, branch: any, ev
  const day=Object.fromEntries(parts.map(p=>[p.type,p.value]));
  const recordedDate=event.context?.date;
  const date=typeof recordedDate==='string' && /^\d{4}-\d{2}-\d{2}$/.test(recordedDate) ? recordedDate : `${day.year}-${day.month}-${day.day}`;
- const {data,error}=await db.rpc('owner_push_financial_summary',{p_restaurant_id:restaurantId,p_branch_id:branch?.id || null,p_date:date});
- if(error) { console.error('Optional financial summary unavailable'); return null; }
- return data;
+ const params={p_restaurant_id:restaurantId,p_branch_id:branch.id,p_date:date};
+ const [summary,credit]=await Promise.all([
+  db.rpc('owner_push_financial_summary',params),
+  db.rpc('owner_push_credit_metrics',params),
+ ]);
+ if(summary.error) { console.error('Optional financial summary unavailable'); return null; }
+ // A missing optional metric must never break otherwise valid Web Push delivery
+ // or falsely render missing credit/debt balances as zero.
+ if(credit.error) console.error('Optional customer credit metrics unavailable');
+ return {...summary.data,credit_sales:credit.error?null:credit.data?.credit_sales ?? null,
+  receivables:credit.error?null:credit.data?.receivables ?? null};
 }
 async function send(device: any, payload: any, keys: any) {
  if (!validSubscription({ endpoint: device.endpoint, keys: { p256dh: device.p256dh, auth: device.auth_key } })) throw new Error('Invalid push provider');
