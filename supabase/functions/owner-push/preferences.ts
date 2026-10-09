@@ -107,7 +107,7 @@ export function renderNotification(settings: any, event: any, business: any, bra
   sales:money('sales'),expenses:money('expenses'),purchases:money('purchases'),net_profit:money('net_profit'),
   date: financial?.date || '—',currency:pushCurrency(financial?.currency || business?.currency),
   business: business?.name || 'BizCTRL',
-  branch: branch?.name || event.context?.branch_name || event.branch || globalBranch || '',
+  branch: branch?.name || event.context?.branch_name || readablePushReference(event.branch) || globalBranch || '',
   action: ACTIONS[language][event.action] || event.action || '',
   entity: entityLabel(event.entity,language),
   reference: p.show_reference ? readablePushReference(event.reference) : '',
@@ -135,7 +135,10 @@ export function renderNotification(settings: any, event: any, business: any, bra
   const status=recordDetails({...event,reference:'',context:{status:event.context?.status}},language,currency,false)[0] || '';
   const details=[values.branch, reference, amountText || status].filter(Boolean).join(' · ');
   const lines=compactFinancialLines(language,financial,currency);
-  const body=[eventLine,details,...lines].filter(Boolean).join('\n').slice(0,500);
+  const deliveryDetails=['driver_sales_entries','driver_settlements'].includes(event.entity)
+   ? recordDetails({...event,reference:'',context:{cash:event.context?.cash,network:event.context?.network,status:event.context?.status}},language,currency,false)
+   : [];
+  const body=[eventLine,details,...deliveryDetails,...lines].filter(Boolean).join('\n').slice(0,500);
   return {title:fill(p.title_template,100),body};
  }
  const body=[header,context,tail].filter(Boolean).join('\n').slice(0,1000);
