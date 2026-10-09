@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, PieChart, Pie, Cell, Legend, AreaChart, Area,
+  LineChart, Line, Legend, AreaChart, Area,
 } from 'recharts';
 import {
   TrendingUp, Minus, DollarSign, BarChart3,
@@ -32,7 +32,6 @@ import {
 import {
   computeExecutiveSummary,
   computeSalesPerformance,
-  computePaymentAnalytics,
   computeNetworkAnalytics,
   computeBranchPerformance,
   computeCostControl,
@@ -40,6 +39,7 @@ import {
   generateRecommendations,
 } from '@/services/salesAnalyticsEngine';
 import { generateSalesAnalyticsPDF } from '@/lib/salesAnalyticsPdf';
+import PaymentAnalyticsERP from '@/components/reports/PaymentAnalyticsERP';
 import { SALES_REPORT_PERIODS, salesReportDateRange, buildSalesReportSnapshot, salesReportGrowth } from '@/lib/salesReportPeriod';
 import { formatPct, computeProductQuantityAnalytics } from '@/lib/helpers';
 import { format, startOfMonth } from 'date-fns';
@@ -242,11 +242,6 @@ export default function Reports() {
 
   const performance = useMemo(
     () => computeSalesPerformance(sales, revenueSources),
-    [sales, revenueSources]
-  );
-
-  const payment = useMemo(
-    () => computePaymentAnalytics(sales, revenueSources),
     [sales, revenueSources]
   );
 
@@ -511,121 +506,16 @@ export default function Reports() {
         )}
       </Section>
 
-      {/* ── 3. PAYMENT ANALYTICS ─────────────────────────────────────────── */}
+      {/* ── 3. ERP PAYMENT ANALYTICS ───────────────────────────────────── */}
       <Section title={t('payment_analytics')} icon={CreditCard}>
-        {/* Payment Mix Donut */}
-        {payment.paymentMix.length > 0 && (
-          <div className="mb-3 flex flex-col sm:flex-row gap-3 items-center">
-            <div className="w-full sm:w-48 flex-shrink-0">
-              <p className="text-xs font-semibold text-muted-foreground mb-1 text-center">{t('payment_mix')}</p>
-              <ResponsiveContainer width="100%" height={160}>
-                <PieChart>
-                  <Pie
-                    data={payment.paymentMix}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%" cy="50%"
-                    outerRadius={60}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    labelLine={false}
-                  >
-                    {payment.paymentMix.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={v => fmtC(v, currency)} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex-1 w-full overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-1 font-semibold text-muted-foreground">{t('name')}</th>
-                    <th className="text-right py-1 font-semibold text-muted-foreground">{t('today')}</th>
-                    <th className="text-right py-1 font-semibold text-muted-foreground">{t('yesterday')}</th>
-                    <th className="text-right py-1 font-semibold text-muted-foreground">{t('this_month')}</th>
-                    <th className="text-right py-1 font-semibold text-muted-foreground">{t('year_sales')}</th>
-                    <th className="text-right py-1 font-semibold text-muted-foreground">{t('pct_of_month')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payment.sources.map((src, i) => (
-                    <tr key={src.key} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="py-1.5 font-medium">
-                        <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: COLORS[i % COLORS.length] }} />
-                        {src.name}
-                      </td>
-                      <td className="text-right py-1.5">{fmtC(src.today, currency)}</td>
-                      <td className="text-right py-1.5">{fmtC(src.yesterday, currency)}</td>
-                      <td className="text-right py-1.5 font-semibold">{fmtC(src.month, currency)}</td>
-                      <td className="text-right py-1.5">{fmtC(src.year, currency)}</td>
-                      <td className="text-right py-1.5">
-                        <Badge variant="outline" className="text-xs">{fmtP(src.pctOfMonth)}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Source Comparison Bar */}
-        {payment.sources.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground mb-1">{t('source_comparison')}</p>
-            <ResponsiveContainer width="100%" height={120}>
-              <BarChart data={payment.sources} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis type="number" tick={{ fontSize: 9 }} tickFormatter={v => `${currency}${(v / 1000).toFixed(0)}k`} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} width={60} />
-                <Tooltip formatter={v => fmtC(v, currency)} />
-                <Bar dataKey="month" fill="#2563eb" radius={[0, 3, 3, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </Section>
-
-      {/* ── 4. ADDITIONAL SALES SOURCES ──────────────────────────────────── */}
-      <Section title={t('additional_sources')} icon={ShoppingCart}>
-        {(() => {
-          const additionalSrcs = (payment?.sources || []).filter(s => !['cash', 'network', 'credit'].includes(s.key));
-          if (isLoading) {
-            return (
-              <div className="flex items-center justify-center py-6">
-                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-              </div>
-            );
-          }
-          if (additionalSrcs.length === 0) {
-            return (
-              <div className="py-6 text-center">
-                <ShoppingCart className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">{t('no_additional_sources') || 'No additional sales sources recorded for this period.'}</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">Configure sources in Settings → Sales Sources</p>
-              </div>
-            );
-          }
-          return (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-              {additionalSrcs.map((src, i) => {
-                const growth = src.yesterday > 0
-                  ? ((src.today - src.yesterday) / src.yesterday) * 100
-                  : src.today > 0 ? 100 : 0;
-                return (
-                  <KPICard
-                    key={src.key || src.name || i}
-                    label={src.name || '—'}
-                    value={fmtC(src.today || 0, currency)}
-                    sub={`${t('yesterday')}: ${fmtC(src.yesterday || 0, currency)} · ${t('this_month')}: ${fmtC(src.month || 0, currency)}`}
-                    trend={growth}
-                    color={['blue', 'green', 'amber', 'purple', 'cyan'][i % 5]}
-                  />
-                );
-              })}
-            </div>
-          );
-        })()}
+        <PaymentAnalyticsERP
+          sales={sales}
+          revenueSources={revenueSources}
+          snapshot={periodSnapshot}
+          range={reportRange}
+          currency={currency}
+          lang={lang}
+        />
       </Section>
 
       {/* ── 5. NETWORK ANALYTICS ─────────────────────────────────────────── */}
