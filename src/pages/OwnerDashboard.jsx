@@ -19,6 +19,7 @@ import { buildActiveAlertCandidates, reconcileActiveAlerts } from '@/lib/activeA
 import { useAuth } from '@/lib/AuthContext';
 import { useBranchScope } from '@/lib/BranchScopeContext';
 import { calculateERPAccounting, calculateSalesRevenue, tagExpensesWithCategories } from '@/lib/helpers';
+import { summarizeDrawerCash } from '@/lib/executiveDrawerCash';
 import { useLanguage } from '@/lib/LanguageContext';
 import {
   aggregateDailyRevenue,
@@ -55,6 +56,7 @@ const EN = {
   title: 'ERP Owner Report Center', subtitle: 'Complete financial, operational, consumption and pricing intelligence',
   executive: 'Executive', finance: 'Finance', operations: 'Operations & Consumption', priceControl: 'Price Control', allBranches: 'All branches', live: 'Live', syncing: 'Syncing', today: 'Today', thisWeek: 'This week', thisMonth: 'This month', sixMonths: 'Last 6 months', thisYear: 'This year', choosePeriod: 'Report period',
   sales: 'Sales', netProfit: 'Net profit', netMargin: 'Net margin', profit: 'Profit', health: 'Health', executiveSnapshot: 'Executive snapshot', selectedPeriod: 'Selected period', verifiedERP: 'VERIFIED ERP', vsPreviousPeriod: 'vs previous period',
+  drawerCash: 'Cash in drawer', drawerCashHint: 'Recorded physical cash remaining', drawerCashMissing: 'Not recorded', paymentOverview: 'Cash position & payments', paymentOverviewHint: 'Drawer balance is separate from sales; no handovers added', partialDrawerCash: 'Incomplete cash counts across branches',
   periodSales: 'Period sales', receivables: 'Receivables', payables: 'Payables', activeRisks: 'Active risks', branchCommand: 'Branch command board', branchCommandHint: 'Ranked by verified sales in the selected period', noBranchData: 'No branch sales have been recorded in this period.',
   ownerAttention: 'Owner attention', ownerAttentionHint: 'Highest-priority ERP exceptions', noRisks: 'No active risks. Operations are clear.', inventoryPulse: 'Inventory pulse', inventoryPulseHint: 'Current stock health across the selected scope', stockValue: 'Stock value', activeProducts: 'Active products', lowStock: 'Low stock', outOfStock: 'Out of stock',
   addBranch: 'Add branch', compare: 'Compare', scheduled: 'Scheduled', alerts: 'Alerts', reportDirectory: 'Complete report directory', reportDirectoryHint: 'Open every ERP report without leaving the dashboard', branchAnalytics: 'Branch analytics', salesAnalytics: 'Sales analytics', biCenter: 'BI center', activityLog: 'Activity log',
@@ -73,6 +75,7 @@ const COPY = {
   en: EN,
   fa: { ...EN,
     title: 'مرکز گزارش‌دهی مالک ERP', subtitle: 'گزارش کامل مالی، عملیاتی، مصرف و کنترول نرخ', executive: 'اجرایی', finance: 'مالی', operations: 'عملیات و مصرف', priceControl: 'کنترول نرخ', allBranches: 'تمام شعبه‌ها', live: 'زنده', syncing: 'در حال همگام‌سازی', today: 'امروز', thisWeek: 'این هفته', thisMonth: 'این ماه', sixMonths: '۶ ماه اخیر', thisYear: 'امسال', choosePeriod: 'بازه گزارش',
+    drawerCash: 'پول باقی‌مانده در صندوق', drawerCashHint: 'موجودی نقدی شمارش‌شده در صندوق', drawerCashMissing: 'ثبت نشده', paymentOverview: 'وضعیت صندوق و پرداخت‌ها', paymentOverviewHint: 'مانده صندوق جدا از فروش است؛ پول تحویل‌شده اضافه نمی‌شود', partialDrawerCash: 'شمارش پول بعضی شعبه‌ها کامل نیست',
     sales: 'فروش', netProfit: 'سود خالص', netMargin: 'حاشیه سود خالص', profit: 'سود', health: 'سلامت', executiveSnapshot: 'خلاصه اجرایی', selectedPeriod: 'بازه انتخاب‌شده', verifiedERP: 'دادهٔ تأییدشده ERP', vsPreviousPeriod: 'نسبت به بازه قبل', periodSales: 'فروش بازه', receivables: 'مطالبات', payables: 'بدهی تأمین‌کننده', activeRisks: 'ریسک‌های فعال',
     branchCommand: 'مرکز فرمان شعبه‌ها', branchCommandHint: 'رتبه‌بندی بر اساس فروش تأییدشده بازه انتخاب‌شده', noBranchData: 'در این بازه هنوز فروش شعبه ثبت نشده است.', ownerAttention: 'نیازمند توجه مالک', ownerAttentionHint: 'مهم‌ترین استثناهای ERP', noRisks: 'ریسک فعالی وجود ندارد؛ عملیات عادی است.', inventoryPulse: 'نبض موجودی', inventoryPulseHint: 'وضعیت موجودی در محدوده انتخاب‌شده', stockValue: 'ارزش موجودی', activeProducts: 'محصولات فعال', lowStock: 'موجودی کم', outOfStock: 'ناموجود',
     addBranch: 'افزودن شعبه', compare: 'مقایسه', scheduled: 'زمان‌بندی', alerts: 'هشدارها', reportDirectory: 'فهرست کامل گزارش‌ها', reportDirectoryHint: 'تمام گزارش‌های ERP را مستقیماً از داشبورد باز کنید', branchAnalytics: 'تحلیل شعبه‌ها', salesAnalytics: 'تحلیل فروش', biCenter: 'مرکز BI', activityLog: 'گزارش فعالیت',
@@ -82,7 +85,7 @@ const COPY = {
     procurementPulse: 'نبض خرید', procurementPulseHint: 'رسیدهای تأییدشده تأمین‌کننده در بازه انتخاب‌شده', purchasedQty: 'مقدار خرید', purchaseCost: 'هزینه خرید', suppliers: 'تأمین‌کننده‌ها', stockHealth: 'سلامت موجودی', stockHealthHint: 'ریسک موجودی در محدوده انتخاب‌شده', products: 'محصولات', inventoryCommand: 'مرکز موجودی', inventoryLedger: 'دفتر موجودی', wasteReport: 'گزارش ضایعات', stockTransfers: 'انتقال موجودی', productMaster: 'محصولات', procurement: 'خرید و تدارکات', peoplePayroll: 'کارمندان و معاش',
     targetMargin: 'حاشیه هدف', averageMargin: 'میانگین حاشیه', costIncreases: 'افزایش نرخ خرید', needsAction: 'نیازمند اقدام', critical: 'بحرانی', watch: 'بررسی', 'no-data': 'بدون داده', marginIntelligence: 'هوشمندی حاشیه سود', marginIntelligenceHint: 'هزینه، نرخ فروش و پیشنهاد بر اساس هدف', cost: 'هزینه', sellingPrice: 'نرخ فروش', margin: 'حاشیه', suggestedPrice: 'نرخ پیشنهادی', costChange: 'تغییر هزینه', supplierComparison: 'مقایسه نرخ تأمین‌کننده', supplierComparisonHint: 'آخرین نرخ ثبت‌شده هر تأمین‌کننده و محصول', save: 'صرفه‌جویی', branchRateConsistency: 'یکسانی نرخ شعبه‌ها', branchRateConsistencyHint: 'محصولات دارای هزینه متفاوت میان شعبه‌ها', rateAudit: 'تاریخچه تغییر نرخ', rateAuditHint: 'تغییرات اخیر هزینه تأمین‌کننده در ERP', priceOptimization: 'بهینه‌سازی نرخ', purchaseOrders: 'درخواست‌های خرید', syncRequired: 'نیاز به همگام‌سازی', unable: 'بخشی از داده‌های ERP تازه‌سازی نشد؛ ارقام موجود فقط از رکوردهای تأییدشده‌اند.',
   },
-  ar: { ...EN, title: 'مركز تقارير مالك ERP', subtitle: 'التقارير المالية والتشغيلية والاستهلاك والتحكم بالأسعار', executive: 'تنفيذي', finance: 'مالي', operations: 'العمليات والاستهلاك', priceControl: 'التحكم بالأسعار', allBranches: 'جميع الفروع', live: 'مباشر', syncing: 'جارٍ التزامن', today: 'اليوم', thisWeek: 'هذا الأسبوع', thisMonth: 'هذا الشهر', sixMonths: 'آخر 6 أشهر', thisYear: 'هذه السنة', choosePeriod: 'فترة التقرير', selectedPeriod: 'الفترة المحددة', vsPreviousPeriod: 'مقارنة بالفترة السابقة', periodSales: 'مبيعات الفترة', previousPeriodSales: 'مبيعات الفترة السابقة', previousPeriodProfit: 'ربح الفترة السابقة', periodConsumption: 'استهلاك المواد', syncRequired: 'يلزم التزامن' },
+  ar: { ...EN, drawerCash: 'النقد المتبقي في الصندوق', drawerCashHint: 'النقد الفعلي المسجل في الصندوق', drawerCashMissing: 'غير مسجل', paymentOverview: 'النقد المتبقي والمدفوعات', paymentOverviewHint: 'رصيد الصندوق مستقل عن المبيعات ولا يشمل النقد المُسلّم', partialDrawerCash: 'جرد النقد غير مكتمل في بعض الفروع', title: 'مركز تقارير مالك ERP', subtitle: 'التقارير المالية والتشغيلية والاستهلاك والتحكم بالأسعار', executive: 'تنفيذي', finance: 'مالي', operations: 'العمليات والاستهلاك', priceControl: 'التحكم بالأسعار', allBranches: 'جميع الفروع', live: 'مباشر', syncing: 'جارٍ التزامن', today: 'اليوم', thisWeek: 'هذا الأسبوع', thisMonth: 'هذا الشهر', sixMonths: 'آخر 6 أشهر', thisYear: 'هذه السنة', choosePeriod: 'فترة التقرير', selectedPeriod: 'الفترة المحددة', vsPreviousPeriod: 'مقارنة بالفترة السابقة', periodSales: 'مبيعات الفترة', previousPeriodSales: 'مبيعات الفترة السابقة', previousPeriodProfit: 'ربح الفترة السابقة', periodConsumption: 'استهلاك المواد', syncRequired: 'يلزم التزامن' },
 };
 
 const approvedPurchase = (record) => ['approved', 'auto_approved'].includes(record?.approval_status) || ['approved', 'paid', 'partial'].includes(record?.status);
@@ -96,17 +99,6 @@ function recordMatchesBranch(record, branch) {
   const branchId = branch.id ? String(branch.id) : null;
   const branchKey = branch.key || branch.branch_key;
   return Boolean((recordBranchId && branchId && recordBranchId === branchId) || (branchKey && String(record.branch || '') === String(branchKey)) || (branchKey && String(record.branch_key || '') === String(branchKey)));
-}
-
-function latestCashPosition(sales) {
-  const latestByBranch = new Map();
-  (sales || []).forEach((sale) => {
-    const key = String(sale.branch_id || sale.branch || sale.branch_key || '__unassigned__');
-    const timestamp = new Date(sale.updated_at || sale.created_at || `${sale.date || '1970-01-01'}T00:00:00`).getTime();
-    const current = latestByBranch.get(key);
-    if (!current || timestamp >= current.timestamp) latestByBranch.set(key, { sale, timestamp });
-  });
-  return Array.from(latestByBranch.values()).reduce((sum, item) => sum + numeric(item.sale.closing_cash ?? item.sale.restaurant_cash ?? item.sale.cash), 0);
 }
 
 function healthScore({ metrics, alertCount, lowStockCount }) {
@@ -343,7 +335,8 @@ function OwnerDashboardContent() {
   const revenueTrend = useMemo(() => aggregateDailyRevenue(periodSales, (sale) => calculateSalesRevenue(sale, revenueSources).total), [periodSales, revenueSources]);
   const receivables = customerDebts.reduce((sum, debt) => sum + numeric(debt.remaining_amount ?? debt.balance ?? debt.total_amount), 0);
   const payables = supplierInvoices.filter(approvedPurchase).reduce((sum, invoice) => sum + Math.max(0, numeric(invoice.remaining_amount ?? invoice.balance ?? (numeric(invoice.total_amount) - numeric(invoice.paid_amount ?? invoice.amount_paid)))), 0);
-  const cashRegister = latestCashPosition(periodSales);
+  const drawerCash = useMemo(() => summarizeDrawerCash(periodSales), [periodSales]);
+  const cashRegister = drawerCash.amount;
   const periodSalesChange = percentageChange(periodMetrics.totalSales, previousPeriodMetrics.totalSales);
   const periodPurchaseQuantity = periodPurchases.reduce((sum, invoice) => sum + (Array.isArray(invoice.items) ? invoice.items.reduce((itemSum, item) => itemSum + numeric(item?.quantity), 0) : numeric(invoice.qty ?? invoice.quantity)), 0);
   const supplierCount = new Set(periodPurchases.map((invoice) => invoice.supplier_id || invoice.supplier_name).filter(Boolean)).size;
@@ -371,12 +364,12 @@ function OwnerDashboardContent() {
 
   const model = useMemo(() => ({
     formatMoney, periodMetrics, previousPeriodMetrics, periodSalesChange, periodLabel,
-    branchRankings, scopedAlerts, inventoryOverview, receivables, payables, cashRegister,
+    branchRankings, scopedAlerts, inventoryOverview, receivables, payables, cashRegister, drawerCash,
     consumption, priceReport, supplierComparisons, branchPriceInconsistencies, priceHistory,
     expenseGroups, revenueTrend, periodPurchaseQuantity, periodPurchaseCost: periodMetrics.totalPurchaseCost,
     supplierCount, selectBranch: setSelectedBranchId, canAddBranch: role === 'owner',
     openQuickAddBranch: () => setQuickAddBranchOpen(true), loadingActiveAlerts, hasQueryError,
-  }), [branchPriceInconsistencies, branchRankings, cashRegister, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, loadingActiveAlerts, payables, periodLabel, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount]);
+  }), [branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, loadingActiveAlerts, payables, periodLabel, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount]);
 
   if (loading) return <DashboardSkeleton />;
 
