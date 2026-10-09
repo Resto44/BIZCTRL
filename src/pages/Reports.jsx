@@ -24,7 +24,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell, Legend, AreaChart, Area,
 } from 'recharts';
 import {
-  TrendingUp, TrendingDown, Minus, DollarSign, BarChart3,
+  TrendingUp, Minus, DollarSign, BarChart3,
   ShoppingCart, CreditCard, Wifi, Building2, AlertTriangle,
   FileText, Loader2, CheckCircle2, ArrowUpRight, ArrowDownRight,
   ChevronDown, ChevronUp, Activity, Target, Package,
