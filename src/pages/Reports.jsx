@@ -24,7 +24,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell, Legend, AreaChart, Area,
 } from 'recharts';
 import {
-  TrendingUp, TrendingDown, Minus, DollarSign, BarChart3,
+  TrendingUp, Minus, DollarSign, BarChart3,
   ShoppingCart, CreditCard, Wifi, Building2, AlertTriangle,
   FileText, Loader2, CheckCircle2, ArrowUpRight, ArrowDownRight,
   ChevronDown, ChevronUp, Activity, Target, Package,
@@ -39,15 +39,16 @@ import {
   computeProfitAnalysis,
   generateRecommendations,
 } from '@/services/salesAnalyticsEngine';
-import { generateUltimatePDF } from '@/lib/pdfGenerator';
-import { formatCurrency, formatPct, formatDate, getDateRange, computeProductQuantityAnalytics } from '@/lib/helpers';
+import { generateSalesAnalyticsPDF } from '@/lib/salesAnalyticsPdf';
+import { SALES_REPORT_PERIODS, salesReportDateRange, buildSalesReportSnapshot, salesReportGrowth } from '@/lib/salesReportPeriod';
+import { formatPct, computeProductQuantityAnalytics } from '@/lib/helpers';
 import { format, startOfMonth } from 'date-fns';
 
 // ─── Color palette ────────────────────────────────────────────────────────────
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function fmtC(val, currency) { return formatCurrency(val, currency); }
+function fmtC(val, currency) { return `${currency} ${Number(val || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`; }
 function fmtP(val) { return formatPct(val); }
 function growthColor(v) {
   if (v === null || v === undefined) return 'text-muted-foreground';
@@ -126,9 +127,18 @@ export default function Reports() {
     selectedBranchKey,
     selectedBranchLabel,
     isAllBranches,
-    branchFilter,
     setSelectedBranchId,
   } = useBranchScope();
+  const [reportPeriod, setReportPeriod] = useState('today');
+  const reportRange = useMemo(() => salesReportDateRange(reportPeriod), [reportPeriod]);
+  const earliestReportDate = useMemo(() => `${new Date().getFullYear() - 1}-01-01`, []);
+  const todayReportDate = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  const ui = ({
+    en: {branch:'Branch', all:'All branches', selected:'Showing data for', period:'Report period', today:'Today', yesterday:'Yesterday', week:'This week', month:'This month', year:'This year', from:'From', to:'To', confirmed:'Finalized sales only', netMargin:'Net margin', grossMargin:'Gross margin', cost:'Approved purchases', variable:'Variable expenses', fixed:'Allocated fixed costs', transactions:'Finalized closings', average:'Average daily sales', sales:'Sales', cash:'Cash sales', network:'Network sales', credit:'Credit sales', other:'Other revenue', growth:'Compared with prior period', noGrowth:'No comparable previous sales', warning:'This report excludes drafts and cash handovers. Network and credit are part of sales, not additional revenue.', reference:'More sections below show calendar-based historical analytics.', error:'Report data could not be loaded. Export is disabled until data is available.', periodTitle:'Selected period summary'},
+    ar: {branch:'الفرع',all:'جميع الفروع',selected:'عرض بيانات',period:'فترة التقرير',today:'اليوم',yesterday:'أمس',week:'هذا الأسبوع',month:'هذا الشهر',year:'هذه السنة',from:'من',to:'إلى',confirmed:'مبيعات معتمدة فقط',netMargin:'هامش الربح الصافي',grossMargin:'هامش الربح الإجمالي',cost:'المشتريات المعتمدة',variable:'المصروفات المتغيرة',fixed:'المصاريف الثابتة الموزعة',transactions:'الإقفالات المعتمدة',average:'متوسط المبيعات اليومية',sales:'المبيعات',cash:'المبيعات النقدية',network:'مبيعات الشبكة',credit:'المبيعات الآجلة',other:'مصادر أخرى',growth:'مقارنة بالفترة السابقة',noGrowth:'لا توجد مبيعات سابقة للمقارنة',warning:'يستبعد التقرير المسودات والتسويات النقدية. الشبكة والآجل ضمن المبيعات وليسا دخلاً إضافياً.',reference:'الأقسام أدناه تعرض تحليلات تاريخية حسب التقويم.',error:'تعذر تحميل بيانات التقرير. تم تعطيل التصدير مؤقتًا.',periodTitle:'ملخص الفترة المحددة'},
+    fa: {branch:'شعبه',all:'تمام شعبه‌ها',selected:'نمایش اطلاعات',period:'دوره گزارش',today:'امروز',yesterday:'دیروز',week:'این هفته',month:'این ماه',year:'امسال',from:'از',to:'تا',confirmed:'فقط فروشات نهایی',netMargin:'حاشیه فایده خالص',grossMargin:'حاشیه فایده ناخالص',cost:'خریدهای تأییدشده',variable:'مصارف متغیر',fixed:'سهم مصارف ثابت',transactions:'بستن‌های نهایی فروش',average:'میانگین روزانه فروش',sales:'فروشات',cash:'فروشات نقد',network:'فروشات شبکه',credit:'فروشات نسیه',other:'منابع دیگر',growth:'مقایسه با دوره پیشین',noGrowth:'فروشات قابل مقایسه موجود نیست',warning:'پیش‌نویس و تحویل وجه نقد در فروش شامل نیست. شبکه و نسیه بخشی از فروش‌اند.',reference:'بخش‌های پایین تحلیل تاریخی ماه و سال تقویمی را نشان می‌دهند.',error:'اطلاعات گزارش کامل بارگذاری نشد. خروجی PDF موقتاً غیرفعال است.',periodTitle:'خلاصه دوره انتخاب‌شده'},
+  })[lang] || null;
+  const copy = ui || {branch:'Branch', all:'All branches', selected:'Showing data for', period:'Report period', today:'Today', yesterday:'Yesterday', week:'This week', month:'This month', year:'This year', from:'From', to:'To', confirmed:'Finalized sales only', netMargin:'Net margin', grossMargin:'Gross margin', cost:'Approved purchases', variable:'Variable expenses', fixed:'Allocated fixed costs', transactions:'Finalized closings', average:'Average daily sales', sales:'Sales', cash:'Cash sales', network:'Network sales', credit:'Credit sales', other:'Other revenue', growth:'Compared with prior period', noGrowth:'No comparable previous sales', warning:'Confirmed closings only.', reference:'Historical calendar views below.', error:'Report data unavailable', periodTitle:'Selected period summary'};
   const { revenueSources, isLoading: loadingSources } = useSalesSources({
     branchId: isAllBranches ? undefined : selectedBranchId,
   });
@@ -137,68 +147,56 @@ export default function Reports() {
   // A branch UUID is always combined with the active restaurant ID; there is no
   // branch-name fallback and no independent report-page selection state.
   const hasScope = Boolean(activeRestaurant?.id);
-  const salesFilter = branchFilter || {};
-  const expenseFilter = branchFilter || {};
-  const walletFilter = branchFilter || {};
-
+  // Every page is tenant + authorized branch scoped. The old 2,000-row limit
+  // silently truncated year reports; page by 500 and fail closed on errors.
   const fetchReportRows = async (table, legacyColumn = 'branch', orderColumn = 'date') => {
     if (!activeRestaurant?.id) return [];
-    const createQuery = () => {
-      let query = supabase.from(table).select('*').eq('restaurant_id', activeRestaurant.id);
-      if (orderColumn) query = query.order(orderColumn, { ascending: false });
-      return query.limit(2000);
+    const load = async applyScope => {
+      const all = [];
+      for (let offset = 0; offset < 50000; offset += 500) {
+        const end = orderColumn === 'transaction_date' ? `${todayReportDate}T23:59:59.999` : todayReportDate;
+        let q = supabase.from(table).select('*').eq('restaurant_id', activeRestaurant.id)
+          .gte(orderColumn, earliestReportDate).lte(orderColumn, end)
+          .order(orderColumn, { ascending: false }).order('id', { ascending: false });
+        q = applyScope(q).range(offset, offset + 499);
+        const { data, error } = await q;
+        if (error) throw error;
+        all.push(...(data || []));
+        if ((data || []).length < 500) return all;
+      }
+      throw new Error('Report row limit reached. Narrow the selected branch or date range.');
     };
-    if (isAllBranches) {
-      const { data, error } = await createQuery();
-      if (error) throw error;
-      return data || [];
-    }
-    if (!selectedBranchId || !selectedBranchKey) return [];
+    if (isAllBranches) return load(q=>q);
+    if (!selectedBranchId) return [];
     const [canonical, legacy] = await Promise.all([
-      createQuery().eq('branch_id', selectedBranchId),
-      createQuery().is('branch_id', null).eq(legacyColumn, selectedBranchKey),
+      load(q=>q.eq('branch_id',selectedBranchId)),
+      selectedBranchKey ? load(q=>q.is('branch_id',null).eq(legacyColumn,selectedBranchKey)) : Promise.resolve([]),
     ]);
-    if (canonical.error || legacy.error) throw canonical.error || legacy.error;
-    return Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
-      .map((record) => [record.id, record])).values());
+    return Array.from(new Map([...canonical,...legacy].map(row=>[row.id,row])).values());
   };
 
   // ── Data fetching ──────────────────────────────────────────────────────────
-  const { data: sales = [], isLoading: loadingSales } = useQuery({
+  const { data: sales = [], isLoading: loadingSales, isError: salesError } = useQuery({
     queryKey: ['sales', 'reports', activeRestaurant?.id, selectedBranchId],
-    queryFn: () => fetchReportRows('daily_sales'),
+    queryFn: async () => (await fetchReportRows('daily_sales')).filter(row => ['finalized','locked'].includes(row.closing_state)),
     staleTime: 120000,
     enabled: hasScope,
   });
 
-  const { data: purchases = [], isLoading: loadingPurchases } = useQuery({
+  const { data: purchases = [], isLoading: loadingPurchases, isError: purchasesError } = useQuery({
     queryKey: ['purchases_erp', activeRestaurant?.id, selectedBranchId],
     queryFn: async () => {
       if (!activeRestaurant?.id) return [];
-      const buildQuery = () => supabase
-        .from('supplier_invoices')
-        .select('*')
-        .eq('restaurant_id', activeRestaurant.id)
-        .in('status', ['approved', 'partial', 'paid'])
-        .order('date', { ascending: false })
-        .limit(2000);
-      if (isAllBranches) {
-        const { data, error } = await buildQuery();
-        return error ? [] : (data || []);
-      }
-      const [canonicalResult, legacyResult] = await Promise.all([
-        buildQuery().eq('branch_id', selectedBranchId),
-        selectedBranchKey ? buildQuery().is('branch_id', null).eq('branch', selectedBranchKey) : Promise.resolve({ data: [] }),
-      ]);
-      if (canonicalResult.error || legacyResult.error) return [];
-      return Array.from(new Map([...(canonicalResult.data || []), ...(legacyResult.data || [])]
-        .map((record) => [record.id, record])).values());
+      return (await fetchReportRows('supplier_invoices')).filter(invoice =>
+        ['approved','auto_approved'].includes(invoice.approval_status)
+          || (!invoice.approval_status && ['approved','paid','partial'].includes(invoice.status))
+      );
     },
     staleTime: 120000,
     enabled: hasScope,
   });
 
-  const { data: expenses = [], isLoading: loadingExpenses } = useQuery({
+  const { data: expenses = [], isLoading: loadingExpenses, isError: expensesError } = useQuery({
     queryKey: ['expenses', 'reports', activeRestaurant?.id, selectedBranchId],
     queryFn: () => fetchReportRows('expenses', 'branch_key'),
     staleTime: 120000,
@@ -212,13 +210,8 @@ export default function Reports() {
     enabled: hasScope,
   });
 
-  const { data: brandSettingsList = [] } = useQuery({
-    queryKey: ['brand_settings'],
-    queryFn: () => base44.entities.BrandSettings.list(),
-  });
-
   // Expense categories — needed for fixed vs variable proration
-  const { data: expenseCategories = [] } = useQuery({
+  const { data: expenseCategories = [], isLoading: loadingCategories, isError: categoriesError } = useQuery({
     queryKey: ['expense_categories_reports'],
     queryFn: () => base44.entities.ExpenseCategory
       ? base44.entities.ExpenseCategory.list('sort_order', 500)
@@ -227,8 +220,20 @@ export default function Reports() {
     enabled: hasScope,
   });
 
-  const isLoading = loadingSales || loadingPurchases || loadingExpenses || loadingSources;
+  const isLoading = loadingSales || loadingPurchases || loadingExpenses || loadingSources || loadingCategories;
+  const hasReportError = salesError || purchasesError || expensesError || categoriesError;
 
+  const periodSnapshot = useMemo(() => buildSalesReportSnapshot({
+    sales,purchases,expenses,expenseCategories,revenueSources,
+    from:reportRange.from,to:reportRange.to,
+    groupBy:reportRange.type==='year'?'month':'day',
+  }),[sales,purchases,expenses,expenseCategories,revenueSources,reportRange]);
+  const previousSnapshot = useMemo(() => buildSalesReportSnapshot({
+    sales,purchases,expenses,expenseCategories,revenueSources,
+    from:reportRange.previousFrom,to:reportRange.previousTo,
+    groupBy:reportRange.type==='year'?'month':'day',
+  }),[sales,purchases,expenses,expenseCategories,revenueSources,reportRange]);
+  const periodGrowth = salesReportGrowth(periodSnapshot,previousSnapshot);
   // ── Analytics computations (all from engine) ───────────────────────────────
   const executive = useMemo(
     () => computeExecutiveSummary(sales, purchases, expenses, revenueSources, walletTransactions, expenseCategories),
@@ -251,9 +256,10 @@ export default function Reports() {
   );
 
   const scopedBranches = useMemo(
-    () => isAllBranches
-      ? branches
-      : (branches || []).filter((branch) => String(branch.id) === String(selectedBranchId)),
+    () => (isAllBranches
+      ? (branches || [])
+      : (branches || []).filter((branch) => String(branch.id) === String(selectedBranchId)))
+      .map(b => ({...b, key:b.branch_key || b.key || String(b.id),label:b.name || b.label || b.branch_key || String(b.id)})), 
     [branches, isAllBranches, selectedBranchId],
   );
 
@@ -289,34 +295,21 @@ export default function Reports() {
   const [pdfError, setPdfError] = useState(null);
 
   const handleGeneratePDF = useCallback(async () => {
-    setPdfStatus('generating');
-    setPdfError(null);
+    if (hasReportError || isLoading) return;
+    setPdfStatus('generating');setPdfError(null);
     try {
-      const dr = getDateRange('month');
-      const inventory = await fetchReportRows('inventory');
-      await generateUltimatePDF({
-        sales, purchases, expenses,
-        rangeType: 'month',
-        fromStr: formatDate(dr.from),
-        toStr: formatDate(dr.to),
-        t, lang, currency,
-        branches: scopedBranches || [],
-        dir,
-        brandSettings: brandSettingsList[0] || null,
-        inventory,
-        supplierInvoices: purchases,
-        walletTransactions,
-        revenueSources,
-        expenseCategories,
+      await generateSalesAnalyticsPDF({
+        snapshot:periodSnapshot,previousSnapshot,growth:periodGrowth,
+        range:reportRange, branchLabel:isAllBranches?copy.all:selectedBranchLabel,
+        businessName:activeRestaurant?.name || 'BizCTRL', currency, lang, dir,
       });
       setPdfStatus('done');
-      setTimeout(() => setPdfStatus('idle'), 3000);
     } catch (e) {
-      console.error('PDF error:', e);
-      setPdfError(e.message || 'Generation failed');
+      console.error('PDF report generation failed',e);
+      setPdfError(e.message || 'PDF generation failed');
       setPdfStatus('error');
     }
-  }, [sales, purchases, expenses, scopedBranches, walletTransactions, revenueSources, expenseCategories, brandSettingsList, t, lang, currency, dir, activeRestaurant?.id, selectedBranchId, selectedBranchKey, isAllBranches]);
+  },[hasReportError,isLoading,periodSnapshot,previousSnapshot,periodGrowth,reportRange,isAllBranches,copy.all,selectedBranchLabel,activeRestaurant?.name,currency,lang,dir]);
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (isLoading) {
@@ -335,7 +328,7 @@ export default function Reports() {
     <Button
       size="sm"
       onClick={handleGeneratePDF}
-      disabled={pdfStatus === 'generating'}
+      disabled={pdfStatus === 'generating' || hasReportError || isLoading}
       variant={pdfStatus === 'done' ? 'outline' : 'default'}
       className={`gap-1.5 ${pdfStatus === 'done' ? 'text-emerald-600 border-emerald-300' : ''}`}
     >
@@ -352,26 +345,40 @@ export default function Reports() {
   return (
     <div className="max-w-full overflow-x-hidden px-3 pb-8">
       <PageHeader title={t('erp_analytics')} action={PDFButton} />
-      <div className="mb-3 rounded-lg border bg-card p-3 sm:flex sm:items-end sm:justify-between sm:gap-3">
-        <div className="min-w-0 flex-1">
-          <label htmlFor="sales-analytics-branch" className="mb-1.5 block text-xs font-semibold text-foreground">Branch</label>
-          <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
-            <SelectTrigger id="sales-analytics-branch" className="w-full sm:max-w-sm">
-              <SelectValue placeholder="Select branch" />
-            </SelectTrigger>
-            <SelectContent>
-              {!isBranchScoped && <SelectItem value="all">All Branches</SelectItem>}
-              {(branches || []).map((branch) => (
-                <SelectItem key={branch.id} value={String(branch.id)}>
-                  {branch.name || branch.label || branch.branch_key || branch.key}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div data-testid="sales-report-controls" className="mb-4 rounded-2xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/40 p-3 shadow-sm dark:border-blue-900/60 dark:from-slate-950 dark:to-blue-950/30 sm:p-5">
+        <div className="grid gap-3 sm:grid-cols-2 sm:items-end">
+          <div className="min-w-0">
+            <label htmlFor="sales-analytics-branch" className="mb-1.5 block text-xs font-semibold text-foreground">{copy.branch}</label>
+            <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
+              <SelectTrigger id="sales-analytics-branch" className="w-full bg-background">
+                <SelectValue placeholder={copy.branch} />
+              </SelectTrigger>
+              <SelectContent>
+                {!isBranchScoped && <SelectItem value="all">{copy.all}</SelectItem>}
+                {(branches || []).filter(b=>b.id).map((branch) => (
+                  <SelectItem key={branch.id} value={String(branch.id)}>{branch.name || branch.label || branch.branch_key || branch.key}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-0">
+            <p className="mb-1.5 text-xs font-semibold text-foreground">{copy.period}</p>
+            <div className="rounded-xl border bg-background px-3 py-2 text-xs text-muted-foreground">
+              <p className="font-bold text-foreground">{isAllBranches ? copy.all : selectedBranchLabel}</p>
+              <p className="mt-1 tabular-nums" dir="ltr">{reportRange.from} — {reportRange.to}</p>
+            </div>
+          </div>
         </div>
-        <p className="mt-2 text-xs font-medium text-muted-foreground sm:mb-2 sm:mt-0">
-          {isAllBranches ? 'Showing data for: All Branches' : `Showing data for: ${selectedBranchLabel}`}
-        </p>
+        <div role="group" aria-label={copy.period} data-testid="sales-report-periods" className="mt-3 grid grid-cols-5 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-slate-900">
+          {SALES_REPORT_PERIODS.map(period => (
+            <button key={period} type="button" onClick={() => setReportPeriod(period)}
+              aria-pressed={reportPeriod === period} data-testid={`sales-period-${period}`}
+              className={`min-w-0 rounded-xl px-1 py-2 text-[11px] font-semibold transition sm:text-sm ${reportPeriod===period ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-blue-700 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
+              {copy[period]}
+            </button>
+          ))}
+        </div>
+        <p className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="size-3.5" />{copy.confirmed}</p>
       </div>
 
       {pdfError && (
@@ -380,23 +387,53 @@ export default function Reports() {
         </div>
       )}
 
-      {/* ── 1. EXECUTIVE SUMMARY ─────────────────────────────────────────── */}
-      <Section title={t('executive_summary')} icon={Activity} defaultOpen>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-2">
-          <KPICard label={t('today')}        value={fmtC(executive.todaySales, currency)}    icon={DollarSign}  color="green" />
-          <KPICard label={t('yesterday')}    value={fmtC(executive.yesterdaySales, currency)} icon={DollarSign}  color="slate" />
-          <KPICard label={t('this_month')}   value={fmtC(executive.monthSales, currency)}    icon={BarChart3}   color="blue" />
-          <KPICard label={t('year_sales')}   value={fmtC(executive.yearSales, currency)}     icon={TrendingUp}  color="purple" />
-          <KPICard label={t('sales_growth_pct')} value={executive.salesGrowth != null ? `${executive.salesGrowth >= 0 ? '+' : ''}${executive.salesGrowth.toFixed(1)}%` : '—'} icon={executive.salesGrowth != null && executive.salesGrowth >= 0 ? TrendingUp : TrendingDown} color={executive.salesGrowth != null && executive.salesGrowth >= 0 ? 'green' : 'red'} />
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-          <KPICard label={t('gross_profit')}     value={fmtC(executive.grossProfit, currency)}  icon={Target}      color="green" />
-          <KPICard label={t('net_profit')}        value={fmtC(executive.netProfit, currency)}    icon={Target}      color={executive.netProfit >= 0 ? 'green' : 'red'} />
-          <KPICard label={t('profit_margin')}     value={fmtP(executive.profitMargin)}           icon={Activity}    color="cyan" />
-          <KPICard label={t('avg_daily_revenue')} value={fmtC(executive.avgDailyRevenue, currency)} icon={BarChart3} color="amber" />
-          <KPICard label={t('avg_ticket')}        value={fmtC(executive.avgTicket, currency)}    icon={ShoppingCart} color="blue" />
+      {hasReportError && <div role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{copy.error}</div>}
+      <Section title={copy.periodTitle} icon={Activity} defaultOpen>
+        <div data-testid="sales-period-summary" className="space-y-3">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 p-4 text-white shadow-lg shadow-blue-700/10">
+            <div className="flex flex-wrap justify-between gap-2 text-xs text-blue-100">
+              <span>{copy[reportPeriod]} · {isAllBranches ? copy.all : selectedBranchLabel}</span>
+              <span className="tabular-nums" dir="ltr">{reportRange.from} — {reportRange.to}</span>
+            </div>
+            <p className="mt-2 text-xs font-bold text-blue-100">{copy.sales}</p>
+            <p data-testid="period-sales" className="mt-1 break-words text-[clamp(1.7rem,5vw,2.4rem)] font-black tabular-nums" dir="ltr">{fmtC(periodSnapshot.sales,currency)}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full bg-white/15 px-2.5 py-1">{copy.growth}: {periodGrowth === null ? '—' : `${periodGrowth>=0?'+':''}${periodGrowth.toFixed(1)}%`}</span>
+              <span className="rounded-full bg-white/15 px-2.5 py-1">{copy.transactions}: {periodSnapshot.finalizedClosings}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+            <KPICard label={copy.cost} value={fmtC(periodSnapshot.purchases,currency)} icon={ShoppingCart} color="amber" />
+            <KPICard label={t('gross_profit')} value={fmtC(periodSnapshot.grossProfit,currency)} icon={Target} color={periodSnapshot.grossProfit>=0?'green':'red'} />
+            <KPICard label={t('net_profit')} value={fmtC(periodSnapshot.netProfit,currency)} icon={Target} color={periodSnapshot.netProfit>=0?'green':'red'} />
+            <KPICard label={copy.netMargin} value={periodSnapshot.netMargin===null?'—':`${periodSnapshot.netMargin.toFixed(1)}%`} icon={Activity} color={periodSnapshot.netProfit>=0?'cyan':'red'} />
+            <KPICard label={copy.variable} value={fmtC(periodSnapshot.variableExpenses,currency)} icon={Minus} color="slate" />
+            <KPICard label={copy.fixed} value={fmtC(periodSnapshot.fixedDeduction,currency)} icon={Minus} color="slate" />
+            <KPICard label={copy.grossMargin} value={periodSnapshot.grossMargin===null?'—':`${periodSnapshot.grossMargin.toFixed(1)}%`} icon={TrendingUp} color="blue" />
+            <KPICard label={copy.average} value={fmtC(periodSnapshot.averageDailySales,currency)} icon={BarChart3} color="purple" />
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <KPICard label={copy.cash} value={fmtC(periodSnapshot.cash,currency)} color="green" />
+            <KPICard label={copy.network} value={fmtC(periodSnapshot.network,currency)} color="blue" />
+            <KPICard label={copy.credit} value={fmtC(periodSnapshot.credit,currency)} color="purple" />
+            <KPICard label={copy.other} value={fmtC(periodSnapshot.other,currency)} color="slate" />
+          </div>
+          {periodSnapshot.breakdown.length>1 && <div className="rounded-xl border bg-card p-3">
+            <p className="mb-2 text-xs font-semibold text-foreground">{t('daily_sales_trend')}</p>
+            <ResponsiveContainer width="100%" height={170}>
+              <BarChart data={periodSnapshot.breakdown}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="date" tick={{fontSize:9}} tickFormatter={d=>d.slice(reportPeriod==='year'?5:5)} />
+                <YAxis tick={{fontSize:9}} />
+                <Tooltip formatter={value=>fmtC(value,currency)} />
+                <Bar dataKey="sales" fill="#2563eb" radius={[3,3,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>}
+          <p className="rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-xs leading-relaxed text-slate-600 dark:border-blue-950 dark:bg-blue-950/20 dark:text-slate-300">{copy.warning}</p>
         </div>
       </Section>
+      <p className="mb-3 text-[11px] text-muted-foreground">{copy.reference}</p>
 
       {/* ── 2. SALES PERFORMANCE ─────────────────────────────────────────── */}
       <Section title={t('sales_performance')} icon={TrendingUp}>
