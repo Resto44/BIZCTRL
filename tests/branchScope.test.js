@@ -61,8 +61,8 @@ describe('central branch UUID scope contract', () => {
     expect(reports).toContain("isAllBranches ? 'all' : selectedBranchKey");
     expect(reports).toContain('const scopedBranches = useMemo(');
     expect(reports).toContain("String(branch.id) === String(selectedBranchId)");
-    expect(reports).toContain('branches: scopedBranches || []');
-    expect(reports).toContain('Showing data for: ${selectedBranchLabel}');
+    expect(reports).toContain('branchLabel:isAllBranches?copy.all:selectedBranchLabel');
+    expect(reports).toContain('isAllBranches ? copy.all : selectedBranchLabel');
     expect(reports).not.toContain("computeProductQuantityAnalytics(purchases, 'all'");
 
     for (const page of [sales, purchases, expenses, inventory, treasury]) {
