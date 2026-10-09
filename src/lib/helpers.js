@@ -193,7 +193,8 @@ export function formatPct(val) {
  * calculateSalesRevenue
  *
  * Calculates total revenue from a single sales record, respecting SalesSource configuration.
- * Parses sales_sources_json and applies included_in_revenue flags.
+ * Uses canonical custom_sources_total; sales_sources_json is a breakdown snapshot,
+ * never an additional sales bucket. Applies existing base-source inclusion flags.
  *
  * @param {Object} record - Sales record with restaurant_cash, restaurant_network, credit, sales_sources_json
  * @param {Array} revenueSources - Array of SalesSource objects with included_in_revenue flags
@@ -211,37 +212,11 @@ export function calculateSalesRevenue(record, revenueSources = []) {
 
   const baseSales = (cashIncluded ? cash : 0) + (networkIncluded ? network : 0) + (creditIncluded ? credit : 0);
 
-  // Parse custom sources from sales_sources_json
-  let customSources = 0;
-  const rawSources = record?.sales_sources_json;
-
-  if (rawSources) {
-    try {
-      let entries = [];
-      if (typeof rawSources === 'string') {
-        entries = JSON.parse(rawSources);
-      } else if (Array.isArray(rawSources)) {
-        entries = rawSources;
-      } else if (typeof rawSources === 'object') {
-        entries = [rawSources];
-      }
-
-      if (Array.isArray(entries)) {
-        entries.forEach(e => {
-          if (!e) return;
-          const sourceId = e.source_id || e.source_key;
-          const sourceConfig = revenueSources?.find(s => s.id === sourceId || s.source_key === sourceId);
-          // Include if no config found (default) or if explicitly included
-          if (!sourceConfig || sourceConfig.included_in_revenue !== false) {
-            customSources += Number(e.amount || 0);
-          }
-        });
-      }
-    } catch (err) {
-      console.warn('Failed to parse sales_sources_json:', err);
-    }
-  }
-
+  // Finalized Sales Closing folds source snapshots into restaurant_cash,
+  // restaurant_network and credit. The JSON snapshots explain payment splits
+  // (including driver/network amounts); summing them again doubles revenue.
+  // Sales History and push summaries use this persisted OTHER bucket only.
+  const customSources = Math.max(0, Number(record?.custom_sources_total) || 0);
   const total = baseSales + customSources;
 
   return {

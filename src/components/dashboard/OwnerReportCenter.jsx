@@ -156,31 +156,75 @@ function TrendChart({ data, copy, formatMoney }) {
 function ExecutiveReport({ model, copy }) {
   const {
     formatMoney, periodMetrics, periodSalesChange, periodLabel, branchRankings,
-    scopedAlerts, inventoryOverview, receivables, payables, openQuickAddBranch,
+    scopedAlerts, inventoryOverview, receivables, payables, openQuickAddBranch, hasQueryError,
   } = model;
   const navigate = useNavigate();
+  const paymentMix = [
+    { key: 'cash', label: text(copy, 'cash', 'Cash'), amount: periodMetrics.totalCash, color: 'bg-emerald-400' },
+    { key: 'network', label: text(copy, 'network', 'Network'), amount: periodMetrics.totalNetwork, color: 'bg-sky-400' },
+    { key: 'credit', label: text(copy, 'credit', 'Credit'), amount: periodMetrics.totalCredit, color: 'bg-violet-400' },
+    { key: 'other', label: text(copy, 'otherSources', 'Other sources'), amount: periodMetrics.totalAdditionalSources, color: 'bg-amber-400' },
+  ].filter((item) => item.amount > 0);
+  const salesTotal = Math.max(0, periodMetrics.totalSales);
   return (
     <div data-testid="report-executive" className="w-full min-w-0 max-w-full overflow-x-hidden space-y-4">
-      <section className="relative overflow-hidden rounded-[1.65rem] bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-950 p-4 text-white shadow-xl shadow-blue-900/20 sm:p-6">
-        <div className="pointer-events-none absolute -end-12 -top-16 h-52 w-52 rounded-full bg-cyan-400/20 blur-3xl" />
+      <section data-testid="executive-snapshot" className="relative isolate w-full min-w-0 overflow-hidden rounded-[1.75rem] border border-blue-400/30 bg-gradient-to-br from-blue-700 via-blue-800 to-slate-950 p-4 text-white shadow-[0_20px_45px_-24px_rgba(29,78,216,0.65)] sm:p-6">
+        <div aria-hidden="true" className="pointer-events-none absolute -end-20 -top-28 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -start-24 bottom-0 h-40 w-64 rounded-full bg-violet-500/15 blur-3xl" />
         <div className="relative">
-          <div className="flex items-start justify-between gap-3">
-            <div><p className="text-xs font-bold text-blue-100">{text(copy, 'executiveSnapshot', 'Executive snapshot')}</p><h2 className="mt-1 text-xl font-black sm:text-2xl">{periodLabel}</h2></div>
-            <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black backdrop-blur">{text(copy, 'verifiedERP', 'VERIFIED ERP')}</span>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/15 shadow-inner"><BarChart3 className="h-5 w-5 text-cyan-200" aria-hidden="true" /></span>
+              <div className="min-w-0">
+                <h2 className="text-base font-black tracking-tight sm:text-xl">{text(copy, 'executiveSnapshot', 'Executive snapshot')}</h2>
+                <p className="mt-0.5 text-xs font-medium text-blue-100">{periodLabel}</p>
+              </div>
+            </div>
+            <span data-testid="snapshot-verification" className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${hasQueryError ? 'border-amber-300/40 bg-amber-400/20 text-amber-100' : 'border-emerald-300/30 bg-emerald-400/15 text-emerald-100'}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${hasQueryError ? 'bg-amber-300' : 'bg-emerald-300'}`} />
+              {hasQueryError ? text(copy, 'syncRequired', 'Sync required') : text(copy, 'verifiedERP', 'VERIFIED ERP')}
+            </span>
           </div>
-          <div className="mt-5 grid grid-cols-3 divide-x divide-white/20 rtl:divide-x-reverse">
-            {[
-              [text(copy, 'sales', 'Sales'), formatMoney(periodMetrics.totalSales)],
-              [text(copy, 'netProfit', 'Net profit'), formatMoney(periodMetrics.netProfit)],
-              [text(copy, 'netMargin', 'Net margin'), `${periodMetrics.netMargin.toFixed(1)}%`],
-            ].map(([label, value], index) => <div key={label} className={`min-w-0 px-2 text-center sm:px-5 ${index === 0 ? '' : ''}`}><p className="truncate text-[10px] font-semibold text-blue-100 sm:text-xs">{label}</p><p className="mt-1 truncate text-base font-black sm:text-2xl">{value}</p></div>)}
+
+          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <div data-testid="snapshot-sales" className="col-span-2 min-w-0 rounded-2xl border border-white/20 bg-white/15 p-3.5 shadow-inner backdrop-blur-sm sm:col-span-1 sm:p-4">
+              <div className="flex items-center gap-2 text-xs font-semibold text-blue-100"><BarChart3 className="h-4 w-4 text-cyan-200" aria-hidden="true" />{text(copy, 'sales', 'Sales')}</div>
+              <p className="mt-2 break-words text-[clamp(1.4rem,5vw,2rem)] font-black leading-tight tracking-tight tabular-nums" dir="ltr">{formatMoney(periodMetrics.totalSales)}</p>
+              {periodSalesChange != null && <p className={`mt-2 inline-flex items-center gap-1 text-xs font-bold ${periodSalesChange >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{periodSalesChange >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}{periodSalesChange >= 0 ? '+' : ''}{periodSalesChange.toFixed(1)}% {text(copy, 'vsPreviousPeriod', 'vs previous period')}</p>}
+            </div>
+            <div data-testid="snapshot-profit" className="min-w-0 rounded-2xl border border-white/15 bg-slate-950/20 p-3.5 backdrop-blur-sm sm:p-4">
+              <div className="flex items-center gap-2 text-[11px] font-semibold text-blue-100"><BadgeDollarSign className="h-4 w-4 text-emerald-300" aria-hidden="true" />{text(copy, 'netProfit', 'Net profit')}</div>
+              <p className="mt-3 break-words text-[clamp(1.05rem,3.5vw,1.65rem)] font-black leading-tight tabular-nums" dir="ltr">{formatMoney(periodMetrics.netProfit)}</p>
+            </div>
+            <div data-testid="snapshot-margin" className="min-w-0 rounded-2xl border border-white/15 bg-slate-950/20 p-3.5 backdrop-blur-sm sm:p-4">
+              <div className="flex items-center gap-2 text-[11px] font-semibold text-blue-100"><TrendingUp className="h-4 w-4 text-violet-300" aria-hidden="true" />{text(copy, 'netMargin', 'Net margin')}</div>
+              <p className="mt-3 text-[clamp(1.35rem,4.5vw,1.9rem)] font-black leading-tight tabular-nums" dir="ltr">{periodMetrics.netMargin.toFixed(1)}%</p>
+            </div>
           </div>
-          {periodSalesChange != null ? <p className={`mt-4 flex items-center justify-center gap-1 text-xs font-black ${periodSalesChange >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{periodSalesChange >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}{periodSalesChange >= 0 ? '+' : ''}{periodSalesChange.toFixed(1)}% {text(copy, 'vsPreviousPeriod', 'vs previous period')}</p> : null}
+
+          <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/20 p-3.5">
+            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-blue-100">
+              <span>{text(copy, 'revenueMix', 'Revenue mix')}</span>
+              <span className="tabular-nums" dir="ltr">{formatMoney(periodMetrics.totalSales)}</span>
+            </div>
+            <div data-testid="snapshot-payment-mix" role="img" aria-label={text(copy, 'revenueMix', 'Revenue mix')} className="flex h-2.5 w-full overflow-hidden rounded-full bg-white/15" dir="ltr">
+              {paymentMix.map((item) => <span key={item.key} className={item.color} style={{ width: `${salesTotal > 0 ? Math.min(100, Math.max(0, (item.amount / salesTotal) * 100)) : 0}%` }} />)}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
+              {paymentMix.map((item) => (
+                <div key={item.key} className="min-w-0 text-[10px]">
+                  <p className="flex items-center gap-1.5 font-medium text-blue-100"><span className={`h-2 w-2 shrink-0 rounded-full ${item.color}`} />{item.label}</p>
+                  <p className="mt-1 font-bold tabular-nums text-white" dir="ltr">{formatMoney(item.amount)}</p>
+                </div>
+              ))}
+              {!paymentMix.length && <p className="col-span-2 text-xs text-blue-100">{text(copy, 'noPeriodData', 'No recorded data for this period.')}</p>}
+            </div>
+          </div>
         </div>
       </section>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <MetricCard label={text(copy, 'periodSales', 'Period sales')} value={formatMoney(periodMetrics.totalSales)} icon={BarChart3} tone="blue" />
+        <MetricCard label={text(copy, 'purchases', 'Purchases')} value={formatMoney(periodMetrics.totalPurchaseCost)} icon={ShoppingBasket} tone="blue" />
         <MetricCard label={text(copy, 'receivables', 'Receivables')} value={formatMoney(receivables)} icon={Landmark} tone="green" />
         <MetricCard label={text(copy, 'payables', 'Payables')} value={formatMoney(payables)} icon={ReceiptText} tone="amber" />
         <MetricCard label={text(copy, 'activeRisks', 'Active risks')} value={compactNumber(scopedAlerts.length)} icon={ShieldAlert} tone={scopedAlerts.length ? 'rose' : 'green'} />
