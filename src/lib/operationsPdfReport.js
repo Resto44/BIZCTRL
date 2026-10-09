@@ -55,8 +55,6 @@ export function buildOperationsPdfReport({
   return {key:stockKey(row),name:nameOf(row)||'Unlabelled product',unit:String(row.unit||'unit'),
     quantity,threshold,branchId:String(row.branch_id||''),low:quantity!==null && threshold!==null && quantity<=threshold};
  });
- const stockMap=new Map();
- for(const row of stock)if(row.key)stockMap.set(row.key,row);
  const consumption=new Map();let wasteCost=0, wasteQuantity=0;
  for(const transaction of inventoryTransactions||[]){
   const date=String(transaction.created_date||transaction.created_at||'').slice(0,10);
@@ -120,7 +118,7 @@ export function buildOperationsPdfReport({
    revenueSources,from:range.from,to:range.to}).netProfit)-branchReports.reduce((v,x)=>v+x.netProfit,0);
  return {
   range,asOfDate:asOfDate||asDay(new Date()),branches:branchReports,
-  best,worst,stocks:stock.slice(0,30),lowStock:lowStock.slice(0,15),noStock:noStock.length,
+  best,worst,stockCount:stock.length,stocks:stock.slice(0,30),lowStock:lowStock.slice(0,15),noStock:noStock.length,
   consumption:usage,wasteCost,wasteQuantity,costGroups:costs,
   debts,risks,hasInventoryData:stock.length>0,hasConsumptionData:consumption.size>0,
   branchProfitUnallocated:Math.abs(unassignedCosts)>0.01 ? unassignedCosts:0,
