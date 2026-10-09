@@ -67,17 +67,20 @@ describe('Executive snapshot canonical finalized Sales Closing accounting', () =
   });
 
   it('scopes both comparison periods to finalized rows and uses live ERP metrics in the card', async () => {
-    const [dashboard, card] = await Promise.all([
+    const [dashboard, card, snapshot] = await Promise.all([
       source('../src/pages/OwnerDashboard.jsx'),
       source('../src/components/dashboard/OwnerReportCenter.jsx'),
+      source('../src/components/dashboard/ExecutiveSnapshotV2.jsx'),
     ]);
     expect(dashboard).toContain("filters: { closing_state: 'finalized' }");
     expect(dashboard.match(/filters: \{ closing_state: 'finalized' \}/g)).toHaveLength(2);
-    expect(card).toContain('data-testid="snapshot-sales"');
-    expect(card).toContain('data-testid="snapshot-profit"');
-    expect(card).toContain('data-testid="snapshot-margin"');
-    expect(card).toContain('data-testid="snapshot-drawer-cash"');
-    expect(card).toContain('periodMetrics.totalAdditionalSources');
+    expect(card).toContain('<ExecutiveSnapshotV2 model={model} copy={copy} />');
+    expect(snapshot).toContain('data-testid="snapshot-sales"');
+    expect(snapshot).toContain('data-testid="snapshot-profit"');
+    expect(snapshot).toContain('data-testid="snapshot-margin"');
+    expect(snapshot).toContain('data-testid="snapshot-drawer-cash"');
+    expect(snapshot).toContain('buildExecutiveSnapshotPresentation');
+    expect(snapshot).not.toContain('drawerCash.amount / presentation.sales');
     expect(card).not.toContain('SAR 885');
   });
 });
