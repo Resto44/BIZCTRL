@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { prepareLocalizedPdf, drawLocalizedPdfText, safePdfFilename } from './pdfLocalization';
+import { appendOperationsPdfPages } from './operationsPdfPages';
 
 const L={
  en:{title:'ERP Sales Analytics',branch:'Branch',range:'Reporting period',sales:'Verified sales',purchase:'Approved purchases',gross:'Gross profit',net:'Net profit / loss',expenses:'Total expenses',margin:'Net margin',payments:'Payment channels',cash:'Cash sales',network:'Network sales',credit:'Credit sales',other:'Other revenue',comparison:'Previous comparable period',growth:'Sales change',noCompare:'No previous sales data',trend:'Sales trend',details:'Period breakdown',date:'Date',gp:'Gross P/L',note:'Confirmed closings only. Cash sales are not the physical drawer balance. Payment channels are included in sales, not added again.',generated:'Generated',page:'Page',of:'of',periodDays:'Reported days',grossMargin:'Gross margin'},
@@ -13,7 +14,7 @@ const dateLabel=range=>`${range.from} — ${range.to}`;
 
 export async function generateSalesAnalyticsPDF({
  snapshot, previousSnapshot, growth, range, branchLabel, businessName='BizCTRL', currency='SAR',
- lang='en', dir='ltr', download=true,
+ lang='en', dir='ltr', operationsReport=null, download=true,
 }={}){
  if(!snapshot || !range || !branchLabel)throw new Error('A verified report, period and branch are required');
  const language=L[lang]?lang:'en',t=L[language],rtl=language!=='en' || dir==='rtl';
@@ -97,6 +98,7 @@ export async function generateSalesAnalyticsPDF({
   doc.setDrawColor(203,213,225);doc.line(M,y+3,W-M,y+3);
   label(`${t.sales}: ${money(snapshot.sales,currency)}   |   ${t.net}: ${money(snapshot.netProfit,currency)}`,rtl?W-M:M,y+12,{bold:true,size:9});
  }
+ if(operationsReport)appendOperationsPdfPages(doc,{report:operationsReport,range,branchLabel,businessName,currency,lang:language});
  footer();
  if(download)doc.save(safePdfFilename(`BizCTRL-Sales-Analytics-${range.type}-${range.from}-${range.to}`,language));
  return doc;
