@@ -70,7 +70,7 @@ describe('Executive drawer cash — physical closing balance only', () => {
     expect(executive).toContain('methods.map(method=>');
     expect(executive).toContain('presentation.reconciled');
     expect(executive).toContain('data-testid="snapshot-payment-mix"');
-    expect(executive).toContain('Cash sales and cash remaining in drawer are separate.');
+    expect(executive).toContain('Cash sales and cash left in drawer are different figures.');
     expect(executive).not.toContain('periodMetrics.totalCash');
     expect(executive).toContain('drawerCash?.complete');
     expect(executive).toContain("drawerCash.amount");
