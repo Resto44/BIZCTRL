@@ -41,7 +41,7 @@ import {
 } from '@/services/salesAnalyticsEngine';
 import { generateSalesAnalyticsPDF } from '@/lib/salesAnalyticsPdf';
 import { SALES_REPORT_PERIODS, salesReportDateRange, buildSalesReportSnapshot, salesReportGrowth } from '@/lib/salesReportPeriod';
-import { formatCurrency, formatPct, computeProductQuantityAnalytics } from '@/lib/helpers';
+import { formatPct, computeProductQuantityAnalytics } from '@/lib/helpers';
 import { format, startOfMonth } from 'date-fns';
 
 // ─── Color palette ────────────────────────────────────────────────────────────
@@ -167,10 +167,10 @@ export default function Reports() {
       throw new Error('Report row limit reached. Narrow the selected branch or date range.');
     };
     if (isAllBranches) return load(q=>q);
-    if (!selectedBranchId || !selectedBranchKey) return [];
+    if (!selectedBranchId) return [];
     const [canonical, legacy] = await Promise.all([
       load(q=>q.eq('branch_id',selectedBranchId)),
-      load(q=>q.is('branch_id',null).eq(legacyColumn,selectedBranchKey)),
+      selectedBranchKey ? load(q=>q.is('branch_id',null).eq(legacyColumn,selectedBranchKey)) : Promise.resolve([]),
     ]);
     return Array.from(new Map([...canonical,...legacy].map(row=>[row.id,row])).values());
   };
@@ -210,11 +210,6 @@ export default function Reports() {
     enabled: hasScope,
   });
 
-  const { data: brandSettingsList = [] } = useQuery({
-    queryKey: ['brand_settings'],
-    queryFn: () => base44.entities.BrandSettings.list(),
-  });
-
   // Expense categories — needed for fixed vs variable proration
   const { data: expenseCategories = [], isLoading: loadingCategories, isError: categoriesError } = useQuery({
     queryKey: ['expense_categories_reports'],
@@ -239,13 +234,6 @@ export default function Reports() {
     groupBy:reportRange.type==='year'?'month':'day',
   }),[sales,purchases,expenses,expenseCategories,revenueSources,reportRange]);
   const periodGrowth = salesReportGrowth(periodSnapshot,previousSnapshot);
-  const selectedPeriodSales = useMemo(() => SALES_REPORT_PERIODS.map(period=>{
-    const dateRange=salesReportDateRange(period);
-    return {period,total:buildSalesReportSnapshot({
-      sales, purchases:[],expenses:[],revenueSources,from:dateRange.from,to:dateRange.to,
-    }).sales};
-  }),[sales,revenueSources]);
-
   // ── Analytics computations (all from engine) ───────────────────────────────
   const executive = useMemo(
     () => computeExecutiveSummary(sales, purchases, expenses, revenueSources, walletTransactions, expenseCategories),
@@ -269,7 +257,7 @@ export default function Reports() {
 
   const scopedBranches = useMemo(
     () => (isAllBranches
-      ? branches
+      ? (branches || [])
       : (branches || []).filter((branch) => String(branch.id) === String(selectedBranchId)))
       .map(b => ({...b, key:b.branch_key || b.key || String(b.id),label:b.name || b.label || b.branch_key || String(b.id)})), 
     [branches, isAllBranches, selectedBranchId],
