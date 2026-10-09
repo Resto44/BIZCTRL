@@ -39,6 +39,7 @@ import {
   generateRecommendations,
 } from '@/services/salesAnalyticsEngine';
 import { generateSalesAnalyticsPDF } from '@/lib/salesAnalyticsPdf';
+import { buildOperationsPdfReport } from '@/lib/operationsPdfReport';
 import PaymentAnalyticsERP from '@/components/reports/PaymentAnalyticsERP';
 import { SALES_REPORT_PERIODS, salesReportDateRange, buildSalesReportSnapshot, salesReportGrowth } from '@/lib/salesReportPeriod';
 import { formatPct, computeProductQuantityAnalytics } from '@/lib/helpers';
@@ -175,6 +176,38 @@ export default function Reports() {
     return Array.from(new Map([...canonical,...legacy].map(row=>[row.id,row])).values());
   };
 
+  // Static balances are intentionally NOT filtered by the sales period.
+  // Inventory and open debt are as-of-now snapshots; stock movements, by contrast,
+  // are period-filtered. Every read carries tenant+branch isolation.
+  const fetchOperationsRows = async (table, {legacyColumn = 'branch', dateColumn=null, isTimestamp=false}={}) => {
+    if (!activeRestaurant?.id) return [];
+    const load = async scope => {
+      const records=[];
+      for(let offset=0;offset<50000;offset+=500){
+        let q=supabase.from(table).select('*').eq('restaurant_id',activeRestaurant.id)
+          .order('id',{ascending:false});
+        if(dateColumn){
+          q=q.gte(dateColumn,isTimestamp?`${reportRange.from}T00:00:00`:reportRange.from)
+            .lte(dateColumn,isTimestamp?`${reportRange.to}T23:59:59.999`:reportRange.to);
+        }
+        const {data,error}=await scope(q).range(offset,offset+499);
+        if(error)throw error;
+        records.push(...(data||[]));
+        if((data||[]).length<500)return records;
+      }
+      throw new Error('ERP PDF source row limit exceeded; select a narrower branch or period.');
+    };
+    if(isAllBranches)return load(q=>q);
+    if(!selectedBranchId)return [];
+    const [canonical,legacy]=await Promise.all([
+      load(q=>q.eq('branch_id',selectedBranchId)),
+      legacyColumn && selectedBranchKey
+        ? load(q=>q.is('branch_id',null).eq(legacyColumn,selectedBranchKey))
+        : Promise.resolve([]),
+    ]);
+    return Array.from(new Map([...canonical,...legacy].map(row=>[row.id,row])).values());
+  };
+
   // ── Data fetching ──────────────────────────────────────────────────────────
   const { data: sales = [], isLoading: loadingSales, isError: salesError } = useQuery({
     queryKey: ['sales', 'reports', activeRestaurant?.id, selectedBranchId],
@@ -220,8 +253,23 @@ export default function Reports() {
     enabled: hasScope,
   });
 
-  const isLoading = loadingSales || loadingPurchases || loadingExpenses || loadingSources || loadingCategories;
-  const hasReportError = salesError || purchasesError || expensesError || categoriesError;
+  const {data: reportInventory = [],isLoading:loadingInventory,isError:inventoryError} = useQuery({
+    queryKey:['report_inventory_snapshot',activeRestaurant?.id,selectedBranchId],
+    queryFn:()=>fetchOperationsRows('inventory'),enabled:hasScope,staleTime:60000,
+  });
+  const {data: reportStockMovements = [],isLoading:loadingMovements,isError:movementsError} = useQuery({
+    queryKey:['report_stock_movements',activeRestaurant?.id,selectedBranchId,reportRange.from,reportRange.to],
+    queryFn:()=>fetchOperationsRows('inventory_transactions',{legacyColumn:null,dateColumn:'created_date',isTimestamp:true}),
+    enabled:hasScope,staleTime:60000,
+  });
+  const {data: reportDebts = [],isLoading:loadingDebts,isError:debtsError} = useQuery({
+    queryKey:['report_open_debts_snapshot',activeRestaurant?.id,selectedBranchId],
+    queryFn:()=>fetchOperationsRows('debt_records'),enabled:hasScope,staleTime:60000,
+  });
+  const isLoading = loadingSales || loadingPurchases || loadingExpenses || loadingSources || loadingCategories ||
+    loadingInventory || loadingMovements || loadingDebts;
+  const hasReportError = salesError || purchasesError || expensesError || categoriesError ||
+    inventoryError || movementsError || debtsError;
 
   const periodSnapshot = useMemo(() => buildSalesReportSnapshot({
     sales,purchases,expenses,expenseCategories,revenueSources,
@@ -257,6 +305,15 @@ export default function Reports() {
       .map(b => ({...b, key:b.branch_key || b.key || String(b.id),label:b.name || b.label || b.branch_key || String(b.id)})), 
     [branches, isAllBranches, selectedBranchId],
   );
+
+  // Finance and operations pages both use the same period selection; the
+  // branch rows cannot contain data outside the report's authorized scope.
+  const operationsReport = useMemo(()=>buildOperationsPdfReport({
+    branches:scopedBranches,sales,purchases,expenses,expenseCategories,
+    inventory:reportInventory,inventoryTransactions:reportStockMovements,
+    customerDebts:reportDebts,range:reportRange,revenueSources,
+  }),[scopedBranches,sales,purchases,expenses,expenseCategories,reportInventory,
+      reportStockMovements,reportDebts,reportRange,revenueSources]);
 
   const branchPerf = useMemo(
     () => computeBranchPerformance(scopedBranches, sales, purchases, expenses, revenueSources, expenseCategories),
@@ -297,6 +354,7 @@ export default function Reports() {
         snapshot:periodSnapshot,previousSnapshot,growth:periodGrowth,
         range:reportRange, branchLabel:isAllBranches?copy.all:selectedBranchLabel,
         businessName:activeRestaurant?.name || 'BizCTRL', currency, lang, dir,
+        operationsReport,
       });
       setPdfStatus('done');
     } catch (e) {
@@ -304,7 +362,7 @@ export default function Reports() {
       setPdfError(e.message || 'PDF generation failed');
       setPdfStatus('error');
     }
-  },[hasReportError,isLoading,periodSnapshot,previousSnapshot,periodGrowth,reportRange,isAllBranches,copy.all,selectedBranchLabel,activeRestaurant?.name,currency,lang,dir]);
+  },[hasReportError,isLoading,periodSnapshot,previousSnapshot,periodGrowth,reportRange,isAllBranches,copy.all,selectedBranchLabel,activeRestaurant?.name,currency,lang,dir,operationsReport]);
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (isLoading) {
@@ -750,7 +808,7 @@ export default function Reports() {
       <Section title={t('generate_pdf_report')} icon={FileText}>
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            10-page executive PDF: Executive Summary · Sales · Branches · Payment Sources · Network · Profit · Expenses · Inventory · Trends · Recommendations
+            ERP PDF: Executive Summary · Sales & Payment Trends · Branch Performance · Inventory & Consumption · Expenses · Debts & Operational Risks
           </p>
           {/* Recommendations preview */}
           {recommendations.length > 0 && (
