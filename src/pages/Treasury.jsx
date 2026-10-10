@@ -503,7 +503,7 @@ export default function Treasury() {
               })}
               {transactions.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">{t('no_data')}</p>}
             </div>
-          </Card>
+          </Card>}
         </TabsContent>
 
         {/* ── ACCOUNTS ────────────────────────────────────────────────── */}
