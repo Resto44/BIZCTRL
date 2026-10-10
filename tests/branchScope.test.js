@@ -65,12 +65,20 @@ describe('central branch UUID scope contract', () => {
     expect(reports).toContain('isAllBranches ? copy.all : selectedBranchLabel');
     expect(reports).not.toContain("computeProductQuantityAnalytics(purchases, 'all'");
 
-    for (const page of [sales, purchases, expenses, inventory, treasury]) {
+    for (const page of [sales, purchases, expenses, inventory]) {
       expect(page).toContain('useBranchScope');
       expect(page).toContain('selectedBranchId');
       expect(page).toContain("eq('branch_id', selectedBranchId)");
       expect(page).toContain("is('branch_id', null)");
     }
+    // Treasury now delegates UUID/legacy filtering and full ledger pagination to
+    // its tested common read helper. Check BOTH the wiring and actual predicates.
+    const treasuryReader = await source('../src/lib/treasuryLedgerRead.js');
+    expect(treasury).toContain('useBranchScope');
+    expect(treasury).toContain('branchId: selectedBranchId, branchKey: selectedBranchKey');
+    expect(treasury).toContain('fetchCompleteTreasuryRows({');
+    expect(treasuryReader).toContain("query.eq('branch_id',branchId)");
+    expect(treasuryReader).toContain("query.is('branch_id',null).eq(legacyColumn,branchKey)");
   });
 
   it('uses canonical branch UUIDs and server-scoped Sales Source reads without browser filtering', async () => {
