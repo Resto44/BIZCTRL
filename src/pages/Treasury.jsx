@@ -798,6 +798,14 @@ export default function Treasury() {
               <div><Label className="text-xs">{local('Amount')} *</Label><Input type="number" inputMode="decimal" value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0" /></div>
             </div>
 
+            {form.account_id && typeConfig?.direction==='out' &&
+              Number(form.amount)>0 && Number.isFinite(Number(form.amount)) &&
+              Number(accountBalances[form.account_id]||0)<Number(form.amount) &&
+              <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+                {lang==='ar'?('تنبيه: رصيد الحساب '+fmt(accountBalances[form.account_id]||0)+' أقل من مبلغ الصرف. سيصبح الرصيد '+fmt(Number(accountBalances[form.account_id]||0)-Number(form.amount))+'. راجع الحركة قبل الحفظ.'):
+                 lang==='fa'?('هشدار: مانده حساب '+fmt(accountBalances[form.account_id]||0)+' کمتر از مبلغ پرداخت است. مانده بعد از ثبت '+fmt(Number(accountBalances[form.account_id]||0)-Number(form.amount))+' خواهد شد.'):
+                 ('Warning: current account balance '+fmt(accountBalances[form.account_id]||0)+' is below this outgoing amount. Projected balance: '+fmt(Number(accountBalances[form.account_id]||0)-Number(form.amount))+'.')}
+              </p>}
             {showBranch && (
               <div><Label className="text-xs">{local('Branch')}</Label><BranchSelect value={form.branch} onChange={(branchKey) => {
                 setTransactionError('');
