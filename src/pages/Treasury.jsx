@@ -18,8 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowDownLeft, ArrowUpRight, Building2, User,
-  TrendingUp, Banknote, CreditCard,
+import { Plus, ArrowDownLeft, ArrowUpRight,
+  TrendingUp,
   Trash2, Scale, AlertTriangle, UserCircle, ShieldCheck, ExternalLink,
   Pencil, Power, WalletCards, Landmark
 } from 'lucide-react';
