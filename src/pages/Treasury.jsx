@@ -682,7 +682,7 @@ export default function Treasury() {
                   <Bar dataKey="balance" fill="#6366f1" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </Card>}
+            </Card>
           )}
 
           {/* Type breakdown */}
