@@ -1,5 +1,5 @@
 // Service Worker — network-first for JS/CSS, cache-first for images/fonts only
-const CACHE_VERSION = 'v12';
+const CACHE_VERSION = 'v13';
 const CACHE_NAME = `app-cache-${CACHE_VERSION}`;
 
 // On install: skip waiting so the new SW activates immediately
@@ -85,7 +85,7 @@ self.addEventListener('push', (event) => {
   try { payload = event.data?.json() || {}; } catch { /* Always display a notification. */ }
   event.waitUntil(self.registration.showNotification(payload.title || 'BizCTRL', {
     body: payload.body || 'New business activity · رویداد جدید کسب‌وکار',
-    icon: '/icons/icon-192.png', badge: '/icons/icon-96.png',
+    icon: '/icons/bizctrl-icon-192-v2.png', badge: '/icons/icon-96.png',
     tag: payload.tag || undefined,
     data: { url: pushTarget(payload.url, payload.eventId || payload.tag) },
   }));
