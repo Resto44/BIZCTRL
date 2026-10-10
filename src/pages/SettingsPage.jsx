@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
+import DisplayCurrencyPicker from '@/components/settings/DisplayCurrencyPicker';
 import { useTenant } from '@/lib/TenantContext';
 import { useRole } from '@/lib/RoleContext';
 import useERPSettings from '@/hooks/useERPSettings';
@@ -126,7 +127,22 @@ export default function SettingsPage() {
               </div>
               <div className="flex items-center gap-3 p-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300"><DollarSign className="h-5 w-5" /></span>
-                <div className="min-w-0 flex-1"><p className="text-xs font-semibold text-slate-500">Display currency</p><Select value={currency} onValueChange={setCurrency}><SelectTrigger className="mt-0.5 h-8 border-0 px-0 font-bold shadow-none focus:ring-0"><SelectValue /></SelectTrigger><SelectContent>{['SAR', 'USD', 'EUR', 'AFN'].map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-slate-500">{lang === 'ar' ? 'عملة العرض' : lang === 'fa' ? 'ارز نمایشی' : 'Display currency'}</p>
+                  <DisplayCurrencyPicker value={currency} onChange={setCurrency} lang={lang} />
+                  <p className="mt-1.5 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                    {lang === 'ar' ? 'تنسيق العرض فقط، لا يتم تحويل المبالغ تلقائياً.' :
+                      lang === 'fa' ? 'فقط تنظیم نمایش است؛ مبالغ خودکار تبدیل نمی‌شوند.' :
+                      'Display preference only. Financial amounts are not converted.'}
+                  </p>
+                  {currency !== (settings.finance?.currencyCode || 'SAR') && (
+                    <p role="status" className="mt-1.5 text-[11px] font-semibold leading-4 text-amber-700 dark:text-amber-300">
+                      {lang === 'ar' ? `عملة الحسابات الأصلية: ${settings.finance?.currencyCode || 'SAR'}؛ القيم لم تتحول إلى ${currency}.` :
+                        lang === 'fa' ? `ارز اصلی حسابداری: ${settings.finance?.currencyCode || 'SAR'}؛ ارقام به ${currency} تبدیل نشده‌اند.` :
+                        `Accounting base: ${settings.finance?.currencyCode || 'SAR'}. Values have not been converted to ${currency}.`}
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-3 p-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300">{darkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}</span>
