@@ -33,7 +33,7 @@ describe('Treasury transaction save regression',()=>{
     expect(()=>buildTreasuryEntry({...args,form:{...form,payment_method:'both'}}))
       .toThrow(TreasuryEntryError);
     expect(()=>buildTreasuryEntry({...args,form:{...form,payment_method:'both'}}))
-      .toThrow('two separate');
+      .toThrow('separately');
   });
   it('rejects invalid amount/date and accepts decimal money without floating noise',()=>{
     for(const invalid of ['0','-5','abc','1.231']){
