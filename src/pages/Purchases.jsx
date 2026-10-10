@@ -16,6 +16,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import BranchSelect from '@/components/shared/BranchSelect';
 import PurchaseInvoiceForm from '@/components/purchases/PurchaseInvoiceForm';
 import PurchaseInvoiceList from '@/components/purchases/PurchaseInvoiceList';
+import { downloadPurchaseInvoicePDF, sharePurchaseInvoicePDF } from '@/lib/purchaseInvoicePdf';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -23,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import {
-  Plus, BarChart3, BookOpen, Receipt, Search, AlertCircle, Clock
+  Plus, BarChart3, BookOpen, Receipt, Search, AlertCircle, Clock, Download, Share2
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { deletePurchaseInvoiceWithRollback, getOverdueInfo } from '@/lib/procurementEngine';
@@ -32,7 +33,7 @@ const STATUS_FILTERS = ['all', 'draft', 'pending', 'approved', 'paid', 'partial'
 
 export default function Purchases() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { currency } = useLanguage();
+  const { currency, lang } = useLanguage();
   const { activeRestaurant, branches } = useTenant();
   const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const { role } = useRole();
@@ -41,6 +42,9 @@ export default function Purchases() {
   const canDelete = role === ROLES.OWNER || role === ROLES.MANAGER || role === ROLES.GENERAL_MANAGER;
 
   const [showForm, setShowForm] = useState(false);
+  const [previewInvoice, setPreviewInvoice] = useState(null);
+  const [shareFallback, setShareFallback] = useState(null);
+  const [pdfError, setPdfError] = useState('');
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [bulkDeletingIds, setBulkDeletingIds] = useState(null);
@@ -92,6 +96,36 @@ export default function Purchases() {
     staleTime: 120000,
     enabled: Boolean(activeRestaurant?.id),
   });
+
+  const { data: businessBrand = null } = useQuery({
+    queryKey: ['brand_settings', activeRestaurant?.id],
+    queryFn: async () => {
+      const {data,error}=await supabase.from('brand_settings').select('*')
+        .eq('restaurant_id', activeRestaurant.id).limit(1).maybeSingle();
+      if(error)throw error;
+      return data;
+    },
+    enabled:!!activeRestaurant?.id,staleTime:120000,
+    retry:false,
+  });
+  const purchasePdfOptions = (inv) => ({
+    lang, currency: inv.currency || businessBrand?.currency || currency,
+    business: activeRestaurant, brand:businessBrand,
+    branch:(branches||[]).find(b=>String(b.id)===String(inv.branch_id)
+      || (!inv.branch_id && [b.branch_key,b.key].includes(inv.branch))) || null,
+  });
+  const downloadPDF = inv => {
+    try {setPdfError('');downloadPurchaseInvoicePDF(inv,purchasePdfOptions(inv));}
+    catch(error){setPdfError(error.message || 'Unable to generate purchase invoice PDF.');}
+  };
+  const sharePDF = async inv => {
+    try {
+      setPdfError('');setShareFallback(null);
+      const result=await sharePurchaseInvoicePDF(inv,purchasePdfOptions(inv));
+      if(result.downloaded)setShareFallback(result);
+      // Native iOS sheet cancelled by user: no success notice or fallback action.
+    }catch(error){setPdfError(error.message || 'Unable to share purchase invoice PDF.');}
+  };
 
   const invalidatePurchaseQueries = () => {
     qc.invalidateQueries({ queryKey: ['supplier_invoices'] });
@@ -236,6 +270,14 @@ export default function Purchases() {
         </div>
       </div>
 
+      {pdfError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{pdfError}</p>}
+      {shareFallback && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-800">
+        <p>PDF downloaded. To send it on WhatsApp, open the chat and attach the downloaded PDF from Files.</p>
+        <Button type="button" variant="outline" className="mt-2 gap-2" onClick={()=>window.open(shareFallback.whatsappUrl,'_blank','noopener')}>
+          <Share2 className="h-4 w-4"/> Open WhatsApp message
+        </Button>
+      </div>}
+
       {/* Invoice count */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{filtered.length} invoice{filtered.length !== 1 ? 's' : ''}</span>
@@ -257,9 +299,41 @@ export default function Purchases() {
           onEdit={(inv) => { setEditing(inv); setShowForm(true); }}
           onDelete={canDelete ? (inv) => setDeleting(inv) : null}
           onBulkDelete={canDelete ? (ids) => setBulkDeletingIds(ids) : null}
+          onView={setPreviewInvoice}
+          onDownloadPDF={downloadPDF}
+          onSharePDF={sharePDF}
         />
       )}
 
+      {/* Read-only saved invoice, with download or share PDF actions. */}
+      <Dialog open={!!previewInvoice} onOpenChange={open=>{if(!open)setPreviewInvoice(null);}}>
+        <DialogContent className="max-h-[90dvh] max-w-xl overflow-y-auto rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>BizCTRL · Purchase Invoice</DialogTitle>
+          </DialogHeader>
+          {previewInvoice && <div className="space-y-3 text-sm">
+            <div className="rounded-xl bg-blue-50 p-3">
+              <p className="font-black text-blue-900">{previewInvoice.invoice_number || 'Invoice reference not recorded'}</p>
+              <p className="mt-1 text-slate-700">{previewInvoice.supplier_name || 'Supplier not recorded'}</p>
+              <p className="text-xs text-slate-500">{previewInvoice.date} · {previewInvoice.status}</p>
+            </div>
+            <div className="max-h-60 overflow-y-auto divide-y rounded-xl border">
+              {(Array.isArray(previewInvoice.items)?previewInvoice.items:[]).map((item,i)=>
+                <div className="flex justify-between gap-3 p-3" key={i}>
+                  <span className="min-w-0 flex-1 break-words">{item.product_name || item.name || 'Item'} · {item.quantity} × {item.unit_cost}</span>
+                  <span className="shrink-0 font-semibold">{currency} {Number(item.line_total||0).toFixed(2)}</span>
+                </div>)}
+            </div>
+            <div className="flex justify-between rounded-xl bg-slate-50 p-3 font-black">
+              <span>Total</span><span>{previewInvoice.currency || currency} {Number(previewInvoice.total_amount||0).toFixed(2)}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" variant="outline" className="gap-2" onClick={()=>downloadPDF(previewInvoice)}><Download className="h-4 w-4"/> PDF</Button>
+              <Button type="button" className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={()=>sharePDF(previewInvoice)}><Share2 className="h-4 w-4"/> WhatsApp PDF</Button>
+            </div>
+          </div>}
+        </DialogContent>
+      </Dialog>
       {/* Create/Edit Dialog */}
       <Dialog open={showForm} onOpenChange={open => { if (!open) { setShowForm(false); setEditing(null); } }}>
         <DialogContent className="h-[100dvh] w-screen max-w-none gap-0 overflow-hidden rounded-none border-0 p-0 sm:h-[94vh] sm:max-w-3xl sm:rounded-2xl [&>button]:hidden">
