@@ -57,7 +57,8 @@ describe('Reference ERP Purchase PDF visual and accounting invariants',()=>{
  it('QR encodes only invoice reference, NOT a fake government tax verification',async()=>{
   const source=await file('../src/lib/purchaseInvoiceReferenceLayout.js');
   expect(source).toContain("BizCTRL invoice reference: ");
-  expect(source).not.toContain('ZATCA');
+  expect(source).toContain("const payload='BizCTRL invoice reference: '+invoiceNumber;");
+  expect(source).not.toContain("const payload='ZATCA");
   expect(source).toContain("invoicePaymentLabel");
  });
  it('does not drop a long list of products',()=>{
