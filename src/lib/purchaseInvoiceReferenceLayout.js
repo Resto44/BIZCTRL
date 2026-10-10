@@ -123,7 +123,7 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{lang='en',busi
   });
  };
  const smallHeading=(s,x,y,accent=BLUE)=>{roundedBox(x,y-5,5,5,[235,245,255],null,1);icon(x+.45,y-.2,'doc',accent);
-  txt(s,x+8,y,{size:8.8,bold:true,color:NAVY,limit:30});};
+  txt(s,x+8,y,{size:8.8,bold:true,color:NAVY,limit:30,align:'left'});};
  const drawHeader=(continuation=false)=>{
    doc.setFillColor(248,252,255);doc.rect(0,0,210,34,'F');
    brandMark(10,7.2,1.5);
@@ -141,7 +141,7 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{lang='en',busi
   roundedBox(L,37,94,48,[248,252,255]);
   roundedBox(106,37,95,48,[248,252,255]);
   smallHeading(w.business,14,45);
-  txt(model.businessName,17,53,{size:12,bold:true,color:NAVY,limit:36,maxWidth:83});
+  txt(model.businessName,17,53,{size:12,bold:true,color:NAVY,limit:36,maxWidth:83,align:'left'});
   field(w.branch,model.branch,13,61,86,{labelWidth:25});
   field(w.taxId,model.businessTax,13,69,86,{labelWidth:26});
   field(w.address,model.address,13,77,86,{labelWidth:24});
@@ -179,7 +179,7 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{lang='en',busi
  };
  const drawLine=(item,index,y)=>{
   const nameLines=wrapWords(item.product_name||item.name||item.description,23).slice(0,4);
-  const height=Math.max(12.5,5.5+5.2*nameLines.length);
+  const height=Math.max(12.5,2.3+5.1*nameLines.length);
   roundedBox(L,y,CW,height,index%2===0?[251,253,255]:[246,250,254],null,0.6);
   let x=L;
   const result=calcPurchaseLine(item);
@@ -287,13 +287,13 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{lang='en',busi
  if(!lines.length){txt(w.noItems,L+8,y+7,{size:8,color:FADED,align:'left'});y+=15;}
  for(let idx=0;idx<lines.length;idx++){
   const item=lines[idx];
-  const needed=Math.max(12.5,5.5+5.2*Math.min(4,wrapWords(item.product_name||item.name||item.description,23).length));
-  if(y+needed>179){
+  const needed=Math.max(12.5,2.3+5.1*Math.min(4,wrapWords(item.product_name||item.name||item.description,23).length));
+  if(y+needed>191){
    doc.addPage();drawHeader(true);drawTableHead(44);y=56;
   }
   y+=drawLine(item,idx,y);
  }
- if(Math.max(183,y+3)+80>270){
+ if(Math.max(183,y+3)+75>270){
   doc.addPage();drawHeader(true);y=56;
  }
  finishSummary(y);
