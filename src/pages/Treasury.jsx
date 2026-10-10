@@ -36,6 +36,8 @@ import ReconciliationDashboard from '@/components/treasury/ReconciliationDashboa
 import CashflowProjection from '@/components/treasury/CashflowProjection';
 import OwnerPersonalFinance from '@/components/treasury/OwnerPersonalFinance';
 import { useNotify } from '@/lib/useNotify';
+import TreasuryERPOverview from '@/components/treasury/TreasuryERPOverview';
+import { fetchCompleteTreasuryRows, accountsForTreasuryScope, treasuryIntegrity } from '@/lib/treasuryLedgerRead';
 import {
   TREASURY_ACCOUNT_TYPES,
   buildTreasuryAccountBalances,
@@ -93,7 +95,7 @@ const transactionDate = (transaction) => transaction?.transaction_date || transa
 const transactionType = (transaction) => transaction?.transaction_type || transaction?.type || '';
 
 export default function Treasury() {
-  const { currency, t, translateLiteral } = useLanguage();
+  const { currency, t, translateLiteral, lang } = useLanguage();
   const { role } = useRole();
   const { branches, activeRestaurantId, activeRestaurant, ownerFilter } = useTenant();
   const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
@@ -113,26 +115,12 @@ export default function Treasury() {
   const filterBranch = isAllBranches ? 'all' : (selectedBranchKey || 'all');
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const fetchScopedRows = async (table, legacyColumn = 'branch', orderColumn = 'date') => {
-    if (!activeRestaurant?.id) return [];
-    const baseQuery = () => supabase.from(table).select('*')
-      .eq('restaurant_id', activeRestaurant.id)
-      .order(orderColumn, { ascending: false })
-      .limit(2000);
-    if (isAllBranches) {
-      const { data, error } = await baseQuery();
-      if (error) throw error;
-      return data || [];
-    }
-    if (!selectedBranchId || !selectedBranchKey) return [];
-    const [canonical, legacy] = await Promise.all([
-      baseQuery().eq('branch_id', selectedBranchId),
-      baseQuery().is('branch_id', null).eq(legacyColumn, selectedBranchKey),
-    ]);
-    if (canonical.error || legacy.error) throw canonical.error || legacy.error;
-    return Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
-      .map((record) => [record.id, record])).values());
-  };
+  const fetchScopedRows = (table, legacyColumn = 'branch', orderColumn = 'date') =>
+    fetchCompleteTreasuryRows({
+      db: supabase, table, restaurantId: activeRestaurant?.id,
+      branchId: selectedBranchId, branchKey: selectedBranchKey,
+      allBranches: isAllBranches, legacyColumn, orderColumn,
+    });
 
   const { data: accounts = [] } = useQuery({
     queryKey: ['treasury_accounts', activeRestaurantId],
@@ -141,7 +129,7 @@ export default function Treasury() {
     enabled: !!activeRestaurantId,
   });
 
-  const { data: transactions = [], isLoading } = useQuery({
+  const { data: transactions = [], isLoading, isError: transactionsError } = useQuery({
     queryKey: ['wallet_transactions', activeRestaurant?.id, selectedBranchId],
     queryFn: () => fetchScopedRows('wallet_transactions', 'branch', 'transaction_date'),
     staleTime: 60000,
@@ -185,9 +173,20 @@ export default function Treasury() {
     return { receivedBySponsor, sentToOwner, remaining: Math.max(0, remaining), branchesWithBalance };
   }, [settlements]);
 
-  const accountBalances = useMemo(() => buildTreasuryAccountBalances(accounts, transactions), [accounts, transactions]);
-  const treasuryLedgerBalance = useMemo(() => calculateTreasuryLedgerBalance(accounts, transactions), [accounts, transactions]);
-  const activeAccounts = useMemo(() => accounts.filter((account) => account.is_active !== false), [accounts]);
+  const scopedAccounts = useMemo(() => accountsForTreasuryScope(accounts,{
+    allBranches:isAllBranches,branchId:selectedBranchId,branchKey:selectedBranchKey,
+  }),[accounts,isAllBranches,selectedBranchId,selectedBranchKey]);
+  const accountBalances = useMemo(() => buildTreasuryAccountBalances(scopedAccounts, transactions),
+    [scopedAccounts, transactions]);
+  const mixedAccountCurrencies = useMemo(()=>
+    new Set(scopedAccounts.map(account=>account.currency||currency)).size>1,
+    [scopedAccounts,currency]);
+  const treasuryLedgerBalance = useMemo(() => mixedAccountCurrencies?null:
+    calculateTreasuryLedgerBalance(scopedAccounts, transactions),
+    [scopedAccounts, transactions, mixedAccountCurrencies]);
+  const activeAccounts = useMemo(() => scopedAccounts.filter(a=>a.is_active!==false),[scopedAccounts]);
+  const integrity = useMemo(() => treasuryIntegrity(scopedAccounts,transactions,accounts),
+    [scopedAccounts,transactions,accounts]);
 
   const accountSaveMut = useMutation({
     mutationFn: async (payload) => {
@@ -248,12 +247,14 @@ export default function Treasury() {
 
   const branchBalances = useMemo(() => {
     const map = {};
-    transactions.filter(tx => tx.wallet === 'branch_cash' && tx.branch).forEach(tx => {
-      if (!map[tx.branch]) map[tx.branch] = 0;
-      map[tx.branch] += tx.direction === 'in' ? (tx.amount || 0) : -(tx.amount || 0);
+    transactions.filter(tx => tx.wallet === 'branch_cash').forEach(tx => {
+      const key=tx.branch || branches.find(b=>b.id===tx.branch_id)?.key;
+      if(!key)return;
+      if (!map[key]) map[key] = 0;
+      map[key] += tx.direction === 'in' ? (Number(tx.amount)||0) : -(Number(tx.amount)||0);
     });
     return map;
-  }, [transactions]);
+  }, [transactions,branches]);
 
   // ── Monthly summary ───────────────────────────────────────────────────
   const monthlySummary = useMemo(() => {
@@ -285,10 +286,13 @@ export default function Treasury() {
   }, [branchBalances, branches]);
 
   // ── Payroll obligation ────────────────────────────────────────────────
-  const payrollObligation = useMemo(() =>
-    employees.filter(e => e.is_active !== false).reduce((s, e) => s + (e.base_salary || 0), 0),
-    [employees]
-  );
+  // Base salaries are a monthly estimate, not an unpaid payroll liability.
+  const payrollObligation = useMemo(() => employees
+    .filter(e => e.is_active !== false && (isAllBranches ||
+      e.branch_id === selectedBranchId ||
+      (!e.branch_id && e.branch === selectedBranchKey)))
+    .reduce((sum,e)=>sum+(Number(e.base_salary)||0),0),
+    [employees,isAllBranches,selectedBranchId,selectedBranchKey]);
 
   const openCreateAccount = () => {
     setEditingAccount(null);
@@ -409,92 +413,31 @@ export default function Treasury() {
 
         {/* ── OVERVIEW ────────────────────────────────────────────────── */}
         <TabsContent value="overview" className="mt-3 space-y-3">
-          <Card className="p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-950/40"><WalletCards className="h-4 w-4 text-indigo-600" /></div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">{local('Treasury Accounts')}</p>
-                  <p className="text-xs text-muted-foreground">{accounts.length} {local('accounts')} · {activeAccounts.length} {local('active')}</p>
-                </div>
-              </div>
-              <div className="min-w-[9rem] rounded-lg bg-indigo-50 px-3 py-2 text-end dark:bg-indigo-950/20">
-                <p className="text-xs text-muted-foreground">{local('Ledger Balance')}</p>
-                <p className={`text-base font-bold ${treasuryLedgerBalance >= 0 ? 'text-indigo-700 dark:text-indigo-300' : 'text-red-500'}`}>{fmt(treasuryLedgerBalance)}</p>
-              </div>
-            </div>
-            {accounts.length ? (
-              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {accounts.slice(0, 6).map((account) => (
-                  <div key={account.id} className="min-w-0 rounded-lg border border-border bg-muted/25 p-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0"><p className="truncate text-xs font-semibold">{account.account_name}</p><p className="truncate text-xs text-muted-foreground">{local(TREASURY_ACCOUNT_TYPES.find((type) => type.value === account.account_type)?.label || account.account_type)}</p></div>
-                      <Badge variant={account.is_active !== false ? 'outline' : 'secondary'} className="shrink-0 text-[10px]">{account.is_active !== false ? local('Active') : local('Inactive')}</Badge>
-                    </div>
-                    <p className={`mt-2 text-sm font-bold ${accountBalances[account.id] >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(accountBalances[account.id] || 0)}</p>
-                  </div>
-                ))}
-              </div>
-            ) : <p className="py-3 text-center text-xs text-muted-foreground">{local('No Treasury accounts have been created yet.')}</p>}
-          </Card>
-
-          {/* Owner wallets — split Network vs Cash */}
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">{t('owner')} {t('total')}</p>
-                <p className={`text-lg font-bold ${walletBalance.ownerTotal >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(walletBalance.ownerTotal)}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-2">
-                <p className="text-xs text-muted-foreground flex items-center gap-1"><CreditCard className="w-3 h-3" /> {t('owner_network')}</p>
-                <p className={`text-sm font-bold mt-0.5 ${walletBalance.ownerNetwork >= 0 ? 'text-blue-600' : 'text-red-500'}`}>{fmt(walletBalance.ownerNetwork)}</p>
-                <p className="text-xs text-muted-foreground">+{fmt(monthlySummary.networkIn)} {t('this_month')}</p>
-              </div>
-              <div className="bg-emerald-50 dark:bg-emerald-950/20 rounded-lg p-2">
-                <p className="text-xs text-muted-foreground flex items-center gap-1"><Banknote className="w-3 h-3" /> {t('owner_cash')}</p>
-                <p className={`text-sm font-bold mt-0.5 ${walletBalance.ownerCash >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(walletBalance.ownerCash)}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <div className="bg-emerald-50 dark:bg-emerald-950/20 rounded-lg p-2 text-center">
-                <p className="text-xs text-muted-foreground">{t('cash_in')}</p>
-                <p className="text-sm font-semibold text-emerald-600">{fmt(monthlySummary.ownerIn)}</p>
-              </div>
-              <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-2 text-center">
-                <p className="text-xs text-muted-foreground">{t('cash_out')}</p>
-                <p className="text-sm font-semibold text-red-500">{fmt(monthlySummary.ownerOut)}</p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Branch cash wallets */}
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Building2 className="w-4 h-4 text-primary" />
-              <div>
-                <p className="text-sm font-semibold">{t('branch_cash')}</p>
-                <p className="text-xs text-muted-foreground">{t('branch')}</p>
-              </div>
-            </div>
-            {Object.entries(branchBalances).length === 0 ? (
-              <p className="text-xs text-muted-foreground">{t('no_data')}</p>
-            ) : (
-              <div className="space-y-2">
-                {Object.entries(branchBalances).map(([key, bal]) => (
-                  <div key={key} className="flex items-center justify-between">
-                    <span className="text-sm">{branches.find(b => b.key === key)?.label || key}</span>
-                    <span className={`text-sm font-semibold ${bal >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(bal)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
+          {transactionsError && (
+            <Card className="border-rose-300 bg-rose-50 p-3 text-sm text-rose-700" role="alert">
+              {lang==='ar'?'تعذر تحميل سجل الخزينة بالكامل؛ لا تعرض الأرصدة الجزئية.':
+               lang==='fa'?'بارگذاری کامل دفتر خزانه ناموفق بود؛ مانده ناقص نمایش داده نمی‌شود.':
+               'Unable to load the complete treasury ledger; partial balances are not shown.'}
+            </Card>
+          )}
+          {!transactionsError && <TreasuryERPOverview
+            accounts={scopedAccounts}
+            accountBalances={accountBalances}
+            ledger={treasuryLedgerBalance}
+            walletBalance={walletBalance}
+            branchBalances={branchBalances}
+            branches={branches}
+            monthlySummary={monthlySummary}
+            trendData={trendData}
+            integrity={integrity}
+            payrollEstimate={payrollObligation}
+            fmt={fmt}
+            lang={lang}
+            valueScope={isAllBranches?'all':'selected'}
+            isLoading={isLoading}
+            setTab={setTab}
+            mixedCurrencies={mixedAccountCurrencies}
+          />}
           {/* Sponsor Holdings Summary */}
           {(sponsorSummary.receivedBySponsor > 0 || sponsorSummary.remaining > 0) && (
             <Card className={`p-4 ${sponsorSummary.remaining > 0 ? 'border-amber-300 bg-amber-50/30' : 'border-emerald-200'}`}>
@@ -534,21 +477,8 @@ export default function Treasury() {
             </Card>
           )}
 
-          {/* Payroll obligation */}
-          {payrollObligation > 0 && (
-            <Card className="p-3 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Banknote className="w-4 h-4 text-amber-500" />
-                  <p className="text-sm font-medium">{t('payroll')}</p>
-                </div>
-                <p className="text-sm font-bold text-amber-600">{fmt(payrollObligation)}</p>
-              </div>
-            </Card>
-          )}
-
           {/* Recent transactions */}
-          <Card className="p-4">
+          {!transactionsError && <Card className="p-4">
             <p className="text-sm font-semibold mb-2">{t('details')}</p>
             <div className="space-y-2">
               {transactions.slice(0, 8).map(tx => {
@@ -752,7 +682,7 @@ export default function Treasury() {
                   <Bar dataKey="balance" fill="#6366f1" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </Card>
+            </Card>}
           )}
 
           {/* Type breakdown */}
