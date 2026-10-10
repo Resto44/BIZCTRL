@@ -102,7 +102,9 @@ export function drawSinglePageSalesAnalytics(doc,{snapshot,previousSnapshot=null
   draw(label,146,110+i*10,{size:7.3,maxWidth:28});
   draw(money(value,currency),199,110+i*10,{size:7.3,bold:true,color:navy,align:'right',maxWidth:22});
   const width=part>0?Math.min(55,Math.max(0,Number(value)||0)/part*55):0;
-  if(width>0){doc.setFillColor(...color);doc.rect(barLeft,144,Math.min(55-barLeft+139,width),2,'F');barLeft+=width;}
+  const available=Math.max(0,194-barLeft);
+  const segment=Math.min(available,width);
+  if(segment>0){doc.setFillColor(...color);doc.rect(barLeft,144,segment,2,'F');barLeft+=segment;}
  });
  // Branch summary
  block(7,154,122,57);title(9,156,118,tr.branches);
