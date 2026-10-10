@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { calcInvoiceTotals } from './procurementEngine';
-import { drawLocalizedPdfText, prepareLocalizedPdf, safePdfFilename } from './pdfLocalization';
+import { prepareLocalizedPdf, safePdfFilename } from './pdfLocalization';
+import { renderPurchaseInvoiceReference } from './purchaseInvoiceReferenceLayout';
 
 const WORDS={
   en:{title:'Purchase Invoice',business:'Business',branch:'Branch',supplier:'Supplier',
@@ -81,114 +82,23 @@ export function buildPurchaseInvoiceDocument(invoice,options={}){
     subtotalWithVat,vat,additional,total,paid,remaining:rounded(Math.max(0,total-paid)),
     beforeVAT:rounded(subtotalWithVat-vat),
     difference:Math.abs(total-computed.grandTotal),status:statusOf(invoice),
-    businessName:safe(options.business?.name||options.business?.brand_name||options.brand?.brand_name||'Restaurant'),
-    businessTax:safe(options.business?.tax_number||options.business?.vat_number||options.brand?.vat_registration_number),
-    address:safe(options.brand?.address||options.business?.address),
+    businessName:safe(options.brand?.brand_name||options.business?.settings?.legal_name||options.business?.name||'Restaurant'),
+    businessTax:safe(options.brand?.vat_registration_number||options.business?.tax_number||options.business?.vat_number||options.business?.settings?.tax_number),
+    address:safe(options.brand?.address||options.business?.address||options.branch?.location),
     branch:safe(options.branch?.name||options.branch?.label||invoice.branch),
     currency:invoice.currency||options.currency||'SAR',
   };
 }
-export function createBrandedPurchaseInvoicePDF(invoice,{lang='en',business,brand,branch,currency}={}){
- const language=WORDS[lang]?lang:'en',w=WORDS[language],rtl=language!=='en';
+export function createBrandedPurchaseInvoicePDF(invoice,options={}){
+ const {lang='en',business,brand,branch,currency}=options;
+ const language=WORDS[lang]?lang:'en',rtl=language!=='en';
  const m=buildPurchaseInvoiceDocument(invoice,{business,brand,branch,currency});
  const doc=new jsPDF({format:'a4',orientation:'portrait',unit:'mm',putOnlyUsedFonts:true});
  prepareLocalizedPdf(doc,{lang:language,dir:rtl?'rtl':'ltr'});
- const W=210,L=12,R=198, CW=186, left=x=>rtl?R-x:L+x;
- const write=(value,x,y,{size=8,bold=false,color=NAVY,align,maxWidth}={})=>
-   drawLocalizedPdfText(doc,String(value??'—'),x,y,{rtl,size,bold,color,align:align||(rtl?'right':'left'),maxWidth});
- const rectangle=(x,y,width,height,fill=[248,251,255])=>{
-  doc.setFillColor(...fill);doc.setDrawColor(...BORDER);doc.roundedRect(x,y,width,height,2.4,2.4,'FD');
- };
- const amount=(n)=>cash(n)+' '+m.currency;
- let pageNo=0;
- const header=()=>{
-  pageNo+=1;
-  // Four-part mark inspired by the existing BizCTRL identity. Brand is
-  // identifiable even if the restaurant hasn't uploaded its own logo.
-  const positions=[[0,0],[7.7,0],[0,7.7],[7.7,7.7]];
-  positions.forEach(([dx,dy],i)=>{doc.setFillColor(...(i===1||i===3?CYAN:BLUE));
-    doc.roundedRect(13+dx,10+dy,6.8,6.8,1.1,1.1,'F');});
-  write('BizCTRL',32,20,{size:23,bold:true,align:'left'});
-  write('Restaurant ERP System',32,26.5,{size:7.5,color:MUTED,align:'left'});
-  write(w.title,R,18,{size:16,bold:true,color:NAVY,align:'right'});
-  write(safe(invoice.invoice_number),R,27,{size:9,bold:true,color:BLUE,align:'right'});
-  doc.setDrawColor(...BORDER);doc.line(L,32,R,32);
-  rectangle(L,37,91,40,[244,249,255]);rectangle(107,37,91,40,[248,251,255]);
-  const businessX=rtl?99:16;
-  write(w.business+': '+m.businessName,businessX,45,{size:9.5,bold:true,maxWidth:82});
-  write(w.branch+': '+m.branch,businessX,54,{size:8,maxWidth:82});
-  write(w.taxId+': '+m.businessTax,businessX,62,{size:7.5,maxWidth:82});
-  write(w.address+': '+m.address,businessX,70,{size:7.2,maxWidth:82});
-  const invX=rtl?194:111;
-  write(w.supplier+': '+safe(invoice.supplier_name),invX,45,{size:9.5,bold:true,maxWidth:82});
-  write(w.date+': '+safe(invoice.date),invX,54,{size:8,maxWidth:82});
-  write(w.due+': '+safe(invoice.due_date),invX,62,{size:7.5,maxWidth:82});
-  write(w.status+': '+w[m.status],invX,70,{size:8,bold:true,color:m.status==='approved'?GREEN:BLUE,maxWidth:82});
- };
- const gridTitles=[w.product,w.unit,w.qty,w.price,w.discount,w.tax,w.line];
- const widths=[61,19,14,23,20,20,29];
- const grid=(y)=>{
-  doc.setFillColor(230,242,254);doc.roundedRect(L,y,CW,10,1.4,1.4,'F');
-  let x=L;
-  gridTitles.forEach((name,i)=>{write(name,x+widths[i]/2,y+6.6,{size:7,bold:true,align:'center',maxWidth:widths[i]-2});x+=widths[i]});
- };
- const newPage=()=>{if(pageNo)doc.addPage();header();grid(83);return 95;};
- let y=newPage();
- for (const [i,item] of m.items.entries()){
-  // Printed product descriptions wrap without crossing numeric columns.
-  // Height follows the real number of lines; long invoices keep all items
-  // and continue onto subsequent pages rather than hiding products.
-  const productLines=wrapItem(item.product_name||item.name||item.description);
-  const rowHeight=Math.max(13.5,7+productLines.length*5.6);
-  if(y+rowHeight>264)y=newPage();
-  if(i%2===0){doc.setFillColor(248,251,255);doc.rect(L,y-1,CW,rowHeight,'F');}
-  productLines.forEach((line,k)=>write(line,L+widths[0]/2,y+4.5+k*5.6,
-    {size:7.2,align:'center',maxWidth:widths[0]-3}));
-  const numbers=[
-    safe(item.unit||item.unit_name),String(item.quantity),
-    cash(item.unit_cost),cash(item.discount),cash(calcInvoiceTotals([item]).taxAmount),cash(item.line_total),
-  ];
-  let x=L+widths[0];
-  numbers.forEach((value,j)=>{
-   const col=j+1;
-   write(value,x+widths[col]/2,y+Math.min(7,rowHeight/2),{size:7.1,bold:col===6,
-    color:col===6?BLUE:NAVY,align:'center',maxWidth:widths[col]-3});
-   x+=widths[col];
-  });
-  y+=rowHeight;
- }
- if(!m.items.length){write(w.empty,L+4,y+7,{size:9,color:MUTED,align:'left'});y+=17;}
- // Summary is never placed over the footer or cut off by item overflow.
- if(y>194){doc.addPage();header();y=84;}
- y+=4;
- rectangle(107,y,91,71,[247,251,255]);
- write(w.summary,rtl?194:111,y+8,{size:9,bold:true,color:BLUE});
- const summaryRows=[
-  [w.before,m.beforeVAT],[w.vat,m.vat],[w.additional,m.additional],
-  [w.total,m.total],[w.paid,m.paid],[w.dueAmount,m.remaining],
- ];
- summaryRows.forEach(([label,n],i)=>{
-  const yy=y+17+i*9;
-  if(i===3){doc.setFillColor(223,240,255);doc.rect(109,yy-6,87,9,'F');}
-  write(label,rtl?194:111,yy,{size:i===3?8.5:7.5,bold:i===3,maxWidth:44});
-  write(amount(n),rtl?111:194,yy,{size:i===3?9.5:8,bold:i===3,color:i===5?GREEN:NAVY,
-    align:rtl?'left':'right',maxWidth:42});
+ renderPurchaseInvoiceReference(doc,invoice,m,{
+   lang:language,business,brand,branch,
+   payments:options.payments||[],auditEvents:options.auditEvents||[],
  });
- rectangle(L,y,91,45,[248,251,255]);
- write(w.notes,rtl?99:16,y+9,{size:9,bold:true,color:BLUE});
- write(safe(invoice.notes),rtl?99:16,y+19,{size:7.5,maxWidth:83});
- if(m.difference>.05)write(w.mismatch,rtl?99:16,y+37,{size:6.7,color:[205,73,47],maxWidth:83});
- // No false approval timeline or QR verification; only stored approval state.
- if(m.status==='approved'){
-   write(w.approved,rtl?99:16,y+31,{size:8,bold:true,color:GREEN});
- }else write(w[m.status],rtl?99:16,y+31,{size:8,bold:true,color:BLUE});
- const totalPages=doc.getNumberOfPages();
- for(let p=1;p<=totalPages;p++){
-  doc.setPage(p);doc.setDrawColor(...BORDER);doc.line(L,277,R,277);
-  write(w.generated,rtl?R:L,283,{size:8,bold:true,color:BLUE});
-  write(w.disclaimer,rtl?R:L,288,{size:6.5,color:MUTED,maxWidth:150});
-  write(w.page+' '+p+' '+w.of+' '+totalPages,rtl?L:R,291.2,{size:7,color:MUTED,align:rtl?'left':'right'});
- }
  const filename=safePdfFilename('BizCTRL-Purchase-'+safe(invoice.invoice_number||invoice.id).replace(/[^a-zA-Z0-9_-]/g,''),language);
  return {doc,filename,model:m};
 }
