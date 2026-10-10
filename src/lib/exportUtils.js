@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import {drawERPReportBrand,loadERPReportIcon} from './erpPdfBrand';
 import {
   drawLocalizedPdfText,
   localizePdfColumns,
@@ -34,7 +35,7 @@ export function downloadCSV(filename, headers, rows) {
  * Shared export table. Callers supply already-localized headings and values; the
  * direction and embedded Unicode font follow the selected application language.
  */
-export function downloadPDF({
+export async function downloadPDF({
   filename,
   title,
   subtitle,
@@ -46,13 +47,16 @@ export function downloadPDF({
 }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
   const { rtl } = prepareLocalizedPdf(doc, { lang, dir });
+  const iconData=await loadERPReportIcon();
   const pageW = 210;
   const marginL = 14;
   const marginR = 14;
   const tableW = pageW - marginL - marginR;
   const colW = tableW / Math.max(headers.length, 1);
   const rowH = 8;
-  let y = 14;
+  let y = 31;
+  const drawHeader=()=>drawERPReportBrand(doc,{lang,title,period:subtitle||'',iconData,pageLabel:''});
+  drawHeader();
 
   const drawRow = (values, rowY, { header = false, totals = false } = {}) => {
     const columns = localizePdfColumns(values, rtl);
@@ -68,23 +72,6 @@ export function downloadPDF({
     });
   };
 
-  drawLocalizedPdfText(doc, title, rtl ? pageW - marginR : marginL, y, {
-    rtl,
-    bold: true,
-    size: rtl ? 16 : 15,
-    color: [15, 23, 42],
-  });
-  y += 7;
-
-  if (subtitle) {
-    drawLocalizedPdfText(doc, subtitle, rtl ? pageW - marginR : marginL, y, {
-      rtl,
-      size: rtl ? 10 : 9,
-      color: [100, 100, 100],
-    });
-    y += 7;
-  }
-
   doc.setFillColor(37, 99, 235);
   doc.rect(marginL, y, tableW, rowH, 'F');
   drawRow(headers, y, { header: true });
@@ -93,7 +80,8 @@ export function downloadPDF({
   rows.forEach((row, rowIndex) => {
     if (y > 270) {
       doc.addPage();
-      y = 14;
+      y = 31;
+      drawHeader();
       doc.setFillColor(37, 99, 235);
       doc.rect(marginL, y, tableW, rowH, 'F');
       drawRow(headers, y, { header: true });
@@ -110,13 +98,19 @@ export function downloadPDF({
   if (totalsRow) {
     if (y > 270) {
       doc.addPage();
-      y = 14;
+      y = 31;
+      drawHeader();
     }
     doc.setFillColor(229, 231, 235);
     doc.rect(marginL, y, tableW, rowH, 'F');
     drawRow(totalsRow, y, { totals: true });
   }
 
+  const pageCount=doc.getNumberOfPages();
+  for(let page=1;page<=pageCount;page++){
+    doc.setPage(page);
+    drawERPReportBrand(doc,{lang,title,period:subtitle||'',iconData,pageLabel:page+' / '+pageCount});
+  }
   doc.save(safePdfFilename(filename, lang));
 }
 

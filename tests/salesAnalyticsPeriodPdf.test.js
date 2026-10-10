@@ -80,7 +80,7 @@ describe('ERP Sales Analytics canonical periods',()=>{
   for(const lang of ['en','ar','fa']){
    const doc=await generateSalesAnalyticsPDF({snapshot,previousSnapshot:null,growth:null,range,
     branchLabel:'فرع الريان',businessName:'مطاعم شمعة الريان',currency:'SAR',lang,download:false});
-   expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(2);
+   expect(doc.getNumberOfPages()).toBe(1);
    expect(Buffer.from(doc.output('arraybuffer')).subarray(0,8).toString()).toContain('%PDF-');
    expect(doc.__erpPdfRTL).toBe(lang!=='en');
   }

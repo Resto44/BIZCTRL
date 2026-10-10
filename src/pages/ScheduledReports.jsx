@@ -8,11 +8,15 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Trash2, Mail, Clock, Loader2, Send, CheckCircle2, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { Plus, Trash2, Mail, Clock, Loader2, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { toast } from 'sonner';
+import { useBranchScope } from '@/lib/BranchScopeContext';
+import { salesReportDateRange,buildSalesReportSnapshot,salesReportGrowth } from '@/lib/salesReportPeriod';
+import { buildOperationsPdfReport } from '@/lib/operationsPdfReport';
+import { generateSalesAnalyticsPDF } from '@/lib/salesAnalyticsPdf';
+import { fetchScheduledERPReportData } from '@/lib/scheduledERPReportData';
 import EmptyState from '@/components/shared/EmptyState';
-import { getDateRange, formatDate, formatCurrency } from '@/lib/helpers';
-import { computeExecutiveSummary } from '@/services/salesAnalyticsEngine';
-import { generateUltimatePDF } from '@/lib/pdfGenerator';
+import { formatCurrency } from '@/lib/helpers';
 import { useTenant } from '@/lib/TenantContext';
 import { useSalesSources } from '@/hooks/useSalesSources';
 import { supabase } from '@/api/supabaseClient';
@@ -25,77 +29,53 @@ const FREQ_LABELS = { daily: 'daily', weekly: 'weekly', monthly: 'monthly' };
 
 export default function ScheduledReports() {
   const { t, currency, lang, dir } = useLanguage();
-  const { ownerFilter, branches } = useTenant();
+  const { branches,activeRestaurant } = useTenant();
+  const { selectedBranchId,selectedBranchKey,selectedBranchLabel,isAllBranches } = useBranchScope();
   const { revenueSources } = useSalesSources();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
-  const [sendingId, setSendingId] = useState(null);
-  const [sentId, setSentId] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfDone, setPdfDone] = useState(false);
   const [form, setForm] = useState({ name: '', email_to: '', frequency: 'weekly' });
-  const hasFilter = !!(ownerFilter?.created_by || ownerFilter?.branch);
+
 
   const { data: schedules = [], isLoading } = useQuery({
     queryKey: ['scheduled_reports'],
     queryFn: () => base44.entities.ScheduledReport.list('-created_date'),
   });
 
-  const { data: sales = [] } = useQuery({
-    queryKey: ['sales', ownerFilter],
-    queryFn: () => base44.entities.DailySales.filter(ownerFilter || {}, '-date', 2000),
-    staleTime: 120000,
-    enabled: hasFilter,
+  const reportRange = useMemo(()=>salesReportDateRange('week'),[]);
+  const fromStr=reportRange.from,toStr=reportRange.to;
+  const hasScope=Boolean(activeRestaurant?.id);
+  const { data:reportData,isLoading:loadingERP,isError:reportError }=useQuery({
+    queryKey:['scheduled_erp_pdf',activeRestaurant?.id,selectedBranchId,reportRange.from,reportRange.to],
+    queryFn:()=>fetchScheduledERPReportData({
+      db:supabase,restaurantId:activeRestaurant.id,range:reportRange,
+      branchId:selectedBranchId,branchKey:selectedBranchKey,allBranches:isAllBranches,
+    }),
+    enabled:hasScope,staleTime:120000,
   });
-  const { data: purchases = [] } = useQuery({
-    queryKey: ['purchases_erp', ownerFilter],
-    queryFn: async () => {
-      if (!ownerFilter?.created_by) return [];
-      const { data, error } = await supabase
-        .from('supplier_invoices')
-        .select('*')
-        .eq('created_by', ownerFilter.created_by)
-        .in('approval_status', ['approved', 'auto_approved'])
-        .order('date', { ascending: false })
-        .limit(2000);
-      if (error) return [];
-      return data || [];
-    },
-    staleTime: 120000,
-    enabled: hasFilter,
-  });
-  const { data: expenses = [] } = useQuery({
-    queryKey: ['expenses', ownerFilter],
-    queryFn: () => base44.entities.Expense.filter(ownerFilter || {}, '-date', 2000),
-    staleTime: 120000,
-    enabled: hasFilter,
-  });
-  const { data: walletTransactions = [] } = useQuery({
-    queryKey: ['wallet_transactions', ownerFilter],
-    queryFn: () => base44.entities.WalletTransaction.filter(ownerFilter || {}, '-transaction_date', 500),
-    staleTime: 60000,
-    enabled: hasFilter,
-  });
-  const { data: inventory = [] } = useQuery({
-    queryKey: ['inventory', ownerFilter],
-    queryFn: () => base44.entities.Inventory.list('-date', 2000),
-    staleTime: 300000,
-    enabled: hasFilter,
-  });
-  const { data: brandSettingsList = [] } = useQuery({
-    queryKey: ['brand_settings'],
-    queryFn: () => base44.entities.BrandSettings.list(),
-  });
-
-  // KPI summary using engine
-  // Note: expenseCategories not fetched here; fixed-expense proration will be skipped (treated as variable)
-  const weekKPIs = useMemo(() =>
-    computeExecutiveSummary(sales, purchases, expenses, revenueSources, walletTransactions, []),
-    [sales, purchases, expenses, revenueSources, walletTransactions]
-  );
-  const dr = getDateRange('week');
-  const fromStr = formatDate(dr.from);
-  const toStr = formatDate(dr.to);
+  const emptyData={sales:[],purchases:[],expenses:[],expenseCategories:[],
+    inventory:[],inventoryTransactions:[],customerDebts:[]};
+  const d=reportData||emptyData;
+  const periodSnapshot=useMemo(()=>buildSalesReportSnapshot({
+    sales:d.sales,purchases:d.purchases,expenses:d.expenses,expenseCategories:d.expenseCategories,
+    revenueSources,from:reportRange.from,to:reportRange.to,
+  }),[reportData,revenueSources,reportRange]);
+  const previousSnapshot=useMemo(()=>buildSalesReportSnapshot({
+    sales:d.sales,purchases:d.purchases,expenses:d.expenses,expenseCategories:d.expenseCategories,
+    revenueSources,from:reportRange.previousFrom,to:reportRange.previousTo,
+  }),[reportData,revenueSources,reportRange]);
+  const growth=salesReportGrowth(periodSnapshot,previousSnapshot);
+  const scopedBranches=useMemo(()=>(isAllBranches?branches:
+    branches.filter(b=>String(b.id)===String(selectedBranchId)))
+    .map(b=>({...b,key:b.branch_key||b.key||String(b.id),label:b.name||b.label||b.branch_key||b.key})),
+    [isAllBranches,branches,selectedBranchId]);
+  const operationsReport=useMemo(()=>reportData?buildOperationsPdfReport({
+    branches:scopedBranches,sales:d.sales,purchases:d.purchases,expenses:d.expenses,
+    expenseCategories:d.expenseCategories,inventory:d.inventory,inventoryTransactions:d.inventoryTransactions,
+    customerDebts:d.customerDebts,range:reportRange,revenueSources,
+  }):null,[reportData,scopedBranches,revenueSources,reportRange]);
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.ScheduledReport.create(data),
@@ -112,39 +92,30 @@ export default function ScheduledReports() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scheduled_reports'] }),
   });
 
-  const handleSendNow = async (schedule) => {
-    setSendingId(schedule.id);
-    await new Promise(r => setTimeout(r, 800));
-    setSendingId(null);
-    setSentId(schedule.id);
-    setTimeout(() => setSentId(null), 3000);
-  };
-
-  const handlePDF = async () => {
-    setPdfLoading(true);
-    setPdfDone(false);
-    try {
-      await generateUltimatePDF({
-        sales, purchases, expenses,
-        rangeType: 'week',
-        fromStr, toStr,
-        t, lang, currency,
-        branches: branches.length > 0 ? branches : [{ key: 'main', label: 'Main Branch' }],
-        dir,
-        brandSettings: brandSettingsList[0] || null,
-        inventory,
-        supplierInvoices: purchases,
-        walletTransactions,
-        revenueSources,
-      });
-      setPdfDone(true);
-      setTimeout(() => setPdfDone(false), 3000);
-    } finally {
-      setPdfLoading(false);
+  const handlePDF=async()=>{
+    if(!hasScope||loadingERP||reportError||!reportData){
+      toast.error(lang==='ar'?'بيانات التقرير غير مكتملة؛ لا يمكن التصدير.':
+        lang==='fa'?'اطلاعات گزارش کامل بارگذاری نشده است.':'Report data is incomplete. Export disabled.');
+      return;
     }
+    setPdfLoading(true);setPdfDone(false);
+    try{
+      const doc=await generateSalesAnalyticsPDF({
+        snapshot:periodSnapshot,previousSnapshot,growth,range:reportRange,
+        branchLabel:isAllBranches?(lang==='ar'?'جميع الفروع':lang==='fa'?'تمام شعبه‌ها':'All branches'):selectedBranchLabel,
+        businessName:activeRestaurant?.name||'BizCTRL',currency,lang,dir,
+        operationsReport,download:true,
+      });
+      if(doc.getNumberOfPages()!==1)throw new Error('PDF must be one A4 page');
+      setPdfDone(true);
+      toast.success(lang==='ar'?'تم تنزيل تقرير المبيعات':lang==='fa'?'گزارش فروشات دانلود شد':'Sales Analytics PDF downloaded');
+    }catch(e){
+      console.error('Scheduled sales analytics PDF failed:',e);
+      toast.error(e?.message||'Could not generate PDF');
+    }finally{setPdfLoading(false);}
   };
 
-  const branchLabel = (key) => key === 'all' ? t('all_branches') : (branches?.find(b => b.key === key)?.label || key);
+  const branchLabel = key => key==='all'?t('all_branches'):(branches?.find(b=>b.key===key||b.branch_key===key)?.name||key);
 
   return (
     <div>
@@ -160,14 +131,16 @@ export default function ScheduledReports() {
       {/* Live KPI snapshot */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
         {[
-          { label: t('total_sales'), val: weekKPIs.monthSales, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: t('total_purchase_cost'), val: weekKPIs.monthMetrics?.totalPurchaseCost || 0, icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: t('total_expenses'), val: weekKPIs.monthMetrics?.totalExpensesAll || 0, icon: TrendingDown, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: t('net_profit'), val: weekKPIs.netProfit, icon: weekKPIs.netProfit >= 0 ? TrendingUp : TrendingDown, color: weekKPIs.netProfit >= 0 ? 'text-emerald-700' : 'text-red-600', bg: weekKPIs.netProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50' },
+          {label:t('total_sales'),val:periodSnapshot.sales,icon:TrendingUp,color:'text-emerald-600',bg:'bg-emerald-50'},
+          {label:t('total_purchase_cost'),val:periodSnapshot.purchases,icon:DollarSign,color:'text-blue-600',bg:'bg-blue-50'},
+          {label:t('total_expenses'),val:periodSnapshot.totalExpenses,icon:TrendingDown,color:'text-amber-600',bg:'bg-amber-50'},
+          {label:t('net_profit'),val:periodSnapshot.netProfit,icon:periodSnapshot.netProfit>=0?TrendingUp:TrendingDown,
+            color:periodSnapshot.netProfit>=0?'text-emerald-700':'text-red-600',bg:periodSnapshot.netProfit>=0?'bg-emerald-50':'bg-red-50'},
+
         ].map(({ label, val, icon: KpiIcon, color, bg }) => (
           <Card key={label} className={`p-3 ${bg} border-0`}>
             <KpiIcon className={`w-4 h-4 mb-1 ${color}`} />
-            <p className={`text-base font-bold ${color}`}>{formatCurrency(val, currency)}</p>
+            <p className={`text-base font-bold ${color}`}>{loadingERP?'…':reportError?'—':formatCurrency(val, currency)}</p>
             <p className="text-[10px] text-muted-foreground">{label} ({t('this_week')})</p>
           </Card>
         ))}
@@ -177,16 +150,16 @@ export default function ScheduledReports() {
       <Card className="p-4 mb-4 border-primary/20 bg-primary/5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h3 className="font-semibold text-sm">{t('export_ultimate_pdf')}</h3>
+            <h3 className="font-semibold text-sm">{lang==='ar'?'تقرير تحليلات المبيعات ERP (صفحة واحدة)':lang==='fa'?'گزارش تحلیل فروشات ERP (یک صفحه)':'ERP Sales Analytics PDF · One A4 page'}</h3>
             <p className="text-xs text-muted-foreground">{t('pdf_period')}: {fromStr} → {toStr}</p>
           </div>
           <button
             onClick={handlePDF}
-            disabled={pdfLoading}
+            disabled={pdfLoading || loadingERP || reportError || !hasScope || !reportData}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${pdfDone ? 'text-emerald-600 border-emerald-300 bg-emerald-50' : 'bg-primary text-primary-foreground border-primary hover:bg-primary/90'}`}
           >
             {pdfLoading ? <span className="animate-spin">⏳</span> : pdfDone ? '✓' : <FileText className="w-4 h-4" />}
-            {pdfLoading ? t('generating_pdf') : pdfDone ? t('pdf_ready') : t('export_ultimate_pdf')}
+            {pdfLoading ? t('generating_pdf') : pdfDone ? t('pdf_ready') : (lang==='ar'?'تحميل تقرير المبيعات':lang==='fa'?'دانلود گزارش فروشات':'Export Sales Analytics PDF')}
           </button>
         </div>
       </Card>
@@ -255,17 +228,9 @@ export default function ScheduledReports() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs gap-1"
-                    onClick={() => handleSendNow(s)}
-                    disabled={sendingId === s.id}
-                  >
-                    {sendingId === s.id ? <Loader2 className="w-3 h-3 animate-spin" />
-                      : sentId === s.id ? <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                      : <Send className="w-3 h-3" />}
-                    {sentId === s.id ? '✓' : t('export')}
+                  <Button size="sm" variant="outline" className="h-8 text-xs gap-1"
+                    onClick={handlePDF} disabled={pdfLoading || loadingERP || reportError || !reportData}>
+                    <FileText className="w-3 h-3"/>{t('export')}
                   </Button>
                   <Switch
                     checked={!!s.is_active}
@@ -283,7 +248,7 @@ export default function ScheduledReports() {
 
       <div className="mt-6 p-4 rounded-xl bg-muted text-xs text-muted-foreground">
         <p className="font-medium mb-1">📅 {t('scheduled_reports')}</p>
-        <p>{t('pdf_disclaimer')}</p>
+        <p>{t('pdf_disclaimer')} · {"AR / EN / FA · PDF A4 · 1 / 1"}</p>
       </div>
     </div>
   );
