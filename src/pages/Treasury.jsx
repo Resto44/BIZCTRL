@@ -378,6 +378,27 @@ export default function Treasury() {
 
   const fmt = (v) => formatCurrency(v, currency);
 
+  // Never display an apparently balanced/zero ledger in ANY Treasury tab after
+  // a failed financial read. These screens drive actual payment decisions.
+  if (transactionsError || accountsError) {
+    const message=lang==='ar'
+      ? 'تعذر تحميل دفتر الخزينة بالكامل. لم تُعرض أي أرصدة جزئية.'
+      :lang==='fa'
+      ? 'بارگذاری کامل دفتر خزانه ناموفق بود؛ هیچ مانده ناقصی نشان داده نمی‌شود.'
+      : 'The complete Treasury ledger could not be loaded. No partial balances are displayed.';
+    return <div className="mx-auto max-w-2xl p-4">
+      <Card role="alert" className="rounded-2xl border-rose-300 bg-rose-50 p-5 text-rose-800">
+        <div className="flex items-start gap-3"><AlertTriangle className="h-6 w-6 shrink-0"/>
+          <div><h2 className="font-extrabold">Treasury data unavailable</h2><p className="mt-2 text-sm">{message}</p></div>
+        </div>
+        <Button type="button" className="mt-4" onClick={()=>{
+          qc.invalidateQueries({queryKey:['wallet_transactions',activeRestaurant?.id,selectedBranchId]});
+          qc.invalidateQueries({queryKey:['treasury_accounts',activeRestaurantId]});
+        }}>{lang==='ar'?'إعادة المحاولة':lang==='fa'?'تلاش دوباره':'Retry loading'}</Button>
+      </Card>
+    </div>;
+  }
+
   return (
     <div>
       <PageHeader
