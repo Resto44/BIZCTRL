@@ -21,7 +21,7 @@ import {
 import { base44, supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { drawLocalizedPdfText, prepareLocalizedPdf, safePdfFilename } from '@/lib/pdfLocalization';
-import { drawERPReportBrand } from '@/lib/erpPdfBrand';
+import { drawERPReportBrand,loadERPReportIcon } from '@/lib/erpPdfBrand';
 import { useTenant } from '@/lib/TenantContext';
 import { formatCurrency } from '@/lib/helpers';
 import { useSalesSources } from '@/hooks/useSalesSources';
@@ -409,7 +409,8 @@ export default function ProfitLoss() {
 
   const downloadCSV = () => downloadBlob(csvFromRows(exportData), `financial-analysis_${range.from}_${range.to}.csv`, 'text/csv;charset=utf-8');
   const downloadExcel = () => downloadBlob(xlsFromRows(exportData), `financial-analysis_${range.from}_${range.to}.xls`, 'application/vnd.ms-excel');
-  const downloadPDF = () => {
+  const downloadPDF = async () => {
+    const iconData=await loadERPReportIcon();
     const pdf = new jsPDF({ unit: 'pt', format: 'a4', putOnlyUsedFonts: true });
     const { rtl } = prepareLocalizedPdf(pdf, { lang, dir });
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -436,7 +437,7 @@ export default function ProfitLoss() {
     const pages=pdf.getNumberOfPages();
     for(let page=1;page<=pages;page++){
       pdf.setPage(page);
-      drawERPReportBrand(pdf,{lang,title:heading,period:range.from+' — '+range.to,
+      drawERPReportBrand(pdf,{lang,title:heading,iconData,period:range.from+' — '+range.to,
         pageLabel:page+' / '+pages});
     }
     pdf.save(safePdfFilename(`financial-analysis_${range.from}_${range.to}`, lang));
