@@ -122,7 +122,7 @@ export default function Treasury() {
       allBranches: isAllBranches, legacyColumn, orderColumn,
     });
 
-  const { data: accounts = [] } = useQuery({
+  const { data: accounts = [], isLoading: accountsLoading, isError: accountsError } = useQuery({
     queryKey: ['treasury_accounts', activeRestaurantId],
     queryFn: () => base44.entities.TreasuryAccount.filter({ restaurant_id: activeRestaurantId }, 'account_name', 500),
     staleTime: 30000,
@@ -413,14 +413,14 @@ export default function Treasury() {
 
         {/* ── OVERVIEW ────────────────────────────────────────────────── */}
         <TabsContent value="overview" className="mt-3 space-y-3">
-          {transactionsError && (
+          {(transactionsError || accountsError) && (
             <Card className="border-rose-300 bg-rose-50 p-3 text-sm text-rose-700" role="alert">
               {lang==='ar'?'تعذر تحميل سجل الخزينة بالكامل؛ لا تعرض الأرصدة الجزئية.':
                lang==='fa'?'بارگذاری کامل دفتر خزانه ناموفق بود؛ مانده ناقص نمایش داده نمی‌شود.':
                'Unable to load the complete treasury ledger; partial balances are not shown.'}
             </Card>
           )}
-          {!transactionsError && <TreasuryERPOverview
+          {!transactionsError && !accountsError && <TreasuryERPOverview
             accounts={scopedAccounts}
             accountBalances={accountBalances}
             ledger={treasuryLedgerBalance}
@@ -434,7 +434,7 @@ export default function Treasury() {
             fmt={fmt}
             lang={lang}
             valueScope={isAllBranches?'all':'selected'}
-            isLoading={isLoading}
+            isLoading={isLoading || accountsLoading}
             setTab={setTab}
             mixedCurrencies={mixedAccountCurrencies}
           />}
@@ -478,7 +478,7 @@ export default function Treasury() {
           )}
 
           {/* Recent transactions */}
-          {!transactionsError && <Card className="p-4">
+          {!transactionsError && !accountsError && <Card className="p-4">
             <p className="text-sm font-semibold mb-2">{t('details')}</p>
             <div className="space-y-2">
               {transactions.slice(0, 8).map(tx => {
@@ -508,6 +508,7 @@ export default function Treasury() {
 
         {/* ── ACCOUNTS ────────────────────────────────────────────────── */}
         <TabsContent value="accounts" className="mt-3 space-y-3">
+          {(transactionsError || accountsError) && <Card role="alert" className="border-rose-300 bg-rose-50 p-3 text-sm text-rose-700">Unable to load the complete Treasury ledger. Account balances are temporarily unavailable.</Card>}
           <Card className="p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
@@ -518,11 +519,11 @@ export default function Treasury() {
             </div>
           </Card>
 
-          {accounts.length === 0 ? (
+          {(transactionsError || accountsError) ? null : scopedAccounts.length === 0 ? (
             <Card className="p-8 text-center"><WalletCards className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" /><p className="text-sm font-medium">{local('No Treasury accounts')}</p><p className="mt-1 text-xs text-muted-foreground">{local('Create an account to link every Treasury transaction and track its balance.')}</p>{isOwner && <Button size="sm" className="mt-4" onClick={openCreateAccount}>{local('Create Account')}</Button>}</Card>
           ) : (
             <div className="grid gap-3 lg:grid-cols-2">
-              {accounts.map((account) => {
+              {scopedAccounts.map((account) => {
                 const balance = accountBalances[account.id] || 0;
                 const linkedCount = transactions.filter((transaction) => transaction.account_id === account.id).length;
                 const accountType = TREASURY_ACCOUNT_TYPES.find((type) => type.value === account.account_type)?.label || account.account_type;
