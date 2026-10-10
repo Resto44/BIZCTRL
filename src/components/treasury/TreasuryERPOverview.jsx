@@ -19,7 +19,7 @@ const textByLanguage={
   orphan:'Transactions referring to unlisted accounts',inspect:'Review reconciliation',
   accountsAction:'Manage accounts',txAction:'All transactions',noData:'No recorded data',all:'All branches',
   selected:'Selected branch',active:'Active',inactive:'Inactive',negativeInfo:'A negative ledger is not automatically a bug. Review opening balances and recorded movements.',
-  payroll:'Estimated base payroll per month',
+  payroll:'Estimated base payroll per month',multi:'Different account currencies cannot be combined without FX rates.',
  },
  ar:{
   title:'مركز إدارة الخزينة',subtitle:'الحركات المسجلة وأرصدة الحسابات وحالة التسوية',
@@ -33,7 +33,7 @@ const textByLanguage={
   orphan:'حركات تشير لحسابات غير ظاهرة',inspect:'مراجعة المطابقة',
   accountsAction:'إدارة الحسابات',txAction:'جميع الحركات',noData:'لا توجد بيانات مسجلة',all:'جميع الفروع',
   selected:'الفرع المحدد',active:'نشط',inactive:'غير نشط',negativeInfo:'الرصيد السالب لا يعني خطأً تلقائياً. راجع الرصيد الافتتاحي والحركات المسجلة.',
-  payroll:'تقدير الرواتب الأساسية شهرياً',
+  payroll:'تقدير الرواتب الأساسية شهرياً',multi:'لا يمكن جمع حسابات بعملات مختلفة دون سعر صرف معتمد.',
  },
  fa:{
   title:'مرکز مدیریت خزانه',subtitle:'گردش ثبت‌شده، مانده حساب‌ها و وضعیت تسویه',
@@ -47,12 +47,12 @@ const textByLanguage={
   orphan:'تراکنش‌های متصل به حساب نامشخص',inspect:'بررسی تطبیق',
   accountsAction:'مدیریت حساب‌ها',txAction:'همه تراکنش‌ها',noData:'داده ثبت نشده',all:'همه شعبه‌ها',
   selected:'شعبه انتخابی',active:'فعال',inactive:'غیرفعال',negativeInfo:'مانده منفی به‌تنهایی نشانه باگ نیست؛ مانده اولیه و تراکنش‌ها را بررسی کنید.',
-  payroll:'برآورد ماهانه حقوق پایه',
+  payroll:'برآورد ماهانه حقوق پایه',multi:'حساب‌های دارای ارز متفاوت بدون نرخ تبدیل معتبر جمع نمی‌شوند.',
  },
 };
 const tone=n=>Number(n)<0?'text-rose-600 dark:text-rose-400':'text-emerald-600 dark:text-emerald-400';
 const Card=({children,className=''})=><section className={'rounded-[22px] border border-slate-200/90 bg-white p-4 shadow-sm dark:border-slate-700/70 dark:bg-slate-900 '+className}>{children}</section>;
-const Money=({value,fmt,className=''})=><span dir="ltr" className={'block break-words font-black tracking-tight tabular-nums '+tone(value)+' '+className}>{fmt(Number(value)||0)}</span>;
+const Money=({value,fmt,className=''})=><span dir="ltr" className={'block break-words font-black tracking-tight tabular-nums '+tone(value)+' '+className}>{value==null?'—':fmt(Number(value)||0)}</span>;
 function Header({icon:Icon,title,hint,action}){
  return <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
   <div className="flex min-w-0 items-center gap-2">
@@ -69,7 +69,7 @@ const Mini=({title,value,fmt,icon:Icon,color='emerald'})=><div className={'min-w
 export default function TreasuryERPOverview({
  accounts=[],accountBalances={},ledger=0,walletBalance={},
  branchBalances={},branches=[],monthlySummary={},trendData=[],
- integrity={},fmt,valueScope='all',setTab,payrollEstimate=0,lang='en',isLoading=false,
+ integrity={},fmt,currency='SAR',valueScope='all',setTab,payrollEstimate=0,lang='en',isLoading=false,mixedCurrencies=false,
 }){
  const tr=textByLanguage[lang]||textByLanguage.en;
  const balanceRows=accounts.slice(0,6);
@@ -88,15 +88,15 @@ export default function TreasuryERPOverview({
       <div className="mt-4 rounded-xl border border-white/20 bg-white/10 px-3 py-3">
         <span className="text-xs text-blue-100">{tr.ledger}</span>
         {isLoading?<p className="mt-2 text-sm text-blue-100">…</p>:
-         <p dir="ltr" className="mt-1 break-words text-3xl font-black tracking-tight tabular-nums">{accounts.length?fmt(ledger):'—'}</p>}
-        <p className="mt-1 text-[10px] text-blue-200">{accounts.length} {tr.accounts} · {tr.negativeInfo}</p>
+         <p dir="ltr" className="mt-1 break-words text-3xl font-black tracking-tight tabular-nums">{accounts.length&&!mixedCurrencies&&ledger!=null?fmt(ledger):'—'}</p>}
+        <p className="mt-1 text-[10px] text-blue-200">{accounts.length} {tr.accounts} · {mixedCurrencies?tr.multi:tr.negativeInfo}</p>
       </div>
     </div>
     <div className="grid grid-cols-2 gap-2.5 p-3 sm:grid-cols-4">
-      <Mini icon={CreditCard} title={tr.ownerNetwork} value={walletBalance.ownerNetwork} fmt={fmt} color="blue"/>
-      <Mini icon={Banknote} title={tr.ownerCash} value={walletBalance.ownerCash} fmt={fmt}/>
-      <Mini icon={ArrowDownLeft} title={tr.inflows} value={monthlySummary.ownerIn} fmt={fmt}/>
-      <Mini icon={ArrowUpRight} title={tr.outflows} value={monthlySummary.ownerOut} fmt={fmt} color="rose"/>
+      <Mini icon={CreditCard} title={tr.ownerNetwork} value={isLoading?null:walletBalance.ownerNetwork} fmt={fmt} color="blue"/>
+      <Mini icon={Banknote} title={tr.ownerCash} value={isLoading?null:walletBalance.ownerCash} fmt={fmt}/>
+      <Mini icon={ArrowDownLeft} title={tr.inflows} value={isLoading?null:monthlySummary.ownerIn} fmt={fmt}/>
+      <Mini icon={ArrowUpRight} title={tr.outflows} value={isLoading?null:monthlySummary.ownerOut} fmt={fmt} color="rose"/>
     </div>
     <p className="px-4 pb-3 text-[11px] text-muted-foreground">{tr.notBank}</p>
   </Card>
@@ -107,7 +107,12 @@ export default function TreasuryERPOverview({
      {balanceRows.map(account=><div key={account.id} className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/70">
        <div className="min-w-0"><div className="flex items-center gap-1.5 text-xs font-bold"><span className="h-2 w-2 shrink-0 rounded-full bg-blue-500"/><span className="truncate">{account.account_name}</span></div>
          <span className="text-[10px] text-muted-foreground">{account.is_active===false?tr.inactive:tr.active} · {account.account_type}</span></div>
-       <Money value={accountBalances[account.id]||0} fmt={fmt} className="shrink-0 text-sm"/>
+       <Money value={isLoading?null:accountBalances[account.id]??0}
+         fmt={value=>{
+           const unit=account.currency||currency;
+           try{return new Intl.NumberFormat('en-US',{style:'currency',currency:unit,minimumFractionDigits:0,maximumFractionDigits:2}).format(value);}
+           catch{return fmt(value);}
+         }} className="shrink-0 text-sm"/>
      </div>)}
    </div>:<p className="text-xs text-muted-foreground">{tr.noData}</p>}
   </Card>
