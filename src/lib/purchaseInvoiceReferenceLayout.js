@@ -1,5 +1,6 @@
 import QRCode from 'qrcode';
 import { drawLocalizedPdfText } from './pdfLocalization';
+import {drawBizCTRLReportIcon} from './erpPdfBrand';
 import { calcPurchaseLine } from './procurementEngine';
 
 const LANGUAGE = {
@@ -116,12 +117,7 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{lang='en',busi
   doc.roundedRect(x,y-3,4.4,5.6,.5,.5,'S');
   doc.line(x+.9,y-1.8,x+3.4,y-1.8);doc.line(x+.9,y-.1,x+3,y-.1);
  };
- const brandMark=(x,y,scale=1)=>{
-  const sz=5.5*scale, gap=1.15*scale;
-  [[0,0,BLUE],[1,0,CYAN],[0,1,BLUE],[1,1,CYAN]].forEach(([cx,cy,color])=>{
-   doc.setFillColor(...color);doc.roundedRect(x+cx*(sz+gap),y+cy*(sz+gap),sz,sz,1*scale,1*scale,'F');
-  });
- };
+ const brandMark=(x,y,scale=1)=>drawBizCTRLReportIcon(doc,x,y,11.9*scale);
  const smallHeading=(s,x,y,accent=BLUE)=>{roundedBox(x,y-5,5,5,[235,245,255],null,1);icon(x+.45,y-.2,'doc',accent);
   txt(s,x+8,y,{size:8.8,bold:true,color:NAVY,limit:30,align:'left'});};
  const drawHeader=(continuation=false)=>{
