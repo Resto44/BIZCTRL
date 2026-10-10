@@ -83,7 +83,10 @@ describe('Branded Purchase Invoice PDF and WhatsApp',()=>{
   expect(list).toContain('onDownloadPDF');
   expect(list).toContain('onSharePDF');
   expect(purchases).toContain('activeRestaurant?.id');
-  expect(purchases).toContain('purchasePdfOptions(inv)');
+  expect(purchases).toContain('purchasePdfOptions(inv,evidence)');
+  expect(purchases).toContain(".eq('invoice_id',inv.id)");
+  expect(purchases).toContain(".eq('entity_id',inv.id)");
+  expect(purchases).toContain(".eq('restaurant_id',activeRestaurant.id)");
   expect(sharePurchaseInvoicePDF).toBeTypeOf('function');
  });
 });
