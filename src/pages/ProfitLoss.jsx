@@ -21,6 +21,7 @@ import {
 import { base44, supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { drawLocalizedPdfText, prepareLocalizedPdf, safePdfFilename } from '@/lib/pdfLocalization';
+import { drawERPReportBrand } from '@/lib/erpPdfBrand';
 import { useTenant } from '@/lib/TenantContext';
 import { formatCurrency } from '@/lib/helpers';
 import { useSalesSources } from '@/hooks/useSalesSources';
@@ -421,17 +422,23 @@ export default function ProfitLoss() {
       .filter((value) => value !== undefined && value !== null && value !== '')
       .map((value) => typeof value === 'string' ? translateLiteral(value) : value)
       .join('   |   '))];
-    let y = 42;
+    let y = 96;
     lines.forEach((line, index) => {
       pdf.setFont(rtl ? 'NotoNaskhArabic' : 'helvetica', index === 0 ? 'bold' : 'normal');
       pdf.setFontSize(index === 0 ? 17 : 10);
       const wrapped = pdf.splitTextToSize(String(line), 510);
       wrapped.forEach((part) => {
-        if (y > pageHeight - 42) { pdf.addPage(); y = 42; }
+        if (y > pageHeight - 60) { pdf.addPage(); y = 96; }
         drawLocalizedPdfText(pdf, part, rtl ? right : left, y, { rtl, bold: index === 0, size: index === 0 ? 17 : 10, color: [15, 23, 42], align: rtl ? 'right' : 'left', maxWidth: 510 });
         y += index === 0 ? 20 : 14;
       });
     });
+    const pages=pdf.getNumberOfPages();
+    for(let page=1;page<=pages;page++){
+      pdf.setPage(page);
+      drawERPReportBrand(pdf,{lang,title:heading,period:range.from+' — '+range.to,
+        pageLabel:page+' / '+pages});
+    }
     pdf.save(safePdfFilename(`financial-analysis_${range.from}_${range.to}`, lang));
   };
   const printReport = () => {
