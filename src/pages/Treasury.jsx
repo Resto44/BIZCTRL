@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
@@ -36,6 +37,7 @@ import ReconciliationDashboard from '@/components/treasury/ReconciliationDashboa
 import CashflowProjection from '@/components/treasury/CashflowProjection';
 import OwnerPersonalFinance from '@/components/treasury/OwnerPersonalFinance';
 import { useNotify } from '@/lib/useNotify';
+import { buildTreasuryEntry, treasurySaveErrorMessage } from '@/lib/treasuryEntryValidation';
 import TreasuryERPOverview from '@/components/treasury/TreasuryERPOverview';
 import { fetchCompleteTreasuryRows, accountsForTreasuryScope, treasuryIntegrity } from '@/lib/treasuryLedgerRead';
 import {
@@ -105,6 +107,9 @@ export default function Treasury() {
   const local = (value) => translateLiteral?.(value) || value;
   const [tab, setTab] = useState('overview');
   const [showForm, setShowForm] = useState(false);
+  const [transactionError, setTransactionError] = useState('');
+  const pendingTransactionId = useRef(null);
+  const submissionLock = useRef(false);
   const [form, setForm] = useState(emptyForm);
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [accountForm, setAccountForm] = useState(emptyAccountForm);
@@ -199,12 +204,12 @@ export default function Treasury() {
       setEditingAccount(null);
       setAccountForm(emptyAccountForm);
     },
-    onError: (error) => notif.error(error?.message || local('Unable to save Treasury account.')),
+    onError: (error) => toast.error(error?.message || local('Unable to save Treasury account.')),
   });
   const accountStatusMut = useMutation({
     mutationFn: ({ id, is_active }) => base44.entities.TreasuryAccount.update(id, { is_active }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['treasury_accounts'] }),
-    onError: (error) => notif.error(error?.message || local('Unable to update Treasury account status.')),
+    onError: (error) => toast.error(error?.message || local('Unable to update Treasury account status.')),
   });
   const accountDeleteMut = useMutation({
     mutationFn: (id) => base44.entities.TreasuryAccount.delete(id),
@@ -214,13 +219,22 @@ export default function Treasury() {
     },
     onError: (error) => {
       setDeleteAccountId(null);
-      notif.error(error?.message || local('Accounts with transactions must be deactivated instead of deleted.'));
+      toast.error(error?.message || local('Accounts with transactions must be deactivated instead of deleted.'));
     },
   });
 
   const saveMut = useMutation({
-    mutationFn: d => base44.entities.WalletTransaction.create(d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['wallet_transactions'] }); setShowForm(false); setForm(emptyForm); },
+    mutationFn: async (payload) => {
+      try {return await base44.entities.WalletTransaction.create(payload);}
+      catch(error){
+        if(error?.code==='23505' && payload.id){
+          const {data}=await supabase.from('wallet_transactions').select('id,restaurant_id')
+            .eq('id',payload.id).eq('restaurant_id',payload.restaurant_id).maybeSingle();
+          if(data?.id===payload.id)return data;
+        }
+        throw error;
+      }
+    },
   });
   const deleteMut = useMutation({
     mutationFn: id => base44.entities.WalletTransaction.delete(id),
@@ -331,38 +345,36 @@ export default function Treasury() {
   };
 
   const handleSave = async () => {
-    if (!form.type || !form.amount || !form.date) return;
-    const meta = TYPE_META[form.type];
-    const amount = Number(form.amount);
-    const selectedAccount = activeAccounts.find((account) => account.id === form.account_id);
-    if (!selectedAccount) {
-      notif.error(local('Select an active Treasury account.'));
-      return;
-    }
-    const formBranch = branches.find((branch) => (branch.key || branch.branch_key) === form.branch) || null;
-    saveMut.mutate({
-      transaction_date: form.date,
-      transaction_type: form.type,
-      account_id: selectedAccount.id,
-      branch: form.branch || selectedAccount.branch_key || selectedBranchKey || '',
-      branch_id: formBranch?.id || selectedAccount.branch_id || (isAllBranches ? null : selectedBranchId),
-      amount,
-      payment_method: form.payment_method,
-      description: form.description || null,
-      wallet: meta?.wallet || accountWalletKey(selectedAccount),
-      direction: meta?.direction || 'out',
-      restaurant_id: activeRestaurantId,
-    });
-    // Fire notification based on type
-    if (form.type?.startsWith('branch_to_owner')) {
-      notif.branchToOwner({ branch: form.branch, amount });
-    } else if (form.type === 'owner_to_branch_funding') {
-      notif.ownerToBranch({ branch: form.branch, amount });
-    } else if (form.type?.startsWith('credit_collection')) {
-      notif.creditCollection({ branch: form.branch, amount });
-    } else if (form.type === 'salary_advance') {
-      notif.salaryAdvance({ branch: form.branch, amount, employeeName: form.description || 'Employee' });
-    }
+    if(submissionLock.current||saveMut.isPending)return;
+    submissionLock.current=true;
+    setTransactionError('');
+    try{
+      const selectedAccount=activeAccounts.find(a=>a.id===form.account_id);
+      const payload=buildTreasuryEntry({
+        form,account:selectedAccount,meta:TYPE_META[form.type],branches,
+        restaurantId:activeRestaurantId,selectedBranchId,selectedBranchKey,isAllBranches,
+      });
+      pendingTransactionId.current ||= crypto.randomUUID();
+      const confirmed=await saveMut.mutateAsync({...payload,id:pendingTransactionId.current});
+      if(!confirmed?.id)throw new Error('Server did not confirm a saved transaction.');
+      qc.invalidateQueries({queryKey:['wallet_transactions']});
+      qc.invalidateQueries({queryKey:['treasury_accounts']});
+      setShowForm(false);setForm(emptyForm);pendingTransactionId.current=null;
+      toast.success(local('Transaction saved successfully.'));
+      try{
+        const amount=payload.amount,branch=payload.branch;
+        if(payload.transaction_type?.startsWith('branch_to_owner'))notif.branchToOwner({branch,amount});
+        else if(payload.transaction_type==='owner_to_branch_funding')notif.ownerToBranch({branch,amount});
+        else if(payload.transaction_type?.startsWith('credit_collection'))notif.creditCollection({branch,amount});
+        else if(payload.transaction_type==='salary_advance')notif.salaryAdvance({
+          branch,amount,employeeName:payload.description||'Employee',
+        });
+      }catch(notificationError){console.warn('Treasury push notification unavailable:',notificationError);}
+    }catch(error){
+      const message=treasurySaveErrorMessage(error);
+      setTransactionError(message);
+      toast.error(message);
+    }finally{submissionLock.current=false;}
   };
 
   const typeConfig = form.type ? TYPE_META[form.type] : null;
@@ -730,7 +742,7 @@ export default function Treasury() {
       </Tabs>
 
       {/* Add transaction dialog */}
-      <Dialog open={showForm} onOpenChange={v => { setShowForm(v); if (!v) setForm(emptyForm); }}>
+      <Dialog open={showForm} onOpenChange={v => { if(saveMut.isPending)return; setShowForm(v); if(!v){setForm(emptyForm);setTransactionError('');pendingTransactionId.current=null;} }}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-md overflow-y-auto">
           <DialogHeader><DialogTitle>{t('add_transaction')}</DialogTitle></DialogHeader>
           <div className="space-y-3">
@@ -738,8 +750,9 @@ export default function Treasury() {
               <Label className="text-xs">{t('transaction_type')} *</Label>
               <Select value={form.type} onValueChange={v => {
                 const meta = TYPE_META[v];
-                set('type', v);
-                if (meta) { set('wallet', meta.wallet); }
+                setTransactionError('');
+                setForm(current=>({...current,type:v,wallet:meta?.wallet||current.wallet,
+                  branch:current.branch||(!isAllBranches?selectedBranchKey||'':'')}));
               }}>
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder={local('Select transaction type')} />
@@ -769,9 +782,10 @@ export default function Treasury() {
               <Label className="text-xs">{local('Treasury Account')} *</Label>
               <Select value={form.account_id} onValueChange={(value) => {
                 const account = activeAccounts.find((item) => item.id === value);
-                set('account_id', value);
-                if (account?.branch_key && !form.branch) set('branch', account.branch_key);
-                if (account) set('wallet', accountWalletKey(account));
+                setTransactionError('');
+                setForm(current=>({...current,account_id:value,
+                  branch:current.branch||account?.branch_key||(!isAllBranches?selectedBranchKey||'':''),
+                  wallet:account?accountWalletKey(account):current.wallet}));
               }}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder={local('Select account')} /></SelectTrigger>
                 <SelectContent>{activeAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.account_name} · {fmt(accountBalances[account.id] || 0)}</SelectItem>)}</SelectContent>
@@ -786,27 +800,33 @@ export default function Treasury() {
 
             {showBranch && (
               <div><Label className="text-xs">{local('Branch')}</Label><BranchSelect value={form.branch} onChange={(branchKey) => {
+                setTransactionError('');
                 set('branch', branchKey);
-                setSelectedBranchId(branchKey === 'all' ? 'all' : branches.find((branch) => (branch.key || branch.branch_key) === branchKey)?.id || 'all');
               }} /></div>
             )}
 
             <div>
               <Label className="text-xs">{local('Payment Method')}</Label>
-              <Select value={form.payment_method} onValueChange={v => set('payment_method', v)}>
+              <Select value={form.payment_method} onValueChange={v => {setTransactionError('');set('payment_method',v);}}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">{local('Cash')}</SelectItem>
                   <SelectItem value="network">{local('Network')}</SelectItem>
-                  <SelectItem value="both">{local('Both')}</SelectItem>
+                  <SelectItem value="both">{local('Both')} — {local('Split required')}</SelectItem>
                 </SelectContent>
               </Select>
+              {form.payment_method==='both'&&<p role="alert" className="mt-1 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                {lang==='ar'?'اختر نقداً أو شبكة. إذا تم الدفع بالطريقتين، سجّل حركتين منفصلتين بمبالغ دقيقة.':
+                 lang==='fa'?'نقد یا شبکه را انتخاب کن. برای پرداخت ترکیبی، دو تراکنش جدا با مبلغ مشخص ثبت کن.':
+                 'Select Cash or Network. For mixed payments record two transactions with exact amounts.'}
+              </p>}
             </div>
 
             <div><Label className="text-xs">{local('Description / Notes')}</Label><Input value={form.description} onChange={e => set('description', e.target.value)} /></div>
 
+            {transactionError&&<p role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs font-semibold text-rose-800">{transactionError}</p>}
             <div className="flex flex-col gap-2 pt-1 sm:flex-row">
-              <Button className="w-full sm:flex-1" onClick={handleSave} disabled={saveMut.isPending || !form.type || !form.account_id || !form.amount}>{local('Save')}</Button>
+              <Button className="w-full sm:flex-1" onClick={handleSave} disabled={saveMut.isPending || !form.type || !form.account_id || !form.amount || form.payment_method==='both'}>{saveMut.isPending?local('Saving...'):local('Save')}</Button>
               <Button variant="outline" className="w-full sm:flex-1" onClick={() => setShowForm(false)}>{local('Cancel')}</Button>
             </div>
           </div>
