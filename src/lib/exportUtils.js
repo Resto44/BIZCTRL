@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import {drawERPReportBrand} from './erpPdfBrand';
+import {drawERPReportBrand,loadERPReportIcon} from './erpPdfBrand';
 import {
   drawLocalizedPdfText,
   localizePdfColumns,
@@ -35,7 +35,7 @@ export function downloadCSV(filename, headers, rows) {
  * Shared export table. Callers supply already-localized headings and values; the
  * direction and embedded Unicode font follow the selected application language.
  */
-export function downloadPDF({
+export async function downloadPDF({
   filename,
   title,
   subtitle,
@@ -47,6 +47,7 @@ export function downloadPDF({
 }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
   const { rtl } = prepareLocalizedPdf(doc, { lang, dir });
+  const iconData=await loadERPReportIcon();
   const pageW = 210;
   const marginL = 14;
   const marginR = 14;
@@ -54,7 +55,7 @@ export function downloadPDF({
   const colW = tableW / Math.max(headers.length, 1);
   const rowH = 8;
   let y = 31;
-  const drawHeader=()=>drawERPReportBrand(doc,{lang,title,period:subtitle||'',pageLabel:''});
+  const drawHeader=()=>drawERPReportBrand(doc,{lang,title,period:subtitle||'',iconData,pageLabel:''});
   drawHeader();
 
   const drawRow = (values, rowY, { header = false, totals = false } = {}) => {
@@ -108,7 +109,7 @@ export function downloadPDF({
   const pageCount=doc.getNumberOfPages();
   for(let page=1;page<=pageCount;page++){
     doc.setPage(page);
-    drawERPReportBrand(doc,{lang,title,period:subtitle||'',pageLabel:page+' / '+pageCount});
+    drawERPReportBrand(doc,{lang,title,period:subtitle||'',iconData,pageLabel:page+' / '+pageCount});
   }
   doc.save(safePdfFilename(filename, lang));
 }
