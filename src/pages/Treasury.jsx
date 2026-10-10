@@ -432,6 +432,7 @@ export default function Treasury() {
             integrity={integrity}
             payrollEstimate={payrollObligation}
             fmt={fmt}
+            currency={currency}
             lang={lang}
             valueScope={isAllBranches?'all':'selected'}
             isLoading={isLoading || accountsLoading}
