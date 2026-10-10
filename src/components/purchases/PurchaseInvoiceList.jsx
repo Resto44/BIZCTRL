@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/lib/LanguageContext';
-import { Pencil, Trash2, CheckCircle2, Clock, AlertCircle, Eye, Square, CheckSquare } from 'lucide-react';
+import { Pencil, Trash2, CheckCircle2, Clock, AlertCircle, Eye, FileDown, Share2, Square, CheckSquare } from 'lucide-react';
 import { getOverdueInfo } from '@/lib/procurementEngine';
 import { approveInvoice } from '@/lib/procurementEngine';
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,8 +35,13 @@ const OVERDUE_COLORS = {
 const isMutableDraft = (invoice) =>
   invoice?.status === 'draft' && !['approved', 'auto_approved'].includes(invoice?.approval_status);
 
-export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, onBulkDelete, onView }) {
-  const { currency } = useLanguage();
+export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, onBulkDelete, onView, onDownloadPDF, onSharePDF }) {
+  const { currency,lang } = useLanguage();
+  const labels=({
+    en:{pdf:'Download purchase PDF',share:'Share purchase PDF on WhatsApp'},
+    ar:{pdf:'تحميل فاتورة المشتريات PDF',share:'مشاركة فاتورة المشتريات عبر واتساب'},
+    fa:{pdf:'دریافت PDF فاکتور خرید',share:'اشتراک PDF فاکتور خرید در واتس‌اپ'},
+  })[lang] || {pdf:'Download purchase PDF',share:'Share purchase PDF on WhatsApp'};
   const { user } = useAuth();
   const { role } = useRole();
   const qc = useQueryClient();
@@ -179,6 +184,18 @@ export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, o
                 {onView && (
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onView(inv)}>
                     <Eye className="w-3.5 h-3.5" />
+                  </Button>
+                )}
+                {onDownloadPDF && (
+                  <Button type="button" variant="ghost" size="icon" title={labels.pdf} aria-label={labels.pdf}
+                    className="h-8 w-8 text-blue-600" onClick={() => onDownloadPDF(inv)}>
+                    <FileDown className="h-4 w-4"/>
+                  </Button>
+                )}
+                {onSharePDF && (
+                  <Button type="button" variant="ghost" size="icon" title={labels.share} aria-label={labels.share}
+                    className="h-8 w-8 text-emerald-600" onClick={() => onSharePDF(inv)}>
+                    <Share2 className="h-4 w-4"/>
                   </Button>
                 )}
                 {onEdit && isMutableDraft(inv) && (
