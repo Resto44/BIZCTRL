@@ -8,6 +8,7 @@ import { FileText, Download, Loader2, CheckCircle, AlertTriangle, Clock } from '
 import { format } from 'date-fns';
 import { useLanguage } from '@/lib/LanguageContext';
 import { drawLocalizedPdfText, prepareLocalizedPdf, safePdfFilename } from '@/lib/pdfLocalization';
+import { drawBizCTRLReportIcon, drawERPReportBrand } from '@/lib/erpPdfBrand';
 
 function getStatusColor(status) {
   if (status === 'paid') return 'bg-green-100 text-green-700';
@@ -57,6 +58,7 @@ export default function SupplierStatement({ supplier }) {
       let y = 20;
 
       doc.setFillColor(30, 41, 59); doc.rect(0, 0, pageW, 40, 'F');
+      drawBizCTRLReportIcon(doc,8,10,18);
       draw(loc('STATEMENT OF ACCOUNT'), pageW / 2, 18, { bold: true, size: 18, color: [255, 255, 255], align: 'center' });
       draw(`${t('supplier')}: ${supplier.name}`, pageW / 2, 27, { size: 10, color: [255, 255, 255], align: 'center' });
       draw(`${loc('Generated')}: ${format(new Date(), 'dd MMM yyyy')}`, pageW / 2, 34, { size: 9, color: [226, 232, 240], align: 'center' });
@@ -110,6 +112,12 @@ export default function SupplierStatement({ supplier }) {
 
       y += 8;
       draw(loc('This is a computer-generated statement. Please contact us for any discrepancies.'), pageW / 2, y, { size: 8, color: [100, 116, 139], align: 'center' });
+      const count=doc.getNumberOfPages();
+      for(let page=1;page<=count;page++){
+        doc.setPage(page);
+        if(page>1)drawBizCTRLReportIcon(doc,8,3,10);
+        drawERPReportBrand(doc,{lang,showTop:false,pageLabel:page+' / '+count});
+      }
       doc.save(safePdfFilename(`statement_${supplier.name.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}`, lang));
     } finally {
       setGenerating(false);
