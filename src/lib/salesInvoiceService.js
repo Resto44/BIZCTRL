@@ -7,6 +7,7 @@
 import { supabase } from '@/api/supabaseClient';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
+import {drawBizCTRLReportIcon} from './erpPdfBrand';
 import {
   drawLocalizedPdfText,
   prepareLocalizedPdf,
@@ -197,6 +198,7 @@ export function createLocalizedInvoicePDF(invoice, brandName = 'BizCTRL', curren
   };
 
   doc.setFillColor(37, 99, 235); doc.rect(0, 0, W, 33, 'F');
+  drawBizCTRLReportIcon(doc,2.5,5.5,12);
   draw(brandName, mainX, 13, { bold: true, size: 18, color: [255, 255, 255] });
   draw(details.title, mainX, 21, { bold: true, size: 10, color: [219, 234, 254] });
   draw(invoice.invoice_number, rtl ? left : right, 21, { bold: true, size: 10, color: [255, 255, 255], align: rtl ? 'left' : 'right' });
