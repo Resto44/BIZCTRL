@@ -56,6 +56,7 @@ export function buildOperationsPdfReport({
     quantity,threshold,branchId:String(row.branch_id||''),low:quantity!==null && threshold!==null && quantity<=threshold};
  });
  const consumption=new Map();let wasteCost=0, wasteQuantity=0;
+ let hasWasteData=false, wasteCostComplete=true;
  for(const transaction of inventoryTransactions||[]){
   const date=String(transaction.created_date||transaction.created_at||'').slice(0,10);
   if(!isWithin(date,range))continue;
@@ -64,7 +65,12 @@ export function buildOperationsPdfReport({
   if(qty<=0)continue;
   const fallback=productMap.get(String(transaction.product_id||''))||{};
   const unitCost=hasValue(transaction.unit_cost)?amount(transaction.unit_cost):null;
-  if(type==='waste'){wasteQuantity+=qty;if(unitCost!==null)wasteCost+=qty*unitCost;continue;}
+  if(type==='waste'){
+   hasWasteData=true;wasteQuantity+=qty;
+   if(unitCost!==null)wasteCost+=qty*unitCost;
+   else wasteCostComplete=false;
+   continue;
+  }
   if(!['recipe_consumption','consumption','sale','usage','ingredient_usage','production_consumption'].includes(type))continue;
   const id=String(transaction.product_id||'');
   const entry=consumption.get(id)||{id,name:nameOf(fallback)||'Unlabelled product',
@@ -119,7 +125,7 @@ export function buildOperationsPdfReport({
  return {
   range,asOfDate:asOfDate||asDay(new Date()),branches:branchReports,
   best,worst,stockCount:stock.length,stocks:stock.slice(0,30),lowStock:lowStock.slice(0,15),noStock:noStock.length,
-  consumption:usage,wasteCost,wasteQuantity,costGroups:costs,
+  consumption:usage,wasteCost,wasteQuantity,hasWasteData,wasteCostComplete,costGroups:costs,
   debts,risks,hasDebtData:customerDebts.length>0,hasInventoryData:stock.length>0,hasConsumptionData:consumption.size>0,
   branchProfitUnallocated:Math.abs(unassignedCosts)>0.01 ? unassignedCosts:0,
  };

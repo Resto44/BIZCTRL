@@ -1,5 +1,6 @@
 import {drawLocalizedPdfText} from './pdfLocalization';
 import {drawERPReportBrand} from './erpPdfBrand';
+import {buildPdfConsumptionCostControl} from './reportConsumptionCostControl';
 
 const L={
  en:{title:'ERP Sales Analytics Report',period:'Reporting period',sales:'Verified sales',purchases:'Approved purchases',
@@ -10,7 +11,7 @@ const L={
   debt:'Outstanding balances',receivables:'Receivables',payables:'Payables',risk:'Management attention',
   risks:'Items requiring review',noData:'Not recorded',generated:'Generated',note:'Finalized closings only · Network and credit are included in sales · Cash sales ≠ cash in drawer',
   summary:'Cost & profitability',fixed:'Allocated fixed expenses',variable:'Variable expenses',closing:'Finalized closings',
-  unknown:'Source not available',page:'PAGE 1 / 1',details:'Top recorded branches',total:'Total',growth:'vs previous period'},
+  unknown:'Source not available',page:'PAGE 1 / 1',details:'Top recorded branches',total:'Total',growth:'vs previous period',consumption:'Product Consumption Analytics',costControl:'Cost Control',purchaseRatio:'Purchases / sales',expenseRatio:'Expenses / sales',waste:'Waste cost',costCategory:'Largest expense',units:'SKUs',lowShort:'low',outShort:'out'},
  ar:{title:'تقرير تحليلات المبيعات ERP',period:'فترة التقرير',sales:'المبيعات المعتمدة',purchases:'المشتريات المعتمدة',
   expenses:'مصروفات الفترة',net:'صافي الربح / الخسارة',trend:'اتجاه المبيعات والأرباح',
   payment:'توزيع طرق الدفع',cash:'نقد',network:'شبكة',credit:'آجل',other:'مصادر مبيعات أخرى',
@@ -19,7 +20,7 @@ const L={
   debt:'الأرصدة المستحقة',receivables:'الذمم المدينة',payables:'الذمم الدائنة',risk:'متابعة الإدارة',
   risks:'تنبيهات تحتاج متابعة',noData:'غير مسجل',generated:'تم الإنشاء',note:'فقط المبيعات المعتمدة · الشبكة والآجل ضمن المبيعات · النقد ليس رصيد الصندوق',
   summary:'التكلفة والربحية',fixed:'المصروفات الثابتة الموزعة',variable:'المصروفات المتغيرة',closing:'إقفالات معتمدة',
-  unknown:'المصدر غير متاح',page:'صفحة ١ / ١',details:'الفروع المسجلة',total:'المجموع',growth:'مقارنة بالفترة السابقة'},
+  unknown:'المصدر غير متاح',page:'صفحة ١ / ١',details:'الفروع المسجلة',total:'المجموع',growth:'مقارنة بالفترة السابقة',consumption:'تحليلات استهلاك المنتجات',costControl:'التحكم في التكاليف',purchaseRatio:'المشتريات / المبيعات',expenseRatio:'المصروفات / المبيعات',waste:'تكلفة الهدر',costCategory:'أعلى مصروف',units:'صنف',lowShort:'منخفض',outShort:'نافد'},
  fa:{title:'گزارش تحلیل فروشات ERP',period:'دوره گزارش',sales:'فروشات نهایی',purchases:'خریدهای تأییدشده',
   expenses:'مصارف دوره',net:'فایده / نقصان خالص',trend:'روند فروشات و فایده',
   payment:'تقسیم روش‌های پرداخت',cash:'نقد',network:'شبکه',credit:'نسیه',other:'منابع دیگر فروش',
@@ -28,7 +29,7 @@ const L={
   debt:'مانده بدهی‌ها',receivables:'مطالبات',payables:'بدهی‌ها',risk:'توجه مدیریت',
   risks:'موارد نیازمند بررسی',noData:'ثبت نشده',generated:'ایجاد شده',note:'تنها فروشات نهایی · شبکه و نسیه داخل فروشات است · نقد فروش با مانده صندوق فرق دارد',
   summary:'هزینه و سودآوری',fixed:'مصارف ثابت تخصیص‌یافته',variable:'مصارف متغیر',closing:'بستن‌های نهایی',
-  unknown:'منبع در دسترس نیست',page:'صفحه ۱ / ۱',details:'شعبه‌های ثبت‌شده',total:'مجموع',growth:'مقایسه با دوره گذشته'}
+  unknown:'منبع در دسترس نیست',page:'صفحه ۱ / ۱',details:'شعبه‌های ثبت‌شده',total:'مجموع',growth:'مقایسه با دوره گذشته',consumption:'تحلیل مصرف محصولات',costControl:'کنترل هزینه‌ها',purchaseRatio:'خرید / فروشات',expenseRatio:'مصارف / فروشات',waste:'هزینه ضایعات',costCategory:'بیشترین مصرف',units:'قلم',lowShort:'کم',outShort:'تمام'}
 };
 const navy=[18,33,68],muted=[99,116,139],blue=[29,100,236],green=[5,150,105],red=[222,46,86],border=[216,228,243];
 const num=n=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(Number(n)||0);
@@ -129,24 +130,47 @@ export function drawSinglePageSalesAnalytics(doc,{snapshot,previousSnapshot=null
   draw(value===null?'—':i===3?Number(value).toFixed(1)+'%':money(value,currency),198,177+i*8.4,{
    size:7.6,bold:true,align:'right',maxWidth:25,color:i===3?tone(snapshot.netProfit):navy});
  });
- // Operations intelligence as-of-now, rather than artificial zeros.
- block(7,215,62,57);title(9,217,58,tr.stock);
- const inventoryRows=report?[
-  [tr.items,report.hasInventoryData?report.stockCount:null],
-  [tr.low,report.hasInventoryData?report.lowStock?.length:null],
-  [tr.out,report.hasInventoryData?report.noStock:null],
- ]: [[tr.items,null],[tr.low,null],[tr.out,null]];
- inventoryRows.forEach(([label,value],i)=>{draw(label,12,238+i*9,{size:7.1,color:muted,maxWidth:37});
-  draw(value==null?'—':String(value),63,238+i*9,{size:8.5,bold:true,align:'right',color:value>0&&i>0?red:navy});});
- block(73,215,62,57);title(75,217,58,tr.debt);
- const debts=[ [tr.receivables,report?.hasDebtData?report.debts?.receivables:null],
+
+ // Recorded product consumption; never equate approved purchases to real food COGS.
+ const control=buildPdfConsumptionCostControl({snapshot,previousSnapshot,operationsReport:report});
+ const pct=(value,prior)=>value===null?'—':num(value)+'%'+(prior===null?'':' ('+(value-prior>=0?'+':'')+num(value-prior)+'pp)');
+ block(7,215,94,35);title(9,217,90,tr.consumption);
+ if(!control.productRows.length)draw(tr.noData,rtl?95:12,235,{size:7.3,color:muted,maxWidth:80});
+ control.productRows.forEach((item,i)=>{
+   const y=235+i*7;
+   draw(item.name.slice(0,24),rtl?94:12,y,{size:7.1,maxWidth:41});
+   draw(num(item.quantity)+' '+item.unit,rtl?57:76,y,{size:7.1,color:blue,align:rtl?'left':'right',maxWidth:23});
+   draw(item.estimatedCost===null?'—':money(item.estimatedCost,currency),rtl?77:97,y,{
+     size:7,color:item.estimatedCost===null?muted:green,align:rtl?'left':'right',maxWidth:21});
+ });
+ draw(tr.waste+': '+(control.wasteCost===null?'—':money(control.wasteCost,currency)),
+   rtl?95:12,247,{size:6.9,color:muted,maxWidth:82});
+ block(105,215,98,35);title(107,217,94,tr.costControl);
+ draw(tr.purchaseRatio,110,234,{size:7.3,color:muted,maxWidth:55,align:'left'});
+ draw(pct(control.purchaseRatio,control.prevPurchaseRatio),199,234,{size:7.8,bold:true,align:'right',maxWidth:36});
+ draw(tr.expenseRatio,110,241,{size:7.3,color:muted,maxWidth:55,align:'left'});
+ draw(pct(control.expenseRatio,control.prevExpenseRatio),199,241,{size:7.8,bold:true,align:'right',maxWidth:36});
+ const category=control.topExpenseCategory;
+ draw(category?category.name.slice(0,19):tr.costCategory,110,248,{size:7,color:muted,maxWidth:52,align:'left'});
+ draw(category?money(category.value,currency):'—',199,248,{size:7.3,bold:true,align:'right',maxWidth:36});
+ // Keep previous inventory, receivables and operational risk summaries.
+ block(7,253,62,22);title(9,254,58,tr.stock);
+ const stock=report?.hasInventoryData?[report.stockCount,tr.units,'·',report.lowStock?.length||0,tr.lowShort,'·',
+   report.noStock||0,tr.outShort].join(' '):tr.unknown;
+ draw(stock,rtl?63:12,269,{size:7,color:navy,maxWidth:51});
+ block(73,253,62,22);title(75,254,58,tr.debt);
+ const debtRows=[[tr.receivables,report?.hasDebtData?report.debts?.receivables:null],
    [tr.payables,report?.hasDebtData?report.debts?.payables:null]];
- debts.forEach(([label,value],i)=>{draw(label,78,240+i*12,{size:7.2,color:muted,maxWidth:45});
-   draw(value==null?'—':money(value,currency),130,245+i*12,{size:9,bold:true,color:i===0?green:red,align:'right',maxWidth:50});});
- block(139,215,64,57);title(141,217,60,tr.risk);
- const count=report? (report.lowStock?.length||0)+(report.debts?.receivables>0?1:0)+(report.branches||[]).filter(b=>Number(b.netProfit)<0).length:null;
- draw(tr.risks,145,239,{size:7.1,color:muted,maxWidth:54});
- draw(count==null?tr.unknown:String(count),198,250,{size:13.4,bold:true,color:count>0?red:green,align:'right'});
+ debtRows.forEach(([label,value],i)=>{
+   const y=265.5+i*6.8;
+   draw(label,78,y,{size:6.9,color:muted,align:'left',maxWidth:28});
+   draw(value==null?'—':money(value,currency),130,y,{size:7.3,bold:true,color:i===0?green:red,align:'right',maxWidth:27});
+ });
+ block(139,253,64,22);title(141,254,60,tr.risk);
+ const count=report?(report.lowStock?.length||0)+(report.debts?.receivables>0?1:0)+
+   (report.branches||[]).filter(b=>Number(b.netProfit)<0).length:null;
+ draw(tr.risks,145,266,{size:6.8,color:muted,maxWidth:44,align:'left'});
+ draw(count==null?'—':String(count),198,271,{size:11,bold:true,color:count>0?red:green,align:'right'});
  draw(tr.note,rtl?195:12,280,{size:7,color:muted,maxWidth:180});
  if(doc.getNumberOfPages()!==1)throw Error('Single-page ERP Sales Analytics overflow');
 }
