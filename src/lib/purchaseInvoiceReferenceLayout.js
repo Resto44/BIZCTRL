@@ -141,7 +141,13 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{lang='en',busi
   roundedBox(L,37,94,48,[248,252,255]);
   roundedBox(106,37,95,48,[248,252,255]);
   smallHeading(w.business,14,45);
-  txt(model.businessName,17,53,{size:12,bold:true,color:NAVY,limit:36,maxWidth:83,align:'left'});
+  const companyImage=firstStr(brand?.image_data,business?.image_data);
+  const hasCompanyImage=companyImage&&/^data:image\/(?:png|jpe?g);base64,/i.test(companyImage);
+  if(hasCompanyImage){
+    try{doc.addImage(companyImage,15,47.3,13,11.7);}catch{/* Logo unavailable in this PDF viewer */}
+  }
+  txt(model.businessName,hasCompanyImage?31:17,53,{size:hasCompanyImage?10.6:12,bold:true,color:NAVY,
+    limit:36,maxWidth:hasCompanyImage?70:83,align:'left'});
   field(w.branch,model.branch,13,61,86,{labelWidth:25});
   field(w.taxId,model.businessTax,13,69,86,{labelWidth:26});
   field(w.address,model.address,13,77,86,{labelWidth:24});
