@@ -202,8 +202,8 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{lang='en',busi
     if(dataImage&&/^data:image\/(?:png|jpe?g);base64,/i.test(dataImage)){
       try{doc.addImage(dataImage,imgX,y+1.1,7.8,Math.min(9,height-2));}catch{/* no fake image */}}
     for(let k=0;k<nameLines.length;k++){
-      txt(nameLines[k],x+col.width/2,y+5.1+k*4.9,{size:7.3,bold:k===0,align:'center',
-        maxWidth:col.width-10,limit:27});
+      txt(nameLines[k],x+col.width/2+(dataImage?(rtl?-4:4):0),y+5.1+k*4.9,
+        {size:7.3,bold:k===0,align:'center',maxWidth:col.width-(dataImage?13:5),limit:27});
     }
    }else{
     txt(values[col.key],x+col.width/2,y+Math.min(height/2+2,8),{
