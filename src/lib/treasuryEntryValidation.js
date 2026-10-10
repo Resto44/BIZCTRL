@@ -33,7 +33,7 @@ export function buildTreasuryEntry({form,account,meta,branches=[],restaurantId,
   const mustHaveBranch=Boolean(branchType(meta));
   const fallbackKey=!isAllBranches?selectedBranchKey:null;
   // Match the actual account branch first; never re-scope unrelated accounts silently.
-  const requestedKey=form.branch || account.branch_key || fallbackKey || '';
+  const requestedKey=form.branch || fallbackKey || account.branch_key || '';
   const branch=branches.find(b=>String(b.key||b.branch_key)===String(requestedKey))||
     branches.find(b=>b.id===account.branch_id)||
     (!isAllBranches?branches.find(b=>b.id===selectedBranchId):null)||null;
