@@ -184,7 +184,7 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{lang='en',busi
   }
  };
  const drawLine=(item,index,y)=>{
-  const nameLines=wrapWords(item.product_name||item.name||item.description,23).slice(0,4);
+  const nameLines=wrapWords(item.product_name||item.name||item.description,23);
   const height=Math.max(12.5,2.3+5.1*nameLines.length);
   roundedBox(L,y,CW,height,index%2===0?[251,253,255]:[246,250,254],null,0.6);
   let x=L;
@@ -293,7 +293,7 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{lang='en',busi
  if(!lines.length){txt(w.noItems,L+8,y+7,{size:8,color:FADED,align:'left'});y+=15;}
  for(let idx=0;idx<lines.length;idx++){
   const item=lines[idx];
-  const needed=Math.max(12.5,2.3+5.1*Math.min(4,wrapWords(item.product_name||item.name||item.description,23).length));
+  const needed=Math.max(12.5,2.3+5.1*wrapWords(item.product_name||item.name||item.description,23).length);
   if(y+needed>191){
    doc.addPage();drawHeader(true);drawTableHead(44);y=56;
   }
