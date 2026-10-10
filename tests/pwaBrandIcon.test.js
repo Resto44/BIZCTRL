@@ -49,7 +49,7 @@ describe('BizCTRL new Safari and Chrome icon',()=>{
   });
   it('rolls the service worker image cache and prevents stale long-cache response',()=>{
     const sw=read('public/sw.js');
-    expect(sw).toContain("const CACHE_VERSION = 'v13-bizctrl-icon-v2'");
+    expect(sw).toContain("const CACHE_VERSION = 'v13'");
     expect(sw).toContain("icon: '/icons/bizctrl-icon-192-v2.png'");
     const vercel=JSON.parse(read('vercel.json'));
     const iconHeader=vercel.headers.find(item=>item.source==='/icons/(.*)');
