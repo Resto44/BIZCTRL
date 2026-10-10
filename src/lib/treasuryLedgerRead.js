@@ -14,11 +14,10 @@ export async function fetchCompleteTreasuryRows({
     for(let page=0;page<1000;page++){
       let query=db.from(table).select('*').eq('restaurant_id',restaurantId)
         .order(orderColumn,{ascending:false})
-        .order('id',{ascending:false})
-        .range(page*pageSize,(page+1)*pageSize-1);
+        .order('id',{ascending:false});
       if(predicate==='canonical')query=query.eq('branch_id',branchId);
       if(predicate==='legacy')query=query.is('branch_id',null).eq(legacyColumn,branchKey);
-      const {data,error}=await query;
+      const {data,error}=await query.range(page*pageSize,(page+1)*pageSize-1);
       if(error)throw error;
       const batch=data||[];
       records.push(...batch);
