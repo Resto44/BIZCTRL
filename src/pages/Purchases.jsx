@@ -31,6 +31,26 @@ import { deletePurchaseInvoiceWithRollback, getOverdueInfo } from '@/lib/procure
 
 const STATUS_FILTERS = ['all', 'draft', 'pending', 'approved', 'paid', 'partial', 'unpaid', 'cancelled'];
 
+const imageDataForPDF = async source => {
+  if(typeof source!=='string'||!source)return null;
+  if(/^data:image\/(?:png|jpe?g);base64,/i.test(source))return source;
+  if(!/^https:\/\//i.test(source)||typeof fetch==='undefined')return null;
+  try{
+    // Only embed public, CORS-enabled images; no credentials or auth tokens.
+    const response=await fetch(source,{mode:'cors',credentials:'omit'});
+    if(!response.ok)return null;
+    const blob=await response.blob();
+    if(!['image/jpeg','image/png'].includes(blob.type)||blob.size>1000000)return null;
+    return await new Promise(resolve=>{
+      const reader=new FileReader();
+      reader.onerror=()=>resolve(null);
+      reader.onload=()=>resolve(typeof reader.result==='string'?reader.result:null);
+      reader.readAsDataURL(blob);
+    });
+  }catch{return null;}
+};
+
+
 export default function Purchases() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { currency, lang } = useLanguage();
@@ -108,23 +128,70 @@ export default function Purchases() {
     enabled:!!activeRestaurant?.id,staleTime:120000,
     retry:false,
   });
-  const purchasePdfOptions = (inv) => ({
-    lang, currency: inv.currency || businessBrand?.currency || currency,
-    business: activeRestaurant, brand:businessBrand,
+  const invoicePdfEvidence = useRef(new Map());
+  const loadInvoicePdfEvidence = async (inv) => {
+    if(!inv?.id || !activeRestaurant?.id || inv.restaurant_id !== activeRestaurant.id)return null;
+    if(invoicePdfEvidence.current.has(inv.id))return invoicePdfEvidence.current.get(inv.id);
+    const ids=[...new Set((Array.isArray(inv.items)?inv.items:[])
+      .map(item=>item.product_id).filter(id=>/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(id||'')))].slice(0,40);
+    const [payments,logs,images,restaurantLogo]=await Promise.all([
+      supabase.from('supplier_payments').select('payment_method,date,amount')
+        .eq('restaurant_id',activeRestaurant.id).eq('invoice_id',inv.id).limit(100)
+        .then(result=>result.error?[]:result.data||[]).catch(()=>[]),
+      supabase.from('audit_logs').select('action,user_name,created_date')
+        .eq('restaurant_id',activeRestaurant.id).eq('entity_type','supplier_invoices')
+        .eq('entity_id',inv.id).order('created_date',{ascending:true}).limit(30)
+        .then(result=>result.error?[]:result.data||[]).catch(()=>[]),
+      ids.length ? supabase.from('products').select('id,image_url')
+        .eq('restaurant_id',activeRestaurant.id).in('id',ids).limit(40)
+        .then(result=>result.error?[]:result.data||[]).catch(()=>[]):Promise.resolve([]),
+      imageDataForPDF(businessBrand?.logo_url||activeRestaurant.logo_url),
+    ]);
+    const imageByProductId={};
+    await Promise.all(images.map(async img=>{
+      const encoded=await imageDataForPDF(img.image_url);
+      if(encoded)imageByProductId[img.id]=encoded;
+    }));
+    const evidence={payments,auditEvents:logs,imageByProductId,restaurantLogo};
+    invoicePdfEvidence.current.set(inv.id,evidence);
+    return evidence;
+  };
+  const purchasePdfOptions = (inv, evidence=invoicePdfEvidence.current.get(inv.id)) => ({
+    lang,currency:inv.currency||businessBrand?.currency||currency,
+    business:activeRestaurant,
+    brand:{...businessBrand,image_data:evidence?.restaurantLogo||null},
     branch:(branches||[]).find(b=>String(b.id)===String(inv.branch_id)
-      || (!inv.branch_id && [b.branch_key,b.key].includes(inv.branch))) || null,
+      || (!inv.branch_id && [b.branch_key,b.key].includes(inv.branch)))||null,
+    payments:evidence?.payments||[],
+    auditEvents:evidence?.auditEvents||[],
   });
-  const downloadPDF = inv => {
-    try {setPdfError('');downloadPurchaseInvoicePDF(inv,purchasePdfOptions(inv));}
-    catch(error){setPdfError(error.message || 'Unable to generate purchase invoice PDF.');}
+  const invoiceWithImages = (inv,evidence) => ({
+    ...inv,
+    items:(Array.isArray(inv.items)?inv.items:[]).map(item=>({
+      ...item,image_data:evidence?.imageByProductId?.[item.product_id]||item.image_data,
+    })),
+  });
+  const openInvoicePreview = (inv) => {
+    setPreviewInvoice(inv);
+    void loadInvoicePdfEvidence(inv);
+  };
+  const downloadPDF = async inv => {
+    try{
+      setPdfError('');
+      const evidence=await loadInvoicePdfEvidence(inv);
+      downloadPurchaseInvoicePDF(invoiceWithImages(inv,evidence),purchasePdfOptions(inv,evidence));
+    }catch(error){setPdfError(error.message||'Unable to generate purchase invoice PDF.');}
   };
   const sharePDF = async inv => {
-    try {
+    try{
       setPdfError('');setShareFallback(null);
-      const result=await sharePurchaseInvoicePDF(inv,purchasePdfOptions(inv));
+      // Do not await network requests here: Safari's native document sharing
+      // must execute while a user activation is available.
+      const evidence=invoicePdfEvidence.current.get(inv.id);
+      const result=await sharePurchaseInvoicePDF(
+        invoiceWithImages(inv,evidence),purchasePdfOptions(inv,evidence));
       if(result.downloaded)setShareFallback(result);
-      // Native iOS sheet cancelled by user: no success notice or fallback action.
-    }catch(error){setPdfError(error.message || 'Unable to share purchase invoice PDF.');}
+    }catch(error){setPdfError(error.message||'Unable to share purchase invoice PDF.');}
   };
 
   const invalidatePurchaseQueries = () => {
@@ -299,7 +366,7 @@ export default function Purchases() {
           onEdit={(inv) => { setEditing(inv); setShowForm(true); }}
           onDelete={canDelete ? (inv) => setDeleting(inv) : null}
           onBulkDelete={canDelete ? (ids) => setBulkDeletingIds(ids) : null}
-          onView={setPreviewInvoice}
+          onView={openInvoicePreview}
           onDownloadPDF={downloadPDF}
           onSharePDF={sharePDF}
         />
