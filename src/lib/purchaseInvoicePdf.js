@@ -45,6 +45,21 @@ const cash=n=>new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFrac
 const arr=value=>{if(Array.isArray(value))return value;try{const v=JSON.parse(value);return Array.isArray(v)?v:[]}catch{return []}};
 const safe=value=>String(value??'').trim()||'—';
 const rounded=n=>Math.round((Number(n)||0)*100)/100;
+const wrapItem=(value,max=26)=>{
+ const parts=String(value||'—').trim().split(/\s+/);
+ const rows=[];let row='';
+ for(const raw of parts){
+  for(let word=raw;word.length;){
+   const part=word.slice(0,max); word=word.slice(max);
+   if(row && (row.length+part.length+1)>max){rows.push(row);row='';}
+   row=row?row+' '+part:part;
+   if(word.length){rows.push(row);row='';}
+  }
+ }
+ if(row)rows.push(row);
+ return rows.length?rows:['—'];
+};
+
 const statusOf=invoice=>{
   if(invoice.status==='cancelled')return 'cancelled';
   if(['approved','auto_approved'].includes(invoice.approval_status)||['approved','paid','partial'].includes(invoice.status))return 'approved';
@@ -120,19 +135,25 @@ export function createBrandedPurchaseInvoicePDF(invoice,{lang='en',business,bran
  const newPage=()=>{if(pageNo)doc.addPage();header();grid(83);return 95;};
  let y=newPage();
  for (const [i,item] of m.items.entries()){
-  // Explicit pagination instead of clipping long invoices or forcing tiny font.
-  if(y>252)y=newPage();
-  const rowHeight=13.5;
+  // Printed product descriptions wrap without crossing numeric columns.
+  // Height follows the real number of lines; long invoices keep all items
+  // and continue onto subsequent pages rather than hiding products.
+  const productLines=wrapItem(item.product_name||item.name||item.description);
+  const rowHeight=Math.max(13.5,7+productLines.length*5.6);
+  if(y+rowHeight>264)y=newPage();
   if(i%2===0){doc.setFillColor(248,251,255);doc.rect(L,y-1,CW,rowHeight,'F');}
-  const title=safe(item.product_name||item.name||item.description);
-  let x=L;
+  productLines.forEach((line,k)=>write(line,L+widths[0]/2,y+4.5+k*5.6,
+    {size:7.2,align:'center',maxWidth:widths[0]-3}));
   const numbers=[
-    title,safe(item.unit||item.unit_name),String(item.quantity),
+    safe(item.unit||item.unit_name),String(item.quantity),
     cash(item.unit_cost),cash(item.discount),cash(calcInvoiceTotals([item]).taxAmount),cash(item.line_total),
   ];
-  numbers.forEach((value,col)=>{
-   write(value,x+widths[col]/2,y+5.5,{size:col===0?7.2:7.1,bold:col===6,
-    color:col===6?BLUE:NAVY,align:'center',maxWidth:widths[col]-3});x+=widths[col];
+  let x=L+widths[0];
+  numbers.forEach((value,j)=>{
+   const col=j+1;
+   write(value,x+widths[col]/2,y+Math.min(7,rowHeight/2),{size:7.1,bold:col===6,
+    color:col===6?BLUE:NAVY,align:'center',maxWidth:widths[col]-3});
+   x+=widths[col];
   });
   y+=rowHeight;
  }
