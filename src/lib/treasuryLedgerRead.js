@@ -38,8 +38,8 @@ export function accountsForTreasuryScope(accounts=[],{allBranches=true,branchId=
      (branchKey && a.branch_key===branchKey &&
       (!a.branch_id || a.branch_id===branchId))));
 }
-export function treasuryIntegrity(accounts=[],transactions=[]){
- const ids=new Set(accounts.map(a=>a.id));
+export function treasuryIntegrity(accounts=[],transactions=[],knownAccounts=accounts){
+ const ids=new Set(knownAccounts.map(a=>a.id));
  return {
   // Legacy wallet-only transactions may legitimately have no account_id.
   legacyWalletMovements:transactions.filter(tx=>!tx.account_id).length,
