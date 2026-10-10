@@ -2,7 +2,7 @@ import React from 'react';
 import {
   ArrowDownLeft,ArrowUpRight,ArrowRightLeft,AlertTriangle,
   BarChart3,Banknote,Building2,CreditCard,Landmark,
-  Scale,ShieldAlert,WalletCards,Users,Activity,
+  ShieldAlert,WalletCards,Users,Activity,
 } from 'lucide-react';
 import {BarChart,Bar,CartesianGrid,Tooltip,ResponsiveContainer,XAxis} from 'recharts';
 
