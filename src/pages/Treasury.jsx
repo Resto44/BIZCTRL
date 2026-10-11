@@ -123,7 +123,6 @@ export default function Treasury() {
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [accountForm, setAccountForm] = useState(emptyAccountForm);
   const [editingAccount, setEditingAccount] = useState(null);
-  const [deleteId, setDeleteId] = useState(null);
   const [deleteAccountId, setDeleteAccountId] = useState(null);
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
   const filterBranch = isAllBranches ? 'all' : (selectedBranchKey || 'all');
@@ -138,7 +137,10 @@ export default function Treasury() {
 
   const { data: accounts = [], isLoading: accountsLoading, isError: accountsError } = useQuery({
     queryKey: ['treasury_accounts', activeRestaurantId],
-    queryFn: () => base44.entities.TreasuryAccount.filter({ restaurant_id: activeRestaurantId }, 'account_name', 500),
+    queryFn:()=>fetchCompleteTreasuryRows({
+      db:supabase,table:'treasury_accounts',restaurantId:activeRestaurantId,
+      allBranches:true,orderColumn:'account_name',
+    }),
     staleTime: 30000,
     enabled: !!activeRestaurantId,
   });
@@ -172,7 +174,7 @@ export default function Treasury() {
     queryFn: () => base44.entities.Employee.filter({ restaurant_id: activeRestaurant?.id }, 'full_name', 500),
     enabled: Boolean(activeRestaurant?.id),
   });
-  const { data: allSales = [] } = useQuery({
+  const { data: allSales = [], isError: salesError, isLoading: salesLoading } = useQuery({
     queryKey: ['sales', activeRestaurant?.id, selectedBranchId],
     queryFn: () => fetchScopedRows('daily_sales'),
     staleTime: 60000,
@@ -192,14 +194,14 @@ export default function Treasury() {
       .filter(s => s.flow_type === 'MANAGER_TO_SPONSOR' && s.status === 'approved')
       .reduce((a, s) => a + (s.amount || 0), 0);
     const sentToOwner = settlements
-      .filter(s => s.flow_type === 'SPONSOR_TO_OWNER' && s.status !== 'rejected')
+      .filter(s => s.flow_type === 'SPONSOR_TO_OWNER' && s.status === 'approved')
       .reduce((a, s) => a + (s.amount || 0), 0);
     const remaining = receivedBySponsor - sentToOwner;
     // Count distinct branches with remaining
     const branchMap = {};
     settlements.filter(s => s.flow_type === 'MANAGER_TO_SPONSOR' && s.status === 'approved' && s.branch)
       .forEach(s => { branchMap[s.branch] = (branchMap[s.branch] || 0) + (s.amount || 0); });
-    settlements.filter(s => s.flow_type === 'SPONSOR_TO_OWNER' && s.status !== 'rejected' && s.branch)
+    settlements.filter(s => s.flow_type === 'SPONSOR_TO_OWNER' && s.status === 'approved' && s.branch)
       .forEach(s => { branchMap[s.branch] = (branchMap[s.branch] || 0) - (s.amount || 0); });
     const branchesWithBalance = Object.values(branchMap).filter(v => v > 0).length;
     return { receivedBySponsor, sentToOwner, remaining: Math.max(0, remaining), branchesWithBalance };
@@ -266,11 +268,6 @@ export default function Treasury() {
       }
     },
   });
-  const deleteMut = useMutation({
-    mutationFn: id => base44.entities.WalletTransaction.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['wallet_transactions'] }); setDeleteId(null); },
-  });
-
   // ── Filter transactions ───────────────────────────────────────────────
   const monthTx = useMemo(() =>
     transactions.filter(tx => transactionDate(tx).startsWith(filterMonth)),
@@ -363,8 +360,14 @@ export default function Treasury() {
   const handleAccountSave = () => {
     if (!isOwner || !activeRestaurantId || !accountForm.account_name.trim()) return;
     if(centralTxError||centralTxLoading){toast.error(local('Complete Treasury data is required to edit an account.'));return;}
-    if(editingAccount&&overviewTransactions.some(tx=>tx.account_id===editingAccount.id)&&Number(accountForm.opening_balance||0)!==Number(editingAccount.opening_balance||0)){
-      toast.error(local('Opening balance is locked once an account has transactions.'));return;
+    if(editingAccount&&overviewTransactions.some(tx=>tx.account_id===editingAccount.id)){
+      const historicalChange=Number(accountForm.opening_balance||0)!==Number(editingAccount.opening_balance||0)||
+        (accountForm.currency||ledgerCurrency)!==(editingAccount.currency||ledgerCurrency)||
+        (accountForm.branch_id||null)!==(editingAccount.branch_id||null);
+      if(historicalChange){
+        toast.error(local('Posted account: opening balance, currency and branch are locked. Use an audited adjustment.'));
+        return;
+      }
     }
     const selectedBranch = branches.find((branch) => branch.id === accountForm.branch_id) || null;
     accountSaveMut.mutate({
@@ -649,12 +652,16 @@ export default function Treasury() {
 
         {/* ── RECONCILIATION ──────────────────────────────────────────── */}
         <TabsContent value="reconcile" className="mt-3">
-          <ReconciliationDashboard
+          {(!isOwner&&(salesError||salesLoading))||(isOwner&&(centralSalesError||centralSalesLoading))
+            ?<Card role="status" className="p-4 text-sm text-amber-700">
+              {(isOwner?centralSalesError:salesError)?local('Closing ledger unavailable; reconciliation cannot be verified.'):
+                local('Loading complete Closing records…')}
+             </Card>:<ReconciliationDashboard
             transactions={isOwner?centralTransactions:transactions}
             sales={isOwner?centralSales:allSales}
             branches={branches}
             currency={ledgerCurrency}
-          />
+          />}
         </TabsContent>
 
         {/* ── SETTLEMENT ──────────────────────────────────────────────── */}
@@ -716,9 +723,9 @@ export default function Treasury() {
                       <span className={`text-sm font-bold ${isIn ? 'text-emerald-600' : 'text-red-500'}`}>
                         {isIn ? '+' : '-'}{fmt(tx.amount)}
                       </span>
-                      {!tx.auto_generated&&!tx.reference_id&&!tx.settlement_request_id && <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(tx.id)} title={local('Delete unlinked manual draft')}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>}
+                      <Badge variant="outline" className="shrink-0 text-[10px]" title="Posted ledger entries cannot be deleted. Corrections require an audited reversal.">
+                        {local('Posted · Locked')}
+                      </Badge>
                     </div>
                   </div>
                 </Card>
@@ -927,15 +934,7 @@ export default function Treasury() {
         <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md"><AlertDialogHeader><AlertDialogTitle>{local('Delete Treasury account?')}</AlertDialogTitle></AlertDialogHeader><p className="text-sm text-muted-foreground">{local('Accounts with transactions are protected and can be deactivated instead.')}</p><AlertDialogFooter className="gap-2 sm:gap-0"><AlertDialogCancel>{local('Cancel')}</AlertDialogCancel><AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => accountDeleteMut.mutate(deleteAccountId)}>{local('Delete')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Delete this transaction?</AlertDialogTitle></AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => deleteMut.mutate(deleteId)}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
     </div>
   );
 }
