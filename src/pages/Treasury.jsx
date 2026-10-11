@@ -92,7 +92,7 @@ const emptyAccountForm = { account_name: '', account_type: 'cash', branch_id: ''
 
 function accountWalletKey(account) {
   if (account?.legacy_wallet_key) return account.legacy_wallet_key;
-  if (account?.branch_key) return 'branch_cash';
+  if (account?.branch_key || account?.branch_id) return 'branch_cash';
   return ['bank', 'network_pos', 'digital_wallet', 'clearing'].includes(account?.account_type) ? 'owner_network' : 'owner_cash';
 }
 
@@ -125,7 +125,7 @@ export default function Treasury() {
   const [deleteAccountId, setDeleteAccountId] = useState(null);
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
   const filterBranch = isAllBranches ? 'all' : (selectedBranchKey || 'all');
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k, v) => {if(form[k]!==v)pendingTransactionId.current=null;setForm(f => ({ ...f, [k]: v }));};
 
   const fetchScopedRows = (table, legacyColumn = 'branch', orderColumn = 'date') =>
     fetchCompleteTreasuryRows({
@@ -360,6 +360,10 @@ export default function Treasury() {
   const setAccount = (key, value) => setAccountForm((current) => ({ ...current, [key]: value }));
   const handleAccountSave = () => {
     if (!isOwner || !activeRestaurantId || !accountForm.account_name.trim()) return;
+    if(centralTxError||centralTxLoading){toast.error(local('Complete Treasury data is required to edit an account.'));return;}
+    if(editingAccount&&overviewTransactions.some(tx=>tx.account_id===editingAccount.id)&&Number(accountForm.opening_balance||0)!==Number(editingAccount.opening_balance||0)){
+      toast.error(local('Opening balance is locked once an account has transactions.'));return;
+    }
     const selectedBranch = branches.find((branch) => branch.id === accountForm.branch_id) || null;
     accountSaveMut.mutate({
       restaurant_id: activeRestaurantId,
@@ -383,6 +387,7 @@ export default function Treasury() {
       const payload=buildTreasuryEntry({
         form,account:selectedAccount,meta:TYPE_META[form.type],branches,
         restaurantId:activeRestaurantId,selectedBranchId,selectedBranchKey,isAllBranches,
+        availableBalance:accountBalances[selectedAccount?.id]??null,
       });
       pendingTransactionId.current ||= crypto.randomUUID();
       const confirmed=await saveMut.mutateAsync({...payload,id:pendingTransactionId.current});
@@ -408,6 +413,7 @@ export default function Treasury() {
   };
 
   const typeConfig = form.type ? TYPE_META[form.type] : null;
+  const matchingTxnAccounts=typeConfig?activeAccounts.filter(account=>accountWalletKey(account)===typeConfig.wallet):activeAccounts;
   const showBranch = typeConfig && (
     typeConfig.wallet === 'branch_cash' ||
     form.type?.startsWith('branch_') ||
@@ -487,11 +493,11 @@ export default function Treasury() {
             accounts={scopedAccounts}
             accountBalances={accountBalances}
             ledger={treasuryLedgerBalance}
-            walletBalance={walletBalance}
-            branchBalances={branchBalances}
+            walletBalance={mixedAccountCurrencies?{ownerNetwork:null,ownerCash:null}:walletBalance}
+            branchBalances={mixedAccountCurrencies?{}:branchBalances}
             branches={branches}
-            monthlySummary={monthlySummary}
-            trendData={trendData}
+            monthlySummary={mixedAccountCurrencies?{}:monthlySummary}
+            trendData={mixedAccountCurrencies?[]:trendData}
             integrity={integrity}
             payrollEstimate={payrollObligation}
             fmt={fmt}
@@ -610,10 +616,10 @@ export default function Treasury() {
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-950/40"><Landmark className="h-4 w-4 text-indigo-600" /></div>
                         <div className="min-w-0"><p className="truncate text-sm font-semibold">{account.account_name}</p><p className="truncate text-xs text-muted-foreground">{local(accountType)}{account.branch_key ? ` · ${account.branch_key}` : ''}</p></div>
                       </div>
-                      <div className="text-end"><Badge variant={account.is_active !== false ? 'outline' : 'secondary'}>{account.is_active !== false ? local('Active') : local('Inactive')}</Badge><p className={`mt-1 text-base font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(balance)}</p></div>
+                      <div className="text-end"><Badge variant={account.is_active !== false ? 'outline' : 'secondary'}>{account.is_active !== false ? local('Active') : local('Inactive')}</Badge><p className={`mt-1 text-base font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{formatCurrency(balance,account.currency||ledgerCurrency)}</p></div>
                     </div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                      <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Opening')}</p><p className="truncate text-xs font-semibold">{fmt(account.opening_balance || 0)}</p></div>
+                      <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Opening')}</p><p className="truncate text-xs font-semibold">{formatCurrency(account.opening_balance||0,account.currency||ledgerCurrency)}</p></div>
                       <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Transactions')}</p><p className="truncate text-xs font-semibold">{linkedCount}</p></div>
                       <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Currency')}</p><p className="truncate text-xs font-semibold" dir="ltr">{account.currency}</p></div>
                     </div>
@@ -793,7 +799,8 @@ export default function Treasury() {
               <Select value={form.type} onValueChange={v => {
                 const meta = TYPE_META[v];
                 setTransactionError('');
-                setForm(current=>({...current,type:v,wallet:meta?.wallet||current.wallet,
+                pendingTransactionId.current=null;
+                setForm(current=>({...current,type:v,account_id:'',wallet:meta?.wallet||current.wallet,
                   branch:current.branch||(!isAllBranches?selectedBranchKey||'':'')}));
               }}>
                 <SelectTrigger className="mt-1">
@@ -825,12 +832,13 @@ export default function Treasury() {
               <Select value={form.account_id} onValueChange={(value) => {
                 const account = activeAccounts.find((item) => item.id === value);
                 setTransactionError('');
+                pendingTransactionId.current=null;
                 setForm(current=>({...current,account_id:value,
                   branch:current.branch||account?.branch_key||(!isAllBranches?selectedBranchKey||'':''),
                   wallet:account?accountWalletKey(account):current.wallet}));
               }}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder={local('Select account')} /></SelectTrigger>
-                <SelectContent>{activeAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.account_name} · {fmt(accountBalances[account.id] || 0)}</SelectItem>)}</SelectContent>
+                <SelectContent>{matchingTxnAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.account_name} · {formatCurrency(accountBalances[account.id]||0,account.currency||ledgerCurrency)}</SelectItem>)}</SelectContent>
               </Select>
               {activeAccounts.length === 0 && <p className="mt-1 text-xs text-destructive">{local('No active Treasury account is available.')}</p>}
             </div>
@@ -894,7 +902,7 @@ export default function Treasury() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div><Label className="text-xs">{local('Branch')}</Label><Select value={accountForm.branch_id || '__unassigned'} onValueChange={(value) => setAccount('branch_id', value === '__unassigned' ? '' : value)}><SelectTrigger className="mt-1"><SelectValue placeholder={local('All branches / Owner')} /></SelectTrigger><SelectContent><SelectItem value="__unassigned">{local('All branches / Owner')}</SelectItem>{branches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.label || branch.name || branch.key}</SelectItem>)}</SelectContent></Select></div>
-              <div><Label className="text-xs">{local('Opening Balance')}</Label><Input className="mt-1" type="number" inputMode="decimal" value={accountForm.opening_balance} onChange={(event) => setAccount('opening_balance', event.target.value)} placeholder="0" /></div>
+              <div><Label className="text-xs">{local('Opening Balance')}</Label><Input className="mt-1" type="number" inputMode="decimal" value={accountForm.opening_balance} disabled={Boolean(editingAccount&&overviewTransactions.some(tx=>tx.account_id===editingAccount.id))} onChange={(event) => setAccount('opening_balance', event.target.value)} placeholder="0" /></div>
             </div>
             {!editingAccount?.is_system && <div><Label className="text-xs">{local('Status')}</Label><Select value={accountForm.is_active ? 'active' : 'inactive'} onValueChange={(value) => setAccount('is_active', value === 'active')}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">{local('Active')}</SelectItem><SelectItem value="inactive">{local('Inactive')}</SelectItem></SelectContent></Select></div>}
             {editingAccount?.is_system && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{local('System-mapped accounts stay active so automatic Treasury transactions remain linked.')}</div>}
