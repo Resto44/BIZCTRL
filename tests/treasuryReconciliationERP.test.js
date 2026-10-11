@@ -81,7 +81,8 @@ describe('Treasury ERP reconciliation',()=>{
   const page=await readFile(new URL('../src/pages/Treasury.jsx',import.meta.url),'utf8');
   expect(page).toContain('const overviewTransactions=isOwner?centralTransactions:transactions');
   expect(page).toContain('transactions={isOwner?centralTransactions:transactions}');
-  expect(page).toContain('!tx.auto_generated&&!tx.reference_id&&!tx.settlement_request_id');
+  expect(page).toContain('Posted · Locked');
+  expect(page).not.toContain('WalletTransaction.delete(');
   expect(page).toContain('const ledgerCurrency=activeRestaurant?.currency||currency');
   expect(page).not.toContain("branch_to_owner_cash',      label: 'Branch → Owner (Cash Transfer)', wallet: 'owner_cash',    direction: 'in',  settlement: true");
  });
