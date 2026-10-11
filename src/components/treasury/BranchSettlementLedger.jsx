@@ -203,7 +203,7 @@ export default function BranchSettlementLedger({ transactions = [], branches = [
               </div>
               <div className="flex items-center gap-2">
                 <div className="text-end">
-                  <p className="text-xs text-muted-foreground">{tr("Remaining w/ Owner")}</p>
+                  <p className="text-xs text-muted-foreground">{tr("Net ledger movement (not bank cash)")}</p>
                   <p className={`text-sm font-bold ${isNegative ? 'text-red-500' : 'text-emerald-600'}`}>{fmt(s.remaining)}</p>
                 </div>
                 {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}

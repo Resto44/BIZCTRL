@@ -19,7 +19,7 @@ const textByLanguage={
   orphan:'Transactions referring to unlisted accounts',branchMismatch:'Branch/account mismatches',duplicateNetwork:'Duplicate network Closing refs',unpairedFunding:'Unpaired branch funding',inspect:'Review reconciliation',
   accountsAction:'Manage accounts',txAction:'All transactions',noData:'No recorded data',all:'All branches',
   selected:'Selected branch',active:'Active',inactive:'Inactive',negativeInfo:'A negative ledger is not automatically a bug. Review opening balances and recorded movements.',
-  payroll:'Estimated base payroll per month',multi:'Different account currencies cannot be combined without FX rates.',
+  mismatch:'Account / branch conflicts',duplicate:'Duplicate network references',unpaired:'Unpaired funding transfers',payroll:'Estimated base payroll per month',multi:'Different account currencies cannot be combined without FX rates.',
  },
  ar:{
   title:'مركز إدارة الخزينة',subtitle:'الحركات المسجلة وأرصدة الحسابات وحالة التسوية',
@@ -33,7 +33,7 @@ const textByLanguage={
   orphan:'حركات تشير لحسابات غير ظاهرة',branchMismatch:'مغایرة الفروع والحسابات',duplicateNetwork:'مبيعات شبكة مكررة',unpairedFunding:'تمويل غير متوازن',inspect:'مراجعة المطابقة',
   accountsAction:'إدارة الحسابات',txAction:'جميع الحركات',noData:'لا توجد بيانات مسجلة',all:'جميع الفروع',
   selected:'الفرع المحدد',active:'نشط',inactive:'غير نشط',negativeInfo:'الرصيد السالب لا يعني خطأً تلقائياً. راجع الرصيد الافتتاحي والحركات المسجلة.',
-  payroll:'تقدير الرواتب الأساسية شهرياً',multi:'لا يمكن جمع حسابات بعملات مختلفة دون سعر صرف معتمد.',
+  mismatch:'حركات مرتبطة بفرع خاطئ',duplicate:'مراجع شبكة مكررة',unpaired:'تمويل غير متوازن',payroll:'تقدير الرواتب الأساسية شهرياً',multi:'لا يمكن جمع حسابات بعملات مختلفة دون سعر صرف معتمد.',
  },
  fa:{
   title:'مرکز مدیریت خزانه',subtitle:'گردش ثبت‌شده، مانده حساب‌ها و وضعیت تسویه',
@@ -47,7 +47,7 @@ const textByLanguage={
   orphan:'تراکنش‌های متصل به حساب نامشخص',branchMismatch:'اختلاف شعبه و حساب',duplicateNetwork:'فروش شبکه تکراری',unpairedFunding:'تمویل بدون برداشت مالک',inspect:'بررسی تطبیق',
   accountsAction:'مدیریت حساب‌ها',txAction:'همه تراکنش‌ها',noData:'داده ثبت نشده',all:'همه شعبه‌ها',
   selected:'شعبه انتخابی',active:'فعال',inactive:'غیرفعال',negativeInfo:'مانده منفی به‌تنهایی نشانه باگ نیست؛ مانده اولیه و تراکنش‌ها را بررسی کنید.',
-  payroll:'برآورد ماهانه حقوق پایه',multi:'حساب‌های دارای ارز متفاوت بدون نرخ تبدیل معتبر جمع نمی‌شوند.',
+  mismatch:'تعارض حساب و شعبه',duplicate:'مرجع تکراری شبکه',unpaired:'تمویل بدون دو طرف برابر',payroll:'برآورد ماهانه حقوق پایه',multi:'حساب‌های دارای ارز متفاوت بدون نرخ تبدیل معتبر جمع نمی‌شوند.',
  },
 };
 const tone=n=>Number(n)<0?'text-rose-600 dark:text-rose-400':'text-emerald-600 dark:text-emerald-400';
@@ -151,11 +151,17 @@ export default function TreasuryERPOverview({
   <Card>
    <Header icon={ShieldAlert} title={tr.health}
      action={<button type="button" onClick={()=>setTab('reconcile')} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-bold text-blue-700 dark:bg-blue-950">{tr.inspect}</button>}/>
-   <div className="grid grid-cols-3 gap-2">
-    {[{label:tr.negative,n:negAccountCount},{label:tr.unlinked,n:integrity.legacyWalletMovements||0},{label:tr.orphan,n:integrity.unknownAccountMovements||0},{label:tr.branchMismatch,n:integrity.branchAccountMismatches||0},{label:tr.duplicateNetwork,n:integrity.duplicateNetworkClosings||0},{label:tr.unpairedFunding,n:integrity.unpairedFundingCredits||0}].map(item=>
-    <div key={item.label} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-2 text-center dark:border-slate-700 dark:bg-slate-800">
-      <span className={'text-lg font-black '+(item.n?'text-amber-600':'text-emerald-600')}>{item.n}</span>
-      <p className="mt-1 break-words text-[10px] leading-4 text-muted-foreground">{item.label}</p>
+   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    {[
+      {label:tr.negative,n:negAccountCount},
+      {label:tr.unlinked,n:integrity.legacyWalletMovements||0},
+      {label:tr.orphan,n:integrity.unknownAccountMovements||0},
+      {label:tr.mismatch,n:integrity.scopeMismatches||0},
+      {label:tr.duplicate,n:integrity.duplicateNetworkReferences||0},
+      {label:tr.unpaired,n:integrity.unpairedFunding||0},
+    ].map(item=><div key={item.label} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center dark:border-slate-700 dark:bg-slate-800">
+      <span className={'text-xl font-black tabular-nums '+(item.n?'text-amber-600':'text-emerald-600')}>{item.n}</span>
+      <p className="mt-1 break-words text-[11px] leading-4 text-muted-foreground">{item.label}</p>
     </div>)}
    </div>
    {attention>0&&<p className="mt-2 flex items-start gap-1.5 text-[11px] text-amber-700 dark:text-amber-300"><AlertTriangle className="h-3.5 w-3.5 shrink-0"/>{tr.negativeInfo}</p>}
