@@ -497,7 +497,7 @@ export default function Treasury() {
             restaurantId={activeRestaurantId}
             accounts={accounts} branches={branches}
             transactions={centralTransactions} sales={centralSales}
-            lang={lang} currency={currency}
+            lang={lang} currency={activeRestaurant?.currency||currency}
             loading={centralTxLoading||centralSalesLoading||accountsLoading}
             error={centralTxError||centralSalesError||accountsError}
             onComplete={()=>{
