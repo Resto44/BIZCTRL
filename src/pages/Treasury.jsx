@@ -59,7 +59,7 @@ const TX_TYPES = [
   { value: 'credit_collection_cash',    label: 'Credit Collection (Cash)',        wallet: 'branch_cash',   direction: 'in' },
   // Branch → Owner settlements
   { value: 'branch_to_owner_cash',      label: 'Branch → Owner (Cash Transfer)', wallet: 'owner_cash',    direction: 'in',  settlement: true },
-  { value: 'branch_to_owner_network',   label: 'Branch → Owner (Network Sales)', wallet: 'owner_network', direction: 'in',  settlement: true },
+  { value: 'branch_to_owner_network',   label: 'Branch → Owner (Network Sales)', wallet: 'owner_network', direction: 'in',  auto: true },
   // Owner → Branch
   { value: 'owner_to_branch_funding',   label: 'Owner → Branch (Funding)',        wallet: 'branch_cash',   direction: 'in',  auto: true },
   { value: 'owner_expense',             label: 'Owner Expense (for Branch)',      wallet: 'owner_network', direction: 'out', settlement: true },
