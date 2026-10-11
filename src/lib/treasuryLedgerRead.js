@@ -49,6 +49,7 @@ export function treasuryIntegrity(accounts=[],transactions=[],knownAccounts=acco
    if(!a)return false;
    if(a.restaurant_id&&tx.restaurant_id&&a.restaurant_id!==tx.restaurant_id)return true;
    if(a.branch_id&&tx.branch_id&&a.branch_id!==tx.branch_id)return true;
+   if(a.branch_id&&!tx.branch_id&&(!a.branch_key||!tx.branch||a.branch_key!==tx.branch))return true;
    if(a.branch_key&&tx.branch&&!a.branch_id&&a.branch_key!==tx.branch)return true;
    return false;
  }).length;
