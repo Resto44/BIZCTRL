@@ -18,7 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AlertTriangle, CheckCircle2, Clock, DollarSign, XCircle, PlusCircle, Scale } from 'lucide-react';
 import { useTenant } from '@/lib/TenantContext';
-import { subDays } from 'date-fns';
+import { subDays, format } from 'date-fns';
+import {reconcileSalesToTreasury,reconcileExplicitSponsorFlows} from '@/lib/treasuryReconciliation';
 
 export default function ReconciliationDashboard({ transactions, sales, branches, currency }) {
   const { user } = useAuth();
@@ -32,8 +33,8 @@ export default function ReconciliationDashboard({ transactions, sales, branches,
   const [adjForm, setAdjForm] = useState({ amount: '', fee_reason: '', notes: '' });
   const [saving, setSaving] = useState(false);
 
-  const cutoff = formatDate(subDays(new Date(), lookbackDays));
-  const today = formatDate(new Date());
+  const cutoff = format(subDays(new Date(), lookbackDays), 'yyyy-MM-dd');
+  const today = format(new Date(), 'yyyy-MM-dd');
 
   // ── Fetch SponsorTransactions ────────────────────────────────────────────
   // Note: transactions and sales are passed as props (already tenant-filtered by Treasury parent)
@@ -50,77 +51,14 @@ export default function ReconciliationDashboard({ transactions, sales, branches,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sponsor_transactions_recon'] }); setAdjDialog(null); setSaving(false); },
   });
 
-  // ── TAB 1: Wallet reconciliation (original logic) ────────────────────────
-  const walletRecon = useMemo(() => {
-    const filteredSales = sales.filter(s =>
-      s.date >= cutoff && s.date <= today &&
-      (selectedBranch === 'all' || s.branch === selectedBranch)
-    );
-    const autoTx = transactions.filter(tx =>
-      tx.auto_generated &&
-      tx.date >= cutoff && tx.date <= today &&
-      (selectedBranch === 'all' || !tx.branch || tx.branch === selectedBranch)
-    );
-    const rows = [];
-    filteredSales.forEach(sale => {
-      if ((sale.cash || 0) > 0) {
-        const match = autoTx.find(tx => tx.reference_id === sale.id && tx.type === 'cash_sales_branch');
-        const dep = match?.amount || 0;
-        const diff = (sale.cash || 0) - dep;
-        rows.push({ date: sale.date, branch: sale.branch, type: 'Cash Sales', expected: sale.cash || 0, deposited: dep, diff, status: !match ? 'undeposited' : Math.abs(diff) < 0.01 ? 'matched' : 'discrepancy', reference: sale.id });
-      }
-      if ((sale.network || 0) > 0) {
-        const match = autoTx.find(tx => tx.reference_id === sale.id && tx.type === 'network_sales_auto');
-        const dep = match?.amount || 0;
-        const diff = (sale.network || 0) - dep;
-        rows.push({ date: sale.date, branch: sale.branch, type: 'Network Sales', expected: sale.network || 0, deposited: dep, diff, status: !match ? 'undeposited' : Math.abs(diff) < 0.01 ? 'matched' : 'discrepancy', reference: sale.id });
-      }
-    });
-    autoTx.forEach(tx => {
-      if (!sales.some(s => s.id === tx.reference_id)) {
-        rows.push({ date: tx.date, branch: tx.branch || '—', type: tx.type === 'cash_sales_branch' ? 'Cash (No Sale)' : 'Network (No Sale)', expected: 0, deposited: tx.amount || 0, diff: -(tx.amount || 0), status: 'unaccounted', reference: tx.id });
-      }
-    });
-    return rows.sort((a, b) => b.date.localeCompare(a.date));
-  }, [sales, transactions, cutoff, today, selectedBranch]);
-
-  // ── TAB 2: Sales vs NETWORK_TO_SPONSOR sponsor entries ──────────────────
-  const sponsorRecon = useMemo(() => {
-    const filteredSales = sales.filter(s =>
-      s.date >= cutoff && s.date <= today &&
-      (selectedBranch === 'all' || s.branch === selectedBranch)
-    );
-    const filteredSponsor = sponsorTxs.filter(tx =>
-      tx.date >= cutoff && tx.date <= today &&
-      (selectedBranch === 'all' || !tx.branch || tx.branch === selectedBranch)
-    );
-
-    // Group sponsor NETWORK_TO_SPONSOR by date+branch
-    const sponsorMap = {};
-    filteredSponsor.forEach(tx => {
-      const key = `${tx.date}|${tx.branch || 'all'}`;
-      sponsorMap[key] = (sponsorMap[key] || 0) + (tx.amount || 0);
-    });
-
-    const rows = [];
-    filteredSales.forEach(sale => {
-      if ((sale.network || 0) <= 0) return;
-      const key = `${sale.date}|${sale.branch}`;
-      const keyAll = `${sale.date}|all`;
-      const sponsorAmount = (sponsorMap[key] || 0) + (sponsorMap[keyAll] || 0);
-      const diff = (sale.network || 0) - sponsorAmount;
-      rows.push({
-        date: sale.date,
-        branch: sale.branch,
-        saleNetwork: sale.network || 0,
-        sponsorRecorded: sponsorAmount,
-        diff,
-        status: Math.abs(diff) < 0.01 ? 'matched' : sponsorAmount === 0 ? 'unrecorded' : 'discrepancy',
-        saleId: sale.id,
-      });
-    });
-    return rows.sort((a, b) => b.date.localeCompare(a.date));
-  }, [sales, sponsorTxs, cutoff, today, selectedBranch]);
+  // Compare canonical finalized Closings to ledger postings, never to bank deposits.
+  const walletRecon=useMemo(()=>reconcileSalesToTreasury({
+    sales,transactions,from:cutoff,to:today,branch:selectedBranch,
+  }),[sales,transactions,cutoff,today,selectedBranch]);
+  // The Owner's network sales do not automatically belong to the sponsor.
+  const sponsorRecon=useMemo(()=>reconcileExplicitSponsorFlows({
+    sales,sponsorTransactions:sponsorTxs,from:cutoff,to:today,branch:selectedBranch,
+  }),[sales,sponsorTxs,cutoff,today,selectedBranch]);
 
   const walletSummary = useMemo(() => {
     const byStatus = (s) => walletRecon.filter(r => r.status === s);
@@ -147,8 +85,8 @@ export default function ReconciliationDashboard({ transactions, sales, branches,
   const statusConfig = {
     matched:     { label: 'Matched',       icon: CheckCircle2, cls: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' },
     discrepancy: { label: 'Discrepancy',   icon: AlertTriangle, cls: 'text-amber-600',  bg: 'bg-amber-50 border-amber-200' },
-    undeposited: { label: 'Undeposited',   icon: Clock,         cls: 'text-red-500',    bg: 'bg-red-50 border-red-200' },
-    unaccounted: { label: 'Unaccounted',   icon: XCircle,       cls: 'text-violet-600', bg: 'bg-violet-50 border-violet-200' },
+    undeposited: { label: 'Missing ledger posting',   icon: Clock,         cls: 'text-red-500',    bg: 'bg-red-50 border-red-200' },
+    unaccounted: { label: 'Orphan ledger posting',   icon: XCircle,       cls: 'text-violet-600', bg: 'bg-violet-50 border-violet-200' },
     unrecorded:  { label: 'Not in Sponsor',icon: AlertTriangle, cls: 'text-orange-600', bg: 'bg-orange-50 border-orange-200' },
   };
 
@@ -203,6 +141,7 @@ export default function ReconciliationDashboard({ transactions, sales, branches,
 
         {/* ── TAB 1: Wallet reconciliation ─────────────────────────────── */}
         <TabsContent value="wallet" className="mt-3 space-y-3">
+          <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">This checks Closing amounts against Treasury ledger postings, not bank deposits or payment-provider settlement. Duplicate postings are flagged as discrepancies.</p>
           <div className="grid grid-cols-2 gap-2">
             {['matched','discrepancy','undeposited','unaccounted'].map(key => {
               const cfg = statusConfig[key];
@@ -282,7 +221,7 @@ export default function ReconciliationDashboard({ transactions, sales, branches,
 
           <Card className="p-3 bg-blue-50 border-blue-200">
             <p className="text-xs text-blue-700">
-              <span className="font-semibold">How it works:</span> Each day's network sales are compared against <code className="bg-blue-100 px-1 rounded">NETWORK_TO_SPONSOR</code> entries. Discrepancies can be fixed by creating a <code className="bg-blue-100 px-1 rounded">SPONSOR_FEE_OR_ADJUSTMENT</code> entry inline.
+              <span className="font-semibold">How it works:</span> Only days with actual recorded sponsor transfers are compared against <code className="bg-blue-100 px-1 rounded">NETWORK_TO_SPONSOR</code> entries. Do not create an adjustment without evidence; authorized adjustments can be recorded using a <code className="bg-blue-100 px-1 rounded">SPONSOR_FEE_OR_ADJUSTMENT</code> entry inline.
             </p>
           </Card>
 
