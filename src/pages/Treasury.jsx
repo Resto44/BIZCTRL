@@ -373,7 +373,12 @@ export default function Treasury() {
     const enteredCurrency=String(accountForm.currency||ledgerCurrency||'').trim();
     if(!enteredCurrency||isUnverifiedTreasuryCurrency(enteredCurrency)||
        !/^(?:[A-Za-z]{3}|SR|S\.R|ر\.س|ر\.س\.)$/.test(enteredCurrency)){
-      toast.error(lang==='ar'?'اختر رمز عملة صحيحاً مثل SAR أو USD، وليس علامة 
+      toast.error(lang==='ar'?'استخدم رمز عملة صحيحا مثل SAR أو USD بدلا من علامة غير معروفة':
+        lang==='fa'?'کد معتبر ارز مانند SAR یا USD وارد کنید، نه علامت نامعلوم':
+        'Enter a valid ISO currency code such as SAR or USD, not an ambiguous symbol.');
+      return;
+    }
+    const canonicalAccountCurrency=normalizeTreasuryCurrency(enteredCurrency,ledgerCurrency);
     if(centralTxError||centralTxLoading){toast.error(local('Complete Treasury data is required to edit an account.'));return;}
     if(editingAccount&&overviewTransactions.some(tx=>tx.account_id===editingAccount.id)){
       const historicalChange=Number(accountForm.opening_balance||0)!==Number(editingAccount.opening_balance||0)||
