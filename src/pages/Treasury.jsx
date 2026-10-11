@@ -55,10 +55,10 @@ const TX_TYPES = [
   { value: 'owner_branch_funding_debit', label: 'Owner Funding Sent', wallet: 'owner_network', direction: 'out', auto: true },
   { value: 'cash_sales_branch',         label: 'Cash Sales (Auto)',               wallet: 'branch_cash',   direction: 'in',  auto: true },
   // Credit collections
-  { value: 'credit_collection_network', label: 'Credit Collection (Network)',     wallet: 'owner_network', direction: 'in' },
-  { value: 'credit_collection_cash',    label: 'Credit Collection (Cash)',        wallet: 'branch_cash',   direction: 'in' },
+  { value: 'credit_collection_network', label: 'Credit Collection (Network)',     wallet: 'owner_network', direction: 'in', auto:true },
+  { value: 'credit_collection_cash',    label: 'Credit Collection (Cash)',        wallet: 'branch_cash',   direction: 'in', auto:true },
   // Branch → Owner settlements
-  { value: 'branch_to_owner_cash',      label: 'Branch → Owner (Cash Transfer)', wallet: 'owner_cash',    direction: 'in',  settlement: true },
+  { value: 'branch_to_owner_cash',      label: 'Branch → Owner (Cash Transfer)', wallet: 'owner_cash',    direction: 'in',  auto: true },
   { value: 'branch_to_owner_network',   label: 'Branch → Owner (Network Sales)', wallet: 'owner_network', direction: 'in',  auto: true },
   // Owner → Branch
   { value: 'owner_to_branch_funding',   label: 'Owner → Branch (Funding)',        wallet: 'branch_cash',   direction: 'in',  auto: true },
@@ -101,8 +101,12 @@ const transactionType = (transaction) => transaction?.transaction_type || transa
 
 export default function Treasury() {
   const { currency, t, translateLiteral, lang } = useLanguage();
+
   const { role } = useRole();
   const { branches, activeRestaurantId, activeRestaurant, ownerFilter } = useTenant();
+  // Transaction values are denominated in the organization's booked currency;
+  // workspace display currency is not an FX-conversion engine.
+  const ledgerCurrency=activeRestaurant?.currency||currency;
   const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const notif = useNotify();
   const qc = useQueryClient();
@@ -199,20 +203,23 @@ export default function Treasury() {
     return { receivedBySponsor, sentToOwner, remaining: Math.max(0, remaining), branchesWithBalance };
   }, [settlements]);
 
+  // Owner's central accounts cannot be valued from a branch-filtered ledger.
+  // Managers continue to see only their authorized branch and accounts.
+  const overviewTransactions=isOwner?centralTransactions:transactions;
   const scopedAccounts = useMemo(() => accountsForTreasuryScope(accounts,{
-    allBranches:isAllBranches,branchId:selectedBranchId,branchKey:selectedBranchKey,
-  }),[accounts,isAllBranches,selectedBranchId,selectedBranchKey]);
-  const accountBalances = useMemo(() => buildTreasuryAccountBalances(scopedAccounts, transactions),
-    [scopedAccounts, transactions]);
+    allBranches:isOwner||isAllBranches,branchId:selectedBranchId,branchKey:selectedBranchKey,
+  }),[accounts,isOwner,isAllBranches,selectedBranchId,selectedBranchKey]);
+  const accountBalances = useMemo(() => buildTreasuryAccountBalances(scopedAccounts, overviewTransactions),
+    [scopedAccounts, overviewTransactions]);
   const mixedAccountCurrencies = useMemo(()=>
-    new Set(scopedAccounts.map(account=>account.currency||currency)).size>1,
-    [scopedAccounts,currency]);
+    new Set(scopedAccounts.map(account=>account.currency||ledgerCurrency)).size>1,
+    [scopedAccounts,ledgerCurrency]);
   const treasuryLedgerBalance = useMemo(() => mixedAccountCurrencies?null:
-    calculateTreasuryLedgerBalance(scopedAccounts, transactions),
-    [scopedAccounts, transactions, mixedAccountCurrencies]);
+    calculateTreasuryLedgerBalance(scopedAccounts, overviewTransactions),
+    [scopedAccounts, overviewTransactions, mixedAccountCurrencies]);
   const activeAccounts = useMemo(() => scopedAccounts.filter(a=>a.is_active!==false),[scopedAccounts]);
-  const integrity = useMemo(() => treasuryIntegrity(scopedAccounts,transactions,accounts),
-    [scopedAccounts,transactions,accounts]);
+  const integrity = useMemo(() => treasuryIntegrity(scopedAccounts,overviewTransactions,accounts),
+    [scopedAccounts,overviewTransactions,accounts]);
 
   const accountSaveMut = useMutation({
     mutationFn: async (payload) => {
@@ -268,49 +275,51 @@ export default function Treasury() {
     [transactions, filterMonth]
   );
   const filteredTx = useMemo(() => monthTx, [monthTx]);
+  const overviewMonthTx=useMemo(()=>overviewTransactions.filter(tx=>
+    transactionDate(tx).startsWith(filterMonth)),[overviewTransactions,filterMonth]);
 
   // ── Wallet balances ───────────────────────────────────────────────────
   const walletBalance = useMemo(() => {
-    const calc = (walletKey) => transactions.filter(tx => tx.wallet === walletKey)
-      .reduce((s, tx) => s + (tx.direction === 'in' ? (tx.amount || 0) : -(tx.amount || 0)), 0);
+    const calc = (walletKey) => overviewTransactions.filter(tx => tx.wallet === walletKey)
+      .reduce((s, tx) => s + (tx.direction === 'in' ? 1 : -1)*Number(tx.amount||0), 0);
     return {
       ownerNetwork: calc('owner_network'),
       ownerCash: calc('owner_cash'),
       get ownerTotal() { return this.ownerNetwork + this.ownerCash; },
     };
-  }, [transactions]);
+  }, [overviewTransactions]);
 
   const branchBalances = useMemo(() => {
     const map = {};
-    transactions.filter(tx => tx.wallet === 'branch_cash').forEach(tx => {
+    overviewTransactions.filter(tx => tx.wallet === 'branch_cash').forEach(tx => {
       const key=tx.branch || branches.find(b=>b.id===tx.branch_id)?.key;
       if(!key)return;
       if (!map[key]) map[key] = 0;
       map[key] += tx.direction === 'in' ? (Number(tx.amount)||0) : -(Number(tx.amount)||0);
     });
     return map;
-  }, [transactions,branches]);
+  }, [overviewTransactions,branches]);
 
   // ── Monthly summary ───────────────────────────────────────────────────
   const monthlySummary = useMemo(() => {
-    const ownerIn = monthTx.filter(tx => (tx.wallet === 'owner_network' || tx.wallet === 'owner_cash') && tx.direction === 'in').reduce((s, tx) => s + (tx.amount || 0), 0);
-    const ownerOut = monthTx.filter(tx => (tx.wallet === 'owner_network' || tx.wallet === 'owner_cash') && tx.direction === 'out').reduce((s, tx) => s + (tx.amount || 0), 0);
-    const networkIn = monthTx.filter(tx => tx.wallet === 'owner_network' && tx.direction === 'in').reduce((s, tx) => s + (tx.amount || 0), 0);
-    const branchIn = monthTx.filter(tx => tx.wallet === 'branch_cash' && tx.direction === 'in').reduce((s, tx) => s + (tx.amount || 0), 0);
-    const branchOut = monthTx.filter(tx => tx.wallet === 'branch_cash' && tx.direction === 'out').reduce((s, tx) => s + (tx.amount || 0), 0);
+    const ownerIn = overviewMonthTx.filter(tx => (tx.wallet === 'owner_network' || tx.wallet === 'owner_cash') && tx.direction === 'in').reduce((s, tx) => s + Number(tx.amount||0), 0);
+    const ownerOut = overviewMonthTx.filter(tx => (tx.wallet === 'owner_network' || tx.wallet === 'owner_cash') && tx.direction === 'out').reduce((s, tx) => s + Number(tx.amount||0), 0);
+    const networkIn = overviewMonthTx.filter(tx => tx.wallet === 'owner_network' && tx.direction === 'in').reduce((s, tx) => s + Number(tx.amount||0), 0);
+    const branchIn = overviewMonthTx.filter(tx => tx.wallet === 'branch_cash' && tx.direction === 'in').reduce((s, tx) => s + Number(tx.amount||0), 0);
+    const branchOut = overviewMonthTx.filter(tx => tx.wallet === 'branch_cash' && tx.direction === 'out').reduce((s, tx) => s + Number(tx.amount||0), 0);
     return { ownerIn, ownerOut, networkIn, branchIn, branchOut };
-  }, [monthTx]);
+  }, [overviewMonthTx]);
 
   // ── Monthly trend (last 6 months) ────────────────────────────────────
   const trendData = useMemo(() => {
     return MONTH_OPTIONS.slice().reverse().map(({ value, label }) => {
-      const txs = transactions.filter(tx => transactionDate(tx).startsWith(value));
-      const networkIn = txs.filter(tx => tx.wallet === 'owner_network' && tx.direction === 'in').reduce((s, tx) => s + (tx.amount || 0), 0);
-      const ownerOut = txs.filter(tx => (tx.wallet === 'owner_network' || tx.wallet === 'owner_cash') && tx.direction === 'out').reduce((s, tx) => s + (tx.amount || 0), 0);
-      const ownerIn = txs.filter(tx => (tx.wallet === 'owner_network' || tx.wallet === 'owner_cash') && tx.direction === 'in').reduce((s, tx) => s + (tx.amount || 0), 0);
+      const txs = overviewTransactions.filter(tx => transactionDate(tx).startsWith(value));
+      const networkIn = txs.filter(tx => tx.wallet === 'owner_network' && tx.direction === 'in').reduce((s, tx) => s + Number(tx.amount||0), 0);
+      const ownerOut = txs.filter(tx => (tx.wallet === 'owner_network' || tx.wallet === 'owner_cash') && tx.direction === 'out').reduce((s, tx) => s + Number(tx.amount||0), 0);
+      const ownerIn = txs.filter(tx => (tx.wallet === 'owner_network' || tx.wallet === 'owner_cash') && tx.direction === 'in').reduce((s, tx) => s + Number(tx.amount||0), 0);
       return { label, networkIn, ownerIn, ownerOut, net: ownerIn - ownerOut };
     });
-  }, [transactions]);
+  }, [overviewTransactions]);
 
   // ── Branch balance chart ──────────────────────────────────────────────
   const branchBalanceChart = useMemo(() => {
@@ -331,7 +340,7 @@ export default function Treasury() {
 
   const openCreateAccount = () => {
     setEditingAccount(null);
-    setAccountForm({ ...emptyAccountForm, currency: currency || 'SAR' });
+    setAccountForm({ ...emptyAccountForm, currency: ledgerCurrency || 'SAR' });
     setShowAccountForm(true);
   };
   const openEditAccount = (account) => {
@@ -341,7 +350,7 @@ export default function Treasury() {
       account_type: account.account_type || 'cash',
       branch_id: account.branch_id || '',
       branch_key: account.branch_key || '',
-      currency: account.currency || currency || 'SAR',
+      currency: account.currency || ledgerCurrency || 'SAR',
       opening_balance: String(account.opening_balance || 0),
       is_active: account.is_active !== false,
       notes: account.notes || '',
@@ -358,7 +367,7 @@ export default function Treasury() {
       account_type: accountForm.account_type,
       branch_id: selectedBranch?.id || null,
       branch_key: selectedBranch?.key || selectedBranch?.branch_key || null,
-      currency: accountForm.currency.trim() || currency || 'SAR',
+      currency: accountForm.currency.trim() || ledgerCurrency || 'SAR',
       opening_balance: Number(accountForm.opening_balance || 0),
       is_active: accountForm.is_active,
       notes: accountForm.notes.trim() || null,
@@ -409,11 +418,11 @@ export default function Treasury() {
     return <div className="text-center py-20 text-muted-foreground text-sm">{t('error')}</div>;
   }
 
-  const fmt = (v) => formatCurrency(v, currency);
+  const fmt = (v) => formatCurrency(v, ledgerCurrency);
 
   // Never display an apparently balanced/zero ledger in ANY Treasury tab after
   // a failed financial read. These screens drive actual payment decisions.
-  if (transactionsError || accountsError) {
+  if (transactionsError || accountsError || (isOwner && (centralTxError || centralSalesError))) {
     const message=lang==='ar'
       ? 'تعذر تحميل دفتر الخزينة بالكامل. لم تُعرض أي أرصدة جزئية.'
       :lang==='fa'
@@ -486,10 +495,10 @@ export default function Treasury() {
             integrity={integrity}
             payrollEstimate={payrollObligation}
             fmt={fmt}
-            currency={currency}
+            currency={ledgerCurrency}
             lang={lang}
-            valueScope={isAllBranches?'all':'selected'}
-            isLoading={isLoading || accountsLoading}
+            valueScope={isOwner||isAllBranches?'all':'selected'}
+            isLoading={isLoading || accountsLoading || (isOwner&&centralTxLoading)}
             setTab={setTab}
             mixedCurrencies={mixedAccountCurrencies}
           />}
@@ -592,7 +601,7 @@ export default function Treasury() {
             <div className="grid gap-3 lg:grid-cols-2">
               {scopedAccounts.map((account) => {
                 const balance = accountBalances[account.id] || 0;
-                const linkedCount = transactions.filter((transaction) => transaction.account_id === account.id).length;
+                const linkedCount = overviewTransactions.filter((transaction) => transaction.account_id === account.id).length;
                 const accountType = TREASURY_ACCOUNT_TYPES.find((type) => type.value === account.account_type)?.label || account.account_type;
                 return (
                   <Card key={account.id} className="min-w-0 p-4">
@@ -624,17 +633,17 @@ export default function Treasury() {
         {/* ── RECONCILIATION ──────────────────────────────────────────── */}
         <TabsContent value="reconcile" className="mt-3">
           <ReconciliationDashboard
-            transactions={transactions}
-            sales={allSales}
+            transactions={isOwner?centralTransactions:transactions}
+            sales={isOwner?centralSales:allSales}
             branches={branches}
-            currency={currency}
+            currency={ledgerCurrency}
           />
         </TabsContent>
 
         {/* ── SETTLEMENT ──────────────────────────────────────────────── */}
         <TabsContent value="settlement" className="mt-3">
           <BranchSettlementLedger
-            transactions={transactions}
+            transactions={overviewTransactions}
             branches={branches}
             currency={currency}
             onRecord={() => setShowForm(true)}
@@ -690,9 +699,9 @@ export default function Treasury() {
                       <span className={`text-sm font-bold ${isIn ? 'text-emerald-600' : 'text-red-500'}`}>
                         {isIn ? '+' : '-'}{fmt(tx.amount)}
                       </span>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(tx.id)}>
+                      {!tx.auto_generated&&!tx.reference_id&&!tx.settlement_request_id && <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(tx.id)} title={local('Delete unlinked manual draft')}>
                         <Trash2 className="w-3 h-3" />
-                      </Button>
+                      </Button>}
                     </div>
                   </div>
                 </Card>
@@ -708,7 +717,7 @@ export default function Treasury() {
 
         {/* ── CASHFLOW FORECAST ────────────────────────────────────────── */}
         <TabsContent value="forecast" className="mt-3">
-          <CashflowProjection accounts={accounts} transactions={transactions} />
+          <CashflowProjection accounts={scopedAccounts} transactions={overviewTransactions} />
         </TabsContent>
 
         {/* ── OWNER PERSONAL FINANCE ───────────────────────────────────── */}
