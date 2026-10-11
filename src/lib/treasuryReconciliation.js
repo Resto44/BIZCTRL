@@ -16,10 +16,9 @@ export function reconcileSalesToTreasury({
  const filteredSales=sales.filter(s=>['finalized','locked'].includes(saleStatus(s))&&
    (!from||day(s.date)>=from)&&(!to||day(s.date)<=to)&&
    (branch==='all'||s.branch===branch));
- const filteredTx=transactions.filter(tx=>relevantTypes.has(txType(tx))&&
-   tx.direction==='in'&&(!from||day(tx.transaction_date||tx.date)>=from)&&
-   (!to||day(tx.transaction_date||tx.date)<=to)&&
-   (branch==='all'||tx.branch===branch));
+ // A Closing and its posted entry may have different accounting dates.
+ // Match against the COMPLETE tenant ledger; filter periods only for orphan rows.
+ const filteredTx=transactions.filter(tx=>relevantTypes.has(txType(tx))&&tx.direction==='in');
  const byKey=new Map();
  const key=(ref,type)=>String(ref||'')+'::'+type;
  for(const tx of filteredTx){
@@ -28,7 +27,7 @@ export function reconcileSalesToTreasury({
    byKey.set(id,[...(byKey.get(id)||[]),tx]);
  }
  const rows=[];
- const scopeSaleIds=new Set(filteredSales.map(s=>String(s.id)));
+ const scopeSaleIds=new Set(sales.map(s=>String(s.id)));
  for(const sale of filteredSales){
    for(const [family,expectedAmount,label] of [
      ['cash',getSaleCash(sale),'Cash sales ledger'],
@@ -39,17 +38,22 @@ export function reconcileSalesToTreasury({
      const matches=byKey.get(key(sale.id,family))||[];
      const actual=matches.reduce((sum,tx)=>sum+Number(tx.amount||0),0);
      const malformed=matches.some(tx=>!finiteNonnegative(tx.amount));
+     const branchMismatch=matches.some(tx=>
+       ((sale.branch_id&&tx.branch_id)&&String(sale.branch_id)!==String(tx.branch_id))||
+       (sale.branch&&tx.branch&&sale.branch!==tx.branch));
      const diff=expected-actual;
      rows.push({
        date:day(sale.date),branch:sale.branch||'—',type:label,
        expected,deposited:actual,diff,reference:sale.id,postingCount:matches.length,
-       status:!matches.length?'undeposited':matches.length>1||malformed||Math.abs(diff)>=0.01
+       status:!matches.length?'undeposited':matches.length>1||malformed||branchMismatch||Math.abs(diff)>=0.01
          ?'discrepancy':'matched',
      });
    }
  }
  // Unknown or duplicate postings must never be silently counted as receipts.
  for(const tx of filteredTx){
+   const recordDay=day(tx.transaction_date||tx.date);
+   if((from&&recordDay<from)||(to&&recordDay>to)||(branch!=='all'&&tx.branch!==branch))continue;
    if(scopeSaleIds.has(String(tx.reference_id)))continue;
    const amt=Number(tx.amount)||0;
    rows.push({
