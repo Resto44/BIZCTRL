@@ -53,7 +53,11 @@ export function summarizeOwnerNetworkClosings(sales=[],transactions=[]){
  for(const closing of finalized){
    const transactionsForClosing=byReference.get(String(closing.id))||[];
    const expected=Number(getSaleNetwork(closing));
-   if(transactionsForClosing.length!==1 ||
+   const posting=transactionsForClosing[0];
+   const wrongScope=posting&&((posting.wallet&&posting.wallet!=='owner_network')||
+     (posting.branch_id&&closing.branch_id&&posting.branch_id!==closing.branch_id)||
+     (posting.branch&&closing.branch&&posting.branch!==closing.branch));
+   if(transactionsForClosing.length!==1 || wrongScope ||
       Math.abs((Number(transactionsForClosing[0].amount)||0)-expected)>0.009){
       missing+=1;
    }else linked+=expected;
@@ -70,6 +74,7 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
  const tr=T[lang]||T.en;
  const qc=useQueryClient();
  const requestId=useRef(null);
+ const submissionLock=useRef(false);
  const [sourceId,setSourceId]=useState('');
  const [branchId,setBranchId]=useState('');
  const [targetId,setTargetId]=useState('');
@@ -79,13 +84,13 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
  const [receiptConfirmed,setReceiptConfirmed]=useState(false);
  const [note,setNote]=useState('');
  const [saveError,setSaveError]=useState('');
- const change=(setter,value)=>{setter(value);setSaveError('');requestId.current=null;};
+ const change=(setter,value)=>{if(submissionLock.current)return;setter(value);setSaveError('');requestId.current=null;};
  const totals=useMemo(()=>summarizeOwnerNetworkClosings(sales,transactions),[sales,transactions]);
  const balances=useMemo(()=>buildTreasuryAccountBalances(accounts,transactions),[accounts,transactions]);
  const ownerAccounts=accounts.filter(a=>a.is_active!==false&&!a.branch_id&&!a.branch_key&&
    ['bank','cash','network_pos','digital_wallet','clearing'].includes(a.account_type));
  const branchAccounts=accounts.filter(a=>a.is_active!==false&&(a.branch_id===branchId||
-   (!a.branch_id&&a.branch_key&&branches.find(b=>b.id===branchId)?.branch_key===a.branch_key))&&
+   (!a.branch_id&&a.branch_key&&(branches.find(b=>b.id===branchId)?.branch_key||branches.find(b=>b.id===branchId)?.key)===a.branch_key))&&
    ['cash','petty_cash'].includes(a.account_type));
  const chosenSource=ownerAccounts.find(a=>a.id===sourceId);
  const chosenDestination=branchAccounts.find(a=>a.id===targetId);
@@ -94,7 +99,8 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
    normalizeTreasuryCurrency(chosenDestination.currency,currency));
  const needsSettled=chosenSource&&['network_pos','clearing'].includes(chosenSource.account_type);
  const selectedAmount=Number(amount);
- const ready=Boolean(restaurantId&&sourceId&&branchId&&targetId&&selectedAmount>0&&
+ const ready=Boolean(restaurantId&&chosenSource&&branchId&&chosenDestination&&selectedAmount>0&&
+   selectedAmount<=Number(balances[sourceId]??0)&&
    Number.isFinite(selectedAmount)&&Math.abs(selectedAmount*100-Math.round(selectedAmount*100))<.000001&&
    !fundingCurrencyMismatch&&receiptConfirmed&&(!needsSettled||settlementConfirmed)&&!loading&&!error);
  const {mutateAsync,isPending}=useMutation({mutationFn:async payload=>{
@@ -104,7 +110,8 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
    return data;
  }});
  const submit=async()=>{
-  if(!ready||isPending)return;
+  if(!ready||isPending||submissionLock.current)return;
+  submissionLock.current=true;
   try{
    requestId.current ||= crypto.randomUUID();
    await mutateAsync({
@@ -114,6 +121,7 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
     p_network_settlement_confirmed:Boolean(settlementConfirmed),
     p_branch_receipt_confirmed:Boolean(receiptConfirmed),
    });
+   qc.invalidateQueries({queryKey:['treasury_owner_central_transactions']});
    qc.invalidateQueries({queryKey:['wallet_transactions']});
    qc.invalidateQueries({queryKey:['treasury_accounts']});
    await onComplete?.();
@@ -128,7 +136,7 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
         'Owner and branch accounts have different currencies. Check account denominations.')
       :rawMessage.slice(0,350);
    setSaveError(message);toast.error(message);
-  }
+  }finally{submissionLock.current=false;}
  };
  const money=(n,code=currency)=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n||0)
   +' '+normalizeTreasuryCurrency(code,currency);
@@ -154,34 +162,34 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
   <div className="space-y-3 border-t pt-3">
    <h4 className="flex items-center gap-2 text-sm font-bold"><ArrowLeftRight className="h-4 w-4"/>{tr.funding}</h4>
    <div><Label>{tr.source} *</Label>
-    <Select value={sourceId} onValueChange={id=>change(setSourceId,id)}>
+    <Select disabled={isPending} value={sourceId} onValueChange={id=>change(setSourceId,id)}>
       <SelectTrigger><SelectValue placeholder={tr.source}/></SelectTrigger>
       <SelectContent>{ownerAccounts.map(a=><SelectItem key={a.id} value={a.id}>{a.account_name} · {money(balances[a.id],a.currency||currency)}</SelectItem>)}</SelectContent>
     </Select>
    </div>
    <div className="grid gap-3 sm:grid-cols-2">
     <div><Label>{tr.branch} *</Label>
-      <Select value={branchId} onValueChange={v=>{change(setBranchId,v);setTargetId('');}}>
+      <Select disabled={isPending} value={branchId} onValueChange={v=>{if(submissionLock.current)return;change(setBranchId,v);setTargetId('');}}>
        <SelectTrigger><SelectValue placeholder={tr.noBranch}/></SelectTrigger>
        <SelectContent>{branches.filter(b=>b.is_active!==false).map(b=><SelectItem value={b.id} key={b.id}>{b.name||b.label||b.branch_key}</SelectItem>)}</SelectContent>
       </Select>
     </div>
     <div><Label>{tr.dest} *</Label>
-      <Select value={targetId} onValueChange={v=>change(setTargetId,v)}>
+      <Select disabled={isPending} value={targetId} onValueChange={v=>change(setTargetId,v)}>
        <SelectTrigger><SelectValue placeholder={tr.dest}/></SelectTrigger>
        <SelectContent>{branchAccounts.map(a=><SelectItem key={a.id} value={a.id}>{a.account_name}</SelectItem>)}</SelectContent>
       </Select>
     </div>
-    <div><Label>{tr.amount} *</Label><Input value={amount} type="number" min="0.01" step="0.01"
+    <div><Label>{tr.amount} *</Label><Input disabled={isPending} value={amount} type="number" min="0.01" step="0.01"
       inputMode="decimal" onChange={e=>change(setAmount,e.target.value)}/></div>
     <div><Label>{tr.method} *</Label>
-     <Select value={method} onValueChange={v=>change(setMethod,v)}>
+     <Select disabled={isPending} value={method} onValueChange={v=>change(setMethod,v)}>
       <SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
        <SelectItem value="network">{tr.network}</SelectItem><SelectItem value="cash">{tr.cash}</SelectItem>
       </SelectContent></Select>
     </div>
    </div>
-   <div><Label>{tr.note}</Label><Input value={note} maxLength={200}
+   <div><Label>{tr.note}</Label><Input disabled={isPending} value={note} maxLength={200}
      onChange={e=>change(setNote,e.target.value)}/></div>
    {chosenSource&&<p className="text-xs text-muted-foreground">
      {tr.account}: <strong>{money(balances[sourceId],chosenSource.currency||currency)}</strong>
@@ -189,10 +197,10 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
      ?<span className="ms-2 font-bold text-rose-600">Insufficient balance</span>:null}
    </p>}
    {needsSettled&&<label className="flex items-start gap-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
-     <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" checked={settlementConfirmed} onChange={e=>change(setSettlementConfirmed,e.target.checked)}/>
+     <input disabled={isPending} type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" checked={settlementConfirmed} onChange={e=>change(setSettlementConfirmed,e.target.checked)}/>
      <span>{tr.settlement}</span></label>}
    <label className="flex items-start gap-2 rounded-lg border p-2 text-xs">
-     <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" checked={receiptConfirmed} onChange={e=>change(setReceiptConfirmed,e.target.checked)}/>
+     <input disabled={isPending} type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" checked={receiptConfirmed} onChange={e=>change(setReceiptConfirmed,e.target.checked)}/>
      <span>{tr.received}</span></label>
    {fundingCurrencyMismatch&&<p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
       {lang==='ar'?'عملة الحسابين غير متطابقة':lang==='fa'?'ارز دو حساب یکسان نیست':'Account currencies do not match'}

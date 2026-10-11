@@ -29,6 +29,7 @@ export default function BranchCashHandoverPanel({restaurantId,accounts=[],branch
  const t=labels[lang]||labels.en;
  const qc=useQueryClient();
  const requestId=useRef(null);
+ const submissionLock=useRef(false);
  const [branchId,setBranchId]=useState('');
  const [sourceId,setSourceId]=useState('');
  const [ownerId,setOwnerId]=useState('');
@@ -36,7 +37,7 @@ export default function BranchCashHandoverPanel({restaurantId,accounts=[],branch
  const [note,setNote]=useState('');
  const [receipt,setReceipt]=useState(false);
  const [saveError,setSaveError]=useState('');
- const change=(setter,value)=>{setter(value);requestId.current=null;setSaveError('');};
+ const change=(setter,value)=>{if(submissionLock.current)return;setter(value);requestId.current=null;setSaveError('');};
  const ownerAccounts=accounts.filter(a=>a.is_active!==false&&!a.branch_id&&!a.branch_key&&a.account_type==='cash');
  const branch=branches.find(b=>b.id===branchId);
  const branchAccounts=accounts.filter(a=>a.is_active!==false&&
@@ -57,7 +58,8 @@ export default function BranchCashHandoverPanel({restaurantId,accounts=[],branch
   return data;
  }});
  const submit=async()=>{
-  if(!ready||isPending)return;
+  if(!ready||isPending||submissionLock.current)return;
+  submissionLock.current=true;
   try{
    requestId.current ||= crypto.randomUUID();
    await mutateAsync({p_restaurant_id:restaurantId,p_branch_id:branchId,
@@ -69,11 +71,11 @@ export default function BranchCashHandoverPanel({restaurantId,accounts=[],branch
    qc.invalidateQueries({queryKey:['treasury_accounts']});
    await onComplete?.();
    toast.success(t.success);
-   change(setAmount,'');setNote('');setReceipt(false);
+   setAmount('');setNote('');setReceipt(false);requestId.current=null;
   }catch(e){
    const msg=String(e?.message||'Transaction not confirmed').slice(0,300);
    setSaveError(msg);toast.error(msg);
-  }
+  }finally{submissionLock.current=false;}
  };
  return <Card className="border-blue-100 p-4" data-testid="treasury-owner-cash-handover">
   <details className="group">
@@ -85,32 +87,32 @@ export default function BranchCashHandoverPanel({restaurantId,accounts=[],branch
    </summary>
    <div className="mt-4 space-y-3 border-t pt-4">
     <div><Label>{t.branch} *</Label>
-     <Select value={branchId} onValueChange={id=>{change(setBranchId,id);setSourceId('');}}>
+     <Select disabled={isPending} value={branchId} onValueChange={id=>{if(submissionLock.current)return;change(setBranchId,id);setSourceId('');}}>
       <SelectTrigger><SelectValue placeholder={t.branch}/></SelectTrigger>
       <SelectContent>{branches.filter(b=>b.is_active!==false).map(b=><SelectItem value={b.id} key={b.id}>{b.name||b.label||b.branch_key}</SelectItem>)}</SelectContent>
      </Select>
     </div>
     <div><Label>{t.source} *</Label>
-     <Select value={sourceId} onValueChange={v=>change(setSourceId,v)}>
+     <Select disabled={isPending} value={sourceId} onValueChange={v=>change(setSourceId,v)}>
       <SelectTrigger><SelectValue placeholder={t.no}/></SelectTrigger>
       <SelectContent>{branchAccounts.map(a=><SelectItem value={a.id} key={a.id}>{a.account_name} · {money(Number(balances[a.id]||0),a.currency)}</SelectItem>)}</SelectContent>
      </Select>
     </div>
     <div><Label>{t.destination} *</Label>
-     <Select value={ownerId} onValueChange={v=>change(setOwnerId,v)}>
+     <Select disabled={isPending} value={ownerId} onValueChange={v=>change(setOwnerId,v)}>
       <SelectTrigger><SelectValue placeholder={t.no}/></SelectTrigger>
       <SelectContent>{ownerAccounts.map(a=><SelectItem value={a.id} key={a.id}>{a.account_name} · {a.currency||currency}</SelectItem>)}</SelectContent>
      </Select>
     </div>
     <div className="grid gap-3 sm:grid-cols-2">
-     <div><Label>{t.amount} *</Label><Input value={amount} type="number" inputMode="decimal"
+     <div><Label>{t.amount} *</Label><Input disabled={isPending} value={amount} type="number" inputMode="decimal"
       step="0.01" min="0.01" onChange={e=>change(setAmount,e.target.value)}/></div>
-     <div><Label>{t.note}</Label><Input value={note} maxLength={200}
+     <div><Label>{t.note}</Label><Input disabled={isPending} value={note} maxLength={200}
       onChange={e=>change(setNote,e.target.value)}/></div>
     </div>
     {source&&<p className="text-xs text-muted-foreground">{t.balance}: {money(balance,source.currency)}</p>}
     <label className="flex items-start gap-2 rounded-lg border bg-emerald-50/50 p-3 text-xs">
-     <input type="checkbox" checked={receipt} onChange={e=>change(setReceipt,e.target.checked)}
+     <input disabled={isPending} type="checkbox" checked={receipt} onChange={e=>change(setReceipt,e.target.checked)}
       className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-600"/>
      <span>{t.received}</span>
     </label>

@@ -18,7 +18,7 @@ export function reconcileSalesToTreasury({
    (branch==='all'||s.branch===branch));
  // A Closing and its posted entry may have different accounting dates.
  // Match against the COMPLETE tenant ledger; filter periods only for orphan rows.
- const filteredTx=transactions.filter(tx=>relevantTypes.has(txType(tx))&&tx.direction==='in');
+ const filteredTx=transactions.filter(tx=>relevantTypes.has(txType(tx)));
  const byKey=new Map();
  const key=(ref,type)=>String(ref||'')+'::'+type;
  for(const tx of filteredTx){
@@ -34,10 +34,12 @@ export function reconcileSalesToTreasury({
      ['network',getSaleNetwork(sale),'Network sales ledger'],
    ]){
      const expected=Number(expectedAmount);
-     if(!Number.isFinite(expected)||expected<=0)continue;
      const matches=byKey.get(key(sale.id,family))||[];
-     const actual=matches.reduce((sum,tx)=>sum+Number(tx.amount||0),0);
-     const malformed=matches.some(tx=>!finiteNonnegative(tx.amount));
+     if(Number.isFinite(expected)&&expected===0&&!matches.length)continue;
+     const actual=matches.reduce((sum,tx)=>sum+(tx.direction==='out'?-1:1)*Number(tx.amount||0),0);
+     const malformed=!finiteNonnegative(expected)||matches.some(tx=>
+       !finiteNonnegative(tx.amount)||tx.direction!=='in'||
+       (tx.wallet&&tx.wallet!==(family==='cash'?'branch_cash':'owner_network')));
      const branchMismatch=matches.some(tx=>
        ((sale.branch_id&&tx.branch_id)&&String(sale.branch_id)!==String(tx.branch_id))||
        (sale.branch&&tx.branch&&sale.branch!==tx.branch));
@@ -45,7 +47,7 @@ export function reconcileSalesToTreasury({
      rows.push({
        date:day(sale.date),branch:sale.branch||'—',type:label,
        expected,deposited:actual,diff,reference:sale.id,postingCount:matches.length,
-       status:!matches.length?'undeposited':matches.length>1||malformed||branchMismatch||Math.abs(diff)>=0.01
+       status:malformed?'discrepancy':!matches.length?'undeposited':matches.length>1||branchMismatch||Math.abs(diff)>0.009
          ?'discrepancy':'matched',
      });
    }

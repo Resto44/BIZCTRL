@@ -22,6 +22,13 @@ describe('Central Owner network & branch funding',()=>{
     sales:620,linked:620,missing:0,unlinkedHistorical:1,
   });
  });
+ it('does not recognize a posting made to the wrong wallet or branch',()=>{
+  const sale={id:'a',closing_state:'finalized',restaurant_network:100,branch:'b'};
+  for(const change of [{wallet:'branch_cash'},{branch:'other'}]){
+   expect(summarizeOwnerNetworkClosings([sale],[{transaction_type:'network_sales_auto_v2',
+    reference_id:'a',direction:'in',amount:100,...change}])).toMatchObject({linked:0,missing:1});
+  }
+ });
  it('a missing Closing posting is shown as incomplete, not silently counted as funds',()=>{
   const m=summarizeOwnerNetworkClosings([{id:'a',closing_state:'finalized',restaurant_network:500}],[]);
   expect(m).toMatchObject({sales:500,linked:0,missing:1});

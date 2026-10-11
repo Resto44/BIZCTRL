@@ -410,6 +410,7 @@ export default function Treasury() {
       if(!confirmed?.id)throw new Error('Server did not confirm a saved transaction.');
       qc.invalidateQueries({queryKey:['wallet_transactions']});
       qc.invalidateQueries({queryKey:['treasury_accounts']});
+      qc.invalidateQueries({queryKey:['treasury_owner_central_transactions']});
       setShowForm(false);setForm(emptyForm);pendingTransactionId.current=null;
       toast.success(local('Transaction saved successfully.'));
       try{
@@ -522,6 +523,9 @@ export default function Treasury() {
             payrollEstimate={payrollObligation}
             fmt={fmt}
             currency={ledgerCurrency}
+            appCurrency={displayCurrency}
+            restaurantCurrency={activeRestaurant?.currency}
+            financeCurrency={financeCurrency}
             lang={lang}
             valueScope={isOwner||isAllBranches?'all':'selected'}
             isLoading={isLoading || accountsLoading || (isOwner&&centralTxLoading)}
@@ -529,6 +533,7 @@ export default function Treasury() {
             mixedCurrencies={mixedAccountCurrencies}
           />}
           {isOwner&&<CentralOwnerTreasuryPanel
+            key={`funding-${activeRestaurantId}`}
             restaurantId={activeRestaurantId}
             accounts={accounts} branches={branches}
             transactions={centralTransactions} sales={centralSales}
@@ -541,6 +546,7 @@ export default function Treasury() {
             }}
           />}
           {isOwner&&<BranchCashHandoverPanel
+            key={`handover-${activeRestaurantId}`}
             restaurantId={activeRestaurantId} accounts={accounts} branches={branches}
             transactions={centralTransactions} currency={ledgerCurrency} lang={lang}
             loading={centralTxLoading||accountsLoading} error={centralTxError||accountsError}

@@ -23,7 +23,8 @@ export function buildTreasuryEntry({form,account,meta,branches=[],restaurantId,
   if(Math.abs(Math.round(amount*100)/100-amount)>0.00000001)
     throw new TreasuryEntryError('AMOUNT_PRECISION','Amounts must use at most 2 decimal places.');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(form.date||'')||
-     Number.isNaN(new Date(form.date+'T12:00:00Z').getTime()))
+     Number.isNaN(new Date(form.date+'T12:00:00Z').getTime())||
+     new Date(form.date+'T12:00:00Z').toISOString().slice(0,10)!==form.date)
     throw new TreasuryEntryError('INVALID_DATE','Select a valid transaction date.');
   const payment=form.payment_method;
   if(payment==='both')throw new TreasuryEntryError('SPLIT_PAYMENT',
