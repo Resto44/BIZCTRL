@@ -50,7 +50,7 @@ CREATE OR REPLACE FUNCTION public.erp_owner_receive_branch_cash(
  p_owner_account_id uuid,p_amount numeric,p_request_id uuid,
  p_note text DEFAULT '',p_owner_receipt_confirmed boolean DEFAULT false)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER
-SET search_path TO 'public','pg_temp' AS $
+SET search_path TO 'public','pg_temp' AS $treasury_handover$
 DECLARE
  v_branch public.branches%ROWTYPE;
  v_source public.treasury_accounts%ROWTYPE;
@@ -124,7 +124,7 @@ BEGIN
  RETURN jsonb_build_object('status','posted','request_id',p_request_id,
   'debit_id',v_debit,'credit_id',v_credit,'branch_id',p_branch_id,'amount',p_amount);
 END;
-$;
+$treasury_handover$;
 REVOKE ALL ON FUNCTION public.erp_owner_receive_branch_cash(uuid,uuid,uuid,uuid,numeric,uuid,text,boolean)
  FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.erp_owner_receive_branch_cash(uuid,uuid,uuid,uuid,numeric,uuid,text,boolean)
