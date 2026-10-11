@@ -25,7 +25,7 @@ import { Plus, ArrowDownLeft, ArrowUpRight,
   Pencil, Power, WalletCards, Landmark
 } from 'lucide-react';
 import useERPSettings from '@/hooks/useERPSettings';
-import {formatTreasuryCurrency,normalizeTreasuryCurrency,resolveTreasuryCurrency,treasuryCurrencyWarning} from '@/lib/treasuryCurrency';
+import {formatTreasuryCurrency,normalizeTreasuryCurrency,resolveTreasuryCurrency,treasuryCurrencyWarning,isUnverifiedTreasuryCurrency} from '@/lib/treasuryCurrency';
 import { format } from 'date-fns';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
@@ -370,6 +370,1181 @@ export default function Treasury() {
   const setAccount = (key, value) => setAccountForm((current) => ({ ...current, [key]: value }));
   const handleAccountSave = () => {
     if (!isOwner || !activeRestaurantId || !accountForm.account_name.trim()) return;
+    const enteredCurrency=String(accountForm.currency||ledgerCurrency||'').trim();
+    if(!enteredCurrency||isUnverifiedTreasuryCurrency(enteredCurrency)||
+       !/^(?:[A-Za-z]{3}|SR|S\.R|ر\.س|ر\.س\.)$/.test(enteredCurrency)){
+      toast.error(lang==='ar'?'اختر رمز عملة صحيحاً مثل SAR أو USD، وليس علامة 
+    if(centralTxError||centralTxLoading){toast.error(local('Complete Treasury data is required to edit an account.'));return;}
+    if(editingAccount&&overviewTransactions.some(tx=>tx.account_id===editingAccount.id)){
+      const historicalChange=Number(accountForm.opening_balance||0)!==Number(editingAccount.opening_balance||0)||
+        (accountForm.currency||ledgerCurrency)!==(editingAccount.currency||ledgerCurrency)||
+        (accountForm.branch_id||null)!==(editingAccount.branch_id||null);
+      if(historicalChange){
+        toast.error(local('Posted account: opening balance, currency and branch are locked. Use an audited adjustment.'));
+        return;
+      }
+    }
+    const selectedBranch = branches.find((branch) => branch.id === accountForm.branch_id) || null;
+    accountSaveMut.mutate({
+      restaurant_id: activeRestaurantId,
+      account_name: accountForm.account_name.trim(),
+      account_type: accountForm.account_type,
+      branch_id: selectedBranch?.id || null,
+      branch_key: selectedBranch?.key || selectedBranch?.branch_key || null,
+      currency: canonicalAccountCurrency,
+      opening_balance: Number(accountForm.opening_balance || 0),
+      is_active: accountForm.is_active,
+      notes: accountForm.notes.trim() || null,
+    });
+  };
+
+  const handleSave = async () => {
+    if(submissionLock.current||saveMut.isPending)return;
+    submissionLock.current=true;
+    setTransactionError('');
+    try{
+      const selectedAccount=activeAccounts.find(a=>a.id===form.account_id);
+      const payload=buildTreasuryEntry({
+        form,account:selectedAccount,meta:TYPE_META[form.type],branches,
+        restaurantId:activeRestaurantId,selectedBranchId,selectedBranchKey,isAllBranches,
+        availableBalance:accountBalances[selectedAccount?.id]??null,
+      });
+      pendingTransactionId.current ||= crypto.randomUUID();
+      const confirmed=await saveMut.mutateAsync({...payload,id:pendingTransactionId.current});
+      if(!confirmed?.id)throw new Error('Server did not confirm a saved transaction.');
+      qc.invalidateQueries({queryKey:['wallet_transactions']});
+      qc.invalidateQueries({queryKey:['treasury_accounts']});
+      setShowForm(false);setForm(emptyForm);pendingTransactionId.current=null;
+      toast.success(local('Transaction saved successfully.'));
+      try{
+        const amount=payload.amount,branch=payload.branch;
+        if(payload.transaction_type?.startsWith('branch_to_owner'))notif.branchToOwner({branch,amount});
+        else if(payload.transaction_type==='owner_to_branch_funding')notif.ownerToBranch({branch,amount});
+        else if(payload.transaction_type?.startsWith('credit_collection'))notif.creditCollection({branch,amount});
+        else if(payload.transaction_type==='salary_advance')notif.salaryAdvance({
+          branch,amount,employeeName:payload.description||'Employee',
+        });
+      }catch(notificationError){console.warn('Treasury push notification unavailable:',notificationError);}
+    }catch(error){
+      const message=treasurySaveErrorMessage(error);
+      setTransactionError(message);
+      toast.error(message);
+    }finally{submissionLock.current=false;}
+  };
+
+  const typeConfig = form.type ? TYPE_META[form.type] : null;
+  const matchingTxnAccounts=typeConfig?activeAccounts.filter(account=>accountWalletKey(account)===typeConfig.wallet):activeAccounts;
+  const showBranch = typeConfig && (
+    typeConfig.wallet === 'branch_cash' ||
+    form.type?.startsWith('branch_') ||
+    typeConfig.settlement === true
+  );
+
+  if (role === 'cashier') {
+    return <div className="text-center py-20 text-muted-foreground text-sm">{t('error')}</div>;
+  }
+
+  const fmt=(v)=>formatTreasuryCurrency(v,moneyOptions);
+  const accountFmt=(v,account)=>formatTreasuryCurrency(v,{
+    ...moneyOptions,accountCurrency:account?.currency,
+  });
+  const selectedCurrencyNote=treasuryCurrencyWarning(moneyOptions);
+
+  // Never display an apparently balanced/zero ledger in ANY Treasury tab after
+  // a failed financial read. These screens drive actual payment decisions.
+  if (transactionsError || accountsError || (isOwner && (centralTxError || centralSalesError))) {
+    const message=lang==='ar'
+      ? 'تعذر تحميل دفتر الخزينة بالكامل. لم تُعرض أي أرصدة جزئية.'
+      :lang==='fa'
+      ? 'بارگذاری کامل دفتر خزانه ناموفق بود؛ هیچ مانده ناقصی نشان داده نمی‌شود.'
+      : 'The complete Treasury ledger could not be loaded. No partial balances are displayed.';
+    return <div className="mx-auto max-w-2xl p-4">
+      <Card role="alert" className="rounded-2xl border-rose-300 bg-rose-50 p-5 text-rose-800">
+        <div className="flex items-start gap-3"><AlertTriangle className="h-6 w-6 shrink-0"/>
+          <div><h2 className="font-extrabold">Treasury data unavailable</h2><p className="mt-2 text-sm">{message}</p></div>
+        </div>
+        <Button type="button" className="mt-4" onClick={()=>{
+          qc.invalidateQueries({queryKey:['wallet_transactions',activeRestaurant?.id,selectedBranchId]});
+          qc.invalidateQueries({queryKey:['treasury_accounts',activeRestaurantId]});
+        }}>{lang==='ar'?'إعادة المحاولة':lang==='fa'?'تلاش دوباره':'Retry loading'}</Button>
+      </Card>
+    </div>;
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title={t('treasury')}
+        action={
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            {isOwner && (
+              <Button size="sm" variant="outline" className="w-full whitespace-nowrap sm:w-auto" onClick={openCreateAccount}>
+                <Landmark className="h-3.5 w-3.5 shrink-0" /> {local('Add Account')}
+              </Button>
+            )}
+            <Button size="sm" className="w-full whitespace-nowrap sm:w-auto" onClick={() => setShowForm(true)}>
+              <Plus className="h-3.5 w-3.5 shrink-0" /> {t('add_transaction')}
+            </Button>
+          </div>
+        }
+      />
+      {selectedCurrencyNote && <p role="status" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{selectedCurrencyNote}</p>}
+      <Tabs value={tab} onValueChange={setTab} className="mb-4 min-w-0">
+        <div className="treasury-tab-scroll" role="region" aria-label={local('Treasury sections')}>
+          <TabsList className="treasury-tab-list">
+            <TabsTrigger value="overview" className="treasury-tab-trigger">{t('overview')}</TabsTrigger>
+            <TabsTrigger value="accounts" className="treasury-tab-trigger"><WalletCards className="h-3.5 w-3.5 shrink-0" />{local('Accounts')}</TabsTrigger>
+            <TabsTrigger value="settlement" className="treasury-tab-trigger"><Scale className="h-3.5 w-3.5 shrink-0" />{t('settlement')}</TabsTrigger>
+            <TabsTrigger value="reconcile" className="treasury-tab-trigger text-amber-700"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />{local('Reconciliation')}</TabsTrigger>
+            <TabsTrigger value="transactions" className="treasury-tab-trigger">{local('Transactions')}</TabsTrigger>
+            <TabsTrigger value="analytics" className="treasury-tab-trigger">{t('analytics')}</TabsTrigger>
+            <TabsTrigger value="sponsor" className="treasury-tab-trigger text-amber-700"><ShieldCheck className="h-3.5 w-3.5 shrink-0" />{t('sponsor_treasury')}</TabsTrigger>
+            <TabsTrigger value="forecast" className="treasury-tab-trigger text-indigo-600"><TrendingUp className="h-3.5 w-3.5 shrink-0" />{t('forecast')}</TabsTrigger>
+            {isOwner ? <TabsTrigger value="personal" className="treasury-tab-trigger text-violet-600"><UserCircle className="h-3.5 w-3.5 shrink-0" />{local('Personal')}</TabsTrigger> : null}
+          </TabsList>
+        </div>
+
+        {/* ── OVERVIEW ────────────────────────────────────────────────── */}
+        <TabsContent value="overview" className="mt-3 space-y-3">
+          {(transactionsError || accountsError) && (
+            <Card className="border-rose-300 bg-rose-50 p-3 text-sm text-rose-700" role="alert">
+              {lang==='ar'?'تعذر تحميل سجل الخزينة بالكامل؛ لا تعرض الأرصدة الجزئية.':
+               lang==='fa'?'بارگذاری کامل دفتر خزانه ناموفق بود؛ مانده ناقص نمایش داده نمی‌شود.':
+               'Unable to load the complete treasury ledger; partial balances are not shown.'}
+            </Card>
+          )}
+          {!transactionsError && !accountsError && <TreasuryERPOverview
+            accounts={scopedAccounts}
+            accountBalances={accountBalances}
+            ledger={treasuryLedgerBalance}
+            walletBalance={mixedAccountCurrencies?{ownerNetwork:null,ownerCash:null}:walletBalance}
+            branchBalances={mixedAccountCurrencies?{}:branchBalances}
+            branches={branches}
+            monthlySummary={mixedAccountCurrencies?{}:monthlySummary}
+            trendData={mixedAccountCurrencies?[]:trendData}
+            integrity={integrity}
+            payrollEstimate={payrollObligation}
+            fmt={fmt}
+            currency={ledgerCurrency}
+            lang={lang}
+            valueScope={isOwner||isAllBranches?'all':'selected'}
+            isLoading={isLoading || accountsLoading || (isOwner&&centralTxLoading)}
+            setTab={setTab}
+            mixedCurrencies={mixedAccountCurrencies}
+          />}
+          {isOwner&&<CentralOwnerTreasuryPanel
+            restaurantId={activeRestaurantId}
+            accounts={accounts} branches={branches}
+            transactions={centralTransactions} sales={centralSales}
+            lang={lang} currency={ledgerCurrency}
+            loading={centralTxLoading||centralSalesLoading||accountsLoading}
+            error={centralTxError||centralSalesError||accountsError}
+            onComplete={()=>{
+              qc.invalidateQueries({queryKey:['treasury_owner_central_transactions']});
+              qc.invalidateQueries({queryKey:['wallet_transactions']});
+            }}
+          />}
+          {isOwner&&<BranchCashHandoverPanel
+            restaurantId={activeRestaurantId} accounts={accounts} branches={branches}
+            transactions={centralTransactions} currency={ledgerCurrency} lang={lang}
+            loading={centralTxLoading||accountsLoading} error={centralTxError||accountsError}
+            onComplete={()=>{
+              qc.invalidateQueries({queryKey:['treasury_owner_central_transactions']});
+              qc.invalidateQueries({queryKey:['wallet_transactions']});
+            }}
+          />}
+          {/* Sponsor Holdings Summary */}
+          {(sponsorSummary.receivedBySponsor > 0 || sponsorSummary.remaining > 0) && (
+            <Card className={`p-4 ${sponsorSummary.remaining > 0 ? 'border-amber-300 bg-amber-50/30' : 'border-emerald-200'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className={`w-4 h-4 ${sponsorSummary.remaining > 0 ? 'text-amber-500' : 'text-emerald-500'}`} />
+                  <p className="text-sm font-semibold">Sponsor Holdings (كفيل)</p>
+                </div>
+                <Link to="/sponsor-treasury" className="text-xs text-primary flex items-center gap-1 hover:underline">
+                  Details <ExternalLink className="w-3 h-3" />
+                </Link>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center mb-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">{t('inflows')}</p>
+                  <p className="text-sm font-bold text-blue-600">{fmt(sponsorSummary.receivedBySponsor)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t('direction_out')}</p>
+                  <p className="text-sm font-bold text-violet-600">{fmt(sponsorSummary.sentToOwner)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t('net_flow')}</p>
+                  <p className={`text-sm font-bold ${sponsorSummary.remaining > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    {fmt(sponsorSummary.remaining)}
+                  </p>
+                </div>
+              </div>
+              {sponsorSummary.remaining > 0 && (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-100 border border-amber-200">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <p className="text-xs text-amber-700">
+                    {sponsorSummary.branchesWithBalance} {t('branch')} — {t('settlement')}
+                  </p>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Recent transactions */}
+          {!transactionsError && !accountsError && <Card className="p-4">
+            <p className="text-sm font-semibold mb-2">{t('details')}</p>
+            <div className="space-y-2">
+              {transactions.slice(0, 8).map(tx => {
+                const meta = TYPE_META[transactionType(tx)];
+                const isIn = tx.direction === 'in';
+                return (
+                  <div key={tx.id} className="flex items-center justify-between py-1 border-b border-border last:border-0">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isIn ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                        {isIn ? <ArrowDownLeft className="w-3 h-3 text-emerald-600" /> : <ArrowUpRight className="w-3 h-3 text-red-500" />}
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium line-clamp-1">{local(meta?.label || transactionType(tx))}</p>
+                        <p className="text-xs text-muted-foreground">{transactionDate(tx)}{transactionAccountName(tx, accounts) ? ` · ${transactionAccountName(tx, accounts)}` : ''}</p>
+                      </div>
+                    </div>
+                    <span className={`text-sm font-semibold ${isIn ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {isIn ? '+' : '-'}{fmt(tx.amount)}
+                    </span>
+                  </div>
+                );
+              })}
+              {transactions.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">{t('no_data')}</p>}
+            </div>
+          </Card>}
+        </TabsContent>
+
+        {/* ── ACCOUNTS ────────────────────────────────────────────────── */}
+        <TabsContent value="accounts" className="mt-3 space-y-3">
+          {(transactionsError || accountsError) && <Card role="alert" className="border-rose-300 bg-rose-50 p-3 text-sm text-rose-700">Unable to load the complete Treasury ledger. Account balances are temporarily unavailable.</Card>}
+          <Card className="p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <Landmark className="h-5 w-5 shrink-0 text-indigo-600" />
+                <div className="min-w-0"><p className="text-sm font-semibold">{local('Treasury Accounts')}</p><p className="text-xs text-muted-foreground">{local('Balances are calculated from opening balance plus linked transactions.')}</p></div>
+              </div>
+              {isOwner && <Button size="sm" className="w-full shrink-0 sm:w-auto" onClick={openCreateAccount}><Plus className="h-3.5 w-3.5 shrink-0" />{local('Add Account')}</Button>}
+            </div>
+          </Card>
+
+          {(transactionsError || accountsError) ? null : scopedAccounts.length === 0 ? (
+            <Card className="p-8 text-center"><WalletCards className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" /><p className="text-sm font-medium">{local('No Treasury accounts')}</p><p className="mt-1 text-xs text-muted-foreground">{local('Create an account to link every Treasury transaction and track its balance.')}</p>{isOwner && <Button size="sm" className="mt-4" onClick={openCreateAccount}>{local('Create Account')}</Button>}</Card>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {scopedAccounts.map((account) => {
+                const balance = accountBalances[account.id] || 0;
+                const linkedCount = overviewTransactions.filter((transaction) => transaction.account_id === account.id).length;
+                const accountType = TREASURY_ACCOUNT_TYPES.find((type) => type.value === account.account_type)?.label || account.account_type;
+                return (
+                  <Card key={account.id} className="min-w-0 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-2">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-950/40"><Landmark className="h-4 w-4 text-indigo-600" /></div>
+                        <div className="min-w-0"><p className="truncate text-sm font-semibold">{account.account_name}</p><p className="truncate text-xs text-muted-foreground">{local(accountType)}{account.branch_key ? ` · ${account.branch_key}` : ''}</p></div>
+                      </div>
+                      <div className="text-end"><Badge variant={account.is_active !== false ? 'outline' : 'secondary'}>{account.is_active !== false ? local('Active') : local('Inactive')}</Badge><p className={`mt-1 text-base font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{accountFmt(balance,account)}</p></div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                      <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Opening')}</p><p className="truncate text-xs font-semibold">{accountFmt(account.opening_balance||0,account)}</p></div>
+                      <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Transactions')}</p><p className="truncate text-xs font-semibold">{linkedCount}</p></div>
+                      <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Currency')}</p><p className="truncate text-xs font-semibold" dir="ltr">{resolveTreasuryCurrency({...moneyOptions,accountCurrency:account.currency}).code}</p></div>
+                    </div>
+                    {account.notes && <p className="mt-3 break-words text-xs text-muted-foreground">{account.notes}</p>}
+                    {isOwner && <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-border pt-3">
+                      <Button size="sm" variant="outline" className="min-w-24" onClick={() => openEditAccount(account)}><Pencil className="h-3.5 w-3.5" />{local('Edit')}</Button>
+                      {!account.is_system && <Button size="sm" variant="outline" className="min-w-24" onClick={() => accountStatusMut.mutate({ id: account.id, is_active: account.is_active === false })}><Power className="h-3.5 w-3.5" />{account.is_active !== false ? local('Deactivate') : local('Activate')}</Button>}
+                      {!account.is_system && <Button size="sm" variant="outline" className="min-w-24 text-destructive" onClick={() => setDeleteAccountId(account.id)}><Trash2 className="h-3.5 w-3.5" />{local('Delete')}</Button>}
+                    </div>}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── RECONCILIATION ──────────────────────────────────────────── */}
+        <TabsContent value="reconcile" className="mt-3">
+          {(!isOwner&&(salesError||salesLoading))||(isOwner&&(centralSalesError||centralSalesLoading))
+            ?<Card role="status" className="p-4 text-sm text-amber-700">
+              {(isOwner?centralSalesError:salesError)?local('Closing ledger unavailable; reconciliation cannot be verified.'):
+                local('Loading complete Closing records…')}
+             </Card>:<ReconciliationDashboard
+            transactions={isOwner?centralTransactions:transactions}
+            sales={isOwner?centralSales:allSales}
+            branches={branches}
+            currency={ledgerCurrency}
+          />}
+        </TabsContent>
+
+        {/* ── SETTLEMENT ──────────────────────────────────────────────── */}
+        <TabsContent value="settlement" className="mt-3">
+          <BranchSettlementLedger
+            transactions={overviewTransactions}
+            branches={branches}
+            currency={currency}
+            onRecord={() => setShowForm(true)}
+          />
+        </TabsContent>
+
+        {/* ── TRANSACTIONS ────────────────────────────────────────────── */}
+        <TabsContent value="transactions" className="mt-3 space-y-3">
+          <div className="flex gap-2">
+            <Select value={filterMonth} onValueChange={setFilterMonth}>
+              <SelectTrigger className="flex-1 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTH_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <BranchSelect
+              value={filterBranch}
+              onChange={(branchKey) => setSelectedBranchId(
+                branchKey === 'all' ? 'all' : branches.find((branch) => (branch.key || branch.branch_key) === branchKey)?.id || 'all'
+              )}
+              includeAll
+            />
+          </div>
+
+          <div className="space-y-2">
+            {isLoading ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">{t('loading')}</p>
+            ) : filteredTx.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">{t('no_data')}</p>
+            ) : filteredTx.map(tx => {
+              const meta = TYPE_META[transactionType(tx)];
+              const isIn = tx.direction === 'in';
+              return (
+                <Card key={tx.id} className="p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isIn ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                        {isIn ? <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" /> : <ArrowUpRight className="w-3.5 h-3.5 text-red-500" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate">{local(meta?.label || transactionType(tx))}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-muted-foreground">{transactionDate(tx)}</span>
+                          {tx.branch && <Badge variant="outline" className="text-xs py-0">{tx.branch}</Badge>}
+                          {transactionAccountName(tx, accounts) && <Badge variant="secondary" className="max-w-32 truncate text-xs py-0">{transactionAccountName(tx, accounts)}</Badge>}
+                          {tx.description && <span className="text-xs text-muted-foreground truncate max-w-28">{tx.description}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-sm font-bold ${isIn ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {isIn ? '+' : '-'}{fmt(tx.amount)}
+                      </span>
+                      <Badge variant="outline" className="shrink-0 text-[10px]" title="Posted ledger entries cannot be deleted. Corrections require an audited reversal.">
+                        {local('Posted · Locked')}
+                      </Badge>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </TabsContent>
+
+        {/* ── SPONSOR LEDGER ──────────────────────────────────────────── */}
+        <TabsContent value="sponsor" className="mt-3">
+          <SponsorLedger />
+        </TabsContent>
+
+        {/* ── CASHFLOW FORECAST ────────────────────────────────────────── */}
+        <TabsContent value="forecast" className="mt-3">
+          <CashflowProjection accounts={scopedAccounts} transactions={overviewTransactions} />
+        </TabsContent>
+
+        {/* ── OWNER PERSONAL FINANCE ───────────────────────────────────── */}
+        {(role === 'owner' || role === 'admin') && (
+          <TabsContent value="personal" className="mt-3">
+            <OwnerPersonalFinance />
+          </TabsContent>
+        )}
+
+        {/* ── ANALYTICS ───────────────────────────────────────────────── */}
+        <TabsContent value="analytics" className="mt-3 space-y-3">
+          {trendData.some(d => d.ownerIn > 0 || d.ownerOut > 0) && (
+            <Card className="p-4">
+              <p className="text-sm font-semibold mb-3">{t('cashflow_title')}</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${ledgerCurrency} ${(v/1000).toFixed(0)}k`} />
+                  <Tooltip formatter={v => fmt(v)} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="networkIn" name={t('network')} stroke="#3b82f6" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="ownerIn" name={t('inflows')} stroke="#10b981" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="ownerOut" name={t('outflows')} stroke="#ef4444" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="net" name={t('net_flow')} stroke="#6366f1" strokeWidth={2} dot={false} strokeDasharray="4 2" />
+                </LineChart>
+              </ResponsiveContainer>
+            </Card>
+          )}
+
+          {branchBalanceChart.length > 0 && (
+            <Card className="p-4">
+              <p className="text-sm font-semibold mb-3">{t('branch_cash')}</p>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={branchBalanceChart}>
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${ledgerCurrency} ${(v/1000).toFixed(0)}k`} />
+                  <Tooltip formatter={v => fmt(v)} />
+                  <Bar dataKey="balance" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          )}
+
+          {/* Type breakdown */}
+          <Card className="p-4">
+            <p className="text-sm font-semibold mb-3">{t('summary')} — {filterMonth}</p>
+            <div className="space-y-1.5">
+              {TX_TYPES.map(({ value, label, direction }) => {
+                const total = monthTx.filter(tx => transactionType(tx) === value).reduce((s, tx) => s + (tx.amount || 0), 0);
+                if (total === 0) return null;
+                return (
+                  <div key={value} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground truncate flex-1">{local(label)}</span>
+                    <span className={`font-semibold ml-2 ${direction === 'in' ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {direction === 'in' ? '+' : '-'}{fmt(total)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Add transaction dialog */}
+      <Dialog open={showForm} onOpenChange={v => { if(saveMut.isPending)return; setShowForm(v); if(!v){setForm(emptyForm);setTransactionError('');pendingTransactionId.current=null;} }}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-md overflow-y-auto">
+          <DialogHeader><DialogTitle>{t('add_transaction')}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">{t('transaction_type')} *</Label>
+              <Select value={form.type} onValueChange={v => {
+                const meta = TYPE_META[v];
+                setTransactionError('');
+                pendingTransactionId.current=null;
+                setForm(current=>({...current,type:v,account_id:'',wallet:meta?.wallet||current.wallet,
+                  branch:current.branch||(!isAllBranches?selectedBranchKey||'':'')}));
+              }}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder={local('Select transaction type')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__settle_header__" disabled className="font-semibold text-xs text-muted-foreground">— Branch ↔ Owner Settlement —</SelectItem>
+                  {TX_TYPES.filter(t => !t.auto && t.settlement).map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                  <SelectItem value="__credit_header__" disabled className="font-semibold text-xs text-muted-foreground">— Credit Collections —</SelectItem>
+                  {TX_TYPES.filter(t => !t.auto && t.value.startsWith('credit_')).map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                  <SelectItem value="__owner_header__" disabled className="font-semibold text-xs text-muted-foreground">— Owner Only —</SelectItem>
+                  {TX_TYPES.filter(t => !t.auto && !t.settlement && !t.value.startsWith('credit_') && (t.wallet === 'owner_network' || t.wallet === 'owner_cash')).map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                  <SelectItem value="__branch_header__" disabled className="font-semibold text-xs text-muted-foreground">— Branch Cash —</SelectItem>
+                  {TX_TYPES.filter(t => !t.auto && !t.settlement && t.wallet === 'branch_cash').map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs">{local('Treasury Account')} *</Label>
+              <Select value={form.account_id} onValueChange={(value) => {
+                const account = activeAccounts.find((item) => item.id === value);
+                setTransactionError('');
+                pendingTransactionId.current=null;
+                setForm(current=>({...current,account_id:value,
+                  branch:current.branch||account?.branch_key||(!isAllBranches?selectedBranchKey||'':''),
+                  wallet:account?accountWalletKey(account):current.wallet}));
+              }}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder={local('Select account')} /></SelectTrigger>
+                <SelectContent>{matchingTxnAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.account_name} · {accountFmt(accountBalances[account.id]||0,account)}</SelectItem>)}</SelectContent>
+              </Select>
+              {activeAccounts.length === 0 && <p className="mt-1 text-xs text-destructive">{local('No active Treasury account is available.')}</p>}
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div><Label className="text-xs">{local('Date')} *</Label><Input type="date" value={form.date} onChange={e => set('date', e.target.value)} /></div>
+              <div><Label className="text-xs">{local('Amount')} *</Label><Input type="number" inputMode="decimal" value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0" /></div>
+            </div>
+
+            {form.account_id && typeConfig?.direction==='out' &&
+              Number(form.amount)>0 && Number.isFinite(Number(form.amount)) &&
+              Number(accountBalances[form.account_id]||0)<Number(form.amount) &&
+              <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+                {lang==='ar'?('تنبيه: رصيد الحساب '+fmt(accountBalances[form.account_id]||0)+' أقل من مبلغ الصرف. سيصبح الرصيد '+fmt(Number(accountBalances[form.account_id]||0)-Number(form.amount))+'. راجع الحركة قبل الحفظ.'):
+                 lang==='fa'?('هشدار: مانده حساب '+fmt(accountBalances[form.account_id]||0)+' کمتر از مبلغ پرداخت است. مانده بعد از ثبت '+fmt(Number(accountBalances[form.account_id]||0)-Number(form.amount))+' خواهد شد.'):
+                 ('Warning: current account balance '+fmt(accountBalances[form.account_id]||0)+' is below this outgoing amount. Projected balance: '+fmt(Number(accountBalances[form.account_id]||0)-Number(form.amount))+'.')}
+              </p>}
+            {showBranch && (
+              <div><Label className="text-xs">{local('Branch')}</Label><BranchSelect value={form.branch} onChange={(branchKey) => {
+                setTransactionError('');
+                set('branch', branchKey);
+              }} /></div>
+            )}
+
+            <div>
+              <Label className="text-xs">{local('Payment Method')}</Label>
+              <Select value={form.payment_method} onValueChange={v => {setTransactionError('');set('payment_method',v);}}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">{local('Cash')}</SelectItem>
+                  <SelectItem value="network">{local('Network')}</SelectItem>
+                  <SelectItem value="both">{local('Both')} — {local('Split required')}</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.payment_method==='both'&&<p role="alert" className="mt-1 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                {lang==='ar'?'اختر نقداً أو شبكة. إذا تم الدفع بالطريقتين، سجّل حركتين منفصلتين بمبالغ دقيقة.':
+                 lang==='fa'?'نقد یا شبکه را انتخاب کن. برای پرداخت ترکیبی، دو تراکنش جدا با مبلغ مشخص ثبت کن.':
+                 'Select Cash or Network. For mixed payments record two transactions with exact amounts.'}
+              </p>}
+            </div>
+
+            <div><Label className="text-xs">{local('Description / Notes')}</Label><Input value={form.description} onChange={e => set('description', e.target.value)} /></div>
+
+            {transactionError&&<p role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs font-semibold text-rose-800">{transactionError}</p>}
+            <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+              <Button className="w-full sm:flex-1" onClick={handleSave} disabled={saveMut.isPending || !form.type || !form.account_id || !form.amount || form.payment_method==='both'}>{saveMut.isPending?local('Saving...'):local('Save')}</Button>
+              <Button variant="outline" className="w-full sm:flex-1" onClick={() => setShowForm(false)}>{local('Cancel')}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAccountForm} onOpenChange={(open) => { setShowAccountForm(open); if (!open) { setEditingAccount(null); setAccountForm(emptyAccountForm); } }}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-lg overflow-y-auto">
+          <DialogHeader><DialogTitle>{editingAccount ? local('Edit Treasury Account') : local('Add Treasury Account')}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label className="text-xs">{local('Account Name')} *</Label><Input className="mt-1" value={accountForm.account_name} onChange={(event) => setAccount('account_name', event.target.value)} placeholder={local('e.g. Main Bank Account')} /></div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div><Label className="text-xs">{local('Account Type')} *</Label><Select value={accountForm.account_type} onValueChange={(value) => setAccount('account_type', value)}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent>{TREASURY_ACCOUNT_TYPES.map((type) => <SelectItem key={type.value} value={type.value}>{local(type.label)}</SelectItem>)}</SelectContent></Select></div>
+              <div><Label className="text-xs">{local('Currency')} *</Label><Input className="mt-1" dir="ltr" value={accountForm.currency} onChange={(event) => setAccount('currency', event.target.value.toUpperCase())} maxLength={8} /></div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div><Label className="text-xs">{local('Branch')}</Label><Select value={accountForm.branch_id || '__unassigned'} onValueChange={(value) => setAccount('branch_id', value === '__unassigned' ? '' : value)}><SelectTrigger className="mt-1"><SelectValue placeholder={local('All branches / Owner')} /></SelectTrigger><SelectContent><SelectItem value="__unassigned">{local('All branches / Owner')}</SelectItem>{branches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.label || branch.name || branch.key}</SelectItem>)}</SelectContent></Select></div>
+              <div><Label className="text-xs">{local('Opening Balance')}</Label><Input className="mt-1" type="number" inputMode="decimal" value={accountForm.opening_balance} disabled={Boolean(editingAccount&&overviewTransactions.some(tx=>tx.account_id===editingAccount.id))} onChange={(event) => setAccount('opening_balance', event.target.value)} placeholder="0" /></div>
+            </div>
+            {!editingAccount?.is_system && <div><Label className="text-xs">{local('Status')}</Label><Select value={accountForm.is_active ? 'active' : 'inactive'} onValueChange={(value) => setAccount('is_active', value === 'active')}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">{local('Active')}</SelectItem><SelectItem value="inactive">{local('Inactive')}</SelectItem></SelectContent></Select></div>}
+            {editingAccount?.is_system && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{local('System-mapped accounts stay active so automatic Treasury transactions remain linked.')}</div>}
+            <div><Label className="text-xs">{local('Notes')}</Label><Textarea className="mt-1 min-h-20 resize-y" value={accountForm.notes} onChange={(event) => setAccount('notes', event.target.value)} /></div>
+            <div className="flex flex-col gap-2 pt-1 sm:flex-row"><Button className="w-full sm:flex-1" onClick={handleAccountSave} disabled={accountSaveMut.isPending || !accountForm.account_name.trim()}>{accountSaveMut.isPending ? local('Saving...') : local('Save Account')}</Button><Button variant="outline" className="w-full sm:flex-1" onClick={() => setShowAccountForm(false)}>{local('Cancel')}</Button></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteAccountId} onOpenChange={() => setDeleteAccountId(null)}>
+        <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md"><AlertDialogHeader><AlertDialogTitle>{local('Delete Treasury account?')}</AlertDialogTitle></AlertDialogHeader><p className="text-sm text-muted-foreground">{local('Accounts with transactions are protected and can be deactivated instead.')}</p><AlertDialogFooter className="gap-2 sm:gap-0"><AlertDialogCancel>{local('Cancel')}</AlertDialogCancel><AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => accountDeleteMut.mutate(deleteAccountId)}>{local('Delete')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+      </AlertDialog>
+
+
+    </div>
+  );
+}:
+        lang==='fa'?'کد معتبر ارز مانند SAR یا USD وارد کنید، نه علامت 
+    if(centralTxError||centralTxLoading){toast.error(local('Complete Treasury data is required to edit an account.'));return;}
+    if(editingAccount&&overviewTransactions.some(tx=>tx.account_id===editingAccount.id)){
+      const historicalChange=Number(accountForm.opening_balance||0)!==Number(editingAccount.opening_balance||0)||
+        (accountForm.currency||ledgerCurrency)!==(editingAccount.currency||ledgerCurrency)||
+        (accountForm.branch_id||null)!==(editingAccount.branch_id||null);
+      if(historicalChange){
+        toast.error(local('Posted account: opening balance, currency and branch are locked. Use an audited adjustment.'));
+        return;
+      }
+    }
+    const selectedBranch = branches.find((branch) => branch.id === accountForm.branch_id) || null;
+    accountSaveMut.mutate({
+      restaurant_id: activeRestaurantId,
+      account_name: accountForm.account_name.trim(),
+      account_type: accountForm.account_type,
+      branch_id: selectedBranch?.id || null,
+      branch_key: selectedBranch?.key || selectedBranch?.branch_key || null,
+      currency: accountForm.currency.trim() || ledgerCurrency || 'SAR',
+      opening_balance: Number(accountForm.opening_balance || 0),
+      is_active: accountForm.is_active,
+      notes: accountForm.notes.trim() || null,
+    });
+  };
+
+  const handleSave = async () => {
+    if(submissionLock.current||saveMut.isPending)return;
+    submissionLock.current=true;
+    setTransactionError('');
+    try{
+      const selectedAccount=activeAccounts.find(a=>a.id===form.account_id);
+      const payload=buildTreasuryEntry({
+        form,account:selectedAccount,meta:TYPE_META[form.type],branches,
+        restaurantId:activeRestaurantId,selectedBranchId,selectedBranchKey,isAllBranches,
+        availableBalance:accountBalances[selectedAccount?.id]??null,
+      });
+      pendingTransactionId.current ||= crypto.randomUUID();
+      const confirmed=await saveMut.mutateAsync({...payload,id:pendingTransactionId.current});
+      if(!confirmed?.id)throw new Error('Server did not confirm a saved transaction.');
+      qc.invalidateQueries({queryKey:['wallet_transactions']});
+      qc.invalidateQueries({queryKey:['treasury_accounts']});
+      setShowForm(false);setForm(emptyForm);pendingTransactionId.current=null;
+      toast.success(local('Transaction saved successfully.'));
+      try{
+        const amount=payload.amount,branch=payload.branch;
+        if(payload.transaction_type?.startsWith('branch_to_owner'))notif.branchToOwner({branch,amount});
+        else if(payload.transaction_type==='owner_to_branch_funding')notif.ownerToBranch({branch,amount});
+        else if(payload.transaction_type?.startsWith('credit_collection'))notif.creditCollection({branch,amount});
+        else if(payload.transaction_type==='salary_advance')notif.salaryAdvance({
+          branch,amount,employeeName:payload.description||'Employee',
+        });
+      }catch(notificationError){console.warn('Treasury push notification unavailable:',notificationError);}
+    }catch(error){
+      const message=treasurySaveErrorMessage(error);
+      setTransactionError(message);
+      toast.error(message);
+    }finally{submissionLock.current=false;}
+  };
+
+  const typeConfig = form.type ? TYPE_META[form.type] : null;
+  const matchingTxnAccounts=typeConfig?activeAccounts.filter(account=>accountWalletKey(account)===typeConfig.wallet):activeAccounts;
+  const showBranch = typeConfig && (
+    typeConfig.wallet === 'branch_cash' ||
+    form.type?.startsWith('branch_') ||
+    typeConfig.settlement === true
+  );
+
+  if (role === 'cashier') {
+    return <div className="text-center py-20 text-muted-foreground text-sm">{t('error')}</div>;
+  }
+
+  const fmt=(v)=>formatTreasuryCurrency(v,moneyOptions);
+  const accountFmt=(v,account)=>formatTreasuryCurrency(v,{
+    ...moneyOptions,accountCurrency:account?.currency,
+  });
+  const selectedCurrencyNote=treasuryCurrencyWarning(moneyOptions);
+
+  // Never display an apparently balanced/zero ledger in ANY Treasury tab after
+  // a failed financial read. These screens drive actual payment decisions.
+  if (transactionsError || accountsError || (isOwner && (centralTxError || centralSalesError))) {
+    const message=lang==='ar'
+      ? 'تعذر تحميل دفتر الخزينة بالكامل. لم تُعرض أي أرصدة جزئية.'
+      :lang==='fa'
+      ? 'بارگذاری کامل دفتر خزانه ناموفق بود؛ هیچ مانده ناقصی نشان داده نمی‌شود.'
+      : 'The complete Treasury ledger could not be loaded. No partial balances are displayed.';
+    return <div className="mx-auto max-w-2xl p-4">
+      <Card role="alert" className="rounded-2xl border-rose-300 bg-rose-50 p-5 text-rose-800">
+        <div className="flex items-start gap-3"><AlertTriangle className="h-6 w-6 shrink-0"/>
+          <div><h2 className="font-extrabold">Treasury data unavailable</h2><p className="mt-2 text-sm">{message}</p></div>
+        </div>
+        <Button type="button" className="mt-4" onClick={()=>{
+          qc.invalidateQueries({queryKey:['wallet_transactions',activeRestaurant?.id,selectedBranchId]});
+          qc.invalidateQueries({queryKey:['treasury_accounts',activeRestaurantId]});
+        }}>{lang==='ar'?'إعادة المحاولة':lang==='fa'?'تلاش دوباره':'Retry loading'}</Button>
+      </Card>
+    </div>;
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title={t('treasury')}
+        action={
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            {isOwner && (
+              <Button size="sm" variant="outline" className="w-full whitespace-nowrap sm:w-auto" onClick={openCreateAccount}>
+                <Landmark className="h-3.5 w-3.5 shrink-0" /> {local('Add Account')}
+              </Button>
+            )}
+            <Button size="sm" className="w-full whitespace-nowrap sm:w-auto" onClick={() => setShowForm(true)}>
+              <Plus className="h-3.5 w-3.5 shrink-0" /> {t('add_transaction')}
+            </Button>
+          </div>
+        }
+      />
+      {selectedCurrencyNote && <p role="status" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{selectedCurrencyNote}</p>}
+      <Tabs value={tab} onValueChange={setTab} className="mb-4 min-w-0">
+        <div className="treasury-tab-scroll" role="region" aria-label={local('Treasury sections')}>
+          <TabsList className="treasury-tab-list">
+            <TabsTrigger value="overview" className="treasury-tab-trigger">{t('overview')}</TabsTrigger>
+            <TabsTrigger value="accounts" className="treasury-tab-trigger"><WalletCards className="h-3.5 w-3.5 shrink-0" />{local('Accounts')}</TabsTrigger>
+            <TabsTrigger value="settlement" className="treasury-tab-trigger"><Scale className="h-3.5 w-3.5 shrink-0" />{t('settlement')}</TabsTrigger>
+            <TabsTrigger value="reconcile" className="treasury-tab-trigger text-amber-700"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />{local('Reconciliation')}</TabsTrigger>
+            <TabsTrigger value="transactions" className="treasury-tab-trigger">{local('Transactions')}</TabsTrigger>
+            <TabsTrigger value="analytics" className="treasury-tab-trigger">{t('analytics')}</TabsTrigger>
+            <TabsTrigger value="sponsor" className="treasury-tab-trigger text-amber-700"><ShieldCheck className="h-3.5 w-3.5 shrink-0" />{t('sponsor_treasury')}</TabsTrigger>
+            <TabsTrigger value="forecast" className="treasury-tab-trigger text-indigo-600"><TrendingUp className="h-3.5 w-3.5 shrink-0" />{t('forecast')}</TabsTrigger>
+            {isOwner ? <TabsTrigger value="personal" className="treasury-tab-trigger text-violet-600"><UserCircle className="h-3.5 w-3.5 shrink-0" />{local('Personal')}</TabsTrigger> : null}
+          </TabsList>
+        </div>
+
+        {/* ── OVERVIEW ────────────────────────────────────────────────── */}
+        <TabsContent value="overview" className="mt-3 space-y-3">
+          {(transactionsError || accountsError) && (
+            <Card className="border-rose-300 bg-rose-50 p-3 text-sm text-rose-700" role="alert">
+              {lang==='ar'?'تعذر تحميل سجل الخزينة بالكامل؛ لا تعرض الأرصدة الجزئية.':
+               lang==='fa'?'بارگذاری کامل دفتر خزانه ناموفق بود؛ مانده ناقص نمایش داده نمی‌شود.':
+               'Unable to load the complete treasury ledger; partial balances are not shown.'}
+            </Card>
+          )}
+          {!transactionsError && !accountsError && <TreasuryERPOverview
+            accounts={scopedAccounts}
+            accountBalances={accountBalances}
+            ledger={treasuryLedgerBalance}
+            walletBalance={mixedAccountCurrencies?{ownerNetwork:null,ownerCash:null}:walletBalance}
+            branchBalances={mixedAccountCurrencies?{}:branchBalances}
+            branches={branches}
+            monthlySummary={mixedAccountCurrencies?{}:monthlySummary}
+            trendData={mixedAccountCurrencies?[]:trendData}
+            integrity={integrity}
+            payrollEstimate={payrollObligation}
+            fmt={fmt}
+            currency={ledgerCurrency}
+            lang={lang}
+            valueScope={isOwner||isAllBranches?'all':'selected'}
+            isLoading={isLoading || accountsLoading || (isOwner&&centralTxLoading)}
+            setTab={setTab}
+            mixedCurrencies={mixedAccountCurrencies}
+          />}
+          {isOwner&&<CentralOwnerTreasuryPanel
+            restaurantId={activeRestaurantId}
+            accounts={accounts} branches={branches}
+            transactions={centralTransactions} sales={centralSales}
+            lang={lang} currency={ledgerCurrency}
+            loading={centralTxLoading||centralSalesLoading||accountsLoading}
+            error={centralTxError||centralSalesError||accountsError}
+            onComplete={()=>{
+              qc.invalidateQueries({queryKey:['treasury_owner_central_transactions']});
+              qc.invalidateQueries({queryKey:['wallet_transactions']});
+            }}
+          />}
+          {isOwner&&<BranchCashHandoverPanel
+            restaurantId={activeRestaurantId} accounts={accounts} branches={branches}
+            transactions={centralTransactions} currency={ledgerCurrency} lang={lang}
+            loading={centralTxLoading||accountsLoading} error={centralTxError||accountsError}
+            onComplete={()=>{
+              qc.invalidateQueries({queryKey:['treasury_owner_central_transactions']});
+              qc.invalidateQueries({queryKey:['wallet_transactions']});
+            }}
+          />}
+          {/* Sponsor Holdings Summary */}
+          {(sponsorSummary.receivedBySponsor > 0 || sponsorSummary.remaining > 0) && (
+            <Card className={`p-4 ${sponsorSummary.remaining > 0 ? 'border-amber-300 bg-amber-50/30' : 'border-emerald-200'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className={`w-4 h-4 ${sponsorSummary.remaining > 0 ? 'text-amber-500' : 'text-emerald-500'}`} />
+                  <p className="text-sm font-semibold">Sponsor Holdings (كفيل)</p>
+                </div>
+                <Link to="/sponsor-treasury" className="text-xs text-primary flex items-center gap-1 hover:underline">
+                  Details <ExternalLink className="w-3 h-3" />
+                </Link>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center mb-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">{t('inflows')}</p>
+                  <p className="text-sm font-bold text-blue-600">{fmt(sponsorSummary.receivedBySponsor)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t('direction_out')}</p>
+                  <p className="text-sm font-bold text-violet-600">{fmt(sponsorSummary.sentToOwner)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t('net_flow')}</p>
+                  <p className={`text-sm font-bold ${sponsorSummary.remaining > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    {fmt(sponsorSummary.remaining)}
+                  </p>
+                </div>
+              </div>
+              {sponsorSummary.remaining > 0 && (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-100 border border-amber-200">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <p className="text-xs text-amber-700">
+                    {sponsorSummary.branchesWithBalance} {t('branch')} — {t('settlement')}
+                  </p>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Recent transactions */}
+          {!transactionsError && !accountsError && <Card className="p-4">
+            <p className="text-sm font-semibold mb-2">{t('details')}</p>
+            <div className="space-y-2">
+              {transactions.slice(0, 8).map(tx => {
+                const meta = TYPE_META[transactionType(tx)];
+                const isIn = tx.direction === 'in';
+                return (
+                  <div key={tx.id} className="flex items-center justify-between py-1 border-b border-border last:border-0">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isIn ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                        {isIn ? <ArrowDownLeft className="w-3 h-3 text-emerald-600" /> : <ArrowUpRight className="w-3 h-3 text-red-500" />}
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium line-clamp-1">{local(meta?.label || transactionType(tx))}</p>
+                        <p className="text-xs text-muted-foreground">{transactionDate(tx)}{transactionAccountName(tx, accounts) ? ` · ${transactionAccountName(tx, accounts)}` : ''}</p>
+                      </div>
+                    </div>
+                    <span className={`text-sm font-semibold ${isIn ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {isIn ? '+' : '-'}{fmt(tx.amount)}
+                    </span>
+                  </div>
+                );
+              })}
+              {transactions.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">{t('no_data')}</p>}
+            </div>
+          </Card>}
+        </TabsContent>
+
+        {/* ── ACCOUNTS ────────────────────────────────────────────────── */}
+        <TabsContent value="accounts" className="mt-3 space-y-3">
+          {(transactionsError || accountsError) && <Card role="alert" className="border-rose-300 bg-rose-50 p-3 text-sm text-rose-700">Unable to load the complete Treasury ledger. Account balances are temporarily unavailable.</Card>}
+          <Card className="p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <Landmark className="h-5 w-5 shrink-0 text-indigo-600" />
+                <div className="min-w-0"><p className="text-sm font-semibold">{local('Treasury Accounts')}</p><p className="text-xs text-muted-foreground">{local('Balances are calculated from opening balance plus linked transactions.')}</p></div>
+              </div>
+              {isOwner && <Button size="sm" className="w-full shrink-0 sm:w-auto" onClick={openCreateAccount}><Plus className="h-3.5 w-3.5 shrink-0" />{local('Add Account')}</Button>}
+            </div>
+          </Card>
+
+          {(transactionsError || accountsError) ? null : scopedAccounts.length === 0 ? (
+            <Card className="p-8 text-center"><WalletCards className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" /><p className="text-sm font-medium">{local('No Treasury accounts')}</p><p className="mt-1 text-xs text-muted-foreground">{local('Create an account to link every Treasury transaction and track its balance.')}</p>{isOwner && <Button size="sm" className="mt-4" onClick={openCreateAccount}>{local('Create Account')}</Button>}</Card>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {scopedAccounts.map((account) => {
+                const balance = accountBalances[account.id] || 0;
+                const linkedCount = overviewTransactions.filter((transaction) => transaction.account_id === account.id).length;
+                const accountType = TREASURY_ACCOUNT_TYPES.find((type) => type.value === account.account_type)?.label || account.account_type;
+                return (
+                  <Card key={account.id} className="min-w-0 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-2">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-950/40"><Landmark className="h-4 w-4 text-indigo-600" /></div>
+                        <div className="min-w-0"><p className="truncate text-sm font-semibold">{account.account_name}</p><p className="truncate text-xs text-muted-foreground">{local(accountType)}{account.branch_key ? ` · ${account.branch_key}` : ''}</p></div>
+                      </div>
+                      <div className="text-end"><Badge variant={account.is_active !== false ? 'outline' : 'secondary'}>{account.is_active !== false ? local('Active') : local('Inactive')}</Badge><p className={`mt-1 text-base font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{accountFmt(balance,account)}</p></div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                      <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Opening')}</p><p className="truncate text-xs font-semibold">{accountFmt(account.opening_balance||0,account)}</p></div>
+                      <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Transactions')}</p><p className="truncate text-xs font-semibold">{linkedCount}</p></div>
+                      <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Currency')}</p><p className="truncate text-xs font-semibold" dir="ltr">{resolveTreasuryCurrency({...moneyOptions,accountCurrency:account.currency}).code}</p></div>
+                    </div>
+                    {account.notes && <p className="mt-3 break-words text-xs text-muted-foreground">{account.notes}</p>}
+                    {isOwner && <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-border pt-3">
+                      <Button size="sm" variant="outline" className="min-w-24" onClick={() => openEditAccount(account)}><Pencil className="h-3.5 w-3.5" />{local('Edit')}</Button>
+                      {!account.is_system && <Button size="sm" variant="outline" className="min-w-24" onClick={() => accountStatusMut.mutate({ id: account.id, is_active: account.is_active === false })}><Power className="h-3.5 w-3.5" />{account.is_active !== false ? local('Deactivate') : local('Activate')}</Button>}
+                      {!account.is_system && <Button size="sm" variant="outline" className="min-w-24 text-destructive" onClick={() => setDeleteAccountId(account.id)}><Trash2 className="h-3.5 w-3.5" />{local('Delete')}</Button>}
+                    </div>}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── RECONCILIATION ──────────────────────────────────────────── */}
+        <TabsContent value="reconcile" className="mt-3">
+          {(!isOwner&&(salesError||salesLoading))||(isOwner&&(centralSalesError||centralSalesLoading))
+            ?<Card role="status" className="p-4 text-sm text-amber-700">
+              {(isOwner?centralSalesError:salesError)?local('Closing ledger unavailable; reconciliation cannot be verified.'):
+                local('Loading complete Closing records…')}
+             </Card>:<ReconciliationDashboard
+            transactions={isOwner?centralTransactions:transactions}
+            sales={isOwner?centralSales:allSales}
+            branches={branches}
+            currency={ledgerCurrency}
+          />}
+        </TabsContent>
+
+        {/* ── SETTLEMENT ──────────────────────────────────────────────── */}
+        <TabsContent value="settlement" className="mt-3">
+          <BranchSettlementLedger
+            transactions={overviewTransactions}
+            branches={branches}
+            currency={currency}
+            onRecord={() => setShowForm(true)}
+          />
+        </TabsContent>
+
+        {/* ── TRANSACTIONS ────────────────────────────────────────────── */}
+        <TabsContent value="transactions" className="mt-3 space-y-3">
+          <div className="flex gap-2">
+            <Select value={filterMonth} onValueChange={setFilterMonth}>
+              <SelectTrigger className="flex-1 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTH_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <BranchSelect
+              value={filterBranch}
+              onChange={(branchKey) => setSelectedBranchId(
+                branchKey === 'all' ? 'all' : branches.find((branch) => (branch.key || branch.branch_key) === branchKey)?.id || 'all'
+              )}
+              includeAll
+            />
+          </div>
+
+          <div className="space-y-2">
+            {isLoading ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">{t('loading')}</p>
+            ) : filteredTx.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">{t('no_data')}</p>
+            ) : filteredTx.map(tx => {
+              const meta = TYPE_META[transactionType(tx)];
+              const isIn = tx.direction === 'in';
+              return (
+                <Card key={tx.id} className="p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isIn ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                        {isIn ? <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" /> : <ArrowUpRight className="w-3.5 h-3.5 text-red-500" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate">{local(meta?.label || transactionType(tx))}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-muted-foreground">{transactionDate(tx)}</span>
+                          {tx.branch && <Badge variant="outline" className="text-xs py-0">{tx.branch}</Badge>}
+                          {transactionAccountName(tx, accounts) && <Badge variant="secondary" className="max-w-32 truncate text-xs py-0">{transactionAccountName(tx, accounts)}</Badge>}
+                          {tx.description && <span className="text-xs text-muted-foreground truncate max-w-28">{tx.description}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-sm font-bold ${isIn ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {isIn ? '+' : '-'}{fmt(tx.amount)}
+                      </span>
+                      <Badge variant="outline" className="shrink-0 text-[10px]" title="Posted ledger entries cannot be deleted. Corrections require an audited reversal.">
+                        {local('Posted · Locked')}
+                      </Badge>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </TabsContent>
+
+        {/* ── SPONSOR LEDGER ──────────────────────────────────────────── */}
+        <TabsContent value="sponsor" className="mt-3">
+          <SponsorLedger />
+        </TabsContent>
+
+        {/* ── CASHFLOW FORECAST ────────────────────────────────────────── */}
+        <TabsContent value="forecast" className="mt-3">
+          <CashflowProjection accounts={scopedAccounts} transactions={overviewTransactions} />
+        </TabsContent>
+
+        {/* ── OWNER PERSONAL FINANCE ───────────────────────────────────── */}
+        {(role === 'owner' || role === 'admin') && (
+          <TabsContent value="personal" className="mt-3">
+            <OwnerPersonalFinance />
+          </TabsContent>
+        )}
+
+        {/* ── ANALYTICS ───────────────────────────────────────────────── */}
+        <TabsContent value="analytics" className="mt-3 space-y-3">
+          {trendData.some(d => d.ownerIn > 0 || d.ownerOut > 0) && (
+            <Card className="p-4">
+              <p className="text-sm font-semibold mb-3">{t('cashflow_title')}</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${ledgerCurrency} ${(v/1000).toFixed(0)}k`} />
+                  <Tooltip formatter={v => fmt(v)} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="networkIn" name={t('network')} stroke="#3b82f6" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="ownerIn" name={t('inflows')} stroke="#10b981" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="ownerOut" name={t('outflows')} stroke="#ef4444" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="net" name={t('net_flow')} stroke="#6366f1" strokeWidth={2} dot={false} strokeDasharray="4 2" />
+                </LineChart>
+              </ResponsiveContainer>
+            </Card>
+          )}
+
+          {branchBalanceChart.length > 0 && (
+            <Card className="p-4">
+              <p className="text-sm font-semibold mb-3">{t('branch_cash')}</p>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={branchBalanceChart}>
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${ledgerCurrency} ${(v/1000).toFixed(0)}k`} />
+                  <Tooltip formatter={v => fmt(v)} />
+                  <Bar dataKey="balance" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          )}
+
+          {/* Type breakdown */}
+          <Card className="p-4">
+            <p className="text-sm font-semibold mb-3">{t('summary')} — {filterMonth}</p>
+            <div className="space-y-1.5">
+              {TX_TYPES.map(({ value, label, direction }) => {
+                const total = monthTx.filter(tx => transactionType(tx) === value).reduce((s, tx) => s + (tx.amount || 0), 0);
+                if (total === 0) return null;
+                return (
+                  <div key={value} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground truncate flex-1">{local(label)}</span>
+                    <span className={`font-semibold ml-2 ${direction === 'in' ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {direction === 'in' ? '+' : '-'}{fmt(total)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Add transaction dialog */}
+      <Dialog open={showForm} onOpenChange={v => { if(saveMut.isPending)return; setShowForm(v); if(!v){setForm(emptyForm);setTransactionError('');pendingTransactionId.current=null;} }}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-md overflow-y-auto">
+          <DialogHeader><DialogTitle>{t('add_transaction')}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">{t('transaction_type')} *</Label>
+              <Select value={form.type} onValueChange={v => {
+                const meta = TYPE_META[v];
+                setTransactionError('');
+                pendingTransactionId.current=null;
+                setForm(current=>({...current,type:v,account_id:'',wallet:meta?.wallet||current.wallet,
+                  branch:current.branch||(!isAllBranches?selectedBranchKey||'':'')}));
+              }}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder={local('Select transaction type')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__settle_header__" disabled className="font-semibold text-xs text-muted-foreground">— Branch ↔ Owner Settlement —</SelectItem>
+                  {TX_TYPES.filter(t => !t.auto && t.settlement).map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                  <SelectItem value="__credit_header__" disabled className="font-semibold text-xs text-muted-foreground">— Credit Collections —</SelectItem>
+                  {TX_TYPES.filter(t => !t.auto && t.value.startsWith('credit_')).map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                  <SelectItem value="__owner_header__" disabled className="font-semibold text-xs text-muted-foreground">— Owner Only —</SelectItem>
+                  {TX_TYPES.filter(t => !t.auto && !t.settlement && !t.value.startsWith('credit_') && (t.wallet === 'owner_network' || t.wallet === 'owner_cash')).map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                  <SelectItem value="__branch_header__" disabled className="font-semibold text-xs text-muted-foreground">— Branch Cash —</SelectItem>
+                  {TX_TYPES.filter(t => !t.auto && !t.settlement && t.wallet === 'branch_cash').map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs">{local('Treasury Account')} *</Label>
+              <Select value={form.account_id} onValueChange={(value) => {
+                const account = activeAccounts.find((item) => item.id === value);
+                setTransactionError('');
+                pendingTransactionId.current=null;
+                setForm(current=>({...current,account_id:value,
+                  branch:current.branch||account?.branch_key||(!isAllBranches?selectedBranchKey||'':''),
+                  wallet:account?accountWalletKey(account):current.wallet}));
+              }}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder={local('Select account')} /></SelectTrigger>
+                <SelectContent>{matchingTxnAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.account_name} · {accountFmt(accountBalances[account.id]||0,account)}</SelectItem>)}</SelectContent>
+              </Select>
+              {activeAccounts.length === 0 && <p className="mt-1 text-xs text-destructive">{local('No active Treasury account is available.')}</p>}
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div><Label className="text-xs">{local('Date')} *</Label><Input type="date" value={form.date} onChange={e => set('date', e.target.value)} /></div>
+              <div><Label className="text-xs">{local('Amount')} *</Label><Input type="number" inputMode="decimal" value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0" /></div>
+            </div>
+
+            {form.account_id && typeConfig?.direction==='out' &&
+              Number(form.amount)>0 && Number.isFinite(Number(form.amount)) &&
+              Number(accountBalances[form.account_id]||0)<Number(form.amount) &&
+              <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+                {lang==='ar'?('تنبيه: رصيد الحساب '+fmt(accountBalances[form.account_id]||0)+' أقل من مبلغ الصرف. سيصبح الرصيد '+fmt(Number(accountBalances[form.account_id]||0)-Number(form.amount))+'. راجع الحركة قبل الحفظ.'):
+                 lang==='fa'?('هشدار: مانده حساب '+fmt(accountBalances[form.account_id]||0)+' کمتر از مبلغ پرداخت است. مانده بعد از ثبت '+fmt(Number(accountBalances[form.account_id]||0)-Number(form.amount))+' خواهد شد.'):
+                 ('Warning: current account balance '+fmt(accountBalances[form.account_id]||0)+' is below this outgoing amount. Projected balance: '+fmt(Number(accountBalances[form.account_id]||0)-Number(form.amount))+'.')}
+              </p>}
+            {showBranch && (
+              <div><Label className="text-xs">{local('Branch')}</Label><BranchSelect value={form.branch} onChange={(branchKey) => {
+                setTransactionError('');
+                set('branch', branchKey);
+              }} /></div>
+            )}
+
+            <div>
+              <Label className="text-xs">{local('Payment Method')}</Label>
+              <Select value={form.payment_method} onValueChange={v => {setTransactionError('');set('payment_method',v);}}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">{local('Cash')}</SelectItem>
+                  <SelectItem value="network">{local('Network')}</SelectItem>
+                  <SelectItem value="both">{local('Both')} — {local('Split required')}</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.payment_method==='both'&&<p role="alert" className="mt-1 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                {lang==='ar'?'اختر نقداً أو شبكة. إذا تم الدفع بالطريقتين، سجّل حركتين منفصلتين بمبالغ دقيقة.':
+                 lang==='fa'?'نقد یا شبکه را انتخاب کن. برای پرداخت ترکیبی، دو تراکنش جدا با مبلغ مشخص ثبت کن.':
+                 'Select Cash or Network. For mixed payments record two transactions with exact amounts.'}
+              </p>}
+            </div>
+
+            <div><Label className="text-xs">{local('Description / Notes')}</Label><Input value={form.description} onChange={e => set('description', e.target.value)} /></div>
+
+            {transactionError&&<p role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs font-semibold text-rose-800">{transactionError}</p>}
+            <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+              <Button className="w-full sm:flex-1" onClick={handleSave} disabled={saveMut.isPending || !form.type || !form.account_id || !form.amount || form.payment_method==='both'}>{saveMut.isPending?local('Saving...'):local('Save')}</Button>
+              <Button variant="outline" className="w-full sm:flex-1" onClick={() => setShowForm(false)}>{local('Cancel')}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAccountForm} onOpenChange={(open) => { setShowAccountForm(open); if (!open) { setEditingAccount(null); setAccountForm(emptyAccountForm); } }}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-lg overflow-y-auto">
+          <DialogHeader><DialogTitle>{editingAccount ? local('Edit Treasury Account') : local('Add Treasury Account')}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label className="text-xs">{local('Account Name')} *</Label><Input className="mt-1" value={accountForm.account_name} onChange={(event) => setAccount('account_name', event.target.value)} placeholder={local('e.g. Main Bank Account')} /></div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div><Label className="text-xs">{local('Account Type')} *</Label><Select value={accountForm.account_type} onValueChange={(value) => setAccount('account_type', value)}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent>{TREASURY_ACCOUNT_TYPES.map((type) => <SelectItem key={type.value} value={type.value}>{local(type.label)}</SelectItem>)}</SelectContent></Select></div>
+              <div><Label className="text-xs">{local('Currency')} *</Label><Input className="mt-1" dir="ltr" value={accountForm.currency} onChange={(event) => setAccount('currency', event.target.value.toUpperCase())} maxLength={8} /></div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div><Label className="text-xs">{local('Branch')}</Label><Select value={accountForm.branch_id || '__unassigned'} onValueChange={(value) => setAccount('branch_id', value === '__unassigned' ? '' : value)}><SelectTrigger className="mt-1"><SelectValue placeholder={local('All branches / Owner')} /></SelectTrigger><SelectContent><SelectItem value="__unassigned">{local('All branches / Owner')}</SelectItem>{branches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.label || branch.name || branch.key}</SelectItem>)}</SelectContent></Select></div>
+              <div><Label className="text-xs">{local('Opening Balance')}</Label><Input className="mt-1" type="number" inputMode="decimal" value={accountForm.opening_balance} disabled={Boolean(editingAccount&&overviewTransactions.some(tx=>tx.account_id===editingAccount.id))} onChange={(event) => setAccount('opening_balance', event.target.value)} placeholder="0" /></div>
+            </div>
+            {!editingAccount?.is_system && <div><Label className="text-xs">{local('Status')}</Label><Select value={accountForm.is_active ? 'active' : 'inactive'} onValueChange={(value) => setAccount('is_active', value === 'active')}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">{local('Active')}</SelectItem><SelectItem value="inactive">{local('Inactive')}</SelectItem></SelectContent></Select></div>}
+            {editingAccount?.is_system && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{local('System-mapped accounts stay active so automatic Treasury transactions remain linked.')}</div>}
+            <div><Label className="text-xs">{local('Notes')}</Label><Textarea className="mt-1 min-h-20 resize-y" value={accountForm.notes} onChange={(event) => setAccount('notes', event.target.value)} /></div>
+            <div className="flex flex-col gap-2 pt-1 sm:flex-row"><Button className="w-full sm:flex-1" onClick={handleAccountSave} disabled={accountSaveMut.isPending || !accountForm.account_name.trim()}>{accountSaveMut.isPending ? local('Saving...') : local('Save Account')}</Button><Button variant="outline" className="w-full sm:flex-1" onClick={() => setShowAccountForm(false)}>{local('Cancel')}</Button></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteAccountId} onOpenChange={() => setDeleteAccountId(null)}>
+        <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md"><AlertDialogHeader><AlertDialogTitle>{local('Delete Treasury account?')}</AlertDialogTitle></AlertDialogHeader><p className="text-sm text-muted-foreground">{local('Accounts with transactions are protected and can be deactivated instead.')}</p><AlertDialogFooter className="gap-2 sm:gap-0"><AlertDialogCancel>{local('Cancel')}</AlertDialogCancel><AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => accountDeleteMut.mutate(deleteAccountId)}>{local('Delete')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+      </AlertDialog>
+
+
+    </div>
+  );
+}:
+        'Use a real three-letter currency code such as SAR or USD, not a $ symbol.');
+      return;
+    }
+    const canonicalAccountCurrency=normalizeTreasuryCurrency(enteredCurrency,ledgerCurrency);
     if(centralTxError||centralTxLoading){toast.error(local('Complete Treasury data is required to edit an account.'));return;}
     if(editingAccount&&overviewTransactions.some(tx=>tx.account_id===editingAccount.id)){
       const historicalChange=Number(accountForm.opening_balance||0)!==Number(editingAccount.opening_balance||0)||
