@@ -10,6 +10,7 @@ import {Label} from '@/components/ui/label';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
 import {ArrowDownToLine,ArrowLeftRight,WalletCards,AlertTriangle} from 'lucide-react';
 import {getSaleNetwork} from '@/lib/helpers';
+import {normalizeTreasuryCurrency} from '@/lib/treasuryCurrency';
 
 const T={
  en:{heading:'Central Owner Treasury',hint:'All branch network sales accrue centrally. Provider settlement is not verified automatically.',
@@ -87,11 +88,15 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
    (!a.branch_id&&a.branch_key&&branches.find(b=>b.id===branchId)?.branch_key===a.branch_key))&&
    ['cash','petty_cash'].includes(a.account_type));
  const chosenSource=ownerAccounts.find(a=>a.id===sourceId);
+ const chosenDestination=branchAccounts.find(a=>a.id===targetId);
+ const fundingCurrencyMismatch=Boolean(chosenSource&&chosenDestination&&
+   normalizeTreasuryCurrency(chosenSource.currency,currency)!==
+   normalizeTreasuryCurrency(chosenDestination.currency,currency));
  const needsSettled=chosenSource&&['network_pos','clearing'].includes(chosenSource.account_type);
  const selectedAmount=Number(amount);
  const ready=Boolean(restaurantId&&sourceId&&branchId&&targetId&&selectedAmount>0&&
    Number.isFinite(selectedAmount)&&Math.abs(selectedAmount*100-Math.round(selectedAmount*100))<.000001&&
-   receiptConfirmed&&(!needsSettled||settlementConfirmed)&&!loading&&!error);
+   !fundingCurrencyMismatch&&receiptConfirmed&&(!needsSettled||settlementConfirmed)&&!loading&&!error);
  const {mutateAsync,isPending}=useMutation({mutationFn:async payload=>{
    const {data,error:rpcError}=await supabase.rpc('erp_owner_fund_branch',payload);
    if(rpcError)throw rpcError;
@@ -116,11 +121,17 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
    setAmount('');setNote('');setReceiptConfirmed(false);setSettlementConfirmed(false);
    requestId.current=null;
   }catch(e){
-   const message=String(e?.message||'Transfer was not confirmed').slice(0,350);
+   const rawMessage=String(e?.message||'Transfer was not confirmed');
+    const message=rawMessage.includes('OWNER_FUNDING_CURRENCY_MISMATCH')
+      ?(lang==='ar'?'عملة حساب المالك لا تطابق عملة الفرع. تحقق من إعدادات الحساب.':
+        lang==='fa'?'ارز حساب مالک با شعبه یکسان نیست. تنظیم ارز حساب‌ها را بررسی کنید.':
+        'Owner and branch accounts have different currencies. Check account denominations.')
+      :rawMessage.slice(0,350);
    setSaveError(message);toast.error(message);
   }
  };
- const money=(n,code=currency)=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n||0)+' '+code;
+ const money=(n,code=currency)=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n||0)
+  +' '+normalizeTreasuryCurrency(code,currency);
  return <Card className="space-y-4 border-blue-200 p-4" data-testid="owner-central-treasury">
   <div className="flex items-center gap-3">
    <span className="rounded-xl bg-blue-100 p-2.5 text-blue-700"><WalletCards className="h-5 w-5"/></span>
@@ -183,7 +194,10 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
    <label className="flex items-start gap-2 rounded-lg border p-2 text-xs">
      <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" checked={receiptConfirmed} onChange={e=>change(setReceiptConfirmed,e.target.checked)}/>
      <span>{tr.received}</span></label>
-   {saveError&&<p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">{saveError}</p>}
+   {fundingCurrencyMismatch&&<p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+      {lang==='ar'?'عملة الحسابين غير متطابقة':lang==='fa'?'ارز دو حساب یکسان نیست':'Account currencies do not match'}
+    </p>}
+    {saveError&&<p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">{saveError}</p>}
    <Button onClick={submit} disabled={!ready||isPending} className="w-full gap-2">
      <ArrowDownToLine className="h-4 w-4"/>{isPending?tr.saving:tr.save}
    </Button>
