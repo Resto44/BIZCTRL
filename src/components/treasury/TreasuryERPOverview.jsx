@@ -16,7 +16,7 @@ const textByLanguage={
   branch:'Branch wallet movements',branchNote:'These are signed wallet movements, not a verified physical cash count.',
   flow:'Owner inflow / outflow trend',flows:'6 recorded months',inflow:'In',outflow:'Out',
   health:'Reconciliation attention',negative:'Negative linked account(s)',unlinked:'Legacy wallet-only movements',
-  orphan:'Transactions referring to unlisted accounts',inspect:'Review reconciliation',
+  orphan:'Transactions referring to unlisted accounts',branchMismatch:'Branch/account mismatches',duplicateNetwork:'Duplicate network Closing refs',unpairedFunding:'Unpaired branch funding',inspect:'Review reconciliation',
   accountsAction:'Manage accounts',txAction:'All transactions',noData:'No recorded data',all:'All branches',
   selected:'Selected branch',active:'Active',inactive:'Inactive',negativeInfo:'A negative ledger is not automatically a bug. Review opening balances and recorded movements.',
   payroll:'Estimated base payroll per month',multi:'Different account currencies cannot be combined without FX rates.',
@@ -30,7 +30,7 @@ const textByLanguage={
   branch:'حركات محفظة الفرع',branchNote:'هذه حركات محفظة وليست جرداً فعلياً للنقد في الصندوق.',
   flow:'اتجاه التدفقات الواردة والصادرة',flows:'آخر 6 أشهر مسجلة',inflow:'وارد',outflow:'صادر',
   health:'متابعة المطابقة',negative:'حسابات مرتبطة برصيد سالب',unlinked:'حركات محفظة غير مرتبطة بحساب',
-  orphan:'حركات تشير لحسابات غير ظاهرة',inspect:'مراجعة المطابقة',
+  orphan:'حركات تشير لحسابات غير ظاهرة',branchMismatch:'مغایرة الفروع والحسابات',duplicateNetwork:'مبيعات شبكة مكررة',unpairedFunding:'تمويل غير متوازن',inspect:'مراجعة المطابقة',
   accountsAction:'إدارة الحسابات',txAction:'جميع الحركات',noData:'لا توجد بيانات مسجلة',all:'جميع الفروع',
   selected:'الفرع المحدد',active:'نشط',inactive:'غير نشط',negativeInfo:'الرصيد السالب لا يعني خطأً تلقائياً. راجع الرصيد الافتتاحي والحركات المسجلة.',
   payroll:'تقدير الرواتب الأساسية شهرياً',multi:'لا يمكن جمع حسابات بعملات مختلفة دون سعر صرف معتمد.',
@@ -44,7 +44,7 @@ const textByLanguage={
   branch:'گردش کیف‌پول شعبه',branchNote:'این ارقام گردش کیف‌پول هستند، نه شمارش واقعی نقد در صندوق.',
   flow:'روند ورودی و خروجی مالک',flows:'شش ماه ثبت‌شده',inflow:'ورودی',outflow:'خروجی',
   health:'موارد نیازمند تطبیق',negative:'حساب‌های متصل با مانده منفی',unlinked:'گردش‌های قدیمی بدون اتصال به حساب',
-  orphan:'تراکنش‌های متصل به حساب نامشخص',inspect:'بررسی تطبیق',
+  orphan:'تراکنش‌های متصل به حساب نامشخص',branchMismatch:'اختلاف شعبه و حساب',duplicateNetwork:'فروش شبکه تکراری',unpairedFunding:'تمویل بدون برداشت مالک',inspect:'بررسی تطبیق',
   accountsAction:'مدیریت حساب‌ها',txAction:'همه تراکنش‌ها',noData:'داده ثبت نشده',all:'همه شعبه‌ها',
   selected:'شعبه انتخابی',active:'فعال',inactive:'غیرفعال',negativeInfo:'مانده منفی به‌تنهایی نشانه باگ نیست؛ مانده اولیه و تراکنش‌ها را بررسی کنید.',
   payroll:'برآورد ماهانه حقوق پایه',multi:'حساب‌های دارای ارز متفاوت بدون نرخ تبدیل معتبر جمع نمی‌شوند.',
@@ -152,7 +152,7 @@ export default function TreasuryERPOverview({
    <Header icon={ShieldAlert} title={tr.health}
      action={<button type="button" onClick={()=>setTab('reconcile')} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-bold text-blue-700 dark:bg-blue-950">{tr.inspect}</button>}/>
    <div className="grid grid-cols-3 gap-2">
-    {[{label:tr.negative,n:negAccountCount},{label:tr.unlinked,n:integrity.legacyWalletMovements||0},{label:tr.orphan,n:integrity.unknownAccountMovements||0}].map(item=>
+    {[{label:tr.negative,n:negAccountCount},{label:tr.unlinked,n:integrity.legacyWalletMovements||0},{label:tr.orphan,n:integrity.unknownAccountMovements||0},{label:tr.branchMismatch,n:integrity.branchAccountMismatches||0},{label:tr.duplicateNetwork,n:integrity.duplicateNetworkClosings||0},{label:tr.unpairedFunding,n:integrity.unpairedFundingCredits||0}].map(item=>
     <div key={item.label} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-2 text-center dark:border-slate-700 dark:bg-slate-800">
       <span className={'text-lg font-black '+(item.n?'text-amber-600':'text-emerald-600')}>{item.n}</span>
       <p className="mt-1 break-words text-[10px] leading-4 text-muted-foreground">{item.label}</p>

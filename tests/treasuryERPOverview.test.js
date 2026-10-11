@@ -70,7 +70,7 @@ describe('Treasury ERP read-only ledger integrity',()=>{
    {id:'2',account_id:'acc2',direction:'in',amount:45},
    {id:'3',account_id:'unknown',direction:'out',amount:99},
   ],all);
-  expect(integrity).toEqual({legacyWalletMovements:1,unknownAccountMovements:1,negativeAccounts:1});
+  expect(integrity).toMatchObject({legacyWalletMovements:1,unknownAccountMovements:1,negativeAccounts:1,branchAccountMismatches:0,duplicateNetworkClosings:0,unpairedFundingCredits:0});
  });
  it('rejects a failed ledger page, never returning a plausible partial balance',async()=>{
   const db={

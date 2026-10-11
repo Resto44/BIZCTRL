@@ -11,7 +11,7 @@ const branchType = t => t?.wallet==='branch_cash' || t?.value?.startsWith('branc
   (t?.settlement===true && t?.value==='owner_to_branch_funding');
 
 export function buildTreasuryEntry({form,account,meta,branches=[],restaurantId,
-  selectedBranchId=null,selectedBranchKey=null,isAllBranches=false}){
+  selectedBranchId=null,selectedBranchKey=null,isAllBranches=false,availableBalance=null}){
   if(!restaurantId)throw new TreasuryEntryError('MISSING_RESTAURANT','No active restaurant selected. Reopen the restaurant workspace.');
   if(!meta||!form?.type)throw new TreasuryEntryError('MISSING_TYPE','Choose a transaction type.');
   if(!account?.id || account.is_active===false)throw new TreasuryEntryError('MISSING_ACCOUNT','Choose an active Treasury account.');
@@ -31,6 +31,8 @@ export function buildTreasuryEntry({form,account,meta,branches=[],restaurantId,
   if(!['cash','network'].includes(payment))
     throw new TreasuryEntryError('PAYMENT_METHOD','Select Cash or Network as the payment method.');
   const mustHaveBranch=Boolean(branchType(meta));
+  if(mustHaveBranch&&isAllBranches&&!form.branch)
+    throw new TreasuryEntryError('MISSING_BRANCH','Choose the destination branch for this transaction.');
   const fallbackKey=!isAllBranches?selectedBranchKey:null;
   // Match the actual account branch first; never re-scope unrelated accounts silently.
   const requestedKey=form.branch || fallbackKey || account.branch_key || '';
@@ -39,19 +41,31 @@ export function buildTreasuryEntry({form,account,meta,branches=[],restaurantId,
     (!isAllBranches?branches.find(b=>b.id===selectedBranchId):null)||null;
   if(mustHaveBranch&&!branch)throw new TreasuryEntryError('MISSING_BRANCH',
     'Choose the destination branch for this transaction.');
+  if(!isAllBranches&&branch&&selectedBranchId&&String(branch.id)!==String(selectedBranchId))
+    throw new TreasuryEntryError('BRANCH_SCOPE','The selected branch is outside your current branch scope.');
   if(account.branch_id && branch && String(account.branch_id)!==String(branch.id))
     throw new TreasuryEntryError('ACCOUNT_BRANCH','The Treasury account and destination branch do not match.');
   if(account.branch_key && branch && account.branch_key!==(branch.key||branch.branch_key))
     throw new TreasuryEntryError('ACCOUNT_BRANCH','The Treasury account belongs to another branch.');
-  if(!isAllBranches&&branch&&selectedBranchId&&String(branch.id)!==String(selectedBranchId))
-    throw new TreasuryEntryError('BRANCH_SCOPE','The selected branch is outside your current branch scope.');
   // Enforce exact ledger source. A general cash account belongs to the owner,
   // even if the expense was for a branch; a branch cash account stays branch cash.
   const accountWallet=account.legacy_wallet_key||
     (account.branch_key||account.branch_id?'branch_cash':
       ['bank','network_pos','digital_wallet','clearing'].includes(account.account_type)?
       'owner_network':'owner_cash');
-  const wallet=meta.wallet==='branch_cash'?accountWallet:(meta.wallet||accountWallet);
+  // Payment source and business event must refer to the same physical account.
+  // Never silently post an employee's branch cash payment from Owner Network/Cash.
+  if(meta.wallet && meta.wallet!==accountWallet)
+    throw new TreasuryEntryError('ACCOUNT_WALLET_MISMATCH',
+      'Transaction type and Treasury account do not match. Choose the correct Owner or Branch account.');
+  if(meta.direction==='out'&&availableBalance!==null){
+    const balance=Number(availableBalance);
+    if(!Number.isFinite(balance))
+      throw new TreasuryEntryError('INVALID_BALANCE','Treasury account balance is unavailable. Reload and reconcile this account.');
+    if(amount>balance+0.000001)
+      throw new TreasuryEntryError('INSUFFICIENT_FUNDS','Insufficient account balance. Reconcile the account before recording a payment.');
+  }
+  const wallet=accountWallet;
   return {
     transaction_date:form.date,
     transaction_type:form.type,

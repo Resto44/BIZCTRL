@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { buildTreasuryEntry, TreasuryEntryError, treasurySaveErrorMessage } from '../src/lib/treasuryEntryValidation.js';
 
-const account={id:'a1',restaurant_id:'r1',account_name:'الراجحي',account_type:'cash',is_active:true};
+const account={id:'a1',restaurant_id:'r1',account_name:'Rayyan Cash',account_type:'cash',legacy_wallet_key:'branch_cash',branch_id:'b1',branch_key:'rayyan',is_active:true};
 const branches=[{id:'b1',key:'rayyan',label:'فرع الريان'},{id:'b2',key:'rawdah'}];
 const meta={value:'salary_advance',wallet:'branch_cash',direction:'out'};
 const form={type:'salary_advance',account_id:'a1',date:'2026-10-10',amount:'450',
@@ -14,7 +14,7 @@ describe('Treasury transaction save regression',()=>{
     const result=buildTreasuryEntry(args);
     expect(result).toMatchObject({restaurant_id:'r1',transaction_type:'salary_advance',
       branch_id:'b1',branch:'rayyan',amount:450,payment_method:'cash',
-      direction:'out',wallet:'owner_cash',account_id:'a1'});
+      direction:'out',wallet:'branch_cash',account_id:'a1'});
   });
   it('owner must choose destination branch on branch-only transaction',()=>{
     expect(()=>buildTreasuryEntry({...args,isAllBranches:true,
@@ -42,6 +42,12 @@ describe('Treasury transaction save regression',()=>{
     const result=buildTreasuryEntry({...args,form:{...form,amount:'450.50',payment_method:'network'}});
     expect(result.amount).toBe(450.5);
     expect(result.payment_method).toBe('network');
+  });
+  it('refuses unbalanced payments and wrong wallet-account pairing',()=>{
+    expect(()=>buildTreasuryEntry({...args,availableBalance:40})).toThrow('Insufficient account balance');
+    expect(buildTreasuryEntry({...args,availableBalance:500}).wallet).toBe('branch_cash');
+    expect(()=>buildTreasuryEntry({...args,account:{...account,branch_id:null,branch_key:null,legacy_wallet_key:'owner_cash'}}))
+      .toThrow('do not match');
   });
   it('converts Supabase RLS, FK and unknown errors into visible status text',()=>{
     expect(treasurySaveErrorMessage({code:'42501'})).toMatch(/Permission denied/);
