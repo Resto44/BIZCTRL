@@ -40,7 +40,7 @@ export default function BranchCashHandoverPanel({restaurantId,accounts=[],branch
  const ownerAccounts=accounts.filter(a=>a.is_active!==false&&!a.branch_id&&!a.branch_key&&a.account_type==='cash');
  const branch=branches.find(b=>b.id===branchId);
  const branchAccounts=accounts.filter(a=>a.is_active!==false&&
-  (a.branch_id===branchId||(!a.branch_id&&a.branch_key===branch?.branch_key))&&
+  (a.branch_id===branchId||(!a.branch_id&&a.branch_key===(branch?.branch_key||branch?.key)))&&
   ['cash','petty_cash'].includes(a.account_type));
  const balances=useMemo(()=>buildTreasuryAccountBalances(accounts,transactions),[accounts,transactions]);
  const source=branchAccounts.find(a=>a.id===sourceId);
