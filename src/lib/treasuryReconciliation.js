@@ -27,7 +27,7 @@ export function reconcileSalesToTreasury({
    byKey.set(id,[...(byKey.get(id)||[]),tx]);
  }
  const rows=[];
- const scopeSaleIds=new Set(sales.map(s=>String(s.id)));
+ const scopeSaleIds=new Set(sales.filter(s=>['finalized','locked'].includes(saleStatus(s))).map(s=>String(s.id)));
  for(const sale of filteredSales){
    for(const [family,expectedAmount,label] of [
      ['cash',getSaleCash(sale),'Cash sales ledger'],
