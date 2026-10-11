@@ -38,15 +38,30 @@ const T={
    noBranch:'انتخاب شعبه',noData:'ثبت نشده',complete:'تمویل از حساب مالک کم و به حساب شعبه اضافه شد.',account:'مانده ثبت‌شده'}
 };
 export function summarizeOwnerNetworkClosings(sales=[],transactions=[]){
- const credits=new Set(transactions.filter(t=>['network_sales_auto','network_sales_auto_v2'].includes(t.transaction_type)
-   &&t.direction==='in'&&t.reference_id).map(t=>String(t.reference_id)));
- const finalized=sales.filter(s=>['finalized','locked'].includes(s.closing_state)&&Number(getSaleNetwork(s))>0);
+ const byReference=new Map();
+ for(const tx of transactions){
+   if(!['network_sales_auto','network_sales_auto_v2'].includes(tx.transaction_type)
+      ||tx.direction!=='in'||!tx.reference_id)continue;
+   const id=String(tx.reference_id);
+   byReference.set(id,[...(byReference.get(id)||[]),tx]);
+ }
+ const finalized=sales.filter(s=>['finalized','locked'].includes(s.closing_state)&&
+   Number(getSaleNetwork(s))>0);
+ const closingIds=new Set(finalized.map(s=>String(s.id)));
+ let linked=0,missing=0;
+ for(const closing of finalized){
+   const transactionsForClosing=byReference.get(String(closing.id))||[];
+   const expected=Number(getSaleNetwork(closing));
+   if(transactionsForClosing.length!==1 ||
+      Math.abs((Number(transactionsForClosing[0].amount)||0)-expected)>0.009){
+      missing+=1;
+   }else linked+=expected;
+ }
  return {
    sales:finalized.reduce((n,s)=>n+Number(getSaleNetwork(s)),0),
-   linked:finalized.filter(s=>credits.has(String(s.id))).reduce((n,s)=>n+Number(getSaleNetwork(s)),0),
-   missing:finalized.filter(s=>!credits.has(String(s.id))).length,
-   unlinkedHistorical:transactions.filter(t=>['network_sales_auto','network_sales_auto_v2'].includes(t.transaction_type)
-     &&!finalized.some(s=>String(s.id)===String(t.reference_id))).length,
+   linked,missing,
+   unlinkedHistorical:transactions.filter(t=>['network_sales_auto','network_sales_auto_v2']
+     .includes(t.transaction_type)&&!closingIds.has(String(t.reference_id))).length,
  };
 }
 export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],branches=[],
@@ -105,7 +120,7 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
    setSaveError(message);toast.error(message);
   }
  };
- const money=n=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n||0)+' '+currency;
+ const money=(n,code=currency)=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n||0)+' '+code;
  return <Card className="space-y-4 border-blue-200 p-4" data-testid="owner-central-treasury">
   <div className="flex items-center gap-3">
    <span className="rounded-xl bg-blue-100 p-2.5 text-blue-700"><WalletCards className="h-5 w-5"/></span>
@@ -130,7 +145,7 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
    <div><Label>{tr.source} *</Label>
     <Select value={sourceId} onValueChange={id=>change(setSourceId,id)}>
       <SelectTrigger><SelectValue placeholder={tr.source}/></SelectTrigger>
-      <SelectContent>{ownerAccounts.map(a=><SelectItem key={a.id} value={a.id}>{a.account_name} · {money(balances[a.id])}</SelectItem>)}</SelectContent>
+      <SelectContent>{ownerAccounts.map(a=><SelectItem key={a.id} value={a.id}>{a.account_name} · {money(balances[a.id],a.currency||currency)}</SelectItem>)}</SelectContent>
     </Select>
    </div>
    <div className="grid gap-3 sm:grid-cols-2">
@@ -158,7 +173,7 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
    <div><Label>{tr.note}</Label><Input value={note} maxLength={200}
      onChange={e=>change(setNote,e.target.value)}/></div>
    {chosenSource&&<p className="text-xs text-muted-foreground">
-     {tr.account}: <strong>{money(balances[sourceId])}</strong>
+     {tr.account}: <strong>{money(balances[sourceId],chosenSource.currency||currency)}</strong>
      {selectedAmount>0&&selectedAmount>Number(balances[sourceId]||0)
      ?<span className="ms-2 font-bold text-rose-600">Insufficient balance</span>:null}
    </p>}
