@@ -105,7 +105,8 @@ REVOKE ALL ON FUNCTION public.erp_post_finalized_network_to_owner() FROM PUBLIC,
 CREATE OR REPLACE FUNCTION public.erp_owner_fund_branch(
  p_restaurant_id uuid,p_branch_id uuid,p_source_account_id uuid,
  p_destination_account_id uuid,p_amount numeric,p_payment_method text,
- p_request_id uuid,p_note text DEFAULT '',p_network_settlement_confirmed boolean DEFAULT false)
+ p_request_id uuid,p_note text DEFAULT '',p_network_settlement_confirmed boolean DEFAULT false,
+ p_branch_receipt_confirmed boolean DEFAULT false)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER
 SET search_path TO 'public','pg_temp' AS $$
 DECLARE
@@ -122,6 +123,7 @@ BEGIN
  IF NOT public.treasury_account_is_owner(p_restaurant_id)
  THEN RAISE EXCEPTION 'OWNER_FUNDING_PERMISSION_DENIED' USING ERRCODE='42501'; END IF;
  IF p_request_id IS NULL THEN RAISE EXCEPTION 'OWNER_FUNDING_REQUEST_ID_REQUIRED'; END IF;
+ IF NOT p_branch_receipt_confirmed THEN RAISE EXCEPTION 'OWNER_FUNDING_BRANCH_RECEIPT_NOT_CONFIRMED'; END IF;
  IF p_source_account_id=p_destination_account_id
  THEN RAISE EXCEPTION 'OWNER_FUNDING_SAME_ACCOUNT'; END IF;
  IF p_amount IS NULL OR p_amount<=0 OR p_amount>1000000000 OR round(p_amount,2)<>p_amount
@@ -151,6 +153,8 @@ BEGIN
      AND (branch_id=p_branch_id OR (branch_id IS NULL AND branch_key=v_branch.branch_key))
      FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'OWNER_FUNDING_INVALID_BRANCH_ACCOUNT'; END IF;
+ IF v_dest.account_type NOT IN ('cash','petty_cash')
+ THEN RAISE EXCEPTION 'OWNER_FUNDING_DESTINATION_MUST_BE_BRANCH_CASH'; END IF;
  IF v_src.currency IS DISTINCT FROM v_dest.currency
  THEN RAISE EXCEPTION 'OWNER_FUNDING_CURRENCY_MISMATCH'; END IF;
  IF v_src.account_type IN ('network_pos','clearing') AND NOT p_network_settlement_confirmed
@@ -186,7 +190,7 @@ BEGIN
   'branch_id',p_branch_id);
 END;
 $$;
-REVOKE ALL ON FUNCTION public.erp_owner_fund_branch(uuid,uuid,uuid,uuid,numeric,text,uuid,text,boolean) FROM PUBLIC,anon;
-GRANT EXECUTE ON FUNCTION public.erp_owner_fund_branch(uuid,uuid,uuid,uuid,numeric,text,uuid,text,boolean) TO authenticated;
+REVOKE ALL ON FUNCTION public.erp_owner_fund_branch(uuid,uuid,uuid,uuid,numeric,text,uuid,text,boolean,boolean) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.erp_owner_fund_branch(uuid,uuid,uuid,uuid,numeric,text,uuid,text,boolean,boolean) TO authenticated;
 
 COMMIT;
