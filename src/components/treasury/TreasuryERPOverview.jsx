@@ -1,4 +1,5 @@
 import React from 'react';
+import {formatTreasuryCurrency} from '@/lib/treasuryCurrency';
 import {
   ArrowDownLeft,ArrowUpRight,ArrowRightLeft,AlertTriangle,
   BarChart3,Banknote,Building2,CreditCard,Landmark,
@@ -69,7 +70,7 @@ const Mini=({title,value,fmt,icon:Icon,color='emerald'})=><div className={'min-w
 export default function TreasuryERPOverview({
  accounts=[],accountBalances={},ledger=0,walletBalance={},
  branchBalances={},branches=[],monthlySummary={},trendData=[],
- integrity={},fmt,currency='SAR',valueScope='all',setTab,payrollEstimate=0,lang='en',isLoading=false,mixedCurrencies=false,
+ integrity={},fmt,currency='SAR',appCurrency='SAR',restaurantCurrency=null,financeCurrency=null,valueScope='all',setTab,payrollEstimate=0,lang='en',isLoading=false,mixedCurrencies=false,
 }){
  const tr=textByLanguage[lang]||textByLanguage.en;
  const balanceRows=accounts.slice(0,6);
@@ -108,11 +109,9 @@ export default function TreasuryERPOverview({
        <div className="min-w-0"><div className="flex items-center gap-1.5 text-xs font-bold"><span className="h-2 w-2 shrink-0 rounded-full bg-blue-500"/><span className="truncate">{account.account_name}</span></div>
          <span className="text-[10px] text-muted-foreground">{account.is_active===false?tr.inactive:tr.active} · {account.account_type}</span></div>
        <Money value={isLoading?null:accountBalances[account.id]??0}
-         fmt={value=>{
-           const unit=account.currency||currency;
-           try{return new Intl.NumberFormat('en-US',{style:'currency',currency:unit,minimumFractionDigits:0,maximumFractionDigits:2}).format(value);}
-           catch{return fmt(value);}
-         }} className="shrink-0 text-sm"/>
+         fmt={value=>formatTreasuryCurrency(value,{
+            appCurrency,restaurantCurrency,financeCurrency,accountCurrency:account.currency,lang,
+          })} className="shrink-0 text-sm"/>
      </div>)}
    </div>:<p className="text-xs text-muted-foreground">{tr.noData}</p>}
   </Card>
