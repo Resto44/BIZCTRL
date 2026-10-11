@@ -38,13 +38,29 @@ export function accountsForTreasuryScope(accounts=[],{allBranches=true,branchId=
       (!a.branch_id || a.branch_id===branchId))));
 }
 export function treasuryIntegrity(accounts=[],transactions=[],knownAccounts=accounts){
- const ids=new Set(knownAccounts.map(a=>a.id));
+ const accountMap=new Map(knownAccounts.map(a=>[a.id,a]));
+ const ids=new Set(accountMap.keys());
+ const closingReferences=new Map();
+ const fundingDebits=new Set(transactions.filter(t=>t.transaction_type==='owner_branch_funding_debit'&&t.reference_id)
+   .map(t=>String(t.restaurant_id)+'|'+String(t.reference_id)));
+ let branchAccountMismatches=0;
+ for(const tx of transactions){
+  const account=accountMap.get(tx.account_id);
+  if(account?.branch_id&&String(account.branch_id)!==String(tx.branch_id||''))branchAccountMismatches++;
+  if(['network_sales_auto','network_sales_auto_v2'].includes(tx.transaction_type)&&tx.reference_id){
+   const k=String(tx.restaurant_id)+'|'+String(tx.reference_id);
+   closingReferences.set(k,(closingReferences.get(k)||0)+1);
+  }
+ }
  return {
-  // Legacy wallet-only transactions may legitimately have no account_id.
   legacyWalletMovements:transactions.filter(tx=>!tx.account_id).length,
   unknownAccountMovements:transactions.filter(tx=>tx.account_id&&!ids.has(tx.account_id)).length,
   negativeAccounts:accounts.filter(a=>a.is_active!==false &&
-    (Number(a.opening_balance||0)+transactions.filter(tx=>tx.account_id===a.id)
-      .reduce((v,tx)=>v+(tx.direction==='out'?-1:1)*Number(tx.amount||0),0))<0).length,
+   (Number(a.opening_balance||0)+transactions.filter(tx=>tx.account_id===a.id)
+     .reduce((v,tx)=>v+(tx.direction==='out'?-1:1)*Number(tx.amount||0),0))<0).length,
+  branchAccountMismatches,
+  duplicateNetworkClosings:[...closingReferences.values()].reduce((n,count)=>n+Math.max(0,count-1),0),
+  unpairedFundingCredits:transactions.filter(tx=>tx.transaction_type==='owner_to_branch_funding'&&
+    !fundingDebits.has(String(tx.restaurant_id)+'|'+String(tx.reference_id||''))).length,
  };
 }
