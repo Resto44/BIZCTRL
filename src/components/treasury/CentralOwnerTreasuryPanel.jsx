@@ -194,7 +194,7 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
      onChange={e=>change(setNote,e.target.value)}/></div>
    {chosenSource&&<p className="text-xs text-muted-foreground">
      {tr.account}: <strong>{money(balances[sourceId],chosenSource.currency||currency)}</strong>
-     {selectedAmount>0&&insufficientFunds}
+     {selectedAmount>0&&insufficientFunds
      ?<span className="ms-2 font-bold text-rose-600">Insufficient balance</span>:null}
    </p>}
    {needsSettled&&<label className="flex items-start gap-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
