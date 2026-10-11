@@ -77,7 +77,10 @@ export function treasuryIntegrity(accounts=[],transactions=[],knownAccounts=acco
       (Number(a.opening_balance||0)+transactions.filter(tx=>tx.account_id===a.id)
        .reduce((v,tx)=>v+(tx.direction==='out'?-1:1)*Number(tx.amount||0),0))<0).length,
    scopeMismatches,
+   branchAccountMismatches:scopeMismatches,
    duplicateNetworkReferences:[...refs.values()].filter(n=>n>1).length,
+   duplicateNetworkClosings:[...refs.values()].filter(n=>n>1).length,
    unpairedFunding,
+   unpairedFundingCredits:unpairedFunding,
  };
 }
