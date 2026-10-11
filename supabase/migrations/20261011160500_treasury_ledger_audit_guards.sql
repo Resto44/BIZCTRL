@@ -43,6 +43,36 @@ CREATE TRIGGER trg_erp_guard_treasury_opening_balance
  BEFORE UPDATE OF opening_balance ON public.treasury_accounts
  FOR EACH ROW EXECUTE FUNCTION public.erp_guard_treasury_opening_balance();
 
+
+-- The receiving half of a new transfer requires the debit to exist already.
+-- Legacy unmatched historical rows stay untouched and visible in reconciliation.
+CREATE OR REPLACE FUNCTION public.erp_guard_treasury_transfer_insert()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public','pg_temp' AS $treasury_pair_guard$
+DECLARE counterpart text;
+BEGIN
+ IF NEW.transaction_type IN ('owner_branch_funding_debit','branch_owner_cash_handover_debit')
+     AND NOT public.treasury_account_is_owner(NEW.restaurant_id) THEN
+  RAISE EXCEPTION 'ERP_TREASURY_TRANSFER_OWNER_ONLY' USING ERRCODE='42501';
+ END IF;
+ IF NEW.transaction_type IN ('owner_to_branch_funding','branch_to_owner_cash') THEN
+  counterpart:=CASE WHEN NEW.transaction_type='owner_to_branch_funding'
+    THEN 'owner_branch_funding_debit' ELSE 'branch_owner_cash_handover_debit' END;
+  IF NEW.reference_id IS NULL OR NOT EXISTS (
+   SELECT 1 FROM public.wallet_transactions debit
+   WHERE debit.restaurant_id=NEW.restaurant_id AND debit.reference_id=NEW.reference_id
+     AND debit.transaction_type=counterpart AND debit.direction='out'
+     AND debit.amount=NEW.amount AND debit.branch_id=NEW.branch_id
+  ) THEN RAISE EXCEPTION 'ERP_TREASURY_TRANSFER_REQUIRES_MATCHING_DEBIT'; END IF;
+ END IF;
+ RETURN NEW;
+END;
+$treasury_pair_guard$;
+DROP TRIGGER IF EXISTS trg_erp_guard_treasury_transfer_insert ON public.wallet_transactions;
+CREATE TRIGGER trg_erp_guard_treasury_transfer_insert
+ BEFORE INSERT ON public.wallet_transactions FOR EACH ROW
+ EXECUTE FUNCTION public.erp_guard_treasury_transfer_insert();
+
 -- Owner-authorized cash handover: a matched OUT from branch and IN to Owner.
 -- Legacy one-sided receipts are not silently repaired or backfilled.
 CREATE OR REPLACE FUNCTION public.erp_owner_receive_branch_cash(
