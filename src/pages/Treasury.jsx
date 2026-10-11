@@ -484,7 +484,7 @@ export default function Treasury() {
           </div>
         }
       />
-
+      {selectedCurrencyNote && <p role="status" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{selectedCurrencyNote}</p>}
       <Tabs value={tab} onValueChange={setTab} className="mb-4 min-w-0">
         <div className="treasury-tab-scroll" role="region" aria-label={local('Treasury sections')}>
           <TabsList className="treasury-tab-list">
