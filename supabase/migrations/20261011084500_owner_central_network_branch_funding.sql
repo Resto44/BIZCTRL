@@ -55,7 +55,7 @@ BEGIN
   IF v_row IS NOT NULL THEN
     UPDATE public.wallet_transactions SET amount=v_amount,
       transaction_date=NEW.date,branch=NEW.branch,branch_id=NEW.branch_id,
-      account_id=v_account,updated_date=now()
+      account_id=COALESCE(v_account,account_id),updated_date=now()
       WHERE id=v_row AND (amount IS DISTINCT FROM v_amount OR transaction_date IS DISTINCT FROM NEW.date
         OR branch IS DISTINCT FROM NEW.branch OR branch_id IS DISTINCT FROM NEW.branch_id
         OR account_id IS DISTINCT FROM v_account);
@@ -64,10 +64,15 @@ BEGIN
 
   -- Historic client-side auto entries exist. Match them by *this* Closing ID;
   -- never add a second entry to the same Closing or reconcile old orphans blindly.
-  SELECT count(*),min(id) INTO v_old_count,v_row
+  SELECT count(*) INTO v_old_count
     FROM public.wallet_transactions
    WHERE restaurant_id=v_restaurant AND reference_id=NEW.id::text
      AND transaction_type='network_sales_auto';
+  IF v_old_count=1 THEN
+    SELECT id INTO v_row FROM public.wallet_transactions
+     WHERE restaurant_id=v_restaurant AND reference_id=NEW.id::text
+       AND transaction_type='network_sales_auto' LIMIT 1 FOR UPDATE;
+  END IF;
   IF v_old_count>1 THEN RAISE EXCEPTION 'OWNER_NETWORK_LEGACY_DUPLICATE_CLOSING'; END IF;
   IF v_old_count=1 THEN
     UPDATE public.wallet_transactions SET amount=v_amount,
