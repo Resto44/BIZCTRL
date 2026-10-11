@@ -5,11 +5,17 @@ import {formatLocalizedCurrency} from './localization';
  * *symbol* rather than an ISO currency code. An ambiguous symbol is not USD.
  * Never change stored values or silently exchange-convert them.
  */
-const AMBIGUOUS_SYMBOLS=new Set(['
+const AMBIGUOUS_SYMBOLS=new Set(['﷼']);
+const SAUDI_RIYAL_ALIASES=new Set(['SR','S.R','ر.س','ر.س.','SAR.']);
+const LEGACY_SYMBOLS=new Set([...AMBIGUOUS_SYMBOLS,...SAUDI_RIYAL_ALIASES]);
+export function isUnverifiedTreasuryCurrency(value){
+ const raw=String(value??'').trim();
+ return AMBIGUOUS_SYMBOLS.has(raw)||(raw.length===1&&raw.charCodeAt(0)===36);
+}
 export function normalizeTreasuryCurrency(value,fallback='SAR'){
  const raw=String(value??'').trim();
  if(SAUDI_RIYAL_ALIASES.has(raw))return 'SAR';
- if(!raw||AMBIGUOUS_SYMBOLS.has(raw))return String(fallback||'SAR').trim().toUpperCase();
+ if(!raw||isUnverifiedTreasuryCurrency(raw))return String(fallback||'SAR').trim().toUpperCase();
  const code=raw.toUpperCase();
  if(/^[A-Z]{3}$/.test(code)){
   try{new Intl.NumberFormat('en-US',{style:'currency',currency:code});return code;}
