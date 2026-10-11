@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import {describe,it,expect} from 'vitest';
 import {readFile} from 'node:fs/promises';
 import {buildTreasuryAccountBalances} from '../src/lib/treasuryAccounts.js';
