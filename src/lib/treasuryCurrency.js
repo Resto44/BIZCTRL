@@ -8,6 +8,7 @@ import {formatLocalizedCurrency} from './localization';
 const LEGACY_SYMBOLS=new Set(['$','﷼','ر.س','ر.س.','SR','S.R','SAR.']);
 export function normalizeTreasuryCurrency(value,fallback='SAR'){
  const raw=String(value??'').trim();
+ if(['SR','S.R','ر.س','ر.س.','SAR.'].includes(raw))return 'SAR';
  if(!raw||LEGACY_SYMBOLS.has(raw))return String(fallback||'SAR').trim().toUpperCase();
  const code=raw.toUpperCase();
  if(/^[A-Z]{3}$/.test(code)){
