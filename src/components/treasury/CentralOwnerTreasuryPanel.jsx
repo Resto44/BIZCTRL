@@ -10,6 +10,7 @@ import {Label} from '@/components/ui/label';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
 import {ArrowDownToLine,ArrowLeftRight,WalletCards,AlertTriangle} from 'lucide-react';
 import {getSaleNetwork} from '@/lib/helpers';
+import {normalizeTreasuryCurrency,isUnverifiedTreasuryCurrency} from '@/lib/treasuryCurrency';
 
 const T={
  en:{heading:'Central Owner Treasury',hint:'All branch network sales accrue centrally. Provider settlement is not verified automatically.',
@@ -87,11 +88,25 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
    (!a.branch_id&&a.branch_key&&branches.find(b=>b.id===branchId)?.branch_key===a.branch_key))&&
    ['cash','petty_cash'].includes(a.account_type));
  const chosenSource=ownerAccounts.find(a=>a.id===sourceId);
+ const chosenDestination=branchAccounts.find(a=>a.id===targetId);
+ // Only identical verified ISO denominations are transferable.
+ const sourceCode=chosenSource?normalizeTreasuryCurrency(chosenSource.currency,currency):null;
+ const destinationCode=chosenDestination?normalizeTreasuryCurrency(chosenDestination.currency,currency):null;
+ const currencyMismatch=Boolean(chosenSource&&chosenDestination&&(
+   isUnverifiedTreasuryCurrency(chosenSource.currency)||
+   isUnverifiedTreasuryCurrency(chosenDestination.currency)||
+   sourceCode!==destinationCode));
+ const insufficientFunds=Number(amount)>Number(balances[sourceId]||0);
+ const currencyError=lang==='ar'
+   ?'تعذّر التمويل: عملة الحسابين مختلفة أو غير محددة. صحّح عملة الحساب قبل التحويل.'
+   :lang==='fa'
+   ?'تمویل ممکن نیست: ارز حساب مالک و شعبه متفاوت یا نامشخص است. ارز حساب را اصلاح کنید.'
+   :'Funding blocked: account currencies differ or are unverified. Correct the denomination before transfer.';
  const needsSettled=chosenSource&&['network_pos','clearing'].includes(chosenSource.account_type);
  const selectedAmount=Number(amount);
  const ready=Boolean(restaurantId&&sourceId&&branchId&&targetId&&selectedAmount>0&&
    Number.isFinite(selectedAmount)&&Math.abs(selectedAmount*100-Math.round(selectedAmount*100))<.000001&&
-   receiptConfirmed&&(!needsSettled||settlementConfirmed)&&!loading&&!error);
+   !currencyMismatch&&!insufficientFunds&&receiptConfirmed&&(!needsSettled||settlementConfirmed)&&!loading&&!error);
  const {mutateAsync,isPending}=useMutation({mutationFn:async payload=>{
    const {data,error:rpcError}=await supabase.rpc('erp_owner_fund_branch',payload);
    if(rpcError)throw rpcError;
@@ -116,11 +131,16 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
    setAmount('');setNote('');setReceiptConfirmed(false);setSettlementConfirmed(false);
    requestId.current=null;
   }catch(e){
-   const message=String(e?.message||'Transfer was not confirmed').slice(0,350);
+   const rawMessage=String(e?.message||'Transfer was not confirmed');
+    const message=rawMessage.includes('OWNER_FUNDING_CURRENCY_MISMATCH')
+      ?currencyError:rawMessage.includes('OWNER_FUNDING_INSUFFICIENT_BALANCE')
+      ?(lang==='fa'?'مانده حساب مالک کافی نیست.':lang==='ar'?'رصيد حساب المالك غير كافٍ.':'Insufficient owner balance.')
+      :rawMessage.slice(0,350);
    setSaveError(message);toast.error(message);
   }
  };
- const money=(n,code=currency)=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n||0)+' '+code;
+ const money=(n,code=currency)=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n||0)
+   +' '+normalizeTreasuryCurrency(code,currency);
  return <Card className="space-y-4 border-blue-200 p-4" data-testid="owner-central-treasury">
   <div className="flex items-center gap-3">
    <span className="rounded-xl bg-blue-100 p-2.5 text-blue-700"><WalletCards className="h-5 w-5"/></span>
@@ -145,7 +165,7 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
    <div><Label>{tr.source} *</Label>
     <Select value={sourceId} onValueChange={id=>change(setSourceId,id)}>
       <SelectTrigger><SelectValue placeholder={tr.source}/></SelectTrigger>
-      <SelectContent>{ownerAccounts.map(a=><SelectItem key={a.id} value={a.id}>{a.account_name} · {money(balances[a.id],a.currency||currency)}</SelectItem>)}</SelectContent>
+      <SelectContent>{ownerAccounts.map(a=><SelectItem key={a.id} value={a.id}>{a.account_name} · {money(balances[a.id],a.currency||currency)}{isUnverifiedTreasuryCurrency(a.currency)?' · Currency not verified':''}</SelectItem>)}</SelectContent>
     </Select>
    </div>
    <div className="grid gap-3 sm:grid-cols-2">
@@ -174,7 +194,7 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
      onChange={e=>change(setNote,e.target.value)}/></div>
    {chosenSource&&<p className="text-xs text-muted-foreground">
      {tr.account}: <strong>{money(balances[sourceId],chosenSource.currency||currency)}</strong>
-     {selectedAmount>0&&selectedAmount>Number(balances[sourceId]||0)
+     {selectedAmount>0&&insufficientFunds}
      ?<span className="ms-2 font-bold text-rose-600">Insufficient balance</span>:null}
    </p>}
    {needsSettled&&<label className="flex items-start gap-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
@@ -183,7 +203,10 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
    <label className="flex items-start gap-2 rounded-lg border p-2 text-xs">
      <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" checked={receiptConfirmed} onChange={e=>change(setReceiptConfirmed,e.target.checked)}/>
      <span>{tr.received}</span></label>
-   {saveError&&<p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">{saveError}</p>}
+   {currencyMismatch&&<p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+      {currencyError} ({String(chosenSource?.currency)} → {String(chosenDestination?.currency)})
+    </p>}
+    {saveError&&<p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">{saveError}</p>}
    <Button onClick={submit} disabled={!ready||isPending} className="w-full gap-2">
      <ArrowDownToLine className="h-4 w-4"/>{isPending?tr.saving:tr.save}
    </Button>
