@@ -24,7 +24,8 @@ import { Plus, ArrowDownLeft, ArrowUpRight,
   Trash2, Scale, AlertTriangle, UserCircle, ShieldCheck, ExternalLink,
   Pencil, Power, WalletCards, Landmark
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/helpers';
+import useERPSettings from '@/hooks/useERPSettings';
+import {formatTreasuryCurrency,normalizeTreasuryCurrency,resolveTreasuryCurrency,treasuryCurrencyWarning} from '@/lib/treasuryCurrency';
 import { format } from 'date-fns';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
@@ -106,9 +107,16 @@ export default function Treasury() {
 
   const { role } = useRole();
   const { branches, activeRestaurantId, activeRestaurant, ownerFilter } = useTenant();
-  // Transaction values are denominated in the organization's booked currency;
-  // workspace display currency is not an FX-conversion engine.
-  const ledgerCurrency=activeRestaurant?.currency||currency;
+  const {settings:erpSettings,lastSavedAt:financeSettingsSavedAt}=useERPSettings();
+  // Legacy restaurant "$" is a symbol, not proof of USD denomination.
+  // Finance/account currency remains authoritative where explicitly configured.
+  const displayCurrency=normalizeTreasuryCurrency(currency);
+  const financeCurrency=financeSettingsSavedAt?erpSettings?.finance?.currencyCode:null;
+  const ledgerCurrency=resolveTreasuryCurrency({
+    appCurrency:displayCurrency,restaurantCurrency:activeRestaurant?.currency,financeCurrency,
+  }).code;
+  const moneyOptions={appCurrency:displayCurrency,restaurantCurrency:activeRestaurant?.currency,
+    financeCurrency,lang};
   const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const notif = useNotify();
   const qc = useQueryClient();
@@ -216,8 +224,11 @@ export default function Treasury() {
   const accountBalances = useMemo(() => buildTreasuryAccountBalances(scopedAccounts, overviewTransactions),
     [scopedAccounts, overviewTransactions]);
   const mixedAccountCurrencies = useMemo(()=>
-    new Set(scopedAccounts.map(account=>account.currency||ledgerCurrency)).size>1,
-    [scopedAccounts,ledgerCurrency]);
+    new Set(scopedAccounts.map(account=>resolveTreasuryCurrency({
+      appCurrency:displayCurrency,restaurantCurrency:activeRestaurant?.currency,
+      financeCurrency,accountCurrency:account.currency,
+    }).code)).size>1,
+    [scopedAccounts,displayCurrency,activeRestaurant?.currency,financeCurrency]);
   const treasuryLedgerBalance = useMemo(() => mixedAccountCurrencies?null:
     calculateTreasuryLedgerBalance(scopedAccounts, overviewTransactions),
     [scopedAccounts, overviewTransactions, mixedAccountCurrencies]);
@@ -429,7 +440,11 @@ export default function Treasury() {
     return <div className="text-center py-20 text-muted-foreground text-sm">{t('error')}</div>;
   }
 
-  const fmt = (v) => formatCurrency(v, ledgerCurrency);
+  const fmt=(v)=>formatTreasuryCurrency(v,moneyOptions);
+  const accountFmt=(v,account)=>formatTreasuryCurrency(v,{
+    ...moneyOptions,accountCurrency:account?.currency,
+  });
+  const selectedCurrencyNote=treasuryCurrencyWarning(moneyOptions);
 
   // Never display an apparently balanced/zero ledger in ANY Treasury tab after
   // a failed financial read. These screens drive actual payment decisions.
@@ -469,7 +484,7 @@ export default function Treasury() {
           </div>
         }
       />
-
+      {selectedCurrencyNote && <p role="status" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{selectedCurrencyNote}</p>}
       <Tabs value={tab} onValueChange={setTab} className="mb-4 min-w-0">
         <div className="treasury-tab-scroll" role="region" aria-label={local('Treasury sections')}>
           <TabsList className="treasury-tab-list">
@@ -517,7 +532,7 @@ export default function Treasury() {
             restaurantId={activeRestaurantId}
             accounts={accounts} branches={branches}
             transactions={centralTransactions} sales={centralSales}
-            lang={lang} currency={activeRestaurant?.currency||currency}
+            lang={lang} currency={ledgerCurrency}
             loading={centralTxLoading||centralSalesLoading||accountsLoading}
             error={centralTxError||centralSalesError||accountsError}
             onComplete={()=>{
@@ -630,12 +645,12 @@ export default function Treasury() {
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-950/40"><Landmark className="h-4 w-4 text-indigo-600" /></div>
                         <div className="min-w-0"><p className="truncate text-sm font-semibold">{account.account_name}</p><p className="truncate text-xs text-muted-foreground">{local(accountType)}{account.branch_key ? ` · ${account.branch_key}` : ''}</p></div>
                       </div>
-                      <div className="text-end"><Badge variant={account.is_active !== false ? 'outline' : 'secondary'}>{account.is_active !== false ? local('Active') : local('Inactive')}</Badge><p className={`mt-1 text-base font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{formatCurrency(balance,account.currency||ledgerCurrency)}</p></div>
+                      <div className="text-end"><Badge variant={account.is_active !== false ? 'outline' : 'secondary'}>{account.is_active !== false ? local('Active') : local('Inactive')}</Badge><p className={`mt-1 text-base font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{accountFmt(balance,account)}</p></div>
                     </div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                      <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Opening')}</p><p className="truncate text-xs font-semibold">{formatCurrency(account.opening_balance||0,account.currency||ledgerCurrency)}</p></div>
+                      <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Opening')}</p><p className="truncate text-xs font-semibold">{accountFmt(account.opening_balance||0,account)}</p></div>
                       <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Transactions')}</p><p className="truncate text-xs font-semibold">{linkedCount}</p></div>
-                      <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Currency')}</p><p className="truncate text-xs font-semibold" dir="ltr">{account.currency}</p></div>
+                      <div className="min-w-0 rounded-md bg-muted/50 p-2"><p className="truncate text-[10px] text-muted-foreground">{local('Currency')}</p><p className="truncate text-xs font-semibold" dir="ltr">{resolveTreasuryCurrency({...moneyOptions,accountCurrency:account.currency}).code}</p></div>
                     </div>
                     {account.notes && <p className="mt-3 break-words text-xs text-muted-foreground">{account.notes}</p>}
                     {isOwner && <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-border pt-3">
@@ -760,7 +775,7 @@ export default function Treasury() {
                 <LineChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${currency}${(v/1000).toFixed(0)}k`} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${ledgerCurrency} ${(v/1000).toFixed(0)}k`} />
                   <Tooltip formatter={v => fmt(v)} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Line type="monotone" dataKey="networkIn" name={t('network')} stroke="#3b82f6" strokeWidth={2} dot={false} />
@@ -778,7 +793,7 @@ export default function Treasury() {
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={branchBalanceChart}>
                   <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${currency}${(v/1000).toFixed(0)}k`} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${ledgerCurrency} ${(v/1000).toFixed(0)}k`} />
                   <Tooltip formatter={v => fmt(v)} />
                   <Bar dataKey="balance" fill="#6366f1" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -856,7 +871,7 @@ export default function Treasury() {
                   wallet:account?accountWalletKey(account):current.wallet}));
               }}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder={local('Select account')} /></SelectTrigger>
-                <SelectContent>{matchingTxnAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.account_name} · {formatCurrency(accountBalances[account.id]||0,account.currency||ledgerCurrency)}</SelectItem>)}</SelectContent>
+                <SelectContent>{matchingTxnAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.account_name} · {accountFmt(accountBalances[account.id]||0,account)}</SelectItem>)}</SelectContent>
               </Select>
               {activeAccounts.length === 0 && <p className="mt-1 text-xs text-destructive">{local('No active Treasury account is available.')}</p>}
             </div>
