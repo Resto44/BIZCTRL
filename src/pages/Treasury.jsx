@@ -40,6 +40,7 @@ import { useNotify } from '@/lib/useNotify';
 import { buildTreasuryEntry, treasurySaveErrorMessage } from '@/lib/treasuryEntryValidation';
 import TreasuryERPOverview from '@/components/treasury/TreasuryERPOverview';
 import CentralOwnerTreasuryPanel from '@/components/treasury/CentralOwnerTreasuryPanel';
+import BranchCashHandoverPanel from '@/components/treasury/BranchCashHandoverPanel';
 import { fetchCompleteTreasuryRows, accountsForTreasuryScope, treasuryIntegrity } from '@/lib/treasuryLedgerRead';
 import {
   TREASURY_ACCOUNT_TYPES,
@@ -59,6 +60,7 @@ const TX_TYPES = [
   { value: 'credit_collection_cash',    label: 'Credit Collection (Cash)',        wallet: 'branch_cash',   direction: 'in', auto:true },
   // Branch → Owner settlements
   { value: 'branch_to_owner_cash',      label: 'Branch → Owner (Cash Transfer)', wallet: 'owner_cash',    direction: 'in',  auto: true },
+  { value: 'branch_owner_cash_handover_debit', label: 'Branch Cash Handed to Owner', wallet: 'branch_cash', direction: 'out', auto: true }
   { value: 'branch_to_owner_network',   label: 'Branch → Owner (Network Sales)', wallet: 'owner_network', direction: 'in',  auto: true },
   // Owner → Branch
   { value: 'owner_to_branch_funding',   label: 'Owner → Branch (Funding)',        wallet: 'branch_cash',   direction: 'in',  auto: true },
@@ -515,6 +517,15 @@ export default function Treasury() {
             lang={lang} currency={activeRestaurant?.currency||currency}
             loading={centralTxLoading||centralSalesLoading||accountsLoading}
             error={centralTxError||centralSalesError||accountsError}
+            onComplete={()=>{
+              qc.invalidateQueries({queryKey:['treasury_owner_central_transactions']});
+              qc.invalidateQueries({queryKey:['wallet_transactions']});
+            }}
+          />}
+          {isOwner&&<BranchCashHandoverPanel
+            restaurantId={activeRestaurantId} accounts={accounts} branches={branches}
+            transactions={centralTransactions} currency={ledgerCurrency} lang={lang}
+            loading={centralTxLoading||accountsLoading} error={centralTxError||accountsError}
             onComplete={()=>{
               qc.invalidateQueries({queryKey:['treasury_owner_central_transactions']});
               qc.invalidateQueries({queryKey:['wallet_transactions']});
