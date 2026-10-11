@@ -7,7 +7,6 @@ import {Card} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
-import {Checkbox} from '@/components/ui/checkbox';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
 import {ArrowDownToLine,ArrowLeftRight,WalletCards,AlertTriangle} from 'lucide-react';
 import {getSaleNetwork} from '@/lib/helpers';
@@ -164,10 +163,10 @@ export default function CentralOwnerTreasuryPanel({restaurantId,accounts=[],bran
      ?<span className="ms-2 font-bold text-rose-600">Insufficient balance</span>:null}
    </p>}
    {needsSettled&&<label className="flex items-start gap-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
-     <Checkbox checked={settlementConfirmed} onCheckedChange={v=>change(setSettlementConfirmed,v===true)}/>
+     <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" checked={settlementConfirmed} onChange={e=>change(setSettlementConfirmed,e.target.checked)}/>
      <span>{tr.settlement}</span></label>}
    <label className="flex items-start gap-2 rounded-lg border p-2 text-xs">
-     <Checkbox checked={receiptConfirmed} onCheckedChange={v=>change(setReceiptConfirmed,v===true)}/>
+     <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" checked={receiptConfirmed} onChange={e=>change(setReceiptConfirmed,e.target.checked)}/>
      <span>{tr.received}</span></label>
    {saveError&&<p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">{saveError}</p>}
    <Button onClick={submit} disabled={!ready||isPending} className="w-full gap-2">
