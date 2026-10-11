@@ -16,7 +16,8 @@ import {
 const SENT_TO_OWNER_TYPES = [
   'branch_to_owner_cash',
   'branch_to_owner_network',
-  'network_sales_auto', // auto network sales go to owner_network
+  'network_sales_auto', // legacy automatic owner network receipts
+  'network_sales_auto_v2', // canonical server-side owner network accruals
 ];
 const RETURNED_TO_BRANCH_TYPES = [
   'owner_to_branch_funding',
