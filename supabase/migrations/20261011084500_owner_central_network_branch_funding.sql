@@ -22,13 +22,13 @@ BEGIN
    '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
   THEN
     IF NEW.closing_state IN ('finalized','locked')
-       AND GREATEST(COALESCE(NEW.restaurant_network,0),COALESCE(NEW.network,0),0)>0
+       AND GREATEST(COALESCE(NEW.restaurant_network,NEW.network,0),0)>0
     THEN RAISE EXCEPTION 'OWNER_NETWORK_CLOSING_MISSING_TENANT'; END IF;
     RETURN NEW;
   END IF;
   v_restaurant:=NEW.restaurant_id::uuid;
   v_amount:=CASE WHEN NEW.closing_state IN ('finalized','locked')
-   THEN GREATEST(COALESCE(NEW.restaurant_network,0),COALESCE(NEW.network,0),0) ELSE 0 END;
+   THEN GREATEST(COALESCE(NEW.restaurant_network,NEW.network,0),0) ELSE 0 END;
   -- Prevent duplicate network receipt when the Closing save path retries.
   PERFORM pg_advisory_xact_lock(hashtextextended('owner-network:'||NEW.id::text,0));
   SELECT id INTO v_account FROM public.treasury_accounts
