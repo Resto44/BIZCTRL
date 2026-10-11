@@ -39,6 +39,7 @@ import OwnerPersonalFinance from '@/components/treasury/OwnerPersonalFinance';
 import { useNotify } from '@/lib/useNotify';
 import { buildTreasuryEntry, treasurySaveErrorMessage } from '@/lib/treasuryEntryValidation';
 import TreasuryERPOverview from '@/components/treasury/TreasuryERPOverview';
+import CentralOwnerTreasuryPanel from '@/components/treasury/CentralOwnerTreasuryPanel';
 import { fetchCompleteTreasuryRows, accountsForTreasuryScope, treasuryIntegrity } from '@/lib/treasuryLedgerRead';
 import {
   TREASURY_ACCOUNT_TYPES,
@@ -50,6 +51,8 @@ import {
 const TX_TYPES = [
   // Auto-generated (shown in history, not in add form)
   { value: 'network_sales_auto',        label: 'Network Sales (Auto)',            wallet: 'owner_network', direction: 'in',  auto: true },
+  { value: 'network_sales_auto_v2',     label: 'Network Sales (Auto · Server)',   wallet: 'owner_network', direction: 'in',  auto: true },
+  { value: 'owner_branch_funding_debit', label: 'Owner Funding Sent', wallet: 'owner_network', direction: 'out', auto: true },
   { value: 'cash_sales_branch',         label: 'Cash Sales (Auto)',               wallet: 'branch_cash',   direction: 'in',  auto: true },
   // Credit collections
   { value: 'credit_collection_network', label: 'Credit Collection (Network)',     wallet: 'owner_network', direction: 'in' },
@@ -58,7 +61,7 @@ const TX_TYPES = [
   { value: 'branch_to_owner_cash',      label: 'Branch → Owner (Cash Transfer)', wallet: 'owner_cash',    direction: 'in',  settlement: true },
   { value: 'branch_to_owner_network',   label: 'Branch → Owner (Network Sales)', wallet: 'owner_network', direction: 'in',  settlement: true },
   // Owner → Branch
-  { value: 'owner_to_branch_funding',   label: 'Owner → Branch (Funding)',        wallet: 'branch_cash',   direction: 'in',  settlement: true },
+  { value: 'owner_to_branch_funding',   label: 'Owner → Branch (Funding)',        wallet: 'branch_cash',   direction: 'in',  auto: true },
   { value: 'owner_expense',             label: 'Owner Expense (for Branch)',      wallet: 'owner_network', direction: 'out', settlement: true },
   { value: 'owner_salary_payment',      label: 'Owner Pays Salary (for Branch)', wallet: 'owner_network', direction: 'out', settlement: true },
   { value: 'owner_external_payment',    label: 'Owner Supplier Payment',         wallet: 'owner_network', direction: 'out', settlement: true },
@@ -139,6 +142,24 @@ export default function Treasury() {
     queryFn: () => fetchScopedRows('wallet_transactions', 'branch', 'transaction_date'),
     staleTime: 60000,
     enabled: Boolean(activeRestaurant?.id),
+  });
+  // Central Owner report is deliberately all-branch regardless of selected
+  // branch tab. Without this, branch-only queries hide owner network credits.
+  const {data: centralTransactions=[],isLoading:centralTxLoading,isError:centralTxError}=useQuery({
+    queryKey:['treasury_owner_central_transactions',activeRestaurant?.id],
+    queryFn:()=>fetchCompleteTreasuryRows({
+      db:supabase,table:'wallet_transactions',restaurantId:activeRestaurant?.id,
+      allBranches:true,legacyColumn:'branch',orderColumn:'transaction_date',
+    }),
+    enabled:isOwner&&Boolean(activeRestaurant?.id),staleTime:30000,
+  });
+  const {data:centralSales=[],isLoading:centralSalesLoading,isError:centralSalesError}=useQuery({
+    queryKey:['treasury_owner_central_closings',activeRestaurant?.id],
+    queryFn:()=>fetchCompleteTreasuryRows({
+      db:supabase,table:'daily_sales',restaurantId:activeRestaurant?.id,
+      allBranches:true,legacyColumn:'branch',orderColumn:'date',
+    }),
+    enabled:isOwner&&Boolean(activeRestaurant?.id),staleTime:30000,
   });
   const { data: employees = [] } = useQuery({
     queryKey: ['employees', activeRestaurant?.id, selectedBranchId],
@@ -471,6 +492,18 @@ export default function Treasury() {
             isLoading={isLoading || accountsLoading}
             setTab={setTab}
             mixedCurrencies={mixedAccountCurrencies}
+          />}
+          {isOwner&&<CentralOwnerTreasuryPanel
+            restaurantId={activeRestaurantId}
+            accounts={accounts} branches={branches}
+            transactions={centralTransactions} sales={centralSales}
+            lang={lang} currency={currency}
+            loading={centralTxLoading||centralSalesLoading||accountsLoading}
+            error={centralTxError||centralSalesError||accountsError}
+            onComplete={()=>{
+              qc.invalidateQueries({queryKey:['treasury_owner_central_transactions']});
+              qc.invalidateQueries({queryKey:['wallet_transactions']});
+            }}
           />}
           {/* Sponsor Holdings Summary */}
           {(sponsorSummary.receivedBySponsor > 0 || sponsorSummary.remaining > 0) && (
