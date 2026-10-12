@@ -37,7 +37,7 @@ export async function fetchPlatformOwnerSnapshot() {
 
 export const platformOwnerApi = {
   snapshot: fetchPlatformOwnerSnapshot,
-  dashboard: () => rpc('platform_owner_dashboard'),
+  dashboard: () => rpc('platform_owner_dashboard_metrics'),
   controlCenter: () => rpc('platform_owner_control_center'),
   modules: () => rpc('platform_owner_list_modules'),
   organizations: (query, status, limit, offset) => rpc('platform_owner_list_organizations', { p_query: query || null, p_status: status || null, p_limit: limit, p_offset: offset }),

@@ -28,6 +28,11 @@ beforeEach(async()=>{
 });
 afterEach(()=>{tree.unmount();client.clear();});
 describe('Platform owner management interactions',()=>{
+ it('retains the pending filter when drilling into payments from the dashboard',async()=>{
+  const card=tree.root.findByProps({'aria-label':'Platform overview'}).findAllByType('button')[3];
+  await act(async()=>card.props.onClick());await settle();
+  expect(api.payments.mock.lastCall).toEqual(['pending',25,0]);
+ });
  it('uses approval status for users and resets pagination after search or status changes',async()=>{
   await click('Users');
   const selector=tree.root.findByProps({'aria-label':'Status',value:''});
