@@ -688,9 +688,12 @@ export default function Treasury() {
         {/* ── SETTLEMENT ──────────────────────────────────────────────── */}
         <TabsContent value="settlement" className="mt-3">
           <BranchSettlementLedger
+            key={`${activeRestaurantId}:${filterBranch}`}
+            initialBranchKey={filterBranch}
+            loading={isOwner ? centralTxLoading : isLoading}
             transactions={overviewTransactions}
             branches={branches}
-            currency={currency}
+            currency={ledgerCurrency}
             onRecord={() => setShowForm(true)}
           />
         </TabsContent>

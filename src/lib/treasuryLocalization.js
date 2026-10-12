@@ -125,6 +125,118 @@ export const treasuryMessages = {
     "ar": "رصيد كل فرع لدى المالك رصيد تشغيلي، وليس ربحاً إضافياً."
   }
 };
+Object.assign(treasuryMessages, {
+  "Branch": {
+    "en": "Branch",
+    "fa": "شعبه",
+    "ar": "الفرع"
+  },
+  "All branches": {
+    "en": "All branches",
+    "fa": "همهٔ شعبه‌ها",
+    "ar": "كل الفروع"
+  },
+  "Reporting period": {
+    "en": "Reporting period",
+    "fa": "دورهٔ حساب‌دهی",
+    "ar": "فترة التقرير"
+  },
+  "Today": {
+    "en": "Today",
+    "fa": "امروز",
+    "ar": "اليوم"
+  },
+  "Week (last 7 days)": {
+    "en": "Week (last 7 days)",
+    "fa": "هفته (۷ روز اخیر)",
+    "ar": "أسبوع (آخر ٧ أيام)"
+  },
+  "Month": {
+    "en": "Month",
+    "fa": "ماه",
+    "ar": "شهر"
+  },
+  "3 months": {
+    "en": "3 months",
+    "fa": "۳ ماه",
+    "ar": "٣ أشهر"
+  },
+  "6 months": {
+    "en": "6 months",
+    "fa": "۶ ماه",
+    "ar": "٦ أشهر"
+  },
+  "Year": {
+    "en": "Year",
+    "fa": "سال",
+    "ar": "سنة"
+  },
+  "All history": {
+    "en": "All history",
+    "fa": "تمام سابقه",
+    "ar": "كل السجل"
+  },
+  "Calendar months and year to date; week is the last 7 days. Dates follow your device calendar.": {
+    "en": "Calendar months and year to date; week is the last 7 days. Dates follow your device calendar.",
+    "fa": "ماه‌ها و سال از شروع تقویمی تا امروز؛ هفته یعنی ۷ روز اخیر. تاریخ مطابق تقویم دستگاه شماست.",
+    "ar": "الأشهر والسنة من بدايتها التقويمية حتى اليوم؛ الأسبوع آخر ٧ أيام. التاريخ حسب تقويم جهازك."
+  },
+  "Loading settlement ledger…": {
+    "en": "Loading settlement ledger…",
+    "fa": "در حال بارگذاری دفتر حساب‌دهی…",
+    "ar": "جارٍ تحميل دفتر التسويات…"
+  },
+  "Selected branches · end of period": {
+    "en": "Selected branches · end of period",
+    "fa": "شعبه‌های انتخاب‌شده · پایان دوره",
+    "ar": "الفروع المحددة · نهاية الفترة"
+  },
+  "Branches in report": {
+    "en": "Branches in report",
+    "fa": "شعبه‌های این گزارش",
+    "ar": "الفروع في التقرير"
+  },
+  "Selected branch scope": {
+    "en": "Selected branch scope",
+    "fa": "محدودهٔ شعبهٔ انتخاب‌شده",
+    "ar": "نطاق الفروع المحددة"
+  },
+  "Closing ledger balance (not bank cash)": {
+    "en": "Closing ledger balance (not bank cash)",
+    "fa": "ماندهٔ پایان دورهٔ دفتر (نه موجودی بانک)",
+    "ar": "رصيد الدفتر الختامي (ليس رصيد البنك)"
+  },
+  "Owner spending + funding": {
+    "en": "Owner spending + funding",
+    "fa": "مصارف و تمویل مالک",
+    "ar": "مصروفات وتمويل المالك"
+  },
+  "Period movement": {
+    "en": "Period movement",
+    "fa": "گردش خالص دوره",
+    "ar": "صافي حركة الفترة"
+  },
+  "No settlement activity in this period": {
+    "en": "No settlement activity in this period",
+    "fa": "در این دوره تراکنش حساب‌دهی وجود ندارد.",
+    "ar": "لا توجد حركة تسوية في هذه الفترة."
+  },
+  "Period Settlement Statements": {
+    "en": "Period Settlement Statements",
+    "fa": "صورت‌حساب تسویهٔ دوره",
+    "ar": "كشوف تسوية الفترة"
+  },
+  "– Returned to branch": {
+    "en": "– Returned to branch",
+    "fa": "− برگشت و تمویل به شعبه",
+    "ar": "− مبالغ معادة وتمويل للفرع"
+  },
+  "Entries without a valid date are excluded from this report.": {
+    "en": "Entries without a valid date are excluded from this report.",
+    "fa": "تراکنش‌های بدون تاریخ معتبر از این گزارش کنار گذاشته شده‌اند.",
+    "ar": "تم استبعاد القيود التي لا تحمل تاريخاً صالحاً من هذا التقرير."
+  }
+});
 export function treasuryText(source, language) {
   return treasuryMessages[source]?.[language] || treasuryMessages[source]?.en || source;
 }
