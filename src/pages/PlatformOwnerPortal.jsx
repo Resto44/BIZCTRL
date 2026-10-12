@@ -103,8 +103,9 @@ export default function PlatformOwnerPortal() {
   }, [manualSettings.data]);
   useEffect(() => { setPage(0); setStatus(active === 'trials' ? 'TRIAL' : ''); setSearch(''); }, [active]);
   useEffect(() => {
-    if (snapshot.isSuccess && (!snapshot.data?.authorized || (snapshot.data.mfa_required && !snapshot.data.mfa_verified))) {
-      supabase.auth.signOut().finally(() => navigate('/platform-owner/login', { replace: true }));
+    if (snapshot.isSuccess && (!snapshot.data?.authenticated || !snapshot.data?.authorized || (snapshot.data.mfa_required && !snapshot.data.mfa_verified))) {
+      // Preserve an existing session so the login page can complete MFA.
+      navigate('/platform-owner/login', { replace: true });
     }
   }, [snapshot.isSuccess, snapshot.data, navigate]);
 
@@ -125,8 +126,8 @@ export default function PlatformOwnerPortal() {
   };
 
   if (snapshot.isLoading) return <div className="grid min-h-screen place-items-center bg-slate-950 text-slate-300">{t.loading}</div>;
-  if (snapshot.isError) return <div className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-200"><div className="max-w-md"><QueryError t={t} onRetry={() => snapshot.refetch()} /></div></div>;
-  if (!snapshot.data?.authorized || (snapshot.data.mfa_required && !snapshot.data.mfa_verified)) return null;
+  if (snapshot.isError) return <div className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-200"><div className="max-w-md"><QueryError t={t} onRetry={() => snapshot.refetch()} /><Button className="mt-4" variant="outline" onClick={() => navigate('/platform-owner/login', { replace: true })}>{lang === 'fa' ? 'بازگشت به ورود مالک پلتفرم' : lang === 'ar' ? 'العودة إلى تسجيل دخول مالك المنصة' : 'Back to Platform Owner sign in'}</Button></div></div>;
+  if (!snapshot.data?.authenticated || !snapshot.data?.authorized || (snapshot.data.mfa_required && !snapshot.data.mfa_verified)) return null;
 
   const data = dashboard.data || {};
   const plansData = plans.data || controlCenter.data?.plans || [];

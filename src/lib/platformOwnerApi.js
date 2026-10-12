@@ -6,8 +6,37 @@ async function rpc(name, args = {}) {
   return data;
 }
 
+const signedOutSnapshot = () => ({
+  authenticated: false, authorized: false, mfa_required: false,
+  mfa_verified: false, session_expired: true,
+});
+
+function isExpiredSessionError(error) {
+  return Number(error?.status) === 401 || [
+    'PGRST301', 'PGRST303', 'refresh_token_not_found',
+    'refresh_token_already_used', 'session_not_found',
+  ].includes(error?.code);
+}
+
+// The snapshot RPC intentionally cannot be executed by anonymous visitors.
+// Check session presence before calling it; only the server may grant access.
+export async function fetchPlatformOwnerSnapshot() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    if (isExpiredSessionError(error)) return signedOutSnapshot();
+    throw error;
+  }
+  if (!data?.session?.access_token) return signedOutSnapshot();
+  try {
+    return await rpc('platform_owner_session_snapshot');
+  } catch (error) {
+    if (isExpiredSessionError(error)) return signedOutSnapshot();
+    throw error;
+  }
+}
+
 export const platformOwnerApi = {
-  snapshot: () => rpc('platform_owner_session_snapshot'),
+  snapshot: fetchPlatformOwnerSnapshot,
   dashboard: () => rpc('platform_owner_dashboard'),
   controlCenter: () => rpc('platform_owner_control_center'),
   modules: () => rpc('platform_owner_list_modules'),
