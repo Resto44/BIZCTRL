@@ -1,3 +1,5 @@
+import {supplierInvoiceCurrencyTotals,readAllPortalRows} from '@/lib/portalReliability';
+import PortalDataState from '@/components/shared/PortalDataState';
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -37,55 +39,49 @@ export default function SupplierPortalERP() {
   const [search, setSearch] = useState('');
 
   // ── Supplier profile (canonical linked entity from ERP membership) ────────
-  const { data: supplierProfile } = useQuery({
-    queryKey: ['supplier-profile', user?.linked_entity_id, user?.restaurant_id],
+  const { data: supplierProfile, isError: supplierProfileError, refetch: retrySupplierProfile, isLoading: supplierProfileLoading } = useQuery({
+    queryKey: ['supplier-profile', user?.id, user?.linked_entity_id, user?.restaurant_id, user?.branch_id],
     queryFn: async () => {
       let query = supabase.from('suppliers').select('*').eq('restaurant_id', user?.restaurant_id);
       query = user?.linked_entity_id
         ? query.eq('id', user.linked_entity_id)
         : query.eq('email', user?.email).eq('branch_id', user?.branch_id);
-      const { data } = await query.maybeSingle();
+      const { data, error } = await query.maybeSingle();
+      if (error) throw error;
       return data;
     },
     enabled: !!user?.restaurant_id && (!!user?.linked_entity_id || !!user?.email),
   });
 
   // ── Purchase orders for this supplier ─────────────────────────────────────
-  const { data: purchaseOrders = [], isLoading, refetch } = useQuery({
-    queryKey: ['supplier-pos', supplierProfile?.id],
+  const { data: purchaseOrders = [], isLoading, refetch, isError: purchaseOrdersError } = useQuery({
+    queryKey: ['supplier-pos', supplierProfile?.id, user?.restaurant_id],
     queryFn: async () => {
       if (!supplierProfile?.id) return [];
-      const { data, error } = await supabase
+      return readAllPortalRows(() => supabase
         .from('purchase_orders')
-        .select('*, branches(name), purchase_order_items(*, products(name))')
+        .select('*')
         .eq('supplier_id', supplierProfile.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      return data || [];
+        .order('created_date', { ascending: false })
+        .order('id', { ascending: true }));
     },
     enabled: !!supplierProfile?.id,
     refetchInterval: 60000,
   });
 
   // ── Supplier invoices — canonical supplier id plus tenant and branch ────────
-  const { data: invoices = [], isLoading: invoicesLoading, refetch: refetchInvoices } = useQuery({
+  const { data: invoices = [], isLoading: invoicesLoading, refetch: refetchInvoices, isError: invoicesError } = useQuery({
     queryKey: ['supplier-invoices-portal', supplierProfile?.id, user?.branch_id],
     queryFn: async () => {
       if (!supplierProfile?.id) return [];
-      const { data, error } = await supabase
+      return readAllPortalRows(() => supabase
         .from('supplier_invoices')
         .select('*')
         .eq('restaurant_id', user.restaurant_id)
         .eq('branch_id', user.branch_id)
         .eq('supplier_id', supplierProfile.id)
         .order('created_date', { ascending: false })
-        .limit(100);
-      if (error) {
-        console.warn('[SupplierPortalERP] invoices fetch error:', error.message);
-        return [];
-      }
-      return data || [];
+        .order('id', { ascending: true }));
     },
     enabled: !!supplierProfile?.id && !!user?.restaurant_id && !!user?.branch_id,
     refetchInterval: 30000,
@@ -93,11 +89,15 @@ export default function SupplierPortalERP() {
 
   const confirmShipmentMutation = useMutation({
     mutationFn: async (poId) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('purchase_orders')
-        .update({ status: 'shipped', shipped_at: new Date().toISOString() })
-        .eq('id', poId);
+        .update({ status: 'shipped' })
+        .eq('id', poId)
+        .eq('supplier_id', supplierProfile.id)
+        .eq('status', 'approved')
+        .select('id');
       if (error) throw error;
+      if (!data?.length) throw new Error('Order changed or shipment permission is unavailable. Refresh and retry.');
     },
     onSuccess: () => {
       toast.success('Shipment confirmed!');
@@ -106,10 +106,14 @@ export default function SupplierPortalERP() {
     onError: (err) => toast.error(err.message),
   });
 
+  if (supplierProfileError || purchaseOrdersError || invoicesError) return <PortalDataState onRetry={() => {retrySupplierProfile();refetch();refetchInvoices();}}/>;
+  if (supplierProfileLoading || isLoading || invoicesLoading) return <PortalDataState loading/>;
+  if (!supplierProfile || !user?.branch_id) return <PortalDataState missing onRetry={retrySupplierProfile}/>;
+
   const filteredPOs = purchaseOrders.filter(po =>
     !search ||
     po.id?.toLowerCase().includes(search.toLowerCase()) ||
-    po.branches?.name?.toLowerCase().includes(search.toLowerCase())
+    po.branch?.toLowerCase().includes(search.toLowerCase())
   );
 
   const filteredInvoices = invoices.filter(inv =>
@@ -121,13 +125,10 @@ export default function SupplierPortalERP() {
   const pending = purchaseOrders.filter(po => po.status === 'approved');
   const totalPOValue = purchaseOrders
     .filter(po => ['approved', 'shipped', 'received'].includes(po.status))
-    .reduce((s, po) => s + (po.total_amount || 0), 0);
+    .reduce((s, po) => s + (Number(po.total_amount) || 0), 0);
 
-  const totalInvoiced = invoices.reduce((s, i) => s + (parseFloat(i.total_amount) || 0), 0);
-  const totalPaid = invoices
-    .filter(i => i.status === 'paid')
-    .reduce((s, i) => s + (parseFloat(i.paid_amount || i.total_amount) || 0), 0);
-  const outstanding = totalInvoiced - totalPaid;
+  const currencyTotals = supplierInvoiceCurrencyTotals(invoices);
+  const showTotal = field => currencyTotals.length ? currencyTotals.map(row => `${row.currency} ${row[field].toLocaleString()}`).join(' · ') : '—';
 
   const tabs = [
     { id: 'home',     label: 'Home',     icon: Home },
@@ -183,7 +184,7 @@ export default function SupplierPortalERP() {
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-3 text-center">
                   <p className="text-2xl font-black text-rose-400">
-                    {outstanding > 0 ? outstanding.toLocaleString() : '0'}
+                    {showTotal('outstanding')}
                   </p>
                   <p className="text-slate-500 text-xs mt-0.5">Outstanding</p>
                 </CardContent>
@@ -254,13 +255,13 @@ export default function SupplierPortalERP() {
               </Card>
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-3 text-center">
-                  <p className="text-xl font-black text-cyan-400">{totalInvoiced.toLocaleString()}</p>
+                  <p className="text-xl font-black text-cyan-400">{showTotal('invoiced')}</p>
                   <p className="text-slate-500 text-xs mt-0.5">Invoiced</p>
                 </CardContent>
               </Card>
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-3 text-center">
-                  <p className="text-xl font-black text-rose-400">{outstanding.toLocaleString()}</p>
+                  <p className="text-xl font-black text-rose-400">{showTotal('outstanding')}</p>
                   <p className="text-slate-500 text-xs mt-0.5">Outstanding</p>
                 </CardContent>
               </Card>
@@ -342,11 +343,11 @@ export default function SupplierPortalERP() {
                       <div>
                         <p className="text-white text-sm font-medium">PO #{po.id?.slice(0, 8)}</p>
                         <p className="text-slate-500 text-xs">
-                          {po.branches?.name} · {po.created_at ? format(new Date(po.created_at), 'MMM d, yyyy') : ''}
+                          {po.branch} · {po.created_date ? format(new Date(po.created_date), 'MMM d, yyyy') : ''}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-white text-sm font-bold">${(po.total_amount || 0).toLocaleString()}</p>
+                        <p className="text-white text-sm font-bold">{(Number(po.total_amount) || 0).toLocaleString()}</p>
                         <Badge className={`text-[10px] border ${PO_STATUS[po.status]?.color || ''}`}>
                           {PO_STATUS[po.status]?.label || po.status}
                         </Badge>
@@ -433,32 +434,32 @@ function POCard({ po, onConfirmShipment, loading }) {
             <p className="text-white font-bold text-sm">PO #{po.id?.slice(0, 8)}</p>
             <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
               <Building2 className="w-3 h-3" />
-              {po.branches?.name || 'Unknown Branch'}
+              {po.branch || 'Unknown Branch'}
               <Calendar className="w-3 h-3 ml-1" />
-              {po.created_at ? format(new Date(po.created_at), 'MMM d') : ''}
+              {po.created_date ? format(new Date(po.created_date), 'MMM d') : ''}
             </div>
           </div>
           <div className="text-right">
-            <p className="text-white font-bold text-sm">${(po.total_amount || 0).toLocaleString()}</p>
+            <p className="text-white font-bold text-sm">{(Number(po.total_amount) || 0).toLocaleString()}</p>
             <Badge className={`text-[10px] border ${statusConf.color}`}>{statusConf.label}</Badge>
           </div>
         </div>
 
-        {po.purchase_order_items?.length > 0 && (
+        {po.items?.length > 0 && (
           <button
             onClick={() => setExpanded(v => !v)}
             className="text-slate-500 text-xs hover:text-slate-300 mb-2"
           >
-            {expanded ? 'Hide' : 'Show'} {po.purchase_order_items.length} item{po.purchase_order_items.length > 1 ? 's' : ''}
+            {expanded ? 'Hide' : 'Show'} {po.items.length} item{po.items.length > 1 ? 's' : ''}
           </button>
         )}
 
-        {expanded && po.purchase_order_items?.length > 0 && (
+        {expanded && po.items?.length > 0 && (
           <div className="space-y-1 mb-3 bg-white/5 rounded-lg p-2">
-            {po.purchase_order_items.map((item, i) => (
+            {po.items.map((item, i) => (
               <div key={i} className="flex items-center justify-between text-xs">
-                <span className="text-slate-300">{item.products?.name || 'Item'}</span>
-                <span className="text-white">×{item.quantity} @ ${item.unit_price}</span>
+                <span className="text-slate-300">{item.product_name || item.name || 'Item'}</span>
+                <span className="text-white">×{item.quantity} @ {item.unit_price}</span>
               </div>
             ))}
           </div>

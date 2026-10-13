@@ -1,10 +1,12 @@
+import {portalTreasuryMovement, readAllPortalRows} from '@/lib/portalReliability';
+import PortalDataState from '@/components/shared/PortalDataState';
 /**
  * ManagerDashboardERP — Enterprise Branch Manager Dashboard.
  *
  * Sections (all 17 from spec):
  *   1.  Today's Sales
- *   2.  Cash Balance
- *   3.  POS Balance
+ *   2.  Cash sales today
+ *   3.  Network sales today
  *   4.  Credit Sales
  *   5.  Purchases Today
  *   6.  Expenses Today
@@ -12,7 +14,7 @@
  *   8.  Pending Purchase Orders
  *   9.  Pending Supplier Invoices
  *   10. Low Stock Alerts
- *   11. Treasury Summary
+ *   11. Treasury · latest 20 movements
  *   12. Recent Activity
  *   13. Shift Status
  *   14. Staff Online
@@ -162,29 +164,32 @@ function ManagerContent({ branchId, branchName, branchKey }) {
   const today     = format(new Date(), 'yyyy-MM-dd');
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
-  const { data: todaySales = [], isLoading: loadingSales } = useQuery({
+  const { data: todaySales = [], isLoading: loadingSales, isError: todaySalesError, refetch: retryTodaySales } = useQuery({
     queryKey: ['mgr-today-sales', branchId, today],
     queryFn: async () => {
-      const { data } = await supabase.from('daily_sales').select('*').eq('date', today).eq('branch_id', branchId);
+      const { data, error } = await supabase.from('daily_sales').select('*').eq('date', today).eq('branch_id', branchId);
+      if (error) throw error;
       return data || [];
     },
     enabled: !!branchId,
     refetchInterval: 60000,
   });
 
-  const { data: yesterdaySales = [] } = useQuery({
+  const { data: yesterdaySales = [], isError: yesterdaySalesError, refetch: retryYesterdaySales, isLoading: yesterdaySalesLoading } = useQuery({
     queryKey: ['mgr-yesterday-sales', branchId, yesterday],
     queryFn: async () => {
-      const { data } = await supabase.from('daily_sales').select('total, custom_sources_total').eq('date', yesterday).eq('branch_id', branchId);
+      const { data, error } = await supabase.from('daily_sales').select('total, custom_sources_total').eq('date', yesterday).eq('branch_id', branchId);
+      if (error) throw error;
       return data || [];
     },
     enabled: !!branchId,
   });
 
-  const { data: todayPurchases = [], isLoading: loadingPurchases } = useQuery({
+  const { data: todayPurchases = [], isLoading: loadingPurchases, isError: todayPurchasesError, refetch: retryTodayPurchases } = useQuery({
     queryKey: ['mgr-today-purchases', branchId, today],
     queryFn: async () => {
-      const { data } = await supabase.from('supplier_invoices').select('id, total_amount, status').eq('branch_id', branchId).eq('date', today);
+      const { data, error } = await supabase.from('supplier_invoices').select('id, total_amount, status').eq('branch_id', branchId).eq('date', today);
+      if (error) throw error;
       return data || [];
     },
     enabled: !!branchId,
@@ -195,17 +200,18 @@ function ManagerContent({ branchId, branchName, branchKey }) {
   // causing the Expenses Today KPI to always show 0.
   // Use the canonical branch key returned by TenantContext, with a database
   // lookup fallback for older expense rows that only retained branch_key.
-  const { data: todayExpenses = [], isLoading: loadingExpenses } = useQuery({
+  const { data: todayExpenses = [], isLoading: loadingExpenses, isError: todayExpensesError, refetch: retryTodayExpenses } = useQuery({
     queryKey: ['mgr-today-expenses', branchId, branchKey, today],
     queryFn: async () => {
       let resolvedKey = branchKey;
       // Resolve a missing legacy key from the authorized branch UUID.
       if (!resolvedKey) {
-        const { data: branchRow } = await supabase
+        const { data: branchRow, error: branchError } = await supabase
           .from('branches')
           .select('branch_key')
           .eq('id', branchId)
           .single();
+        if (branchError) throw branchError;
         resolvedKey = branchRow?.branch_key || null;
       }
       // Query expenses by branch_key (primary) OR branch_id (fallback)
@@ -218,74 +224,79 @@ function ManagerContent({ branchId, branchName, branchKey }) {
       } else {
         q = q.eq('branch_id', branchId);
       }
-      const { data } = await q;
+      const { data, error } = await q;
+      if (error) throw error;
       return data || [];
     },
     enabled: !!branchId,
     refetchInterval: 60000,
   });
 
-  const { data: inventory = [], isLoading: loadingInventory } = useQuery({
+  const { data: inventory = [], isLoading: loadingInventory, isError: inventoryError, refetch: retryInventory } = useQuery({
     queryKey: ['mgr-inventory', branchId],
     queryFn: async () => {
-      const { data } = await supabase.from('inventory').select('id, name, quantity, unit, reorder_point, cost_per_unit').eq('branch_id', branchId).order('quantity', { ascending: true }).limit(100);
-      return data || [];
+      return readAllPortalRows(() => supabase.from('inventory').select('id, name:product_name, quantity, unit, reorder_point:low_stock_threshold, cost_per_unit:average_cost').eq('branch_id', branchId).order('id'));
     },
     enabled: !!branchId,
   });
 
-  const { data: pendingPOs = [], isLoading: loadingPOs } = useQuery({
+  const { data: pendingPOs = [], isLoading: loadingPOs, isError: pendingPOsError, refetch: retryPendingPOs } = useQuery({
     queryKey: ['mgr-pending-pos', branchId],
     queryFn: async () => {
-      const { data } = await supabase.from('purchase_orders').select('id, order_number, total_amount, status, created_at').eq('branch_id', branchId).in('status', ['pending', 'sent', 'partial']).order('created_at', { ascending: false }).limit(10);
+      const { data, error } = await supabase.from('purchase_orders').select('id, order_number, total_amount, status, created_date').eq('branch_id', branchId).in('status', ['pending', 'sent', 'partial']).order('created_date', { ascending: false }).limit(10);
+      if (error) throw error;
       return data || [];
     },
     enabled: !!branchId,
   });
 
-  const { data: pendingInvoices = [], isLoading: loadingInvoices } = useQuery({
+  const { data: pendingInvoices = [], isLoading: loadingInvoices, isError: pendingInvoicesError, refetch: retryPendingInvoices } = useQuery({
     queryKey: ['mgr-pending-invoices', branchId],
     queryFn: async () => {
-      const { data } = await supabase.from('supplier_invoices').select('id, invoice_number, total_amount, paid_amount, status, due_date').eq('branch_id', branchId).in('status', ['pending', 'partial']).order('due_date', { ascending: true }).limit(10);
+      const { data, error } = await supabase.from('supplier_invoices').select('id, invoice_number, total_amount, paid_amount, status, due_date').eq('branch_id', branchId).in('status', ['pending', 'partial']).order('due_date', { ascending: true }).limit(10);
+      if (error) throw error;
       return data || [];
     },
     enabled: !!branchId,
   });
 
-  const { data: treasury = [], isLoading: loadingTreasury } = useQuery({
+  const { data: treasury = [], isLoading: loadingTreasury, isError: treasuryError, refetch: retryTreasury } = useQuery({
     queryKey: ['mgr-treasury', branchId],
     queryFn: async () => {
-      const { data } = await supabase.from('wallet_transactions').select('id, amount, transaction_type, transaction_date, description, account_id, direction').eq('branch_id', branchId).order('transaction_date', { ascending: false }).limit(20);
+      const { data, error } = await supabase.from('wallet_transactions').select('id, amount, transaction_type, transaction_date, description, account_id, direction').eq('branch_id', branchId).order('transaction_date', { ascending: false }).limit(20);
+      if (error) throw error;
       return data || [];
     },
     enabled: !!branchId,
   });
 
-  const { data: recentActivity = [] } = useQuery({
+  const { data: recentActivity = [], isError: recentActivityError, refetch: retryRecentActivity, isLoading: recentActivityLoading } = useQuery({
     queryKey: ['mgr-recent-activity', branchId],
     queryFn: async () => {
       const [s, p, e] = await Promise.all([
         supabase.from('daily_sales').select('id, total, custom_sources_total, created_date').eq('branch_id', branchId).order('created_date', { ascending: false }).limit(5),
-        supabase.from('supplier_invoices').select('id, total_amount, created_at').eq('branch_id', branchId).order('created_at', { ascending: false }).limit(5),
-        supabase.from('expenses').select('id, amount, description, created_at').eq('branch_id', branchId).order('created_at', { ascending: false }).limit(5),
+        supabase.from('supplier_invoices').select('id, total_amount, created_date').eq('branch_id', branchId).order('created_date', { ascending: false }).limit(5),
+        supabase.from('expenses').select('id, amount, description, created_date').eq('branch_id', branchId).order('created_date', { ascending: false }).limit(5),
       ]);
+      for (const response of [s,p,e]) if (response.error) throw response.error;
       const items = [
         ...(s.data || []).map(r => ({ type: 'sale',     amount: (Number(r.total) || 0) + (Number(r.custom_sources_total) || 0), label: 'Daily Sales', time: r.created_date })),
-        ...(p.data || []).map(r => ({ type: 'purchase', amount: r.total_amount, label: 'Purchase',    time: r.created_at })),
-        ...(e.data || []).map(r => ({ type: 'expense',  amount: r.amount,       label: r.description || 'Expense', time: r.created_at })),
+        ...(p.data || []).map(r => ({ type: 'purchase', amount: r.total_amount, label: 'Purchase',    time: r.created_date })),
+        ...(e.data || []).map(r => ({ type: 'expense',  amount: r.amount,       label: r.description || 'Expense', time: r.created_date })),
       ];
       return items.sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 10);
     },
     enabled: !!branchId,
   });
 
-  const { data: salesTrend = [] } = useQuery({
-    queryKey: ['mgr-sales-trend', branchId],
+  const { data: salesTrend = [], isError: salesTrendError, refetch: retrySalesTrend, isLoading: salesTrendLoading } = useQuery({
+    queryKey: ['mgr-sales-trend', branchId, today],
     queryFn: async () => {
       const days = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), 6 - i), 'yyyy-MM-dd'));
-      const { data } = await supabase.from('daily_sales').select('date, total, custom_sources_total, restaurant_cash, restaurant_network').eq('branch_id', branchId).in('date', days);
+      const { data, error } = await supabase.from('daily_sales').select('date, total, custom_sources_total, restaurant_cash, restaurant_network').eq('branch_id', branchId).in('date', days);
+      if (error) throw error;
       const map = {};
-      (data || []).forEach(r => { map[r.date] = r; });
+      (data || []).forEach(r => { const row=map[r.date] ||= {total:0,custom_sources_total:0,restaurant_cash:0,restaurant_network:0}; for(const key of Object.keys(row))row[key]+=Number(r[key])||0; });
       return days.map(d => ({
         date:  format(new Date(d + 'T12:00:00'), 'EEE'),
         sales: (Number(map[d]?.total) || 0) + (Number(map[d]?.custom_sources_total) || 0),
@@ -301,8 +312,8 @@ function ManagerContent({ branchId, branchName, branchKey }) {
     const cashTotal    = todaySales.reduce((s, r) => s + (Number(r.restaurant_cash) || 0), 0);
     const posTotal     = todaySales.reduce((s, r) => s + (Number(r.restaurant_network) || 0), 0);
     const creditTotal  = todaySales.reduce((s, r) => s + (Number(r.credit) || 0), 0);
-    const purchTotal   = todayPurchases.reduce((s, r) => s + (r.total_amount || 0), 0);
-    const expTotal     = todayExpenses.reduce((s, r) => s + (r.amount || 0), 0);
+    const purchTotal   = todayPurchases.reduce((s, r) => s + (Number(r.total_amount) || 0), 0);
+    const expTotal     = todayExpenses.reduce((s, r) => s + (Number(r.amount) || 0), 0);
     const grossProfit  = todayTotal - purchTotal;
     const netProfit    = grossProfit - expTotal;
 
@@ -313,14 +324,15 @@ function ManagerContent({ branchId, branchName, branchKey }) {
     const outOfStock   = inventory.filter(i => i.quantity <= 0);
     const invValue     = inventory.reduce((s, i) => s + (i.quantity * (i.cost_per_unit || 0)), 0);
 
-    const treasuryIn   = treasury.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-    const treasuryOut  = treasury.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
-    const treasuryNet  = treasuryIn - treasuryOut;
+    const {inflow:treasuryIn,outflow:treasuryOut,net:treasuryNet}=portalTreasuryMovement(treasury);
 
     return { todayTotal, cashTotal, posTotal, creditTotal, purchTotal, expTotal, grossProfit, netProfit, salesTrendPct, lowStock, outOfStock, invValue, treasuryIn, treasuryOut, treasuryNet };
   }, [todaySales, yesterdaySales, todayPurchases, todayExpenses, inventory, treasury]);
 
-  const loading = loadingSales || loadingPurchases || loadingExpenses;
+  if (todaySalesError || yesterdaySalesError || todayPurchasesError || todayExpensesError || inventoryError || pendingPOsError || pendingInvoicesError || treasuryError || recentActivityError || salesTrendError) return <PortalDataState onRetry={() => { retryTodaySales(); retryYesterdaySales(); retryTodayPurchases(); retryTodayExpenses(); retryInventory(); retryPendingPOs(); retryPendingInvoices(); retryTreasury(); retryRecentActivity(); retrySalesTrend(); }}/>;
+
+  if (loadingSales || loadingPurchases || loadingExpenses || loadingInventory || loadingPOs || loadingInvoices || loadingTreasury || yesterdaySalesLoading || recentActivityLoading || salesTrendLoading) return <PortalDataState loading/>;
+  const loading = false;
 
   return (
     <div className="space-y-6">
@@ -345,8 +357,8 @@ function ManagerContent({ branchId, branchName, branchKey }) {
         <SectionHeader title="Today's Performance" icon={BarChart3} />
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <KPICard label="Today's Sales"   value={formatCurrency(kpis.todayTotal)}  icon={TrendingUp}  colorClass="text-primary"     bgClass="bg-primary/10"     trend={kpis.salesTrendPct} loading={loading} />
-          <KPICard label="Cash Balance"    value={formatCurrency(kpis.cashTotal)}   icon={Banknote}    colorClass="text-green-600"   bgClass="bg-green-500/10"   loading={loading} />
-          <KPICard label="POS Balance"     value={formatCurrency(kpis.posTotal)}    icon={CreditCard}  colorClass="text-blue-600"    bgClass="bg-blue-500/10"    loading={loading} />
+          <KPICard label="Cash sales today"    value={formatCurrency(kpis.cashTotal)}   icon={Banknote}    colorClass="text-green-600"   bgClass="bg-green-500/10"   loading={loading} />
+          <KPICard label="Network sales today"     value={formatCurrency(kpis.posTotal)}    icon={CreditCard}  colorClass="text-blue-600"    bgClass="bg-blue-500/10"    loading={loading} />
           <KPICard label="Credit Sales"    value={formatCurrency(kpis.creditTotal)} icon={Receipt}     colorClass="text-amber-600"   bgClass="bg-amber-500/10"   loading={loading} />
           <KPICard label="Purchases Today" value={formatCurrency(kpis.purchTotal)}  icon={ShoppingCart} colorClass="text-orange-600" bgClass="bg-orange-500/10"  loading={loading} />
           <KPICard label="Expenses Today"  value={formatCurrency(kpis.expTotal)}    icon={DollarSign}  colorClass="text-red-600"     bgClass="bg-red-500/10"     loading={loading} />
@@ -355,8 +367,8 @@ function ManagerContent({ branchId, branchName, branchKey }) {
 
       {/* Profit row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <KPICard label="Gross Profit"    value={formatCurrency(kpis.grossProfit)} icon={TrendingUp}  colorClass={kpis.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'} bgClass={kpis.grossProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} loading={loading} />
-        <KPICard label="Net Profit"      value={formatCurrency(kpis.netProfit)}   icon={Activity}    colorClass={kpis.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}  bgClass={kpis.netProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}  loading={loading} />
+        <KPICard label="Sales less purchases"    value={formatCurrency(kpis.grossProfit)} icon={TrendingUp}  colorClass={kpis.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'} bgClass={kpis.grossProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} loading={loading} />
+        <KPICard label="Before payroll and fixed costs"      value={formatCurrency(kpis.netProfit)}   icon={Activity}    colorClass={kpis.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}  bgClass={kpis.netProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}  loading={loading} />
         <KPICard label="Inventory Value" value={formatCurrency(kpis.invValue)}    icon={Package}     colorClass="text-purple-600"  bgClass="bg-purple-500/10" loading={loadingInventory} />
       </div>
 
@@ -532,11 +544,11 @@ function ManagerContent({ branchId, branchName, branchKey }) {
             </CardContent>
           </Card>
 
-          {/* Treasury Summary */}
+          {/* Treasury · latest 20 movements */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-teal-600" /> Treasury Summary
+                <Wallet className="w-4 h-4 text-teal-600" /> Treasury · latest 20 movements
               </CardTitle>
             </CardHeader>
             <CardContent>

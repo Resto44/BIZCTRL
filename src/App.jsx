@@ -312,7 +312,7 @@ const SubscribedRoutes = () => {
         <Route path="/inventory/control" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="control" /></RoleGuard>} />
         <Route path="/inventory-transfers" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="operations" fallback={<InventoryTransfer />} /></RoleGuard>} />
         <Route path="/inventory-waste" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="control" fallback={<InventoryWaste />} /></RoleGuard>} />
-        <Route path="/inventory-forecast" element={<RetailInventoryRoute page="operations" fallback={<InventoryForecast />} />} />
+        <Route path="/inventory-forecast" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="operations" fallback={<InventoryForecast />} /></RoleGuard>} />
 
         {/* ── Analytics & Reports ── */}
         <Route path="/reports" element={<RoleGuard permission="viewReports"><Reports /></RoleGuard>} />
