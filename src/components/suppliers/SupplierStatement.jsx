@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import {supabase} from '@/api/supabaseClient';
+import {useTenant} from '@/lib/TenantContext';
+import {fetchSupplierLedger} from '@/lib/supplierLedgerData';
+import {buildSupplierLedger} from '@/lib/supplierLedger';
+import PortalDataState from '@/components/shared/PortalDataState';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,22 +30,25 @@ export default function SupplierStatement({ supplier }) {
   const { currency, t, lang, dir, translateLiteral, translateLabel } = useLanguage();
   const [generating, setGenerating] = useState(false);
 
-  const { data: invoices = [] } = useQuery({
-    queryKey: ['supplier_invoices', supplier.id],
-    queryFn: () => base44.entities.SupplierInvoice.filter({ supplier_id: supplier.id }, '-date', 200),
+  const {activeRestaurant, activeRestaurantId, isBranchScoped, isManager, managerBranchObject} = useTenant();
+  const restaurantId = activeRestaurantId || activeRestaurant?.id;
+  const restricted = isBranchScoped || isManager;
+  const [selectedCurrency,setSelectedCurrency] = useState('');
+  const query = useQuery({
+    queryKey: ['supplier-ledger',restaurantId,restricted,managerBranchObject?.id,managerBranchObject?.key],
+    queryFn: () => fetchSupplierLedger(supabase,{restaurantId,branch:restricted?managerBranchObject:null}),
+    enabled: Boolean(restaurantId && (!restricted || managerBranchObject?.id)),
   });
-
-  const { data: debts = [] } = useQuery({
-    queryKey: ['debts_supplier', supplier.name],
-    queryFn: () => base44.entities.DebtRecord.filter({ party_type: 'supplier', party_name: supplier.name }, '-date', 100),
-  });
-
-  const totalInvoiced = invoices.reduce((sum, invoice) => sum + (invoice.amount || 0), 0);
-  const totalPaid = invoices.reduce((sum, invoice) => sum + (invoice.paid_amount || 0), 0);
-  const totalOutstanding = totalInvoiced - totalPaid;
-  const overdueInvoices = invoices.filter((invoice) => invoice.status !== 'paid' && invoice.due_date && new Date(invoice.due_date) < new Date());
+  const ledger = buildSupplierLedger({...query.data,supplierId:supplier.id,end:format(new Date(),'yyyy-MM-dd')});
+  const group = ledger.groups.find(g=>g.currency===selectedCurrency) || ledger.groups.find(g=>g.currency===currency) || ledger.groups[0];
+  const statementCurrency = group?.currency || currency;
+  const invoices = (group?.invoices || []).map(row=>({...row,amount:row.total_amount,paid_amount:row.ledgerPaid,status:row.ledgerRemaining<=0?'paid':row.ledgerPaid>0?'partial':'unpaid'}));
+  const totalInvoiced = group?.invoiced || 0;
+  const totalPaid = group?.paid || 0;
+  const totalOutstanding = group?.closing || 0;
+  const overdueInvoices = group?.overdue || [];
   const isRTL = dir === 'rtl';
-  const number = (value) => Number(value || 0).toLocaleString('en-US');
+  const number = (value) => Number(value || 0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 
   const generatePDF = async () => {
     setGenerating(true);
@@ -71,7 +78,7 @@ export default function SupplierStatement({ supplier }) {
 
       doc.setFillColor(248, 250, 252); doc.roundedRect(pageLeft, y, pageW - 30, 28, 3, 3, 'F');
       draw(loc('ACCOUNT SUMMARY'), mainX, y + 7, { bold: true, size: 10, color: [15, 23, 42] });
-      const summary = [[loc('Total Invoiced'), `${number(totalInvoiced)} ${currency}`], [loc('Total Paid'), `${number(totalPaid)} ${currency}`], [loc('Outstanding Balance'), `${number(totalOutstanding)} ${currency}`]];
+      const summary = [[loc('Total Invoiced'), `${number(totalInvoiced)} ${statementCurrency}`], [loc('Total Paid'), `${number(totalPaid)} ${statementCurrency}`], [loc('Outstanding Balance'), `${number(totalOutstanding)} ${statementCurrency}`]];
       summary.forEach(([label, value], index) => {
         const boxX = rtl ? pageRight - 5 - index * 60 : pageLeft + 5 + index * 60;
         draw(label, boxX, y + 14, { size: 8, color: [100, 116, 139] });
@@ -100,7 +107,7 @@ export default function SupplierStatement({ supplier }) {
         doc.setFillColor(...(index % 2 === 0 ? [255, 255, 255] : [248, 250, 252])); doc.rect(pageLeft, y - 1, tableWidth, 8, 'F');
         const remaining = (invoice.amount || 0) - (invoice.paid_amount || 0);
         const row = [(invoice.invoice_number || '—').slice(0, 10), invoice.date || '—', invoice.due_date || '—', number(invoice.amount), number(invoice.paid_amount), number(remaining), translateLabel(invoice.status, invoice.status || '—')];
-        const overdue = invoice.status !== 'paid' && invoice.due_date && new Date(invoice.due_date) < new Date();
+        const overdue = invoice.isOverdue;
         let x = rtl ? pageLeft + tableWidth : pageLeft;
         row.forEach((value, column) => {
           const width = widths[column];
@@ -125,8 +132,13 @@ export default function SupplierStatement({ supplier }) {
     }
   };
 
+  if (query.isLoading) return <PortalDataState loading/>;
+  if (!restaurantId || (restricted && !managerBranchObject?.id)) return <PortalDataState missing/>;
+  if (query.isError) return <PortalDataState onRetry={query.refetch}/>;
   return (
     <div className="space-y-4">
+      <label className="block text-xs">{translateLiteral('Currency')}<select aria-label="Statement currency" className="ms-2 rounded border bg-background p-2" value={group?.currency || ''} onChange={e=>setSelectedCurrency(e.target.value)}>{ledger.groups.map(g=><option key={g.currency} value={g.currency}>{g.currency}</option>)}</select></label>
+      {ledger.issues.length>0 && <p role="alert" className="rounded border border-amber-400 p-3 text-sm">{lang==='fa'?'سوابق نیاز به تطبیق دارند. برای بررسی اختلاف‌ها دفتر حساب تأمین‌کننده را باز کنید.':lang==='ar'?'السجلات تحتاج مطابقة. راجع كشف حساب المورد للتفاصيل.':'Records need reconciliation. Open Supplier Ledger to review the differences.'} ({ledger.issues.length})</p>}
       <div className="grid grid-cols-3 gap-2">
         <Card><CardContent className="p-3 text-center"><div className="text-lg font-bold">{number(totalInvoiced)}</div><div className="text-[10px] text-muted-foreground">{translateLiteral('Total Invoiced')}</div></CardContent></Card>
         <Card><CardContent className="p-3 text-center"><div className="text-lg font-bold text-green-600">{number(totalPaid)}</div><div className="text-[10px] text-muted-foreground">{translateLiteral('Total Paid')}</div></CardContent></Card>
@@ -135,7 +147,7 @@ export default function SupplierStatement({ supplier }) {
 
       {overdueInvoices.length > 0 && <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-red-500 shrink-0" /><p className="text-xs text-red-700 font-medium">{translateLiteral('{{count}} overdue invoice(s)', { count: overdueInvoices.length })}</p></div>}
 
-      <Button className="w-full gap-2" onClick={generatePDF} disabled={generating || invoices.length === 0}>
+      <Button className="w-full gap-2" onClick={generatePDF} disabled={generating || invoices.length === 0 || ledger.issues.length > 0}>
         {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
         {generating ? translateLiteral('Generating PDF...') : translateLiteral('Generate Statement PDF')}
       </Button>
@@ -145,7 +157,7 @@ export default function SupplierStatement({ supplier }) {
         {invoices.length === 0 ? <p className="text-sm text-muted-foreground text-center py-6">{translateLiteral('No invoices recorded')}</p> : invoices.map((invoice) => (
           <div key={invoice.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2.5">
             <div className="min-w-0"><div className="text-xs font-semibold flex items-center gap-1.5"><FileText className="w-3 h-3 text-muted-foreground" />{invoice.invoice_number || translateLiteral('No number')}</div><div className="text-[10px] text-muted-foreground">{invoice.date} {invoice.due_date && `· ${t('due_date')}: ${invoice.due_date}`}</div></div>
-            <div className="text-right shrink-0"><div className="text-xs font-bold">{number(invoice.amount)} <span className="text-muted-foreground font-normal">{currency}</span></div><Badge className={`text-[9px] ${getStatusColor(invoice.status)}`}>{getStatusIcon(invoice.status)}<span className="mr-1">{translateLabel(invoice.status, invoice.status)}</span></Badge></div>
+            <div className="text-right shrink-0"><div className="text-xs font-bold">{number(invoice.amount)} <span className="text-muted-foreground font-normal">{statementCurrency}</span></div><Badge className={`text-[9px] ${getStatusColor(invoice.status)}`}>{getStatusIcon(invoice.status)}<span className="mr-1">{translateLabel(invoice.status, invoice.status)}</span></Badge></div>
           </div>
         ))}
       </div>
