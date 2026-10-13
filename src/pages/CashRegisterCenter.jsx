@@ -12,7 +12,7 @@
  * - Reports: Daily, Monthly, Movement, Shortage, Injection, Branch Comparison
  * - Audit Log: Every cash movement tracked with source module + record ID
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { isRestaurantPOSPortal } from '@/lib/productImportAccess';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
@@ -29,7 +29,8 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { readCashRows, cashBranchLabel, cashRegisterIssues } from '@/lib/cashRegisterData';
+import PortalDataState from '@/components/shared/PortalDataState';
 
 import CashRegisterDashboard from '@/components/cashregister/CashRegisterDashboard';
 import DailyCashSettlementForm from '@/components/cashregister/DailyCashSettlementForm';
@@ -38,8 +39,9 @@ import OwnerCashInjectionForm from '@/components/cashregister/OwnerCashInjection
 import CashRegisterReports from '@/components/cashregister/CashRegisterReports';
 
 export default function CashRegisterCenter() {
-  const { currency, t } = useLanguage();
-  const { branches, activeRestaurantId, activeRestaurant } = useTenant();
+  const { currency, t, lang } = useLanguage();
+  const text = (en, fa, ar) => lang === "fa" ? fa : lang === "ar" ? ar : en;
+  const { branches, activeRestaurantId, activeRestaurant, managerBranchObject } = useTenant();
   const { configuration } = useWorkspaceCustomization();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -51,26 +53,37 @@ export default function CashRegisterCenter() {
 
   const isOwner = user?.role === 'owner';
   const isManager = user?.role === 'manager';
-  const effectiveBranch = isManager ? (user?.branch || selectedBranch) : selectedBranch;
+  const effectiveBranch = isManager ? (managerBranchObject?.key || managerBranchObject?.branch_key || '__unassigned__') : selectedBranch;
+  useEffect(() => { setSelectedBranch('all'); setShowInjectionForm(false); }, [activeRestaurantId]);
 
-  const { data: pendingShortages = [] } = useQuery({
-    queryKey: ['cash_shortages_pending_count', user?.email],
-    queryFn: () => base44.entities.CashShortage.filter({
-      created_by: user?.email,
+  const { isError: cashError1, data: pendingShortages = [] } = useQuery({
+    queryKey: ['cash_shortages_pending_count', user?.email, activeRestaurantId, effectiveBranch],
+    queryFn: () => readCashRows('CashShortage', {
+      restaurant_id: activeRestaurantId,
       status: 'Pending',
+      ...(effectiveBranch !== 'all' ? { branch: effectiveBranch } : {}),
     }, '-date', 50),
-    enabled: !!user?.email,
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 60000,
   });
 
   const pendingCount = pendingShortages.length;
 
-  const settlementBranches = useMemo(() => {
-    if (isManager && user?.branch) return [{ key: user.branch, label: user.branch }];
-    if (selectedBranch !== 'all') return [{ key: selectedBranch, label: selectedBranch }];
-    return branches;
-  }, [branches, isManager, user?.branch, selectedBranch]);
+  const settlementBranches = useMemo(() => branches.filter(b => effectiveBranch === 'all' || b.key === effectiveBranch), [branches, effectiveBranch]);
+  const { data: issues = [], isError: auditError, isLoading: auditLoading } = useQuery({
+    queryKey: ['cash_register_integrity', activeRestaurantId, effectiveBranch],
+    enabled: Boolean(activeRestaurantId) && (!isManager || Boolean(managerBranchObject?.id)),
+    queryFn: async () => {
+      const scope = { restaurant_id: activeRestaurantId, ...(effectiveBranch !== 'all' ? { branch: effectiveBranch } : {}) };
+      const [injections, movements] = await Promise.all([readCashRows('OwnerCashInjection', scope), readCashRows('CashMovement', { ...scope, is_reversed: false })]);
+      return cashRegisterIssues(injections, movements);
+    },
+  });
+  if (!activeRestaurantId || (isManager && !managerBranchObject?.id)) return <PortalDataState missing />;
+  if (auditLoading) return <PortalDataState loading />;
+  if (auditError) return <PortalDataState onRetry={() => qc.invalidateQueries()} />;
 
+  if (cashError1) return <PortalDataState onRetry={() => qc.invalidateQueries()} />;
   return (
     <div className="space-y-4 pb-24">
       {isRestaurantPOSPortal(activeRestaurant) && isWorkspacePathEnabled(configuration, '/restaurant/pos') && (
@@ -79,13 +92,13 @@ export default function CashRegisterCenter() {
         </Link>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between pt-1">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
             <Wallet className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-lg font-bold leading-tight">Cash Register</h1>
+            <h1 className="text-lg font-bold leading-tight">{text("Cash Register","کاش رجستر","الصندوق النقدي")}</h1>
             <p className="text-xs text-muted-foreground">{format(new Date(), 'EEEE, MMMM d')}</p>
           </div>
         </div>
@@ -98,7 +111,7 @@ export default function CashRegisterCenter() {
               onClick={() => setShowInjectionForm(!showInjectionForm)}
             >
               <Banknote className="w-3.5 h-3.5" />
-              Inject
+              {text("Inject","تزریق نقد","تمويل")}
             </Button>
           )}
           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => qc.invalidateQueries()}>
@@ -109,11 +122,11 @@ export default function CashRegisterCenter() {
 
       {/* Quick Injection Form */}
       {showInjectionForm && (
-        <OwnerCashInjectionForm
+        <OwnerCashInjectionForm key={activeRestaurantId}
           defaultBranch={selectedBranch !== 'all' ? selectedBranch : (branches[0]?.key || '')}
           onSuccess={() => {
             setShowInjectionForm(false);
-            qc.invalidateQueries({ queryKey: ['daily_cash_settlements'] });
+            qc.invalidateQueries();
           }}
           onCancel={() => setShowInjectionForm(false)}
         />
@@ -134,46 +147,41 @@ export default function CashRegisterCenter() {
         </Select>
       )}
 
-      {/* Integration Notice */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
-        <p className="text-xs text-blue-700">
-          <span className="font-semibold">Auto-Sync Active.</span>{' '}
-          Cash movements from Sales, Purchases, Expenses, and Payments are automatically posted here. No manual entry required.
-        </p>
-      </div>
+      <p className="rounded-xl border bg-muted/30 p-3 text-xs leading-6">{text('The register shows recorded cash movements, not bank or network balances. Review source references before adding a manual transaction.', 'رجستر حرکت‌های ثبت‌شده نقد را نشان می‌دهد، نه مانده بانک یا شبکه. قبل از ثبت دستی، مرجع معامله را بررسی کنید.', 'يعرض الصندوق حركات النقد المسجلة، وليس أرصدة البنك أو الشبكة. راجع مراجع الحركات قبل التسجيل اليدوي.')}</p>
+      {issues.length > 0 && <div role="alert" className="rounded-xl border border-amber-400 bg-amber-500/10 p-4 text-sm leading-7"><strong>{issues.length} {text('cash contributions need reconciliation','تزریق نقد نیاز به تطبیق دارد','مساهمات نقدية تحتاج مطابقة')}</strong><p>{text('A treasury link is missing or the cash movement count is inconsistent. Historical records have not been changed; review these references before relying on totals.', 'لینک خزانه ناقص است یا تعداد حرکات نقد هماهنگ نیست. رکوردهای قبلی تغییر نکرده‌اند؛ قبل از اعتماد به مجموع‌ها این مرجع‌ها را بررسی کنید.', 'رابط الخزينة مفقود أو عدد حركات النقد غير متطابق. لم تتغير السجلات السابقة؛ راجع هذه المراجع قبل الاعتماد على الإجماليات.')}</p><ul className="mt-2 space-y-1">{issues.map(row => <li key={row.id} className="break-words">{cashBranchLabel(branches,row.branch)} · {row.date} · <span dir="ltr">{row.id}</span></li>)}</ul></div>}
 
       {/* Main Tabs */}
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full grid grid-cols-5 h-9">
-          <TabsTrigger value="dashboard" className="text-[10px] px-1">
+        <TabsList className="w-full flex justify-start overflow-x-auto h-auto min-h-12">
+          <TabsTrigger value="dashboard" className="min-h-11 shrink-0 text-xs px-3">
             <LayoutDashboard className="w-3 h-3 mr-0.5" />
-            <span className="hidden sm:inline">Dashboard</span>
+            <span className="inline">Dashboard</span>
           </TabsTrigger>
-          <TabsTrigger value="settlement" className="text-[10px] px-1">
+          <TabsTrigger value="settlement" className="min-h-11 shrink-0 text-xs px-3">
             <ClipboardList className="w-3 h-3 mr-0.5" />
-            <span className="hidden sm:inline">Settle</span>
+            <span className="inline">Settle</span>
           </TabsTrigger>
-          <TabsTrigger value="shortages" className="text-[10px] px-1 relative">
+          <TabsTrigger value="shortages" className="min-h-11 shrink-0 text-xs px-3 relative">
             <AlertTriangle className="w-3 h-3 mr-0.5" />
-            <span className="hidden sm:inline">Shortages</span>
+            <span className="inline">Shortages</span>
             {pendingCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
                 {pendingCount}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="injection" className="text-[10px] px-1">
+          <TabsTrigger value="injection" className="min-h-11 shrink-0 text-xs px-3">
             <Banknote className="w-3 h-3 mr-0.5" />
-            <span className="hidden sm:inline">Inject</span>
+            <span className="inline">Inject</span>
           </TabsTrigger>
-          <TabsTrigger value="reports" className="text-[10px] px-1">
+          <TabsTrigger value="reports" className="min-h-11 shrink-0 text-xs px-3">
             <BarChart3 className="w-3 h-3 mr-0.5" />
-            <span className="hidden sm:inline">Reports</span>
+            <span className="inline">Reports</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-3">
-          <CashRegisterDashboard selectedBranch={effectiveBranch} />
+          <CashRegisterDashboard key={activeRestaurantId} selectedBranch={effectiveBranch} />
         </TabsContent>
 
         <TabsContent value="settlement" className="mt-3 space-y-4">
@@ -185,7 +193,7 @@ export default function CashRegisterCenter() {
           ) : (
             settlementBranches.map(b => (
               <DailyCashSettlementForm
-                key={b.key}
+                key={`${activeRestaurantId}:${b.key}`}
                 branch={b.key}
                 date={today}
                 onSettlementChange={() => qc.invalidateQueries({ queryKey: ['daily_cash_settlements'] })}
@@ -213,19 +221,20 @@ export default function CashRegisterCenter() {
 function OwnerInjectionHistory({ branch, user, currency }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
-  const { branches } = useTenant();
-  const fmt = (n) => `${currency}${(Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const { branches, activeRestaurantId } = useTenant();
+  const fmt = (n) => `${currency}${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const { data: injections = [], isLoading } = useQuery({
-    queryKey: ['owner_cash_injections_all', user?.email, branch],
-    queryFn: () => base44.entities.OwnerCashInjection.filter({
-      created_by: user?.email,
+  const { isError: cashError2, data: injections = [], isLoading } = useQuery({
+    queryKey: ['owner_cash_injections_all', user?.email, activeRestaurantId, branch],
+    queryFn: () => readCashRows('OwnerCashInjection', {
+      restaurant_id: activeRestaurantId,
       ...(branch !== 'all' ? { branch } : {}),
     }, '-date', 200),
-    enabled: !!user?.email,
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 30000,
   });
 
+  if (cashError2) return <PortalDataState onRetry={() => qc.invalidateQueries()} />;
   const total = injections.reduce((s, r) => s + Number(r.amount || 0), 0);
 
   return (
@@ -240,6 +249,7 @@ function OwnerInjectionHistory({ branch, user, currency }) {
           <Button
             size="sm"
             className="bg-green-600 hover:bg-green-700 text-xs h-9"
+            disabled={user?.role !== "owner"}
             onClick={() => setShowForm(!showForm)}
           >
             <Plus className="w-3.5 h-3.5 mr-1" />
@@ -249,7 +259,7 @@ function OwnerInjectionHistory({ branch, user, currency }) {
       </div>
 
       {showForm && (
-        <OwnerCashInjectionForm
+        <OwnerCashInjectionForm key={activeRestaurantId}
           defaultBranch={branch !== 'all' ? branch : (branches[0]?.key || '')}
           onSuccess={() => {
             setShowForm(false);
@@ -275,7 +285,7 @@ function OwnerInjectionHistory({ branch, user, currency }) {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-semibold text-green-600">{fmt(inj.amount)}</p>
-                  <p className="text-xs text-muted-foreground">{inj.branch} · {format(new Date(inj.date), 'MMM d, yyyy')}</p>
+                  <p className="text-xs text-muted-foreground">{cashBranchLabel(branches, inj.branch)} · {format(new Date(inj.date), 'MMM d, yyyy')}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{inj.reason}</p>
                   {inj.notes && <p className="text-xs text-muted-foreground italic mt-0.5">{inj.notes}</p>}
                 </div>

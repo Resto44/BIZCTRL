@@ -11,7 +11,8 @@ import {
   approveSettlement,
   rejectSettlement,
 } from '@/services/cashRegisterService';
-import { base44 } from '@/api/base44Client';
+import { readCashRows, cashBranchLabel } from '@/lib/cashRegisterData';
+import PortalDataState from '@/components/shared/PortalDataState';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,7 +27,7 @@ import { format } from 'date-fns';
 import OwnerCashInjectionForm from './OwnerCashInjectionForm';
 
 // ── Numeric Keypad ────────────────────────────────────────────────────────────
-function NumericKeypad({ value, onChange }) {
+function NumericKeypad({ value, onChange, onConfirm }) {
   const handleKey = (key) => {
     if (key === 'C') { onChange(''); return; }
     if (key === '⌫') { onChange(String(value).slice(0, -1)); return; }
@@ -56,7 +57,7 @@ function NumericKeypad({ value, onChange }) {
       {/* Full-width confirm button */}
       <button
         type="button"
-        onClick={() => {}}
+        onClick={onConfirm}
         className="col-span-3 h-12 rounded-xl bg-primary text-primary-foreground text-base font-semibold hover:bg-primary/90 transition-all active:scale-95"
       >
         Confirm Count
@@ -68,7 +69,7 @@ function NumericKeypad({ value, onChange }) {
 // ── Cash Line Item ────────────────────────────────────────────────────────────
 function CashLineItem({ label, value, direction, color, bold }) {
   const { currency } = useLanguage();
-  const fmt = (n) => `${currency}${(Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const fmt = (n) => `${currency} ${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   return (
     <div className={`flex items-center justify-between py-2 border-b border-border last:border-0 ${bold ? 'font-semibold' : ''}`}>
       <div className="flex items-center gap-2">
@@ -103,13 +104,13 @@ function StatusBadge({ status }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function DailyCashSettlementForm({ branch, date, onSettlementChange }) {
   const { user } = useAuth();
-  const { activeRestaurantId } = useTenant();
+  const { activeRestaurantId, allBranches } = useTenant();
   const { currency } = useLanguage();
   const notif = useNotify();
   const qc = useQueryClient();
 
   const d = date || format(new Date(), 'yyyy-MM-dd');
-  const fmt = (n) => `${currency}${(Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const fmt = (n) => `${currency} ${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const [cashCounted, setCashCounted] = useState('');
   const [notes, setNotes] = useState('');
@@ -118,29 +119,29 @@ export default function DailyCashSettlementForm({ branch, date, onSettlementChan
   const [showDetails, setShowDetails] = useState(true);
 
   // Load settlement for this branch/date
-  const { data: settlements = [], isLoading, refetch } = useQuery({
-    queryKey: ['daily_cash_settlements', d, branch, user?.email],
-    queryFn: () => base44.entities.DailyCashSettlement.filter({
+  const { isError: cashError1, isLoading: cashLoading1, data: settlements = [], isLoading, refetch } = useQuery({
+    queryKey: ['daily_cash_settlements', d, branch, user?.email, activeRestaurantId],
+    queryFn: () => readCashRows('DailyCashSettlement', {
       date: d,
       branch,
-      created_by: user?.email,
+      restaurant_id: activeRestaurantId,
     }, '-created_date', 5),
-    enabled: !!branch && !!user?.email,
+    enabled: !!activeRestaurantId && !!branch && !!user?.email,
     staleTime: 15000,
   });
 
   const settlement = settlements[0] || null;
 
   // Load today's cash movements for this branch
-  const { data: movements = [] } = useQuery({
-    queryKey: ['cash_movements', d, branch, user?.email],
-    queryFn: () => base44.entities.CashMovement.filter({
+  const { isError: cashError2, isLoading: cashLoading2, data: movements = [] } = useQuery({
+    queryKey: ['cash_movements', d, branch, user?.email, activeRestaurantId],
+    queryFn: () => readCashRows('CashMovement', {
       date: d,
       branch,
-      created_by: user?.email,
+      restaurant_id: activeRestaurantId,
       is_reversed: false,
     }, '-posted_at', 200),
-    enabled: !!branch && !!user?.email,
+    enabled: !!activeRestaurantId && !!branch && !!user?.email,
     staleTime: 15000,
   });
 
@@ -149,11 +150,11 @@ export default function DailyCashSettlementForm({ branch, date, onSettlementChan
     if (!settlement) return { expected_closing_cash: 0, difference: 0, shortage: 0, overage: 0 };
     return computeExpectedClosing({
       ...settlement,
-      cash_counted: Number(cashCounted) || Number(settlement.cash_counted) || 0,
+      cash_counted: cashCounted === '' ? Number(settlement.cash_counted || 0) : Number(cashCounted),
     });
   }, [settlement, cashCounted]);
 
-  const isEditable = !settlement || settlement.status === 'Draft' || settlement.status === 'Rejected';
+  const isEditable = user?.role === 'owner' && (!settlement || settlement.status === 'Draft' || settlement.status === 'Rejected');
   const isOwner = user?.role === 'owner';
 
   // ── Submit Settlement ──────────────────────────────────────────────────────
@@ -164,6 +165,7 @@ export default function DailyCashSettlementForm({ branch, date, onSettlementChan
         s = await getOrCreateSettlement({
           date: d,
           branch,
+          branchId: allBranches.find(b => b.key === branch || b.branch_key === branch)?.id,
           createdBy: user?.email,
           restaurantId: activeRestaurantId,
         });
@@ -178,7 +180,7 @@ export default function DailyCashSettlementForm({ branch, date, onSettlementChan
     },
     onSuccess: (data) => {
       notif.success('Settlement submitted successfully.');
-      qc.invalidateQueries({ queryKey: ['daily_cash_settlements'] });
+      qc.invalidateQueries();
       qc.invalidateQueries({ queryKey: ['cash_shortages'] });
       // Refresh dashboard and live summary
       qc.invalidateQueries({ queryKey: ['sales_today'] });
@@ -197,7 +199,7 @@ export default function DailyCashSettlementForm({ branch, date, onSettlementChan
     mutationFn: () => approveSettlement({ settlementId: settlement.id, approvedBy: user?.email }),
     onSuccess: () => {
       notif.success('Settlement approved.');
-      qc.invalidateQueries({ queryKey: ['daily_cash_settlements'] });
+      qc.invalidateQueries();
       qc.invalidateQueries({ queryKey: ['sales_today'] });
       qc.invalidateQueries({ queryKey: ['sales_today_live'] });
       qc.invalidateQueries({ queryKey: ['sales_month_live'] });
@@ -211,11 +213,13 @@ export default function DailyCashSettlementForm({ branch, date, onSettlementChan
     mutationFn: () => rejectSettlement({ settlementId: settlement.id, rejectedBy: user?.email, notes }),
     onSuccess: () => {
       notif.success('Settlement rejected.');
-      qc.invalidateQueries({ queryKey: ['daily_cash_settlements'] });
+      qc.invalidateQueries();
     },
     onError: (err) => notif.error('Failed to reject: ' + (err?.message || 'Unknown error')),
   });
 
+  if (cashLoading1 || cashLoading2) return <PortalDataState loading />;
+  if (cashError1 || cashError2) return <PortalDataState onRetry={() => window.location.reload()} />;
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -232,7 +236,7 @@ export default function DailyCashSettlementForm({ branch, date, onSettlementChan
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold">{format(new Date(d), 'EEEE, MMMM d')}</h3>
-          <p className="text-xs text-muted-foreground">{branch}</p>
+          <p className="text-xs text-muted-foreground">{cashBranchLabel(allBranches,branch)}</p>
         </div>
         <div className="flex items-center gap-2">
           {settlement && <StatusBadge status={settlement.status} />}
@@ -298,15 +302,15 @@ export default function DailyCashSettlementForm({ branch, date, onSettlementChan
                 className="relative cursor-pointer"
                 onClick={() => setShowKeypad(!showKeypad)}
               >
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{currency}</span>
-                <div className="h-14 pl-8 pr-4 flex items-center text-2xl font-bold rounded-xl border-2 border-primary/30 bg-primary/5 text-primary">
+                <span className="absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{currency}</span>
+                <div className="h-14 ps-20 pr-4 flex items-center text-2xl font-bold rounded-xl border-2 border-primary/30 bg-primary/5 text-primary">
                   {cashCounted || <span className="text-muted-foreground/50 text-lg">Tap to count</span>}
                 </div>
               </div>
 
               {/* Mobile Numeric Keypad */}
               {showKeypad && (
-                <NumericKeypad value={cashCounted} onChange={setCashCounted} />
+                <NumericKeypad value={cashCounted} onChange={setCashCounted} onConfirm={() => setShowKeypad(false)} />
               )}
 
               {/* Difference Preview */}
@@ -452,7 +456,7 @@ export default function DailyCashSettlementForm({ branch, date, onSettlementChan
           shortageAmount={settlement ? Math.abs(settlement.difference) : 0}
           onSuccess={() => {
             setShowInjection(false);
-            qc.invalidateQueries({ queryKey: ['daily_cash_settlements'] });
+            qc.invalidateQueries();
           }}
           onCancel={() => setShowInjection(false)}
         />
