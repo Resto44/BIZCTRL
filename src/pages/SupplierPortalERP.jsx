@@ -1,3 +1,4 @@
+import HelpLink from '@/components/help/HelpLink';
 import {supplierInvoiceCurrencyTotals,readAllPortalRows} from '@/lib/portalReliability';
 import PortalDataState from '@/components/shared/PortalDataState';
 import React, { useState } from 'react';
@@ -156,7 +157,8 @@ export default function SupplierPortalERP() {
             <Button variant="ghost" size="sm" onClick={() => { refetch(); refetchInvoices(); }} className="text-slate-400">
               <RefreshCw className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={logout} className="text-slate-400">
+            <HelpLink guide="supplier-portal" />
+          <Button variant="ghost" size="sm" onClick={logout} className="text-slate-400">
               <LogOut className="w-4 h-4" />
             </Button>
           </div>
