@@ -1,3 +1,4 @@
+import HelpLink from '@/components/help/HelpLink';
 import PortalDataState from '@/components/shared/PortalDataState';
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
@@ -168,6 +169,7 @@ export default function EmployeeDashboardERP() {
               </div>
             </div>
           </div>
+          <HelpLink guide="employee" />
           <Button variant="ghost" size="sm" onClick={logout} className="text-slate-400 hover:text-white">
             <LogOut className="w-4 h-4" />
           </Button>

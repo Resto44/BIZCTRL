@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import HelpCenter, { HELP_COPY } from '@/components/help/HelpCenter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -55,11 +57,18 @@ const LABELS = {
   },
 };
 
+export function parseTicketAttachments(value) {
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    return Array.isArray(parsed) ? parsed.filter(item => item && typeof item.url === 'string' && /^https?:\/\//i.test(item.url)) : [];
+  } catch { return []; }
+}
+
 function TicketCard({ ticket, onClick }) {
   const status = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.open;
   const priority = PRIORITY_CONFIG[ticket.priority] || PRIORITY_CONFIG.medium;
   const StatusIcon = status.icon;
-  const attachments = ticket.attachments ? JSON.parse(ticket.attachments) : [];
+  const attachments = parseTicketAttachments(ticket.attachments);
 
   return (
     <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={onClick}>
@@ -102,7 +111,7 @@ function TicketCard({ ticket, onClick }) {
 }
 
 function TicketDetail({ ticket, onClose }) {
-  const attachments = ticket.attachments ? JSON.parse(ticket.attachments) : [];
+  const attachments = parseTicketAttachments(ticket.attachments);
   const status = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.open;
   const priority = PRIORITY_CONFIG[ticket.priority] || PRIORITY_CONFIG.medium;
 
@@ -166,27 +175,31 @@ function TicketDetail({ ticket, onClose }) {
 
 export default function Support() {
   const { user } = useAuth();
-  const { language } = useLanguage();
+  const { lang: language, dir } = useLanguage();
+  const [params, setParams] = useSearchParams();
+  const showTickets = params.get("tab") === "tickets";
+  const helpCopy = HELP_COPY[language] || HELP_COPY.en;
   const lbl = LABELS[language] || LABELS.en;
   const qc = useQueryClient();
 
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState(null);
 
-  const { data: tickets = [], isLoading } = useQuery({
+  const { data: tickets = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['support_tickets', user?.email],
     queryFn: () => base44.entities.SupportTicket.filter({ submitted_by: user?.email }, '-created_date', 100),
-    enabled: !!user?.email,
+    enabled: !!user?.email && showTickets,
     staleTime: 30000,
   });
 
   const handleClose = () => {
     setShowNew(false);
+    setParams({ tab: 'tickets' });
     qc.invalidateQueries({ queryKey: ['support_tickets'] });
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div dir={dir} className="max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -194,7 +207,7 @@ export default function Support() {
             <HeadphonesIcon className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-lg font-bold">{lbl.title}</h1>
+            <h1 className="text-lg font-bold">{helpCopy.title}</h1>
             <p className="text-xs text-muted-foreground">{lbl.my_tickets}</p>
           </div>
         </div>
@@ -203,8 +216,10 @@ export default function Support() {
         </Button>
       </div>
 
-      {/* Ticket list */}
-      {isLoading ? (
+      <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label={helpCopy.title}>
+        {[['guides', helpCopy.title], ['tickets', lbl.my_tickets]].map(([tab, label]) => <Button key={tab} variant={(showTickets ? 'tickets' : 'guides') === tab ? 'default' : 'outline'} aria-pressed={(showTickets ? 'tickets' : 'guides') === tab} onClick={() => setParams(current => { const next = new URLSearchParams(current); next.set('tab', tab); return next; }, { replace: true })}>{label}</Button>)}
+      </div>
+      {!showTickets ? <HelpCenter /> : isError ? <div role="alert" className="rounded-xl border p-4"><p>{language === 'fa' ? 'تیکت‌ها دریافت نشد.' : language === 'ar' ? 'تعذر تحميل التذاكر.' : 'Could not load support tickets.'}</p><Button className="mt-3" onClick={() => refetch()}>{language === 'fa' ? 'تلاش دوباره' : language === 'ar' ? 'إعادة المحاولة' : 'Retry'}</Button></div> : isLoading ? (
         <p className="text-center text-sm text-muted-foreground py-8">{lbl.loading}</p>
       ) : tickets.length === 0 ? (
         <div className="text-center py-16">

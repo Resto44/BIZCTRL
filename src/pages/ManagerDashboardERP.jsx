@@ -1,3 +1,4 @@
+import HelpLink from '@/components/help/HelpLink';
 import {portalTreasuryMovement, readAllPortalRows} from '@/lib/portalReliability';
 import PortalDataState from '@/components/shared/PortalDataState';
 /**
@@ -347,6 +348,7 @@ function ManagerContent({ branchId, branchName, branchKey }) {
             {format(new Date(), 'EEEE, MMMM d, yyyy')} · Branch Manager Dashboard
           </p>
         </div>
+        <HelpLink guide="manager" />
         <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
           <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
         </Button>

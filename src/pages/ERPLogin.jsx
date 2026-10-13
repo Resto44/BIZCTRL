@@ -1,3 +1,4 @@
+import HelpLink from '@/components/help/HelpLink';
 import BrandLogo from '@/components/BrandLogo';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -176,6 +177,7 @@ export default function ERPLogin() {
       </div>
 
       <div className="relative w-full max-w-2xl">
+        <div className="mb-3 text-end text-slate-200"><HelpLink guide="start" /></div>
         {/* Header */}
         <BrandLogo className="mx-auto mb-6 h-20 w-auto max-w-full" />
         <div className="text-center mb-8">

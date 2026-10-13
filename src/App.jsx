@@ -118,6 +118,7 @@ const SalesSourceManagement = lazy(() => import('@/pages/SalesSourceManagement')
 const TelegramSettings    = lazy(() => import('@/pages/TelegramSettings'));
 const Billing             = lazy(() => import('@/pages/Billing'));
 const Support             = lazy(() => import('@/pages/Support'));
+const Help = lazy(() => import('@/pages/Help'));
 const PlatformOwnerPortal = lazy(() => import('@/pages/PlatformOwnerPortal'));
 const PlatformOwnerLogin  = lazy(() => import('@/pages/PlatformOwnerLogin'));
 const PlatformOwnerPasswordChange = lazy(() => import('@/pages/PlatformOwnerPasswordChange'));
@@ -648,6 +649,7 @@ function App() {
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/refund" element={<RefundPage />} />
               <Route path="/contact" element={<ContactPage />} />
+              <Route path="/help" element={<Suspense fallback={<PageLoader />}><Help /></Suspense>} />
               <Route path="/retail/customer-display" element={<CustomerDisplay />} />
               <Route path="/restaurant/customer-display" element={<CustomerDisplay rpc={restaurantRpc} brand="RESTAURANT" />} />
               {/* All authenticated routes */}
