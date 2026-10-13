@@ -213,6 +213,10 @@ const ClosingFieldControlRow = memo(function ClosingFieldControlRow({ field, lab
 });
 
 const DriverSalesSourceCard = memo(function DriverSalesSourceCard({ source, sourceLabel, entries, drivers, branchLabel, previous, currency, onAdd, onChange, onRemove, isHistoryLoading, isHistoryUnavailable, copy }) {
+  // This accordion deliberately excludes stored driver names from DOM translation.
+  // Localize its own UI labels explicitly so the selected SaaS language is honored.
+  const { translateLiteral } = useLanguage();
+  const tr = translateLiteral;
   const driverEntries = asRecordArray(entries);
   const today = driverSourceTodayTotal(driverEntries);
   const total = previous + today;
@@ -247,59 +251,59 @@ const DriverSalesSourceCard = memo(function DriverSalesSourceCard({ source, sour
           <div className="flex min-w-0 items-center gap-2.5">
             <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tone.soft} ${tone.text}`}><SourceIcon className="h-5 w-5" /></span>
             <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-2"><p className={`truncate text-sm font-black ${tone.strongText}`}>{sourceLabel}</p><Badge variant="outline" className={`hidden shrink-0 text-[9px] sm:inline-flex ${tone.border} ${tone.soft} ${tone.text}`}>Driver source</Badge></div>
-              <p className="mt-0.5 truncate text-[10px] font-medium text-muted-foreground">{branchLabel || 'Current branch'} · {availableDrivers.length} active {availableDrivers.length === 1 ? 'driver' : 'drivers'}</p>
+              <div className="flex min-w-0 items-center gap-2"><p className={`truncate text-sm font-black ${tone.strongText}`}>{sourceLabel}</p><Badge variant="outline" className={`hidden shrink-0 text-[9px] sm:inline-flex ${tone.border} ${tone.soft} ${tone.text}`}>{tr('Driver source')}</Badge></div>
+              <p className="mt-0.5 truncate text-[10px] font-medium text-muted-foreground">{branchLabel || tr('Current branch')} · {availableDrivers.length} {tr('active')} {availableDrivers.length === 1 ? tr('driver') : tr('drivers')}</p>
             </div>
           </div>
-          <Button type="button" size="sm" className="min-h-11 rounded-xl bg-blue-600 px-3 font-bold hover:bg-blue-700" onClick={addDriver} disabled={!canAddDriver}><PlusCircle className="mr-1.5 h-4 w-4" />Add Driver</Button>
+          <Button type="button" size="sm" className="min-h-11 rounded-xl bg-blue-600 px-3 font-bold hover:bg-blue-700" onClick={addDriver} disabled={!canAddDriver}><PlusCircle className="mr-1.5 h-4 w-4" />{tr('Add Driver')}</Button>
         </div>
 
         <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70" data-testid="driver-source-summary">
-          <div className="min-w-0 px-2 py-3 text-center"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Today</p><Money currency={currency} value={today} className="mt-1 block truncate text-sm font-black text-slate-950" /></div>
-          <div className="min-w-0 border-x border-slate-200 px-2 py-3 text-center"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Cash</p><Money currency={currency} value={breakdown.cash} className="mt-1 block truncate text-sm font-black text-emerald-700" /></div>
-          <div className="min-w-0 px-2 py-3 text-center"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Network</p><Money currency={currency} value={breakdown.network} className="mt-1 block truncate text-sm font-black text-blue-700" /></div>
+          <div className="min-w-0 px-2 py-3 text-center"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">{tr('Today')}</p><Money currency={currency} value={today} className="mt-1 block truncate text-sm font-black text-slate-950" /></div>
+          <div className="min-w-0 border-x border-slate-200 px-2 py-3 text-center"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">{tr('Cash')}</p><Money currency={currency} value={breakdown.cash} className="mt-1 block truncate text-sm font-black text-emerald-700" /></div>
+          <div className="min-w-0 px-2 py-3 text-center"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">{tr('Network')}</p><Money currency={currency} value={breakdown.network} className="mt-1 block truncate text-sm font-black text-blue-700" /></div>
         </div>
       </div>
 
       <div className="space-y-2 border-t border-slate-100 bg-slate-50/40 p-3 sm:p-4">
-        {driverEntries.length === 0 ? <div className="flex min-h-16 items-center gap-3 rounded-xl border border-slate-200 bg-background px-3 py-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"><Bike className="h-4 w-4" /></span><div className="min-w-0"><p className="text-xs font-bold text-slate-800">No driver sales yet</p><p className="mt-0.5 text-[10px] text-slate-500">Use Add Driver to record today&apos;s Cash and Network.</p></div></div> : driverEntries.map((entry) => {
+        {driverEntries.length === 0 ? <div className="flex min-h-16 items-center gap-3 rounded-xl border border-slate-200 bg-background px-3 py-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"><Bike className="h-4 w-4" /></span><div className="min-w-0"><p className="text-xs font-bold text-slate-800">{tr('No driver sales yet')}</p><p className="mt-0.5 text-[10px] text-slate-500">{tr('Use Add Driver to record today\'s Cash and Network.')}</p></div></div> : driverEntries.map((entry) => {
           const usedDriverIds = new Set(driverEntries.filter((candidate) => candidate.client_row_id !== entry.client_row_id).map((candidate) => String(candidate.driver_id || '')));
           const amounts = driverSourceEntryAmounts(entry);
           const expanded = expandedEntryId === entry.client_row_id;
           const selectedDriver = availableDrivers.find((driver) => String(driver.id) === String(entry.driver_id || ''));
-          const driverName = entry.driver_name || selectedDriver?.full_name || 'Select driver';
-          const initials = driverName === 'Select driver' ? '?' : driverName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+          const driverName = entry.driver_name || selectedDriver?.full_name || tr('Select driver');
+          const initials = !entry.driver_name && !selectedDriver?.full_name ? '?' : driverName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
           const complete = Boolean(entry.driver_id) && amounts.total > 0;
           const panelId = `driver-source-panel-${entry.client_row_id}`;
 
           return <div key={entry.client_row_id} className={`overflow-hidden rounded-xl border bg-background transition-colors ${expanded ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200'}`}>
             <button type="button" className="grid min-h-16 w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-2.5 text-left" onClick={() => setExpandedEntryId(expanded ? null : entry.client_row_id)} aria-expanded={expanded} aria-controls={panelId}>
               <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-black ${complete ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{initials}</span>
-              <span className="min-w-0"><span className="block truncate text-sm font-bold text-slate-900">{driverName}</span><span className="mt-0.5 block truncate text-[10px] text-slate-500">{entry.driver_id ? <>Cash {currency} {amounts.cash.toLocaleString()} · Network {currency} {amounts.network.toLocaleString()}</> : 'Choose a branch driver'}</span></span>
+              <span className="min-w-0"><span className="block truncate text-sm font-bold text-slate-900">{driverName}</span><span className="mt-0.5 block truncate text-[10px] text-slate-500">{entry.driver_id ? <>{tr('Cash')} {currency} {amounts.cash.toLocaleString()} · {tr('Network')} {currency} {amounts.network.toLocaleString()}</> : tr('Choose a branch driver')}</span></span>
               <Money currency={currency} value={amounts.total} className="whitespace-nowrap text-sm font-black text-slate-900" />
               <span className="flex items-center gap-1.5">{complete ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <AlertCircle className="h-5 w-5 text-amber-500" />}{expanded ? <ChevronUp className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}</span>
             </button>
 
             {expanded && <div id={panelId} className="space-y-3 border-t border-slate-100 bg-slate-50/50 p-3">
-              <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Driver</Label><Select value={entry.driver_id || ''} onValueChange={(driver_id) => {
+              <div><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">{tr('Driver')}</Label><Select value={entry.driver_id || ''} onValueChange={(driver_id) => {
                 const driver = availableDrivers.find((candidate) => String(candidate.id) === String(driver_id));
                 onChange(entry.client_row_id, { driver_id, driver_name: driver?.full_name || '' });
-              }}><SelectTrigger className="min-h-11 bg-background"><SelectValue placeholder="Select Driver" /></SelectTrigger><SelectContent>{availableDrivers.map((driver) => <SelectItem key={driver.id} value={driver.id} disabled={usedDriverIds.has(String(driver.id))}>{driver.full_name}{driver.driver_id ? ` · ${driver.driver_id}` : ''}</SelectItem>)}</SelectContent></Select></div>
+              }}><SelectTrigger className="min-h-11 bg-background"><SelectValue placeholder={tr("Select Driver")} /></SelectTrigger><SelectContent>{availableDrivers.map((driver) => <SelectItem key={driver.id} value={driver.id} disabled={usedDriverIds.has(String(driver.id))}>{driver.full_name}{driver.driver_id ? ` · ${driver.driver_id}` : ''}</SelectItem>)}</SelectContent></Select></div>
               <div className="grid grid-cols-2 gap-2">
-                <div><Label htmlFor={`driver-cash-${entry.client_row_id}`} className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Cash</Label><ClosingNumericInput id={`driver-cash-${entry.client_row_id}`} value={entry.cash_amount ?? entry.cash ?? ''} onChange={(value) => onChange(entry.client_row_id, { cash_amount: value })} prefix={currency} inputClassName="min-h-12 bg-background font-bold" /></div>
-                <div><Label htmlFor={`driver-network-${entry.client_row_id}`} className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Network</Label><ClosingNumericInput id={`driver-network-${entry.client_row_id}`} value={entry.network_amount ?? entry.network ?? ''} onChange={(value) => onChange(entry.client_row_id, { network_amount: value })} prefix={currency} inputClassName="min-h-12 bg-background font-bold" /></div>
+                <div><Label htmlFor={`driver-cash-${entry.client_row_id}`} className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">{tr('Cash')}</Label><ClosingNumericInput id={`driver-cash-${entry.client_row_id}`} value={entry.cash_amount ?? entry.cash ?? ''} onChange={(value) => onChange(entry.client_row_id, { cash_amount: value })} prefix={currency} inputClassName="min-h-12 bg-background font-bold" /></div>
+                <div><Label htmlFor={`driver-network-${entry.client_row_id}`} className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">{tr('Network')}</Label><ClosingNumericInput id={`driver-network-${entry.client_row_id}`} value={entry.network_amount ?? entry.network ?? ''} onChange={(value) => onChange(entry.client_row_id, { network_amount: value })} prefix={currency} inputClassName="min-h-12 bg-background font-bold" /></div>
               </div>
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2"><span className="text-xs font-bold text-blue-800">Driver total</span><Money currency={currency} value={amounts.total} className="text-base font-black text-blue-900" /></div>
-              <Textarea value={entry.notes || ''} onChange={(event) => onChange(entry.client_row_id, { notes: event.target.value })} placeholder="Optional note" className="min-h-11 resize-none bg-background" rows={1} />
-              <div className="flex items-center justify-between gap-2"><Button type="button" variant="ghost" size="sm" className="min-h-10 text-destructive hover:text-destructive" onClick={() => onRemove(entry.client_row_id)}><Trash2 className="mr-1.5 h-4 w-4" />Remove</Button><Button type="button" size="sm" variant="outline" className="min-h-10 bg-background font-bold" onClick={() => setExpandedEntryId(null)}>Done</Button></div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2"><span className="text-xs font-bold text-blue-800">{tr('Driver total')}</span><Money currency={currency} value={amounts.total} className="text-base font-black text-blue-900" /></div>
+              <Textarea value={entry.notes || ''} onChange={(event) => onChange(entry.client_row_id, { notes: event.target.value })} placeholder={tr("Optional note")} className="min-h-11 resize-none bg-background" rows={1} />
+              <div className="flex items-center justify-between gap-2"><Button type="button" variant="ghost" size="sm" className="min-h-10 text-destructive hover:text-destructive" onClick={() => onRemove(entry.client_row_id)}><Trash2 className="mr-1.5 h-4 w-4" />{tr('Remove')}</Button><Button type="button" size="sm" variant="outline" className="min-h-10 bg-background font-bold" onClick={() => setExpandedEntryId(null)}>{tr('Done')}</Button></div>
             </div>}
           </div>;
         })}
       </div>
-      {availableDrivers.length === 0 && <p className="mx-3 mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 sm:mx-4">Create an active driver for this branch before recording driver sales.</p>}
+      {availableDrivers.length === 0 && <p className="mx-3 mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 sm:mx-4">{tr('Create an active driver for this branch before recording driver sales.')}</p>}
       <div className="space-y-2 border-t border-slate-100 px-3 py-3 sm:px-4">
-        <div className="flex items-center justify-between gap-3 text-sm"><div><p className="font-medium text-slate-700">Previous closings</p><p className="text-[10px] text-muted-foreground">{copy.previousHelp}</p></div>{isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={previous} className="font-semibold text-slate-500" />}</div>
-        <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-sm"><div><p className="font-black text-slate-950">Running total</p><p className="text-[10px] text-muted-foreground">Previous + Today · read only</p></div>{isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={total} className="text-lg font-black text-cyan-800" />}</div>
+        <div className="flex items-center justify-between gap-3 text-sm"><div><p className="font-medium text-slate-700">{tr('Previous closings')}</p><p className="text-[10px] text-muted-foreground">{copy.previousHelp}</p></div>{isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={previous} className="font-semibold text-slate-500" />}</div>
+        <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-sm"><div><p className="font-black text-slate-950">{tr('Running total')}</p><p className="text-[10px] text-muted-foreground">{tr('Previous + Today · read only')}</p></div>{isHistoryLoading ? <span className="text-xs text-muted-foreground">{copy.loadingHistory}</span> : isHistoryUnavailable ? <span className="text-xs text-destructive">{copy.historyUnavailable}</span> : <Money currency={currency} value={total} className="text-lg font-black text-cyan-800" />}</div>
       </div>
     </div>
   );
