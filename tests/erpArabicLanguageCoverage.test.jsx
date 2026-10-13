@@ -65,8 +65,8 @@ describe('Selected SaaS language applied throughout ERP',()=>{
   expect(translateInterface('FR-INV-10045','ar')).toBe('FR-INV-10045');
  });
  it('wires the catalog into the global source language resolver',async()=>{
-  const source=await readFile(new URL('../src/lib/translateInterface.js',import.meta.url),'utf8');
-  const provider=await readFile(new URL('../src/lib/LanguageContext.jsx',import.meta.url),'utf8');
+  const source=await readFile(process.cwd()+'/src/lib/translateInterface.js','utf8');
+  const provider=await readFile(process.cwd()+'/src/lib/LanguageContext.jsx','utf8');
   expect(source).toContain('erpInterfacePhrases');
   expect(provider).toContain('useDocumentLocalization({ lang, translateLiteral })');
   expect(provider).toContain("document.documentElement.setAttribute('dir', dir)");
