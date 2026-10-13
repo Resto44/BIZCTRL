@@ -14,8 +14,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Pencil, Trash2, Truck, Phone, CreditCard, MapPin } from 'lucide-react';
 import { useTenant } from '@/lib/TenantContext';
 import SupplierDetail from '@/components/suppliers/SupplierDetail';
-import SupplierPaymentManager from '@/components/suppliers/SupplierPaymentManager';
-import SupplierPaymentForm from '@/components/suppliers/SupplierPaymentForm';
+import {supabase} from '@/api/supabaseClient';
+import {readAllPortalRows} from '@/lib/portalReliability';
+import PortalDataState from '@/components/shared/PortalDataState';
 
 const ui = {
   en: { suppliers: 'Suppliers', add_supplier: 'Add Supplier', edit_supplier: 'Edit Supplier', name: 'Supplier Name', phone: 'Phone', email: 'Email', address: 'Address', notes: 'Notes', save: 'Save', cancel: 'Cancel', confirm_delete: 'Confirm Delete' },
@@ -29,7 +30,7 @@ export default function Suppliers() {
   const { lang } = useLanguage();
   const m = ui[lang] || ui.en;
   const qc = useQueryClient();
-  const { ownerFilter } = useTenant();
+  const { ownerFilter, activeRestaurantId, orgId } = useTenant();
   const [searchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -43,13 +44,13 @@ export default function Suppliers() {
     if (tab) setActiveTab(tab);
   }, [searchParams]);
 
-  const { data: suppliers = [] } = useQuery({ 
-    queryKey: ['suppliers', ownerFilter], 
-    queryFn: () => base44.entities.Supplier.filter(ownerFilter || {}, 'name', 500), 
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch) 
+  const { data: suppliers = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['suppliers', activeRestaurantId],
+    queryFn: () => readAllPortalRows(()=>supabase.from('suppliers').select('*').eq('restaurant_id',activeRestaurantId).order('id')),
+    enabled: Boolean(activeRestaurantId)
   });
 
-  const { activeRestaurantId, orgId } = useTenant();
+
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
@@ -62,17 +63,17 @@ export default function Suppliers() {
         status: true, // Default to active
       };
       try {
-        const result = editing 
-          ? await base44.entities.Supplier.update(editing.id, data) 
+        const result = editing
+          ? await base44.entities.Supplier.update(editing.id, data)
           : await base44.entities.Supplier.create(payload);
         return result;
       } catch (err) {
         throw err;
       }
     },
-    onSuccess: () => { 
-      qc.invalidateQueries({ queryKey: ['suppliers'] }); 
-      closeForm(); 
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['suppliers'] });
+      closeForm();
     },
     onError: (err) => {
       console.error('[Suppliers] Mutation error:', err);
@@ -88,6 +89,8 @@ export default function Suppliers() {
   const openEdit = (s) => { setEditing(s); setForm({ name: s.name, phone: s.phone || '', email: s.email || '', address: s.address || '', notes: s.notes || '' }); setShowForm(true); };
   const closeForm = () => { setShowForm(false); setEditing(null); };
 
+  if (isLoading) return <PortalDataState loading/>;
+  if (isError) return <PortalDataState onRetry={refetch}/>;
   if (selectedSupplier) {
     return <SupplierDetail supplier={selectedSupplier} onBack={() => setSelectedSupplier(null)} />;
   }
@@ -106,8 +109,8 @@ export default function Suppliers() {
 
         <TabsContent value="payments" className="mt-3">
           <div className="space-y-4">
-            <SupplierPaymentForm />
-            <SupplierPaymentManager />
+            <p className="text-sm text-muted-foreground">{lang==='fa'?'تأمین‌کننده را انتخاب کنید؛ تمام حساب‌ها و عملیات در صفحهٔ همان تأمین‌کننده انجام می‌شود.':lang==='ar'?'اختر المورد لإدارة جميع عملياته وحسابه من صفحته.':'Choose a supplier to manage all records and payments in their workspace.'}</p>
+            {suppliers.map(s=><Button key={s.id} variant="outline" className="me-2" onClick={()=>setSelectedSupplier(s)}>{s.name}</Button>)}
           </div>
         </TabsContent>
 

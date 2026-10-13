@@ -1,3 +1,4 @@
+import {postSupplierPayment} from '@/lib/supplierWorkspace';
 /**
  * PurchaseInvoiceForm — Phase 7
  * Enterprise multi-line invoice form with:
@@ -293,7 +294,7 @@ function InvoiceAccordion({ title, subtitle, icon: Icon, verified = false, open,
   );
 }
 
-export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCancel }) {
+export default function PurchaseInvoiceForm({ invoice = null, supplier = null, onSuccess, onCancel }) {
   const { ownerFilter, branches, activeRestaurantId: restaurantId } = useTenant();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -303,9 +304,9 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
   // ── Form state ─────────────────────────────────────────────────────────
   const [form, setForm] = useState({
     invoice_number: invoice?.invoice_number || '',
-    supplier_id: invoice?.supplier_id || '',
-    supplier_name: invoice?.supplier_name || '',
-    supplier_email: invoice?.supplier_email || '',
+    supplier_id: invoice?.supplier_id || supplier?.id || '',
+    supplier_name: invoice?.supplier_name || supplier?.name || '',
+    supplier_email: invoice?.supplier_email || supplier?.email || '',
     branch: invoice?.branch || '',
     date: invoice?.date || format(new Date(), 'yyyy-MM-dd'),
     due_date: invoice?.due_date || '',
@@ -527,8 +528,8 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
     if (!form.branch) { setError('Branch is required'); return; }
     
     // Minimal validation: must have either a selected supplier or a typed name
-    const supplierId = form.supplier_id && form.supplier_id.trim() !== '' ? form.supplier_id : null;
-    const supplierName = form.supplier_name && form.supplier_name.trim() !== '' ? form.supplier_name : null;
+    const supplierId = supplier?.id || (form.supplier_id && form.supplier_id.trim() !== '' ? form.supplier_id : null);
+    const supplierName = supplier?.name || (form.supplier_name && form.supplier_name.trim() !== '' ? form.supplier_name : null);
     
     if (!isDraft && !supplierId && !supplierName) {
       setError('Supplier selection or name is required'); 
@@ -579,7 +580,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
           ? updatePurchaseInvoice({ invoiceId: invoice.id, invoiceData: invoicePayload, items: cleanItems, additionalCosts: cleanCosts, createdBy: user?.email, mode })
           : createPurchaseInvoice({ invoiceData: invoicePayload, items: cleanItems, additionalCosts: cleanCosts, createdBy: user?.email, mode }),
         payments: validPayments,
-        savePayment: (saved, pmt) => addInvoicePayment({ invoiceId: saved.id, amount: parseFloat(pmt.amount), paymentMethod: pmt.payment_method, notes: pmt.notes, date: pmt.date, createdBy: user?.email }),
+        savePayment: (saved, pmt) => (supplier ? postSupplierPayment : addInvoicePayment)({requestId: pmt.requestId ||= crypto.randomUUID(), invoiceId: saved.id, amount: parseFloat(pmt.amount), paymentMethod: pmt.payment_method, notes: pmt.notes, date: pmt.date, createdBy: user?.email }),
         onInvoiceSaved: saved => setForm(current => ({ ...current, status: saved.status })),
       });
 
@@ -592,6 +593,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
       qc.invalidateQueries({ queryKey: ['wallet_transactions'] });
       qc.invalidateQueries({ queryKey: ['wallet_transactions_dash'] });
       qc.invalidateQueries({ queryKey: ['supplier_payments'] });
+      qc.invalidateQueries({ queryKey: ['supplier-ledger'] });
       qc.invalidateQueries({ queryKey: ['suppliers'] });
       qc.invalidateQueries({ queryKey: ['dashboard_metrics'] });
 
@@ -661,7 +663,7 @@ export default function PurchaseInvoiceForm({ invoice = null, onSuccess, onCance
 
           <InvoiceAccordion title="Supplier" subtitle={selectedSupplier?.name || form.supplier_name} icon={UserRound} verified={Boolean(form.supplier_id || form.supplier_name.trim())} open={openSection === 'supplier'} onToggle={() => setOpenSection(current => current === 'supplier' ? null : 'supplier')}>
             <div className="space-y-3">
-              <div><Label className="text-xs text-slate-600">Supplier *</Label><Select value={form.supplier_id} onValueChange={value => { const supplier = suppliers.find(item => item.id === value); setForm(current => ({ ...current, supplier_id: value, supplier_name: supplier?.name || '', supplier_email: supplier?.email || '' })); setPaymentTerms(supplier?.payment_terms || ''); setVatNumber(supplier?.vat_number || supplier?.tax_number || ''); }}><SelectTrigger className="mt-1 h-11 rounded-xl bg-white"><SelectValue placeholder="Select supplier..." /></SelectTrigger><SelectContent>{suppliers.map(supplier => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent></Select>{!form.supplier_id && <Input value={form.supplier_name} onChange={event => setForm(current => ({ ...current, supplier_name: event.target.value }))} placeholder="Or type supplier name" className="mt-2 h-11 rounded-xl bg-white" />}</div>
+              <div><Label className="text-xs text-slate-600">Supplier *</Label><Select disabled={Boolean(supplier)} value={form.supplier_id} onValueChange={value => { const supplier = suppliers.find(item => item.id === value); setForm(current => ({ ...current, supplier_id: value, supplier_name: supplier?.name || '', supplier_email: supplier?.email || '' })); setPaymentTerms(supplier?.payment_terms || ''); setVatNumber(supplier?.vat_number || supplier?.tax_number || ''); }}><SelectTrigger className="mt-1 h-11 rounded-xl bg-white"><SelectValue placeholder="Select supplier..." /></SelectTrigger><SelectContent>{suppliers.map(supplier => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent></Select>{!form.supplier_id && <Input value={form.supplier_name} onChange={event => setForm(current => ({ ...current, supplier_name: event.target.value }))} placeholder="Or type supplier name" className="mt-2 h-11 rounded-xl bg-white" />}</div>
               <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs text-slate-600">Invoice number</Label><Input value={form.invoice_number} onChange={event => setForm(current => ({ ...current, invoice_number: event.target.value }))} className="mt-1 h-10 bg-white" /></div><div><Label className="text-xs text-slate-600">Currency</Label><Select value={form.currency} onValueChange={value => setForm(current => ({ ...current, currency: value }))}><SelectTrigger className="mt-1 h-10 bg-white"><SelectValue /></SelectTrigger><SelectContent>{CURRENCIES.map(currency => <SelectItem key={currency} value={currency}>{currency}</SelectItem>)}</SelectContent></Select></div></div>
               <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs text-slate-600">Invoice date</Label><Input type="date" value={form.date} onChange={event => setForm(current => ({ ...current, date: event.target.value }))} className="mt-1 h-10 bg-white" /></div><div><Label className="text-xs text-slate-600">VAT number</Label><Input value={resolvedVatNumber} onChange={event => setVatNumber(event.target.value)} inputMode="numeric" className="mt-1 h-10 bg-white" placeholder="VAT number" /></div></div>
             </div>

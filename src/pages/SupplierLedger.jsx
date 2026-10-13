@@ -22,14 +22,15 @@ const COPY = {
 function Filter({label,value,onChange,children}) {
  return <label className="min-w-0 text-xs text-muted-foreground">{label}<select aria-label={label} value={value} onChange={e=>onChange(e.target.value)} className="mt-1 block h-10 w-full rounded-md border bg-background px-2 text-sm text-foreground">{children}</select></label>;
 }
-export default function SupplierLedger() {
+export default function SupplierLedger({supplier = null, onPayInvoice, onOpenInvoice}) {
  const {lang='en',currency:preferredCurrency} = useLanguage();
  const t=COPY[lang] || COPY.en;
  const {activeRestaurant,activeRestaurantId,branches=[],isBranchScoped,isManager,managerBranchObject,loadingRestaurants}=useTenant();
  const restaurantId=activeRestaurantId || activeRestaurant?.id;
  const restricted=isBranchScoped || isManager;
  const [branchId,setBranchId]=useState('all');
- const [supplierId,setSupplierId]=useState('all');
+ const [selectedSupplierId,setSupplierId]=useState('all');
+ const supplierId=supplier?.id || selectedSupplierId;
  const [currency,setCurrency]=useState('');
  const [period,setPeriod]=useState('all');
  const [custom,setCustom]=useState({start:'',end:''});
@@ -54,12 +55,12 @@ export default function SupplierLedger() {
  if (query.isError) return <PortalDataState onRetry={query.refetch}/>;
  const issueCounts=ledger.issues.reduce((map,issue)=>({...map,[issue.type]:(map[issue.type]||0)+1}),{});
  return <div className="space-y-4" dir={lang==='fa'||lang==='ar'?'rtl':'ltr'}>
-  <PageHeader title={t.title} subtitle={t.subtitle} icon={<BookOpen className="h-5 w-5"/>}/>
+  <PageHeader title={supplier ? t.statement : t.title} subtitle={t.subtitle} icon={<BookOpen className="h-5 w-5"/>}/>
   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
    <Filter label={t.branch} value={assigned?.id || branchId} onChange={value=>{if(!restricted){setBranchId(value);setLimit(50);}}}>
     {!restricted&&<option value="all">{t.allBranches}</option>}{(assigned?[assigned]:branches).map(b=><option key={b.id} value={b.id}>{b.name||b.label||b.key}</option>)}
    </Filter>
-   <Filter label={t.supplier} value={supplierId} onChange={value=>{setSupplierId(value);setLimit(50);}}><option value="all">{t.allSuppliers}</option>{[...supplierOptions].map(([id,name])=><option key={id} value={id}>{name}</option>)}</Filter>
+   {!supplier && <Filter label={t.supplier} value={supplierId} onChange={value=>{setSupplierId(value);setLimit(50);}}><option value="all">{t.allSuppliers}</option>{[...supplierOptions].map(([id,name])=><option key={id} value={id}>{name}</option>)}</Filter>}
    <Filter label={t.currency} value={selectedCurrency} onChange={setCurrency}>{(ledger.groups.length?ledger.groups:[{currency:selectedCurrency}]).map(g=><option key={g.currency} value={g.currency}>{g.currency==='UNKNOWN'?t.unknown:g.currency}</option>)}</Filter>
    <Filter label={t.period} value={period} onChange={setPeriod}>{['all','today','week','month','3months','6months','year','custom'].map(p=><option key={p} value={p}>{t[p]}</option>)}</Filter>
   </div>
@@ -67,14 +68,14 @@ export default function SupplierLedger() {
   <Button variant="outline" size="sm" onClick={()=>query.refetch()} disabled={query.isFetching}><RefreshCw className="me-2 h-4 w-4"/>{t.refresh}</Button>
   {invalidRange?<p role="alert">{t.range}</p>:<>
    <p className="text-xs text-muted-foreground">{range.start || t.all} — {range.end}<br/>{t.basis}</p>
-   {ledger.issues.length>0&&<details className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-amber-950"><summary className="cursor-pointer font-semibold">{t.review} ({ledger.issues.length})</summary><p className="my-2 text-xs">{t.reviewNote}</p>{Object.entries(issueCounts).map(([type,count])=><p key={type} className="text-xs">{t[type]}: {count}</p>)}<ul className="mt-2 max-h-48 overflow-auto text-xs">{ledger.issues.map((issue,i)=><li key={i}>{t[issue.type]} — {data.invoices.find(row=>row.id===issue.ref)?.invoice_number || issue.ref || '—'}</li>)}</ul></details>}
+   {ledger.issues.length>0&&<details className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-amber-950"><summary className="cursor-pointer font-semibold">{t.review} ({ledger.issues.length})</summary><p className="my-2 text-xs">{t.reviewNote}</p>{Object.entries(issueCounts).map(([type,count])=><p key={type} className="text-xs">{t[type]}: {count}</p>)}<ul className="mt-2 max-h-48 overflow-auto text-xs">{ledger.issues.map((issue,i)=><li key={i}>{t[issue.type]} — {onOpenInvoice && data.invoices.some(row=>row.id===issue.ref)?<button className="underline" onClick={()=>onOpenInvoice(data.invoices.find(row=>row.id===issue.ref))}>{data.invoices.find(row=>row.id===issue.ref)?.invoice_number || issue.ref}</button>:issue.ref || '—'}</li>)}</ul></details>}
    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">{[['opening',group.opening],['invoiced',group.invoiced],['paid',group.paid],['closing',group.closing]].map(([key,value])=><Card key={key} className="min-w-0 p-3"><p className="text-xs text-muted-foreground">{t[key]}</p><p data-testid={`ledger-${key}`} className="mt-1 break-words text-lg font-bold" dir="ltr">{money(value)}</p></Card>)}</div>
    <p className="text-xs text-muted-foreground">{t.overdue}: {group.overdue.length} · {t.credit}</p>
    <Input aria-label={t.search} placeholder={t.search} value={search} onChange={e=>{setSearch(e.target.value);setLimit(50);}}/>
    <p className="text-xs text-muted-foreground">{t.searchNote}</p>
    <Tabs defaultValue="statement"><TabsList className="flex w-full"><TabsTrigger value="statement" className="flex-1">{t.statement}</TabsTrigger><TabsTrigger value="invoices" className="flex-1">{t.invoices} ({group.invoices.length})</TabsTrigger><TabsTrigger value="payments" className="flex-1">{t.payments} ({group.payments.length})</TabsTrigger></TabsList>
     <TabsContent value="statement"><div className="overflow-x-auto rounded-lg border"><table className="w-full min-w-[560px] text-sm"><thead><tr className="bg-muted text-start">{['date','description','amount','balance'].map(key=><th key={key} className="p-3 text-start">{t[key]}</th>)}</tr></thead><tbody>{rows.slice(0,limit).map(row=><tr key={row.id} className="border-t"><td className="whitespace-nowrap p-3">{row.date}</td><td className="p-3"><p>{row.type==='invoice'?t.invoice:t.payment} {row.ref.invoice_number || row.ref.invoice_id?.slice(0,8)}</p><p className="text-xs text-muted-foreground">{row.ref.supplier_name || row.ref.supplier_id || '—'}</p></td><td className="whitespace-nowrap p-3" dir="ltr">{row.type==='invoice'?'+':'−'}{money(row.debit || row.credit)}</td><td className="whitespace-nowrap p-3 font-semibold" dir="ltr">{money(row.balance)}</td></tr>)}</tbody></table></div>{!rows.length&&<p className="p-4 text-sm">{t.empty}</p>}{rows.length>limit&&<Button className="mt-2" onClick={()=>setLimit(limit+50)}>{t.more}</Button>}</TabsContent>
-    <TabsContent value="invoices" className="space-y-2">{group.invoices.filter(match).map(row=><Card key={row.id} className="p-3"><p className="font-semibold">{row.invoice_number || row.id.slice(0,8)} · {row.supplier_name}</p><p className="text-xs text-muted-foreground">{row.date} · {t.due}: {row.due_date || '—'}</p><p dir="ltr">{money(row.total_amount)}</p><p className="text-xs">{t.remaining}: {money(row.ledgerRemaining)}</p></Card>)}</TabsContent>
+    <TabsContent value="invoices" className="space-y-2">{group.invoices.filter(match).map(row=><Card key={row.id} className="p-3"><p className="font-semibold">{row.invoice_number || row.id.slice(0,8)} · {row.supplier_name}</p><p className="text-xs text-muted-foreground">{row.date} · {t.due}: {row.due_date || '—'}</p><p dir="ltr">{money(row.total_amount)}</p><p className="text-xs">{t.remaining}: {money(row.ledgerRemaining)}</p><div className="mt-2 flex gap-2">{onOpenInvoice&&<Button size="sm" variant="outline" onClick={()=>onOpenInvoice(row)}>{t.invoice}</Button>}{onPayInvoice&&row.ledgerRemaining>0&&<Button size="sm" onClick={()=>onPayInvoice(row)}>{t.payment}</Button>}</div></Card>)}</TabsContent>
     <TabsContent value="payments" className="space-y-2">{group.payments.filter(match).map(row=><Card key={row.id} className="p-3"><p className="font-semibold">{row.supplier_name || row.supplier_id || '—'}</p><p className="text-xs text-muted-foreground">{row.date} · {row.payment_method} · {row.invoice_id?.slice(0,8) || '—'}</p><p dir="ltr">{money(row.amount)}</p></Card>)}</TabsContent>
    </Tabs>
   </>}
