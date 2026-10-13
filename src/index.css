@@ -9,6 +9,9 @@
 /* ─── RestoCTRL Enterprise Design System ─────────────────────────────────── */
 @layer base {
   :root {
+    --font-ui: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-rtl: -apple-system, BlinkMacSystemFont, system-ui, 'Vazirmatn', 'Noto Sans Arabic', sans-serif;
+    --font-inter: var(--font-ui);
     /* ── Brand ── */
     --primary:            217 91% 50%;
     --primary-foreground: 0 0% 100%;
@@ -165,7 +168,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-ui);
   }
 }
 
@@ -205,10 +208,16 @@
 .dark :is([class*="border-purple-100"], [class*="border-violet-100"], [class*="border-indigo-100"]):not([class*="dark:border-"]) { border-color: hsl(262 38% 24%) !important; }
 .dark [class*="border-cyan-100"]:not([class*="dark:border-"]) { border-color: hsl(199 38% 23%) !important; }
 
+/* Native typography for Persian/Arabic, including body portals and form controls.
+   The browser selects the device's system font; web fonts remain fallbacks. */
+html:lang(fa), html:lang(ar) {
+  --font-ui: var(--font-rtl);
+}
+
 /* ─── RTL support ─────────────────────────────────────────────────────────── */
 [dir="rtl"] {
   text-align: right;
-  font-family: 'Vazirmatn', 'Noto Sans Arabic', sans-serif;
+  font-family: var(--font-rtl);
   font-size: 1.05rem;
   line-height: 1.6;
 }
@@ -250,7 +259,7 @@ html[dir="rtl"] input[type="email"],
 html[dir="rtl"] input[data-keep-ltr="true"],
 html[dir="rtl"] .font-mono { direction: ltr; text-align: left; unicode-bidi: plaintext; }
 html[dir="rtl"] .recharts-wrapper { direction: ltr; }
-html[dir="rtl"] .recharts-wrapper text { font-family: 'Vazirmatn', 'Noto Sans Arabic', sans-serif; }
+html[dir="rtl"] .recharts-wrapper text { font-family: var(--font-rtl); }
 html[dir="rtl"] [role="dialog"],
 html[dir="rtl"] [data-radix-popper-content-wrapper] { text-align: right; }
 html[dir="rtl"] .animate-slide-in-left { animation-name: slide-in-right; }
