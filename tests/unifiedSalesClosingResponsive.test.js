@@ -446,8 +446,8 @@ describe('Sales Closing localization runtime contract', () => {
     expect(workspace).toContain('data-i18n-skip="true"');
     expect(workspace).toContain('key={source.id}');
     expect(dialogs).toContain("const { lang, t, translateLiteral } = useLanguage();");
-    expect(dialogs).toContain('translateLiteral("Customer credit-linked entries")');
-    expect(dialogs).toContain("translateLiteral('Optional Subcategory')");
+    expect(dialogs).toContain('local("Customer credit-linked entries")');
+    expect(dialogs).toContain("local('Optional Subcategory')");
     expect(dialogs).toContain('localizedDataName(method, lang)');
     expect(languageContext).toContain("localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);");
   });
