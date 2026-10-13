@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import translations from '../src/lib/i18n.js';
 import localizedPhrases from '../src/lib/localizedPhrases.js';
+import erpInterfacePhrases from '../src/lib/erpInterfacePhrases.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceRoot = path.join(root, 'src');
@@ -35,13 +36,14 @@ const englishCatalogValues = new Set(
 );
 
 Object.keys(localizedPhrases).forEach(phrase => englishCatalogValues.add(phrase));
+Object.keys(erpInterfacePhrases).forEach(phrase => englishCatalogValues.add(phrase));
 
 const files = walk(sourceRoot).filter((file) => /\.(jsx?|tsx?)$/.test(file));
 const report = [];
 for (const file of files) {
   const content = fs.readFileSync(file, 'utf8');
   const relative = path.relative(root, file);
-  if (/src\/lib\/(i18n|localizedPhrases|treasuryLocalization|erpWorkflowPhrases)\.js$/.test(relative)) continue;
+  if (/src\/lib\/(i18n|localizedPhrases|erpInterfacePhrases|treasuryLocalization|erpWorkflowPhrases)\.js$/.test(relative)) continue;
   const literals = new Set();
   const add = (raw) => {
     const value = raw.replace(/\\["'`]/g, (m) => m.slice(1)).replace(/\s+/g, ' ').trim();
