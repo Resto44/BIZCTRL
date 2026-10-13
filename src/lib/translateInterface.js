@@ -2,6 +2,7 @@ import { translateInterfaceDate } from './interfaceDates.js';
 import translations from './i18n.js';
 import localizedPhrases from './localizedPhrases.js';
 import persianUiPhrases from './persianUiPhrases.js';
+import erpInterfacePhrases from './erpInterfacePhrases.js';
 import { interpolate, normalizeLanguage } from './localization.js';
 
 // Normalize typography, not business values. Matching stays whole-phrase only.
@@ -16,6 +17,15 @@ for (const [key, english] of Object.entries(translations.en)) {
 for (const [source, entry] of Object.entries(localizedPhrases)) {
   for (const lang of ['fa', 'ar']) if (entry[lang]) catalogs[lang].set(normalizeInterfacePhrase(source), entry[lang]);
 }
+
+// Explicit, reviewed translations for later ERP modules, independent of the
+// fallback DOM-localization path. Safe exact-phrase lookup only.
+for (const [source, entry] of Object.entries(erpInterfacePhrases)) {
+  for (const lang of ['ar', 'fa']) {
+    if (entry[lang]) catalogs[lang].set(normalizeInterfacePhrase(source), entry[lang]);
+  }
+}
+
 for (const [source, value] of Object.entries(persianUiPhrases)) catalogs.fa.set(normalizeInterfacePhrase(source), value);
 
 const folded = Object.fromEntries(Object.entries(catalogs).map(([lang, catalog]) => [lang, new Map([...catalog].map(([k,v]) => [k.toLowerCase(),v]))]));
