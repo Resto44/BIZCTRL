@@ -1,3 +1,4 @@
+import PortalDataState from '@/components/shared/PortalDataState';
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
@@ -25,8 +26,8 @@ export default function EmployeeDashboardERP() {
   const branchId = activeBranch?.id;
 
   // Employee profile
-  const { data: empProfile } = useQuery({
-    queryKey: ['emp-profile', user?.id, user?.linked_entity_id],
+  const { data: empProfile, isError: empProfileError, refetch: retryEmpProfile, isLoading: empProfileLoading } = useQuery({
+    queryKey: ['emp-profile', user?.id, user?.linked_entity_id, user?.restaurant_id, branchId],
     queryFn: async () => {
       let query = supabase.from('employees').select('*');
       if (user?.linked_entity_id) {
@@ -37,54 +38,58 @@ export default function EmployeeDashboardERP() {
           .eq('branch_id', branchId)
           .eq('email', user?.email);
       }
-      const { data } = await query.maybeSingle();
+      const { data, error } = await query.maybeSingle();
+      if (error) throw error;
       return data;
     },
     enabled: !!branchId && (!!user?.linked_entity_id || !!user?.email),
   });
 
   // Today's attendance
-  const { data: todayAttendance } = useQuery({
-    queryKey: ['emp-attendance', user?.id, today],
+  const { data: todayAttendance, isError: todayAttendanceError, refetch: retryTodayAttendance, isLoading: todayAttendanceLoading } = useQuery({
+    queryKey: ['emp-attendance', user?.id, empProfile?.id, branchId, today],
     queryFn: async () => {
       if (!empProfile?.id) return null;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('attendance')
         .select('*')
         .eq('employee_id', empProfile.id)
         .eq('date', today)
-        .single();
+        .maybeSingle();
+      if (error) throw error;
       return data;
     },
     enabled: !!empProfile?.id,
   });
 
   // My tasks
-  const { data: myTasks = [] } = useQuery({
+  const { data: myTasks = [], isError: myTasksError, refetch: retryMyTasks, isLoading: myTasksLoading } = useQuery({
     queryKey: ['emp-tasks', user?.id, branchId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('tasks')
         .select('*')
         .eq('branch_id', branchId)
         .eq('assigned_to', user?.id)
-        .order('created_at', { ascending: false })
+        .order('created_date', { ascending: false })
         .limit(10);
+      if (error) throw error;
       return data || [];
     },
     enabled: !!branchId && !!user?.id,
   });
 
   // Announcements
-  const { data: announcements = [] } = useQuery({
+  const { data: announcements = [], isError: announcementsError, refetch: retryAnnouncements, isLoading: announcementsLoading } = useQuery({
     queryKey: ['emp-announcements', branchId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('announcements')
         .select('*')
         .eq('branch_id', branchId)
-        .order('created_at', { ascending: false })
+        .order('created_date', { ascending: false })
         .limit(5);
+      if (error) throw error;
       return data || [];
     },
     enabled: !!branchId,
@@ -137,6 +142,9 @@ export default function EmployeeDashboardERP() {
     );
   }
 
+  if (empProfileError || todayAttendanceError || myTasksError || announcementsError) return <PortalDataState onRetry={() => { retryEmpProfile(); retryTodayAttendance(); retryMyTasks(); retryAnnouncements(); }}/>;
+  if (empProfileLoading || todayAttendanceLoading || myTasksLoading || announcementsLoading) return <PortalDataState loading/>;
+  if (!empProfile) return <PortalDataState missing onRetry={retryEmpProfile}/>;
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'tasks', label: 'Tasks', icon: ClipboardList },
@@ -294,7 +302,7 @@ export default function EmployeeDashboardERP() {
                     <p className="text-white text-sm font-medium">{ann.title}</p>
                     {ann.content && <p className="text-slate-400 text-xs mt-1">{ann.content}</p>}
                     <p className="text-slate-600 text-xs mt-2">
-                      {ann.created_at ? format(new Date(ann.created_at), 'MMM d, yyyy') : ''}
+                      {ann.created_date ? format(new Date(ann.created_date), 'MMM d, yyyy') : ''}
                     </p>
                   </CardContent>
                 </Card>

@@ -1,3 +1,4 @@
+import { portalAccountState } from '@/lib/portalReliability';
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useRole, ROLE_HOME } from '@/lib/RoleContext';
@@ -36,13 +37,13 @@ export default function ERPRoleGuard({ allowedRoles = [], children }) {
   }
 
   // Account suspended or rejected
-  const approvalStatus = user.status || user.approval_status;
-  if (approvalStatus === 'suspended' || approvalStatus === 'rejected') {
+  const accountState = portalAccountState(user);
+  if (accountState === 'blocked') {
     return <Navigate to="/erp-login" replace />;
   }
 
   // Pending approval
-  if (approvalStatus === 'pending') {
+  if (accountState === 'pending') {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-slate-950 p-8">
         <div className="text-center max-w-sm">
