@@ -138,7 +138,7 @@ export default function SupplierStatement({ supplier }) {
   return (
     <div className="space-y-4">
       <label className="block text-xs">{translateLiteral('Currency')}<select aria-label="Statement currency" className="ms-2 rounded border bg-background p-2" value={group?.currency || ''} onChange={e=>setSelectedCurrency(e.target.value)}>{ledger.groups.map(g=><option key={g.currency} value={g.currency}>{g.currency}</option>)}</select></label>
-      {ledger.issues.length>0 && <p role="alert" className="rounded border border-amber-400 p-3 text-sm">{lang==='fa'?'سوابق نیاز به تطبیق دارند. برای بررسی اختلاف‌ها دفتر حساب تأمین‌کننده را باز کنید.':lang==='ar'?'السجلات تحتاج مطابقة. راجع كشف حساب المورد للتفاصيل.':'Records need reconciliation. Open Supplier Ledger to review the differences.'} ({ledger.issues.length})</p>}
+      {ledger.issues.length>0 && <p role="alert" className="rounded border border-amber-400 p-3 text-sm">{lang==='fa'?'سوابق نیاز به تطبیق دارند. جزئیات اختلاف‌ها را در بخش حساب همین صفحه بررسی کنید.':lang==='ar'?'السجلات تحتاج مطابقة. راجع قسم الحساب في هذه الصفحة للتفاصيل.':'Records need reconciliation. Review the account section on this page for details.'} ({ledger.issues.length})</p>}
       <div className="grid grid-cols-3 gap-2">
         <Card><CardContent className="p-3 text-center"><div className="text-lg font-bold">{number(totalInvoiced)}</div><div className="text-[10px] text-muted-foreground">{translateLiteral('Total Invoiced')}</div></CardContent></Card>
         <Card><CardContent className="p-3 text-center"><div className="text-lg font-bold text-green-600">{number(totalPaid)}</div><div className="text-[10px] text-muted-foreground">{translateLiteral('Total Paid')}</div></CardContent></Card>

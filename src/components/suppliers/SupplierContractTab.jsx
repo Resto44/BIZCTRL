@@ -17,7 +17,7 @@ const TERMS_LABELS = {
   net_60: 'Net 60 days',
 };
 
-export default function SupplierContractTab({ supplier }) {
+export default function SupplierContractTab({ supplier, readOnly = false }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
@@ -31,7 +31,7 @@ export default function SupplierContractTab({ supplier }) {
 
   const saveMut = useMutation({
     mutationFn: (data) => base44.entities.Supplier.update(supplier.id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['suppliers'] }); setEditing(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['suppliers'] }); qc.invalidateQueries({queryKey:['supplier-ledger']}); setEditing(false); },
   });
 
   const hasContract = supplier.contract_start || supplier.payment_terms || supplier.contract_notes;
@@ -44,7 +44,7 @@ export default function SupplierContractTab({ supplier }) {
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <FileText className="w-4 h-4 text-muted-foreground" /> Contract Terms
             </h3>
-            <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+            <Button disabled={readOnly} size="sm" variant="ghost" onClick={() => setEditing(true)}>
               <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
             </Button>
           </div>

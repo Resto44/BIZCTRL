@@ -16,22 +16,22 @@ import PageHeader from '@/components/shared/PageHeader';
 
 const emptyItem = { product_id: '', product_name: '', qty: 1, unit: '', unit_price: 0 };
 
-export default function PurchaseOrderForm({ order, onClose, onSaved }) {
+export default function PurchaseOrderForm({ order, supplier = null, onClose, onSaved }) {
   const { currency } = useLanguage();
-  const { activeRestaurantId, activeRestaurant } = useTenant();
+  const { activeRestaurantId, activeRestaurant, branches } = useTenant();
   const [form, setForm] = useState({
-    supplier_id: order?.supplier_id || '',
-    supplier_name: order?.supplier_name || '',
+    supplier_id: order?.supplier_id || supplier?.id || '',
+    supplier_name: order?.supplier_name || supplier?.name || '',
     supplier_email: order?.supplier_email || '',
     supplier_phone: order?.supplier_phone || '',
     branch: order?.branch || '',
     date: order?.date || format(new Date(), 'yyyy-MM-dd'),
-    expected_delivery: order?.expected_delivery || '',
+    expected_delivery: order?.expected_date || '',
     notes: order?.notes || '',
     status: order?.status || 'draft',
   });
   const [items, setItems] = useState(() => {
-    try { return JSON.parse(order?.items || '[]'); } catch { return [{ ...emptyItem }]; }
+    try { return order?.items ? (Array.isArray(order.items) ? order.items : JSON.parse(order.items)) : [{...emptyItem}]; } catch { return [{ ...emptyItem }]; }
   });
 
   const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: () => base44.entities.Supplier.list('name', 200) });
@@ -55,7 +55,7 @@ export default function PurchaseOrderForm({ order, onClose, onSaved }) {
   const total = items.reduce((s, it) => s + ((it.qty || 0) * (it.unit_price || 0)), 0);
 
   const handleSave = () => {
-    if (!form.supplier_id || !form.branch) return;
+    if (!form.supplier_id || !branches.some(b=>(b.key===form.branch || b.branch_key===form.branch)&&b.id) || !items.length || items.some(i=>!i.product_id || Number(i.qty)<=0 || !Number.isFinite(Number(i.unit_price)) || Number(i.unit_price)<0)) return;
     
     // Sanitize UUID: ensure "" becomes null for UUID column
     const supplierId = form.supplier_id && form.supplier_id.trim() !== '' ? form.supplier_id : null;
@@ -66,7 +66,7 @@ export default function PurchaseOrderForm({ order, onClose, onSaved }) {
       branch: form.branch,
       supplier_id: supplierId,
       supplier_name: form.supplier_name,
-      date: form.date,
+      branch_id: branches.find(b=>b.key===form.branch || b.branch_key===form.branch)?.id,
       expected_date: form.expected_delivery,
       status: form.status,
       items: JSON.stringify(items), 
@@ -83,12 +83,13 @@ export default function PurchaseOrderForm({ order, onClose, onSaved }) {
         action={<Button variant="ghost" size="sm" onClick={onClose}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>}
       />
 
+      {saveMutation.isError && <p role="alert">{saveMutation.error.message}</p>}
       <div className="space-y-4">
         <Card className="p-4 space-y-3">
           <h3 className="font-semibold text-sm">Supplier & Branch</h3>
           <div>
             <Label>Supplier</Label>
-            <Select value={form.supplier_id} onValueChange={handleSupplierChange}>
+            <Select disabled={Boolean(supplier)} value={form.supplier_id} onValueChange={handleSupplierChange}>
               <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
               <SelectContent>{suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
             </Select>
