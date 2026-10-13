@@ -52,7 +52,9 @@ const DATA_LABEL_KEYS = Object.freeze({
 });
 
 export function normalizeLanguage(language) {
-  return SUPPORTED_LANGUAGES.some((item) => item.code === language) ? language : 'en';
+  const code = String(language || '').trim().toLowerCase().split(/[-_]/)[0];
+  const normalized = code === 'prs' ? 'fa' : code;
+  return SUPPORTED_LANGUAGES.some((item) => item.code === normalized) ? normalized : 'en';
 }
 
 export function getLanguageMeta(language) {
