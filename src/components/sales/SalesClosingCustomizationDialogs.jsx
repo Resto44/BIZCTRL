@@ -53,7 +53,7 @@ export function newSalesClosingSource(order = 10) {
 }
 
 export function SalesClosingFieldDialog({ editor, onClose, onSave, isSaving }) {
-  const { t } = useLanguage();
+  const { t, translateLiteral } = useLanguage();
   const [draft, setDraft] = useState(editor?.field || newSalesClosingCustomField());
   const [error, setError] = useState('');
 
@@ -86,7 +86,7 @@ export function SalesClosingFieldDialog({ editor, onClose, onSave, isSaving }) {
         <div className="grid gap-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div><Label>{t('salesClosing.dialog.fieldKey')}</Label><Input value={draft.field_key || ''} disabled={Boolean(editor.field?.is_system)} onChange={(event) => set({ field_key: event.target.value })} placeholder="field_key" maxLength={64} /></div>
-            <div><Label>{t('salesClosing.dialog.fieldType')}</Label><Select value={draft.field_type || 'text'} onValueChange={(field_type) => set({ field_type, options: field_type === 'dropdown' ? draft.options || [] : [] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SALES_CLOSING_FIELD_TYPES.map((type) => <SelectItem key={type} value={type}>{type.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
+            <div><Label>{t('salesClosing.dialog.fieldType')}</Label><Select value={draft.field_type || 'text'} onValueChange={(field_type) => set({ field_type, options: field_type === 'dropdown' ? draft.options || [] : [] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SALES_CLOSING_FIELD_TYPES.map((type) => <SelectItem key={type} value={type}>{translateLiteral(type.replaceAll('_', ' '))}</SelectItem>)}</SelectContent></Select></div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div><Label>{t('salesClosing.dialog.fieldNameEnglish')}</Label><Input value={draft.label_en || ''} onChange={(event) => set({ label_en: event.target.value })} maxLength={120} /></div>
@@ -108,7 +108,7 @@ export function SalesClosingFieldDialog({ editor, onClose, onSave, isSaving }) {
 }
 
 export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMethods = [], branches = [] }) {
-  const { lang, t } = useLanguage();
+  const { lang, t, translateLiteral } = useLanguage();
   const [draft, setDraft] = useState(editor?.source || newSalesClosingSource());
   const [error, setError] = useState('');
 
@@ -142,7 +142,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
       branch_ids: draft.is_global === false ? Array.from(new Set(asArray(draft.branch_ids).map(String).filter(Boolean))) : [],
     };
     if (isCustomerCreditSource(source)) Object.assign(source, customerCreditSourcePatch(true));
-    if (!validPaymentCode(source.default_payment_method)) return setError('Select a valid payment method. For network sales choose Card / Network.');
+    if (!validPaymentCode(source.default_payment_method)) return setError(translateLiteral('Select a valid payment method. For network sales choose Card / Network.'));
     if (!source.name_en) return setError(t('salesClosing.dialog.sourceNameRequired'));
     if (source.is_global === false && !source.branch_ids.length && !source.branch_id) return setError(t('salesSourceManagement.branchRequired'));
     onSave(source);
@@ -169,7 +169,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('salesSourceManagement.configuration')}</p>
             <div className="grid gap-3 sm:grid-cols-3">
               <div><Label>{t('salesSourceManagement.category')}</Label><Select value={draft.category || 'other'} onValueChange={(category) => set({ category })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SOURCE_CATEGORIES.map((category) => <SelectItem key={category} value={category}>{t(`salesSourceManagement.category.${category}`)}</SelectItem>)}</SelectContent></Select></div>
-              <div><Label>Optional Subcategory</Label><Input value={draft.subcategory || ''} onChange={(event) => set({ subcategory: event.target.value })} placeholder="e.g. Drivers" maxLength={120} /></div>
+              <div><Label>{translateLiteral('Optional Subcategory')}</Label><Input value={draft.subcategory || ''} onChange={(event) => set({ subcategory: event.target.value })} placeholder={translateLiteral("e.g. Drivers")} maxLength={120} /></div>
               <div><Label>{t('salesClosing.dialog.defaultPayment')}</Label><Select disabled={isCustomerCreditSource(draft)} value={draft.default_payment_method || 'cash'} onValueChange={(default_payment_method) => set({ default_payment_method })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{salesPaymentOptions(paymentMethods).map((method) => <SelectItem key={method.id} value={method.code}>{localizedDataName(method, lang)}</SelectItem>)}</SelectContent></Select></div>
               <div><Label>{t('salesClosing.dialog.displayOrder')}</Label><Input type="number" min="0" value={draft.sort_order ?? 0} onChange={(event) => set({ sort_order: Number(event.target.value) || 0 })} /></div>
             </div>
@@ -184,7 +184,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
                   {SALES_SOURCE_ICON_OPTIONS.map(({ value, label, Icon }) => {
                     const selected = (draft.icon || 'Banknote') === value;
                     const tone = salesSourceToneFor(draft.color);
-                    return <button key={value} type="button" aria-label={label} aria-pressed={selected} title={label} onClick={() => set({ icon: value })} className={`flex min-h-12 items-center justify-center rounded-xl border transition ${selected ? `${tone.border} ${tone.soft} ${tone.text} ring-2 ring-current/20` : 'border-border bg-background text-muted-foreground hover:bg-muted'}`}><Icon className="h-5 w-5" /></button>;
+                    return <button key={value} type="button" aria-label={translateLiteral(label)} aria-pressed={selected} title={translateLiteral(label)} onClick={() => set({ icon: value })} className={`flex min-h-12 items-center justify-center rounded-xl border transition ${selected ? `${tone.border} ${tone.soft} ${tone.text} ring-2 ring-current/20` : 'border-border bg-background text-muted-foreground hover:bg-muted'}`}><Icon className="h-5 w-5" /></button>;
                   })}
                 </div>
               </div>
@@ -193,16 +193,16 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
                 <div className="grid grid-cols-4 gap-2 sm:grid-cols-7" role="group" aria-label={t('salesSourceManagement.color')}>
                   {SALES_SOURCE_COLOR_OPTIONS.map((option) => {
                     const selected = (draft.color || 'emerald') === option.value;
-                    return <button key={option.value} type="button" aria-label={option.label} aria-pressed={selected} title={option.label} onClick={() => set({ color: option.value })} className={`relative flex min-h-11 items-center justify-center rounded-xl border ${selected ? `${option.border} ${option.soft} ring-2 ring-current/20` : 'border-border bg-background hover:bg-muted'}`}><span className={`h-5 w-5 rounded-full ${option.swatch}`} />{selected && <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-background shadow"><Check className={`h-3 w-3 ${option.text}`} /></span>}</button>;
+                    return <button key={option.value} type="button" aria-label={translateLiteral(option.label)} aria-pressed={selected} title={translateLiteral(option.label)} onClick={() => set({ color: option.value })} className={`relative flex min-h-11 items-center justify-center rounded-xl border ${selected ? `${option.border} ${option.soft} ring-2 ring-current/20` : 'border-border bg-background hover:bg-muted'}`}><span className={`h-5 w-5 rounded-full ${option.swatch}`} />{selected && <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-background shadow"><Check className={`h-3 w-3 ${option.text}`} /></span>}</button>;
                   })}
                 </div>
               </div>
             </div>
-            <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm"><span><span className="block font-medium">Driver-linked entries</span><span className="mt-0.5 block text-xs text-muted-foreground">Allow this source to collect branch-scoped Driver Master records. Its today total will be derived from those entries.</span></span><Switch checked={Boolean(draft.allows_driver_entries)} disabled={draft.system_key === 'credit'} onCheckedChange={(allows_driver_entries) => set({ ...(allows_driver_entries && isCustomerCreditSource(draft) ? customerCreditSourcePatch(false) : {}), allows_driver_entries })} /></label>
+            <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm"><span><span className="block font-medium">{translateLiteral("Driver-linked entries")}</span><span className="mt-0.5 block text-xs text-muted-foreground">{translateLiteral("Allow this source to collect branch-scoped Driver Master records. Its today total will be derived from those entries.")}</span></span><Switch checked={Boolean(draft.allows_driver_entries)} disabled={draft.system_key === 'credit'} onCheckedChange={(allows_driver_entries) => set({ ...(allows_driver_entries && isCustomerCreditSource(draft) ? customerCreditSourcePatch(false) : {}), allows_driver_entries })} /></label>
             <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm">
               <span className="min-w-0"><span className="block font-medium">{lang === 'fa' ? 'ثبت قرضهٔ مشتری' : lang === 'ar' ? 'إدخالات مرتبطة بائتمان العملاء' : 'Customer credit-linked entries'}</span>
                 <span className="mt-0.5 block text-xs text-muted-foreground">{lang === 'fa' ? 'مشتری و مبلغ قرضه را انتخاب کنید. با نهایی‌شدن فروش، بدهی مشتری ثبت می‌شود؛ دریافت بدهی فروش تازه حساب نمی‌شود.' : lang === 'ar' ? 'اختر العميل ومبلغ البيع الآجل. يُسجل الدين عند اعتماد المبيعات؛ سداد الدين ليس مبيعات جديدة.' : 'Select customers and credit sale amounts. Finalizing creates customer receivables; debt payments are not new sales.'}</span></span>
-              <Switch aria-label="Customer credit-linked entries" checked={isCustomerCreditSource(draft)} disabled={draft.system_key === 'credit'} onCheckedChange={enabled => set(customerCreditSourcePatch(enabled))} />
+              <Switch aria-label={translateLiteral("Customer credit-linked entries")} checked={isCustomerCreditSource(draft)} disabled={draft.system_key === 'credit'} onCheckedChange={enabled => set(customerCreditSourcePatch(enabled))} />
             </label>
             <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm"><span><span className="block font-medium">{t('salesSourceManagement.allBranches')}</span><span className="mt-0.5 block text-xs text-muted-foreground">{t('salesSourceManagement.allBranchesHelp')}</span></span><Switch checked={draft.is_global !== false} onCheckedChange={(is_global) => set({ is_global, branch_ids: is_global ? [] : draft.branch_ids || [] })} /></label>
             {draft.is_global === false && <div className="grid gap-2 rounded-lg border bg-background p-3 sm:grid-cols-2">{branches.map((branch) => { const id = String(branch.id); const checked = asArray(draft.branch_ids).map(String).includes(id); return <label key={id} className="flex min-h-10 items-center gap-2 rounded-md px-2 text-sm hover:bg-muted"><input type="checkbox" checked={checked} onChange={() => toggleBranch(id)} className="h-4 w-4 accent-primary" /><span className="truncate">{branch.name || branch.label || branch.branch_key || branch.key}</span></label>; })}</div>}
