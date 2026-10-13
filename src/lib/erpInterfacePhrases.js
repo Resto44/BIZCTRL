@@ -197,5 +197,16 @@ export const erpInterfacePhrases = Object.freeze({
   "Finalize Closing": { ar: "اعتماد الإقفال النهائي", fa: "نهایی‌سازی بستن فروش" },
   "Required closing actions": { ar: "إجراءات الإقفال المطلوبة", fa: "اقدامات الزامی بستن حساب" },
   "Separate purchase invoices": { ar: "فواتير مشتريات منفصلة", fa: "فاکتورهای خرید جدا" },
+  "Driver-linked entries": { ar: "إدخالات مرتبطة بالسائقين", fa: "ثبت‌های مرتبط با رانندگان" },
+  "Allow this source to collect branch-scoped Driver Master records. Its today total will be derived from those entries.": { ar: "اسمح لهذا المصدر بتجميع سجلات السائقين على مستوى الفرع. يُحتسب إجمالي اليوم من تلك الإدخالات.", fa: "اجازه دهید این منبع ثبت‌های رانندگان شعبه را جمع کند. مجموع امروز از این ثبت‌ها محاسبه می‌شود." },
+  "Select a valid payment method. For network sales choose Card / Network.": { ar: "اختر طريقة دفع صحيحة. لمبيعات الشبكة اختر بطاقة / شبكة.", fa: "روش پرداخت معتبر انتخاب کنید. برای فروش شبکه، کارت / شبکه را انتخاب کنید." },
+  "short text": { ar: "نص قصير", fa: "متن کوتاه" },
+  "long text": { ar: "نص طويل", fa: "متن بلند" },
+  "number": { ar: "رقم", fa: "عدد" },
+  "currency": { ar: "عملة", fa: "ارز" },
+  "checkbox": { ar: "مربع اختيار", fa: "چک‌باکس" },
+  "dropdown": { ar: "قائمة منسدلة", fa: "فهرست کشویی" },
+  "date": { ar: "تاريخ", fa: "تاریخ" },
+  "time": { ar: "وقت", fa: "زمان" },
 });
 export default erpInterfacePhrases;
