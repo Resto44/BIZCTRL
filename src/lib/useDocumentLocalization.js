@@ -38,19 +38,20 @@ function canTranslateTextNode(node) {
   const parent = node.parentElement;
   if (!parent) return false;
   const tag = parent.tagName?.toLowerCase();
-  if (['script', 'style', 'code', 'pre', 'textarea', 'option'].includes(tag)) return false;
-  if (parent.closest?.('[data-i18n-skip="true"]')) return false;
+  if (['script', 'style', 'code', 'pre', 'textarea'].includes(tag)) return false;
+  if (parent.closest?.('[data-i18n-skip="true"], [translate="no"], [contenteditable]:not([contenteditable="false"])')) return false;
   return true;
 }
 
 function canTranslateAttribute(element, name) {
-  if (element.closest?.('[data-i18n-skip="true"]')) return false;
+  if (element.closest?.('[data-i18n-skip="true"], [translate="no"], [contenteditable]:not([contenteditable="false"])')) return false;
   if (name === 'value' && !['button', 'submit', 'reset'].includes(element.type)) return false;
   return true;
 }
 
 export function useDocumentLocalization({ lang, translateLiteral }) {
   const textSources = useRef(new WeakMap());
+  const implicitOptionValues = useRef(new WeakMap());
   const attributeSources = useRef(new WeakMap());
   const textOutputs = useRef(new WeakMap());
   const attributeOutputs = useRef(new WeakMap());
@@ -70,6 +71,18 @@ export function useDocumentLocalization({ lang, translateLiteral }) {
         lang,
         translateLiteral,
       });
+      // Native option values default to their text. Pin the original value before
+      // translating the label so form submissions never send translated enums.
+      const parent = node.parentElement;
+      if (parent?.tagName === 'OPTION') {
+        const implicitValue = implicitOptionValues.current.get(parent);
+        if (!parent.hasAttribute('value') || (implicitValue !== undefined && parent.getAttribute('value') === implicitValue)) {
+          parent.setAttribute('value', source);
+          implicitOptionValues.current.set(parent, source);
+        } else {
+          implicitOptionValues.current.delete(parent);
+        }
+      }
       const translated = lang === 'en' ? source : translateLiteral(source);
       const next = preserveWhitespace(source, translated);
       textOutputs.current.set(node, next);
@@ -94,7 +107,7 @@ export function useDocumentLocalization({ lang, translateLiteral }) {
     };
 
     const localizeElement = (element) => {
-      if (!element || element.nodeType !== ELEMENT_NODE || element.closest?.('[data-i18n-skip="true"]')) return;
+      if (!element || element.nodeType !== ELEMENT_NODE || element.closest?.('[data-i18n-skip="true"], [translate="no"], [contenteditable]:not([contenteditable="false"])')) return;
       LOCALIZABLE_ATTRIBUTES.forEach((name) => localizeAttribute(element, name));
       element.querySelectorAll('[placeholder], [title], [aria-label], [alt], input[type="button"], input[type="submit"], input[type="reset"]').forEach(child => {
         LOCALIZABLE_ATTRIBUTES.forEach(name => localizeAttribute(child, name));

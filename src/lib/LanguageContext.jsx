@@ -1,11 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import translations from './i18n';
-import localizedPhrases from './localizedPhrases';
+import { translateInterface } from './translateInterface';
 import useDocumentLocalization from './useDocumentLocalization';
 import {
   LANGUAGE_STORAGE_KEY,
   SUPPORTED_LANGUAGES,
-  createEnglishPhraseIndex,
   formatLocalizedCurrency,
   formatLocalizedDate,
   formatLocalizedNumber,
@@ -24,7 +23,6 @@ const safeGet = (key, fallback) => {
   }
 };
 
-const englishPhraseIndex = createEnglishPhraseIndex(translations);
 
 export function LanguageProvider({ children }) {
   const [lang, setLanguage] = useState(() => normalizeLanguage(safeGet(LANGUAGE_STORAGE_KEY, 'en')));
@@ -33,6 +31,13 @@ export function LanguageProvider({ children }) {
     import('./ownerPush').then(({watchPushLanguage})=>{if(!stopped)cleanup=watchPushLanguage(lang);}).catch(()=>{});
     return()=>{stopped=true;cleanup?.();};
   },[lang]);
+  useEffect(() => {
+    const syncLanguage = event => {
+      if (event.key === LANGUAGE_STORAGE_KEY && event.newValue) setLanguage(normalizeLanguage(event.newValue));
+    };
+    window.addEventListener('storage', syncLanguage);
+    return () => window.removeEventListener('storage', syncLanguage);
+  }, []);
   const [currency, setCurrency] = useState(() => safeGet('rc_currency', 'SAR'));
   const [regionalPreferences, setRegionalPreferences] = useState(() => {
     try {
@@ -53,18 +58,11 @@ export function LanguageProvider({ children }) {
   }, []);
 
   const t = useCallback((key, values) => {
-    const message = translations[lang]?.[key] ?? translations.en?.[key] ?? key;
+    const message = translations[lang]?.[key] ?? translateInterface(translations.en?.[key] ?? key, lang);
     return interpolate(message, values);
   }, [lang]);
 
-  const translateLiteral = useCallback((value, values) => {
-    if (value === null || value === undefined || value === '') return value;
-    const source = String(value).trim();
-    const phraseTranslation = localizedPhrases[source]?.[lang];
-    if (phraseTranslation) return interpolate(phraseTranslation, values);
-    const key = englishPhraseIndex.get(source);
-    return key ? t(key, values) : interpolate(source, values);
-  }, [lang, t]);
+  const translateLiteral = useCallback((value, values) => translateInterface(value, lang, values), [lang]);
 
   const translateLabel = useCallback((value, fallback) => translateDataLabel(value, t, fallback), [t]);
   const formatNumber = useCallback((value, options = {}) => {

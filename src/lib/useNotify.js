@@ -5,12 +5,13 @@
 import { useTenant } from '@/lib/TenantContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
+import { toast } from 'sonner';
 import { notify } from '@/lib/notificationEngine';
 
 export function useNotify() {
   const { orgId, activeRestaurant } = useTenant();
   const { user } = useAuth();
-  const { currency } = useLanguage();
+  const { currency, translateLiteral } = useLanguage();
 
   const base = {
     orgId,
@@ -21,6 +22,10 @@ export function useNotify() {
   };
 
   return {
+    success: (message) => toast.success(translateLiteral(message)),
+    error: (message) => toast.error(translateLiteral(message)),
+    info: (message) => toast.info(translateLiteral(message)),
+    warning: (message) => toast.warning(translateLiteral(message)),
     sale:              (opts) => notify.sale({ ...base, ...opts }),
     purchase:          (opts) => notify.purchase({ ...base, ...opts }),
     expense:           (opts) => notify.expense({ ...base, ...opts }),

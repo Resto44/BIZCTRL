@@ -1,9 +1,13 @@
+import { useLanguage } from '@/lib/LanguageContext'
 import * as React from "react"
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
 import { Check, ChevronRight, Circle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-const DropdownMenu = DropdownMenuPrimitive.Root
+function DropdownMenu(props) {
+  const { dir } = useLanguage()
+  return <DropdownMenuPrimitive.Root dir={dir} {...props} />
+}
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
 const DropdownMenuGroup = DropdownMenuPrimitive.Group
 const DropdownMenuPortal = DropdownMenuPrimitive.Portal
