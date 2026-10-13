@@ -4,6 +4,7 @@ import {createRoot} from 'react-dom/client';
 import {afterEach,describe,expect,it} from 'vitest';
 import {translateInterface} from '../src/lib/translateInterface.js';
 import {erpInterfacePhrases} from '../src/lib/erpInterfacePhrases.js';
+import persianUiPhrases from '../src/lib/persianUiPhrases.js';
 import {useDocumentLocalization} from '../src/lib/useDocumentLocalization.js';
 import {readFile} from 'node:fs/promises';
 
@@ -37,7 +38,7 @@ describe('Selected SaaS language applied throughout ERP',()=>{
    expect(localized.ar,english).toBeTruthy();
    expect(localized.fa,english).toBeTruthy();
    expect(translateInterface(english,'ar'),english).toBe(localized.ar);
-   expect(translateInterface(english,'fa'),english).toBe(localized.fa);
+   expect(translateInterface(english,'fa'),english).toBe(persianUiPhrases[english] ?? localized.fa);
    expect(translateInterface(english,'en'),english).toBe(english);
   }
  });
