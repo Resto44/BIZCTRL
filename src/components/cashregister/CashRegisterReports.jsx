@@ -1,9 +1,11 @@
+import { readAllPortalRows } from '@/lib/portalReliability';
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
-import { base44 } from '@/api/base44Client';
+import { readCashRows, cashBranchLabel } from '@/lib/cashRegisterData';
+import PortalDataState from '@/components/shared/PortalDataState';
 import { supabase } from '@/api/supabaseClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -30,72 +32,62 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
 
 export default function CashRegisterReports({ selectedBranch = 'all' }) {
   const { user } = useAuth();
-  const { branches } = useTenant();
+  const { branches, activeRestaurantId } = useTenant();
   const { currency } = useLanguage();
-  const fmt = (n) => `${currency}${(Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const fmt = (n) => `${currency} ${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const [reportType, setReportType] = useState('daily');
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   // Load all settlements in range
-  const { data: settlements = [], isLoading: loadingS } = useQuery({
-    queryKey: ['settlements_report', user?.email, dateFrom, dateTo],
-    queryFn: () => base44.entities.DailyCashSettlement.filter({
-      created_by: user?.email,
+  const { isError: cashError1, isLoading: cashLoading1, data: settlements = [], isLoading: loadingS } = useQuery({
+    queryKey: ['settlements_report', user?.email, activeRestaurantId, dateFrom, dateTo],
+    queryFn: () => readCashRows('DailyCashSettlement', {
+      restaurant_id: activeRestaurantId,
     }, '-date', 500),
-    enabled: !!user?.email,
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 60000,
   });
 
   // Load shortages
-  const { data: shortages = [], isLoading: loadingSh } = useQuery({
-    queryKey: ['shortages_report', user?.email],
-    queryFn: () => base44.entities.CashShortage.filter({
-      created_by: user?.email,
+  const { isError: cashError2, isLoading: cashLoading2, data: shortages = [], isLoading: loadingSh } = useQuery({
+    queryKey: ['shortages_report', user?.email, activeRestaurantId],
+    queryFn: () => readCashRows('CashShortage', {
+      restaurant_id: activeRestaurantId,
     }, '-date', 500),
-    enabled: !!user?.email,
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 60000,
   });
 
   // Load injections
-  const { data: injections = [], isLoading: loadingI } = useQuery({
-    queryKey: ['injections_report', user?.email],
-    queryFn: () => base44.entities.OwnerCashInjection.filter({
-      created_by: user?.email,
+  const { isError: cashError3, isLoading: cashLoading3, data: injections = [], isLoading: loadingI } = useQuery({
+    queryKey: ['injections_report', user?.email, activeRestaurantId],
+    queryFn: () => readCashRows('OwnerCashInjection', {
+      restaurant_id: activeRestaurantId,
     }, '-date', 500),
-    enabled: !!user?.email,
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 60000,
   });
 
   // Load movements
-  const { data: movements = [], isLoading: loadingM } = useQuery({
-    queryKey: ['movements_report', user?.email],
-    queryFn: () => base44.entities.CashMovement.filter({
-      created_by: user?.email,
+  const { isError: cashError4, isLoading: cashLoading4, data: movements = [], isLoading: loadingM } = useQuery({
+    queryKey: ['movements_report', user?.email, activeRestaurantId],
+    queryFn: () => readCashRows('CashMovement', {
+      restaurant_id: activeRestaurantId,
       is_reversed: false,
     }, '-date', 1000),
-    enabled: !!user?.email,
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 60000,
   });
 
   // Load approved supplier invoices for unified purchase reporting
-  const { data: allInvoicesInRange = [], isLoading: loadingInv } = useQuery({
-    queryKey: ['supplier_invoices_report', user?.email, dateFrom, dateTo],
-    queryFn: async () => {
-      if (!user?.email) return [];
-      const { data, error } = await supabase
-        .from('supplier_invoices')
-        .select('*')
-        .eq('created_by', user.email)
-        .in('approval_status', ['approved', 'auto_approved'])
-        .gte('date', dateFrom)
-        .lte('date', dateTo)
-        .order('date', { ascending: false });
-      if (error) return [];
-      return data || [];
-    },
-    enabled: !!user?.email,
+  const { isError: cashError5, isLoading: cashLoading5, data: allInvoicesInRange = [], isLoading: loadingInv } = useQuery({
+    queryKey: ['supplier_invoices_report', user?.email, activeRestaurantId, dateFrom, dateTo],
+    queryFn: () => readAllPortalRows(() => supabase.from('supplier_invoices').select('*')
+      .eq('restaurant_id', activeRestaurantId).in('approval_status', ['approved', 'auto_approved'])
+      .gte('date', dateFrom).lte('date', dateTo).order('date', { ascending: false }).order('id')),
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 60000,
   });
 
@@ -139,7 +131,7 @@ export default function CashRegisterReports({ selectedBranch = 'all' }) {
             {filteredSettlements.slice(0, 50).map(s => (
               <div key={s.id} className="flex items-center justify-between py-2 border-b border-border last:border-0 text-xs">
                 <div>
-                  <p className="font-medium">{s.branch}</p>
+                  <p className="font-medium">{cashBranchLabel(branches,s.branch)}</p>
                   <p className="text-muted-foreground">{format(parseISO(s.date), 'MMM d, yyyy')}</p>
                 </div>
                 <div className="text-right">
@@ -192,8 +184,8 @@ export default function CashRegisterReports({ selectedBranch = 'all' }) {
               <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} width={50} tickFormatter={v => `${currency}${(v/1000).toFixed(0)}k`} />
-                <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} formatter={v => [`${currency}${v.toLocaleString()}`, '']} />
+                <YAxis tick={{ fontSize: 10 }} width={50} tickFormatter={v => `${currency} ${(v/1000).toFixed(0)}k`} />
+                <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} formatter={v => [`${currency} ${v.toLocaleString()}`, '']} />
                 <Bar dataKey="sales" fill="#10b981" radius={[4,4,0,0]} name="Cash Sales" />
                 <Bar dataKey="expenses" fill="#ef4444" radius={[4,4,0,0]} name="Cash Expenses" />
                 <Bar dataKey="purchases" fill="#f59e0b" radius={[4,4,0,0]} name="Approved Purchases" />
@@ -295,7 +287,7 @@ export default function CashRegisterReports({ selectedBranch = 'all' }) {
               {filteredShortages.slice(0, 50).map(s => (
                 <div key={s.id} className="flex items-center justify-between py-2 border-b border-border last:border-0 text-xs">
                   <div>
-                    <p className="font-medium">{s.branch}</p>
+                    <p className="font-medium">{cashBranchLabel(branches,s.branch)}</p>
                     <p className="text-muted-foreground">{format(parseISO(s.date), 'MMM d, yyyy')}</p>
                   </div>
                   <div className="text-right">
@@ -391,8 +383,8 @@ export default function CashRegisterReports({ selectedBranch = 'all' }) {
               <BarChart data={branchData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="branch" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} width={50} tickFormatter={v => `${currency}${(v/1000).toFixed(0)}k`} />
-                <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} formatter={v => [`${currency}${v.toLocaleString()}`, '']} />
+                <YAxis tick={{ fontSize: 10 }} width={50} tickFormatter={v => `${currency} ${(v/1000).toFixed(0)}k`} />
+                <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} formatter={v => [`${currency} ${v.toLocaleString()}`, '']} />
                 <Bar dataKey="sales" fill="#10b981" radius={[4,4,0,0]} name="Cash Sales" />
                 <Bar dataKey="shortage" fill="#ef4444" radius={[4,4,0,0]} name="Shortage" />
               </BarChart>
@@ -441,7 +433,9 @@ export default function CashRegisterReports({ selectedBranch = 'all' }) {
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {REPORT_TYPES.map(r => {
           const Icon = r.icon;
-          return (
+          if (cashLoading1 || cashLoading2 || cashLoading3 || cashLoading4 || cashLoading5) return <PortalDataState loading />;
+  if (cashError1 || cashError2 || cashError3 || cashError4 || cashError5) return <PortalDataState onRetry={() => window.location.reload()} />;
+  return (
             <button
               key={r.value}
               onClick={() => setReportType(r.value)}

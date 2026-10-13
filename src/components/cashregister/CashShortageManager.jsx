@@ -1,10 +1,12 @@
+import { useTenant } from '@/lib/TenantContext';
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useNotify } from '@/lib/useNotify';
 import { approveShortage, investigateShortage } from '@/services/cashRegisterService';
-import { base44 } from '@/api/base44Client';
+import { readCashRows, cashBranchLabel } from '@/lib/cashRegisterData';
+import PortalDataState from '@/components/shared/PortalDataState';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,12 +34,13 @@ function ShortageStatusBadge({ status }) {
 }
 
 function ShortageCard({ shortage, onAction }) {
+  const { branches } = useTenant();
   const { currency } = useLanguage();
   const { user } = useAuth();
   const notif = useNotify();
   const qc = useQueryClient();
   const isOwner = user?.role === 'owner';
-  const fmt = (n) => `${currency}${(Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const fmt = (n) => `${currency} ${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const [ownerNotes, setOwnerNotes] = useState('');
   const [showInjection, setShowInjection] = useState(false);
@@ -81,7 +84,7 @@ function ShortageCard({ shortage, onAction }) {
                 {isShortage ? 'Cash Shortage' : 'Cash Overage'}: {fmt(amount)}
               </p>
               <p className="text-xs text-muted-foreground">
-                {shortage.branch} · {format(new Date(shortage.date), 'MMM d, yyyy')}
+                {cashBranchLabel(branches,shortage.branch)} · {format(new Date(shortage.date), 'MMM d, yyyy')}
               </p>
             </div>
           </div>
@@ -111,7 +114,7 @@ function ShortageCard({ shortage, onAction }) {
         )}
 
         {/* Owner Actions */}
-        {isOwner && (shortage.status === 'Pending' || shortage.status === 'Investigating') && (
+        {isOwner && !shortage.closing_id && (shortage.status === 'Pending' || shortage.status === 'Investigating') && (
           <div className="space-y-2 mt-2">
             <Textarea
               value={ownerNotes}
@@ -158,7 +161,7 @@ function ShortageCard({ shortage, onAction }) {
         {showInjection && (
           <div className="mt-2">
             <OwnerCashInjectionForm
-              defaultBranch={shortage.branch}
+              defaultBranch={cashBranchLabel(branches,shortage.branch)}
               shortageId={shortage.id}
               shortageAmount={shortage.shortage_amount}
               onSuccess={() => {
@@ -175,19 +178,20 @@ function ShortageCard({ shortage, onAction }) {
 }
 
 export default function CashShortageManager({ branch, dateFrom, dateTo }) {
+  const { activeRestaurantId } = useTenant();
   const { user } = useAuth();
   const { currency } = useLanguage();
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('Pending');
 
-  const { data: shortages = [], isLoading } = useQuery({
-    queryKey: ['cash_shortages', branch, user?.email, statusFilter],
-    queryFn: () => base44.entities.CashShortage.filter({
-      created_by: user?.email,
+  const { isError: cashError1, isLoading: cashLoading1, data: shortages = [], isLoading } = useQuery({
+    queryKey: ['cash_shortages', branch, user?.email, activeRestaurantId, statusFilter],
+    queryFn: () => readCashRows('CashShortage', {
+      restaurant_id: activeRestaurantId,
       ...(branch && branch !== 'all' ? { branch } : {}),
       ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
     }, '-date', 100),
-    enabled: !!user?.email,
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 30000,
   });
 
@@ -198,6 +202,8 @@ export default function CashShortageManager({ branch, dateFrom, dateTo }) {
     Resolved: shortages.filter(s => s.status === 'Resolved').length,
   };
 
+  if (cashLoading1) return <PortalDataState loading />;
+  if (cashError1) return <PortalDataState onRetry={() => window.location.reload()} />;
   return (
     <div className="space-y-3">
       {/* Status Filter Tabs */}

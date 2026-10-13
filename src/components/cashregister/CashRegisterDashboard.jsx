@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
-import { base44 } from '@/api/base44Client';
+import { readCashRows, cashBranchLabel } from '@/lib/cashRegisterData';
+import PortalDataState from '@/components/shared/PortalDataState';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Wallet, TrendingDown, TrendingUp, AlertTriangle,
@@ -39,7 +40,8 @@ function KPICard({ label, value, icon: Icon, color = 'blue', sub, trend }) {
 }
 
 function BranchSettlementRow({ settlement, currency }) {
-  const fmt = (n) => `${currency}${(Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const { branches } = useTenant();
+  const fmt = (n) => `${currency} ${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const statusConfig = {
     Draft:      { color: 'bg-gray-100 text-gray-700', label: 'Draft' },
     Submitted:  { color: 'bg-blue-100 text-blue-700', label: 'Pending' },
@@ -52,7 +54,7 @@ function BranchSettlementRow({ settlement, currency }) {
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{settlement.branch}</p>
+        <p className="text-sm font-medium truncate">{cashBranchLabel(branches,settlement.branch)}</p>
         <div className="flex items-center gap-2 mt-0.5">
           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${sc.color}`}>{sc.label}</span>
           {diff !== 0 && (
@@ -72,62 +74,62 @@ function BranchSettlementRow({ settlement, currency }) {
 
 export default function CashRegisterDashboard({ selectedBranch = 'all' }) {
   const { user } = useAuth();
-  const { branches } = useTenant();
+  const { branches, activeRestaurantId } = useTenant();
   const { currency } = useLanguage();
   const today = format(new Date(), 'yyyy-MM-dd');
-  const fmt = (n) => `${currency}${(Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const fmt = (n) => `${currency} ${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   // Today's settlements
-  const { data: todaySettlements = [], isLoading: loadingSettlements } = useQuery({
-    queryKey: ['daily_cash_settlements_today', today, user?.email],
-    queryFn: () => base44.entities.DailyCashSettlement.filter({
+  const { isError: cashError1, isLoading: cashLoading1, data: todaySettlements = [], isLoading: loadingSettlements } = useQuery({
+    queryKey: ['daily_cash_settlements_today', today, user?.email, activeRestaurantId],
+    queryFn: () => readCashRows('DailyCashSettlement', {
       date: today,
-      created_by: user?.email,
+      restaurant_id: activeRestaurantId,
     }, '-created_date', 50),
-    enabled: !!user?.email,
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 30000,
   });
 
   // Recent settlements (last 30 days for chart)
-  const { data: recentSettlements = [] } = useQuery({
-    queryKey: ['daily_cash_settlements_recent', user?.email],
-    queryFn: () => base44.entities.DailyCashSettlement.filter({
-      created_by: user?.email,
+  const { isError: cashError2, isLoading: cashLoading2, data: recentSettlements = [] } = useQuery({
+    queryKey: ['daily_cash_settlements_recent', user?.email, activeRestaurantId],
+    queryFn: () => readCashRows('DailyCashSettlement', {
+      restaurant_id: activeRestaurantId,
     }, '-date', 200),
-    enabled: !!user?.email,
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 60000,
   });
 
   // Today's shortages
-  const { data: todayShortages = [] } = useQuery({
-    queryKey: ['cash_shortages_today', today, user?.email],
-    queryFn: () => base44.entities.CashShortage.filter({
+  const { isError: cashError3, isLoading: cashLoading3, data: todayShortages = [] } = useQuery({
+    queryKey: ['cash_shortages_today', today, user?.email, activeRestaurantId],
+    queryFn: () => readCashRows('CashShortage', {
       date: today,
-      created_by: user?.email,
+      restaurant_id: activeRestaurantId,
     }, '-created_date', 50),
-    enabled: !!user?.email,
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 30000,
   });
 
   // Today's injections
-  const { data: todayInjections = [] } = useQuery({
-    queryKey: ['owner_cash_injections_today', today, user?.email],
-    queryFn: () => base44.entities.OwnerCashInjection.filter({
+  const { isError: cashError4, isLoading: cashLoading4, data: todayInjections = [] } = useQuery({
+    queryKey: ['owner_cash_injections_today', today, user?.email, activeRestaurantId],
+    queryFn: () => readCashRows('OwnerCashInjection', {
       date: today,
-      created_by: user?.email,
+      restaurant_id: activeRestaurantId,
     }, '-created_date', 50),
-    enabled: !!user?.email,
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 30000,
   });
 
   // Pending shortages (all time)
-  const { data: pendingShortages = [] } = useQuery({
-    queryKey: ['cash_shortages_pending', user?.email],
-    queryFn: () => base44.entities.CashShortage.filter({
-      created_by: user?.email,
+  const { isError: cashError5, isLoading: cashLoading5, data: pendingShortages = [] } = useQuery({
+    queryKey: ['cash_shortages_pending', user?.email, activeRestaurantId],
+    queryFn: () => readCashRows('CashShortage', {
+      restaurant_id: activeRestaurantId,
       status: 'Pending',
     }, '-date', 50),
-    enabled: !!user?.email,
+    enabled: !!activeRestaurantId && !!user?.email,
     staleTime: 30000,
   });
 
@@ -170,6 +172,8 @@ export default function CashRegisterDashboard({ selectedBranch = 'all' }) {
     );
   }
 
+  if (cashLoading1 || cashLoading2 || cashLoading3 || cashLoading4 || cashLoading5) return <PortalDataState loading />;
+  if (cashError1 || cashError2 || cashError3 || cashError4 || cashError5) return <PortalDataState onRetry={() => window.location.reload()} />;
   return (
     <div className="space-y-4">
       {/* KPI Grid */}
@@ -243,10 +247,10 @@ export default function CashRegisterDashboard({ selectedBranch = 'all' }) {
             <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} width={50} tickFormatter={v => `${currency}${(v/1000).toFixed(0)}k`} />
+              <YAxis tick={{ fontSize: 10 }} width={50} tickFormatter={v => `${currency} ${(v/1000).toFixed(0)}k`} />
               <Tooltip
                 contentStyle={{ fontSize: 11, borderRadius: 8 }}
-                formatter={(v, name) => [`${currency}${v.toLocaleString()}`, name]}
+                formatter={(v, name) => [`${currency} ${v.toLocaleString()}`, name]}
               />
               <Bar dataKey="opening" fill="#3b82f6" radius={[4,4,0,0]} name="Opening" />
               <Bar dataKey="expected" fill="#10b981" radius={[4,4,0,0]} name="Expected" />
