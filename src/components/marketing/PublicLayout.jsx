@@ -1,3 +1,4 @@
+import LanguageSwitcher from '@/components/shared/LanguageSwitcher';
 import BrandLogo from '@/components/BrandLogo';
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -100,6 +101,7 @@ export function PublicLayout({ children }) {
       <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <BrandMark />
+          <LanguageSwitcher compact className="min-h-11 min-w-11 text-slate-200 hover:bg-white/10 hover:text-white" />
           <div className="hidden items-center gap-6 md:flex">
             {headerLinks.map((item) => <HeaderLink key={item.label} item={item} />)}
           </div>
@@ -136,6 +138,7 @@ export function PublicLayout({ children }) {
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1.3fr_1fr_1fr]">
           <div>
             <BrandMark />
+          <LanguageSwitcher compact className="min-h-11 min-w-11 text-slate-200 hover:bg-white/10 hover:text-white" />
             <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Run Your Entire Business From One Platform.</p>
             <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">BizCTRL is a cloud-based multi-tenant ERP SaaS for modern, multi-branch businesses.</p>
           </div>
