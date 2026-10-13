@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
 
 const ACTIVE_STATUS = 'active';
+let subscriptionSequence = 0;
 
 export function useActiveAlerts() {
   const queryClient = useQueryClient();
@@ -39,18 +40,27 @@ export function useActiveAlerts() {
   });
 
   useEffect(() => {
-    if (!restaurantId) return undefined;
+    if (!hasScope) return undefined;
+    // Supabase reuses channels by topic. Each effect must own a fresh channel,
+    // including remounts while the previous channel is still being removed.
+    const subscriptionId = ++subscriptionSequence;
+    let active = true;
     const channel = supabase
-      .channel(`active-alerts-${restaurantId}-${isManager ? (managerBranchId || 'none') : 'owner'}`)
+      .channel(`active-alerts-${restaurantId}-${isManager ? managerBranchId : 'owner'}-${subscriptionId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'active_alerts', filter: `restaurant_id=eq.${restaurantId}` },
-        () => queryClient.invalidateQueries({ queryKey: ['active-alerts', restaurantId] }),
+        () => {
+          if (active) queryClient.invalidateQueries({ queryKey: ['active-alerts', restaurantId] });
+        },
       )
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
-  }, [isManager, managerBranchId, queryClient, restaurantId]);
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [hasScope, isManager, managerBranchId, queryClient, restaurantId]);
 
   const resolveMutation = useMutation({
     mutationFn: async (alertId) => {
