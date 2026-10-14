@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { base44, supabase } from '@/api/base44Client';
 import { useTenant } from '@/lib/TenantContext';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -35,15 +35,23 @@ export default function DeductionRulesSettings() {
   const [form, setForm] = useState(emptyRule);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const { data: rules = [] } = useQuery({
-    queryKey: ['deduction_rules'],
-    queryFn: () => base44.entities.DeductionRule.list(),
+  const { data: rules = [], isError: rulesError } = useQuery({
+    queryKey: ['payroll-deduction-rules', activeRestaurant?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('deduction_rules').select('*')
+        .eq('restaurant_id', activeRestaurant.id).order('created_date').limit(2000);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!activeRestaurant?.id,
   });
 
   const createMut = useMutation({
     mutationFn: d => editingId ? base44.entities.DeductionRule.update(editingId, d) : base44.entities.DeductionRule.create(d),
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ['deduction_rules'] });
+      qc.invalidateQueries({ queryKey: ['payroll-deduction-rules'] });
+      qc.invalidateQueries({ queryKey: ['payroll-rules'] });
+      qc.invalidateQueries({ queryKey: ['payroll-dashboard-rules'] });
       setShowForm(false);
       setForm(emptyRule);
       setEditingId(null);
@@ -57,7 +65,13 @@ export default function DeductionRulesSettings() {
 
   const deleteMut = useMutation({
     mutationFn: id => base44.entities.DeductionRule.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['deduction_rules'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['payroll-deduction-rules'] });
+      qc.invalidateQueries({ queryKey: ['payroll-rules'] });
+      qc.invalidateQueries({ queryKey: ['payroll-dashboard-rules'] });
+      toast.success(translateLiteral('Deduction rule deleted'));
+    },
+    onError: error => toast.error(error?.message || translateLiteral('Unable to delete deduction rule')),
   });
 
   const handleSave = () => {
@@ -97,7 +111,10 @@ export default function DeductionRulesSettings() {
         <Button size="sm" onClick={() => { setEditingId(null); setForm(emptyRule); setShowForm(true); }}><Plus className="w-3.5 h-3.5 mr-1" /> Add Rule</Button>
       </div>
 
-      {rules.length === 0 ? (
+      {rulesError && <Card className="border-red-200 p-3 text-sm text-red-700">
+        {translateLiteral('Unable to load deduction rules. Check access and try again.')}
+      </Card>}
+      {rulesError ? null : rules.length === 0 ? (
         <div className="text-center py-10 text-muted-foreground">
           <Settings2 className="w-10 h-10 mx-auto mb-2 opacity-30" />
           <p className="text-sm">No deduction rules configured</p>
