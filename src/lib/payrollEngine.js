@@ -22,7 +22,7 @@ function employeeKey(employee = {}) {
 }
 
 export function calcHours(checkIn, checkOut) {
-  const timePattern = /^([01]\\d|2[0-3]):([0-5]\\d)(?::[0-5]\\d)?$/;
+  const timePattern = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/;
   if (typeof checkIn !== 'string' || typeof checkOut !== 'string') return 0;
   const start = checkIn.match(timePattern);
   const end = checkOut.match(timePattern);
