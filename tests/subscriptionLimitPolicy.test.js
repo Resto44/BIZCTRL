@@ -89,7 +89,10 @@ describe('central subscription limit policy', () => {
     expect(migration).toContain('v_restaurant_id := public.auth_user_restaurant_id();');
     expect(migration).toContain("NEW.restaurant_id := v_restaurant_id;");
     expect(migration).toContain("MESSAGE = 'SUBSCRIPTION_SCOPE_REQUIRED'");
-    expect(employees).toContain('restaurant_id: activeRestaurant?.id || null');
+    // The unified directory inserts directly through Supabase with a non-null
+    // canonical restaurant ID; server-side subscription limits still apply.
+    expect(employees).toContain('restaurant_id: activeRestaurant.id');
+    expect(employees).toContain("if (!mayEdit || !activeRestaurant?.id)");
     expect(employees).toContain("withinLimit('employees')");
   });
 
