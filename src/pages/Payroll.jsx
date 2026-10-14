@@ -12,7 +12,7 @@ import BonusDeductionTab from '@/components/payroll/BonusDeductionTab';
 import DeductionRulesSettings from '@/components/payroll/DeductionRulesSettings';
 import WeeklyRosterView from '@/components/staff/WeeklyRosterView';
 
-export default function Payroll() {
+export default function Payroll({ embedded = false }) {
   const { t } = useLanguage();
   const { role } = useRole();
   const isOwner = role === 'owner';
@@ -29,7 +29,7 @@ export default function Payroll() {
 
   return (
     <div>
-      <PageHeader title={t('payroll')} />
+      {!embedded && <PageHeader title={t('payroll')} />}
       <Tabs defaultValue="attendance">
         <div className="mb-4 max-w-full overflow-x-auto overscroll-x-contain pb-2" role="region" aria-label="Payroll sections" tabIndex={0}>
         <TabsList className="flex w-max min-w-full flex-nowrap justify-start gap-1">
