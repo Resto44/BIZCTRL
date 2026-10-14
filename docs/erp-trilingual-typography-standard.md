@@ -11,7 +11,9 @@ This design contract applies to the web app, owner/manager/staff portals, POS, n
 | Page heading | `text-2xl` | 24 | One meaning regardless of selected language |
 | KPI emphasis | `text-4xl` | 32 | Numeric amounts may have dedicated larger values |
 
-- **English:** Inter with operating-system fallback. **Arabic/Persian:** Vazirmatn with Noto Sans Arabic and OS fallbacks. Do not equate different glyph shapes to a requirement for different CSS font sizes.
+- **Native Apple styling:** On iPhone/iPad, `-apple-system` / `BlinkMacSystemFont` are the first choices for English, Arabic and Persian. Native iOS handles script-specific glyph fallback. On non-Apple browsers use Inter for English and Vazirmatn / Noto Sans Arabic for RTL. We do not ship or embed Apple's proprietary SF font files.
+- **Semantic bold weights:** 700 for heading, 600 for navigation/action/label, 500 for normal body and form controls. An explicit `font-normal` or specialist numeric/KPI weight in a module may override the defaults.
+- Same iOS-like appearance is not pixel-identical on Android/Windows; CSS font fallback is deterministic but available fonts and OS shaping differ. Do not equate different glyph shapes to a need for different CSS font sizes.
 - Use `font-sans`/`var(--font-ui)`, not hard-coded font families. The document `lang` and `dir` are set by `LanguageContext`.
 - The previous RTL-only overrides of `h1`, `h2`, `button`, tables, and `text-xs` through `text-3xl` have been removed. Never reintroduce size rules tied solely to `[dir=rtl]`; RTL should control logical alignment and direction.
 - Existing `text-[8px]` through `text-[11px]` micro-labels use a common **12px floor** except explicit `data-erp-type-optout` specialist elements. Replace tiny ad hoc font sizes with semantic utilities as modules are touched.
