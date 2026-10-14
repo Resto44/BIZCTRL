@@ -32,7 +32,7 @@ describe('Secure employee kiosk boundaries', () => {
   it('uses six-digit mobile PIN input and bundled QR reader', async () => {
     const pin = await read('../src/components/attendance/KioskPINPad.jsx');
     const scanner = await read('../src/components/attendance/QRScanner.jsx');
-    expect(pin).toContain('pin.length === 6');
+    expect(pin).toContain('next.length === 6');
     expect(pin).toContain('max-w-[235px]');
     expect(scanner).toContain("from '@zxing/browser'");
     expect(scanner).not.toContain('cdn.jsdelivr.net');
