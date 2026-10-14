@@ -159,12 +159,10 @@ const MORE_SECTIONS_OWNER_RESTAURANT = [
     title: 'People & Finance',
     items: [
       { path: '/employees',                 icon: Users,       labelKey: 'employees' },
-      { path: '/staff-invitations',         icon: UserCheck,   labelKey: 'staff_invitations' },
       { path: '/customer-management',       icon: Star,        labelKey: 'customer_management' },
       { path: '/driver-management',         icon: Truck,       labelKey: 'driver_management' },
       { path: '/debt-management',           icon: CreditCard,  labelKey: 'debt_management' },
       { path: '/treasury',                  icon: Wallet,      labelKey: 'treasury' },
-      { path: '/payroll',                   icon: Receipt,     labelKey: 'payroll' },
     ],
   },
   {
@@ -225,11 +223,9 @@ const MORE_SECTIONS_OWNER_RETAIL = [
     title: 'People & Finance',
     items: [
       { path: '/employees',                 icon: Users,       labelKey: 'employees' },
-      { path: '/staff-invitations',         icon: UserCheck,   labelKey: 'staff_invitations' },
       { path: '/customer-management',       icon: Star,        labelKey: 'customer_management' },
       { path: '/debt-management',           icon: CreditCard,  labelKey: 'debt_management' },
       { path: '/treasury',                  icon: Wallet,      labelKey: 'treasury' },
-      { path: '/payroll',                   icon: Receipt,     labelKey: 'payroll' },
     ],
   },
   {

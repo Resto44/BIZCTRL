@@ -120,16 +120,13 @@ export const ERP_NAV_GROUPS = [
       { path: '/debt-management',   label: 'Debt Management',   icon: Banknote,  permission: 'viewDebts' },
       { path: '/customer-management',label: 'Customer Management',icon: Users,    permission: 'viewDebts' },
       { path: '/network-management',label: 'Network Settlement',icon: Network,   permission: 'viewNetworkAccounts' },
-      { path: '/payroll',           label: 'Payroll',           icon: CreditCard,permission: 'viewPayroll' },
     ],
   },
   {
     key: 'people',
     label: 'People',
     items: [
-      { path: '/employees',          label: 'Employees',       icon: Users,      permission: 'viewEmployees' },
-      { path: '/employee-attendance',label: 'Attendance',      icon: UserCheck,  permission: 'viewAttendance' },
-      { path: '/employee-control',   label: 'Staff Control',   icon: ShieldCheck,permission: 'viewEmployeeControl' },
+      { path: '/employees',          label: 'Employee Management Center', icon: Users, permission: 'viewEmployees' },
       { path: '/driver-management',  label: 'Driver Management',icon: Truck,      permission: 'viewEmployees' },
     ],
   },
