@@ -7,8 +7,8 @@ import {describe,it,expect,vi,afterEach} from 'vitest';
 const mocks=vi.hoisted(()=>({fail:'',reads:[],invalid:[]}));
 vi.mock('@/lib/AuthContext',()=>({useAuth:()=>({user:{id:'u',restaurant_id:'r',branch_id:'b',linked_entity_id:'profile',email:'test@example.com'},logout:vi.fn()})}));
 vi.mock('@/lib/TenantContext',()=>({useTenant:()=>({managerBranchObject:{id:'b',name:'Branch',branch_key:'branch'}})}));
-vi.mock('@/lib/LanguageContext',()=>({useLanguage:()=>({lang:'en'})}));
-vi.mock('@/api/supabaseClient',()=>({supabase:{from:table=>{
+vi.mock('@/lib/LanguageContext',()=>({useLanguage:()=>({lang:'en',translateLiteral:(value)=>value})}));
+vi.mock('@/api/supabaseClient',()=>({supabase:{rpc:async()=>({data:{configured:false,reason:'APPROVED_EMPLOYEE_LINK_REQUIRED'},error:null}),from:table=>{
  let single=false;
  const chain=new Proxy({}, {get:(_,key)=>{
   if(key==='then')return (resolve)=>{mocks.reads.push(table);resolve({data:single?{id:'profile'}:[],error:table===mocks.fail?new Error('offline'):null});};
@@ -25,7 +25,7 @@ import Supplier from '@/pages/SupplierPortalERP';
 let tree,client;
 afterEach(()=>{if(tree)act(()=>tree.unmount());client?.clear();});
 describe('portal failed reads',()=>{
- for(const [name,Component,table] of [['manager',Manager,'inventory'],['employee',Employee,'employees'],['supplier',Supplier,'supplier_invoices']]){
+ for(const [name,Component,table] of [['manager',Manager,'inventory'],['supplier',Supplier,'supplier_invoices']]){
   it(`${name} shows retry instead of totals/actions after a failed read`,async()=>{
    mocks.fail=table;mocks.reads=[];mocks.invalid=[];
    client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
@@ -38,4 +38,16 @@ describe('portal failed reads',()=>{
    expect(tree.root.findAllByType('button').map(b=>b.children.join(''))).toEqual(['Retry']);
   });
  }
+  it('employee portal still displays a secure attendance clock when employee profile read fails',async()=>{
+    mocks.fail='employees';mocks.reads=[];mocks.invalid=[];
+    client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
+    await act(async()=>{tree=create(<MemoryRouter><QueryClientProvider client={client}><Employee/></QueryClientProvider></MemoryRouter>);});
+    for(let i=0;i<5;i++)await act(async()=>{await new Promise(r=>setTimeout(r,15));});
+    expect(mocks.reads).toContain('employees');
+    expect(mocks.invalid).toEqual([]);
+    const ui=JSON.stringify(tree.toJSON());
+    expect(ui).toContain('My attendance');
+    expect(ui).toContain('Profile unavailable');
+  });
+
 });
