@@ -105,7 +105,25 @@ export default function EmployeeAttendance() {
     enabled: ready,
     refetchInterval: 30000,
   });
-  const rangeFrom = cutoffForToday(analyticsRange, today);
+  const { data: selectedOpenShift, isError: openShiftError } = useQuery({
+    queryKey: ['kiosk-employee-open-shift', restaurantId, branchId, selectedEmployee],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('attendance')
+        .select('id,date,check_in,check_out')
+        .eq('restaurant_id', restaurantId).eq('branch_id', branchId)
+        .eq('employee_id', selectedEmployee).not('check_in', 'is', null)
+        .is('check_out', null).order('date', { ascending: false }).limit(1).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: ready && Boolean(selectedEmployee),
+    refetchInterval: 30000,
+  });
+  const employeeToday = todayAttendance.find(record => String(record.employee_id) === String(selectedEmployee));
+  const selectedAttendanceState = selectedOpenShift
+    ? 'checked_in' : employeeToday?.check_out ? 'completed'
+    : employeeToday?.id ? 'review' : 'not_checked_in';
+    const rangeFrom = cutoffForToday(analyticsRange, today);
   const { data: periodRecords = [], isError: analyticsError } = useQuery({
     queryKey: ['attendance-period', restaurantId, selectedBranch, rangeFrom, today],
     queryFn: () => queryRows('attendance', q => q.eq('restaurant_id', restaurantId)
@@ -116,6 +134,7 @@ export default function EmployeeAttendance() {
     qc.invalidateQueries({ queryKey: ['kiosk-employee-list'] });
     qc.invalidateQueries({ queryKey: ['attendance-today'] });
     qc.invalidateQueries({ queryKey: ['attendance-period'] });
+    qc.invalidateQueries({ queryKey: ['kiosk-employee-open-shift'] });
   };
 
   const kioskMutation = useMutation({
@@ -288,6 +307,21 @@ export default function EmployeeAttendance() {
                   <SelectTrigger className="w-full"><SelectValue placeholder={tr('Select employee')} /></SelectTrigger>
                   <SelectContent>{employees.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>)}</SelectContent>
                 </Select>
+                {selectedEmployee && <p role="status" className="rounded-lg border bg-muted/50 p-3 text-center text-xs">
+                  {selectedAttendanceState === 'checked_in'
+                    ? tr('Check In recorded. Enter PIN again to Check Out.')
+                    : selectedAttendanceState === 'completed'
+                      ? tr('Check In and Check Out are already recorded for today.')
+                      : selectedAttendanceState === 'review'
+                        ? tr('Attendance requires manager review before another scan.')
+                        : tr('No Check In yet. Enter PIN to record arrival.')}
+                  {selectedOpenShift && <span className="block mt-1 text-muted-foreground">
+                    {tr('Open shift date')}: {selectedOpenShift.date} · {selectedOpenShift.check_in}
+                  </span>}
+                </p>}
+                {openShiftError && <p role="alert" className="text-sm text-destructive">
+                  {tr('Unable to read current employee shift. The server will verify the next action.')}
+                </p>}
                 <KioskPINPad key={`${restaurantId}-${selectedBranch}-${selectedEmployee}`}
                   loading={kioskMutation.isPending}
                   disabled={!ready || !selectedEmployee || loadError}

@@ -4,6 +4,20 @@
  * free-text business values or code identifiers.
  */
 export const erpInterfacePhrases = Object.freeze({
+  "Check In recorded. Enter PIN again to Check Out.": { ar: "تم تسجيل الحضور. أدخل الرمز مرة أخرى لتسجيل الانصراف.", fa: "ورود ثبت شده است. برای ثبت خروج دوباره رمز را وارد کنید." },
+  "Check In and Check Out are already recorded for today.": { ar: "تم تسجيل الحضور والانصراف اليوم.", fa: "ورود و خروج امروز قبلاً ثبت شده‌اند." },
+  "Attendance requires manager review before another scan.": { ar: "يجب مراجعة المدير قبل تسجيل حضور جديد.", fa: "قبل از ثبت دوباره، بررسی مدیر لازم است." },
+  "No Check In yet. Enter PIN to record arrival.": { ar: "لم يُسجل الحضور بعد. أدخل الرمز لتسجيل الدخول.", fa: "هنوز ورود ثبت نشده؛ برای ثبت ورود رمز را وارد کنید." },
+  "Open shift date": { ar: "تاريخ الوردية المفتوحة", fa: "تاریخ شیفت باز" },
+  "Unable to read current employee shift. The server will verify the next action.": { ar: "تعذر تحميل الوردية الحالية. سيتحقق الخادم من الإجراء التالي.", fa: "خواندن شیفت فعلی ممکن نشد؛ سرور عمل بعدی را بررسی می‌کند." },
+  "Attendance for this date requires manager review before check-in.": { ar: "يلزم مراجعة المدير قبل تسجيل حضور هذا اليوم.", fa: "برای ثبت ورود این روز بررسی مدیر لازم است." },
+  "This attendance entry requires manager review before another check-in or check-out.": { ar: "يلزم مراجعة المدير قبل تسجيل الحضور أو الانصراف.", fa: "این حاضری پیش از ورود یا خروج دوباره نیاز به بررسی مدیر دارد." },
+  "Attendance state changed. Refresh before retrying.": { ar: "تغيرت حالة الحضور. حدّث الصفحة ثم حاول مجددًا.", fa: "وضعیت حاضری تغییر کرده؛ صفحه را تازه‌سازی کرده دوباره کوشش کنید." },
+  "Attendance has been completed for this shift.": { ar: "اكتمل الحضور والانصراف لهذه الوردية.", fa: "ورود و خروج این شیفت تکمیل شده است." },
+  "Your employee account needs an active branch assignment. Ask the Owner to link your employee record.": { ar: "يجب ربط حساب الموظف بفرع نشط. اطلب من المالك ربط ملفك.", fa: "حساب کارمند باید به شعبهٔ فعال وصل شود؛ از مالک بخواهید پرونده‌تان را متصل کند." },
+  "Profile unavailable. Attendance can still be checked separately.": { ar: "ملف الموظف غير متاح، لكن الحضور يعمل بشكل مستقل.", fa: "پروفایل در دسترس نیست؛ حاضری به‌صورت مستقل قابل بررسی است." },
+  "Retry profile": { ar: "إعادة محاولة تحميل الملف", fa: "بارگذاری دوبارهٔ پروفایل" },
+  "Loading employee profile…": { ar: "جارٍ تحميل ملف الموظف…", fa: "پروفایل کارمند در حال بارگذاری است…" },
   "My attendance — personal phone": { ar: "حضوري من جوالي", fa: "حاضری من با گوشی شخصی" },
   "Only your approved employee account can record attendance. GPS and your six-digit PIN are required.": { ar: "يمكن تسجيل حضورك من حسابك المعتمد فقط، مع الموقع الجغرافي والرمز السري المكون من ٦ أرقام.", fa: "فقط حساب تأییدشدهٔ شما می‌تواند حاضری ثبت کند؛ GPS و رمز شش‌رقمی لازم است." },
   "Your employee account needs Owner approval and an Employee record link.": { ar: "يجب أن يعتمد المالك حسابك ويربطه بسجل الموظف.", fa: "مالک باید حساب شما را تأیید و به پروندهٔ کارمند وصل کند." },

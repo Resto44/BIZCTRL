@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MapPin, ShieldCheck, Clock3, Loader2 } from 'lucide-react';
+import { employeeAttendanceAction } from '@/lib/employeeAttendancePhase';
 
 const messages = {
   APPROVED_EMPLOYEE_LINK_REQUIRED: 'Your employee account needs Owner approval and an Employee record link.',
@@ -17,6 +18,7 @@ const messages = {
   PIN_RATE_LIMITED: 'Too many PIN attempts. Wait 15 minutes before retrying.',
   SHIFT_REVIEW_REQUIRED: 'Shift needs manager review (too short or more than 16 hours).',
   ALREADY_RECORDED: 'Attendance already recorded for this date. Ask the manager to review.',
+  MANAGER_REVIEW_REQUIRED: 'Attendance for this date requires manager review before check-in.',
 };
 const location = () => new Promise((resolve, reject) => {
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -38,7 +40,7 @@ export default function EmployeeMobileAttendance({ userId }) {
   const { translateLiteral: tr } = useLanguage();
   const qc = useQueryClient();
   const [pin, setPin] = useState('');
-  const [success, setSuccess] = useState('');
+  const [success, setSuccess] = useState(null);
   const { data: status, isPending, isError, refetch } = useQuery({
     queryKey: ['employee-mobile-attendance', userId],
     queryFn: async () => {
@@ -53,6 +55,11 @@ export default function EmployeeMobileAttendance({ userId }) {
   const attendance = useMutation({
     mutationFn: async () => {
       if (!/^[0-9]{6}$/.test(pin)) throw new Error('Enter your six-digit PIN.');
+      const latest = await supabase.rpc('erp_attendance_mobile_status');
+      if (latest.error) throw latest.error;
+      if (!['in', 'out'].includes(employeeAttendanceAction(latest.data))) {
+        throw new Error('Attendance state changed. Refresh before retrying.');
+      }
       const coords = await location();
       const { data, error } = await supabase.rpc('erp_attendance_mobile_event', {
         p_pin: pin, p_latitude: coords.latitude, p_longitude: coords.longitude,
@@ -71,12 +78,15 @@ export default function EmployeeMobileAttendance({ userId }) {
       await qc.invalidateQueries({ queryKey: ['payroll-attendance'] });
       await qc.invalidateQueries({ queryKey: ['employee-360-attendance'] });
     },
-    onError: () => setPin(''),
+    onError: async () => { setPin(''); await qc.invalidateQueries({ queryKey: ['employee-mobile-attendance', userId] }); },
   });
   const errorText = attendance.error?.message;
   const ready = Boolean(status?.configured && status?.branch_id);
-  const done = status?.check_out != null && status?.check_out !== '';
-  const checkedIn = Boolean(status?.check_in);
+  const action = employeeAttendanceAction(status);
+  const checkedIn = action === 'out';
+  const done = action === 'completed';
+  const needsReview = action === 'review';
+  const allowAction = action === 'in' || action === 'out';
   return <Card className="border-white/15 bg-white/5 text-white">
     <CardHeader className="pb-2">
       <CardTitle className="flex items-center gap-2 text-sm">
@@ -110,7 +120,10 @@ export default function EmployeeMobileAttendance({ userId }) {
             <p className="mt-1 font-semibold tabular-nums">{status.check_out || '—'}</p>
           </div>
         </div>
-        {!done && <>
+        {needsReview && <p role="alert" className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-200">
+          {tr(messages[status?.reason] || 'This attendance entry requires manager review before another check-in or check-out.')}
+        </p>}
+        {allowAction && <>
           <label htmlFor="employee-mobile-pin" className="block text-xs text-slate-200">{tr('Employee PIN (6 digits)')}</label>
           <Input id="employee-mobile-pin" type="password" inputMode="numeric"
             autoComplete="off" pattern="[0-9]{6}" maxLength={6}
@@ -118,14 +131,14 @@ export default function EmployeeMobileAttendance({ userId }) {
             className="border-white/25 bg-slate-900 text-white"
             placeholder={tr('Enter your six-digit PIN')} />
           <Button className="h-12 w-full bg-emerald-600 text-white hover:bg-emerald-700"
-            disabled={attendance.isPending || pin.length !== 6}
-            onClick={() => { setSuccess(''); attendance.mutate(); }}>
+            disabled={attendance.isPending || pin.length !== 6 || !allowAction}
+            onClick={() => { setSuccess(null); attendance.mutate(); }}>
             {attendance.isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <Clock3 className="me-2 h-4 w-4" />}
             {attendance.isPending ? tr('Verifying location...') : tr(checkedIn ? 'Check Out' : 'Check In')}
           </Button>
         </>}
         {done && <p className="rounded-lg bg-emerald-500/15 p-3 text-sm text-emerald-200">
-          {tr('Today’s attendance is complete.')}
+          {tr('Attendance has been completed for this shift.')}
         </p>}
       </>}
       {success && <p role="status" className="rounded-lg bg-emerald-500/15 p-2 text-sm text-emerald-200">{tr(success.action === 'in' ? 'Check-in saved' : 'Check-out saved')} {success.time}</p>}
