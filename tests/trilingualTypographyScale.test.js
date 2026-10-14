@@ -23,7 +23,8 @@ describe('Trilingual ERP typography design contract', () => {
 
   it('does not inflate headings, controls and Tailwind classes only for RTL', () => {
     expect(css).not.toMatch(/\[dir=["']rtl["']\]\s+\.text-(?:xs|sm|base|lg|xl|2xl|3xl)/);
-    expect(css).not.toMatch(/\[dir=["']rtl["']\]\s+(?:h1|h2|button|table|td|th|\.kpi-value)/);
+    // RTL direction for tables is legitimate; only language-specific type scaling is prohibited.
+    expect(css).not.toMatch(/\[dir=["']rtl["']\][^{]*\{[^}]*font-size\s*:/);
     expect(css).not.toMatch(/\[dir=["']rtl["']\]\s*\{[^}]*font-size/);
     expect(css).not.toMatch(/font-size:\s*1\.05rem/);
     expect(css).not.toMatch(/font-size:[^;]*!important/);
