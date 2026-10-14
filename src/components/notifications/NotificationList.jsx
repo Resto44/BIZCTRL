@@ -8,7 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
-import { presentNotificationBranches } from '@/lib/notificationBranchDisplay';
+import { presentNotificationBranches, localizeNotificationContent } from '@/lib/notificationBranchDisplay';
 
 const TYPE_ICONS = {
   sale_recorded: '💰',
@@ -53,9 +53,9 @@ export default function NotificationList({ notifications }) {
   const { markRead, deleteNotification } = useNotifications();
   const navigate = useNavigate();
   const { branches } = useTenant();
-  const { translateLiteral } = useLanguage();
+  const { lang, translateLiteral } = useLanguage();
   const displayNotifications = notifications.map(n =>
-    presentNotificationBranches(n, branches, translateLiteral('Branch')));
+    localizeNotificationContent(presentNotificationBranches(n, branches, translateLiteral('Branch')), lang));
 
   const handleClick = (n) => {
     if (!n.is_read) markRead(n.id);
