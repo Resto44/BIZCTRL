@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44, supabase } from '@/api/base44Client';
+import { supabase } from '@/api/base44Client';
 import EmployeeRecord360 from '@/components/employees/EmployeeRecord360';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useRole } from '@/lib/RoleContext';
@@ -14,7 +14,6 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Pencil, Trash2, Archive, Eye, UserRound, Phone, Mail, Building2, UserPlus, Bell, Megaphone } from 'lucide-react';
 import BranchSelect from '@/components/shared/BranchSelect';
@@ -219,15 +218,15 @@ export default function Employees({ embedded = false }) {
       </div>}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-3">
-        <TabsList className="grid grid-cols-3 w-full">
+        <TabsList className={`grid w-full ${embedded ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <TabsTrigger value="list" className="text-xs flex items-center gap-1">
-            <UserRound className="w-3.5 h-3.5" /> Employees
+            <UserRound className="w-3.5 h-3.5" /> {tr('Employees')}
           </TabsTrigger>
-          <TabsTrigger value="invite" className="text-xs flex items-center gap-1">
+          {!embedded && <TabsTrigger value="invite" className="text-xs flex items-center gap-1">
             <UserPlus className="w-3.5 h-3.5" /> Staff access
-          </TabsTrigger>
+          </TabsTrigger>}
           <TabsTrigger value="announcements" className="text-xs flex items-center gap-1">
-            <Bell className="w-3.5 h-3.5" /> Announcements
+            <Bell className="w-3.5 h-3.5" /> {tr('Announcements')}
             {announcements.length > 0 && (
               <Badge className="ml-1 h-4 px-1 text-[10px] bg-primary">{announcements.length}</Badge>
             )}
@@ -294,7 +293,7 @@ export default function Employees({ embedded = false }) {
           </div>
         </TabsContent>
 
-        <TabsContent value="invite" className="mt-3">
+        {!embedded && <TabsContent value="invite" className="mt-3">
           <Card className="border-primary/20 bg-primary/[0.03] p-5 text-center">
             <UserPlus className="mx-auto h-8 w-8 text-primary" />
             <h2 className="mt-3 text-sm font-semibold">Staff access is provisioned by the Owner</h2>
@@ -307,7 +306,7 @@ export default function Employees({ embedded = false }) {
               </Button>
             )}
           </Card>
-        </TabsContent>
+        </TabsContent>}
 
         <TabsContent value="announcements" className="mt-3 space-y-3">
           {mayEdit && <Button className="w-full gap-2 bg-primary" onClick={() => setShowAnnouncementForm(true)}>
