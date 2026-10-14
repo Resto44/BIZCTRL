@@ -64,7 +64,7 @@ export default function EmployeeMobileAttendance({ userId }) {
     },
     onSuccess: async data => {
       setPin('');
-      setSuccess(data.action === 'in' ? 'Check-in saved at ' + data.server_time : 'Check-out saved at ' + data.server_time);
+      setSuccess({ action: data.action, time: data.server_time });
       await qc.invalidateQueries({ queryKey: ['employee-mobile-attendance', userId] });
       await qc.invalidateQueries({ queryKey: ['emp-attendance'] });
       await qc.invalidateQueries({ queryKey: ['attendance-today'] });
@@ -128,7 +128,7 @@ export default function EmployeeMobileAttendance({ userId }) {
           {tr('Today’s attendance is complete.')}
         </p>}
       </>}
-      {success && <p role="status" className="rounded-lg bg-emerald-500/15 p-2 text-sm text-emerald-200">{tr(success)}</p>}
+      {success && <p role="status" className="rounded-lg bg-emerald-500/15 p-2 text-sm text-emerald-200">{tr(success.action === 'in' ? 'Check-in saved' : 'Check-out saved')} {success.time}</p>}
       {errorText && <p role="alert" className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{tr(errorText)}</p>}
       <p className="text-xs text-slate-400">{tr('Location is requested only when you tap Check In or Check Out. Raw GPS coordinates are not stored in the attendance history.')}</p>
     </CardContent>
