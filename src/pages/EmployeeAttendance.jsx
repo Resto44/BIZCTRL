@@ -1,487 +1,376 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { base44 } from '@/api/base44Client';
+import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import { useLanguage } from '@/lib/LanguageContext';
-import { useNotify } from '@/lib/useNotify';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import {
-  QrCode, Lock, Users, BarChart2, Camera, CheckCircle2, XCircle, Download,
-  RefreshCw, Calendar
-} from 'lucide-react';
+import { QrCode, Lock, Users, BarChart2, Camera, Download, RefreshCw, Calendar, ShieldCheck } from 'lucide-react';
 import BranchSelect from '@/components/shared/BranchSelect';
 import KioskPINPad from '@/components/attendance/KioskPINPad';
 import QRScanner from '@/components/attendance/QRScanner';
 import AttendanceLiveBoard from '@/components/attendance/AttendanceLiveBoard';
 import AttendanceAnalyticsPanel from '@/components/attendance/AttendanceAnalyticsPanel';
 import EmployeeQRCard from '@/components/attendance/EmployeeQRCard';
-import { format } from 'date-fns';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function calcHours(checkIn, checkOut) {
-  if (!checkIn || !checkOut) return 0;
-  const [ih, im] = checkIn.split(':').map(Number);
-  const [oh, om] = checkOut.split(':').map(Number);
-  const mins = (oh * 60 + om) - (ih * 60 + im);
-  return mins > 0 ? +(mins / 60).toFixed(2) : 0;
+const timeZone = 'Asia/Riyadh';
+function businessToday(date = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date).map(part => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+function cutoffForToday(days, today) {
+  const result = new Date(today + 'T12:00:00Z');
+  result.setUTCDate(result.getUTCDate() - days + 1);
+  return result.toISOString().slice(0, 10);
+}
+function safeCsvCell(value) {
+  const raw = String(value ?? '');
+  const safe = /^[=+@\-\t\r]/.test(raw) ? "'" + raw : raw;
+  return '"' + safe.replace(/"/g, '""') + '"';
 }
 
-function nowHHMM() {
-  return new Date().toTimeString().slice(0, 5);
-}
-
-function todayISO() {
-  return new Date().toISOString().split('T')[0];
-}
-
-// ─── Check-in result popup ────────────────────────────────────────────────────
-function CheckInResult({ result, onClose }) {
-  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, []);
-  if (!result) return null;
-  const isSuccess = result.type === 'success';
-  return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center p-6 ${isSuccess ? 'bg-green-900/60' : 'bg-red-900/60'}`}
-      onClick={onClose}>
-      <div className="bg-card rounded-3xl shadow-2xl p-8 text-center max-w-xs w-full" onClick={e => e.stopPropagation()}>
-        <div className={`w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center ${isSuccess ? 'bg-green-100' : 'bg-red-100'}`}>
-          {isSuccess
-            ? <CheckCircle2 className="w-10 h-10 text-green-600" />
-            : <XCircle className="w-10 h-10 text-red-600" />}
-        </div>
-        <p className="font-bold text-xl mb-1">{result.title}</p>
-        <p className="text-muted-foreground text-sm">{result.message}</p>
-        {result.time && <p className="text-3xl font-mono font-bold text-primary mt-3">{result.time}</p>}
-      </div>
-    </div>
-  );
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
 export default function EmployeeAttendance() {
-  const { user } = useAuth();
-  const { branches, managerBranch, isManager } = useTenant();
+  const { activeRestaurant, branches, managerBranch, isManager } = useTenant();
   const { role } = useRole();
-  const { t } = useLanguage();
-  const notify = useNotify();
+  const { lang, t, translateLiteral: tr } = useLanguage();
   const qc = useQueryClient();
-
-  const isOwner = role === ROLES.OWNER;
-  const defaultBranch = isManager ? (managerBranch || '') : (branches[0]?.key || '');
-
-  const [selectedBranch, setSelectedBranch] = useState(defaultBranch);
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [selectedEmployee, setSelectedEmployee] = useState('');
   const [tab, setTab] = useState('kiosk');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showQRScanner, setShowQRScanner] = useState(false);
-  const [showQRCards, setShowQRCards] = useState(false);
-  const [checkInResult, setCheckInResult] = useState(null);
-  const [analyticsRange, setAnalyticsRange] = useState(30); // days
+  const [result, setResult] = useState(null);
+  const [analyticsRange, setAnalyticsRange] = useState(30);
+  const [pinEmployee, setPinEmployee] = useState('');
+  const [newPin, setNewPin] = useState('');
 
-  // Sync branch when context loads
-  useEffect(() => {
-    if (!selectedBranch && defaultBranch) setSelectedBranch(defaultBranch);
-  }, [defaultBranch]);
+  const restaurantId = activeRestaurant?.id || null;
+  const isOwner = role === ROLES.OWNER;
+  const canManage = isOwner || role === ROLES.MANAGER;
+  const managerBranchKey = typeof managerBranch === 'string'
+    ? managerBranch : (managerBranch?.key || managerBranch?.branch_key || '');
+  const branch = branches.find(b => b.key === selectedBranch || b.branch_key === selectedBranch);
+  const branchId = branch?.id || null;
 
-  // Live clock
   useEffect(() => {
-    const t = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(t);
+    const next = isManager ? managerBranchKey : selectedBranch;
+    const valid = branches.some(b => b.key === next || b.branch_key === next);
+    if (!valid) setSelectedBranch(isManager ? managerBranchKey : (branches[0]?.key || ''));
+    if (isManager && managerBranchKey && selectedBranch !== managerBranchKey) setSelectedBranch(managerBranchKey);
+  }, [branches, isManager, managerBranchKey, selectedBranch]);
+  useEffect(() => { setSelectedEmployee(''); setPinEmployee(''); setResult(null); }, [restaurantId, selectedBranch]);
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  // ── Queries ──
-  const today = todayISO();
-
-  const { data: employees = [], isLoading: loadingEmp } = useQuery({
-    queryKey: ['employees', selectedBranch],
-    queryFn: () => selectedBranch
-      ? base44.entities.Employee.filter({ branch: selectedBranch, is_active: true })
-      : [],
-    enabled: !!selectedBranch,
-    staleTime: 30000,
-  });
-
-  const { data: todayAttendance = [], refetch: refetchToday } = useQuery({
-    queryKey: ['attendance-today', selectedBranch, today],
-    queryFn: () => selectedBranch
-      ? base44.entities.Attendance.filter({ branch: selectedBranch, date: today })
-      : [],
-    enabled: !!selectedBranch,
-    refetchInterval: 30000, // refresh every 30s
-  });
-
-  const { data: periodRecords = [] } = useQuery({
-    queryKey: ['attendance-period', selectedBranch, analyticsRange],
+  const today = businessToday(currentTime);
+  const displayTime = currentTime.toLocaleTimeString(
+    lang === 'fa' ? 'fa-IR' : lang === 'ar' ? 'ar-SA' : 'en-GB',
+    { timeZone, hour: '2-digit', minute: '2-digit', second: '2-digit' },
+  );
+  const ready = Boolean(restaurantId && branchId);
+  const queryRows = async (table, apply) => {
+    const { data, error } = await apply(supabase.from(table).select('*')).limit(5000);
+    if (error) throw error;
+    return data || [];
+  };
+  // Select only non-sensitive employee fields. Never send PIN hashes or salaries to kiosk.
+  const { data: allEmployees = [], isPending: loadingEmp, isError: employeeError } = useQuery({
+    queryKey: ['kiosk-employee-list', restaurantId],
     queryFn: async () => {
-      if (!selectedBranch) return [];
-      const from = new Date();
-      from.setDate(from.getDate() - analyticsRange);
-      const records = await base44.entities.Attendance.filter({ branch: selectedBranch }, '-date', 2000);
-      const cutoff = from.toISOString().split('T')[0];
-      return records.filter(r => r.date >= cutoff);
+      const { data, error } = await supabase.from('employees')
+        .select('id,full_name,position,branch,branch_id,restaurant_id,is_active,qr_code')
+        .eq('restaurant_id', restaurantId).eq('is_active', true).order('full_name').limit(1000);
+      if (error) throw error;
+      return data || [];
     },
-    enabled: tab === 'analytics' && !!selectedBranch,
-    staleTime: 60000,
+    enabled: Boolean(restaurantId),
   });
+  const employees = useMemo(() => allEmployees.filter(e => e.branch_id === branchId
+    || (e.branch_id == null && e.branch === selectedBranch)), [allEmployees, branchId, selectedBranch]);
 
-  // ── Ensure employee has QR code (generate if missing) ──
-  const ensureQRCode = useCallback(async (emp) => {
-    if (emp.qr_code) return emp;
-    const qrCode = `EMP-${emp.id}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
-    await base44.entities.Employee.update(emp.id, { qr_code: qrCode });
-    qc.invalidateQueries({ queryKey: ['employees'] });
-    return { ...emp, qr_code: qrCode };
-  }, [qc]);
+  const { data: todayAttendance = [], isError: attendanceError, refetch: refetchToday } = useQuery({
+    queryKey: ['attendance-today', restaurantId, selectedBranch, today],
+    queryFn: () => queryRows('attendance', q => q.eq('restaurant_id', restaurantId)
+      .eq('branch', selectedBranch).eq('date', today).order('employee_name')),
+    enabled: ready,
+    refetchInterval: 30000,
+  });
+  const rangeFrom = cutoffForToday(analyticsRange, today);
+  const { data: periodRecords = [], isError: analyticsError } = useQuery({
+    queryKey: ['attendance-period', restaurantId, selectedBranch, rangeFrom, today],
+    queryFn: () => queryRows('attendance', q => q.eq('restaurant_id', restaurantId)
+      .eq('branch', selectedBranch).gte('date', rangeFrom).lte('date', today).order('date')),
+    enabled: ready && tab === 'analytics',
+  });
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['kiosk-employee-list'] });
+    qc.invalidateQueries({ queryKey: ['attendance-today'] });
+    qc.invalidateQueries({ queryKey: ['attendance-period'] });
+  };
 
-  // ── Core check-in/out logic ──
-  const performCheckIn = useCallback(async (emp) => {
-    const existing = todayAttendance.find(r => r.employee_id === emp.id);
-    if (existing?.check_in) {
-      // Already checked in — do check-out
-      if (!existing.check_out) {
-        const checkOut = nowHHMM();
-        const hours = calcHours(existing.check_in, checkOut);
-        await base44.entities.Attendance.update(existing.id, { check_out: checkOut, hours_worked: hours });
-        await notify.create({
-          type: 'attendance',
-          title: 'Employee Checked Out',
-          message: `${emp.full_name} checked out at ${checkOut} (${hours.toFixed(1)}h worked)`,
-          severity: 'info',
-          target_role: 'owner',
-          branch: selectedBranch,
-          org_id: user?.email,
-        }).catch(() => {});
-        return { type: 'success', title: 'Checked Out', message: emp.full_name, time: checkOut, action: 'out' };
+  const kioskMutation = useMutation({
+    mutationFn: async ({ employeeId, method, credential }) => {
+      if (!ready) throw new Error(tr('Select an active branch first.'));
+      const { data, error } = await supabase.rpc('erp_attendance_kiosk_event', {
+        p_restaurant_id: restaurantId, p_branch_id: branchId,
+        p_employee_id: employeeId, p_method: method, p_credential: credential,
+      });
+      if (error) throw error;
+      if (!data || data.type !== 'success') {
+        throw new Error(data?.message || tr('Credential rejected'));
       }
-      return { type: 'error', title: 'Already Done', message: `${emp.full_name} already completed shift`, action: 'none' };
-    }
-
-    // Fresh check-in
-    const checkIn = nowHHMM();
-    // Determine if late
-    let lateMinutes = 0;
-    let status = 'present';
-    if (emp.scheduled_start_time) {
-      const [sh, sm] = emp.scheduled_start_time.split(':').map(Number);
-      const [ch, cm] = checkIn.split(':').map(Number);
-      const diff = (ch * 60 + cm) - (sh * 60 + sm);
-      if (diff > 5) { lateMinutes = diff; status = 'late'; }
-    }
-
-    await base44.entities.Attendance.create({
-      employee_id: emp.id,
-      employee_name: emp.full_name,
-      branch: selectedBranch,
-      date: today,
-      check_in: checkIn,
-      status,
-      late_minutes: lateMinutes,
-      hours_worked: 0,
-    });
-
-    await notify.create({
-      type: 'attendance',
-      title: lateMinutes > 0 ? 'Late Check-In' : 'Employee Checked In',
-      message: `${emp.full_name} checked in at ${checkIn}${lateMinutes > 0 ? ` (${lateMinutes}m late)` : ''}`,
-      severity: lateMinutes > 15 ? 'warning' : 'info',
-      target_role: 'owner',
-      branch: selectedBranch,
-      org_id: user?.email,
-    }).catch(() => {});
-
-    return {
-      type: 'success',
-      title: lateMinutes > 0 ? `Late by ${lateMinutes}m` : 'Checked In',
-      message: emp.full_name,
-      time: checkIn,
-      action: 'in',
-    };
-  }, [todayAttendance, selectedBranch, today, user?.email, notify]);
-
-  // ── PIN check-in ──
-  const pinMutation = useMutation({
-    mutationFn: async (pin) => {
-      const emp = employees.find(e => e.pin === pin && e.is_active !== false);
-      if (!emp) throw new Error('PIN not found');
-      return performCheckIn(emp);
+      return data;
     },
-    onSuccess: (result) => {
-      setCheckInResult(result);
-      qc.invalidateQueries({ queryKey: ['attendance-today'] });
+    onSuccess: data => {
+      setResult(data);
+      refresh();
+      qc.invalidateQueries({ queryKey: ['attendance'] });
+      qc.invalidateQueries({ queryKey: ['payroll-attendance'] });
+      qc.invalidateQueries({ queryKey: ['payroll-dashboard-attendance'] });
     },
-    onError: (err) => {
-      setCheckInResult({ type: 'error', title: 'Invalid PIN', message: err.message || 'Employee not found' });
+    onError: error => {
+      setResult({ type: 'error', title: tr('Attendance not recorded'), message: error.message });
     },
   });
+  const submitQR = code => {
+    setShowQRScanner(false);
+    const emp = employees.find(e => e.qr_code === code.trim());
+    if (!emp) {
+      setResult({ type: 'error', title: tr('QR Error'), message: tr('This QR badge is not assigned to the selected branch.') });
+      return;
+    }
+    kioskMutation.mutate({ employeeId: emp.id, method: 'qr', credential: code.trim() });
+  };
 
-  // ── QR check-in ──
+  const setPinMutation = useMutation({
+    mutationFn: async () => {
+      if (!/^[0-9]{6}$/.test(newPin) || !pinEmployee || !employees.some(e => e.id === pinEmployee))
+        throw new Error(tr('Choose an employee and enter a six-digit PIN.'));
+      const { error } = await supabase.rpc('erp_attendance_set_kiosk_pin', {
+        p_restaurant_id: restaurantId, p_employee_id: pinEmployee, p_pin: newPin,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { setNewPin(''); toast.success(tr('Employee PIN saved securely')); },
+    onError: error => toast.error(error.message),
+  });
   const qrMutation = useMutation({
-    mutationFn: async (qrCode) => {
-      const emp = employees.find(e => e.qr_code === qrCode && e.is_active !== false);
-      if (!emp) throw new Error('QR code not recognized');
-      return performCheckIn(emp);
+    mutationFn: async ({ emp, rotate = false }) => {
+      const { data, error } = await supabase.rpc('erp_attendance_issue_kiosk_qr', {
+        p_restaurant_id: restaurantId, p_employee_id: emp.id, p_rotate: rotate,
+      });
+      if (error) throw error;
+      return data;
     },
-    onSuccess: (result) => {
-      setShowQRScanner(false);
-      setCheckInResult(result);
-      qc.invalidateQueries({ queryKey: ['attendance-today'] });
-    },
-    onError: (err) => {
-      setShowQRScanner(false);
-      setCheckInResult({ type: 'error', title: 'QR Error', message: err.message });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['kiosk-employee-list'] }),
+    onError: error => toast.error(error.message),
   });
-
-  // ── Manual check-out from board ──
-  const checkOutMutation = useMutation({
-    mutationFn: async (emp) => {
-      const record = todayAttendance.find(r => r.employee_id === emp.id && !r.check_out);
-      if (!record) throw new Error('No open shift');
-      const checkOut = nowHHMM();
-      const hours = calcHours(record.check_in, checkOut);
-      await base44.entities.Attendance.update(record.id, { check_out: checkOut, hours_worked: hours });
-      return { emp, checkOut };
-    },
-    onSuccess: ({ emp, checkOut }) => {
-      toast.success(`${emp.full_name} checked out at ${checkOut}`);
-      qc.invalidateQueries({ queryKey: ['attendance-today'] });
-    },
-  });
-
-  // ── Export CSV ──
-  const exportCSV = () => {
-    const rows = [
-      ['Date', 'Employee', 'Branch', 'Status', 'Check In', 'Check Out', 'Hours', 'Late Mins'],
-      ...periodRecords.map(r => [
-        r.date, r.employee_name, r.branch, r.status,
-        r.check_in || '', r.check_out || '',
-        (r.hours_worked || 0).toFixed(1), r.late_minutes || 0,
-      ]),
-    ];
-    const csv = rows.map(r => r.join(',')).join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `attendance_${today}.csv`;
-    a.click();
+  const generateMissingQRs = async () => {
+    const missing = employees.filter(emp => !emp.qr_code);
+    for (const employee of missing) {
+      try { await qrMutation.mutateAsync({ emp: employee }); } catch { return; }
+    }
+    toast.success(tr('Missing QR badges generated'));
+  };
+  const exportCSV = async () => {
+    if (!ready) return;
+    try {
+      const records = await queryRows('attendance', q => q.eq('restaurant_id', restaurantId)
+        .eq('branch', selectedBranch).gte('date', rangeFrom).lte('date', today).order('date'));
+      const rows = [
+        ['Date','Employee','Branch','Status','Check In','Check Out','Hours','Late Mins'],
+        ...records.map(r => [r.date, r.employee_name, r.branch, r.status, r.check_in || '',
+          r.check_out || '', Number(r.hours_worked || 0).toFixed(2), r.late_minutes || 0]),
+      ];
+      const csv = '\uFEFF' + rows.map(row => row.map(safeCsvCell).join(',')).join('\r\n');
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = `attendance_${selectedBranch}_${today}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) { toast.error(error.message); }
   };
 
-  // ── Generate missing QR codes for all employees ──
-  const generateAllQRs = async () => {
-    const missing = employees.filter(e => !e.qr_code);
-    await Promise.all(missing.map(ensureQRCode));
-    qc.invalidateQueries({ queryKey: ['employees'] });
-    toast.success(`Generated ${missing.length} QR codes`);
-  };
-
-  // ─── Render ──────────────────────────────────────────────────────────────────
+  const presentlyIn = todayAttendance.filter(r => r.check_in && !r.check_out).length;
+  const done = todayAttendance.filter(r => r.check_out).length;
+  const notCheckedIn = employees.filter(e => !todayAttendance.some(r => r.employee_id === e.id && r.check_in)).length;
+  const loadError = employeeError || attendanceError;
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      {/* Check-in result overlay */}
-      {checkInResult && (
-        <CheckInResult result={checkInResult} onClose={() => setCheckInResult(null)} />
+    <div className="min-h-[70dvh] min-w-0 bg-background pb-[calc(9rem+env(safe-area-inset-bottom))]">
+      {result && (
+        <div role="status" className={`fixed inset-0 z-[80] flex items-center justify-center p-5 ${result.type === 'success' ? 'bg-emerald-950/70' : 'bg-red-950/70'}`}>
+          <div className="w-full max-w-xs rounded-2xl bg-card p-6 text-center shadow-xl">
+            <p className="mb-2 text-xl font-bold">{tr(result.title)}</p>
+            <p className="text-sm text-muted-foreground">{result.message}</p>
+            {result.time && <p className="mt-3 text-2xl font-semibold">{result.time}</p>}
+            <Button className="mt-5 w-full" onClick={() => setResult(null)}>{t('close')}</Button>
+          </div>
+        </div>
       )}
-
-      {/* QR Scanner Modal */}
       <Dialog open={showQRScanner} onOpenChange={setShowQRScanner}>
-        <DialogContent className="p-0 max-w-sm">
-          <QRScanner
-            onScan={(code) => qrMutation.mutate(code)}
-            onClose={() => setShowQRScanner(false)}
-          />
-        </DialogContent>
+        <DialogContent className="max-w-sm p-0"><QRScanner onScan={submitQR} onClose={() => setShowQRScanner(false)} /></DialogContent>
       </Dialog>
 
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h1 className="text-lg font-bold leading-tight">Employee Attendance</h1>
-            <div className="text-xs text-muted-foreground font-mono">
-              {currentTime.toLocaleTimeString()} · {format(new Date(), 'EEE dd MMM')}
-            </div>
+      <header className="sticky top-0 z-10 border-b bg-background/95 px-3 py-3 backdrop-blur sm:px-4">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold">{tr('Employee Attendance')}</h1>
+            <p className="text-xs text-muted-foreground">{displayTime} · {today} · {tr('Saudi time')}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={() => refetchToday()}>
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-            {isOwner && (
-              <Button size="sm" variant="outline" onClick={exportCSV}>
-                <Download className="w-4 h-4" />
-              </Button>
-            )}
+          <div className="flex shrink-0 gap-1">
+            <Button type="button" variant="ghost" size="icon" aria-label={tr('Refresh')} onClick={refresh}><RefreshCw className="h-4 w-4" /></Button>
+            {isOwner && <Button type="button" variant="outline" size="icon" aria-label={tr('Export attendance CSV')}
+              onClick={exportCSV}><Download className="h-4 w-4" /></Button>}
           </div>
         </div>
-
-        {/* Branch selector */}
-        <div className="mt-2">
-          <BranchSelect
-            value={selectedBranch}
-            onChange={setSelectedBranch}
-            disabled={isManager}
-          />
+        <div className="mx-auto mt-3 max-w-3xl">
+          <BranchSelect value={selectedBranch} onChange={setSelectedBranch} includeAll={false} />
         </div>
-      </div>
+      </header>
 
-      <div className="px-4 pt-4 max-w-2xl mx-auto">
+      <main className="mx-auto w-full max-w-3xl px-3 pt-4 sm:px-4">
+        {!ready && <Card className="mb-3 border-amber-300 p-3 text-sm text-amber-700">{tr('Select a registered active branch before recording attendance.')}</Card>}
+        {loadError && <Card role="alert" className="mb-3 border-red-300 p-3 text-sm text-red-700">
+          {tr('Unable to load employees or attendance. Check permissions and retry.')}
+        </Card>}
+        {!loadingEmp && !loadError && ready && employees.length === 0 && (
+          <Card className="mb-3 border-amber-200 p-3 text-sm text-amber-700">
+            {tr('No active employees are assigned to this business and branch. Assign them in Employees before using the kiosk.')}
+          </Card>
+        )}
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-4 w-full mb-4">
-            <TabsTrigger value="kiosk" className="text-xs flex items-center gap-1">
-              <Lock className="w-3.5 h-3.5" /><span className="hidden sm:inline">Kiosk</span>
-            </TabsTrigger>
-            <TabsTrigger value="live" className="text-xs flex items-center gap-1">
-              <Users className="w-3.5 h-3.5" /><span className="hidden sm:inline">Live</span>
-            </TabsTrigger>
-            <TabsTrigger value="qrcodes" className="text-xs flex items-center gap-1">
-              <QrCode className="w-3.5 h-3.5" /><span className="hidden sm:inline">QR</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="text-xs flex items-center gap-1">
-              <BarChart2 className="w-3.5 h-3.5" /><span className="hidden sm:inline">Analytics</span>
-            </TabsTrigger>
+          <TabsList className="mb-4 grid h-auto w-full grid-cols-4 gap-1 p-1">
+            {[
+              { id: 'kiosk', label: 'Kiosk', icon: Lock },
+              { id: 'live', label: 'Live', icon: Users },
+              { id: 'qrcodes', label: 'QR', icon: QrCode },
+              { id: 'analytics', label: 'Analytics', icon: BarChart2 },
+            ].map(item => {
+              const Icon = item.icon;
+              return <TabsTrigger key={item.id} value={item.id}
+                className="flex min-w-0 flex-col gap-1 px-0.5 py-2 text-[10px] sm:flex-row sm:text-xs">
+                <Icon className="h-4 w-4" /><span className="truncate">{tr(item.label)}</span>
+              </TabsTrigger>;
+            })}
           </TabsList>
 
-          {/* ── KIOSK TAB ── */}
-          <TabsContent value="kiosk">
-            <div className="space-y-4">
-              {/* QR Scan button */}
-              <Card>
-                <CardContent className="pt-5 pb-4">
-                  <div className="text-center mb-4">
-                    <p className="text-sm text-muted-foreground font-medium">Scan QR Code</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Point camera at employee QR badge</p>
-                  </div>
-                  <Button
-                    className="w-full h-14 text-base gap-2"
-                    onClick={() => setShowQRScanner(true)}
-                    disabled={qrMutation.isPending}
-                  >
-                    <Camera className="w-5 h-5" />
-                    Scan QR Code
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* PIN Pad */}
-              <Card>
-                <CardHeader className="pb-2 pt-4 px-4">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Lock className="w-4 h-4" /> Enter PIN
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground">Tap digits to check in / check out</p>
-                </CardHeader>
-                <CardContent className="pb-5 flex flex-col items-center">
-                  <KioskPINPad
-                    onSubmit={(pin) => pinMutation.mutate(pin)}
-                    loading={pinMutation.isPending}
-                  />
-                </CardContent>
-              </Card>
-
-              {/* Quick status strip */}
-              <div className="grid grid-cols-3 gap-2 text-center">
-                {[
-                  { label: 'Present', count: todayAttendance.filter(r => r.check_in && !r.check_out).length, color: 'text-green-600' },
-                  { label: 'Done', count: todayAttendance.filter(r => r.check_out).length, color: 'text-slate-500' },
-                  { label: 'Absent', count: Math.max(0, employees.length - todayAttendance.filter(r => r.check_in).length), color: 'text-red-500' },
-                ].map(({ label, count, color }) => (
-                  <Card key={label}>
-                    <CardContent className="pt-3 pb-2">
-                      <div className={`text-2xl font-bold ${color}`}>{count}</div>
-                      <div className="text-xs text-muted-foreground">{label}</div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* ── LIVE BOARD TAB ── */}
-          <TabsContent value="live">
-            {loadingEmp ? (
-              <div className="text-center py-12 text-muted-foreground text-sm">Loading…</div>
-            ) : (
-              <AttendanceLiveBoard
-                employees={employees}
-                todayAttendance={todayAttendance}
-                onCheckOut={(emp) => checkOutMutation.mutate(emp)}
-                checkOutLoading={checkOutMutation.isPending}
-              />
-            )}
-          </TabsContent>
-
-          {/* ── QR CODES TAB ── */}
-          <TabsContent value="qrcodes">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  {employees.filter(e => e.qr_code).length} of {employees.length} employees have QR codes
-                </p>
-                <Button size="sm" onClick={generateAllQRs} variant="outline" className="gap-1">
-                  <QrCode className="w-3.5 h-3.5" /> Generate Missing
-                </Button>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {employees.map(emp => (
-                  <div key={emp.id} className="flex flex-col items-center">
-                    {emp.qr_code
-                      ? <EmployeeQRCard employee={emp} />
-                      : (
-                        <Card className="w-full max-w-[200px] text-center">
-                          <CardContent className="pt-4 pb-3 px-3">
-                            <div className="w-[160px] h-[160px] bg-muted rounded-lg flex items-center justify-center mx-auto">
-                              <QrCode className="w-10 h-10 text-muted-foreground/40" />
-                            </div>
-                            <div className="text-xs font-semibold mt-2">{emp.full_name}</div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="mt-2 w-full text-xs h-7"
-                              onClick={() => ensureQRCode(emp).then(() => toast.success('QR generated'))}
-                            >
-                              Generate
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      )
-                    }
-                  </div>
-                ))}
-              </div>
-              {employees.length === 0 && (
-                <div className="text-center py-10 text-muted-foreground text-sm">
-                  No employees in this branch.
+          <TabsContent value="kiosk" className="space-y-3">
+            <Card>
+              <CardContent className="space-y-2 px-4 pb-4 pt-4">
+                <div className="text-center">
+                  <p className="font-semibold">{tr('Scan QR Code')}</p>
+                  <p className="text-xs text-muted-foreground">{tr('Point camera at employee QR badge')}</p>
                 </div>
-              )}
+                <Button type="button" className="h-12 w-full gap-2"
+                  disabled={!ready || !employees.length || loadError || kioskMutation.isPending}
+                  onClick={() => setShowQRScanner(true)}>
+                  <Camera className="h-5 w-5" />{tr('Scan QR Code')}
+                </Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="px-4 pb-2 pt-4">
+                <CardTitle className="flex items-center gap-2 text-sm"><Lock className="h-4 w-4" />{tr('Enter PIN')}</CardTitle>
+                <p className="text-xs text-muted-foreground">{tr('Choose an employee, then enter the six-digit PIN.')}</p>
+              </CardHeader>
+              <CardContent className="space-y-3 px-4 pb-4">
+                <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                  <SelectTrigger className="w-full"><SelectValue placeholder={tr('Select employee')} /></SelectTrigger>
+                  <SelectContent>{employees.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>)}</SelectContent>
+                </Select>
+                <KioskPINPad key={`${restaurantId}-${selectedBranch}-${selectedEmployee}`}
+                  loading={kioskMutation.isPending}
+                  disabled={!ready || !selectedEmployee || loadError}
+                  onSubmit={pin => kioskMutation.mutate({ employeeId: selectedEmployee, method: 'pin', credential: pin })} />
+              </CardContent>
+            </Card>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              {[
+                [tr('Present'), presentlyIn],
+                [tr('Done'), done],
+                [tr('Not checked in'), notCheckedIn],
+              ].map(([label, value]) => <Card key={label}><CardContent className="px-1 pb-3 pt-3">
+                <p className="text-xl font-bold">{value}</p><p className="text-[11px] text-muted-foreground">{label}</p>
+              </CardContent></Card>)}
             </div>
           </TabsContent>
 
-          {/* ── ANALYTICS TAB ── */}
-          <TabsContent value="analytics">
-            <div className="space-y-4">
-              {/* Range selector */}
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Last</span>
-                {[7, 14, 30, 60].map(d => (
-                  <button
-                    key={d}
-                    onClick={() => setAnalyticsRange(d)}
-                    className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                      analyticsRange === d ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'
-                    }`}
-                  >{d}d</button>
-                ))}
-              </div>
-              <AttendanceAnalyticsPanel records={periodRecords} employees={employees} />
+          <TabsContent value="live">
+            {loadingEmp ? <p className="py-8 text-center">{t('loading')}</p> : loadError ? null
+              : <AttendanceLiveBoard employees={employees} todayAttendance={todayAttendance} />}
+            <p className="mt-3 text-xs text-muted-foreground">{tr('Check-out requires employee QR or PIN in the Kiosk tab.')}</p>
+          </TabsContent>
+
+          <TabsContent value="qrcodes" className="space-y-4">
+            {canManage && <Card className="border-primary/20">
+              <CardHeader className="px-4 pb-2 pt-4"><CardTitle className="flex items-center gap-2 text-sm">
+                <ShieldCheck className="h-4 w-4" />{tr('Set employee kiosk PIN')}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 px-4 pb-4">
+                <Select value={pinEmployee} onValueChange={setPinEmployee}>
+                  <SelectTrigger className="w-full"><SelectValue placeholder={tr('Select employee')} /></SelectTrigger>
+                  <SelectContent>{employees.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input type="password" value={newPin}
+                  onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric" autoComplete="new-password" maxLength={6}
+                  placeholder={tr('New six-digit PIN')} />
+                <Button className="w-full" disabled={!pinEmployee || newPin.length !== 6 || setPinMutation.isPending}
+                  onClick={() => setPinMutation.mutate()}>{tr('Save PIN')}</Button>
+                <p className="text-xs text-muted-foreground">{tr('The PIN is encrypted and is never displayed after saving.')}</p>
+              </CardContent>
+            </Card>}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                {employees.filter(e => e.qr_code).length}/{employees.length} {tr('employees have QR codes')}
+              </p>
+              {canManage && <Button variant="outline" size="sm" disabled={!ready || qrMutation.isPending}
+                onClick={generateMissingQRs}><QrCode className="me-1 h-4 w-4" />{tr('Generate Missing')}</Button>}
             </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {employees.map(emp => emp.qr_code
+                ? <div key={emp.id} className="flex flex-col items-center gap-1">
+                    <EmployeeQRCard employee={emp} />
+                    {canManage && <Button type="button" size="sm" variant="outline"
+                      disabled={qrMutation.isPending}
+                      onClick={() => {
+                        if (window.confirm(tr('Rotate QR and invalidate the existing badge?'))) {
+                          qrMutation.mutate({ emp, rotate: true });
+                        }
+                      }}>{tr('Rotate QR')}</Button>}
+                  </div>
+                : <Card key={emp.id}><CardContent className="space-y-3 p-3 text-center">
+                  <QrCode className="mx-auto h-10 w-10 text-muted-foreground/30" />
+                  <p className="truncate text-sm font-medium">{emp.full_name}</p>
+                  {canManage && <Button type="button" size="sm" variant="outline" disabled={qrMutation.isPending}
+                    onClick={() => qrMutation.mutate({ emp })}>{tr('Generate QR')}</Button>}
+                </CardContent></Card>)}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <span className="text-xs">{tr('Last')}</span>
+              {[7,14,30,60].map(days => <Button key={days} type="button" size="sm"
+                variant={analyticsRange === days ? 'default' : 'outline'}
+                onClick={() => setAnalyticsRange(days)}>{days}{tr('d')}</Button>)}
+            </div>
+            {analyticsError ? <p role="alert" className="text-sm text-red-700">{tr('Attendance history could not be loaded.')}</p>
+              : <AttendanceAnalyticsPanel records={periodRecords} employees={employees} />}
           </TabsContent>
         </Tabs>
-      </div>
+      </main>
     </div>
   );
 }

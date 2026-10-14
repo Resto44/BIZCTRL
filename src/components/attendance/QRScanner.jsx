@@ -1,123 +1,80 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { BrowserQRCodeReader } from '@zxing/browser';
 import { Camera, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useLanguage } from '@/lib/LanguageContext';
 
-// Simple camera-based QR scanner using jsQR via CDN
-// Falls back to manual entry if camera unavailable
+// Local packaged scanner; does not download executable JS from a public CDN.
 export default function QRScanner({ onScan, onClose }) {
+  const { translateLiteral: tr } = useLanguage();
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const streamRef = useRef(null);
-  const rafRef = useRef(null);
-  const [error, setError] = useState(null);
+  const controlsRef = useRef(null);
+  const activeRef = useRef(true);
+  const acceptedRef = useRef(false);
+  const [error, setError] = useState('');
   const [manualCode, setManualCode] = useState('');
-  const [scanning, setScanning] = useState(false);
-  const [jsQRLoaded, setJsQRLoaded] = useState(false);
 
-  // Load jsQR dynamically
   useEffect(() => {
-    if (window.jsQR) { setJsQRLoaded(true); return; }
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
-    s.onload = () => setJsQRLoaded(true);
-    s.onerror = () => setError('QR library failed to load. Use manual entry.');
-    document.head.appendChild(s);
+    activeRef.current = true;
+    acceptedRef.current = false;
+    const reader = new BrowserQRCodeReader();
+    const start = async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera unavailable');
+        const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current,
+          (result, _error, scannerControls) => {
+            if (!result || acceptedRef.current || !activeRef.current) return;
+            acceptedRef.current = true;
+            scannerControls?.stop();
+            controlsRef.current?.stop();
+            onScan(result.getText());
+          });
+        if (activeRef.current) controlsRef.current = controls;
+        else controls.stop();
+      } catch {
+        if (activeRef.current) setError(tr('Camera permission unavailable. Enter code manually.'));
+      }
+    };
+    start();
+    return () => {
+      activeRef.current = false;
+      controlsRef.current?.stop();
+    };
+    // A scanner session must remain stable while the modal is mounted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!jsQRLoaded) return;
-    startCamera();
-    return () => stopCamera();
-  }, [jsQRLoaded]);
-
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-        setScanning(true);
-        scanLoop();
-      }
-    } catch {
-      setError('Camera not available. Enter QR code manually.');
-    }
+  const submitManual = () => {
+    const code = manualCode.trim();
+    if (!code || acceptedRef.current) return;
+    acceptedRef.current = true;
+    controlsRef.current?.stop();
+    onScan(code);
   };
-
-  const stopCamera = () => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-  };
-
-  const scanLoop = () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || !window.jsQR) return;
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      const ctx = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = window.jsQR(imageData.data, imageData.width, imageData.height);
-      if (code?.data) {
-        stopCamera();
-        onScan(code.data);
-        return;
-      }
-    }
-    rafRef.current = requestAnimationFrame(scanLoop);
-  };
-
   return (
-    <div className="flex flex-col items-center gap-4 p-4">
-      <div className="flex items-center justify-between w-full">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <Camera className="w-4 h-4" /> Scan Employee QR Code
-        </div>
-        <button onClick={() => { stopCamera(); onClose(); }} className="p-1 rounded hover:bg-muted">
-          <X className="w-4 h-4" />
-        </button>
+    <div className="flex max-h-[85dvh] flex-col gap-3 overflow-y-auto p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-sm font-semibold"><Camera className="h-4 w-4" />{tr('Scan Employee QR Code')}</h2>
+        <Button type="button" size="icon" variant="ghost" aria-label={tr('Close')}
+          onClick={() => { controlsRef.current?.stop(); onClose(); }}><X className="h-4 w-4" /></Button>
       </div>
-
-      {!error && (
-        <div className="relative w-full max-w-sm aspect-square bg-black rounded-xl overflow-hidden">
-          <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
-          {/* Scanning frame overlay */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-48 h-48 border-2 border-white/70 rounded-xl">
-              <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-primary rounded-tl" />
-              <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-primary rounded-tr" />
-              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-primary rounded-bl" />
-              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-primary rounded-br" />
-            </div>
-          </div>
-          {scanning && (
-            <div className="absolute bottom-3 left-0 right-0 text-center text-xs text-white/80 animate-pulse">
-              Scanning…
-            </div>
-          )}
-        </div>
-      )}
-      <canvas ref={canvasRef} className="hidden" />
-
-      {error && <p className="text-sm text-destructive text-center">{error}</p>}
-
-      <div className="w-full text-center text-xs text-muted-foreground">— or enter code manually —</div>
-      <div className="flex gap-2 w-full max-w-sm">
+      <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-slate-900">
+        <video ref={videoRef} muted playsInline autoPlay className="h-full w-full object-cover" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-[20%] rounded-xl border-2 border-white/80" />
+      </div>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <label className="text-xs text-muted-foreground" htmlFor="manual-employee-qr">{tr('Or enter code manually')}</label>
+      <div className="flex min-w-0 gap-2">
         <input
-          className="flex-1 px-3 py-2 border rounded-lg text-sm"
-          placeholder="Employee QR code"
+          id="manual-employee-qr"
+          className="min-w-0 flex-1 rounded-lg border bg-background px-3 py-2 text-sm"
+          autoComplete="off"
           value={manualCode}
-          onChange={e => setManualCode(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && manualCode) { stopCamera(); onScan(manualCode); } }}
+          onChange={e => setManualCode(e.target.value.slice(0, 120))}
+          placeholder={tr('Employee QR code')}
+          onKeyDown={e => { if (e.key === 'Enter') submitManual(); }}
         />
-        <Button size="sm" onClick={() => { if (manualCode) { stopCamera(); onScan(manualCode); } }}>
-          Submit
-        </Button>
+        <Button type="button" size="sm" disabled={!manualCode.trim()} onClick={submitManual}>{tr('Submit')}</Button>
       </div>
     </div>
   );
