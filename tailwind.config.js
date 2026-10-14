@@ -8,7 +8,17 @@ module.exports = {
             sans: ['var(--font-ui)'],
   			inter: ['var(--font-inter)']
   		},
-  		borderRadius: {
+          fontSize: {
+            xs: ['var(--erp-type-caption)', { lineHeight: '1.125rem' }],
+            sm: ['var(--erp-type-label)', { lineHeight: '1.3125rem' }],
+            base: ['var(--erp-type-body)', { lineHeight: '1.5rem' }],
+            lg: ['1.125rem', { lineHeight: '1.6875rem' }],
+            xl: ['var(--erp-type-section)', { lineHeight: '1.75rem' }],
+            '2xl': ['var(--erp-type-page)', { lineHeight: '2rem' }],
+            '3xl': ['1.875rem', { lineHeight: '2.25rem' }],
+            '4xl': ['var(--erp-type-figure)', { lineHeight: '2.5rem' }],
+        },
+		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
