@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { base44, supabase } from '@/api/base44Client';
+import { useTenant } from '@/lib/TenantContext';
+import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useRole } from '@/lib/RoleContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -38,12 +40,14 @@ const emptyForm = {
 export default function AttendanceTab() {
   const { user } = useAuth();
   const { role } = useRole();
-  const { branches, t } = useLanguage();
+  const { t, translateLiteral } = useLanguage();
+  const { activeRestaurant, branches: tenantBranches, managerBranch } = useTenant();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [filterBranch, setFilterBranch] = useState('all');
   const [filterDate, setFilterDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const { data: employees = [] } = useQuery({
@@ -51,44 +55,79 @@ export default function AttendanceTab() {
     queryFn: () => base44.entities.Employee.list('full_name', 500),
   });
 
-  const { data: records = [], isLoading } = useQuery({
-    queryKey: ['attendance'],
-    queryFn: () => base44.entities.Attendance.list('-date', 5000),
+  // Date scoped fetch (instead of loading 5,000 historical records) and explicit
+  // SELECT errors, so permission/network failures are not mislabeled "No data".
+  const { data: records = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['attendance', activeRestaurant?.id, filterDate],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('attendance').select('*')
+        .eq('date', filterDate).order('employee_name').limit(5000);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: Boolean(activeRestaurant?.id && filterDate),
   });
 
   const createMut = useMutation({
-    mutationFn: d => base44.entities.Attendance.create(d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['attendance'] }); setShowForm(false); setForm(emptyForm); },
-    onError: (error) => { console.error('INSERT FAILED', error); },
+    mutationFn: async data => {
+      const { data: existing, error } = await supabase.from('attendance').select('id')
+        .eq('employee_id', data.employee_id).eq('date', data.date).limit(3);
+      if (error) throw error;
+      if (existing.length > 1) throw new Error('Duplicate attendance entries need administrator review.');
+      if (existing.length === 1) return base44.entities.Attendance.update(existing[0].id, data);
+      return base44.entities.Attendance.create(data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['attendance'] });
+      qc.invalidateQueries({ queryKey: ['payroll-attendance'] });
+      setShowForm(false);
+      setForm({ ...emptyForm, date: filterDate });
+      toast.success(translateLiteral('Attendance saved'));
+    },
+    onError: error => toast.error(error?.message || translateLiteral('Unable to save attendance')),
   });
-
   const deleteMut = useMutation({
     mutationFn: id => base44.entities.Attendance.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['attendance'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['attendance'] });
+      qc.invalidateQueries({ queryKey: ['payroll-attendance'] });
+      setConfirmDelete(null);
+      toast.success(translateLiteral('Attendance deleted'));
+    },
+    onError: error => toast.error(error?.message || translateLiteral('Unable to delete attendance')),
   });
 
   const filtered = useMemo(() => records.filter(r =>
-    (!filterDate || r.date === filterDate) &&
+    (!r.restaurant_id || r.restaurant_id === activeRestaurant?.id) &&
     (filterBranch === 'all' || r.branch === filterBranch)
-  ), [records, filterDate, filterBranch]);
+  ), [records, filterBranch, activeRestaurant?.id]);
 
   // Employees available to manager (by branch)
   const availableEmployees = useMemo(() => {
-    if (role === 'owner') return employees;
-    const managerBranch = user?.branch || '';
-    return employees.filter(e => !managerBranch || e.branch === managerBranch);
-  }, [employees, role, user]);
+    const scoped = employees.filter(e => e.is_active !== false
+      && (!e.restaurant_id || e.restaurant_id === activeRestaurant?.id));
+    if (role === 'owner') return scoped;
+    const key = managerBranch?.key || managerBranch?.branch_key || user?.branch || '';
+    return scoped.filter(e => !key || e.branch === key);
+  }, [employees, role, user, activeRestaurant?.id, managerBranch]);
 
   const handleSubmit = () => {
     if (!form.employee_id || !form.date || !form.status) return;
     const emp = employees.find(e => e.id === form.employee_id);
+    if (!emp || !availableEmployees.some(e => e.id === emp.id) || !activeRestaurant?.id) {
+      toast.error(translateLiteral('Select an active employee in the current business'));
+      return;
+    }
     const hours = calcHours(form.check_in, form.check_out);
+    const branchRecord = tenantBranches.find(branch => (branch.key || branch.branch_key) === emp.branch);
     const payload = {
       ...form,
       employee_name: emp?.full_name || form.employee_name,
       branch: emp?.branch || form.branch,
       hours_worked: hours,
-      late_minutes: Number(form.late_minutes) || 0,
+      late_minutes: form.status === 'late' ? Math.max(0, Number(form.late_minutes) || 0) : 0,
+      restaurant_id: activeRestaurant.id,
+      branch_id: branchRecord?.id || null,
     };
     delete payload.notes;
     createMut.mutate(payload);
@@ -99,12 +138,18 @@ export default function AttendanceTab() {
       ['Date', 'Employee', 'Branch', 'Status', 'Check In', 'Check Out', 'Hours', 'Late Mins'],
       ...filtered.map(r => [r.date, r.employee_name, r.branch, r.status, r.check_in || '', r.check_out || '', (r.hours_worked || 0).toFixed(1), r.late_minutes || 0])
     ];
-    const csv = rows.map(r => r.join(',')).join('\n');
+    const safeCell = value => {
+      const raw = String(value ?? '');
+      const safe = /^[=+@-]/.test(raw) ? `'${raw}` : raw;
+      return `"${safe.replace(/"/g, '""')}"`;
+    };
+    const csv = '\uFEFF' + rows.map(r => r.map(safeCell).join(',')).join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `attendance_${filterDate}.csv`;
     a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   // Summary counts for the displayed day
@@ -117,11 +162,11 @@ export default function AttendanceTab() {
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] gap-2">
         <Input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="flex-1" />
-        <BranchSelect value={filterBranch} onChange={setFilterBranch} includeAll />
-        <Button size="sm" variant="outline" onClick={exportCSV}><Download className="w-3.5 h-3.5" /></Button>
-        <Button size="sm" onClick={() => setShowForm(true)}><Plus className="w-3.5 h-3.5" /></Button>
+        <div className="min-w-0"><BranchSelect value={filterBranch} onChange={setFilterBranch} includeAll /></div>
+        <Button size="sm" variant="outline" aria-label="Export attendance CSV" onClick={exportCSV}><Download className="w-3.5 h-3.5" /></Button>
+        <Button size="sm" aria-label="Record attendance" onClick={() => { setForm({ ...emptyForm, date: filterDate }); setShowForm(true); }}><Plus className="w-3.5 h-3.5" /></Button>
       </div>
 
       {/* Day summary pills */}
@@ -137,13 +182,21 @@ export default function AttendanceTab() {
         })}
       </div>
 
+      {isError && (
+        <Card className="p-3 border-red-200 text-red-700 text-sm">
+          {translateLiteral('Attendance could not be loaded. Check connection and permissions.')}
+          <Button size="sm" variant="outline" className="ms-2" onClick={() => refetch()}>{translateLiteral('Retry')}</Button>
+        </Card>
+      )}
       {/* Records */}
       <div className="space-y-2">
         {isLoading ? <p className="text-center py-8 text-muted-foreground text-sm">{t('loading')}</p> :
-          filtered.length === 0 ? (
+          isError ? null : filtered.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Clock className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">{t('no_data')}</p>
+              <p className="text-sm">{availableEmployees.length === 0
+                  ? translateLiteral('No active employees available. Add employees first.')
+                  : translateLiteral('No attendance recorded for the selected date.')}</p>
               <Button size="sm" className="mt-3" onClick={() => setShowForm(true)}>{t('attendance')}</Button>
             </div>
           ) : filtered.map(r => {
@@ -168,7 +221,7 @@ export default function AttendanceTab() {
                   </div>
                 </div>
                 <Button size="icon" variant="ghost" className="text-destructive shrink-0 h-7 w-7"
-                  onClick={() => deleteMut.mutate(r.id)}>
+                  onClick={() => setConfirmDelete(r)}>
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </Card>
@@ -176,6 +229,19 @@ export default function AttendanceTab() {
           })}
       </div>
 
+      <Dialog open={!!confirmDelete} onOpenChange={open => !open && setConfirmDelete(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{translateLiteral('Delete attendance?')}</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {translateLiteral('Deleting this entry may change the monthly payroll calculation.')}
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setConfirmDelete(null)}>{t('cancel')}</Button>
+            <Button variant="destructive" disabled={deleteMut.isPending}
+              onClick={() => confirmDelete && deleteMut.mutate(confirmDelete.id)}>{t('delete')}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Add Form Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-sm">
@@ -226,7 +292,7 @@ export default function AttendanceTab() {
             )}
             <div><Label className="text-xs">{t('notes')}</Label><Input value={form.notes} onChange={e => set('notes', e.target.value)} /></div>
             <div className="flex gap-2 pt-1">
-              <Button className="flex-1" onClick={handleSubmit} disabled={createMut.isPending || !form.employee_id}>{t('save')}</Button>
+              <Button className="flex-1" onClick={handleSubmit} disabled={createMut.isPending || !form.employee_id || !activeRestaurant?.id}>{t('save')}</Button>
               <Button variant="outline" className="flex-1" onClick={() => setShowForm(false)}>{t('cancel')}</Button>
             </div>
           </div>
