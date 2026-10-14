@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNotifications } from '@/lib/NotificationContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
-import { presentNotificationBranches } from '@/lib/notificationBranchDisplay';
+import { presentNotificationBranches, localizeNotificationContent } from '@/lib/notificationBranchDisplay';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
@@ -74,7 +74,7 @@ function StatCard({ label, value, color }) {
 export default function LiveOperationsCenter() {
   const { notifications } = useNotifications();
   const { branches } = useTenant();
-  const { translateLiteral } = useLanguage();
+  const { lang, translateLiteral } = useLanguage();
   const navigate = useNavigate();
   const [filterBranch, setFilterBranch] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
@@ -161,7 +161,7 @@ export default function LiveOperationsCenter() {
         <div className="space-y-2">
           <AnimatePresence mode="popLayout">
             {recent.map(raw => {
-              const n = presentNotificationBranches(raw, branches, translateLiteral('Branch'));
+              const n = localizeNotificationContent(presentNotificationBranches(raw, branches, translateLiteral('Branch')), lang);
               const cfg = TYPE_ICONS[n.type] || TYPE_ICONS.info;
               const Icon = cfg.icon;
               const route = TYPE_ROUTE[n.type];
