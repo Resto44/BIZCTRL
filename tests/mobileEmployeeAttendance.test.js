@@ -39,6 +39,6 @@ describe('Employee personal-phone attendance integrity', () => {
     expect(setup).toContain("navigator.geolocation.getCurrentPosition");
     expect(setup).toContain("p_branch_id: chosen.id");
     expect(sql).toContain("lower(m.role)='owner'");
-    expect(sql).toContain('p_radius_m BETWEEN 50 AND 500');
+    expect(sql).toContain('p_radius_m NOT BETWEEN 50 AND 500');
   });
 });
