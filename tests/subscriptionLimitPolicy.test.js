@@ -121,7 +121,8 @@ describe('central subscription limit policy', () => {
     ]);
 
     expect(landing).toContain("from('subscription_plans')");
-    expect(cards).toContain('planCapacities(plan)');
+    // Capacity labels now require locale to match the selected app language.
+    expect(cards).toMatch(/planCapacities\(plan,\s*lang\)/);
     expect(billing).toContain('limits, usage, exceededLimits, isWithinCapacity');
     expect(branch).toContain("withinLimit('branches')");
     expect(restaurant).toContain("withinLimit('branches')");
