@@ -2,6 +2,9 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNotifications } from '@/lib/NotificationContext';
 import { useNavigate } from 'react-router-dom';
+import { useTenant } from '@/lib/TenantContext';
+import { useLanguage } from '@/lib/LanguageContext';
+import { presentNotificationBranches } from '@/lib/notificationBranchDisplay';
 import { X, ShoppingBag, ShoppingCart, AlertTriangle, Package, TrendingDown,
          DollarSign, ArrowRightLeft, FileText, Flame, Activity, UserCheck } from 'lucide-react';
 
@@ -49,6 +52,8 @@ const severityConfig = {
 export default function NotificationPopups() {
   const { popups, dismissPopup } = useNotifications();
   const navigate = useNavigate();
+  const { branches } = useTenant();
+  const { translateLiteral } = useLanguage();
 
   const handleClick = (n) => {
     dismissPopup(n._popupId);
@@ -59,7 +64,8 @@ export default function NotificationPopups() {
   return (
     <div className="pointer-events-none fixed bottom-24 end-3 z-[9999] flex w-[min(320px,calc(100vw-1.5rem))] max-w-full flex-col gap-2">
       <AnimatePresence mode="popLayout">
-        {popups.map((n) => {
+        {popups.map((raw) => {
+          const n = presentNotificationBranches(raw, branches, translateLiteral('Branch'));
           const Icon = typeIcons[n.type] || Activity;
           const cfg = severityConfig[n.severity] || severityConfig.info;
 

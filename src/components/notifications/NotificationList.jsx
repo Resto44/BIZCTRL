@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTenant } from '@/lib/TenantContext';
+import { useLanguage } from '@/lib/LanguageContext';
+import { presentNotificationBranches } from '@/lib/notificationBranchDisplay';
 
 const TYPE_ICONS = {
   sale_recorded: '💰',
@@ -49,6 +52,10 @@ const SEVERITY_COLORS = {
 export default function NotificationList({ notifications }) {
   const { markRead, deleteNotification } = useNotifications();
   const navigate = useNavigate();
+  const { branches } = useTenant();
+  const { translateLiteral } = useLanguage();
+  const displayNotifications = notifications.map(n =>
+    presentNotificationBranches(n, branches, translateLiteral('Branch')));
 
   const handleClick = (n) => {
     if (!n.is_read) markRead(n.id);
@@ -68,7 +75,7 @@ export default function NotificationList({ notifications }) {
   return (
     <div className="space-y-2">
       <AnimatePresence>
-        {notifications.map(n => (
+        {displayNotifications.map(n => (
           <motion.div
             key={n.id}
             initial={{ opacity: 0, y: -8 }}
