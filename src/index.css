@@ -184,7 +184,6 @@
     font-family: var(--font-ui);
     font-size: var(--erp-type-body);
     line-height: var(--erp-line-body);
-    font-synthesis: none;
   }
   :is(button, input, textarea, select) {
     font-family: inherit;
