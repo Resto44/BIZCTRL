@@ -3,9 +3,14 @@ import { useNotifications } from '@/lib/NotificationContext';
 import { Bell, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { useTenant } from '@/lib/TenantContext';
+import { useLanguage } from '@/lib/LanguageContext';
+import { presentNotificationBranches } from '@/lib/notificationBranchDisplay';
 
 export default function NotificationBell() {
   const { unreadCount, notifications, markRead } = useNotifications();
+  const { branches } = useTenant();
+  const { translateLiteral } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
@@ -25,7 +30,8 @@ export default function NotificationBell() {
     }
   }, [isOpen]);
 
-  const recentNotifications = notifications.slice(0, 5);
+  const recentNotifications = notifications.slice(0, 5).map(n =>
+    presentNotificationBranches(n, branches, translateLiteral('Branch')));
 
   return (
     <div className="relative">
