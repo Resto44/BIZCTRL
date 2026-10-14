@@ -205,3 +205,22 @@ END;
 $function$;
 REVOKE ALL ON FUNCTION public.erp_attendance_mobile_event(text,double precision,double precision,double precision) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.erp_attendance_mobile_event(text,double precision,double precision,double precision) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.erp_attendance_geofence_admin_status(p_branch_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $function$
+DECLARE v_branch public.branches%ROWTYPE; v_geo public.attendance_branch_geofences%ROWTYPE;
+BEGIN
+ IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501'; END IF;
+ SELECT * INTO v_branch FROM public.branches WHERE id=p_branch_id AND restaurant_id IS NOT NULL;
+ IF NOT FOUND OR NOT EXISTS(SELECT 1 FROM public.erp_memberships m WHERE m.user_id=auth.uid()
+  AND m.restaurant_id=v_branch.restaurant_id AND m.status='approved' AND lower(m.role)='owner')
+ THEN RAISE EXCEPTION 'Owner permission required' USING ERRCODE='42501'; END IF;
+ SELECT * INTO v_geo FROM public.attendance_branch_geofences WHERE branch_id=p_branch_id
+   AND restaurant_id=v_branch.restaurant_id;
+ RETURN jsonb_build_object('configured',v_geo.branch_id IS NOT NULL,
+    'radius_m',v_geo.radius_m,'latitude',v_geo.latitude,'longitude',v_geo.longitude,
+    'updated_at',v_geo.updated_at);
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.erp_attendance_geofence_admin_status(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.erp_attendance_geofence_admin_status(uuid) TO authenticated;
