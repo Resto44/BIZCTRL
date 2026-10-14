@@ -4,6 +4,8 @@
  * free-text business values or code identifiers.
  */
 export const erpInterfacePhrases = Object.freeze({
+  "Rotate QR": { ar: "تبديل رمز QR", fa: "تعویض کد QR" },
+  "Rotate QR and invalidate the existing badge?": { ar: "هل تريد تغيير رمز QR وإلغاء البطاقة القديمة؟", fa: "کد QR تعویض شود و کارت قبلی از اعتبار بیفتد؟" },
   "Employee Attendance": { ar: "حضور الموظفين", fa: "حاضری کارمندان" },
   "Saudi time": { ar: "بتوقيت السعودية", fa: "به وقت سعودی" },
   "Kiosk": { ar: "جهاز الحضور", fa: "دستگاه حاضری" },
