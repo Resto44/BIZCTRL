@@ -52,9 +52,11 @@ export default function Employees({ embedded = false }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const { data: employees = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ['employee-center-directory', activeRestaurant?.id, branchScope],
+    queryKey: ['employee-center-directory', activeRestaurant?.id, branchScope, mayViewPayroll],
     queryFn: async () => {
-      let query = supabase.from('employees').select('*')
+      const publicFields = 'id,restaurant_id,branch_id,full_name,employee_id,branch,position,phone,email,joining_date,hire_date,notes,is_active';
+      const selectedFields = mayViewPayroll ? `${publicFields},base_salary,salary` : publicFields;
+      let query = supabase.from('employees').select(selectedFields)
         .eq('restaurant_id', activeRestaurant.id).order('full_name').limit(1000);
       if (role === 'manager') {
         const managerBranchRecord = branches.find(b => b.key === branchScope || b.branch_key === branchScope || b.id === branchScope);
