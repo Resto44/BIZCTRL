@@ -6,7 +6,7 @@ import { useRole } from '@/lib/RoleContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MapPinned, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -89,7 +89,7 @@ export default function BranchAttendanceGeofence() {
             ? tr('Location is configured for this branch.') + ' (' + status.data.radius_m + 'm)'
             : tr('Location has not been configured for this branch.')}</p>)}
       <label className="flex items-start gap-2 text-xs">
-        <Checkbox checked={onSite} onCheckedChange={v => setOnSite(v === true)} />
+        <Switch checked={onSite} onCheckedChange={v => setOnSite(v === true)} />
         <span>{tr('I am physically at this branch and will use my current GPS position.')}</span>
       </label>
       <Button type="button" size="sm" className="w-full sm:w-auto"
