@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { base44, supabase } from '@/api/base44Client';
+import EmployeeRecord360 from '@/components/employees/EmployeeRecord360';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useRole } from '@/lib/RoleContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -15,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Pencil, Trash2, UserRound, Phone, Mail, Building2, UserPlus, Bell, Megaphone } from 'lucide-react';
+import { Plus, Pencil, Archive, Eye, UserRound, Phone, Mail, Building2, UserPlus, Bell, Megaphone } from 'lucide-react';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { formatCurrency } from '@/lib/helpers';
 import { useTenant } from '@/lib/TenantContext';
@@ -25,39 +26,91 @@ import { toast } from 'sonner';
 
 const emptyForm = { full_name: '', employee_id: '', branch: '', position: '', base_salary: '', joining_date: '', phone: '', email: '', is_active: true, notes: '' };
 
-export default function Employees() {
-  const { currency } = useLanguage();
-  const { role, user } = useRole();
+export default function Employees({ embedded = false }) {
+  const { currency, translateLiteral: tr } = useLanguage();
+  const { role, user, can } = useRole();
+  const mayEdit = role === 'owner' || can?.manageEmployees === true;
   const qc = useQueryClient();
-  const { ownerFilter, activeRestaurant } = useTenant();
+  const { activeRestaurant, branches, managerBranch } = useTenant();
+  const branchScope = role === 'manager' ? (typeof managerBranch === 'string' ? managerBranch : managerBranch?.key || managerBranch?.branch_key || '') : '';
   const { withinLimit, usage, limits, planName } = useSubscription();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [deleteId, setDeleteId] = useState(null);
+  const [profileEmployeeId, setProfileEmployeeId] = useState(null);
+  const [search, setSearch] = useState('');
   const [filterBranch, setFilterBranch] = useState('all');
   const [activeTab, setActiveTab] = useState('list');
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
   const [annForm, setAnnForm] = useState({ title: '', body: '', priority: 'normal', branch_key: 'all', target_roles: '["employee","driver"]' });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const { data: employees = [], isLoading } = useQuery({
-    queryKey: ['employees', ownerFilter],
-    queryFn: () => base44.entities.Employee.filter(ownerFilter || {}, 'full_name', 500),
-    enabled: !!(ownerFilter?.created_by || ownerFilter?.branch),
+  const { data: employees = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['employee-center-directory', activeRestaurant?.id, branchScope],
+    queryFn: async () => {
+      let query = supabase.from('employees').select('*')
+        .eq('restaurant_id', activeRestaurant.id).order('full_name').limit(1000);
+      if (role === 'manager') {
+        const managerBranchRecord = branches.find(b => b.key === branchScope || b.branch_key === branchScope || b.id === branchScope);
+        if (!managerBranchRecord) return [];
+        query = query.or(`branch_id.eq.${managerBranchRecord.id},and(branch_id.is.null,branch.eq.${managerBranchRecord.key || managerBranchRecord.branch_key})`);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: Boolean(activeRestaurant?.id) && (role !== 'manager' || Boolean(branchScope)),
   });
+  const selectedEmployee = employees.find(e => e.id === profileEmployeeId);
 
   const saveMut = useMutation({
-    mutationFn: d => editing
-      ? base44.entities.Employee.update(editing.id, d)
-      : base44.entities.Employee.create({ ...d, restaurant_id: activeRestaurant?.id || null }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['employees'] }); setShowForm(false); setEditing(null); setForm(emptyForm); },
+    mutationFn: async d => {
+      if (!mayEdit || !activeRestaurant?.id) throw new Error('Employee edit permission required.');
+      const matchedBranch = branches.find(b => b.key === d.branch || b.branch_key === d.branch);
+      if (!matchedBranch?.id) throw new Error('Choose a registered branch.');
+      if (role === 'manager' && d.branch !== branchScope) throw new Error('Cannot edit employees outside your assigned branch.');
+      const payload = { ...d, branch_id: matchedBranch.id };
+      if (editing) {
+        const { data, error } = await supabase.from('employees').update(payload)
+          .eq('id', editing.id).eq('restaurant_id', activeRestaurant.id).select('id').single();
+        if (error) throw error;
+        return data;
+      }
+      const { data, error } = await supabase.from('employees')
+        .insert({ ...payload, restaurant_id: activeRestaurant.id, created_by: user?.email || null })
+        .select('id').single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employee-center-directory'] });
+      qc.invalidateQueries({ queryKey: ['kiosk-employee-list'] });
+      qc.invalidateQueries({ queryKey: ['payroll-employees'] });
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      setShowForm(false); setEditing(null); setForm(emptyForm);
+      toast.success(tr('Employee saved'));
+    },
     onError: (error) => toast.error(subscriptionLimitErrorMessage(error, 'Unable to save employee.')),
   });
 
   const deleteMut = useMutation({
-    mutationFn: id => base44.entities.Employee.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['employees'] }); setDeleteId(null); },
+    // Archive rather than deleting payroll/attendance foreign keys or historical records.
+    mutationFn: async id => {
+      if (!mayEdit || !activeRestaurant?.id) throw new Error('Employee edit permission required.');
+      const { data, error } = await supabase.from('employees')
+        .update({ is_active: false }).eq('id', id).eq('restaurant_id', activeRestaurant.id)
+        .select('id').single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employee-center-directory'] });
+      qc.invalidateQueries({ queryKey: ['kiosk-employee-list'] });
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      setDeleteId(null); toast.success(tr('Employee archived; historical records preserved'));
+    },
+    onError: error => toast.error(error.message),
   });
 
   const announceMut = useMutation({
@@ -79,7 +132,7 @@ export default function Employees() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['announcements-mgr'] }),
   });
 
-  const openAdd = () => { setEditing(null); setForm(emptyForm); setShowForm(true); };
+  const openAdd = () => { setEditing(null); setForm({ ...emptyForm, branch: branchScope || '' }); setShowForm(true); };
   const openEdit = (e) => {
     setEditing(e);
     setForm({ full_name: e.full_name || e.name || '', employee_id: e.employee_id || '', branch: e.branch, position: e.position || '', base_salary: e.base_salary || '', joining_date: e.joining_date || '', phone: e.phone || '', email: e.email || '', is_active: e.is_active !== false, notes: e.notes || '' });
@@ -87,7 +140,7 @@ export default function Employees() {
   };
 
   const handleSave = () => {
-    if (!form.full_name || !form.branch) return;
+    if (!mayEdit || !form.full_name?.trim() || !form.branch || !activeRestaurant?.id) return;
     if (!editing && Number(limits?.employees || 0) > 0 && !withinLimit('employees')) {
       toast.error(subscriptionLimitMessage({
         resource: 'employees',
@@ -100,7 +153,10 @@ export default function Employees() {
     saveMut.mutate({ ...form, full_name: form.full_name, base_salary: Number(form.base_salary) || 0 });
   };
 
-  const filtered = employees.filter(e => filterBranch === 'all' || e.branch === filterBranch);
+  const filtered = employees.filter(e =>
+    (filterBranch === 'all' || e.branch === filterBranch) &&
+    (!search || [e.full_name, e.employee_id, e.position, e.phone].some(value => String(value || '').toLowerCase().includes(search.toLowerCase())))
+  );
 
   if (role === 'cashier') {
     return <div className="text-center py-20 text-muted-foreground text-sm">Access restricted.</div>;
@@ -108,14 +164,14 @@ export default function Employees() {
 
   return (
     <div>
-      <PageHeader title="Employees" action={
+      {!embedded && <PageHeader title={tr('Employees')} action={
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setShowAnnouncementForm(true)}>
+          {mayEdit && <Button size="sm" variant="outline" onClick={() => setShowAnnouncementForm(true)}>
             <Megaphone className="w-3.5 h-3.5 mr-1" /> Announce
-          </Button>
-          <Button size="sm" onClick={openAdd}><Plus className="w-3.5 h-3.5 mr-1" /> Add</Button>
+          </Button>}
+          {mayEdit && <Button size="sm" onClick={openAdd}><Plus className="w-3.5 h-3.5 mr-1" /> Add</Button>}
         </div>
-      } />
+      } />}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-3">
         <TabsList className="grid grid-cols-3 w-full">
@@ -134,16 +190,21 @@ export default function Employees() {
         </TabsList>
 
         <TabsContent value="list">
-          <div className="mb-3 mt-3">
-            <BranchSelect value={filterBranch} onChange={setFilterBranch} includeAll />
+          <div className="mb-3 mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <BranchSelect value={filterBranch} onChange={setFilterBranch} includeAll disabled={role === 'manager'} />
+            <Input aria-label={tr('Search employees')} placeholder={tr('Search name, ID, position or phone')}
+              value={search} onChange={e => setSearch(e.target.value)} />
           </div>
+          {isError && <Card role="alert" className="mb-3 border-red-300 p-3 text-sm text-red-700">
+            {tr('Employee records could not be loaded.')} <Button size="sm" variant="outline" onClick={() => refetch()}>{tr('Retry')}</Button>
+          </Card>}
           <div className="space-y-2">
-            {isLoading ? <p className="text-center py-8 text-muted-foreground text-sm">Loading...</p> :
+            {isError ? null : isLoading ? <p className="text-center py-8 text-muted-foreground text-sm">Loading...</p> :
               filtered.length === 0 ? (
                 <div className="text-center py-14 text-muted-foreground">
                   <UserRound className="w-10 h-10 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">No employees yet</p>
-                  <Button size="sm" className="mt-3" onClick={openAdd}>Add First Employee</Button>
+                  {mayEdit && <Button size="sm" className="mt-3" onClick={openAdd}>{tr('Add First Employee')}</Button>}
                 </div>
               ) : filtered.map(e => (
                 <Card key={e.id} className={`p-3 ${e.is_active === false ? 'opacity-60' : ''}`}>
@@ -173,12 +234,13 @@ export default function Employees() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(e)}>
+                      <Button aria-label={tr('View employee records')} size="icon" variant="outline" className="h-8 w-8" onClick={() => setProfileEmployeeId(e.id)}><Eye className="h-4 w-4" /></Button>
+                      {mayEdit && <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(e)}>
                         <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="text-destructive h-8 w-8" onClick={() => setDeleteId(e.id)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                      </Button>}
+                      {mayEdit && e.is_active !== false && <Button aria-label={tr('Archive employee')} size="icon" variant="ghost" className="text-destructive h-8 w-8" onClick={() => setDeleteId(e.id)}>
+                        <Archive className="w-3.5 h-3.5" />
+                      </Button>}
                     </div>
                   </div>
                 </Card>
@@ -203,9 +265,9 @@ export default function Employees() {
         </TabsContent>
 
         <TabsContent value="announcements" className="mt-3 space-y-3">
-          <Button className="w-full gap-2 bg-primary" onClick={() => setShowAnnouncementForm(true)}>
+          {mayEdit && <Button className="w-full gap-2 bg-primary" onClick={() => setShowAnnouncementForm(true)}>
             <Megaphone className="w-4 h-4" /> Post New Announcement
-          </Button>
+          </Button>}
           {announcements.length === 0 && (
             <div className="text-center py-10 text-muted-foreground text-sm">
               <Bell className="w-10 h-10 mx-auto mb-2 opacity-30" />
@@ -227,7 +289,7 @@ export default function Employees() {
                   </p>
                 </div>
                 <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive shrink-0"
-                  onClick={() => deleteAnnMut.mutate(ann.id)}>
+                  onClick={() => deleteAnnMut.mutate(ann.id)} disabled={!mayEdit}>
                   <Trash2 className="w-3 h-3" />
                 </Button>
               </div>
@@ -235,6 +297,13 @@ export default function Employees() {
           ))}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={Boolean(selectedEmployee)} onOpenChange={open => !open && setProfileEmployeeId(null)}>
+        <DialogContent className="max-h-[90dvh] max-w-3xl overflow-y-auto p-4 sm:p-6">
+          <DialogHeader><DialogTitle>{tr('Employee complete record')}</DialogTitle></DialogHeader>
+          {selectedEmployee && <EmployeeRecord360 key={selectedEmployee.id} employee={selectedEmployee} />}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showForm} onOpenChange={v => { setShowForm(v); if (!v) { setEditing(null); setForm(emptyForm); } }}>
         <DialogContent className="max-w-sm">
@@ -271,10 +340,10 @@ export default function Employees() {
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Delete this employee?</AlertDialogTitle></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>{tr('Archive this employee? Attendance and payroll history will be kept.')}</AlertDialogTitle></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => deleteMut.mutate(deleteId)}>Delete</AlertDialogAction>
+            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => deleteMut.mutate(deleteId)}>{tr('Archive')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
