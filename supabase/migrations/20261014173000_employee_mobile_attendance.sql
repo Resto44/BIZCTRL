@@ -127,7 +127,7 @@ BEGIN
   WHERE g.branch_id=v_branch.id AND g.restaurant_id=v_mem.restaurant_id;
  IF NOT FOUND THEN RETURN jsonb_build_object('type','error','reason','BRANCH_GEOFENCE_REQUIRED'); END IF;
  IF p_latitude IS NULL OR p_longitude IS NULL OR p_accuracy_m IS NULL
-  OR p_latitude::text IN ('NaN','Infinity','-Infinity') OR p_longitude::text IN ('NaN','Infinity','-Infinity') OR NOT isfinite(p_accuracy_m)
+  OR p_latitude::text IN ('NaN','Infinity','-Infinity') OR p_longitude::text IN ('NaN','Infinity','-Infinity') OR p_accuracy_m::text IN ('NaN','Infinity','-Infinity')
   OR p_latitude NOT BETWEEN -90 AND 90 OR p_longitude NOT BETWEEN -180 AND 180
   OR p_accuracy_m <= 0 OR p_accuracy_m > 80 THEN
   RETURN jsonb_build_object('type','error','reason','GPS_ACCURACY_REQUIRED');
