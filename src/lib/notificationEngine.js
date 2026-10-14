@@ -3,7 +3,8 @@
  * Import and call from any page/component.
  * Real-time delivery is handled by base44 subscriptions in NotificationContext.
  */
-import { base44 } from '@/api/base44Client';
+import { base44, supabase } from '@/api/base44Client';
+import { isTechnicalBranchKey } from '@/lib/notificationBranchDisplay';
 
 /**
  * Core create function
@@ -29,13 +30,32 @@ export async function createNotification(opts) {
     return;
   }
 
+  // Keep branch as its canonical key for filtering and authorization.
+  // Resolve the user-facing title/message from the current restaurant record,
+  // rather than storing generated `main-...` branch IDs in new notifications.
+  let branchName = String(branch || '').trim();
+  if (branchName && restaurantId && isTechnicalBranchKey(branchName)) {
+    try {
+      const { data, error } = await supabase.from('branches').select('name')
+        .eq('restaurant_id', restaurantId).eq('branch_key', branchName).maybeSingle();
+      if (!error && data?.name?.trim()) branchName = data.name.trim();
+      else branchName = 'فرع';
+    } catch {
+      branchName = 'فرع';
+    }
+  }
+  const displayTitle = typeof title === 'string' && branch
+    ? title.split(branch).join(branchName) : title;
+  const displayMessage = typeof message === 'string' && branch
+    ? message.split(branch).join(branchName) : message;
+
   const payload = {
     org_id: orgId,
     restaurant_id: restaurantId || null,
     branch: branch || null,
     type,
-    title,
-    message,
+    title: displayTitle,
+    message: displayMessage,
     amount: amount != null ? Number(amount) : null,
     actor_email: actorEmail || null,
     actor_name: actorName || null,
@@ -71,7 +91,7 @@ export async function createNotification(opts) {
         const chatId = settingsData.chat_id;
         const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
         
-        const text = `<b>${title}</b>\n${message}`;
+        const text = `<b>${displayTitle}</b>\n${displayMessage}`;
         
         await fetch(url, {
           method: 'POST',
