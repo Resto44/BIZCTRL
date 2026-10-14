@@ -30,9 +30,11 @@ export default function Employees({ embedded = false }) {
   const { currency, translateLiteral: tr } = useLanguage();
   const { role, user, can } = useRole();
   const mayEdit = role === 'owner' || can?.manageEmployees === true;
+  const mayViewPayroll = role === 'owner' || can?.viewPayroll === true;
   const qc = useQueryClient();
   const { activeRestaurant, branches, managerBranch } = useTenant();
-  const branchScope = role === 'manager' ? (typeof managerBranch === 'string' ? managerBranch : managerBranch?.key || managerBranch?.branch_key || '') : '';
+  const branchScope = role === 'manager' ? (typeof managerBranch === 'string'
+    ? managerBranch : (managerBranch?.key || managerBranch?.branch_key || managerBranch?.id || '')) : '';
   const { withinLimit, usage, limits, planName } = useSubscription();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -69,8 +71,11 @@ export default function Employees({ embedded = false }) {
       if (!mayEdit || !activeRestaurant?.id) throw new Error('Employee edit permission required.');
       const matchedBranch = branches.find(b => b.key === d.branch || b.branch_key === d.branch);
       if (!matchedBranch?.id) throw new Error('Choose a registered branch.');
-      if (role === 'manager' && d.branch !== branchScope) throw new Error('Cannot edit employees outside your assigned branch.');
+      if (role === 'manager' && ![matchedBranch.key, matchedBranch.branch_key, matchedBranch.id].includes(branchScope)) {
+        throw new Error('Cannot edit employees outside your assigned branch.');
+      }
       const payload = { ...d, branch_id: matchedBranch.id };
+      if (!mayViewPayroll) delete payload.base_salary;
       if (editing) {
         const { data, error } = await supabase.from('employees').update(payload)
           .eq('id', editing.id).eq('restaurant_id', activeRestaurant.id).select('id').single();
@@ -135,7 +140,7 @@ export default function Employees({ embedded = false }) {
   const openAdd = () => { setEditing(null); setForm({ ...emptyForm, branch: branchScope || '' }); setShowForm(true); };
   const openEdit = (e) => {
     setEditing(e);
-    setForm({ full_name: e.full_name || e.name || '', employee_id: e.employee_id || '', branch: e.branch, position: e.position || '', base_salary: e.base_salary || '', joining_date: e.joining_date || '', phone: e.phone || '', email: e.email || '', is_active: e.is_active !== false, notes: e.notes || '' });
+    setForm({ full_name: e.full_name || e.name || '', employee_id: e.employee_id || '', branch: e.branch, position: e.position || '', base_salary: e.base_salary ?? e.salary ?? '', joining_date: e.joining_date || '', phone: e.phone || '', email: e.email || '', is_active: e.is_active !== false, notes: e.notes || '' });
     setShowForm(true);
   };
 
@@ -150,7 +155,7 @@ export default function Employees({ embedded = false }) {
       }));
       return;
     }
-    saveMut.mutate({ ...form, full_name: form.full_name, base_salary: Number(form.base_salary) || 0 });
+    saveMut.mutate({ ...form, full_name: form.full_name.trim(), ...(mayViewPayroll ? { base_salary: Number(form.base_salary) || 0 } : {}) });
   };
 
   const filtered = employees.filter(e =>
@@ -223,7 +228,7 @@ export default function Employees({ embedded = false }) {
                           <Badge variant="outline" className="text-xs flex items-center gap-0.5">
                             <Building2 className="w-2.5 h-2.5" /> {e.branch}
                           </Badge>
-                          {e.base_salary > 0 && (
+                          {mayViewPayroll && e.base_salary > 0 && (
                             <span className="text-xs font-semibold text-primary">{formatCurrency(e.base_salary, currency)}/mo</span>
                           )}
                         </div>
@@ -316,7 +321,7 @@ export default function Employees({ embedded = false }) {
             <div><Label className="text-xs">Branch *</Label><BranchSelect value={form.branch} onChange={v => set('branch', v)} /></div>
             <div className="grid grid-cols-2 gap-2">
               <div><Label className="text-xs">Position</Label><Input value={form.position} onChange={e => set('position', e.target.value)} placeholder="Cashier, Chef..." /></div>
-              <div><Label className="text-xs">Base Salary (SAR)</Label><Input type="number" value={form.base_salary} onChange={e => set('base_salary', e.target.value)} /></div>
+              {mayViewPayroll && <div><Label className="text-xs">{tr('Base Salary')} ({currency})</Label><Input type="number" min="0" value={form.base_salary} onChange={e => set('base_salary', e.target.value)} /></div>}
             </div>
             <div><Label className="text-xs">Joining Date</Label><Input type="date" value={form.joining_date} onChange={e => set('joining_date', e.target.value)} /></div>
             <div className="grid grid-cols-2 gap-2">
