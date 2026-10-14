@@ -39,7 +39,7 @@ function EmployeeSelect({ employees, value, onChange }) {
 }
 
 export default function BonusDeductionTab() {
-  const { currency } = useLanguage();
+  const { currency, translateLiteral } = useLanguage();
   const qc = useQueryClient();
   const notif = useNotify();
   const [showBonusForm, setShowBonusForm] = useState(false);
@@ -79,7 +79,7 @@ export default function BonusDeductionTab() {
   const createAdvance = useMutation({
     mutationFn: async (d) => {
       const adv = await base44.entities.SalaryAdvance.create(d);
-      await notif.salaryAdvance({ branch: d.branch, employeeName: d.employee_name, amount: d.amount, action: 'create' });
+      try { await notif.salaryAdvance({ branch: d.branch, employeeName: d.employee_name, amount: d.amount, action: 'create' }); } catch (error) { console.warn('Advance saved but notification failed', error); }
       return adv;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['salary_advances'] }); setShowAdvanceForm(false); setAdvanceForm(emptyAdvance); },
@@ -88,16 +88,16 @@ export default function BonusDeductionTab() {
   const deleteAdvance = useMutation({
     mutationFn: async (advance) => {
       await base44.entities.SalaryAdvance.delete(advance.id);
-      await notif.salaryAdvance({ branch: advance.branch, employeeName: advance.employee_name, amount: advance.amount, action: 'delete' });
+      try { await notif.salaryAdvance({ branch: advance.branch, employeeName: advance.employee_name, amount: advance.amount, action: 'delete' }); } catch (error) { console.warn('Advance deleted but notification failed', error); }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['salary_advances'] }),
   });
 
-  const totalBonuses = bonuses.reduce((s, b) => s + (b.amount || 0), 0);
-  const totalAdvances = advances.reduce((s, a) => s + (a.amount || 0), 0);
+  const totalBonuses = bonuses.reduce((s, b) => s + (Number(b.amount) || 0), 0);
+  const totalAdvances = advances.reduce((s, a) => s + (Number(a.amount) || 0), 0);
 
   const submitBonus = () => {
-    if (!bonusForm.employee_id || !bonusForm.amount) {
+    if (!bonusForm.employee_id || !(Number(bonusForm.amount) > 0)) {
       return;
     }
     const emp = employees.find(e => String(e.id) === String(bonusForm.employee_id));
@@ -111,7 +111,7 @@ export default function BonusDeductionTab() {
   };
 
   const submitAdvance = () => {
-    if (!advanceForm.employee_id || !advanceForm.amount) return;
+    if (!advanceForm.employee_id || !(Number(advanceForm.amount) > 0)) return;
     const emp = employees.find(e => String(e.id) === String(advanceForm.employee_id));
     const payload = { 
       ...advanceForm, 
@@ -130,12 +130,12 @@ export default function BonusDeductionTab() {
         <Card className="p-3 text-center bg-emerald-50 border-emerald-200">
           <Gift className="w-5 h-5 mx-auto mb-1 text-emerald-600" />
           <p className="text-lg font-bold text-emerald-700">{formatCurrency(totalBonuses, currency)}</p>
-          <p className="text-xs text-emerald-600">Total Bonuses</p>
+          <p className="text-xs text-emerald-600">{translateLiteral('Total Bonuses')}</p>
         </Card>
         <Card className="p-3 text-center bg-amber-50 border-amber-200">
           <CreditCard className="w-5 h-5 mx-auto mb-1 text-amber-600" />
           <p className="text-lg font-bold text-amber-700">{formatCurrency(totalAdvances, currency)}</p>
-          <p className="text-xs text-amber-600">Total Advances</p>
+          <p className="text-xs text-amber-600">{translateLiteral('Total Advances')}</p>
         </Card>
       </div>
 
@@ -156,7 +156,7 @@ export default function BonusDeductionTab() {
                   <p className="font-medium text-sm truncate">{b.employee_name}</p>
                   <Badge variant="secondary" className="text-xs">{BONUS_TYPES[b.type] || b.type}</Badge>
                 </div>
-                <p className="text-xs text-muted-foreground">{b.date} · {b.branch}</p>
+                <p className="text-xs text-muted-foreground">{b.date} · {employees.find(e => String(e.id) === String(b.employee_id))?.branch || ''}</p>
                 {b.reason && <p className="text-xs text-muted-foreground truncate">{b.reason}</p>}
               </div>
               <div className="flex items-center gap-2 shrink-0">
