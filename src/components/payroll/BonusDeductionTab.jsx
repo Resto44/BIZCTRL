@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { base44, supabase } from '@/api/base44Client';
+import { useTenant } from '@/lib/TenantContext';
+import { useRole } from '@/lib/RoleContext';
+import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,6 +44,8 @@ function EmployeeSelect({ employees, value, onChange }) {
 export default function BonusDeductionTab() {
   const { currency, translateLiteral } = useLanguage();
   const qc = useQueryClient();
+  const { activeRestaurant, branches, managerBranch } = useTenant();
+  const { role } = useRole();
   const notif = useNotify();
   const [showBonusForm, setShowBonusForm] = useState(false);
   const [showAdvanceForm, setShowAdvanceForm] = useState(false);
@@ -49,12 +54,36 @@ export default function BonusDeductionTab() {
   const setB = (k, v) => setBonusForm(f => ({ ...f, [k]: v }));
   const setA = (k, v) => setAdvanceForm(f => ({ ...f, [k]: v }));
 
-  const { data: employees = [] } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list('full_name', 500) });
-  const { data: bonuses = [] } = useQuery({ queryKey: ['employee_bonuses'], queryFn: () => base44.entities.EmployeeBonus.list('-date', 1000) });
-  const { data: advances = [] } = useQuery({ 
-    queryKey: ['salary_advances'], 
-    queryFn: () => base44.entities.SalaryAdvance.list('-created_date', 1000) 
+  const businessId = activeRestaurant?.id;
+  const queryRows = async (table, sort) => {
+    const { data, error } = await supabase.from(table).select('*')
+      .eq('restaurant_id', businessId).order(sort).limit(2000);
+    if (error) throw error;
+    return data || [];
+  };
+  const { data: allEmployees = [], isError: employeesError } = useQuery({
+    queryKey: ['payroll-bonus-employees', businessId],
+    queryFn: () => queryRows('employees', 'full_name'),
+    enabled: !!businessId,
   });
+  const assignedBranch = typeof managerBranch === 'string'
+    ? managerBranch : (managerBranch?.key || managerBranch?.branch_key || '');
+  const employees = allEmployees.filter(employee => role === 'owner'
+    || (assignedBranch && employee.branch === assignedBranch));
+  const { data: bonuses = [], isError: bonusesError } = useQuery({
+    queryKey: ['payroll-bonus-records', businessId],
+    queryFn: () => queryRows('employee_bonuses', 'date'),
+    enabled: !!businessId,
+  });
+  const { data: advances = [], isError: advancesError } = useQuery({
+    queryKey: ['payroll-advance-records', businessId],
+    queryFn: () => queryRows('salary_advances', 'created_date'),
+    enabled: !!businessId,
+  });
+  const employeeIds = new Set(employees.map(employee => String(employee.id)));
+  const visibleBonuses = bonuses.filter(row => employeeIds.has(String(row.employee_id)));
+  const visibleAdvances = advances.filter(row => employeeIds.has(String(row.employee_id)));
+  const loadError = employeesError || bonusesError || advancesError;
 
 
   const createBonus = useMutation({
@@ -62,19 +91,22 @@ export default function BonusDeductionTab() {
       return base44.entities.EmployeeBonus.create(d);
     },
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ['employee_bonuses'] });
+      qc.invalidateQueries({ queryKey: ['payroll-bonus-records'] });
+      qc.invalidateQueries({ queryKey: ['payroll-bonuses'] });
+      qc.invalidateQueries({ queryKey: ['payroll-dashboard-bonuses'] });
       setShowBonusForm(false);
       setBonusForm(emptyBonus);
       // notif.success removed: useNotify does not expose a .success() method
     },
     onError: (error) => {
+      toast.error(error?.message || translateLiteral('Unable to save bonus'));
       console.error('BONUS ERROR', error);
       // notif.error removed: useNotify does not expose a .error() method
     },
   });
   const deleteBonus = useMutation({
     mutationFn: id => base44.entities.EmployeeBonus.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['employee_bonuses'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['payroll-bonus-records'] }); qc.invalidateQueries({ queryKey: ['payroll-bonuses'] }); },
   });
   const createAdvance = useMutation({
     mutationFn: async (d) => {
@@ -82,29 +114,33 @@ export default function BonusDeductionTab() {
       try { await notif.salaryAdvance({ branch: d.branch, employeeName: d.employee_name, amount: d.amount, action: 'create' }); } catch (error) { console.warn('Advance saved but notification failed', error); }
       return adv;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['salary_advances'] }); setShowAdvanceForm(false); setAdvanceForm(emptyAdvance); },
-    onError: (error) => { console.error('INSERT FAILED', error); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['payroll-advance-records'] }); qc.invalidateQueries({ queryKey: ['payroll-advances'] }); qc.invalidateQueries({ queryKey: ['payroll-dashboard-advances'] }); setShowAdvanceForm(false); setAdvanceForm(emptyAdvance); },
+    onError: (error) => { toast.error(error?.message || translateLiteral('Unable to save advance')); console.error('INSERT FAILED', error); },
   });
   const deleteAdvance = useMutation({
     mutationFn: async (advance) => {
       await base44.entities.SalaryAdvance.delete(advance.id);
       try { await notif.salaryAdvance({ branch: advance.branch, employeeName: advance.employee_name, amount: advance.amount, action: 'delete' }); } catch (error) { console.warn('Advance deleted but notification failed', error); }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['salary_advances'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['payroll-advance-records'] }); qc.invalidateQueries({ queryKey: ['payroll-advances'] }); qc.invalidateQueries({ queryKey: ['payroll-dashboard-advances'] }); },
   });
 
-  const totalBonuses = bonuses.reduce((s, b) => s + (Number(b.amount) || 0), 0);
-  const totalAdvances = advances.reduce((s, a) => s + (Number(a.amount) || 0), 0);
+  const totalBonuses = visibleBonuses.reduce((s, b) => s + (Number(b.amount) || 0), 0);
+  const totalAdvances = visibleAdvances.reduce((s, a) => s + (Number(a.amount) || 0), 0);
 
   const submitBonus = () => {
     if (!bonusForm.employee_id || !(Number(bonusForm.amount) > 0)) {
       return;
     }
     const emp = employees.find(e => String(e.id) === String(bonusForm.employee_id));
+    if (!businessId || !emp) return toast.error(translateLiteral('Select an employee from this business'));
+    const matchingBranch = branches.find(b => b.key === emp.branch || b.branch_key === emp.branch);
     const payload = { 
       ...bonusForm, 
       employee_name: emp?.full_name || '', 
-      amount: Number(bonusForm.amount) 
+      amount: Number(bonusForm.amount),
+      restaurant_id: businessId,
+      branch_id: matchingBranch?.id || emp.branch_id || null,
     };
     delete payload.branch;
     createBonus.mutate(payload);
@@ -113,10 +149,14 @@ export default function BonusDeductionTab() {
   const submitAdvance = () => {
     if (!advanceForm.employee_id || !(Number(advanceForm.amount) > 0)) return;
     const emp = employees.find(e => String(e.id) === String(advanceForm.employee_id));
+    if (!businessId || !emp) return toast.error(translateLiteral('Select an employee from this business'));
+    const matchingBranch = branches.find(b => b.key === emp.branch || b.branch_key === emp.branch);
     const payload = { 
       ...advanceForm, 
       employee_name: emp?.full_name || '', 
-      amount: Number(advanceForm.amount) 
+      amount: Number(advanceForm.amount),
+      restaurant_id: businessId,
+      branch_id: matchingBranch?.id || emp.branch_id || null,
     };
     delete payload.branch;
     delete payload.date;
@@ -125,6 +165,9 @@ export default function BonusDeductionTab() {
 
   return (
     <div className="space-y-4">
+      {loadError && <Card className="border-red-200 p-3 text-sm text-red-700">
+        {translateLiteral('Unable to load employee payroll adjustments. Please retry.')}
+      </Card>}
       {/* Summary */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-3 text-center bg-emerald-50 border-emerald-200">
@@ -141,15 +184,15 @@ export default function BonusDeductionTab() {
 
       <Tabs defaultValue="bonuses">
         <TabsList className="w-full">
-          <TabsTrigger value="bonuses" className="flex-1">Bonuses ({bonuses.length})</TabsTrigger>
-          <TabsTrigger value="advances" className="flex-1">Advances ({advances.length})</TabsTrigger>
+          <TabsTrigger value="bonuses" className="flex-1">Bonuses ({visibleBonuses.length})</TabsTrigger>
+          <TabsTrigger value="advances" className="flex-1">Advances ({visibleAdvances.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="bonuses" className="space-y-3 mt-3">
           <Button size="sm" onClick={() => setShowBonusForm(true)} className="w-full gap-1">
             <Plus className="w-3.5 h-3.5" /> Add Bonus
           </Button>
-          {bonuses.map(b => (
+          {visibleBonuses.map(b => (
             <Card key={b.id} className="p-3 flex items-center justify-between gap-2">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -167,14 +210,14 @@ export default function BonusDeductionTab() {
               </div>
             </Card>
           ))}
-          {bonuses.length === 0 && <p className="text-center py-6 text-muted-foreground text-sm">No bonuses recorded</p>}
+          {visibleBonuses.length === 0 && <p className="text-center py-6 text-muted-foreground text-sm">No bonuses recorded</p>}
         </TabsContent>
 
         <TabsContent value="advances" className="space-y-3 mt-3">
           <Button size="sm" onClick={() => setShowAdvanceForm(true)} className="w-full gap-1">
             <Plus className="w-3.5 h-3.5" /> Add Salary Advance
           </Button>
-          {advances.map(a => (
+          {visibleAdvances.map(a => (
             <Card key={a.id} className="p-3 flex items-center justify-between gap-2">
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm truncate">{a.employee_name}</p>
@@ -189,7 +232,7 @@ export default function BonusDeductionTab() {
               </div>
             </Card>
           ))}
-          {advances.length === 0 && <p className="text-center py-6 text-muted-foreground text-sm">No advances recorded</p>}
+          {visibleAdvances.length === 0 && <p className="text-center py-6 text-muted-foreground text-sm">No advances recorded</p>}
         </TabsContent>
       </Tabs>
 
