@@ -241,14 +241,7 @@ export const ALL_NAV_ITEMS = [
     group: NAV_GROUPS.FINANCE,
     permission: 'viewReports',
   },
-  {
-    path: '/payroll',
-    label: 'Payroll',
-    icon: Users,
-    mode: 'all',
-    group: NAV_GROUPS.FINANCE,
-    permission: 'viewPayroll',
-  },
+
 
   // ── ANALYTICS (Shared) ─────────────────────────────────────────────────────
   {
