@@ -87,7 +87,7 @@ const PriceOptimization   = lazy(() => import('@/pages/PriceOptimization'));
 const ActivityLogs        = lazy(() => import('@/pages/ActivityLogs'));
 const ScheduledReports    = lazy(() => import('@/pages/ScheduledReports'));
 
-const Employees           = lazy(() => import('@/pages/Employees'));
+const EmployeeManagementCenter = lazy(() => import('@/pages/EmployeeManagementCenter'));
 const EmployeeControl     = lazy(() => import('@/pages/EmployeeControl'));
 const EmployeeAttendance  = lazy(() => import('@/pages/EmployeeAttendance'));
 const Payroll             = lazy(() => import('@/pages/Payroll'));
@@ -329,7 +329,7 @@ const SubscribedRoutes = () => {
         <Route path="/scheduled-reports" element={<RoleGuard permission="exportPDF"><FeatureRouteGuard feature="scheduled_reports"><ScheduledReports /></FeatureRouteGuard></RoleGuard>} />
 
         {/* ── People ── */}
-        <Route path="/employees" element={<RoleGuard permission="viewEmployees"><Employees /></RoleGuard>} />
+        <Route path="/employees" element={<RoleGuard permission="viewEmployees"><EmployeeManagementCenter /></RoleGuard>} />
         <Route path="/employee-control" element={<RoleGuard permission="viewEmployeeControl"><EmployeeControl /></RoleGuard>} />
         <Route path="/employee-attendance" element={<RoleGuard permission="recordAttendance"><EmployeeAttendance /></RoleGuard>} />
         <Route path="/staff-attendance" element={<RoleGuard permission="viewStaffAttendance"><EmployeeAttendance /></RoleGuard>} />
