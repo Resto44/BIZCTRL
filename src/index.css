@@ -10,7 +10,15 @@
 @layer base {
   :root {
     --font-ui: 'Inter', ui-sans-serif, system-ui, sans-serif;
-    --font-rtl: -apple-system, BlinkMacSystemFont, system-ui, 'Vazirmatn', 'Noto Sans Arabic', sans-serif;
+    --font-rtl: 'Vazirmatn', 'Noto Sans Arabic', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    /* One semantic type scale for en/ar/fa. Headings remain larger than labels. */
+    --erp-type-caption: 0.75rem; /* 12px, minimum readable ERP label */
+    --erp-type-label: 0.875rem;   /* 14px */
+    --erp-type-body: 1rem;       /* 16px */
+    --erp-type-section: 1.25rem; /* 20px */
+    --erp-type-page: 1.5rem;     /* 24px */
+    --erp-type-figure: 2rem;     /* 32px */
+    --erp-line-body: 1.5;
     --font-inter: var(--font-ui);
     /* ── Brand ── */
     --primary:            217 91% 50%;
@@ -166,9 +174,19 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    font-size: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-ui);
+    font-size: var(--erp-type-body);
+    line-height: var(--erp-line-body);
+  }
+  :is(button, input, textarea, select) {
+    font-family: inherit;
   }
 }
 
@@ -208,34 +226,40 @@
 .dark :is([class*="border-purple-100"], [class*="border-violet-100"], [class*="border-indigo-100"]):not([class*="dark:border-"]) { border-color: hsl(262 38% 24%) !important; }
 .dark [class*="border-cyan-100"]:not([class*="dark:border-"]) { border-color: hsl(199 38% 23%) !important; }
 
-/* Native typography for Persian/Arabic, including body portals and form controls.
-   The browser selects the device's system font; web fonts remain fallbacks. */
+/* The document language chooses glyphs, not a different font-size scale.
+   Previously RTL applied forced h1/h2/button/table sizes and !important
+   text-xs/sm/... overrides; those made en/ar/fa mathematically inconsistent. */
 html:lang(fa), html:lang(ar) {
   --font-ui: var(--font-rtl);
 }
-
-/* ─── RTL support ─────────────────────────────────────────────────────────── */
 [dir="rtl"] {
   text-align: right;
-  font-family: var(--font-rtl);
-  font-size: 1.05rem;
-  line-height: 1.6;
+  font-family: var(--font-ui);
 }
-[dir="rtl"] h1, [dir="rtl"] .page-title { font-size: 1.875rem; font-weight: 700; }
-[dir="rtl"] h2, [dir="rtl"] .section-title { font-size: 1.375rem; font-weight: 600; }
-[dir="rtl"] .kpi-value { font-size: 2.125rem; font-weight: 800; }
-[dir="rtl"] table, [dir="rtl"] td, [dir="rtl"] th { font-size: 1.0625rem; }
-[dir="rtl"] th { font-weight: 700; }
-[dir="rtl"] button, [dir="rtl"] .btn { font-size: 1.0625rem; font-weight: 700; }
-[dir="rtl"] .card { padding: 1.25rem; }
-[dir="rtl"] tr { height: 2.75rem; }
-[dir="rtl"] .text-xs  { font-size: 0.875rem !important; }
-[dir="rtl"] .text-sm  { font-size: 1rem !important; }
-[dir="rtl"] .text-base { font-size: 1.0625rem !important; }
-[dir="rtl"] .text-lg  { font-size: 1.25rem !important; }
-[dir="rtl"] .text-xl  { font-size: 1.5rem !important; }
-[dir="rtl"] .text-2xl { font-size: 1.75rem !important; }
-[dir="rtl"] .text-3xl { font-size: 2rem !important; }
+
+/* Legacy micro text was 8–11px in reports, lists and navigation. Normalize
+   those explicit utility classes to the shared 12px caption size.
+   This intentionally does not change SVG charts, PDFs or inline measurements. */
+html :is(
+  [class~="text-[8px]"],
+  [class~="text-[9px]"],
+  [class~="text-[10px]"],
+  [class~="text-[11px]"]
+):not(svg):not([data-erp-type-optout]) {
+  font-size: var(--erp-type-caption);
+  line-height: 1.45;
+}
+
+/* Mobile input controls need >=16px to avoid iOS focus zoom; desktop
+   retains the shared 14px control label scale. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+  textarea,
+  select,
+  [role="combobox"] {
+    font-size: var(--erp-type-body);
+  }
+}
 
 /* Directional ERP behavior. These rules use the document direction rather than
    translating or mutating any database value, number, identifier, or currency. */
