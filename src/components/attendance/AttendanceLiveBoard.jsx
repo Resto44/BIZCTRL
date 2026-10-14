@@ -3,16 +3,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, XCircle, LogOut, AlertCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
-function calcHrs(checkIn, checkOut) {
-  if (!checkIn || !checkOut) return null;
-  const [ih, im] = checkIn.split(':').map(Number);
-  const [oh, om] = checkOut.split(':').map(Number);
-  const mins = (oh * 60 + om) - (ih * 60 + im);
-  return mins > 0 ? (mins / 60).toFixed(1) : null;
-}
+import { useLanguage } from '@/lib/LanguageContext';
+import { calcHours } from '@/lib/payrollEngine';
 
 export default function AttendanceLiveBoard({ employees, todayAttendance, onCheckOut, checkOutLoading }) {
+  const { translateLiteral: tr } = useLanguage();
   const employeeStatus = employees.map(emp => {
     const record = todayAttendance.find(r => r.employee_id === emp.id);
     return { ...emp, record, isIn: !!record?.check_in, isOut: !!record?.check_out };
@@ -30,7 +25,7 @@ export default function AttendanceLiveBoard({ employees, todayAttendance, onChec
           <CardContent className="pt-4 pb-3 text-center">
             <div className="text-3xl font-bold text-green-700">{present.length}</div>
             <div className="text-xs text-green-600 font-medium mt-1 flex items-center justify-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Present
+              <CheckCircle2 className="w-3 h-3" /> {tr('Present')}
             </div>
           </CardContent>
         </Card>
@@ -38,7 +33,7 @@ export default function AttendanceLiveBoard({ employees, todayAttendance, onChec
           <CardContent className="pt-4 pb-3 text-center">
             <div className="text-3xl font-bold text-red-700">{absent.length}</div>
             <div className="text-xs text-red-600 font-medium mt-1 flex items-center justify-center gap-1">
-              <XCircle className="w-3 h-3" /> Absent
+              <XCircle className="w-3 h-3" /> {tr('Not checked in')}
             </div>
           </CardContent>
         </Card>
@@ -46,7 +41,7 @@ export default function AttendanceLiveBoard({ employees, todayAttendance, onChec
           <CardContent className="pt-4 pb-3 text-center">
             <div className="text-3xl font-bold text-slate-600">{checkedOut.length}</div>
             <div className="text-xs text-slate-500 font-medium mt-1 flex items-center justify-center gap-1">
-              <LogOut className="w-3 h-3" /> Done
+              <LogOut className="w-3 h-3" /> {tr('Done')}
             </div>
           </CardContent>
         </Card>
@@ -55,9 +50,9 @@ export default function AttendanceLiveBoard({ employees, todayAttendance, onChec
       {/* Employee rows */}
       <div className="space-y-2">
         {employeeStatus.map(emp => {
-          const hrs = calcHrs(emp.record?.check_in, emp.record?.check_out);
+          const hrs = emp.record?.hours_worked || calcHours(emp.record?.check_in, emp.record?.check_out);
           let statusColor = 'bg-red-100 text-red-700 border-red-200';
-          let statusLabel = 'Absent';
+          let statusLabel = 'Not checked in';
           let StatusIcon = XCircle;
           if (emp.isIn && !emp.isOut) { statusColor = 'bg-green-100 text-green-700 border-green-200'; statusLabel = 'Present'; StatusIcon = CheckCircle2; }
           if (emp.isIn && emp.isOut) { statusColor = 'bg-slate-100 text-slate-600 border-slate-200'; statusLabel = 'Done'; StatusIcon = LogOut; }
@@ -75,15 +70,15 @@ export default function AttendanceLiveBoard({ employees, todayAttendance, onChec
                   {emp.position && <span>{emp.position}</span>}
                   {emp.record?.check_in && <span className="flex items-center gap-0.5"><Clock className="w-3 h-3" /> {emp.record.check_in}</span>}
                   {emp.record?.check_out && <span>→ {emp.record.check_out}</span>}
-                  {hrs && <span className="text-primary font-semibold">{hrs}h</span>}
+                  {hrs && <span className="text-primary font-semibold">{Number(hrs).toFixed(1)}h</span>}
                   {emp.record?.late_minutes > 0 && <span className="text-amber-600">{emp.record.late_minutes}m late</span>}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <Badge className={`${statusColor} border text-xs font-medium`}>
-                  <StatusIcon className="w-3 h-3 mr-1" />{statusLabel}
+                  <StatusIcon className="w-3 h-3 mr-1" />{tr(statusLabel)}
                 </Badge>
-                {emp.isIn && !emp.isOut && (
+                {Boolean(onCheckOut) && emp.isIn && !emp.isOut && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -100,7 +95,7 @@ export default function AttendanceLiveBoard({ employees, todayAttendance, onChec
         })}
         {employeeStatus.length === 0 && (
           <div className="text-center py-10 text-muted-foreground text-sm">
-            No employees found for this branch.
+            {tr('No employees found for this branch.')}
           </div>
         )}
       </div>
