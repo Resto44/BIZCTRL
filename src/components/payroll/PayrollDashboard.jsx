@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/base44Client';
+import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { Card } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/helpers';
@@ -18,7 +19,7 @@ function toNumber(value) {
 }
 
 function employeeKey(employee = {}) {
-  return employee.employee_id ?? employee.id ?? '';
+  return employee.id ?? '';
 }
 
 function sameEmployee(recordEmployeeId, employeeId) {
@@ -30,14 +31,51 @@ function inDateRange(date, from, to) {
 }
 
 export default function PayrollDashboard() {
-  const { currency, branches, t } = useLanguage();
+  const { currency, t } = useLanguage();
+  const { activeRestaurant, branches } = useTenant();
   const [month, setMonth] = useState(currentMonth());
 
-  const { data: employeesData = [] } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list('full_name', 500) });
-  const { data: attendanceData = [] } = useQuery({ queryKey: ['attendance'], queryFn: () => base44.entities.Attendance.list('-date', 5000) });
-  const { data: bonusesData = [] } = useQuery({ queryKey: ['employee_bonuses'], queryFn: () => base44.entities.EmployeeBonus.list('-date', 1000) });
-  const { data: advancesData = [] } = useQuery({ queryKey: ['salary_advances'], queryFn: () => base44.entities.SalaryAdvance.list('-date', 1000) });
-  const { data: rulesData = [] } = useQuery({ queryKey: ['deduction_rules'], queryFn: () => base44.entities.DeductionRule.list() });
+  const { from, to } = monthRange(month);
+  const selectedRestaurantId = activeRestaurant?.id;
+  const scopedRows = async (table, apply = q => q) => {
+    const query = apply(supabase.from(table).select('*').eq('restaurant_id', selectedRestaurantId));
+    const { data, error } = await query.limit(5000);
+    if (error) throw error;
+    return data || [];
+  };
+  const previousTwoMonths = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 3, 1);
+  const trendFrom = `${previousTwoMonths.getFullYear()}-${String(previousTwoMonths.getMonth() + 1).padStart(2, '0')}`;
+  const { data: employeesData = [], isError: employeeError } = useQuery({
+    queryKey: ['payroll-dashboard-employees', selectedRestaurantId],
+    queryFn: () => scopedRows('employees', q => q.order('full_name')),
+    enabled: !!selectedRestaurantId,
+  });
+  const { data: attendanceData = [], isError: attendanceError } = useQuery({
+    queryKey: ['payroll-dashboard-attendance', selectedRestaurantId, month],
+    queryFn: () => scopedRows('attendance', q => q.gte('date', from).lte('date', to)),
+    enabled: !!selectedRestaurantId,
+  });
+  const { data: bonusesData = [], isError: bonusError } = useQuery({
+    queryKey: ['payroll-dashboard-bonuses', selectedRestaurantId, month],
+    queryFn: () => scopedRows('employee_bonuses', q => q.gte('date', from).lte('date', to)),
+    enabled: !!selectedRestaurantId,
+  });
+  const { data: advancesData = [], isError: advanceError } = useQuery({
+    queryKey: ['payroll-dashboard-advances', selectedRestaurantId, month],
+    queryFn: () => scopedRows('salary_advances', q => q.eq('month', month)),
+    enabled: !!selectedRestaurantId,
+  });
+  const { data: rulesData = [], isError: ruleError } = useQuery({
+    queryKey: ['payroll-dashboard-rules', selectedRestaurantId],
+    queryFn: () => scopedRows('deduction_rules'),
+    enabled: !!selectedRestaurantId,
+  });
+  const { data: payrollHistory = [], isError: historyError } = useQuery({
+    queryKey: ['payroll-dashboard-history', selectedRestaurantId, trendFrom, month],
+    queryFn: () => scopedRows('payroll_runs', q => q.gte('month', trendFrom).lte('month', month)),
+    enabled: !!selectedRestaurantId,
+  });
+  const loadError = employeeError || attendanceError || bonusError || advanceError || ruleError || historyError;
 
   const employees = useMemo(() => safeArray(employeesData), [employeesData]);
   const attendanceAll = useMemo(() => safeArray(attendanceData), [attendanceData]);
@@ -45,8 +83,6 @@ export default function PayrollDashboard() {
   const advancesAll = useMemo(() => safeArray(advancesData), [advancesData]);
   const rulesAll = useMemo(() => safeArray(rulesData), [rulesData]);
   const branchOptions = useMemo(() => safeArray(branches), [branches]);
-
-  const { from, to } = monthRange(month);
 
   const rows = useMemo(() => {
     return employees.filter(e => e && e.is_active !== false).map(emp => {
@@ -83,16 +119,21 @@ export default function PayrollDashboard() {
     }).sort((a, b) => a.rate - b.rate);
   }, [branchData, rows]);
 
-  // Last 3 months trend (current month rows only)
+  // Historical chart is strictly from persisted finalized/paid payroll runs.
+  // Do not estimate or multiply this month's figures for other months.
   const trend = useMemo(() => {
-    const [y, m] = monthRange(month).from.slice(0, 7).split('-').map(Number);
+    const [year, monthNumber] = month.split('-').map(Number);
     return [-2, -1, 0].map(offset => {
-      const d = new Date(y, m - 1 + offset, 1);
-      const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const total = rows.reduce((s, r) => s + toNumber(r.final_salary), 0);
-      return { month: label, payroll: Math.round(total * (1 + offset * 0.05)) };
+      const date = new Date(year, monthNumber - 1 + offset, 1);
+      const label = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const runs = payrollHistory.filter(run => run.month === label
+        && ['finalized', 'paid'].includes(run.status));
+      return {
+        month: label,
+        payroll: Math.round(runs.reduce((sum, run) => sum + toNumber(run.final_salary), 0) * 100) / 100,
+      };
     });
-  }, [rows, month]);
+  }, [payrollHistory, month]);
 
   const totalPayroll = rows.reduce((s, r) => s + toNumber(r.final_salary), 0);
   const totalBonuses = rows.reduce((s, r) => s + toNumber(r.bonuses), 0);
@@ -105,6 +146,7 @@ export default function PayrollDashboard() {
 
   return (
     <div className="space-y-4">
+      {loadError && <div role="alert" className="rounded-lg border border-red-200 p-3 text-sm text-red-700">{t("data_load_error") || "Unable to load payroll analytics."}</div>}
       <div className="flex gap-2 items-center">
         <input type="month" value={month} onChange={e => setMonth(e.target.value || currentMonth())}
           className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm flex-1" />

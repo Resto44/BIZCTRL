@@ -17,19 +17,21 @@ function clamp(value, min = 0, max = 100) {
 }
 
 function employeeKey(employee = {}) {
-  return employee.employee_id ?? employee.id ?? '';
+  // The database foreign key is employees.id (UUID); employee_id is a human-readable code.
+  return employee.id ?? '';
 }
 
 export function calcHours(checkIn, checkOut) {
-  if (!checkIn || !checkOut || typeof checkIn !== 'string' || typeof checkOut !== 'string') return 0;
-
-  const [ih, im = 0] = checkIn.split(':').map(Number);
-  const [oh, om = 0] = checkOut.split(':').map(Number);
-
-  if (![ih, im, oh, om].every(Number.isFinite)) return 0;
-
-  const mins = (oh * 60 + om) - (ih * 60 + im);
-  return mins > 0 ? mins / 60 : 0;
+  const timePattern = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/;
+  if (typeof checkIn !== 'string' || typeof checkOut !== 'string') return 0;
+  const start = checkIn.match(timePattern);
+  const end = checkOut.match(timePattern);
+  if (!start || !end) return 0;
+  const startMinutes = Number(start[1]) * 60 + Number(start[2]);
+  const endMinutes = Number(end[1]) * 60 + Number(end[2]);
+  // Allow overnight shifts. A duration above 16 hours needs manual review.
+  const minutes = (endMinutes - startMinutes + 1440) % 1440;
+  return minutes > 0 && minutes <= 960 ? minutes / 60 : 0;
 }
 
 /** Summarise attendance records for one employee in a month */
@@ -77,38 +79,39 @@ export function summariseAttendance(records = []) {
  * @param {Array} rules - DeductionRule records
  * @returns {number} total deduction amount
  */
-export function calcDeductions(summary = {}, baseSalary = 0, workingDaysInMonth = 26, rules = []) {
-  const safeBaseSalary = toNumber(baseSalary);
+export function calcDeductions(summary = {}, baseSalary = 0, workingDaysInMonth = 26, rules = [], attendanceRecords = []) {
+  const safeBaseSalary = Math.max(0, toNumber(baseSalary));
   const safeWorkingDays = toNumber(workingDaysInMonth);
   const dailySalary = safeWorkingDays > 0 ? safeBaseSalary / safeWorkingDays : 0;
   let total = 0;
 
-  // DB columns: applies_to (not type), rule_name (not name), late_threshold (not late_threshold_minutes)
-  // There is no is_active column in deduction_rules — all stored rules are active.
   safeArray(rules).forEach(rule => {
-    // Support both legacy field name (type) and DB field name (applies_to) for safety
+    if (!rule) return;
     const ruleType = rule.applies_to || rule.type;
-    if (ruleType === 'absent') {
-      const amount = rule.deduction_type === 'fixed'
-        ? toNumber(rule.amount) * toNumber(summary.absent)
-        : dailySalary * toNumber(rule.fraction ?? 1) * toNumber(summary.absent);
-      total += amount;
+    const occurrences = ruleType === 'absent' ? toNumber(summary.absent)
+      : ruleType === 'half_day' ? toNumber(summary.halfDay)
+      : ruleType === 'late'
+        ? (safeArray(attendanceRecords).length
+          ? safeArray(attendanceRecords).filter(record => record?.status === 'late'
+            && toNumber(record?.late_minutes) > toNumber(rule.late_threshold ?? 15)).length
+          : toNumber(summary.late))
+        : 0;
+    if (occurrences <= 0) return;
+
+    let perOccurrence = 0;
+    if (rule.deduction_type === 'fixed') {
+      perOccurrence = Math.max(0, toNumber(rule.amount));
+    } else if (rule.deduction_type === 'daily_fraction') {
+      // The DB stores the fraction in "amount" (there is no "fraction" column).
+      // Reject invalid legacy entries such as 50 instead of multiplying salary 50x.
+      const fraction = toNumber(rule.fraction ?? rule.amount);
+      if (fraction <= 0 || fraction > 1) return;
+      perOccurrence = dailySalary * fraction;
     }
-    if (ruleType === 'late') {
-      const amount = rule.deduction_type === 'fixed'
-        ? toNumber(rule.amount) * toNumber(summary.late)
-        : dailySalary * toNumber(rule.fraction ?? 0.5) * toNumber(summary.late);
-      total += amount;
-    }
-    if (ruleType === 'half_day') {
-      const amount = rule.deduction_type === 'fixed'
-        ? toNumber(rule.amount) * toNumber(summary.halfDay)
-        : dailySalary * toNumber(rule.fraction ?? 0.5) * toNumber(summary.halfDay);
-      total += amount;
-    }
+    total += perOccurrence * occurrences;
   });
 
-  return Math.max(0, total);
+  return Math.min(safeBaseSalary, Math.max(0, Math.round(total * 100) / 100));
 }
 
 /**
@@ -118,12 +121,13 @@ export function buildPayrollRow(employee = {}, attendanceRecords = [], bonuses =
   const safeAttendanceRecords = safeArray(attendanceRecords);
   const safeBonuses = safeArray(bonuses);
   const safeAdvances = safeArray(advances);
-  const baseSalary = toNumber(employee.base_salary);
+  const baseSalary = Math.max(0, toNumber(employee.base_salary ?? employee.salary));
   const summary = summariseAttendance(safeAttendanceRecords);
-  const deductions = calcDeductions(summary, baseSalary, workingDaysInMonth, rules);
+  const scopedRules = safeArray(rules).filter(rule => (!rule.restaurant_id || rule.restaurant_id === employee.restaurant_id) && (!rule.branch_id || rule.branch_id === employee.branch_id));
+  const deductions = calcDeductions(summary, baseSalary, workingDaysInMonth, scopedRules, safeAttendanceRecords);
   const totalBonuses = safeBonuses.reduce((s, b) => s + toNumber(b?.amount), 0);
   const totalAdvances = safeAdvances.reduce((s, a) => s + toNumber(a?.amount), 0);
-  const finalSalary = Math.max(0, baseSalary + totalBonuses - deductions - totalAdvances);
+  const finalSalary = Math.max(0, Math.round((baseSalary + totalBonuses - deductions - totalAdvances) * 100) / 100);
   const attendanceRate = summary.accountableDays > 0
     ? clamp(Math.round((summary.present / summary.accountableDays) * 100))
     : 0;

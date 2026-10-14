@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { base44, supabase } from '@/api/base44Client';
+import { useTenant } from '@/lib/TenantContext';
+import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Trash2, Settings2 } from 'lucide-react';
+import { Plus, Trash2, Settings2, Pencil } from 'lucide-react';
 
 // DB columns: rule_name, applies_to, deduction_type, amount, late_threshold
 const RULE_TYPES = { late: 'Late Arrival', absent: 'Absence', half_day: 'Half Day' };
@@ -25,36 +27,64 @@ const emptyRule = {
 };
 
 export default function DeductionRulesSettings() {
-  const { currency } = useLanguage();
+  const { currency, translateLiteral } = useLanguage();
+  const { activeRestaurant } = useTenant();
+  const [editingId, setEditingId] = useState(null);
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyRule);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const { data: rules = [] } = useQuery({
-    queryKey: ['deduction_rules'],
-    queryFn: () => base44.entities.DeductionRule.list(),
+  const { data: rules = [], isError: rulesError } = useQuery({
+    queryKey: ['payroll-deduction-rules', activeRestaurant?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('deduction_rules').select('*')
+        .eq('restaurant_id', activeRestaurant.id).order('created_date').limit(2000);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!activeRestaurant?.id,
   });
 
   const createMut = useMutation({
-    mutationFn: d => base44.entities.DeductionRule.create(d),
+    mutationFn: d => editingId ? base44.entities.DeductionRule.update(editingId, d) : base44.entities.DeductionRule.create(d),
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ['deduction_rules'] });
+      qc.invalidateQueries({ queryKey: ['payroll-deduction-rules'] });
+      qc.invalidateQueries({ queryKey: ['payroll-rules'] });
+      qc.invalidateQueries({ queryKey: ['payroll-dashboard-rules'] });
       setShowForm(false);
       setForm(emptyRule);
+      setEditingId(null);
+      toast.success(translateLiteral('Deduction rule saved'));
     },
     onError: (error) => {
+      toast.error(error?.message || translateLiteral('Unable to save deduction rule'));
       console.error('DEDUCTION ERROR', error);
     },
   });
 
   const deleteMut = useMutation({
     mutationFn: id => base44.entities.DeductionRule.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['deduction_rules'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['payroll-deduction-rules'] });
+      qc.invalidateQueries({ queryKey: ['payroll-rules'] });
+      qc.invalidateQueries({ queryKey: ['payroll-dashboard-rules'] });
+      toast.success(translateLiteral('Deduction rule deleted'));
+    },
+    onError: error => toast.error(error?.message || translateLiteral('Unable to delete deduction rule')),
   });
 
   const handleSave = () => {
-    if (!form.rule_name || !form.applies_to) return;
+    if (!form.rule_name?.trim() || !form.applies_to || !activeRestaurant?.id) {
+      toast.error(translateLiteral('Select a business and enter a rule name'));
+      return;
+    }
+    const numeric = Number(form.deduction_type === 'daily_fraction' ? form._fraction : form.amount);
+    if (!Number.isFinite(numeric) || numeric <= 0 ||
+        (form.deduction_type === 'daily_fraction' && numeric > 1)) {
+      toast.error(translateLiteral('Fixed amount must be positive. Daily fraction must be between 0 and 1.'));
+      return;
+    }
 
     // Build payload using exact DB column names only.
     // The deduction_rules table has: rule_name, applies_to, deduction_type, amount, late_threshold
@@ -63,8 +93,9 @@ export default function DeductionRulesSettings() {
       rule_name: form.rule_name.trim(),
       applies_to: form.applies_to,
       deduction_type: form.deduction_type,
-      amount: Number(form.amount) || 0,
-      late_threshold: Number(form.late_threshold) || 15,
+      amount: numeric,
+      restaurant_id: activeRestaurant.id,
+      late_threshold: Math.max(0, Number(form.late_threshold) || 0),
     };
 
     createMut.mutate(payload);
@@ -77,10 +108,13 @@ export default function DeductionRulesSettings() {
           <h3 className="font-semibold text-sm">Deduction Rules</h3>
           <p className="text-xs text-muted-foreground">Configure how absences, late arrivals, and half-days affect salary</p>
         </div>
-        <Button size="sm" onClick={() => setShowForm(true)}><Plus className="w-3.5 h-3.5 mr-1" /> Add Rule</Button>
+        <Button size="sm" onClick={() => { setEditingId(null); setForm(emptyRule); setShowForm(true); }}><Plus className="w-3.5 h-3.5 mr-1" /> Add Rule</Button>
       </div>
 
-      {rules.length === 0 ? (
+      {rulesError && <Card className="border-red-200 p-3 text-sm text-red-700">
+        {translateLiteral('Unable to load deduction rules. Check access and try again.')}
+      </Card>}
+      {rulesError ? null : rules.length === 0 ? (
         <div className="text-center py-10 text-muted-foreground">
           <Settings2 className="w-10 h-10 mx-auto mb-2 opacity-30" />
           <p className="text-sm">No deduction rules configured</p>
@@ -97,12 +131,30 @@ export default function DeductionRulesSettings() {
                   <p className="text-xs text-muted-foreground">
                     {RULE_TYPES[r.applies_to] || r.applies_to} →{' '}
                     {r.deduction_type === 'fixed'
-                      ? `${currency}${r.amount} per occurrence`
-                      : `Daily fraction per occurrence`}
+                      ? `${currency} ${r.amount} per occurrence`
+                      : `${r.amount} of daily salary per occurrence`}
                     {r.applies_to === 'late' && ` (threshold: ${r.late_threshold ?? 15} min)`}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
+                  {r.deduction_type === 'daily_fraction' && !(Number(r.amount) > 0 && Number(r.amount) <= 1)
+                    && <span className="text-xs text-red-600">{translateLiteral('Invalid fraction')}</span>}
+                  <Button size="icon" variant="ghost" className="h-7 w-7"
+                    aria-label="Edit deduction rule"
+                    onClick={() => {
+                      setEditingId(r.id);
+                      setForm({
+                        rule_name: r.rule_name || '',
+                        applies_to: r.applies_to || 'late',
+                        deduction_type: r.deduction_type || 'fixed',
+                        amount: String(r.amount ?? ''),
+                        late_threshold: r.late_threshold ?? 15,
+                        _fraction: String(r.amount ?? 1),
+                      });
+                      setShowForm(true);
+                    }}>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
                   <Button size="icon" variant="ghost" className="text-destructive h-7 w-7" onClick={() => deleteMut.mutate(r.id)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
@@ -122,7 +174,7 @@ export default function DeductionRulesSettings() {
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Add Deduction Rule</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{translateLiteral(editingId ? 'Edit Deduction Rule' : 'Add Deduction Rule')}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
               <Label className="text-xs">Rule Name</Label>
@@ -143,8 +195,13 @@ export default function DeductionRulesSettings() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Amount ({currency})</Label>
-              <Input type="number" value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0" />
+              <Label className="text-xs">{form.deduction_type === 'daily_fraction'
+                ? translateLiteral('Daily Salary Fraction (0–1)') : `${translateLiteral('Amount')} (${currency})`}</Label>
+              {form.deduction_type === 'daily_fraction'
+                ? <Input type="number" min="0.01" max="1" step="0.01" value={form._fraction}
+                    onChange={e => set('_fraction', e.target.value)} placeholder="0.5" />
+                : <Input type="number" min="0" step="0.01" value={form.amount}
+                    onChange={e => set('amount', e.target.value)} placeholder="0" />}
             </div>
             {form.applies_to === 'late' && (
               <div>
@@ -153,7 +210,7 @@ export default function DeductionRulesSettings() {
               </div>
             )}
             <div className="flex gap-2 pt-1">
-              <Button className="flex-1" onClick={handleSave} disabled={createMut.isPending}>Save Rule</Button>
+              <Button className="flex-1" onClick={handleSave} disabled={createMut.isPending || !activeRestaurant?.id}>Save Rule</Button>
               <Button variant="outline" className="flex-1" onClick={() => setShowForm(false)}>Cancel</Button>
             </div>
           </div>
