@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 
 export default function EmployeeDashboardERP() {
   const { user, logout } = useAuth();
-  const { managerBranchObject, loadingRestaurants } = useTenant();
+  const { managerBranchObject } = useTenant();
   const [activeTab, setActiveTab] = useState('home');
   const activeBranch = managerBranchObject || (user?.branch_id
     ? { id: user.branch_id, name: user.branch_name || 'Assigned Branch' }
@@ -78,21 +78,8 @@ export default function EmployeeDashboardERP() {
     enabled: !!branchId,
   });
 
-  if (!branchId) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-center text-white">
-        <div>
-          <GitBranch className="mx-auto mb-3 h-8 w-8 text-slate-500" />
-          <p className="font-semibold">{loadingRestaurants ? 'Loading assigned branch…' : 'No active branch assignment'}</p>
-          <p className="mt-1 text-sm text-slate-400">Ask the Store Owner to assign your employee portal to an active branch.</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (empProfileError || myTasksError || announcementsError) return <PortalDataState onRetry={() => { retryEmpProfile(); retryMyTasks(); retryAnnouncements(); }}/>;
-  if (empProfileLoading || myTasksLoading || announcementsLoading) return <PortalDataState loading/>;
-  if (!empProfile) return <PortalDataState missing onRetry={retryEmpProfile}/>;
+  // Attendance RPC independently checks the approved membership and employee UUID.
+  // A failed tasks/announcements read must never hide the attendance clock.
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'tasks', label: 'Tasks', icon: ClipboardList },
@@ -128,6 +115,14 @@ export default function EmployeeDashboardERP() {
           <>
             {/* All attendance mutations now use the authenticated employee's server-side identity. */}
             <EmployeeMobileAttendance userId={user?.id} />
+            {!branchId && <p role="alert" className="rounded-lg border border-amber-600/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+              Your employee account needs an active branch assignment. Ask the Owner to link your employee record.
+            </p>}
+            {empProfileError && <p role="alert" className="rounded-lg border border-red-600/40 p-3 text-sm text-red-200">
+              Profile unavailable. Attendance can still be checked separately.
+              <Button variant="ghost" size="sm" onClick={() => retryEmpProfile()}>Retry profile</Button>
+            </p>}
+            {empProfileLoading && <p className="text-xs text-slate-400">Loading employee profile…</p>}
 
             {/* Profile Summary */}
             {empProfile && (
@@ -152,7 +147,7 @@ export default function EmployeeDashboardERP() {
         {activeTab === 'tasks' && (
           <div className="space-y-3">
             <h2 className="text-white font-bold">My Tasks</h2>
-            {myTasks.length === 0 ? (
+            {myTasksError ? <PortalDataState onRetry={retryMyTasks}/> : myTasksLoading ? <PortalDataState loading/> : myTasks.length === 0 ? (
               <p className="text-slate-500 text-sm py-4 text-center">No tasks assigned.</p>
             ) : (
               myTasks.map(task => (
@@ -183,7 +178,7 @@ export default function EmployeeDashboardERP() {
         {activeTab === 'announcements' && (
           <div className="space-y-3">
             <h2 className="text-white font-bold">Announcements</h2>
-            {announcements.length === 0 ? (
+            {announcementsError ? <PortalDataState onRetry={retryAnnouncements}/> : announcementsLoading ? <PortalDataState loading/> : announcements.length === 0 ? (
               <p className="text-slate-500 text-sm py-4 text-center">No announcements.</p>
             ) : (
               announcements.map(ann => (
