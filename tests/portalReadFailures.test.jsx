@@ -25,7 +25,7 @@ import Supplier from '@/pages/SupplierPortalERP';
 let tree,client;
 afterEach(()=>{if(tree)act(()=>tree.unmount());client?.clear();});
 describe('portal failed reads',()=>{
- for(const [name,Component,table] of [['manager',Manager,'inventory'],['employee',Employee,'attendance'],['supplier',Supplier,'supplier_invoices']]){
+ for(const [name,Component,table] of [['manager',Manager,'inventory'],['employee',Employee,'employees'],['supplier',Supplier,'supplier_invoices']]){
   it(`${name} shows retry instead of totals/actions after a failed read`,async()=>{
    mocks.fail=table;mocks.reads=[];mocks.invalid=[];
    client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
