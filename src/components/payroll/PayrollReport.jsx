@@ -51,27 +51,27 @@ export default function PayrollReport() {
   };
   const { data: employees = [], isLoading: loadingEmployees, isError: employeesError } = useQuery({
     queryKey: ['payroll-employees', activeRestaurant?.id],
-    queryFn: () => fetchRows('employees', q => q.order('full_name')),
+    queryFn: () => fetchRows('employees', q => q.eq('restaurant_id', activeRestaurant.id).order('full_name')),
     enabled: !!activeRestaurant?.id,
   });
   const { data: attendanceAll = [], isError: attendanceError } = useQuery({
     queryKey: ['payroll-attendance', activeRestaurant?.id, month],
-    queryFn: () => fetchRows('attendance', q => q.gte('date', from).lte('date', to)),
+    queryFn: () => fetchRows('attendance', q => q.eq('restaurant_id', activeRestaurant.id).gte('date', from).lte('date', to)),
     enabled: !!activeRestaurant?.id,
   });
   const { data: bonusesAll = [], isError: bonusesError } = useQuery({
     queryKey: ['payroll-bonuses', activeRestaurant?.id, month],
-    queryFn: () => fetchRows('employee_bonuses', q => q.gte('date', from).lte('date', to)),
+    queryFn: () => fetchRows('employee_bonuses', q => q.eq('restaurant_id', activeRestaurant.id).gte('date', from).lte('date', to)),
     enabled: !!activeRestaurant?.id,
   });
   const { data: advancesAll = [], isError: advancesError } = useQuery({
     queryKey: ['payroll-advances', activeRestaurant?.id, month],
-    queryFn: () => fetchRows('salary_advances', q => q.eq('month', month)),
+    queryFn: () => fetchRows('salary_advances', q => q.eq('restaurant_id', activeRestaurant.id).eq('month', month)),
     enabled: !!activeRestaurant?.id,
   });
   const { data: rulesAll = [], isError: rulesError } = useQuery({
     queryKey: ['payroll-rules', activeRestaurant?.id],
-    queryFn: () => fetchRows('deduction_rules', q => q.order('created_date')),
+    queryFn: () => fetchRows('deduction_rules', q => q.eq('restaurant_id', activeRestaurant.id).order('created_date')),
     enabled: !!activeRestaurant?.id,
   });
   const { data: payrollRuns = [], isError: runsError } = useQuery({
@@ -86,7 +86,7 @@ export default function PayrollReport() {
   const rows = useMemo(() => {
     const filteredEmp = (Array.isArray(employees) ? employees : []).filter(e =>
       e && e.is_active !== false &&
-      (!e.restaurant_id || e.restaurant_id === activeRestaurant?.id) &&
+      e.restaurant_id === activeRestaurant?.id &&
       (filterBranch === 'all' || e.branch === filterBranch)
     );
 
@@ -110,7 +110,7 @@ export default function PayrollReport() {
 
   const updateRun = useMutation({
     mutationFn: ({ id, data }) => base44.entities.PayrollRun.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['payroll_runs', month] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['payroll_runs'] }),
   });
 
   const createRun = useMutation({
@@ -123,7 +123,14 @@ export default function PayrollReport() {
     if (saving || loadingError || invalidRules.length || !activeRestaurant?.id || row.status === 'paid') return;
     try {
       if (row._saved) {
-        await updateRun.mutateAsync({ id: row.id, data: { status: 'finalized' } });
+        if (row.status !== 'draft') throw new Error('Only draft payroll can be finalized.');
+        const { data: changed, error: updateError } = await supabase.from('payroll_runs')
+          .update({ status: 'finalized' }).eq('id', row.id)
+          .eq('restaurant_id', activeRestaurant.id).eq('status', 'draft')
+          .select('id').maybeSingle();
+        if (updateError) throw updateError;
+        if (!changed) throw new Error('Payroll status changed. Refresh before retrying.');
+        qc.invalidateQueries({ queryKey: ['payroll_runs'] });
       } else {
         // Only fields present in public.payroll_runs may be inserted.
         // Never submit UI-only attendance totals or branch labels to PostgREST.
@@ -157,7 +164,13 @@ export default function PayrollReport() {
     try {
       // Status is a manual payment acknowledgment, not a Treasury transfer.
       // payroll_runs does not have a paid_date column.
-      await updateRun.mutateAsync({ id: row.id, data: { status: 'paid' } });
+      const { data: changed, error: updateError } = await supabase.from('payroll_runs')
+        .update({ status: 'paid' }).eq('id', row.id)
+        .eq('restaurant_id', activeRestaurant.id).eq('status', 'finalized')
+        .select('id').maybeSingle();
+      if (updateError) throw updateError;
+      if (!changed) throw new Error('Payroll status changed. Refresh before retrying.');
+      qc.invalidateQueries({ queryKey: ['payroll_runs'] });
       toast.success(translateLiteral('Payment recorded'));
       setConfirmPaid(null);
     } catch (error) {
@@ -189,7 +202,7 @@ export default function PayrollReport() {
     deductions: rows.reduce((s, r) => s + toNumber(r?.deductions), 0),
     advances: rows.reduce((s, r) => s + toNumber(r?.advances), 0),
     final: rows.reduce((s, r) => s + toNumber(r?.final_salary), 0),
-    unpaid: rows.filter(r => r?.status !== 'paid').reduce((s, r) => s + toNumber(r?.final_salary), 0),
+    unpaid: rows.filter(r => r?.status === 'finalized').reduce((s, r) => s + toNumber(r?.final_salary), 0),
   }), [rows]);
 
   // Deduction warnings (>20% of base)
@@ -257,7 +270,7 @@ export default function PayrollReport() {
       {/* Employee rows */}
       <div className="space-y-2">
         {loadingError ? null : rows.length === 0 ? (
-          <p className="text-center py-8 text-muted-foreground text-sm">No employees found</p>
+          <p className="text-center py-8 text-muted-foreground text-sm">{translateLiteral("No assigned employees found. Assign the restaurant to legacy employee records before finalizing payroll.")}</p>
         ) : rows.map((row, i) => (
           <Card key={row.employee_id || i} className="p-3">
             <div className="flex items-start justify-between gap-2 mb-2">
