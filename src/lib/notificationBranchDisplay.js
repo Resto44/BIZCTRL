@@ -42,3 +42,49 @@ export function presentNotificationBranches(notification, branches = [], unknown
     message: render(notification.message),
   };
 }
+
+
+// Historical notifications were saved with Persian/Arabic mixed source strings.
+// Localize only known generated event prefixes; preserve business-entered names,
+// amounts, invoice identifiers and arbitrary custom notification content.
+const titlePrefixes = {
+  sale_recorded: {
+    source: ['💰 فروش جديد', '💰 فروش جدید', '💰 بيع جديد', '💰 New sale'],
+    fa: '💰 فروش جدید', ar: '💰 بيع جديد', en: '💰 New sale',
+  },
+  owner_to_branch: {
+    source: ['💳 تمويل فرع', '💳 تمویل شعبه', '💳 تمويل الفرع', '💳 Branch funding'],
+    fa: '💳 تمویل شعبه', ar: '💳 تمويل الفرع', en: '💳 Branch funding',
+  },
+  branch_to_owner: {
+    source: ['↔️ تحويل فرع → مالک', '↔️ انتقال شعبه به مالک', '↔️ تحويل الفرع إلى المالك', '↔️ Branch to owner transfer'],
+    fa: '↔️ انتقال شعبه به مالک', ar: '↔️ تحويل الفرع إلى المالك', en: '↔️ Branch to owner transfer',
+  },
+  purchase_recorded: {
+    source: ['🛒 خريد جديد', '🛒 خرید جدید', '🛒 شراء جديد', '🛒 New purchase'],
+    fa: '🛒 خرید جدید', ar: '🛒 شراء جديد', en: '🛒 New purchase',
+  },
+  expense_recorded: {
+    source: ['💸 مصارف جديد', '💸 مصارف جدید', '💸 مصروف جديد', '💸 New expense'],
+    fa: '💸 مصرف جدید', ar: '💸 مصروف جديد', en: '💸 New expense',
+  },
+};
+
+export function localizeNotificationContent(notification, lang = 'en') {
+  if (!notification) return notification;
+  const language = lang === 'fa' || lang === 'ar' ? lang : 'en';
+  const rule = titlePrefixes[notification.type];
+  let title = notification.title;
+  if (typeof title === 'string' && rule) {
+    const source = rule.source.find(prefix => title === prefix || title.startsWith(prefix + ' — ')
+      || title.startsWith(prefix + ' ('));
+    if (source) title = rule[language] + title.slice(source.length);
+  }
+  let message = notification.message;
+  if (typeof message === 'string') {
+    // Translate the standard amount field only, not user-entered free text.
+    message = message.replace(/^(?:مبلغ|المبلغ|Amount)\s*:/i,
+      (language === 'fa' ? 'مبلغ' : language === 'ar' ? 'المبلغ' : 'Amount') + ':');
+  }
+  return { ...notification, title, message };
+}
