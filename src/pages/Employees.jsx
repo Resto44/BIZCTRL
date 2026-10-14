@@ -119,22 +119,55 @@ export default function Employees({ embedded = false }) {
   });
 
   const announceMut = useMutation({
-    mutationFn: data => base44.entities.Announcement.create(data),
+    mutationFn: async data => {
+      if (!mayEdit || !activeRestaurant?.id) throw new Error('Employee management permission required.');
+      const { error } = await supabase.from('announcements').insert({
+        restaurant_id: activeRestaurant.id,
+        branch_id: data.branch_id || null,
+        branch: data.branch_key === 'all' ? null : data.branch_key,
+        title: data.title.trim(),
+        message: data.body.trim(),
+        target_role: 'employee',
+        is_active: true,
+        created_by: user?.email || null,
+      });
+      if (error) throw error;
+    },
     onSuccess: () => {
       toast.success('Announcement posted!');
       setAnnForm({ title: '', body: '', priority: 'normal', branch_key: 'all', target_roles: '["employee","driver"]' });
       setShowAnnouncementForm(false);
+      qc.invalidateQueries({ queryKey: ['employee-center-announcements'] });
     },
   });
 
-  const { data: announcements = [] } = useQuery({
-    queryKey: ['announcements-mgr'],
-    queryFn: () => base44.entities.Announcement.filter({ is_active: true }, '-created_date', 30),
+  const { data: announcements = [], isError: announcementsError } = useQuery({
+    queryKey: ['employee-center-announcements', activeRestaurant?.id, branchScope],
+    queryFn: async () => {
+      let query = supabase.from('announcements').select('*')
+        .eq('restaurant_id', activeRestaurant.id).eq('is_active', true)
+        .order('created_date', { ascending: false }).limit(100);
+      if (role === 'manager' && branchScope) {
+        const managerBranchRecord = branches.find(b => b.id === branchScope || b.key === branchScope || b.branch_key === branchScope);
+        const branchKey = managerBranchRecord?.key || managerBranchRecord?.branch_key || branchScope;
+        query = query.or(`branch.is.null,branch.eq.${branchKey}`);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!activeRestaurant?.id,
   });
 
   const deleteAnnMut = useMutation({
-    mutationFn: id => base44.entities.Announcement.update(id, { is_active: false }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['announcements-mgr'] }),
+    mutationFn: async id => {
+      if (!mayEdit || !activeRestaurant?.id) throw new Error('Employee management permission required.');
+      const { error } = await supabase.from('announcements').update({ is_active: false })
+        .eq('restaurant_id', activeRestaurant.id).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['employee-center-announcements'] }),
+    onError: error => toast.error(error.message),
   });
 
   const openAdd = () => { setEditing(null); setForm({ ...emptyForm, branch: branchScope || '' }); setShowForm(true); };
@@ -273,24 +306,25 @@ export default function Employees({ embedded = false }) {
           {mayEdit && <Button className="w-full gap-2 bg-primary" onClick={() => setShowAnnouncementForm(true)}>
             <Megaphone className="w-4 h-4" /> Post New Announcement
           </Button>}
-          {announcements.length === 0 && (
+          {announcementsError && <p role="alert" className="text-sm text-destructive">{tr('Unable to load announcements.')}</p>}
+          {!announcementsError && announcements.length === 0 && (
             <div className="text-center py-10 text-muted-foreground text-sm">
               <Bell className="w-10 h-10 mx-auto mb-2 opacity-30" />
               No announcements posted
             </div>
           )}
-          {announcements.map(ann => (
+          {!announcementsError && announcements.map(ann => (
             <Card key={ann.id} className="p-3 border-0 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span>{ann.priority === 'urgent' ? '🚨' : ann.priority === 'important' ? '⚠️' : '📢'}</span>
+                    <span>📢</span>
                     <p className="font-semibold text-sm">{ann.title}</p>
-                    <Badge variant="outline" className="text-xs">{ann.priority}</Badge>
+                    <Badge variant="outline" className="text-xs">{tr('Staff')}</Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">{ann.body}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{ann.message}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {ann.branch_key && ann.branch_key !== 'all' ? `Branch: ${ann.branch_key}` : 'All branches'}
+                    {ann.branch ? `${tr('Branch')}: ${ann.branch}` : tr('All branches')}
                   </p>
                 </div>
                 <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive shrink-0"
@@ -365,7 +399,7 @@ export default function Employees({ embedded = false }) {
               <Textarea value={annForm.body} onChange={e => setAnnForm(f => ({ ...f, body: e.target.value }))} placeholder="Announcement details…" rows={3} />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <div><Label className="text-xs">Priority</Label>
+              <div><Label className="text-xs">Priority (informational)</Label>
                 <Select value={annForm.priority} onValueChange={v => setAnnForm(f => ({ ...f, priority: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -382,12 +416,7 @@ export default function Employees({ embedded = false }) {
             <div className="flex gap-2 pt-1">
               <Button variant="outline" className="flex-1" onClick={() => setShowAnnouncementForm(false)}>Cancel</Button>
               <Button className="flex-1" disabled={!annForm.title || !annForm.body || announceMut.isPending}
-                onClick={() => announceMut.mutate({
-                  ...annForm,
-                  posted_by: user?.email,
-                  posted_by_name: user?.full_name || user?.email,
-                  is_active: true,
-                })}>
+                onClick={() => announceMut.mutate(annForm)}>
                 {announceMut.isPending ? 'Posting…' : 'Post'}
               </Button>
             </div>
