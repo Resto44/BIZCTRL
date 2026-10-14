@@ -31,33 +31,35 @@ export default function Payroll() {
     <div>
       <PageHeader title={t('payroll')} />
       <Tabs defaultValue="attendance">
-        <TabsList className="w-full mb-4 flex overflow-x-auto hide-scrollbar">
-          <TabsTrigger value="attendance" className="flex-1 text-xs gap-1 whitespace-nowrap">
+        <div className="mb-4 max-w-full overflow-x-auto overscroll-x-contain pb-2" role="region" aria-label="Payroll sections" tabIndex={0}>
+        <TabsList className="flex w-max min-w-full flex-nowrap justify-start gap-1">
+          <TabsTrigger value="attendance" className="shrink-0 gap-1 whitespace-nowrap px-3 text-xs">
             <CalendarCheck className="w-3 h-3" /> {t('attendance')}
           </TabsTrigger>
-          <TabsTrigger value="roster" className="flex-1 text-xs gap-1 whitespace-nowrap">
+          <TabsTrigger value="roster" className="shrink-0 gap-1 whitespace-nowrap px-3 text-xs">
             <Calendar className="w-3 h-3" /> {t('shift')}
           </TabsTrigger>
-          <TabsTrigger value="bonuses" className="flex-1 text-xs gap-1 whitespace-nowrap">
+          <TabsTrigger value="bonuses" className="shrink-0 gap-1 whitespace-nowrap px-3 text-xs">
             <DollarSign className="w-3 h-3" /> {t('bonuses')}
           </TabsTrigger>
-          <TabsTrigger value="report" className="flex-1 text-xs gap-1 whitespace-nowrap">
+          <TabsTrigger value="report" className="shrink-0 gap-1 whitespace-nowrap px-3 text-xs">
             <Users className="w-3 h-3" /> {t('payroll_report')}
           </TabsTrigger>
-          <TabsTrigger value="perf" className="flex-1 text-xs gap-1 whitespace-nowrap">
+          <TabsTrigger value="perf" className="shrink-0 gap-1 whitespace-nowrap px-3 text-xs">
             <TrendingUp className="w-3 h-3" /> {t('performance')}
           </TabsTrigger>
           {isOwner && (
-            <TabsTrigger value="analytics" className="flex-1 text-xs gap-1 whitespace-nowrap">
+            <TabsTrigger value="analytics" className="shrink-0 gap-1 whitespace-nowrap px-3 text-xs">
               <BarChart3 className="w-3 h-3" /> {t('analytics')}
             </TabsTrigger>
           )}
           {isOwner && (
-            <TabsTrigger value="settings" className="flex-1 text-xs gap-1 whitespace-nowrap">
+            <TabsTrigger value="settings" className="shrink-0 gap-1 whitespace-nowrap px-3 text-xs">
               <Settings2 className="w-3 h-3" /> {t('rules')}
             </TabsTrigger>
           )}
         </TabsList>
+        </div>
 
         <TabsContent value="attendance"><AttendanceTab /></TabsContent>
         <TabsContent value="roster"><WeeklyRosterView /></TabsContent>
