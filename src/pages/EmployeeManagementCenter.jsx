@@ -11,6 +11,7 @@ import { Users, CalendarCheck, Wallet, UserCog, ShieldCheck } from 'lucide-react
 // underlying data and mutations. Legacy deep links remain valid for bookmarks.
 const Employees = lazy(() => import('@/pages/Employees'));
 const EmployeeAttendance = lazy(() => import('@/pages/EmployeeAttendance'));
+const BranchAttendanceGeofence = lazy(() => import('@/components/attendance/BranchAttendanceGeofence'));
 const Payroll = lazy(() => import('@/pages/Payroll'));
 const StaffInvitations = lazy(() => import('@/pages/StaffInvitations'));
 
@@ -49,7 +50,10 @@ export default function EmployeeManagementCenter() {
         </div>
         <Suspense fallback={<Card className="p-8 text-center text-sm text-muted-foreground">{tr('Loading...')}</Card>}>
           {selected === 'records' && <TabsContent forceMount value="records"><Employees embedded /></TabsContent>}
-          {selected === 'attendance' && <TabsContent forceMount value="attendance"><EmployeeAttendance /></TabsContent>}
+          {selected === 'attendance' && <TabsContent forceMount value="attendance">
+            {role === 'owner' && <BranchAttendanceGeofence />}
+            <EmployeeAttendance />
+          </TabsContent>}
           {selected === 'payroll' && <TabsContent forceMount value="payroll"><Payroll embedded /></TabsContent>}
           {selected === 'access' && <TabsContent forceMount value="access"><StaffInvitations embedded /></TabsContent>}
         </Suspense>
