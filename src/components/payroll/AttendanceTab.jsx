@@ -50,9 +50,15 @@ export default function AttendanceTab() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const { data: employees = [] } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => base44.entities.Employee.list('full_name', 500),
+  const { data: employees = [], isError: employeesError } = useQuery({
+    queryKey: ['payroll-attendance-employees', activeRestaurant?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('employees').select('*')
+        .eq('restaurant_id', activeRestaurant.id).order('full_name').limit(500);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!activeRestaurant?.id,
   });
 
   // Date scoped fetch (instead of loading 5,000 historical records) and explicit
@@ -61,7 +67,7 @@ export default function AttendanceTab() {
     queryKey: ['attendance', activeRestaurant?.id, filterDate],
     queryFn: async () => {
       const { data, error } = await supabase.from('attendance').select('*')
-        .eq('date', filterDate).order('employee_name').limit(5000);
+        .eq('restaurant_id', activeRestaurant.id).eq('date', filterDate).order('employee_name').limit(5000);
       if (error) throw error;
       return data || [];
     },
@@ -71,7 +77,7 @@ export default function AttendanceTab() {
   const createMut = useMutation({
     mutationFn: async data => {
       const { data: existing, error } = await supabase.from('attendance').select('id')
-        .eq('employee_id', data.employee_id).eq('date', data.date).limit(3);
+        .eq('restaurant_id', data.restaurant_id).eq('employee_id', data.employee_id).eq('date', data.date).limit(3);
       if (error) throw error;
       if (existing.length > 1) throw new Error('Duplicate attendance entries need administrator review.');
       if (existing.length === 1) return base44.entities.Attendance.update(existing[0].id, data);
@@ -98,16 +104,16 @@ export default function AttendanceTab() {
   });
 
   const filtered = useMemo(() => records.filter(r =>
-    (!r.restaurant_id || r.restaurant_id === activeRestaurant?.id) &&
+    r.restaurant_id === activeRestaurant?.id &&
     (filterBranch === 'all' || r.branch === filterBranch)
   ), [records, filterBranch, activeRestaurant?.id]);
 
   // Employees available to manager (by branch)
   const availableEmployees = useMemo(() => {
-    const scoped = employees.filter(e => e.is_active !== false
-      && (!e.restaurant_id || e.restaurant_id === activeRestaurant?.id));
+    const scoped = employees.filter(e => e.is_active !== false && e.restaurant_id === activeRestaurant?.id);
     if (role === 'owner') return scoped;
-    const key = managerBranch?.key || managerBranch?.branch_key || user?.branch || '';
+    const key = typeof managerBranch === 'string' ? managerBranch
+      : (managerBranch?.key || managerBranch?.branch_key || user?.branch || '');
     return scoped.filter(e => !key || e.branch === key);
   }, [employees, role, user, activeRestaurant?.id, managerBranch]);
 
@@ -136,7 +142,7 @@ export default function AttendanceTab() {
   const exportCSV = () => {
     const rows = [
       ['Date', 'Employee', 'Branch', 'Status', 'Check In', 'Check Out', 'Hours', 'Late Mins'],
-      ...filtered.map(r => [r.date, r.employee_name, r.branch, r.status, r.check_in || '', r.check_out || '', (r.hours_worked || 0).toFixed(1), r.late_minutes || 0])
+      ...filtered.map(r => [r.date, r.employee_name, r.branch, r.status, r.check_in || '', r.check_out || '', (Number(r.hours_worked) || 0).toFixed(1), r.late_minutes || 0])
     ];
     const safeCell = value => {
       const raw = String(value ?? '');
@@ -182,7 +188,7 @@ export default function AttendanceTab() {
         })}
       </div>
 
-      {isError && (
+      {(isError || employeesError) && (
         <Card className="p-3 border-red-200 text-red-700 text-sm">
           {translateLiteral('Attendance could not be loaded. Check connection and permissions.')}
           <Button size="sm" variant="outline" className="ms-2" onClick={() => refetch()}>{translateLiteral('Retry')}</Button>
@@ -191,7 +197,7 @@ export default function AttendanceTab() {
       {/* Records */}
       <div className="space-y-2">
         {isLoading ? <p className="text-center py-8 text-muted-foreground text-sm">{t('loading')}</p> :
-          isError ? null : filtered.length === 0 ? (
+          (isError || employeesError) ? null : filtered.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Clock className="w-10 h-10 mx-auto mb-2 opacity-30" />
               <p className="text-sm">{availableEmployees.length === 0
