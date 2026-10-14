@@ -165,9 +165,9 @@ export default function EmployeeAttendance() {
     onError: error => toast.error(error.message),
   });
   const qrMutation = useMutation({
-    mutationFn: async emp => {
+    mutationFn: async ({ emp, rotate = false }) => {
       const { data, error } = await supabase.rpc('erp_attendance_issue_kiosk_qr', {
-        p_restaurant_id: restaurantId, p_employee_id: emp.id, p_rotate: false,
+        p_restaurant_id: restaurantId, p_employee_id: emp.id, p_rotate: rotate,
       });
       if (error) throw error;
       return data;
@@ -178,7 +178,7 @@ export default function EmployeeAttendance() {
   const generateMissingQRs = async () => {
     const missing = employees.filter(emp => !emp.qr_code);
     for (const employee of missing) {
-      try { await qrMutation.mutateAsync(employee); } catch { return; }
+      try { await qrMutation.mutateAsync({ emp: employee }); } catch { return; }
     }
     toast.success(tr('Missing QR badges generated'));
   };
@@ -339,12 +339,21 @@ export default function EmployeeAttendance() {
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {employees.map(emp => emp.qr_code
-                ? <EmployeeQRCard key={emp.id} employee={emp} />
+                ? <div key={emp.id} className="flex flex-col items-center gap-1">
+                    <EmployeeQRCard employee={emp} />
+                    {canManage && <Button type="button" size="sm" variant="outline"
+                      disabled={qrMutation.isPending}
+                      onClick={() => {
+                        if (window.confirm(tr('Rotate QR and invalidate the existing badge?'))) {
+                          qrMutation.mutate({ emp, rotate: true });
+                        }
+                      }}>{tr('Rotate QR')}</Button>}
+                  </div>
                 : <Card key={emp.id}><CardContent className="space-y-3 p-3 text-center">
                   <QrCode className="mx-auto h-10 w-10 text-muted-foreground/30" />
                   <p className="truncate text-sm font-medium">{emp.full_name}</p>
                   {canManage && <Button type="button" size="sm" variant="outline" disabled={qrMutation.isPending}
-                    onClick={() => qrMutation.mutate(emp)}>{tr('Generate QR')}</Button>}
+                    onClick={() => qrMutation.mutate({ emp })}>{tr('Generate QR')}</Button>}
                 </CardContent></Card>)}
             </div>
           </TabsContent>
