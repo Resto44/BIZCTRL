@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Pencil, Archive, Eye, UserRound, Phone, Mail, Building2, UserPlus, Bell, Megaphone } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, Eye, UserRound, Phone, Mail, Building2, UserPlus, Bell, Megaphone } from 'lucide-react';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { formatCurrency } from '@/lib/helpers';
 import { useTenant } from '@/lib/TenantContext';
@@ -45,7 +45,7 @@ export default function Employees({ embedded = false }) {
   const [filterBranch, setFilterBranch] = useState('all');
   const [activeTab, setActiveTab] = useState('list');
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
-  const [annForm, setAnnForm] = useState({ title: '', body: '', priority: 'normal', branch_key: 'all', target_roles: '["employee","driver"]' });
+  const [annForm, setAnnForm] = useState({ title: '', body: '', branch_key: 'all' });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const { data: employees = [], isLoading, isError, refetch } = useQuery({
@@ -135,10 +135,11 @@ export default function Employees({ embedded = false }) {
     },
     onSuccess: () => {
       toast.success('Announcement posted!');
-      setAnnForm({ title: '', body: '', priority: 'normal', branch_key: 'all', target_roles: '["employee","driver"]' });
+      setAnnForm({ title: '', body: '', branch_key: 'all' });
       setShowAnnouncementForm(false);
       qc.invalidateQueries({ queryKey: ['employee-center-announcements'] });
     },
+    onError: error => toast.error(error.message || tr('Unable to post announcement')),
   });
 
   const { data: announcements = [], isError: announcementsError } = useQuery({
@@ -210,6 +211,12 @@ export default function Employees({ embedded = false }) {
           {mayEdit && <Button size="sm" onClick={openAdd}><Plus className="w-3.5 h-3.5 mr-1" /> Add</Button>}
         </div>
       } />}
+      {embedded && mayEdit && <div className="mb-3 flex flex-wrap justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={() => setShowAnnouncementForm(true)}>
+          <Megaphone className="me-1 h-4 w-4" />{tr('Announce')}
+        </Button>
+        <Button size="sm" onClick={openAdd}><Plus className="me-1 h-4 w-4" />{tr('Add Employee')}</Button>
+      </div>}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-3">
         <TabsList className="grid grid-cols-3 w-full">
@@ -399,16 +406,6 @@ export default function Employees({ embedded = false }) {
               <Textarea value={annForm.body} onChange={e => setAnnForm(f => ({ ...f, body: e.target.value }))} placeholder="Announcement details…" rows={3} />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <div><Label className="text-xs">Priority (informational)</Label>
-                <Select value={annForm.priority} onValueChange={v => setAnnForm(f => ({ ...f, priority: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="normal">Normal</SelectItem>
-                    <SelectItem value="important">Important</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
               <div><Label className="text-xs">Branch</Label>
                 <BranchSelect value={annForm.branch_key} onChange={v => setAnnForm(f => ({ ...f, branch_key: v }))} includeAll />
               </div>
