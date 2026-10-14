@@ -4,6 +4,10 @@
  * free-text business values or code identifiers.
  */
 export const erpInterfacePhrases = Object.freeze({
+  "Notifications": { ar: "الإشعارات", fa: "اعلان‌ها" },
+  "No notifications yet": { ar: "لا توجد إشعارات بعد", fa: "هنوز اعلانی وجود ندارد" },
+  "View all notifications": { ar: "عرض جميع الإشعارات", fa: "مشاهدهٔ همهٔ اعلان‌ها" },
+  "Unread": { ar: "غير مقروء", fa: "خوانده‌نشده" },
   "Check In recorded. Enter PIN again to Check Out.": { ar: "تم تسجيل الحضور. أدخل الرمز مرة أخرى لتسجيل الانصراف.", fa: "ورود ثبت شده است. برای ثبت خروج دوباره رمز را وارد کنید." },
   "Check In and Check Out are already recorded for today.": { ar: "تم تسجيل الحضور والانصراف اليوم.", fa: "ورود و خروج امروز قبلاً ثبت شده‌اند." },
   "Attendance requires manager review before another scan.": { ar: "يجب مراجعة المدير قبل تسجيل حضور جديد.", fa: "قبل از ثبت دوباره، بررسی مدیر لازم است." },
