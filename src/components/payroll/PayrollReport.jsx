@@ -120,7 +120,7 @@ export default function PayrollReport() {
 
   const saving = createRun.isPending || updateRun.isPending;
   const handleFinalize = async (row) => {
-    if (saving || loadingError || !activeRestaurant?.id || row.status === 'paid') return;
+    if (saving || loadingError || invalidRules.length || !activeRestaurant?.id || row.status === 'paid') return;
     try {
       if (row._saved) {
         await updateRun.mutateAsync({ id: row.id, data: { status: 'finalized' } });
@@ -138,7 +138,10 @@ export default function PayrollReport() {
           final_salary: toNumber(row.final_salary),
           status: 'finalized',
         };
-        const duplicates = await base44.entities.PayrollRun.filter({ employee_id: row.employee_id, month });
+        const { data: duplicates, error: duplicateError } = await supabase.from('payroll_runs')
+          .select('id').eq('employee_id', row.employee_id).eq('month', month)
+          .eq('restaurant_id', activeRestaurant.id).limit(2);
+        if (duplicateError) throw duplicateError;
         if (duplicates.length) throw new Error('Payroll already finalized in another session. Refresh before retrying.');
         await createRun.mutateAsync(payload);
       }
@@ -208,7 +211,7 @@ export default function PayrollReport() {
         {translateLiteral('Unable to load payroll data. Check access and try again.')}
       </Card>}
       {invalidRules.length > 0 && <Card className="p-3 border-amber-300 text-amber-700 text-sm">
-        {translateLiteral('Some daily-fraction deduction rules have invalid values. They have been excluded from calculations until corrected.')}
+        {translateLiteral('Some deduction rules have invalid daily fractions. Finalization is blocked until these rules are corrected.')}
       </Card>}
       {/* Totals */}
       <div className="grid grid-cols-2 gap-2">
@@ -288,7 +291,7 @@ export default function PayrollReport() {
             {role === 'owner' && (
               <div className="flex gap-2">
                 {(!row.status || row.status === 'draft') && (
-                  <Button size="sm" variant="outline" className="flex-1 text-xs h-7" onClick={() => setConfirmFinalize(row)} disabled={saving || loadingError}>
+                  <Button size="sm" variant="outline" className="flex-1 text-xs h-7" onClick={() => setConfirmFinalize(row)} disabled={saving || loadingError || invalidRules.length > 0}>
                     Finalize
                   </Button>
                 )}
@@ -327,7 +330,7 @@ export default function PayrollReport() {
             </p>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => handleFinalize(confirmFinalize)}>Finalize</AlertDialogAction>
+              <AlertDialogAction disabled={saving || loadingError || invalidRules.length > 0} onClick={() => handleFinalize(confirmFinalize)}>Finalize</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
