@@ -93,15 +93,15 @@ function MetricCard({ label, value, detail, icon: Icon, tone = 'blue', trend }) 
     slate: 'border-border bg-muted/35 text-foreground',
   };
   return (
-    <div className={`min-w-0 rounded-2xl border p-3.5 ${tones[tone] || tones.blue}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-[11px] font-bold text-muted-foreground">{label}</p>
-          <p className="mt-1 truncate text-lg font-black tracking-tight text-foreground sm:text-xl">{value}</p>
+    <div data-testid="owner-report-metric" className={`min-w-0 rounded-2xl border p-3 sm:p-3.5 ${tones[tone] || tones.blue}`}>
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p data-testid="owner-metric-label" className="whitespace-normal break-words text-[11px] font-bold leading-5 text-muted-foreground [overflow-wrap:anywhere]">{label}</p>
+          <p dir="auto" data-testid="owner-metric-value" className="mt-1 min-w-0 whitespace-normal break-words text-base font-black leading-tight tracking-tight tabular-nums text-foreground [overflow-wrap:anywhere] sm:text-xl">{value}</p>
         </div>
         {Icon ? <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background/80 shadow-sm"><Icon className="h-4 w-4" /></span> : null}
       </div>
-      {detail ? <p className="mt-1.5 truncate text-[10px] font-semibold text-muted-foreground">{detail}</p> : null}
+      {detail ? <p className="mt-1.5 whitespace-normal break-words text-[10px] font-semibold leading-4 text-muted-foreground [overflow-wrap:anywhere]">{detail}</p> : null}
       {trend != null ? (
         <p className={`mt-1.5 inline-flex items-center gap-1 text-[10px] font-black ${trend >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
           {trend >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
@@ -121,11 +121,11 @@ function ReportLinks({ links, copy }) {
   return (
     <Panel>
       <SectionTitle icon={FileBarChart} title={text(copy, 'reportDirectory', 'Complete report directory')} subtitle={text(copy, 'reportDirectoryHint', 'Open every ERP report without leaving the dashboard')} tone="violet" />
-      <nav aria-label={text(copy, 'reportDirectory', 'Complete report directory')} className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+      <nav aria-label={text(copy, 'reportDirectory', 'Complete report directory')} className="mt-4 grid grid-cols-1 gap-2 min-[480px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
         {links.map(({ label, path, icon: Icon, tone = 'blue' }) => (
           <button key={path} type="button" onClick={() => navigate(path)} className="group flex min-h-14 min-w-0 items-center gap-2.5 rounded-2xl border border-border/70 bg-background px-3 py-2.5 text-start transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
             <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone}`}><Icon className="h-4 w-4" /></span>
-            <span className="min-w-0 flex-1 truncate text-xs font-black text-foreground">{label}</span>
+            <span data-testid="owner-report-link-label" className="min-w-0 flex-1 whitespace-normal break-words text-xs font-black leading-5 text-foreground [overflow-wrap:anywhere]">{label}</span>
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
           </button>
         ))}
@@ -319,7 +319,7 @@ function OperationsReport({ model, copy }) {
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel>
           <SectionTitle icon={Truck} title={text(copy, 'procurementPulse', 'Procurement pulse')} subtitle={text(copy, 'procurementPulseHint', "Today's approved supplier receipts")} tone="blue" />
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <MetricCard label={text(copy, 'purchasedQty', 'Purchased qty')} value={compactNumber(periodPurchaseQuantity, 2)} icon={Boxes} tone="blue" />
             <MetricCard label={text(copy, 'purchaseCost', 'Purchase cost')} value={formatMoney(periodPurchaseCost)} icon={ReceiptText} tone="violet" />
             <MetricCard label={text(copy, 'suppliers', 'Suppliers')} value={compactNumber(supplierCount)} icon={Truck} tone="green" />
@@ -327,7 +327,7 @@ function OperationsReport({ model, copy }) {
         </Panel>
         <Panel>
           <SectionTitle icon={Warehouse} title={text(copy, 'stockHealth', 'Stock health')} subtitle={text(copy, 'stockHealthHint', 'Availability risks in the selected branch scope')} tone="amber" />
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <MetricCard label={text(copy, 'products', 'Products')} value={compactNumber(inventoryOverview.skuCount)} icon={PackageCheck} tone="slate" />
             <MetricCard label={text(copy, 'lowStock', 'Low stock')} value={compactNumber(inventoryOverview.lowStock)} icon={AlertTriangle} tone="amber" />
             <MetricCard label={text(copy, 'outOfStock', 'Out of stock')} value={compactNumber(inventoryOverview.outOfStock)} icon={PackageSearch} tone="rose" />
