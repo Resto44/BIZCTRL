@@ -18,7 +18,7 @@ function toNumber(value) {
 }
 
 function employeeKey(employee = {}) {
-  return employee.employee_id ?? employee.id ?? '';
+  return employee.id ?? '';
 }
 
 function sameEmployee(recordEmployeeId, employeeId) {
