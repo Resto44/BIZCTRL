@@ -40,15 +40,19 @@ CREATE OR REPLACE FUNCTION public.erp_attendance_set_kiosk_pin(
 ) RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp
 AS $$
-DECLARE v_employee public.employees%ROWTYPE;
+DECLARE v_employee public.employees%ROWTYPE; v_branch_id uuid;
 BEGIN
   IF auth.uid() IS NULL OR p_pin !~ '^[0-9]{6}$' THEN
     RAISE EXCEPTION 'Enter a six-digit numeric PIN' USING ERRCODE = '22023';
   END IF;
   SELECT * INTO v_employee FROM public.employees
    WHERE id = p_employee_id AND restaurant_id = p_restaurant_id AND is_active IS TRUE;
-  IF NOT FOUND OR v_employee.branch_id IS NULL OR NOT public.erp_can_write_module_scope_text(
-    p_restaurant_id::text, v_employee.branch_id::text, 'manageEmployees'
+  SELECT id INTO v_branch_id FROM public.branches
+    WHERE restaurant_id=p_restaurant_id AND is_active IS TRUE
+      AND (id=v_employee.branch_id OR (v_employee.branch_id IS NULL AND branch_key=v_employee.branch))
+    LIMIT 1;
+  IF v_branch_id IS NULL OR NOT public.erp_can_write_module_scope_text(
+    p_restaurant_id::text, v_branch_id::text, 'manageEmployees'
   ) THEN
     RAISE EXCEPTION 'Employee or permission unavailable' USING ERRCODE = '42501';
   END IF;
@@ -72,13 +76,17 @@ CREATE OR REPLACE FUNCTION public.erp_attendance_issue_kiosk_qr(
 ) RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp
 AS $$
-DECLARE v_employee public.employees%ROWTYPE; v_code text;
+DECLARE v_employee public.employees%ROWTYPE; v_code text; v_branch_id uuid;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Sign in first' USING ERRCODE = '42501'; END IF;
   SELECT * INTO v_employee FROM public.employees
    WHERE id = p_employee_id AND restaurant_id = p_restaurant_id AND is_active IS TRUE;
-  IF NOT FOUND OR v_employee.branch_id IS NULL OR NOT public.erp_can_write_module_scope_text(
-    p_restaurant_id::text, v_employee.branch_id::text, 'manageEmployees'
+  SELECT id INTO v_branch_id FROM public.branches
+    WHERE restaurant_id=p_restaurant_id AND is_active IS TRUE
+      AND (id=v_employee.branch_id OR (v_employee.branch_id IS NULL AND branch_key=v_employee.branch))
+    LIMIT 1;
+  IF v_branch_id IS NULL OR NOT public.erp_can_write_module_scope_text(
+    p_restaurant_id::text, v_branch_id::text, 'manageEmployees'
   ) OR NOT EXISTS (SELECT 1 FROM public.erp_memberships m
     WHERE m.user_id = auth.uid() AND m.restaurant_id = p_restaurant_id
       AND m.status = 'approved' AND m.role IN ('owner','manager')) THEN
