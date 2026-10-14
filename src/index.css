@@ -9,8 +9,13 @@
 /* ─── RestoCTRL Enterprise Design System ─────────────────────────────────── */
 @layer base {
   :root {
-    --font-ui: 'Inter', ui-sans-serif, system-ui, sans-serif;
-    --font-rtl: 'Vazirmatn', 'Noto Sans Arabic', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    /* Apple system UI (including its native Arabic/Persian glyph fallbacks) on
+       iPhone/iPad; Inter/Vazirmatn on non-Apple browsers. Never bundle SF font files. */
+    --font-ui: -apple-system, BlinkMacSystemFont, 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-rtl: -apple-system, BlinkMacSystemFont, 'Vazirmatn', 'Noto Sans Arabic', system-ui, sans-serif;
+    --erp-weight-body: 500;
+    --erp-weight-control: 600;
+    --erp-weight-heading: 700;
     /* One semantic type scale for en/ar/fa. Headings remain larger than labels. */
     --erp-type-caption: 0.75rem; /* 12px, minimum readable ERP label */
     --erp-type-label: 0.875rem;   /* 14px */
@@ -184,9 +189,23 @@
     font-family: var(--font-ui);
     font-size: var(--erp-type-body);
     line-height: var(--erp-line-body);
+    font-weight: var(--erp-weight-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
-  :is(button, input, textarea, select) {
-    font-family: inherit;
+  /* Consistent Apple-like typographic hierarchy, without forcing every
+     paragraph or KPI to 700 and without changing the language-size scale. */
+  :is(h1, h2, h3, h4, h5, h6) {
+    font-family: var(--font-ui);
+    font-weight: var(--erp-weight-heading);
+  }
+  :is(button, [role="tab"], [role="menuitem"], [role="option"], label, th) {
+    font-family: var(--font-ui);
+    font-weight: var(--erp-weight-control);
+  }
+  :is(input, textarea, select) {
+    font-family: var(--font-ui);
+    font-weight: var(--erp-weight-body);
   }
 }
 

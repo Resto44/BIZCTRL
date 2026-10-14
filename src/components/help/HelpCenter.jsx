@@ -39,11 +39,11 @@ export default function HelpCenter() {
       <p className="mt-3 text-xs leading-6 text-muted-foreground">{c.scope}</p>
     </div>
     <div className="space-y-3">
-      <label className="block text-sm font-medium" htmlFor="help-search">{c.search}</label>
+      <label className="block text-sm font-semibold" htmlFor="help-search">{c.search}</label>
       <div className="relative"><Search className="pointer-events-none absolute start-3 top-3 h-5 w-5 text-muted-foreground" aria-hidden="true" /><input id="help-search" type="search" value={query} onChange={event => change('q', event.target.value)} className="min-h-11 w-full rounded-xl border bg-background py-3 pe-3 ps-10 text-base" /></div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="space-y-1 text-sm"><span>{c.category}</span><select value={category} onChange={event => change('topic', event.target.value)} className="min-h-11 w-full rounded-lg border bg-background p-2"><option value="all">{c.all}</option>{Object.entries(c.topics).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label className="space-y-1 text-sm"><span>{c.role}</span><select value={role} onChange={event => change('role', event.target.value)} className="min-h-11 w-full rounded-lg border bg-background p-2"><option value="all">{c.all}</option>{Object.entries(c.roles).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label className="space-y-1 text-sm font-semibold"><span>{c.category}</span><select value={category} onChange={event => change('topic', event.target.value)} className="min-h-11 w-full rounded-lg border bg-background p-2"><option value="all">{c.all}</option>{Object.entries(c.topics).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label className="space-y-1 text-sm font-semibold"><span>{c.role}</span><select value={role} onChange={event => change('role', event.target.value)} className="min-h-11 w-full rounded-lg border bg-background p-2"><option value="all">{c.all}</option>{Object.entries(c.roles).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm"><p role="status">{articles.length} {c.results}</p><button type="button" onClick={clear} className="min-h-11 px-2 text-primary underline">{c.reset}</button></div>
     </div>
@@ -58,7 +58,7 @@ export default function HelpCenter() {
           <h4 className="font-semibold">{c.steps}</h4>
           <ol className="list-decimal space-y-3 ps-6 text-sm leading-7">{copy.steps.map((step, index) => <li key={index} className="ps-1">{step}</li>)}</ol>
           <aside className="rounded-lg border border-amber-300/50 bg-amber-500/10 p-4 text-sm leading-7"><h4 className="font-semibold">{c.note}</h4><p>{copy.note}</p></aside>
-          <div className="flex flex-wrap gap-3"><Link to={article.route} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">{c.open}<ExternalLink className="h-4 w-4" aria-hidden="true" /></Link><Link to={`/help?guide=${article.id}`} className="inline-flex min-h-11 items-center px-2 text-sm text-primary underline">{c.link}</Link></div>
+          <div className="flex flex-wrap gap-3"><Link to={article.route} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">{c.open}<ExternalLink className="h-4 w-4" aria-hidden="true" /></Link><Link to={`/help?guide=${article.id}`} className="inline-flex min-h-11 items-center px-2 text-sm text-primary underline">{c.link}</Link></div>
         </div>
       </article>;
     })}</div>
