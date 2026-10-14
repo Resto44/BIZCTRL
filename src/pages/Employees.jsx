@@ -34,6 +34,10 @@ export default function Employees({ embedded = false }) {
   const { activeRestaurant, branches, managerBranch } = useTenant();
   const branchScope = role === 'manager' ? (typeof managerBranch === 'string'
     ? managerBranch : (managerBranch?.key || managerBranch?.branch_key || managerBranch?.id || '')) : '';
+  const managerBranchRecord = role === 'manager'
+    ? branches.find(branch => [branch.id, branch.key, branch.branch_key].includes(branchScope))
+    : null;
+  const managerBranchKey = managerBranchRecord?.key || managerBranchRecord?.branch_key || '';
   const { withinLimit, usage, limits, planName } = useSubscription();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -120,10 +124,14 @@ export default function Employees({ embedded = false }) {
   const announceMut = useMutation({
     mutationFn: async data => {
       if (!mayEdit || !activeRestaurant?.id) throw new Error('Employee management permission required.');
+      const branch = branches.find(b => b.key === data.branch_key || b.branch_key === data.branch_key);
+      if (role === 'manager' && (!branch || branch.id !== managerBranchRecord?.id)) {
+        throw new Error('Only your assigned branch may receive announcements.');
+      }
       const { error } = await supabase.from('announcements').insert({
         restaurant_id: activeRestaurant.id,
-        branch_id: data.branch_id || null,
-        branch: data.branch_key === 'all' ? null : data.branch_key,
+        branch_id: branch?.id || null,
+        branch: branch?.key || branch?.branch_key || null,
         title: data.title.trim(),
         message: data.body.trim(),
         target_role: 'employee',
@@ -170,7 +178,7 @@ export default function Employees({ embedded = false }) {
     onError: error => toast.error(error.message),
   });
 
-  const openAdd = () => { setEditing(null); setForm({ ...emptyForm, branch: branchScope || '' }); setShowForm(true); };
+  const openAdd = () => { setEditing(null); setForm({ ...emptyForm, branch: managerBranchKey || '' }); setShowForm(true); };
   const openEdit = (e) => {
     setEditing(e);
     setForm({ full_name: e.full_name || e.name || '', employee_id: e.employee_id || '', branch: e.branch, position: e.position || '', base_salary: e.base_salary ?? e.salary ?? '', joining_date: e.joining_date || '', phone: e.phone || '', email: e.email || '', is_active: e.is_active !== false, notes: e.notes || '' });
@@ -406,7 +414,7 @@ export default function Employees({ embedded = false }) {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div><Label className="text-xs">Branch</Label>
-                <BranchSelect value={annForm.branch_key} onChange={v => setAnnForm(f => ({ ...f, branch_key: v }))} includeAll />
+                <BranchSelect value={role === 'manager' ? managerBranchKey : annForm.branch_key} disabled={role === 'manager'} onChange={v => setAnnForm(f => ({ ...f, branch_key: v }))} includeAll={role !== 'manager'} />
               </div>
             </div>
             <div className="flex gap-2 pt-1">
