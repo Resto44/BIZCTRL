@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { base44, supabase } from '@/api/base44Client';
 import { useTenant } from '@/lib/TenantContext';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -42,18 +42,51 @@ export default function PayrollReport() {
   const [confirmFinalize, setConfirmFinalize] = useState(null);
   const [generating, setGenerating] = useState(false);
 
-  const { data: employees = [] } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list('full_name', 500) });
-  const { data: attendanceAll = [] } = useQuery({ queryKey: ['attendance'], queryFn: () => base44.entities.Attendance.list('-date', 5000) });
-  const { data: bonusesAll = [] } = useQuery({ queryKey: ['employee_bonuses'], queryFn: () => base44.entities.EmployeeBonus.list('-date', 1000) });
-  const { data: advancesAll = [] } = useQuery({ queryKey: ['salary_advances'], queryFn: () => base44.entities.SalaryAdvance.list('-date', 1000) });
-  const { data: rulesAll = [] } = useQuery({ queryKey: ['deduction_rules'], queryFn: () => base44.entities.DeductionRule.list() });
-  const { data: payrollRuns = [], refetch: refetchRuns } = useQuery({ queryKey: ['payroll_runs', month], queryFn: () => base44.entities.PayrollRun.filter({ month }) });
-
   const { from, to } = monthRange(month);
+  const fetchRows = async (table, selectQuery) => {
+    const query = selectQuery(supabase.from(table).select('*'));
+    const { data, error } = await query.limit(5000);
+    if (error) throw error;
+    return data || [];
+  };
+  const { data: employees = [], isLoading: loadingEmployees, isError: employeesError } = useQuery({
+    queryKey: ['payroll-employees', activeRestaurant?.id],
+    queryFn: () => fetchRows('employees', q => q.order('full_name')),
+    enabled: !!activeRestaurant?.id,
+  });
+  const { data: attendanceAll = [], isError: attendanceError } = useQuery({
+    queryKey: ['payroll-attendance', activeRestaurant?.id, month],
+    queryFn: () => fetchRows('attendance', q => q.gte('date', from).lte('date', to)),
+    enabled: !!activeRestaurant?.id,
+  });
+  const { data: bonusesAll = [], isError: bonusesError } = useQuery({
+    queryKey: ['payroll-bonuses', activeRestaurant?.id, month],
+    queryFn: () => fetchRows('employee_bonuses', q => q.gte('date', from).lte('date', to)),
+    enabled: !!activeRestaurant?.id,
+  });
+  const { data: advancesAll = [], isError: advancesError } = useQuery({
+    queryKey: ['payroll-advances', activeRestaurant?.id, month],
+    queryFn: () => fetchRows('salary_advances', q => q.eq('month', month)),
+    enabled: !!activeRestaurant?.id,
+  });
+  const { data: rulesAll = [], isError: rulesError } = useQuery({
+    queryKey: ['payroll-rules', activeRestaurant?.id],
+    queryFn: () => fetchRows('deduction_rules', q => q.order('created_date')),
+    enabled: !!activeRestaurant?.id,
+  });
+  const { data: payrollRuns = [], isError: runsError } = useQuery({
+    queryKey: ['payroll_runs', activeRestaurant?.id, month],
+    queryFn: () => fetchRows('payroll_runs', q => q.eq('month', month).eq('restaurant_id', activeRestaurant.id)),
+    enabled: !!activeRestaurant?.id,
+  });
+  const loadingError = employeesError || attendanceError || bonusesError || advancesError || rulesError || runsError;
+  const invalidRules = rulesAll.filter(rule => rule.deduction_type === 'daily_fraction'
+    && !(Number(rule.amount) > 0 && Number(rule.amount) <= 1));
 
   const rows = useMemo(() => {
     const filteredEmp = (Array.isArray(employees) ? employees : []).filter(e =>
       e && e.is_active !== false &&
+      (!e.restaurant_id || e.restaurant_id === activeRestaurant?.id) &&
       (filterBranch === 'all' || e.branch === filterBranch)
     );
 
@@ -73,7 +106,7 @@ export default function PayrollReport() {
       .filter(r => filterBranch === 'all' || employees.some(e => String(e.id) === String(r.employee_id) && e.branch === filterBranch))
       .map(r => ({ ...r, branch: employees.find(e => String(e.id) === String(r.employee_id))?.branch || '', _saved: true }));
     return [...currentRows, ...archived];
-  }, [employees, filterBranch, month, attendanceAll, bonusesAll, advancesAll, rulesAll, payrollRuns, from, to]);
+  }, [employees, filterBranch, month, attendanceAll, bonusesAll, advancesAll, rulesAll, payrollRuns, from, to, activeRestaurant?.id]);
 
   const updateRun = useMutation({
     mutationFn: ({ id, data }) => base44.entities.PayrollRun.update(id, data),
@@ -87,7 +120,7 @@ export default function PayrollReport() {
 
   const saving = createRun.isPending || updateRun.isPending;
   const handleFinalize = async (row) => {
-    if (saving || !activeRestaurant?.id || row.status === 'paid') return;
+    if (saving || loadingError || !activeRestaurant?.id || row.status === 'paid') return;
     try {
       if (row._saved) {
         await updateRun.mutateAsync({ id: row.id, data: { status: 'finalized' } });
@@ -170,6 +203,13 @@ export default function PayrollReport() {
       </div>
 
       {!activeRestaurant?.id && <p className="text-sm text-amber-700">{translateLiteral('Select a business to view payroll')}</p>}
+      {loadingEmployees && <p className="text-sm text-muted-foreground">{translateLiteral('Loading...')}</p>}
+      {loadingError && <Card className="p-3 border-red-200 text-red-700 text-sm">
+        {translateLiteral('Unable to load payroll data. Check access and try again.')}
+      </Card>}
+      {invalidRules.length > 0 && <Card className="p-3 border-amber-300 text-amber-700 text-sm">
+        {translateLiteral('Some daily-fraction deduction rules have invalid values. They have been excluded from calculations until corrected.')}
+      </Card>}
       {/* Totals */}
       <div className="grid grid-cols-2 gap-2">
         <Card className="p-3 text-center">
@@ -213,7 +253,7 @@ export default function PayrollReport() {
 
       {/* Employee rows */}
       <div className="space-y-2">
-        {rows.length === 0 ? (
+        {loadingError ? null : rows.length === 0 ? (
           <p className="text-center py-8 text-muted-foreground text-sm">No employees found</p>
         ) : rows.map((row, i) => (
           <Card key={row.employee_id || i} className="p-3">
@@ -248,7 +288,7 @@ export default function PayrollReport() {
             {role === 'owner' && (
               <div className="flex gap-2">
                 {(!row.status || row.status === 'draft') && (
-                  <Button size="sm" variant="outline" className="flex-1 text-xs h-7" onClick={() => setConfirmFinalize(row)} disabled={saving}>
+                  <Button size="sm" variant="outline" className="flex-1 text-xs h-7" onClick={() => setConfirmFinalize(row)} disabled={saving || loadingError}>
                     Finalize
                   </Button>
                 )}
