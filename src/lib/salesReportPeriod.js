@@ -91,7 +91,7 @@ export function buildSalesReportSnapshot({
   const days=differenceInCalendarDays(parseDate(to),parseDate(from))+1;
   const dates=new Map();
   const keyFor=date=>groupBy==='month'?date.slice(0,7):date;
-  const create=date=>({date, sales:0,cash:0,network:0,credit:0,other:0,purchases:0,variable:0,fixed:0,grossProfit:0,netProfit:0});
+  const create=date=>({date, sales:0,cash:0,network:0,credit:0,other:0,purchases:0,variable:0,fixed:0,grossProfit:0,netProfit:0,closings:0});
   for(let day=parseDate(from);day<=parseDate(to);day=addDays(day,1)){
     const date=dateString(day),key=keyFor(date);
     if(!dates.has(key)) dates.set(key,create(key));
@@ -100,7 +100,7 @@ export function buildSalesReportSnapshot({
   }
   for(const row of confirmedSales){
     const item=dates.get(keyFor(row.date)),r=closingRevenue(row,revenueSources);
-    item.sales+=r.total;item.cash+=r.cash;item.network+=r.network;item.credit+=r.credit;item.other+=r.customSources;
+    item.closings+=1;item.sales+=r.total;item.cash+=r.cash;item.network+=r.network;item.credit+=r.credit;item.other+=r.customSources;
   }
   for(const row of approvedPurchases)dates.get(keyFor(row.date)).purchases+=purchaseValue(row);
   for(const row of periodExpenses.filter(e=>!e._is_fixed))dates.get(keyFor(row.date)).variable+=validNumber(row.amount);
