@@ -808,7 +808,7 @@ export default function Reports() {
       <Section title={t('generate_pdf_report')} icon={FileText}>
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            {lang==='fa'?'گزارش تفصیلی چندصفحه‌ای: فروش و پرداخت، نتیجه مالی، شعب، موجودی و مصرف، خرید، مصارف و بدهی‌ها':lang==='ar'?'تقرير تفصيلي متعدد الصفحات: المبيعات والدفع والنتيجة المالية والفروع والمخزون والاستهلاك والمشتريات والمصروفات والديون':'Detailed multi-page report: sales, payments, profit, branches, inventory, consumption, purchases, expenses and debts'}
+            {lang==='fa'?'گزارش دوصفحه‌ای: صفحه اول فروشات و روند فروش؛ صفحه دوم خرید، مصارف و تحلیل هزینه':lang==='ar'?'تقرير من صفحتين: المبيعات واتجاهاتها؛ المشتريات والمصروفات وتحليل التكاليف':'Two-page report: sales and sales trends; purchases, expenses and cost analysis'}
           </p>
           {/* Recommendations preview */}
           {recommendations.length > 0 && (

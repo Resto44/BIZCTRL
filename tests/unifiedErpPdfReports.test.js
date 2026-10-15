@@ -65,7 +65,7 @@ describe('Paginated unified BizCTRL ERP PDF reporting',()=>{
    const pdf=await generateSalesAnalyticsPDF({snapshot,previousSnapshot:prior,
      growth:salesReportGrowth(snapshot,prior),range,branchLabel:'فرع الريان',
      businessName:'مطاعم شمعة الريان',lang,download:false});
-   expect(pdf.getNumberOfPages()).toBeGreaterThan(1);
+   expect(pdf.getNumberOfPages()).toBe(2);
    expect(pdf.__erpPdfRTL).toBe(lang!=='en');
    expect(Buffer.from(pdf.output('arraybuffer')).subarray(0,5).toString()).toBe('%PDF-');
   }
@@ -85,7 +85,7 @@ describe('Paginated unified BizCTRL ERP PDF reporting',()=>{
   expect(scheduled).toContain('generateSalesAnalyticsPDF');
   expect(scheduled).not.toContain('generateUltimatePDF');
   expect(scheduled).not.toContain('handleSendNow');
-  expect(analytics).toContain('drawSinglePageSalesAnalytics');
+  expect(analytics).toContain('drawTwoPageERPReport');
   expect(table).toContain('drawERPReportBrand');
   expect(profit).toContain('drawERPReportBrand');
   expect(supplier).toContain('drawERPReportBrand');
