@@ -60,6 +60,20 @@ describe('Complete two-page Sales Analytics coverage',()=>{
   expect(labels).toContain('-10 SAR');expect(labels).not.toContain('Best branch by operating result');
   expect(labels).toContain('No comparable prior sales');
  });
+ it.each(['fa','ar'])('keeps the expense legend swatch adjacent to its own %s label',(lang)=>{
+  const doc=new jsPDF();prepareLocalizedPdf(doc,{lang});const labels=[],rects=[];
+  const originalText=doc.text.bind(doc),originalRect=doc.rect.bind(doc);
+  vi.spyOn(doc,'text').mockImplementation((v,x,y,...args)=>{labels.push({v:String(v),x,y,page:doc.getNumberOfPages()});return originalText(v,x,y,...args);});
+  vi.spyOn(doc,'rect').mockImplementation((x,y,w,h,...args)=>{rects.push({x,y,w,h,page:doc.getNumberOfPages()});return originalRect(x,y,w,h,...args);});
+  drawTwoPageERPReport(doc,{snapshot,range,report,fullAnalytics:build(),lang});
+  const label=labels.find(t=>t.v===(lang==='fa'?'مجموع مصارف ثابت و متغیر':'المصروفات الثابتة والمتغيرة'));
+  expect(label).toBeDefined();
+  expect(rects.some(r=>r.page===1&&Math.abs(r.x-label.x-2)<.01&&Math.abs(r.y-label.y)<2&&r.w===1.8)).toBe(true);
+ });
+ it('keeps 704 of expense records separate from supplier purchases',()=>{
+  const result=buildSalesReportSnapshot({sales:[{date:'2026-10-15',closing_state:'finalized',restaurant_cash:7953}],purchases:[{date:'2026-10-15',approval_status:'approved',total_amount:7758.6}],expenses:[{date:'2026-10-15',amount:659},{date:'2026-10-15',amount:45}],from:range.from,to:range.to});
+  expect(result.purchases).toBe(7758.6);expect(result.totalExpenses).toBe(704);expect(result.netProfit).toBeCloseTo(-509.6);
+ });
  it('renders every analytics section in exactly two pages with explicit product row limits',()=>{
   const doc=new jsPDF();prepareLocalizedPdf(doc,{lang:'en'});const labels=[];
   const original=doc.text.bind(doc);vi.spyOn(doc,'text').mockImplementation((v,...args)=>{labels.push(String(v));return original(v,...args);});
