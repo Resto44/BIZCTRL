@@ -34,9 +34,9 @@ export async function fetchScheduledERPReportData({
   return [...new Map([...current,...old].map(row=>[row.id,row])).values()];
  }
  const [
-  sales,purchases,expenses,inventory,inventoryTransactions,customerDebts,expenseCategories,
+  sales,purchases,expenses,inventory,inventoryTransactions,customerDebts,expenseCategories,walletTransactions,
  ]=await Promise.all([
-  read('daily_sales',{from:range.previousFrom,to:range.to}),
+  read('daily_sales',{from:`${Number(range.to.slice(0,4))-1}-01-01`,to:range.to}),
   read('supplier_invoices',{from:range.previousFrom,to:range.to}),
   read('expenses',{legacyColumn:'branch_key',from:firstMonthStart,to:range.to}),
   read('inventory',{dateColumn:null}),
@@ -47,6 +47,7 @@ export async function fetchScheduledERPReportData({
    if(error)throw error;
    return (data||[]).filter(c=>allBranches||!c.branch_id||String(c.branch_id)===String(branchId));
   })(),
+  read('wallet_transactions',{dateColumn:'transaction_date',from:range.from+'T00:00:00',to:range.to+'T23:59:59.999'}),
  ]);
- return {sales,purchases,expenses,inventory,inventoryTransactions,customerDebts,expenseCategories};
+ return {sales,purchases,expenses,inventory,inventoryTransactions,customerDebts,expenseCategories,walletTransactions};
 }
