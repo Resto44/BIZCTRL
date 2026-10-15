@@ -23,15 +23,15 @@ describe('mobile navigation drawer contract', () => {
     expect(sidebar).toContain('mobile = false');
     expect(sidebar).toContain('h-dvh max-h-dvh w-full min-w-0 max-w-full');
     expect(sidebar).toContain('overflow-x-hidden overflow-y-auto overscroll-contain');
-    expect(sidebar).toContain('flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-auto overscroll-contain');
-    expect(sidebar).toContain('sticky bottom-0 z-10 shrink-0');
+    expect(sidebar).toContain('data-mobile-menu-scroll="true"');
+    expect(sidebar.slice(sidebar.indexOf('function MobileOwnerMenu'),sidebar.indexOf('function NavItem'))).not.toContain('sticky bottom-0');
     expect(sidebar).toContain('pb-[max(0.5rem,env(safe-area-inset-bottom))]');
     expect(sidebar).toContain('[overflow-wrap:anywhere]');
     expect(sidebar).toContain('[word-break:break-word]');
     expect(sidebar).toContain('onClick={onNavigate}');
   });
 
-  it('renders the approved smart Owner menu without opening live data channels and keeps fixed quick-entry actions', async () => {
+  it('renders the approved smart Owner menu without opening live data channels and keeps scroll-accessible quick-entry actions', async () => {
     const [sidebar, purchases] = await Promise.all([
       source('../src/components/layout/ERPSidebar.jsx'),
       source('../src/pages/Purchases.jsx'),
@@ -48,7 +48,6 @@ describe('mobile navigation drawer contract', () => {
     expect(sidebar).toContain('Team & Administration');
     expect(sidebar).toContain('class MobileMenuErrorBoundary');
     expect(sidebar).toContain('function MobileMenuFallback');
-    expect(sidebar).toContain('ERP ready');
     expect(sidebar).not.toContain('useActiveAlerts()');
     expect(sidebar).not.toContain(".from('daily_sales')");
     expect(sidebar).not.toContain(".from('supplier_invoices')");

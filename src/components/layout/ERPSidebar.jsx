@@ -27,7 +27,7 @@ import {
   DollarSign, Wallet, BarChart3, Settings, Bell, Building2,
   Shield, Star, Clock, ChevronLeft, ChevronRight,
   Receipt, FileText, AlertTriangle, Zap, Activity, CreditCard,
-  Banknote, Network, UserCheck, GitBranch, Store, Globe,
+  Banknote, Network, GitBranch, Store, Globe,
   PieChart, Target, Layers, ClipboardList, Handshake,
   ArrowLeftRight, ShieldCheck, SlidersHorizontal, Truck, X,
   Search, Plus, CircleAlert, CheckCircle2, LifeBuoy, MapPinned,
@@ -374,38 +374,25 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
   ].filter(Boolean);
 
   return (
-    <aside className="flex h-dvh max-h-dvh w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-white text-slate-950 shadow-2xl dark:bg-slate-950 dark:text-white">
-      <header className="shrink-0 bg-gradient-to-br from-slate-950 via-blue-950 to-blue-900 px-4 pb-4 pt-[max(0.75rem,env(safe-area-inset-top))] text-white">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-label={translateLiteral('Close navigation')}
-            className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-xl text-white/80 transition hover:bg-white/10 hover:text-white"
-          >
-            <X className="h-6 w-6" />
-          </button>
-          <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-bold text-emerald-300">
-            <span className="me-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            {translateLiteral('ERP ready')}
-          </span>
-        </div>
-
-        <div className="mt-2 flex min-w-0 items-center gap-3">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center">
-            <BrandLogo icon className="h-14 w-auto" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="truncate text-xl font-black tracking-tight">
+    <aside data-mobile-menu-scroll="true" className="flex h-dvh max-h-dvh w-full min-w-0 max-w-full flex-col overflow-x-hidden overflow-y-auto overscroll-contain bg-white text-slate-950 shadow-2xl dark:bg-slate-950 dark:text-white">
+      <header className="shrink-0 bg-gradient-to-br from-slate-950 via-blue-950 to-blue-900 px-3 pb-3 pt-[max(0.5rem,env(safe-area-inset-top))] text-white">
+        <div className="flex min-w-0 items-center gap-2">
+          <BrandLogo icon className="h-8 w-8 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-bold">
               {translateLiteral(`${roleTitle(role)} Command Center`)}
             </h2>
-            <p className="mt-0.5 truncate text-sm text-blue-100/75">
+            <p className="truncate text-xs text-blue-100/75">
               {activeRestaurant?.name || translateLiteral('Restaurant')} · {translateLiteral(['owner', 'general_manager'].includes(role) ? 'All branches' : 'Assigned branch')}
             </p>
           </div>
+          <button type="button" onClick={onToggle} aria-label={translateLiteral('Close navigation')}
+            className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-white/80 transition hover:bg-white/10 hover:text-white">
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <label className="relative mt-4 block">
+        <label className="relative mt-2 block">
           <Search className="pointer-events-none absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
           <input
             type="search"
@@ -413,17 +400,17 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder={translateLiteral('Ask or search ERP')}
             aria-label={translateLiteral('Search modules and actions')}
-            className="h-12 w-full rounded-2xl border border-blue-400/50 bg-white ps-12 pe-4 text-base font-medium text-slate-900 shadow-lg outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/20"
+            className="h-11 w-full rounded-xl border border-blue-400/50 bg-white ps-12 pe-4 text-base font-medium text-slate-900 shadow-lg outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/20"
           />
         </label>
       </header>
 
-      <nav className="flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-auto overscroll-contain bg-slate-50 px-3 py-4 dark:bg-slate-950" aria-label={translateLiteral('Main navigation')}>
+      <nav className="shrink-0 min-w-0 max-w-full bg-slate-50 px-3 py-3 dark:bg-slate-950" aria-label={translateLiteral('Main navigation')}>
         {!normalizedSearch && todayActions.length > 0 && (
-          <section aria-labelledby="today-work-title">
-            <h3 id="today-work-title" className="px-1 text-xs font-black tracking-[0.14em] text-slate-500">
+          <details className="rounded-xl border border-slate-200 bg-white px-2 dark:border-slate-800 dark:bg-slate-900">
+            <summary className="min-h-11 cursor-pointer content-center px-1 text-xs font-bold text-slate-500">
               {translateLiteral("TODAY'S WORK")}
-            </h3>
+            </summary>
             <div className="mt-2 space-y-2">
               {todayActions.map((action) => {
                 const ActionIcon = action.icon;
@@ -457,10 +444,10 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
                 {translateLiteral('Open daily command center')}
               </Link>
             )}
-          </section>
+          </details>
         )}
 
-        <section className={cn(!normalizedSearch && todayActions.length > 0 && 'mt-5')} aria-labelledby="navigate-title">
+        <section className={cn(!normalizedSearch && todayActions.length > 0 && 'mt-3')} aria-labelledby="navigate-title">
           <h3 id="navigate-title" className="px-1 text-xs font-black tracking-[0.14em] text-slate-500">
             {normalizedSearch ? translateLiteral('SEARCH RESULTS') : translateLiteral('NAVIGATE')}
           </h3>
@@ -476,7 +463,7 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
                     type="button"
                     onClick={() => setOpenSection((current) => current === section.key ? null : section.key)}
                     aria-expanded={isOpen}
-                    className="flex min-h-[68px] w-full touch-manipulation items-center gap-3 px-3 py-2 text-start transition hover:bg-slate-50 dark:hover:bg-slate-800/70"
+                    className="flex min-h-14 w-full touch-manipulation items-center gap-3 px-3 py-2 text-start transition hover:bg-slate-50 dark:hover:bg-slate-800/70"
                   >
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300">
                       <SectionIcon className="h-5 w-5" />
@@ -540,7 +527,7 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
         )}
       </nav>
 
-      <div className="sticky bottom-0 z-10 shrink-0 border-t border-slate-200 bg-white px-3 pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.10)] dark:border-slate-800 dark:bg-slate-950 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <div className="shrink-0 border-t border-slate-200 bg-white px-3 pt-3 dark:border-slate-800 dark:bg-slate-950 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {(can.viewSales || can.viewPurchases) && (
           <section aria-labelledby="quick-entry-title">
             <h3 id="quick-entry-title" className="mb-2 text-[10px] font-black tracking-[0.14em] text-slate-500">{translateLiteral('QUICK ENTRY')}</h3>
