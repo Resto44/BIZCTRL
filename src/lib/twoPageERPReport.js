@@ -1,112 +1,343 @@
-import {drawLocalizedPdfText} from './pdfLocalization';
-import {drawERPReportBrand} from './erpPdfBrand';
+import { drawLocalizedPdfText } from './pdfLocalization';
+import { drawERPReportBrand } from './erpPdfBrand';
 
-// Bounded executive summaries: all values contribute to totals and charts.
-// Overflow lists are explicitly aggregated into Other, never silently omitted.
-export function aggregateReportTrend(rows=[],limit=16){
- const size=Math.max(1,Math.ceil(rows.length/limit));const result=[];
- for(let i=0;i<rows.length;i+=size){
-  const part=rows.slice(i,i+size);
-  result.push({from:part[0].date,to:part.at(-1).date,sales:part.reduce((v,r)=>v+(Number(r.sales)||0),0),
-   purchases:part.reduce((v,r)=>v+(Number(r.purchases)||0),0),
-   expenses:part.reduce((v,r)=>v+(Number(r.variable)||0)+(Number(r.fixed)||0),0)});
- }
- return result;
-}
-export function summarizeReportRows(rows,limit,otherLabel){
- if(rows.length<=limit)return rows;
- const rest=rows.slice(limit-1);
- return [...rows.slice(0,limit-1),{name:otherLabel,value:rest.reduce((v,r)=>v+r.value,0)}];
-}
-export function drawTwoPageERPReport(doc,{snapshot:s,growth,report:r,
- range,branchLabel,businessName,currency='SAR',lang='en',iconData}){
- const rtl=lang!=='en',tr=(en,fa,ar)=>lang==='fa'?fa:lang==='ar'?ar:en;
- const ink=[20,38,67],blue=[37,99,235],teal=[0,143,111],orange=[218,116,16],muted=[90,108,132];
- const n=v=>v==null||!Number.isFinite(Number(v))?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:2});
- const money=v=>v==null?'—':`${n(v)} ${currency}`;
- const percent=v=>v==null?'—':`${n(v)}%`;
- const text=(v,x,y,w,size=10,color=ink,align)=>drawLocalizedPdfText(doc,v,align==='left'?x:rtl?x+w:x,y,
-  {rtl,bold:true,size,color,fit:true,maxWidth:w,align:align|| (rtl?'right':'left')});
- const panel=(x,y,w,h)=>{doc.setFillColor(247,250,255);doc.setDrawColor(219,230,245);doc.setLineWidth(.25);doc.roundedRect(x,y,w,h,3,3,'FD');};
- const section=(name,y)=>{text(name,12,y,186,12);doc.setFillColor(...blue);doc.roundedRect(rtl?201:7,y-4,2,5,1,1,'F');};
- const metric=(name,value,index,color)=>{
-  const x=7+(rtl?2-index:index)*67;panel(x,53,62,25);text(name,x+4,61,54,9,muted);text(value,x+4,72,54,15,color);
- };
- const heading=(title,subtitle)=>{
-  doc.setFillColor(232,241,255);doc.roundedRect(7,28,196,19,3,3,'F');
-  text(title,12,36,186,17);text(subtitle,12,43,186,9,muted);
- };
- const unavailable=tr('Not available','اطلاعات موجود نیست','البيانات غير متاحة');
- const other=tr('Other (combined)','سایر موارد (مجموع)','أخرى (مجمعة)');
- const salesLabel=tr('Finalized sales','فروشات نهایی','المبيعات المعتمدة');
- const purchasesLabel=tr('Approved purchases','خرید تأییدشده','المشتريات المعتمدة');
- const expenseLabel=tr('Period expenses','مصارف دوره','مصروفات الفترة');
- const trend=aggregateReportTrend(s.breakdown||[]);
- function chart(title,series){
-  section(title,88);panel(7,92,196,65);
-  const x=29,y=107,w=164,h=35;
-  const values=trend.flatMap(p=>series.map(ser=>p[ser.key]));
-  const lo=Math.min(0,...values),hi=Math.max(1,...values),span=hi-lo;
-  const py=v=>y+h-(v-lo)/span*h;
-  for(let i=0;i<=3;i++){
-   const val=lo+span*i/3,yy=py(val);doc.setDrawColor(219,230,245);doc.setLineWidth(.2);doc.line(x,yy,x+w,yy);
-   drawLocalizedPdfText(doc,n(val),26,yy+1,{bold:true,size:7.5,align:'right',fit:true,maxWidth:17,color:muted});
+// All date buckets contribute to trend totals. Never silently sample away money.
+export function aggregateReportTrend(rows = [], limit = 16) {
+  if (!rows.length) return [];
+  const bucket = Math.max(1, Math.ceil(rows.length / Math.max(1, limit)));
+  const output = [];
+  for (let i = 0; i < rows.length; i += bucket) {
+    const part = rows.slice(i, i + bucket);
+    const sum = key => part.reduce((n, r) => n + (Number(r[key]) || 0), 0);
+    output.push({
+      from: part[0].date, to: part.at(-1).date,
+      sales: sum('sales'), purchases: sum('purchases'),
+      expenses: sum('variable') + sum('fixed'),
+      closings: sum('closings'),
+    });
   }
-  for(let k=0;k<series.length;k++){
-   const ser=series[k];text(ser.label,12+k*94,101,89,9,ser.color);
-   doc.setDrawColor(...ser.color);doc.setFillColor(...ser.color);doc.setLineWidth(.7);
-   const px=i=>x+(trend.length===1?w/2:i*w/(trend.length-1));
-   trend.forEach((p,i)=>{if(i)doc.line(px(i-1),py(trend[i-1][ser.key]),px(i),py(p[ser.key]));doc.circle(px(i),py(p[ser.key]),.65,'F');});
+  return output;
+}
+export function summarizeReportRows(rows, limit, otherLabel) {
+  if (rows.length <= limit) return rows;
+  const rest = rows.slice(limit - 1);
+  return [...rows.slice(0, limit - 1), {
+    name: otherLabel, value: rest.reduce((n, r) => n + (Number(r.value) || 0), 0),
+  }];
+}
+export function aggregateConsumptionEvents(rows = [], limit = 16) {
+  const valid = rows.filter(row => row?.date && Number.isFinite(Number(row.events)));
+  const bucket = Math.max(1, Math.ceil(valid.length / Math.max(1, limit)));
+  const result = [];
+  for (let i = 0; i < valid.length; i += bucket) {
+    const part = valid.slice(i, i + bucket);
+    result.push({
+      from: part[0].date, to: part.at(-1).date,
+      events: part.reduce((total, r) => total + Number(r.events), 0),
+    });
   }
-  if(trend.length){
-   text(trend[0].from,29,150,65,8,muted,'left');
-   drawLocalizedPdfText(doc,trend.at(-1).to,193,150,{bold:true,size:8,align:'right',color:muted});
-  }else text(unavailable,35,124,150,11,muted);
-  doc.setLineWidth(.25);
- }
- function list(title,rows,y=221){
-  section(title,y);panel(7,y+4,196,48);
-  const sorted=[...rows].sort((a,b)=>b.value-a.value);
-  const limited=summarizeReportRows(sorted,5,other);
-  const peak=Math.max(1,...limited.map(v=>Math.abs(v.value)));
-  if(!limited.length){text(unavailable,12,y+20,186,10,muted);return;}
-  limited.forEach((row,i)=>{
-   const yy=y+12+i*8;
-   text(row.name,rtl?103:12,yy,94,9.5);
-   text(money(row.value),rtl?12:145,yy,52,10,row.value<0?orange:blue);
-   doc.setFillColor(220,230,245);doc.roundedRect(rtl?68:112,yy-3,30,2,1,1,'F');
-   doc.setFillColor(...blue);const width=30*Math.abs(row.value)/peak;if(width)doc.roundedRect(rtl?98-width:112,yy-3,width,2,Math.min(1,width/2),1,'F');
+  return result;
+}
+
+/**
+ * Premium A4 management report: exactly 2 vector pages.
+ * Data: finalized closings, approved purchases, allocated operating expenses,
+ * recorded inventory movements. No guessed orders, COGS or profit guarantee.
+ * Both /reports and /scheduled-reports call this same implementation.
+ */
+export function drawTwoPageERPReport(doc, {
+  snapshot: s, previousSnapshot: previous = null, growth = null, report: r = null,
+  range, branchLabel, businessName, currency = 'SAR', lang = 'en', iconData,
+} = {}) {
+  if (!s || !range?.from || !range?.to) throw new Error('Verified report data and dates required');
+  const rtl = lang === 'fa' || lang === 'ar';
+  const tr = (en, fa, ar) => lang === 'fa' ? fa : lang === 'ar' ? ar : en;
+  const C = {
+    ink: [17, 34, 63], muted: [91, 108, 133], faint: [220, 230, 244],
+    blue: [34, 98, 232], teal: [0, 151, 130],
+    purple: [118, 75, 218], amber: [220, 129, 35], red: [203, 66, 75],
+    white: [255, 255, 255], background: [247, 250, 255],
+  };
+  const num = value => Number.isFinite(Number(value))
+    ? Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 }) : '—';
+  const money = value => value == null ? '—' : num(value) + ' ' + currency;
+  const pct = value => value == null || !Number.isFinite(Number(value))
+    ? '—' : num(value) + '%';
+  const percentOf = (value, total) => Number(total) > 0 ? 100 * (Number(value) || 0) / Number(total) : null;
+  const text = (v, x, y, w, size = 9, color = C.ink, weight = true, alignment) => {
+    // All regions are inside [7,203]mm and use embedded Arabic/Persian fonts.
+    const align = alignment || (rtl ? 'right' : 'left');
+    const anchor = align === 'right' ? x + w : align === 'center' ? x + w / 2 : x;
+    drawLocalizedPdfText(doc, v == null ? '—' : String(v), anchor, y, {
+      rtl, bold: weight, size, color, align, fit: true, maxWidth: w,
+    });
+  };
+  const panel = (x, y, w, h, bg = C.white) => {
+    doc.setFillColor(...bg); doc.setDrawColor(...C.faint);
+    doc.setLineWidth(0.22); doc.roundedRect(x, y, w, h, 3.5, 3.5, 'FD');
+  };
+  const bar = (x, y, w, ratio, color, height = 2.1) => {
+    doc.setFillColor(...C.faint); doc.roundedRect(x, y, w, height, 0.8, 0.8, 'F');
+    const length = Math.max(0, Math.min(1, ratio || 0)) * w;
+    if (length >= 0.35) {
+      doc.setFillColor(...color); doc.roundedRect(x, y, length, height, 0.8, 0.8, 'F');
+    }
+  };
+  const bullet = (x, y, color) => { doc.setFillColor(...color); doc.circle(x, y, 1.3, 'F'); };
+  const section = (label, x, y, w) => {
+    text(label, x, y, w, 9.6, C.ink);
+    doc.setFillColor(...C.blue);
+    doc.roundedRect(rtl ? x + w - 1.5 : x, y + 1.5, 1.4, 1.7, 0.6, 0.6, 'F');
+  };
+  const titleBand = (title, sub, page) => {
+    doc.setFillColor(...C.background); doc.roundedRect(7, 27, 196, 18, 3, 3, 'F');
+    text(title, 12, 34.6, 173, 14.7, C.ink);
+    text(sub, 12, 41.2, 173, 7.8, C.muted);
+    text('0' + page, 188, 35, 10, 9, C.blue, true, 'right');
+  };
+  const metric = (label, value, index, tone = C.blue, detail = '') => {
+    const col = index % 3, row = Math.floor(index / 3);
+    const x = 7 + (rtl ? 2 - col : col) * 66.4, y = 49 + row * 27;
+    panel(x, y, 63, 24);
+    doc.setFillColor(...tone); doc.roundedRect(rtl ? x + 57.7 : x + 4, y + 4, 1.6, 4.6, 0.6, 0.6, 'F');
+    text(label, x + 4, y + 8.9, 55, 8.2, C.muted);
+    text(value, x + 4, y + 17.8, 55, 13.2, tone);
+    if (detail) text(detail, x + 4, y + 22, 55, 6.8, C.muted);
+  };
+
+  const curve = ({ x, y, w, h, title, series, from, to }) => {
+    panel(x, y, w, h);
+    section(title, x + 5, y + 8.5, w - 10);
+    const lx = x + 9, rx = x + w - 8, top = y + 15, bottom = y + h - 9;
+    const values = series.flatMap(s => s.points.map(p => Number(p.value) || 0));
+    const maximum = Math.max(1, ...values);
+    // Entire chart starts at zero to avoid misleading exaggerations.
+    for (let step = 0; step <= 3; step++) {
+      const yy = bottom - (bottom - top) * step / 3;
+      doc.setDrawColor(...C.faint); doc.setLineWidth(0.18); doc.line(lx, yy, rx, yy);
+    }
+    for (const ser of series) {
+      const pts = ser.points;
+      if (!pts.length) continue;
+      doc.setDrawColor(...ser.color); doc.setFillColor(...ser.color); doc.setLineWidth(0.70);
+      const px = i => lx + (pts.length === 1 ? (rx - lx) / 2 : (rx - lx) * i / (pts.length - 1));
+      const py = val => bottom - (bottom - top) * (Number(val) || 0) / maximum;
+      pts.forEach((pt, index) => {
+        if (index) doc.line(px(index - 1), py(pts[index - 1].value), px(index), py(pt.value));
+        if (pts.length <= 16) doc.circle(px(index), py(pt.value), 0.42, 'F');
+      });
+    }
+    if (!series.some(s => s.points.length)) text(tr('No confirmed data','دادهٔ تأییدشده موجود نیست','لا توجد بيانات معتمدة'),
+      x + 8, y + h / 2 + 3, w - 16, 8, C.muted);
+    if (from && to) {
+      text(from, x + 8, y + h - 3.3, (w - 18) / 2, 6.8, C.muted, false, 'left');
+      text(to, x + w / 2, y + h - 3.3, (w - 18) / 2, 6.8, C.muted, false, 'right');
+    }
+    let legendOffset = 5;
+    series.forEach(ser => {
+      bullet(x + legendOffset + 1, y + 11.4, ser.color);
+      text(ser.name, x + legendOffset + 4, y + 12.4, series.length > 1 ? (w - 14) / series.length - 3 : w - 20,
+        7.2, C.muted, true, 'left');
+      legendOffset += (w - 10) / series.length;
+    });
+  };
+  const horizontal = (x, y, w, h, title, rows, count = 4, color = C.blue) => {
+    panel(x, y, w, h);
+    section(title, x + 5, y + 8.4, w - 10);
+    const sorted = [...rows].filter(a => Number.isFinite(Number(a.value)))
+      .sort((a, b) => b.value - a.value);
+    const grouped = summarizeReportRows(sorted, count,
+      tr('Other / combined','سایر موارد / مجموع','أخرى / مجمعة'));
+    if (!grouped.length) {
+      text(tr('No recorded values','اطلاعات ثبت نشده','لا توجد قيم مسجلة'), x + 6, y + 23, w - 12, 8.8, C.muted);
+      return;
+    }
+    const largest = Math.max(1, ...grouped.map(a => Math.abs(Number(a.value) || 0)));
+    grouped.forEach((item, i) => {
+      const yy = y + 16 + i * 9.1;
+      text(item.name, x + 5, yy, w * 0.57 - 4, 8.0, C.ink);
+      text(money(item.value), x + w * 0.61, yy, w * 0.34, 8.0, color);
+      bar(x + 5, yy + 1.7, w - 10, Math.abs(Number(item.value) || 0) / largest, color, 1.3);
+    });
+  };
+  const note = (message, y) => {
+    text(message, 8, y, 194, 7.2, C.muted, false);
+  };
+  const snapshotSeries = aggregateReportTrend(s.breakdown || []);
+  const earlierSeries = aggregateReportTrend(previous?.breakdown || []);
+  const salesPoints = snapshotSeries.map(row => ({ value: row.sales }));
+  const oldSalesPoints = earlierSeries.map(row => ({ value: row.sales }));
+  const expensesPoints = snapshotSeries.map(row => ({ value: row.expenses }));
+  const oldExpensePoints = earlierSeries.map(row => ({ value: row.expenses }));
+  const purchasePoints = snapshotSeries.map(row => ({ value: row.purchases }));
+  const oldPurchasePoints = earlierSeries.map(row => ({ value: row.purchases }));
+  const captionPeriod = range.from + '  /  ' + range.to;
+  const current = tr('Current','فعلی','الحالي');
+  const before = tr('Previous','قبلی','السابق');
+  const paymentRows = [
+    { label: tr('Cash','نقد','نقد'), value: s.cash, tone: C.blue },
+    { label: tr('Network','شبکه','الشبكة'), value: s.network, tone: C.teal },
+    { label: tr('Customer credit','نسیه','آجل'), value: s.credit, tone: C.purple },
+    { label: tr('Other sources','سایر','أخرى'), value: s.other, tone: C.amber },
+  ];
+  const paymentPanel = () => {
+    const x = 7, y = 168.5, w = 95.5;
+    panel(x, y, w, 55.5);
+    section(tr('Payment mix','ترکیب روش پرداخت','توزيع طرق الدفع'), x + 5, y + 8.5, w - 10);
+    const total = paymentRows.reduce((n, item) => n + Math.max(0, Number(item.value) || 0), 0);
+    const cx = x + 26, cy = y + 32.5, radius = 12;
+    if (total > 0) {
+      let angle = -Math.PI / 2;
+      for (const item of paymentRows) {
+        const value = Math.max(0, Number(item.value) || 0);
+        const finish = angle + 2 * Math.PI * value / total;
+        doc.setFillColor(...item.tone);
+        const slices = Math.max(1, Math.ceil((finish - angle) / 0.10));
+        for (let i = 0; i < slices; i++) {
+          const start = angle + (finish - angle) * i / slices;
+          const end = angle + (finish - angle) * (i + 1) / slices;
+          doc.triangle(cx, cy, cx + radius * Math.cos(start), cy + radius * Math.sin(start),
+            cx + radius * Math.cos(end), cy + radius * Math.sin(end), 'F');
+        }
+        angle = finish;
+      }
+      doc.setFillColor(...C.white); doc.circle(cx, cy, 6.8, 'F');
+      text(pct(100), cx - 6.5, cy + 1, 13, 7.5, C.ink, true, 'center');
+    } else text('—', cx - 6, cy + 2, 12, 14, C.muted, true, 'center');
+    paymentRows.forEach((row, i) => {
+      const yy = y + 19 + i * 8.4;
+      bullet(x + 46.5, yy - 1.8, row.tone);
+      text(row.label, x + 49, yy, 42, 7.4, C.muted);
+      text(pct(percentOf(row.value, total)), x + 49, yy + 3.6, 42, 7.4, row.tone);
+    });
+  };
+  const executive = () => {
+    panel(7, 229, 196, 42);
+    section(tr('Management signals','شاخص‌های مدیریتی','مؤشرات إدارية'), 12, 237, 186);
+    const items = [
+      [tr('Finalized closings','بستن‌های نهایی فروش','إقفالات المبيعات'), String(s.finalizedClosings ?? '—')],
+      [tr('Sales change','تغییر فروشات','تغير المبيعات'), pct(growth)],
+      [tr('Top branch','شعبه برتر','الفرع الأعلى'), r?.branches?.length
+        ? [...r.branches].sort((a, b) => (Number(b.sales)||0)-(Number(a.sales)||0))[0]?.name
+        : tr('Not available','موجود نیست','غير متاح')],
+    ];
+    items.forEach(([label, value], i) => {
+      const x = 12 + (rtl ? 2 - i : i) * 63.4;
+      text(label, x, 248.3, 59, 7.6, C.muted);
+      text(value, x, 257.8, 59, 11, i === 1 && growth < 0 ? C.red : C.blue);
+    });
+    const closingCounts = snapshotSeries.map(d => d.closings);
+    const max = Math.max(1, ...closingCounts);
+    const x = 12, y = 267.2, w = 184;
+    doc.setDrawColor(...C.faint); doc.line(x, y, x + w, y);
+    if (closingCounts.length > 1) {
+      doc.setDrawColor(...C.teal); doc.setLineWidth(.5);
+      closingCounts.forEach((v, i) => {
+        if (i) doc.line(x + w * (i - 1) / (closingCounts.length - 1),
+          y - 4 * closingCounts[i - 1] / max,
+          x + w * i / (closingCounts.length - 1), y - 4 * v / max);
+      });
+    }
+  };
+
+  // 01 / Sales
+  titleBand(tr('Sales Analytics','تحلیل فروشات','تحليل المبيعات'),
+    tr('Verified closings · trends · branches · payment channels','فروش نهایی · روندها · شعبه‌ها · روش‌های پرداخت','الإقفالات المعتمدة · الاتجاهات · الفروع · الدفع'), 1);
+  metric(tr('Finalized sales','فروشات نهایی','المبيعات المعتمدة'), money(s.sales), 0, C.blue);
+  metric(tr('Cash','نقد','نقد'), money(s.cash), 1, C.teal);
+  metric(tr('Network','شبکه','الشبكة'), money(s.network), 2, C.blue);
+  metric(tr('Credit','نسیه','آجل'), money(s.credit), 3, C.purple);
+  metric(tr('Daily average','اوسط روزانه','المتوسط اليومي'), money(s.averageDailySales), 4, C.teal);
+  metric(tr('Growth vs previous','رشد نسبت به قبل','النمو عن السابق'), pct(growth), 5,
+    growth == null ? C.muted : growth >= 0 ? C.teal : C.red);
+  curve({
+    x: 7, y: 105, w: 196, h: 59,
+    title: tr('Sales trend · current versus prior period','روند فروشات · مقایسه با دوره قبل','اتجاه المبيعات · الحالي مقابل السابق'),
+    series: [
+      { name: current, color: C.blue, points: salesPoints },
+      ...(previous ? [{ name: before, color: C.teal, points: oldSalesPoints }] : []),
+    ], from: range.from, to: range.to,
   });
- }
- function small(name,value,x,y,color=ink){text(name,x+4,y+8,85,9,muted);text(value,x+4,y+18,85,13,color);}
- heading(tr('Sales performance','تحلیل عملکرد فروشات','تحليل أداء المبيعات'),
-  tr('Selected branch and period · Finalized closings only','شعبه و دوره انتخاب‌شده · فقط فروشات نهایی','الفرع والفترة المختارة · الإقفالات المعتمدة فقط'));
- metric(salesLabel,money(s.sales),0,blue);
- metric(tr('Daily average','اوسط روزانه','المتوسط اليومي'),money(s.averageDailySales),1,teal);
- metric(tr('Growth vs prior period','رشد نسبت به دوره قبل','النمو عن الفترة السابقة'),percent(growth),2,growth<0?orange:teal);
- chart(tr('Sales trend','روند فروشات','اتجاه المبيعات'),[{key:'sales',label:salesLabel+' / '+currency,color:blue}]);
- section(tr('Payment mix','ترکیب روش‌های پرداخت','توزيع طرق الدفع'),167);panel(7,171,96,39);panel(107,171,96,39);
- const payments=[[tr('Cash','نقد','نقد'),s.cash],[tr('Card / network','شبکه','الشبكة'),s.network],[tr('Credit','نسیه','آجل'),s.credit],[tr('Other sources','سایر منابع','مصادر أخرى'),s.other]];
- payments.forEach(([name,value],i)=>{const x=(i<2?7:107),yy=180+(i%2)*18;text(name,x+4,yy,40,9,muted);text(money(value),x+46,yy,46,11,i<2?blue:teal);});
- list(tr('Branch sales · leading branches + other','فروش شعب · شعب برتر و مجموع سایر شعب','مبيعات الفروع · الأعلى ومجموع الباقي'),(r?.branches||[]).map(b=>({name:b.name,value:Number(b.sales)||0})));
- text(tr('Cash, card and credit are included in sales; they are not additional revenue.','نقد، شبکه و نسیه داخل فروش‌اند و درآمد اضافی نیستند.','النقد والشبكة والآجل ضمن المبيعات وليست إيرادات إضافية.'),8,280,194,8,muted);
- drawERPReportBrand(doc,{lang,title:tr('Sales report','گزارش فروشات','تقرير المبيعات'),business:businessName,branch:branchLabel,period:`${range.from} / ${range.to}`,iconData,pageLabel:'1 / 2'});
- doc.addPage();
- heading(tr('Purchases & expense control','تحلیل خرید و مصارف','تحليل المشتريات والمصروفات'),
-  tr('Approved purchases · Allocated period expenses','خرید تأییدشده · مصارف تخصیص‌یافته به دوره','مشتريات معتمدة · مصروفات موزعة على الفترة'));
- metric(purchasesLabel,money(s.purchases),0,blue);metric(expenseLabel,money(s.totalExpenses),1,orange);
- metric(tr('Sales less purchases & expenses','فروش منهای خرید و مصارف','المبيعات ناقص المشتريات والمصروفات'),money(s.netProfit),2,s.netProfit<0?orange:teal);
- chart(tr('Purchases and expenses trend','روند خرید و مصارف','اتجاه المشتريات والمصروفات'),[
-  {key:'purchases',label:purchasesLabel+' / '+currency,color:blue},{key:'expenses',label:expenseLabel+' / '+currency,color:orange}]);
- section(tr('Cost structure and ratios','ساختار هزینه و نسبت‌ها','هيكل التكاليف والنسب'),167);
- panel(7,171,96,39);panel(107,171,96,39);
- small(tr('Variable / fixed expenses','مصارف متغیر / ثابت','مصروفات متغيرة / ثابتة'),`${n(s.variableExpenses)} / ${n(s.fixedDeduction)} ${currency}`,7,171,orange);
- text(tr('Recorded fixed costs allocated by day','مصارف ثابت بر اساس روز تخصیص یافته‌اند','التكاليف الثابتة موزعة حسب الأيام'),11,204,88,7.5,muted);
- small(tr('Purchases / sales · Expenses / sales','خرید / فروش · مصارف / فروش','المشتريات / المبيعات · المصروفات / المبيعات'),
-  `${percent(s.sales?100*s.purchases/s.sales:null)} / ${percent(s.sales?100*s.totalExpenses/s.sales:null)}`,107,171,blue);
- text(tr('Ratios unavailable when sales are zero','نسبت‌ها در فروش صفر محاسبه نمی‌شوند','النسب غير متاحة عندما تكون المبيعات صفراً'),111,204,88,7.5,muted);
- list(tr('Expense categories · largest + other','دسته‌های مصارف · بزرگ‌ترین‌ها و مجموع سایر موارد','فئات المصروفات · الأكبر ومجموع الباقي'),(r?.costGroups||[]).map(c=>({name:c.name,value:Number(c.value)||0})));
- text(tr('Purchases are not inventory-adjusted COGS. This is a two-page summary, not a transaction ledger.','خرید معادل بهای تعدیل‌شده فروش نیست. این گزارش خلاصه است، نه دفتر معاملات.','المشتريات ليست تكلفة مبيعات معدلة بالمخزون. هذا ملخص وليس دفتر معاملات.'),8,280,194,8,muted);
- drawERPReportBrand(doc,{lang,title:tr('Purchases & expenses','خرید و مصارف','المشتريات والمصروفات'),business:businessName,branch:branchLabel,period:`${range.from} / ${range.to}`,iconData,pageLabel:'2 / 2'});
- if(doc.getNumberOfPages()!==2)throw new Error('Management report must contain exactly two pages');
+  paymentPanel();
+  horizontal(107.5, 168.5, 95.5, 55.5,
+    tr('Sales by branch','فروشات به تفکیک شعبه','المبيعات حسب الفرع'),
+    (r?.branches || []).map(branch => ({ name: branch.name, value: Number(branch.sales) || 0 })),
+    4, C.blue);
+  executive();
+  note(tr('Cash, network and credit are parts of sales, not extra revenue. Orders cannot be inferred from daily closings.',
+    'نقد، شبکه و نسیه بخشی از فروش‌اند. تعداد سفارش را نمی‌توان از بستن روزانه محاسبه کرد.',
+    'النقد والشبكة والآجل ضمن المبيعات. لا يمكن استنتاج عدد الطلبات من الإقفالات اليومية.'), 279.2);
+  drawERPReportBrand(doc, { lang, title: tr('Sales report','گزارش فروشات','تقرير المبيعات'),
+    business: businessName, branch: branchLabel, period: captionPeriod, iconData, pageLabel: '1 / 2' });
+
+  doc.addPage();
+  // 02 / Purchases, expenses, inventory consumption
+  titleBand(tr('Purchases · Expenses · Inventory','خریداری · مصارف · مصرف انبار','المشتريات · المصروفات · استهلاك المخزون'),
+    tr('Approved procurement · allocated costs · recorded movements',
+      'خرید تأییدشده · مصارف دوره · مصرف ثبت‌شده',
+      'المشتريات المعتمدة · مصروفات الفترة · الحركات المسجلة'), 2);
+  metric(tr('Approved purchases','خرید تأییدشده','المشتريات المعتمدة'), money(s.purchases), 0, C.blue);
+  metric(tr('Period expenses','مصارف دوره','مصروفات الفترة'), money(s.totalExpenses), 1, C.amber);
+  metric(tr('Sales less costs*','فروش منهای مصارف*','المبيعات ناقص التكاليف*'), money(s.netProfit), 2, s.netProfit < 0 ? C.red : C.teal);
+  metric(tr('Fixed expenses','مصارف ثابت','المصروفات الثابتة'), money(s.fixedDeduction), 3, C.purple);
+  metric(tr('Variable expenses','مصارف متغیر','المصروفات المتغيرة'), money(s.variableExpenses), 4, C.amber);
+  metric(tr('Purchases / sales','نسبت خرید به فروش','المشتريات / المبيعات'),
+    pct(percentOf(s.purchases, s.sales)), 5, C.blue,
+    tr('Expenses / sales: ','مصارف / فروش: ','المصروفات / المبيعات: ') +
+      pct(percentOf(s.totalExpenses, s.sales)));
+
+  curve({ x: 7, y: 105, w: 95.5, h: 54,
+    title: tr('Purchases trend','روند خریداری','اتجاه المشتريات'),
+    series: [{ name: current, color: C.blue, points: purchasePoints },
+      ...(previous ? [{ name: before, color: C.teal, points: oldPurchasePoints }] : [])],
+    from: range.from, to: range.to });
+  curve({ x: 107.5, y: 105, w: 95.5, h: 54,
+    title: tr('Expenses trend','روند مصارف','اتجاه المصروفات'),
+    series: [{ name: current, color: C.amber, points: expensesPoints },
+      ...(previous ? [{ name: before, color: C.purple, points: oldExpensePoints }] : [])],
+    from: range.from, to: range.to });
+
+  horizontal(7, 163, 95.5, 54,
+    tr('Expense categories','دسته‌های مصارف','فئات المصروفات'),
+    (r?.costGroups || []).map(item => ({ name: item.name, value: Number(item.value) || 0 })),
+    4, C.amber);
+  panel(107.5, 163, 95.5, 54);
+  section(tr('Inventory consumption','مصرف انبار','استهلاك المخزون'), 112.5, 171.4, 85.5);
+  if (r?.hasConsumptionData) {
+    (r.consumption || []).slice(0, 3).forEach((row, i) => {
+      const yy = 179 + i * 10.7;
+      text(row.name, 113, yy, 61, 8.2, C.ink);
+      text(num(row.quantity) + ' ' + String(row.unit || ''), 175, yy, 22, 8.0, C.blue);
+      if (row.costAvailable && Number.isFinite(Number(row.estimatedCost))) {
+        text(money(row.estimatedCost), 113, yy + 3.8, 84, 7, C.muted);
+      }
+    });
+  } else {
+    text(tr('No recorded movements','مصرف ثبت‌شده موجود نیست','لا توجد حركات استهلاك'),
+      114, 188, 82, 9, C.muted);
+  }
+  const inventoryCaveat = r?.hasWasteData
+    ? tr('Waste: ','ضایعات: ','الهدر: ') +
+      (r.wasteCostComplete ? money(r.wasteCost) : tr('cost unavailable','هزینه نامشخص','التكلفة غير متاحة'))
+    : tr('Mixed units are not totaled.','واحدهای متفاوت جمع نمی‌شوند.','لا تُجمع الوحدات المختلفة.');
+  text(inventoryCaveat, 112.5, 213, 86, 7.3, C.muted);
+
+  const events = aggregateConsumptionEvents(r?.consumptionTrend || []);
+  curve({ x: 7, y: 221, w: 95.5, h: 49,
+    title: tr('Consumption events trend','روند رویدادهای مصرف','اتجاه حركات الاستهلاك'),
+    series: [{ name: tr('Events','رویداد','حركات'), color: C.teal,
+      points: events.map(row => ({ value: row.events })) }],
+    from: events[0]?.from, to: events.at(-1)?.to });
+  horizontal(107.5, 221, 95.5, 49,
+    tr('Purchases by branch','خریداری به تفکیک شعبه','المشتريات حسب الفرع'),
+    (r?.branches || []).map(branch => ({ name: branch.name, value: Number(branch.purchases) || 0 })),
+    3, C.blue);
+  note(tr('*Sales less approved purchases and allocated expenses is an operating proxy, not inventory-adjusted COGS or audited net profit.',
+    '*فروش منهای خرید تأییدشده و مصارف دوره، برآورد عملیاتی است؛ نه بهای تمام‌شدهٔ واقعی یا سود حسابرسی‌شده.',
+    '*الفرق بين المبيعات والمشتريات والمصروفات مؤشر تشغيلي، وليس تكلفة بضاعة مباعة أو صافي ربح مدققاً.'), 277.2);
+  drawERPReportBrand(doc, { lang,
+    title: tr('Purchases, expenses & stock','خریداری، مصارف و انبار','المشتريات والمصروفات والمخزون'),
+    business: businessName, branch: branchLabel, period: captionPeriod, iconData, pageLabel: '2 / 2' });
+
+  if (doc.getNumberOfPages() !== 2) throw new Error('ERP management PDF must be exactly two pages');
 }
