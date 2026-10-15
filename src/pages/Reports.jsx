@@ -245,10 +245,13 @@ export default function Reports() {
 
   // Expense categories — needed for fixed vs variable proration
   const { data: expenseCategories = [], isLoading: loadingCategories, isError: categoriesError } = useQuery({
-    queryKey: ['expense_categories_reports'],
-    queryFn: () => base44.entities.ExpenseCategory
-      ? base44.entities.ExpenseCategory.list('sort_order', 500)
-      : Promise.resolve([]),
+    queryKey: ['expense_categories_reports',activeRestaurant?.id],
+    queryFn: async () => {
+      const {data,error}=await supabase.from('expense_categories')
+        .select('*').eq('restaurant_id',activeRestaurant.id).limit(1000);
+      if(error) throw error;
+      return data || [];
+    },
     staleTime: 300000,
     enabled: hasScope,
   });
