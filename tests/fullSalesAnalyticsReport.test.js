@@ -35,7 +35,7 @@ describe('Complete two-page Sales Analytics coverage',()=>{
  it('keeps overlapping operational sources separate from canonical payments',()=>{
   const a=build();expect(a.payment.total).toBe(snapshot.sales);expect(a.payment.sources[0].name).toBe('Delivery');expect(a.payment.reconciled).toBe(true);
  });
- it.each([[0,'Best branch by operating result: '],[10,'Provisional leader (unallocated costs): ']])('plots every branch and qualifies ranking when unallocated costs = %s',(unallocated,prefix)=>{
+ it.each([[0,'Best branch by operating result'],[10,'Provisional leader (unallocated costs)']])('plots every branch and qualifies ranking when unallocated costs = %s',(unallocated,prefix)=>{
   const doc=new jsPDF();prepareLocalizedPdf(doc,{lang:'en'});const labels=[];
   const original=doc.text.bind(doc);vi.spyOn(doc,'text').mockImplementation((v,...args)=>{labels.push(String(v));return original(v,...args);});
   const branches=[
@@ -47,9 +47,18 @@ describe('Complete two-page Sales Analytics coverage',()=>{
   ];
   drawTwoPageERPReport(doc,{snapshot,range,report:{...report,branches,branchProfitUnallocated:unallocated},fullAnalytics:build(),lang:'en'});
   for(const branch of branches)expect(labels).toContain(branch.name);
-  expect(labels).toContain(prefix+'Winner A / Winner B · 30 SAR');
+  expect(labels).toContain(prefix);expect(labels).toContain('Winner A / Winner B');expect(labels).toContain('30 SAR');expect(labels).toContain('No recorded activity');
   expect(labels).toContain('-30');expect(labels).not.toContain('Other branches');
   expect(doc.getNumberOfPages()).toBe(2);
+ });
+ it.each([1,2])('does not call %s loss-making active branches profitable winners',(count)=>{
+  const doc=new jsPDF();prepareLocalizedPdf(doc,{lang:'en'});const labels=[];
+  const original=doc.text.bind(doc);vi.spyOn(doc,'text').mockImplementation((v,...args)=>{labels.push(String(v));return original(v,...args);});
+  const branches=Array.from({length:count},(_,i)=>({name:'Loss '+i,sales:10,purchases:20+i,expenses:0,netProfit:-10-i,closings:1}));
+  drawTwoPageERPReport(doc,{snapshot,range,report:{...report,branches,branchProfitUnallocated:0},fullAnalytics:build(),lang:'en'});
+  expect(labels).toContain(count===1?'Only branch with recorded activity':'Lowest operating loss');
+  expect(labels).toContain('-10 SAR');expect(labels).not.toContain('Best branch by operating result');
+  expect(labels).toContain('No comparable prior sales');
  });
  it('renders every analytics section in exactly two pages with explicit product row limits',()=>{
   const doc=new jsPDF();prepareLocalizedPdf(doc,{lang:'en'});const labels=[];

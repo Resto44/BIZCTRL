@@ -61,7 +61,9 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
   const x=7+(rtl?2-i%3:i%3)*66,y=46+Math.floor(i/3)*25;
   doc.setFillColor(...tint(color));doc.setDrawColor(...tint(color,.78));doc.roundedRect(x,y,64,23,2.5,2.5,'FD');
   text(label,x+3,y+5.5,58,8,C.ink);text(value,x+3,y+13,58,13,color);
-  const key=keys[i],vals=key==='netMargin'?daily.map(d=>d.sales>0?100*(Number(d.netProfit)||0)/d.sales:0):points(daily,({fixedDeduction:'fixed',variableExpenses:'variable',averageDailySales:'sales',netMargin:'netProfit'})[key]||key);
+  const key=keys[i];
+  if(key==='growth'){text(growth==null?tr('No comparable prior sales','فروش قبلی قابل مقایسه نیست','لا مبيعات سابقة قابلة للمقارنة'):tr('Compared with prior period','مقایسه با دورهٔ قبلی','مقارنة بالفترة السابقة'),x+3,y+20,58,7,C.muted);return;}
+  const vals=key==='netMargin'?daily.map(d=>d.sales>0?100*(Number(d.netProfit)||0)/d.sales:0):points(daily,({fixedDeduction:'fixed',variableExpenses:'variable',averageDailySales:'sales',netMargin:'netProfit'})[key]||key);
   const now=key==='netMargin'?s.netMargin:key==='averageDailySales'?s.averageDailySales:s[key];
   const was=previous?.[key];const change=was>0?(now-was)/was*100:null;
   spark(vals,x+3,y+16,20,4,color);
@@ -95,7 +97,7 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
  const showCost=v=>v==null?'—':money(v);
 
  band(tr('Sales Analytics · Complete overview','تحلیل فروشات · گزارش جامع','تحليل المبيعات · نظرة شاملة'),1);
- kpis([[tr('Sales','فروشات','المبيعات'),money(s.sales)],[channelNames.cash,money(s.cash),C.green],[channelNames.network,money(s.network)],[channelNames.credit,money(s.credit),C.orange],[tr('Daily average','اوسط روزانه','المتوسط اليومي'),money(s.averageDailySales)],[tr('Growth','رشد','النمو'),pct(growth),growth<0?C.red:C.green]],['sales','cash','network','credit','averageDailySales','sales']);
+ kpis([[tr('Sales','فروشات','المبيعات'),money(s.sales)],[channelNames.cash,money(s.cash),C.green],[channelNames.network,money(s.network)],[channelNames.credit,money(s.credit),C.orange],[tr('Daily average','اوسط روزانه','المتوسط اليومي'),money(s.averageDailySales)],[tr('Growth','رشد','النمو'),pct(growth),growth<0?C.red:C.green]],['sales','cash','network','credit','averageDailySales','growth']);
  chart(tr('Period sales trend','روند فروشات دوره','اتجاه مبيعات الفترة'),7,70,120,48,[{name:current,color:C.blue,values:points(daily,'sales')},...(previous?[{name:before,color:[151,190,240],values:points(prior,'sales')}]:[])]);
  panel(tr('Payment mix','ترکیب پرداخت‌ها','توزيع المدفوعات'),131,70,72,48);
  const mix=a.payment.channels,positiveMix=mix.every(c=>c.value>=0)&&a.payment.total>0;
@@ -124,8 +126,14 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
  const active=branches.filter(b=>b.closings>0||metrics.some(([key])=>(Number(b[key])||0)!==0));
  const bestValue=active.length?Math.max(...active.map(b=>Number(b.netProfit)||0)):null;
  const winners=active.filter(b=>Number(b.netProfit)===bestValue);
- const winnerLabel=r?.branchProfitUnallocated?tr('Provisional leader (unallocated costs): ','پیشتاز موقت (هزینهٔ تخصیص‌نیافته): ','متصدر مؤقت (تكاليف غير موزعة): '):tr('Best branch by operating result: ','بهترین شعبه بر اساس نتیجه عملیاتی: ','أفضل فرع حسب النتيجة التشغيلية: ');
- text(winnerLabel+(winners.length?winners.map(b=>b.name).join(' / ')+' · '+money(bestValue):'—'),11,234,188,7.5,bestValue<0?C.red:C.green);
+ const winnerLabel=active.length===0?tr('No branch activity in this period','در این دوره فعالیت شعبه ثبت نشده','لا نشاط للفروع خلال الفترة'):
+  active.length===1?tr('Only branch with recorded activity','تنها شعبه با فعالیت ثبت‌شده','الفرع الوحيد ذو نشاط مسجل'):
+  r?.branchProfitUnallocated?tr('Provisional leader (unallocated costs)','پیشتاز موقت (هزینهٔ تخصیص‌نیافته)','متصدر مؤقت (تكاليف غير موزعة)'):
+  bestValue<0?tr('Lowest operating loss','کمترین زیان عملیاتی','أقل خسارة تشغيلية'):
+  tr('Best branch by operating result','بهترین شعبه بر اساس نتیجه عملیاتی','أفضل فرع حسب النتيجة التشغيلية');
+ text(winnerLabel,11,234,86,7.2,C.muted);
+ text(winners.map(b=>b.name).join(' / ')||'—',100,234,65,7.5,C.ink);
+ text(money(bestValue),168,234,31,8,bestValue<0?C.red:C.green,'right');
  if(!branches.length)empty(12,252,186);
  else{
   const values=branches.flatMap(b=>metrics.map(([key])=>Number(b[key])||0));
@@ -134,9 +142,11 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
   for(let i=0;i<=2;i++){const v=min+(max-min)*i/2,yy=py(v);doc.setDrawColor(...C.line);doc.setLineWidth(.15);doc.line(left,yy,right,yy);text(num(v),8,yy+.8,14,5.5,C.muted,'right');}
   doc.setDrawColor(...C.muted);doc.line(left,zero,right,zero);
   branches.forEach((branch,i)=>{const x=left+(rtl?branches.length-1-i:i)*group;
+   const hasActivity=active.includes(branch);
+   if(!hasActivity)text(tr('No recorded activity','فعالیت ثبت نشده','لا نشاط مسجل'),x,255,group-1,6.4,C.muted,'center');
    metrics.forEach(([key,,color],j)=>{const value=Number(branch[key])||0,yy=py(value),xx=x+group*.1+j*bar*1.18;
     doc.setFillColor(...color);if(value!==0)doc.rect(xx,Math.min(yy,zero),bar,Math.abs(zero-yy),'F');
-    text(num(value),xx-bar*.12,value>=0?yy-1:yy+2.2,bar*1.24,5.2,color,'center');
+    if(hasActivity)text(num(value),xx-bar*.12,value>=0?yy-1:yy+2.2,bar*1.24,5.2,color,'center');
    });
    text(branch.name,x,266,group-1,7,C.ink,'center');
   });
@@ -152,7 +162,7 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
  drawERPReportBrand(document,{lang,title:tr('Complete Sales Analytics','گزارش جامع فروشات','تحليل المبيعات الشامل'),business:businessName,branch:branchLabel,period:range.from+' / '+range.to,iconData,pageLabel:'1 / 2'});
  doc.addPage();
  band(tr('Costs · Profit · Products · Actions','مصارف · نتیجه مالی · کالا · اقدامات','التكاليف · النتائج · الأصناف · الإجراءات'),2);
- kpis([[tr('Purchases','خریداری','المشتريات'),money(s.purchases)],[tr('Fixed','مصارف ثابت','الثابتة'),money(s.fixedDeduction),C.purple],[tr('Variable','مصارف متغیر','المتغيرة'),money(s.variableExpenses),C.orange],[tr('Sales − purchases','فروش − خرید','المبيعات − المشتريات'),money(s.grossProfit),C.green],[tr('Operating result*','نتیجه عملیاتی*','النتيجة التشغيلية*'),money(s.netProfit),s.netProfit<0?C.red:C.green],[tr('Operating margin*','حاشیه عملیاتی*','الهامش التشغيلي*'),pct(s.netMargin)]],['purchases','fixedDeduction','variableExpenses','grossProfit','netProfit','netMargin']);
+ kpis([[tr('Purchases','خریداری','المشتريات'),money(s.purchases)],[tr('Fixed','مصارف ثابت','الثابتة'),money(s.fixedDeduction),C.purple],[tr('Variable','مصارف متغیر','المتغيرة'),money(s.variableExpenses),C.orange],[tr('Sales − purchases','فروش − خرید','المبيعات − المشتريات'),money(s.grossProfit),C.green],[tr('Operating result*','نتیجه عملیاتی*','النتيجة التشغيلية*'),money(s.netProfit),s.netProfit<0?C.red:C.green],[tr('Operating margin*','حاشیه عملیاتی*','الهامش التشغيلي*'),pct(s.netMargin),s.netMargin<0?C.red:C.blue]],['purchases','fixedDeduction','variableExpenses','grossProfit','netProfit','netMargin']);
  chart(tr('Purchases trend','روند خریداری','اتجاه المشتريات'),7,70,95.5,46,[{name:current,color:C.blue,values:points(daily,'purchases')},...(previous?[{name:before,color:[151,190,240],values:points(prior,'purchases')}]:[])]);
  chart(tr('Fixed / variable expense trends','روند مصارف ثابت / متغیر','اتجاه الثابتة / المتغيرة'),107.5,70,95.5,46,[{name:tr('Fixed','ثابت','ثابتة'),color:C.purple,values:points(daily,'fixed')},{name:tr('Variable','متغیر','متغيرة'),color:C.orange,values:points(daily,'variable')}]);
  chart(tr('Sales / operating result*','روند فروش / نتیجه عملیاتی*','المبيعات / النتيجة التشغيلية*'),7,120,95.5,42,[{name:tr('Sales','فروش','المبيعات'),color:C.blue,values:points(daily,'sales')},{name:tr('Result*','نتیجه*','النتيجة*'),color:C.green,values:points(daily,'netProfit')}]);
@@ -161,7 +171,7 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
  row(tr('Expenses / sales','مصارف / فروش','المصروفات / المبيعات'),pct(a.cost.expenseRatio)+' / '+pct(a.cost.prevExpenseRatio),111,141,88);
  row(tr('Total period expenses','مجموع مصارف دوره','إجمالي مصروفات الفترة'),money(s.totalExpenses),111,148,88,C.orange);
  text(s.hasExpenseSource===false?tr('No expense sources in period.','مصارف این دوره ثبت نشده است.','لا مصادر مصروفات في الفترة.'):
-  tr('Fixed allocation follows configured daily basis.','مصارف ثابت بر اساس تنظیم روزانه تقسیم شده است.','توزيع الثابت حسب الأساس اليومي المحدد.'),111,158,88,6.4,C.muted);
+  tr('Classification follows category settings, not names.','نوع هزینه تابع تنظیم دسته است، نه نام آن.','التصنيف حسب إعداد الفئة وليس اسمها.'),111,158,88,6.4,C.muted);
  panel(tr('Expense categories','دسته‌های مصارف','فئات المصروفات'),7,166,95.5,43);
  const categories=compact(r?.costGroups||[],4),categoryColors=[C.green,C.blue,C.purple,C.orange];
  if(!categories.length)empty(11,187,87);
