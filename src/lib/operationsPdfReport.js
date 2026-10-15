@@ -1,6 +1,6 @@
-import { addDays, endOfMonth, format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { buildSalesReportSnapshot } from './salesReportPeriod';
-import { tagExpensesWithCategories } from './helpers';
+import { allocateReportExpenses } from './reportExpenseAllocation';
 
 const amount = value => Number.isFinite(Number(value)) ? Number(value) : 0;
 const hasValue = value => value !== undefined && value !== null && value !== '' && Number.isFinite(Number(value));
@@ -13,17 +13,6 @@ const belongs = (row, branch) => String(row?.branch_id || '') === String(branch?
 const stockKey = row => String(row?.product_id || row?.id || '');
 const nameOf = row => String(row?.product_name || row?.name || '').trim();
 const asDay = date => format(date,'yyyy-MM-dd');
-const categoryName = (row, categories) => {
-  const category=categories.find(c=>String(c.id)===String(row.category_id||row.expense_category_id));
-  return String(category?.name || row?.category_name || 'Other');
-};
-const MONTH_DAYS = new Map();
-const daysInMonth = date => {
- const key=date.slice(0,7);
- if(!MONTH_DAYS.has(key)) MONTH_DAYS.set(key,endOfMonth(parseISO(date)).getDate());
- return MONTH_DAYS.get(key);
-};
-
 /** Uses only data already scoped by the requesting authenticated tenant & branch.
  * This is a read-only PDF report model. No inference or fictitious data.
  * Historical flows are period-based; inventory and open debts are current-state snapshots.
@@ -36,7 +25,8 @@ export function buildOperationsPdfReport({
  const branchReports=(branches||[]).filter(b=>!!b?.id).map(branch=>{
   const period=buildSalesReportSnapshot({
    sales:sales.filter(r=>belongs(r,branch)),purchases:purchases.filter(r=>belongs(r,branch)),
-   expenses:expenses.filter(r=>belongs(r,branch)),expenseCategories,revenueSources,
+   expenses:expenses.filter(r=>belongs(r,branch)),
+   expenseCategories:expenseCategories.filter(c=>!c.branch_id||String(c.branch_id)===String(branch.id)),revenueSources,
    from:range.from,to:range.to,
   });
   return {id:branch.id,name:branch.name||branch.label||branchKey(branch),
@@ -62,8 +52,8 @@ export function buildOperationsPdfReport({
   const date=String(transaction.created_date||transaction.created_at||'').slice(0,10);
   if(!isWithin(date,range))continue;
   const type=String(transaction.transaction_type||'').toLowerCase();
-  const qty=Math.abs(amount(transaction.quantity));
-  if(qty<=0)continue;
+  const qty=Math.abs(amount(transaction.quantity))*(type==='consumption_return'?-1:1);
+  if(qty===0)continue;
   const fallback=productMap.get(String(transaction.product_id||''))||{};
   const unitCost=hasValue(transaction.unit_cost)?amount(transaction.unit_cost):null;
   if(type==='waste'){
@@ -72,7 +62,7 @@ export function buildOperationsPdfReport({
    else wasteCostComplete=false;
    continue;
   }
-  if(!['recipe_consumption','consumption','sale','usage','ingredient_usage','production_consumption'].includes(type))continue;
+  if(!['recipe_consumption','consumption','sale','usage','ingredient_usage','production_consumption','stock_out','consumption_return'].includes(type))continue;
   // A cross-product quantity sum is invalid (kg, units, litres differ).
   // The series therefore counts verified consumption stock movements by day.
   const movement=consumptionDays.get(date)||{date,events:0,valuedCost:0,unvalued:0};
@@ -81,35 +71,21 @@ export function buildOperationsPdfReport({
   else movement.valuedCost+=qty*unitCost;
   consumptionDays.set(date,movement);
   const id=String(transaction.product_id||'');
-  const entry=consumption.get(id)||{id,name:nameOf(fallback)||'Unlabelled product',
-    unit:fallback.unit||'unit',quantity:0,estimatedCost:0,costAvailable:unitCost!==null};
+  const unit=transaction.unit||fallback.unit||'unit';
+  const key=JSON.stringify([id,unit]);
+  const entry=consumption.get(key)||{id,name:nameOf(transaction)||nameOf(fallback)||'Unlabelled product',
+    unit,quantity:0,soldQuantity:0,usedQuantity:0,estimatedCost:0,costAvailable:unitCost!==null};
+  entry[type==='sale'||type==='consumption_return'?'soldQuantity':'usedQuantity']+=qty;
   entry.quantity+=qty;
   if(unitCost!==null) entry.estimatedCost+=qty*unitCost;else entry.costAvailable=false;
-  consumption.set(id,entry);
+  consumption.set(key,entry);
  }
  const usage=[...consumption.values()].sort((a,b)=>b.quantity-a.quantity);
  const lowStock=stock.filter(r=>r.low).sort((a,b)=>(a.quantity??0)-(b.quantity??0));
  const noStock=stock.filter(r=>r.quantity!==null && r.quantity<=0);
 
- // Group operational costs using the same fixed-cost daily apportionment as the
- // Sales Analytics card, and variable costs only on their actual recorded dates.
- const tagged=tagExpensesWithCategories(expenses.filter(isActive),expenseCategories);
- const costGroups=new Map();
- for(const row of tagged){
-  const category=categoryName(row,expenseCategories);
-  const date=String(row.date||'').slice(0,10);
-  let cost=0;
-  if(row._is_fixed){
-   let day=parseISO(range.from),end=parseISO(range.to);
-   for(;day<=end;day=addDays(day,1)){
-    const key=asDay(day);
-    if(key.slice(0,7)===date.slice(0,7))cost+=amount(row.amount)/daysInMonth(key);
-   }
-  }else if(isWithin(date,range))cost=amount(row.amount);
-  if(cost)costGroups.set(category,(costGroups.get(category)||0)+cost);
- }
- const costs=[...costGroups.entries()].map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
-
+ const allocation=allocateReportExpenses(expenses,expenseCategories,range.from,range.to);
+ const costs=allocation.costGroups;
  const isOpen=debt=>isActive(debt)&&!['paid','settled','closed'].includes(String(debt.status||'').toLowerCase());
  const debts=(customerDebts||[]).filter(isOpen).reduce((totals,row)=>{
   const balance=hasValue(row.remaining_amount)?amount(row.remaining_amount)
@@ -140,7 +116,7 @@ export function buildOperationsPdfReport({
   best,worst,stockCount:stock.length,stocks:stock,lowStock,noStock:noStock.length,
   consumption:usage,consumptionTrend:[...consumptionDays.values()].sort((a,b)=>a.date.localeCompare(b.date)),
   consumptionEventCount:[...consumptionDays.values()].reduce((sum,row)=>sum+row.events,0),
-  wasteCost,wasteQuantity,hasWasteData,wasteCostComplete,costGroups:costs,
+  wasteCost,wasteQuantity,hasWasteData,wasteCostComplete,costGroups:costs,hasExpenseSource:allocation.hasExpenseSource,
   debts,risks,hasDebtData:customerDebts.length>0,hasInventoryData:stock.length>0,hasConsumptionData:consumption.size>0,
   branchProfitUnallocated:Math.abs(unassignedCosts)>0.01 ? unassignedCosts:0,
  };

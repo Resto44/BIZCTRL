@@ -10,7 +10,10 @@ const range={type:'week',from:'2026-10-10',to:'2026-10-16',previousFrom:'2026-10
 const restaurant='tenant1',branch='branch1',key='rayyan';
 function mockDB(tables={},fault=null){
  const calls=[];
- return {calls,from(table){
+ return {calls,async rpc(name,args){
+  calls.push({rpc:name,args});
+  return fault==='consumption'?{data:null,error:new Error('Consumption failed')}:{data:[],error:null};
+ },from(table){
   let where=[];
   const query={
    select(){return query;},

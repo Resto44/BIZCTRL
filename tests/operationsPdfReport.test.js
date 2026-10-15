@@ -54,9 +54,9 @@ describe('Operations, Branches & Inventory ERP PDF',()=>{
    const rayyan=r.branches.find(x=>x.id===first);
    expect(rayyan.sales).toBe(1335);
    expect(rayyan.purchases).toBe(867);
-   expect(rayyan.expenses).toBe(30);
-   expect(rayyan.netProfit).toBe(438);
-   expect(rayyan.margin).toBeCloseTo(438/1335*100);
+   expect(rayyan.expenses).toBeCloseTo(30.33);
+   expect(rayyan.netProfit).toBeCloseTo(437.67);
+   expect(rayyan.margin).toBeCloseTo(437.67/1335*100);
    const b2=r.branches.find(x=>x.id===second);
    expect(b2).toMatchObject({sales:500,purchases:200,expenses:50,netProfit:250});
    expect(r.best.id).toBe(first);

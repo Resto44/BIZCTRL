@@ -1,8 +1,9 @@
 import {
   format, startOfWeek, startOfMonth, startOfYear, subDays, subWeeks, subMonths, subYears,
-  differenceInCalendarDays, addDays, endOfMonth,
+  differenceInCalendarDays, addDays,
 } from 'date-fns';
-import { calculateSalesRevenue, tagExpensesWithCategories } from './helpers';
+import { calculateSalesRevenue } from './helpers';
+import { allocateReportExpenses } from './reportExpenseAllocation';
 
 export const SALES_REPORT_PERIODS = ['today', 'yesterday', 'week', 'month', 'year'];
 const dateString = date => format(date, 'yyyy-MM-dd');
@@ -12,7 +13,6 @@ const validDate = (row, from, to) => !!row?.date && row.date >= from && row.date
 const approved = row => ['approved', 'auto_approved'].includes(row?.approval_status)
   || (!row?.approval_status && ['approved', 'paid', 'partial'].includes(row?.status));
 const postedClosing = row => ['finalized', 'locked'].includes(row?.closing_state);
-const activeExpense = row => !['cancelled', 'canceled', 'rejected', 'void', 'voided', 'deleted'].includes(String(row?.status || '').toLowerCase());
 
 /** Calendar-aware KSA workweek (Saturday), current periods end today. */
 export function salesReportDateRange(period = 'today', today = new Date()) {
@@ -46,25 +46,6 @@ const purchaseValue = row => {
     : validNumber(row?.qty) * validNumber(row?.used_price ?? row?.current_price);
 };
 
-/** Pro-rate the monthly fixed-expense pool once per included calendar day. */
-function periodAllocatedFixed(allTaggedExpenses, from, to) {
-  let current = parseDate(from), fixed = 0;
-  const end = parseDate(to);
-  const perMonth = new Map();
-  while(current <= end) {
-    const month = dateString(current).slice(0,7);
-    if(!perMonth.has(month)) {
-      const full = allTaggedExpenses.filter(row => row._is_fixed && row.date?.slice(0,7) === month)
-        .reduce((sum,row) => sum + validNumber(row.amount),0);
-      const monthDays = endOfMonth(current).getDate();
-      perMonth.set(month, full / monthDays);
-    }
-    fixed += perMonth.get(month);
-    current = addDays(current, 1);
-  }
-  return fixed;
-}
-
 /** Shared read-only model for screen and downloadable PDF. No cash handovers or
  * sales-source snapshot entries are added back to sales revenue. */
 export function buildSalesReportSnapshot({
@@ -75,10 +56,9 @@ export function buildSalesReportSnapshot({
     throw new Error('Valid report date range required');
   const confirmedSales = sales.filter(row => postedClosing(row) && validDate(row,from,to));
   const approvedPurchases = purchases.filter(row => approved(row) && validDate(row,from,to));
-  const tagged = tagExpensesWithCategories(expenses.filter(activeExpense), expenseCategories);
-  const periodExpenses = tagged.filter(row=>validDate(row,from,to));
-  const fixedDeduction = periodAllocatedFixed(tagged,from,to);
-  const variableExpenses = periodExpenses.filter(row=>!row._is_fixed).reduce((sum,row)=>sum+validNumber(row.amount),0);
+  const allocation = allocateReportExpenses(expenses, expenseCategories, from, to);
+  const fixedDeduction = allocation.fixed;
+  const variableExpenses = allocation.variable;
   const totals = confirmedSales.reduce((v,row)=>{
     const r=closingRevenue(row,revenueSources);
     v.sales+=r.total;v.cash+=r.cash;v.network+=r.network;v.credit+=r.credit;v.other+=r.customSources;
@@ -96,21 +76,21 @@ export function buildSalesReportSnapshot({
     const date=dateString(day),key=keyFor(date);
     if(!dates.has(key)) dates.set(key,create(key));
     const current=dates.get(key);
-    current.fixed+=periodAllocatedFixed(tagged,date,date);
+    current.fixed+=allocation.daily.get(date).fixed;
+    current.variable+=allocation.daily.get(date).variable;
   }
   for(const row of confirmedSales){
     const item=dates.get(keyFor(row.date)),r=closingRevenue(row,revenueSources);
     item.closings+=1;item.sales+=r.total;item.cash+=r.cash;item.network+=r.network;item.credit+=r.credit;item.other+=r.customSources;
   }
   for(const row of approvedPurchases)dates.get(keyFor(row.date)).purchases+=purchaseValue(row);
-  for(const row of periodExpenses.filter(e=>!e._is_fixed))dates.get(keyFor(row.date)).variable+=validNumber(row.amount);
   const breakdown=Array.from(dates.values()).map(row=>({
     ...row,grossProfit:row.sales-row.purchases,
     netProfit:row.sales-row.purchases-row.variable-row.fixed,
   }));
   return {
     ...totals,purchases:purchaseCost,grossProfit,netProfit,
-    variableExpenses,fixedDeduction,totalExpenses,
+    variableExpenses,fixedDeduction,totalExpenses,hasExpenseSource:allocation.hasExpenseSource,
     grossMargin:totals.sales ? 100*grossProfit/totals.sales : null,
     netMargin:totals.sales ? 100*netProfit/totals.sales : null,
     averageDailySales:totals.sales/days,days,from,to,

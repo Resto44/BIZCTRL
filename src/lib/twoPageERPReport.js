@@ -12,7 +12,7 @@ export function aggregateReportTrend(rows = [], limit = 16) {
     output.push({
       from: part[0].date, to: part.at(-1).date,
       sales: sum('sales'), purchases: sum('purchases'),
-      expenses: sum('variable') + sum('fixed'),
+      expenses: sum('variable') + sum('fixed'),fixed:sum('fixed'),variable:sum('variable'),
       closings: sum('closings'),
     });
   }
@@ -100,7 +100,7 @@ export function drawTwoPageERPReport(doc, {
     const x = 7 + (rtl ? 2 - col : col) * 66.4, y = 49 + row * 27;
     panel(x, y, 63, 24);
     doc.setFillColor(...tone); doc.roundedRect(rtl ? x + 57.7 : x + 4, y + 4, 1.6, 4.6, 0.6, 0.6, 'F');
-    text(label, x + 4, y + 8.9, 55, 8.2, C.muted);
+    text(label, rtl ? x + 4 : x + 8, y + 8.9, 51, 8.2, C.muted);
     text(value, x + 4, y + 17.8, 55, 13.2, tone);
     if (detail) text(detail, x + 4, y + 22, 55, 6.8, C.muted);
   };
@@ -108,20 +108,23 @@ export function drawTwoPageERPReport(doc, {
   const curve = ({ x, y, w, h, title, series, from, to }) => {
     panel(x, y, w, h);
     section(title, x + 5, y + 8.5, w - 10);
-    const lx = x + 9, rx = x + w - 8, top = y + 15, bottom = y + h - 9;
+    const lx = x + 20, rx = x + w - 8, top = y + 17, bottom = y + h - 9;
     const values = series.flatMap(s => s.points.map(p => Number(p.value) || 0));
+    const minimum = Math.min(0, ...values);
     const maximum = Math.max(1, ...values);
-    // Entire chart starts at zero to avoid misleading exaggerations.
+    const span = maximum - minimum;
+    // Include zero and signed corrections; never draw negative values outside the panel.
     for (let step = 0; step <= 3; step++) {
       const yy = bottom - (bottom - top) * step / 3;
       doc.setDrawColor(...C.faint); doc.setLineWidth(0.18); doc.line(lx, yy, rx, yy);
+      text(num(minimum + span * step / 3),x + 2,yy + 0.7,16,5.5,C.muted,false,'right');
     }
     for (const ser of series) {
       const pts = ser.points;
       if (!pts.length) continue;
       doc.setDrawColor(...ser.color); doc.setFillColor(...ser.color); doc.setLineWidth(0.70);
       const px = i => lx + (pts.length === 1 ? (rx - lx) / 2 : (rx - lx) * i / (pts.length - 1));
-      const py = val => bottom - (bottom - top) * (Number(val) || 0) / maximum;
+      const py = val => bottom - (bottom - top) * ((Number(val) || 0) - minimum) / span;
       pts.forEach((pt, index) => {
         if (index) doc.line(px(index - 1), py(pts[index - 1].value), px(index), py(pt.value));
         if (pts.length <= 16) doc.circle(px(index), py(pt.value), 0.42, 'F');
@@ -167,8 +170,8 @@ export function drawTwoPageERPReport(doc, {
   const earlierSeries = aggregateReportTrend(previous?.breakdown || []);
   const salesPoints = snapshotSeries.map(row => ({ value: row.sales }));
   const oldSalesPoints = earlierSeries.map(row => ({ value: row.sales }));
-  const expensesPoints = snapshotSeries.map(row => ({ value: row.expenses }));
-  const oldExpensePoints = earlierSeries.map(row => ({ value: row.expenses }));
+  const fixedPoints = snapshotSeries.map(row => ({ value: row.fixed }));
+  const variablePoints = snapshotSeries.map(row => ({ value: row.variable }));
   const purchasePoints = snapshotSeries.map(row => ({ value: row.purchases }));
   const oldPurchasePoints = earlierSeries.map(row => ({ value: row.purchases }));
   const captionPeriod = range.from + '  /  ' + range.to;
@@ -277,7 +280,8 @@ export function drawTwoPageERPReport(doc, {
       'خرید تأییدشده · مصارف دوره · مصرف ثبت‌شده',
       'المشتريات المعتمدة · مصروفات الفترة · الحركات المسجلة'), 2);
   metric(tr('Approved purchases','خرید تأییدشده','المشتريات المعتمدة'), money(s.purchases), 0, C.blue);
-  metric(tr('Period expenses','مصارف دوره','مصروفات الفترة'), money(s.totalExpenses), 1, C.amber);
+  metric(tr('Period expenses','مصارف دوره','مصروفات الفترة'), money(s.totalExpenses), 1, C.amber, s.hasExpenseSource===false
+    ? tr('No records in period','در این دوره ثبت نشده','لا سجلات في الفترة') : '');
   metric(tr('Sales less costs*','فروش منهای مصارف*','المبيعات ناقص التكاليف*'), money(s.netProfit), 2, s.netProfit < 0 ? C.red : C.teal);
   metric(tr('Fixed expenses','مصارف ثابت','المصروفات الثابتة'), money(s.fixedDeduction), 3, C.purple);
   metric(tr('Variable expenses','مصارف متغیر','المصروفات المتغيرة'), money(s.variableExpenses), 4, C.amber);
@@ -293,42 +297,53 @@ export function drawTwoPageERPReport(doc, {
     from: range.from, to: range.to });
   curve({ x: 107.5, y: 105, w: 95.5, h: 54,
     title: tr('Expenses trend','روند مصارف','اتجاه المصروفات'),
-    series: [{ name: current, color: C.amber, points: expensesPoints },
-      ...(previous ? [{ name: before, color: C.purple, points: oldExpensePoints }] : [])],
+    series: [{ name: tr('Fixed','ثابت','ثابتة'), color: C.purple, points: fixedPoints },
+      { name: tr('Variable','متغیر','متغيرة'), color: C.amber, points: variablePoints }],
     from: range.from, to: range.to });
 
   horizontal(7, 163, 95.5, 54,
     tr('Expense categories','دسته‌های مصارف','فئات المصروفات'),
     (r?.costGroups || []).map(item => ({ name: item.name, value: Number(item.value) || 0 })),
     4, C.amber);
-  panel(107.5, 163, 95.5, 54);
-  section(tr('Inventory consumption','مصرف انبار','استهلاك المخزون'), 112.5, 171.4, 85.5);
+  // Quantities remain separate by product AND unit. Kitchen use is not a retail sale.
+  panel(107.5, 163, 95.5, 107);
+  section(tr('Inventory: quantities used / sold','انبار: مقدار مصرف / فروش','المخزون: المستهلك / المباع'), 112.5, 171.4, 85.5);
+  const unitLabel = unit => ({
+    kg:tr('kg','کیلوگرام','كجم'),carton:tr('carton','کارتن','كرتون'),
+    bag:tr('bag','کیسه','كيس'),unit:tr('unit','عدد','وحدة'),
+    piece:tr('piece','عدد','قطعة'),litre:tr('litre','لیتر','لتر'),
+  })[String(unit).toLowerCase()] || String(unit || '');
+  const usageRows = r?.consumption || [];
   if (r?.hasConsumptionData) {
-    (r.consumption || []).slice(0, 3).forEach((row, i) => {
-      const yy = 179 + i * 10.7;
-      text(row.name, 113, yy, 61, 8.2, C.ink);
-      text(num(row.quantity) + ' ' + String(row.unit || ''), 175, yy, 22, 8.0, C.blue);
-      if (row.costAvailable && Number.isFinite(Number(row.estimatedCost))) {
-        text(money(row.estimatedCost), 113, yy + 3.8, 84, 7, C.muted);
-      }
+    usageRows.slice(0, 7).forEach((row, i) => {
+      const yy = 180 + i * 10.2;
+      text(row.name, 113, yy, 84, 8.2, C.ink);
+      const used = row.usedQuantity ?? row.quantity;
+      const sold = row.soldQuantity ?? 0;
+      text(tr('Used: ','مصرف: ','استهلاك: ') + num(used) + ' ' + unitLabel(row.unit),
+        113, yy + 4, 41, 7.2, C.blue);
+      text(tr('Sold*: ','فروش*: ','مباع*: ') + num(sold) + ' ' + unitLabel(row.unit),
+        156, yy + 4, 41, 7.2, C.teal);
+      doc.setDrawColor(...C.faint);doc.setLineWidth(0.15);doc.line(113,yy+6,197,yy+6);
     });
+    text(tr('Shown: ','نمایش: ','المعروض: ') + Math.min(7,usageRows.length) + ' / ' + usageRows.length,
+      113, 253, 84, 7, C.muted);
   } else {
-    text(tr('No recorded movements','مصرف ثبت‌شده موجود نیست','لا توجد حركات استهلاك'),
-      114, 188, 82, 9, C.muted);
+    text(tr('No consumption recorded in this period','مصرف در این دوره ثبت نشده','لا استهلاك مسجل في الفترة'),
+      114, 190, 82, 9, C.muted);
+    text(tr('Record stock-out or link POS recipes.','خروج انبار ثبت یا دستور غذا به فروش وصل شود.','سجّل الصرف أو اربط وصفات نقاط البيع.'),
+      114, 203, 82, 8, C.muted);
+    text(tr('Purchases alone do not prove consumption.','خریداری به‌تنهایی مقدار مصرف را نشان نمی‌دهد.','المشتريات وحدها لا تثبت الاستهلاك.'),
+      114, 214, 82, 8, C.muted);
   }
-  const inventoryCaveat = r?.hasWasteData
-    ? tr('Waste: ','ضایعات: ','الهدر: ') +
-      (r.wasteCostComplete ? money(r.wasteCost) : tr('cost unavailable','هزینه نامشخص','التكلفة غير متاحة'))
-    : tr('Mixed units are not totaled.','واحدهای متفاوت جمع نمی‌شوند.','لا تُجمع الوحدات المختلفة.');
-  text(inventoryCaveat, 112.5, 213, 86, 7.3, C.muted);
+  text(tr('*Net direct sales after returns; no guessed carton conversions.',
+    '*فروش مستقیم پس از برگشت؛ تبدیل کارتن حدس زده نمی‌شود.',
+    '*صافي البيع المباشر بعد المرتجعات؛ لا تحويل تقديري للكرتون.'),112.5,260,86,6.8,C.muted);
+  text(r?.hasWasteData ? tr('Waste cost: ','هزینه ضایعات: ','تكلفة الهدر: ') +
+    (r.wasteCostComplete ? money(r.wasteCost) : tr('unavailable','نامشخص','غير متاحة')) :
+    tr('Mixed units are not totaled.','واحدهای متفاوت جمع نمی‌شوند.','لا تُجمع الوحدات المختلفة.'),112.5,266,86,7,C.muted);
 
-  const events = aggregateConsumptionEvents(r?.consumptionTrend || []);
-  curve({ x: 7, y: 221, w: 95.5, h: 49,
-    title: tr('Consumption events trend','روند رویدادهای مصرف','اتجاه حركات الاستهلاك'),
-    series: [{ name: tr('Events','رویداد','حركات'), color: C.teal,
-      points: events.map(row => ({ value: row.events })) }],
-    from: events[0]?.from, to: events.at(-1)?.to });
-  horizontal(107.5, 221, 95.5, 49,
+  horizontal(7, 221, 95.5, 49,
     tr('Purchases by branch','خریداری به تفکیک شعبه','المشتريات حسب الفرع'),
     (r?.branches || []).map(branch => ({ name: branch.name, value: Number(branch.purchases) || 0 })),
     3, C.blue);
