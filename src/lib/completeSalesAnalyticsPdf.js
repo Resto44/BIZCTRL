@@ -71,9 +71,15 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
  });detailViewport=true;};
  // Aggregate contiguous buckets without dropping values. Monetary axes include zero and corrections.
  const points=(rows,key,limit=31)=>{const n=Math.max(1,Math.ceil(rows.length/limit)),out=[];for(let i=0;i<rows.length;i+=n)out.push(rows.slice(i,i+n).reduce((v,r)=>v+(Number(r[key])||0),0));return out;};
+ // Keep each swatch beside its own label in both writing directions.
+ const legend=(items,x,y,w)=>items.forEach((item,i)=>{
+  const cell=w/items.length,xx=x+i*cell;
+  doc.setFillColor(...item.color);doc.rect(rtl?xx+cell-3:xx,y-1.5,1.8,1.8,'F');
+  text(item.name,rtl?xx:xx+3,y,cell-5,6.7,C.muted,rtl?'right':'left');
+ });
  const chart=(title,x,y,w,h,series,from=range.from,to=range.to)=>{
   panel(title,x,y,w,h);
-  series.forEach((s,i)=>{const xx=x+3+i*(w-6)/series.length;doc.setFillColor(...s.color);doc.circle(xx+1,y+10,0.7,'F');text(s.name,xx+3,y+11,(w-6)/series.length-4,6.7,C.muted,'left');});
+  legend(series,x+3,y+11,w-6);
   const all=series.flatMap(s=>s.values),min=Math.min(0,...all),max=Math.max(1,...all),span=max-min;
   const left=x+17,right=x+w-4,top=y+15,bottom=y+h-7;
   for(let i=0;i<=2;i++){const yy=bottom-(bottom-top)*i/2;doc.setDrawColor(...C.line);doc.setLineWidth(.15);doc.line(left,yy,right,yy);text(num(min+span*i/2),x+1,yy+.5,14,5.6,C.muted,'right');}
@@ -121,8 +127,8 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
  text(tr('Period flow difference; not a verified bank balance.','تفاوت جریان دوره؛ ماندهٔ تأییدشدهٔ بانک نیست.','فرق تدفقات الفترة؛ ليس رصيد بنك مؤكداً.'),111,208,88,6.3,C.muted);
  panel(tr('Branch performance & sales signals','عملکرد شعبه‌ها و شاخص‌های فروش','أداء الفروع ومؤشرات المبيعات'),7,217,196,55);
  const branches=[...(r?.branches||[])]; // Every selected branch; never collapse into “Other”.
- const metrics=[['sales',tr('Sales','فروشات','المبيعات'),C.blue],['purchases',tr('Purchases','خرید','المشتريات'),C.purple],['expenses',tr('Expenses','هزینه','المصروفات'),C.orange],['netProfit',tr('Profit / loss*','سود / زیان*','الربح / الخسارة*'),C.green]];
- metrics.forEach(([,label,color],i)=>{const x=12+i*47;doc.setFillColor(...color);doc.rect(x,226,2,2,'F');text(label,x+4,228,42,7,C.muted);});
+ const metrics=[['sales',tr('Sales','فروشات','المبيعات'),C.blue],['purchases',tr('Purchases','خرید','المشتريات'),C.purple],['expenses',tr('Expenses (fixed + variable)','مجموع مصارف ثابت و متغیر','المصروفات الثابتة والمتغيرة'),C.orange],['netProfit',tr('Profit / loss*','سود / زیان*','الربح / الخسارة*'),C.green]];
+ legend(metrics.map(([,name,color])=>({name,color})),12,228,188);
  const active=branches.filter(b=>b.closings>0||metrics.some(([key])=>(Number(b[key])||0)!==0));
  const bestValue=active.length?Math.max(...active.map(b=>Number(b.netProfit)||0)):null;
  const winners=active.filter(b=>Number(b.netProfit)===bestValue);
