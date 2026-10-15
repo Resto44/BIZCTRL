@@ -20,3 +20,13 @@ describe('localized subscription copy',()=>{
    expect(trialDisclosure({...plan,trial_days:0},'fa')).toBe('');
  });
 });
+
+it('localizes Arabic subscription features and prices without changing billing data', () => {
+  expect(planFeatures(plan,'ar')).toEqual(['إدارة المصروفات','إدارة المخزون']);
+  expect(billingProductLabel(plan,'ar')).toBe('الباقة المبدئية · /شهر');
+  expect(discountLabel(plan,'ar')).toBe('75٪ خصم');
+  expect(planCapacities(plan,'ar')).toEqual(['3 مستخدمين','1 فروع','5 موظفين']);
+  expect(trialDisclosure(plan,'ar')).toContain(money(1000,'ar'));
+  expect(trialDisclosure(plan,'ar')).not.toMatch(/free|month|unless|cancelled/);
+  expect(plan.monthly_price_cents).toBe(1000);
+});

@@ -51,7 +51,7 @@ describe('Branded Purchase Invoice PDF and WhatsApp',()=>{
    expect(doc.getNumberOfPages()).toBe(1);
    expect(model.remaining).toBe(5346);
    expect(doc.__erpPdfRTL).toBe(lang!=='en');
-   expect(doc.getFontList().NotoNaskhArabic).toContain('normal');
+   expect(doc.getFontList().NotoSansArabic).toContain('normal');
    expect(Buffer.from(doc.output('arraybuffer')).subarray(0,8).toString()).toContain('%PDF-');
   }
  });

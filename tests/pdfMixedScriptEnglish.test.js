@@ -25,16 +25,16 @@ describe('English ERP PDF with Arabic/Persian database fields',()=>{
     const doc=new jsPDF({unit:'mm',format:'a4',putOnlyUsedFonts:true});
     prepareLocalizedPdf(doc,{lang:'en',dir:'ltr'});
     expect(doc.__erpPdfRTL).toBe(false);
-    expect(doc.getFontList().NotoNaskhArabic).toContain('normal');
-    expect(doc.getFontList().NotoNaskhArabic).toContain('bold');
+    expect(doc.getFontList().NotoSansArabic).toContain('normal');
+    expect(doc.getFontList().NotoSansArabic).toContain('bold');
     drawLocalizedPdfText(doc,'BRANCH PERFORMANCE',12,12,{rtl:false});
-    expect(doc.getFont().fontName).toBe('helvetica');
+    expect(doc.getFont().fontName).toBe('NotoSansArabic');
     drawLocalizedPdfText(doc,'فرع الريان',12,22,{rtl:false});
-    expect(doc.getFont().fontName).toBe('NotoNaskhArabic');
+    expect(doc.getFont().fontName).toBe('NotoSansArabic');
     drawLocalizedPdfText(doc,'مطاعم شمعة الريان',12,32,{rtl:false,bold:true});
-    expect(doc.getFont().fontName).toBe('NotoNaskhArabic');
+    expect(doc.getFont().fontName).toBe('NotoSansArabic');
     drawLocalizedPdfText(doc,'450 SAR',12,42,{rtl:false});
-    expect(doc.getFont().fontName).toBe('helvetica');
+    expect(doc.getFont().fontName).toBe('NotoSansArabic');
   });
 
   it('keeps Arabic font in native Arabic and Persian reports without changing layout direction',()=>{
@@ -42,7 +42,7 @@ describe('English ERP PDF with Arabic/Persian database fields',()=>{
       const doc=new jsPDF({unit:'mm',format:'a4',putOnlyUsedFonts:true});
       prepareLocalizedPdf(doc,{lang,dir:'rtl'});
       drawLocalizedPdfText(doc,'فرع الريان',15,20,{rtl:true,bold:true});
-      expect(doc.getFont().fontName).toBe('NotoNaskhArabic');
+      expect(doc.getFont().fontName).toBe('NotoSansArabic');
       expect(doc.__erpPdfRTL).toBe(true);
     }
   });
@@ -56,7 +56,7 @@ describe('English ERP PDF with Arabic/Persian database fields',()=>{
     expect(pdf.__erpPdfRTL).toBe(false);
     const buffer=Buffer.from(pdf.output('arraybuffer'));
     expect(buffer.subarray(0,8).toString()).toContain('%PDF-');
-    expect(pdf.getFontList().NotoNaskhArabic).toContain('normal');
+    expect(pdf.getFontList().NotoSansArabic).toContain('normal');
     expect(buffer.byteLength).toBeGreaterThan(15000);
   });
 });

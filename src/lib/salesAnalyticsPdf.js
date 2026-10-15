@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf';
+import {jsPDF} from 'jspdf';
 import {prepareLocalizedPdf,safePdfFilename} from './pdfLocalization';
 import {loadERPReportIcon} from './erpPdfBrand';
 import {drawSinglePageSalesAnalytics} from './singlePageSalesAnalyticsReport';
