@@ -282,7 +282,9 @@ export function drawTwoPageERPReport(doc, {
   metric(tr('Fixed expenses','مصارف ثابت','المصروفات الثابتة'), money(s.fixedDeduction), 3, C.purple);
   metric(tr('Variable expenses','مصارف متغیر','المصروفات المتغيرة'), money(s.variableExpenses), 4, C.amber);
   metric(tr('Purchases / sales','نسبت خرید به فروش','المشتريات / المبيعات'),
-    pct(percentOf(s.purchases, s.sales)), 5, C.blue);
+    pct(percentOf(s.purchases, s.sales)), 5, C.blue,
+    tr('Expenses / sales: ','مصارف / فروش: ','المصروفات / المبيعات: ') +
+      pct(percentOf(s.totalExpenses, s.sales)));
 
   curve({ x: 7, y: 105, w: 95.5, h: 54,
     title: tr('Purchases trend','روند خریداری','اتجاه المشتريات'),
@@ -314,8 +316,11 @@ export function drawTwoPageERPReport(doc, {
     text(tr('No recorded movements','مصرف ثبت‌شده موجود نیست','لا توجد حركات استهلاك'),
       114, 188, 82, 9, C.muted);
   }
-  text(tr('Mixed units are never totaled.','واحدهای متفاوت جمع نمی‌شوند.','لا تُجمع الوحدات المختلفة.'),
-    112.5, 213, 86, 7.3, C.muted);
+  const inventoryCaveat = r?.hasWasteData
+    ? tr('Waste: ','ضایعات: ','الهدر: ') +
+      (r.wasteCostComplete ? money(r.wasteCost) : tr('cost unavailable','هزینه نامشخص','التكلفة غير متاحة'))
+    : tr('Mixed units are not totaled.','واحدهای متفاوت جمع نمی‌شوند.','لا تُجمع الوحدات المختلفة.');
+  text(inventoryCaveat, 112.5, 213, 86, 7.3, C.muted);
 
   const events = aggregateConsumptionEvents(r?.consumptionTrend || []);
   curve({ x: 7, y: 221, w: 95.5, h: 49,
