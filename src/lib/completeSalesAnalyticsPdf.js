@@ -61,7 +61,7 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
   const x=7+(rtl?2-i%3:i%3)*66,y=46+Math.floor(i/3)*25;
   doc.setFillColor(...tint(color));doc.setDrawColor(...tint(color,.78));doc.roundedRect(x,y,64,23,2.5,2.5,'FD');
   text(label,x+3,y+5.5,58,8,C.ink);text(value,x+3,y+13,58,13,color);
-  const key=keys[i],vals=key==='netMargin'?daily.map(d=>d.sales>0?100*d.netProfit/d.sales:0):points(daily,({fixedDeduction:'fixed',variableExpenses:'variable',averageDailySales:'sales',netMargin:'netProfit'})[key]||key);
+  const key=keys[i],vals=key==='netMargin'?daily.map(d=>d.sales>0?100*(Number(d.netProfit)||0)/d.sales:0):points(daily,({fixedDeduction:'fixed',variableExpenses:'variable',averageDailySales:'sales',netMargin:'netProfit'})[key]||key);
   const now=key==='netMargin'?s.netMargin:key==='averageDailySales'?s.averageDailySales:s[key];
   const was=previous?.[key];const change=was>0?(now-was)/was*100:null;
   spark(vals,x+3,y+16,20,4,color);
@@ -118,16 +118,35 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
  row(tr('Sales minus receipts','فروش منهای دریافت','المبيعات ناقص التحصيل'),a.network.available?money(a.network.difference):'—',111,197,88,C.orange);
  text(tr('Period flow difference; not a verified bank balance.','تفاوت جریان دوره؛ ماندهٔ تأییدشدهٔ بانک نیست.','فرق تدفقات الفترة؛ ليس رصيد بنك مؤكداً.'),111,208,88,6.3,C.muted);
  panel(tr('Branch performance & sales signals','عملکرد شعبه‌ها و شاخص‌های فروش','أداء الفروع ومؤشرات المبيعات'),7,217,196,55);
- const perf=a.performance;
- const dayLabel=d=>d?d.date.slice(5)+' / '+money(d.value):'—';
- const peak=perf.peakWeekday==null?'—':new Intl.DateTimeFormat(lang==='fa'?'fa-AF':lang==='ar'?'ar-SA':'en-US',{weekday:'short',timeZone:'UTC'}).format(new Date(Date.UTC(2026,9,11+perf.peakWeekday)));
- [[tr('Best day','بهترین روز','أفضل يوم'),dayLabel(perf.best)],[tr('Lowest posted day','کمترین روز ثبت‌شده','أقل يوم مسجل'),dayLabel(perf.worst)],[tr('Peak weekday / closings','روز اوج / بستن‌ها','يوم الذروة / الإقفالات'),peak+' / '+num(s.finalizedClosings)]].forEach(([label,value],i)=>{text(label,11+i*64,230,59,6.7,C.muted);text(value,11+i*64,236,59,7.4,C.blue);});
- const branches=[...(r?.branches||[])];
- if(branches.length>3){const rest=branches.splice(2);branches.push({name:tr('Other branches','سایر شعبه‌ها','الفروع الأخرى'),...Object.fromEntries(['sales','purchases','expenses','netProfit'].map(k=>[k,rest.reduce((n,b)=>n+(Number(b[k])||0),0)]))});}
- const heads=[tr('Branch','شعبه','الفرع'),tr('Sales','فروش','المبيعات'),tr('Purchases','خرید','المشتريات'),tr('Expenses','مصارف','المصروفات'),tr('Operating result*','نتیجه عملیاتی*','النتيجة التشغيلية*'),tr('Margin*','حاشیه*','الهامش*')];
- const widths=[.26,.15,.15,.14,.18,.12];
- let bx=11;heads.forEach((v,i)=>{text(v,bx,243,188*widths[i]-2,6.5,C.muted);bx+=188*widths[i];});
- branches.forEach((b,j)=>{doc.setFillColor(235,244,255);doc.roundedRect(11,246+j*6.3,Math.max(.1,45*Math.max(0,b.sales)/Math.max(1,...branches.map(v=>v.sales))),5,1,1,'F');let xx=11;[b.name.length>38?b.name.slice(0,36)+'…':b.name,num(b.sales),num(b.purchases),num(b.expenses),num(b.netProfit),pct(b.sales>0?100*b.netProfit/b.sales:null)].forEach((v,i)=>{text(v,xx,250+j*6.3,188*widths[i]-2,7.3,i?C.blue:C.ink);xx+=188*widths[i];});});
+ const branches=[...(r?.branches||[])]; // Every selected branch; never collapse into “Other”.
+ const metrics=[['sales',tr('Sales','فروشات','المبيعات'),C.blue],['purchases',tr('Purchases','خرید','المشتريات'),C.purple],['expenses',tr('Expenses','هزینه','المصروفات'),C.orange],['netProfit',tr('Profit / loss*','سود / زیان*','الربح / الخسارة*'),C.green]];
+ metrics.forEach(([,label,color],i)=>{const x=12+i*47;doc.setFillColor(...color);doc.rect(x,226,2,2,'F');text(label,x+4,228,42,7,C.muted);});
+ const active=branches.filter(b=>b.closings>0||metrics.some(([key])=>(Number(b[key])||0)!==0));
+ const bestValue=active.length?Math.max(...active.map(b=>Number(b.netProfit)||0)):null;
+ const winners=active.filter(b=>Number(b.netProfit)===bestValue);
+ const winnerLabel=r?.branchProfitUnallocated?tr('Provisional leader (unallocated costs): ','پیشتاز موقت (هزینهٔ تخصیص‌نیافته): ','متصدر مؤقت (تكاليف غير موزعة): '):tr('Best branch by operating result: ','بهترین شعبه بر اساس نتیجه عملیاتی: ','أفضل فرع حسب النتيجة التشغيلية: ');
+ text(winnerLabel+(winners.length?winners.map(b=>b.name).join(' / ')+' · '+money(bestValue):'—'),11,234,188,7.5,bestValue<0?C.red:C.green);
+ if(!branches.length)empty(12,252,186);
+ else{
+  const values=branches.flatMap(b=>metrics.map(([key])=>Number(b[key])||0));
+  const min=Math.min(0,...values),max=Math.max(1,...values),left=24,right=199,top=240,bottom=260;
+  const py=value=>bottom-(value-min)/(max-min)*(bottom-top),zero=py(0),group=(right-left)/branches.length,bar=group*.16;
+  for(let i=0;i<=2;i++){const v=min+(max-min)*i/2,yy=py(v);doc.setDrawColor(...C.line);doc.setLineWidth(.15);doc.line(left,yy,right,yy);text(num(v),8,yy+.8,14,5.5,C.muted,'right');}
+  doc.setDrawColor(...C.muted);doc.line(left,zero,right,zero);
+  branches.forEach((branch,i)=>{const x=left+(rtl?branches.length-1-i:i)*group;
+   metrics.forEach(([key,,color],j)=>{const value=Number(branch[key])||0,yy=py(value),xx=x+group*.1+j*bar*1.18;
+    doc.setFillColor(...color);if(value!==0)doc.rect(xx,Math.min(yy,zero),bar,Math.abs(zero-yy),'F');
+    text(num(value),xx-bar*.12,value>=0?yy-1:yy+2.2,bar*1.24,5.2,color,'center');
+   });
+   text(branch.name,x,266,group-1,7,C.ink,'center');
+  });
+ }
+ text(tr('*Profit shown = sales − purchases − expenses; same selected period and currency.',
+  '*سود نمایش‌داده‌شده = فروش − خرید − هزینه؛ در دوره و واحد پول انتخاب‌شده.',
+  '*الربح المعروض = المبيعات − المشتريات − المصروفات؛ لنفس الفترة والعملة.'),11,271,188,6,C.muted);
+ const performance=a.performance;
+ const day=d=>d?d.date+' / '+money(d.value):'—';
+ note(tr('Best day: ','بهترین روز: ','أفضل يوم: ')+day(performance.best)+' · '+tr('Lowest posted day: ','کمترین روز ثبت‌شده: ','أقل يوم مسجل: ')+day(performance.worst)+' · '+tr('Closings: ','بستن‌ها: ','الإقفالات: ')+num(s.finalizedClosings),275);
  note(tr('All amounts: ','تمام مبالغ: ','جميع المبالغ: ')+currency+tr(' · Sources are non-additive. Calendar comparison ends on the shown date.',' · منابع دوباره جمع نمی‌شوند. مقایسهٔ تقویمی تا تاریخ نمایش‌داده‌شده است.',' · المصادر لا تُجمع مجدداً. المقارنة التقويمية حتى التاريخ المعروض.'),278);
  detailViewport=false;
  drawERPReportBrand(document,{lang,title:tr('Complete Sales Analytics','گزارش جامع فروشات','تحليل المبيعات الشامل'),business:businessName,branch:branchLabel,period:range.from+' / '+range.to,iconData,pageLabel:'1 / 2'});

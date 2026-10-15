@@ -35,6 +35,22 @@ describe('Complete two-page Sales Analytics coverage',()=>{
  it('keeps overlapping operational sources separate from canonical payments',()=>{
   const a=build();expect(a.payment.total).toBe(snapshot.sales);expect(a.payment.sources[0].name).toBe('Delivery');expect(a.payment.reconciled).toBe(true);
  });
+ it.each([[0,'Best branch by operating result: '],[10,'Provisional leader (unallocated costs): ']])('plots every branch and qualifies ranking when unallocated costs = %s',(unallocated,prefix)=>{
+  const doc=new jsPDF();prepareLocalizedPdf(doc,{lang:'en'});const labels=[];
+  const original=doc.text.bind(doc);vi.spyOn(doc,'text').mockImplementation((v,...args)=>{labels.push(String(v));return original(v,...args);});
+  const branches=[
+   {name:'High sales loss',sales:100,purchases:120,expenses:10,netProfit:-30,closings:1},
+   {name:'Winner A',sales:60,purchases:20,expenses:10,netProfit:30,closings:1},
+   {name:'Winner B',sales:50,purchases:10,expenses:10,netProfit:30,closings:1},
+   {name:'No activity',sales:0,purchases:0,expenses:0,netProfit:0,closings:0},
+   {name:'Fifth branch',sales:20,purchases:10,expenses:5,netProfit:5,closings:1},
+  ];
+  drawTwoPageERPReport(doc,{snapshot,range,report:{...report,branches,branchProfitUnallocated:unallocated},fullAnalytics:build(),lang:'en'});
+  for(const branch of branches)expect(labels).toContain(branch.name);
+  expect(labels).toContain(prefix+'Winner A / Winner B · 30 SAR');
+  expect(labels).toContain('-30');expect(labels).not.toContain('Other branches');
+  expect(doc.getNumberOfPages()).toBe(2);
+ });
  it('renders every analytics section in exactly two pages with explicit product row limits',()=>{
   const doc=new jsPDF();prepareLocalizedPdf(doc,{lang:'en'});const labels=[];
   const original=doc.text.bind(doc);vi.spyOn(doc,'text').mockImplementation((v,...args)=>{labels.push(String(v));return original(v,...args);});
