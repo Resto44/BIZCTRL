@@ -89,7 +89,7 @@ describe('Operations, Branches & Inventory ERP PDF',()=>{
    expect(empty.stockCount).toBe(0);
    expect(empty.hasDebtData).toBe(false);
  });
- it('renders EXACTLY one reference-layout A4 page in each SaaS language',async()=>{
+ it('renders paginated reference-layout A4 page in each SaaS language',async()=>{
   const snapshot=buildSalesReportSnapshot({sales,purchases,expenses,expenseCategories:categories,from:range.from,to:range.to});
   for(const lang of ['en','ar','fa']){
    const doc=await generateSalesAnalyticsPDF({
@@ -97,12 +97,12 @@ describe('Operations, Branches & Inventory ERP PDF',()=>{
     operationsReport:run(),businessName:'مطاعم شمعة الريان',
     branchLabel:'فرع الريان',currency:'SAR',lang,download:false,
    });
-   expect(doc.getNumberOfPages()).toBe(1);
+   expect(doc.getNumberOfPages()).toBeGreaterThan(1);
    expect(Buffer.from(doc.output('arraybuffer')).subarray(0,8).toString()).toContain('%PDF-');
    expect(doc.__erpPdfRTL).toBe(lang!=='en');
   }
  });
- it('never appends pages with extra branches, inventory or operating risks',async()=>{
+ it('adds pages with extra branches, inventory or operating risks',async()=>{
   const branchCopies=Array.from({length:19},(_,i)=>({id:'branch-'+i,branch_key:'b'+i,name:'Branch '+(i+1)}));
   const moreSales=branchCopies.map((b,i)=>({
     id:'sale-'+i,date:'2026-10-09',branch_id:b.id,closing_state:'finalized',restaurant_cash:100+i*25,
@@ -117,7 +117,7 @@ describe('Operations, Branches & Inventory ERP PDF',()=>{
     snapshot:hugeSnapshot,operationsReport:hugeReport,range,branchLabel:'All branches',
     lang:'en',download:false,
   });
-  expect(doc.getNumberOfPages()).toBe(1);
+  expect(doc.getNumberOfPages()).toBeGreaterThan(1);
  });
 
  it('fetches inventory, movement and debt under tenant and branch access and blocks incomplete PDF',async()=>{

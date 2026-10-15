@@ -1,5 +1,5 @@
+@import './vazirmatn.css';
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
@@ -12,7 +12,7 @@
     /* Apple system UI (including its native Arabic/Persian glyph fallbacks) on
        iPhone/iPad; Inter/Vazirmatn on non-Apple browsers. Never bundle SF font files. */
     --font-ui: -apple-system, BlinkMacSystemFont, 'Inter', ui-sans-serif, system-ui, sans-serif;
-    --font-rtl: -apple-system, BlinkMacSystemFont, 'Vazirmatn', 'Noto Sans Arabic', system-ui, sans-serif;
+    --font-rtl: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Noto Sans Arabic', system-ui, sans-serif;
     --erp-weight-body: 500;
     --erp-weight-control: 600;
     --erp-weight-heading: 700;

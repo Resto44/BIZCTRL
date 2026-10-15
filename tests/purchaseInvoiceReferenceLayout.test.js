@@ -33,7 +33,7 @@ describe('Reference ERP Purchase PDF visual and accounting invariants',()=>{
    expect(model.beforeVAT).toBe(8079);
    expect(model.vat).toBe(1211.85);
    expect(model.paid).toBe(2000);
-   expect(doc.getFontList().NotoSansArabic).toContain('normal');
+   expect(doc.getFontList().Vazirmatn).toContain('normal');
   }
  });
  it('renders approval history ONLY from real events, not fake Reviewed stamp or people',()=>{

@@ -25,16 +25,16 @@ describe('English ERP PDF with Arabic/Persian database fields',()=>{
     const doc=new jsPDF({unit:'mm',format:'a4',putOnlyUsedFonts:true});
     prepareLocalizedPdf(doc,{lang:'en',dir:'ltr'});
     expect(doc.__erpPdfRTL).toBe(false);
-    expect(doc.getFontList().NotoSansArabic).toContain('normal');
-    expect(doc.getFontList().NotoSansArabic).toContain('bold');
+    expect(doc.getFontList().Vazirmatn).toContain('normal');
+    expect(doc.getFontList().Vazirmatn).toContain('bold');
     drawLocalizedPdfText(doc,'BRANCH PERFORMANCE',12,12,{rtl:false});
-    expect(doc.getFont().fontName).toBe('NotoSansArabic');
+    expect(doc.getFont().fontName).toBe('Vazirmatn');
     drawLocalizedPdfText(doc,'فرع الريان',12,22,{rtl:false});
-    expect(doc.getFont().fontName).toBe('NotoSansArabic');
+    expect(doc.getFont().fontName).toBe('Vazirmatn');
     drawLocalizedPdfText(doc,'مطاعم شمعة الريان',12,32,{rtl:false,bold:true});
-    expect(doc.getFont().fontName).toBe('NotoSansArabic');
+    expect(doc.getFont().fontName).toBe('Vazirmatn');
     drawLocalizedPdfText(doc,'450 SAR',12,42,{rtl:false});
-    expect(doc.getFont().fontName).toBe('NotoSansArabic');
+    expect(doc.getFont().fontName).toBe('Vazirmatn');
   });
 
   it('keeps Arabic font in native Arabic and Persian reports without changing layout direction',()=>{
@@ -42,21 +42,21 @@ describe('English ERP PDF with Arabic/Persian database fields',()=>{
       const doc=new jsPDF({unit:'mm',format:'a4',putOnlyUsedFonts:true});
       prepareLocalizedPdf(doc,{lang,dir:'rtl'});
       drawLocalizedPdfText(doc,'فرع الريان',15,20,{rtl:true,bold:true});
-      expect(doc.getFont().fontName).toBe('NotoSansArabic');
+      expect(doc.getFont().fontName).toBe('Vazirmatn');
       expect(doc.__erpPdfRTL).toBe(true);
     }
   });
 
-  it('exports one A4 English report with intact Arabic record values and all finance numbers',async()=>{
+  it('exports a paginated A4 English report with intact Arabic record values and all finance numbers',async()=>{
     const pdf=await generateSalesAnalyticsPDF({
       snapshot,range,operationsReport:report,branchLabel:'فرع الريان',
       businessName:'مطاعم شمعة الريان',currency:'SAR',lang:'en',dir:'ltr',download:false,
     });
-    expect(pdf.getNumberOfPages()).toBe(1);
+    expect(pdf.getNumberOfPages()).toBeGreaterThan(1);
     expect(pdf.__erpPdfRTL).toBe(false);
     const buffer=Buffer.from(pdf.output('arraybuffer'));
     expect(buffer.subarray(0,8).toString()).toContain('%PDF-');
-    expect(pdf.getFontList().NotoSansArabic).toContain('normal');
+    expect(pdf.getFontList().Vazirmatn).toContain('normal');
     expect(buffer.byteLength).toBeGreaterThan(15000);
   });
 });

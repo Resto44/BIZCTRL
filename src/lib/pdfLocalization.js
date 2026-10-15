@@ -1,10 +1,10 @@
 import {
-  NOTO_SANS_ARABIC_BOLD_BASE64,
-  NOTO_SANS_ARABIC_REGULAR_BASE64,
-} from './fonts/notoSansArabicBase64';
+  VAZIRMATN_EXTRABOLD_BASE64,
+  VAZIRMATN_BOLD_BASE64,
+} from './fonts/vazirmatnBase64';
 
 const RTL_LANGUAGES = new Set(['ar', 'fa']);
-const FONT_FAMILY = 'NotoSansArabic';
+const FONT_FAMILY = 'Vazirmatn';
 const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
 
 export function isPdfRTL(language, direction) {
@@ -12,21 +12,23 @@ export function isPdfRTL(language, direction) {
 }
 
 /**
- * Embeds Noto Sans Arabic into a jsPDF document.  The font covers Arabic and
+ * Embeds Vazirmatn into a jsPDF document.  The font covers Arabic and
  * Persian code points and travels inside the exported PDF, so reports remain
  * readable offline on mobile, tablet, and Windows viewers.
  */
 export function prepareLocalizedPdf(doc, { lang = 'en', dir = 'ltr' } = {}) {
   const rtl = isPdfRTL(lang, dir);
   doc.__erpPdfRTL = rtl;
+  // Normal text uses real Bold (700); headings use ExtraBold (800), matching
+  // the bundled Persian/Arabic UI rather than relying on simulated bold.
   // Dataset text can be Arabic/Persian even when the report UI is English.
   // Always register the script font; keep layout direction controlled by lang.
   // Otherwise jsPDF falls back to WinAnsi Helvetica and turns Arabic database
   // names into unreadable mojibake in English report exports.
-  doc.addFileToVFS('NotoSansArabic-Regular.ttf', NOTO_SANS_ARABIC_REGULAR_BASE64);
-  doc.addFont('NotoSansArabic-Regular.ttf', FONT_FAMILY, 'normal');
-  doc.addFileToVFS('NotoSansArabic-Bold.ttf', NOTO_SANS_ARABIC_BOLD_BASE64);
-  doc.addFont('NotoSansArabic-Bold.ttf', FONT_FAMILY, 'bold');
+  doc.addFileToVFS('Vazirmatn-Bold.ttf', VAZIRMATN_BOLD_BASE64);
+  doc.addFont('Vazirmatn-Bold.ttf', FONT_FAMILY, 'normal');
+  doc.addFileToVFS('Vazirmatn-ExtraBold.ttf', VAZIRMATN_EXTRABOLD_BASE64);
+  doc.addFont('Vazirmatn-ExtraBold.ttf', FONT_FAMILY, 'bold');
   // The renderer changes text direction per string. This prevents IDs, dates,
   // Latin currency symbols, and numeric values from being reversed in RTL PDFs.
   doc.setR2L(false);

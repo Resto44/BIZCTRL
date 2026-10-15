@@ -53,7 +53,7 @@ export function buildOperationsPdfReport({
    hasValue(row.opening_stock)?amount(row.opening_stock):null;
   const threshold=hasValue(row.low_stock_threshold)?amount(row.low_stock_threshold):null;
   return {key:stockKey(row),name:nameOf(row)||'Unlabelled product',unit:String(row.unit||'unit'),
-    quantity,threshold,branchId:String(row.branch_id||''),low:quantity!==null && threshold!==null && quantity<=threshold};
+    quantity,threshold,branchId:String(row.branch_id||''),branchName:branches.find(b=>belongs(row,b))?.name||row.branch||row.branch_id||'',low:quantity!==null && threshold!==null && quantity<=threshold};
  });
  const consumption=new Map();let wasteCost=0, wasteQuantity=0;
  let hasWasteData=false, wasteCostComplete=true;
@@ -79,7 +79,7 @@ export function buildOperationsPdfReport({
   if(unitCost!==null) entry.estimatedCost+=qty*unitCost;else entry.costAvailable=false;
   consumption.set(id,entry);
  }
- const usage=[...consumption.values()].sort((a,b)=>b.quantity-a.quantity).slice(0,7);
+ const usage=[...consumption.values()].sort((a,b)=>b.quantity-a.quantity);
  const lowStock=stock.filter(r=>r.low).sort((a,b)=>(a.quantity??0)-(b.quantity??0));
  const noStock=stock.filter(r=>r.quantity!==null && r.quantity<=0);
 
@@ -100,7 +100,7 @@ export function buildOperationsPdfReport({
   }else if(isWithin(date,range))cost=amount(row.amount);
   if(cost)costGroups.set(category,(costGroups.get(category)||0)+cost);
  }
- const costs=[...costGroups.entries()].map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value).slice(0,10);
+ const costs=[...costGroups.entries()].map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
 
  const isOpen=debt=>isActive(debt)&&!['paid','settled','closed'].includes(String(debt.status||'').toLowerCase());
  const debts=(customerDebts||[]).filter(isOpen).reduce((totals,row)=>{
@@ -123,8 +123,13 @@ export function buildOperationsPdfReport({
  const unassignedCosts=amount(buildSalesReportSnapshot({sales,purchases,expenses,expenseCategories,
    revenueSources,from:range.from,to:range.to}).netProfit)-branchReports.reduce((v,x)=>v+x.netProfit,0);
  return {
+  details:{
+   purchases:purchases.filter(r=>isActive(r)&&isWithin(r.date,range)),
+   expenses:expenses.filter(r=>isActive(r)&&isWithin(r.date,range)),
+   debts:customerDebts.filter(isActive),
+  },
   range,asOfDate:asOfDate||asDay(new Date()),branches:branchReports,
-  best,worst,stockCount:stock.length,stocks:stock.slice(0,30),lowStock:lowStock.slice(0,15),noStock:noStock.length,
+  best,worst,stockCount:stock.length,stocks:stock,lowStock,noStock:noStock.length,
   consumption:usage,wasteCost,wasteQuantity,hasWasteData,wasteCostComplete,costGroups:costs,
   debts,risks,hasDebtData:customerDebts.length>0,hasInventoryData:stock.length>0,hasConsumptionData:consumption.size>0,
   branchProfitUnallocated:Math.abs(unassignedCosts)>0.01 ? unassignedCosts:0,

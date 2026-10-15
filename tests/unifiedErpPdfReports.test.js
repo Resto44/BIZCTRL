@@ -35,7 +35,7 @@ const sale=(id,tenant,date,branchId,legacyKey,v)=>({
  id,restaurant_id:tenant,date,branch_id:branchId,branch:legacyKey,closing_state:'finalized',
  restaurant_cash:v,restaurant_network:0,credit:0,
 });
-describe('One-page unified BizCTRL ERP PDF reporting',()=>{
+describe('Paginated unified BizCTRL ERP PDF reporting',()=>{
  it('loads confirmed week sales and previous comparison across paginated tenant/branch records, without cross-tenant data',async()=>{
   const sales=Array.from({length:505},(_,i)=>sale('s'+i,restaurant,'2026-10-15',branch,key,1));
   sales.push(sale('legacy',restaurant,'2026-10-15',null,key,10));
@@ -56,7 +56,7 @@ describe('One-page unified BizCTRL ERP PDF reporting',()=>{
   await expect(fetchScheduledERPReportData({db,restaurantId:restaurant,range}))
     .rejects.toThrow('Ledger fetch failed');
  });
- it('produces EXACTLY one A4 PDF, all languages, with actual snapshot totals',async()=>{
+ it('produces paginated A4 PDF, all languages, with actual snapshot totals',async()=>{
   const snapshot=buildSalesReportSnapshot({sales:[sale('one',restaurant,'2026-10-15',branch,key,885)],
     from:range.from,to:range.to});
   const prior=buildSalesReportSnapshot({sales:[sale('prior',restaurant,'2026-10-09',branch,key,800)],
@@ -65,7 +65,7 @@ describe('One-page unified BizCTRL ERP PDF reporting',()=>{
    const pdf=await generateSalesAnalyticsPDF({snapshot,previousSnapshot:prior,
      growth:salesReportGrowth(snapshot,prior),range,branchLabel:'فرع الريان',
      businessName:'مطاعم شمعة الريان',lang,download:false});
-   expect(pdf.getNumberOfPages()).toBe(1);
+   expect(pdf.getNumberOfPages()).toBeGreaterThan(1);
    expect(pdf.__erpPdfRTL).toBe(lang!=='en');
    expect(Buffer.from(pdf.output('arraybuffer')).subarray(0,5).toString()).toBe('%PDF-');
   }

@@ -6,13 +6,14 @@ describe('Native iOS-style bold fonts for trilingual ERP', () => {
   const css = read('../src/index.css');
   const body = css.slice(css.indexOf('  body {', css.indexOf('@layer base {', css.indexOf(':root'))),
     css.indexOf('/* ─── Dark surface consistency'));
-  it('prefers native iPhone font glyphs for English, Arabic and Persian with safe cross-platform fallback', () => {
+  it('uses a bundled shared Persian/Arabic font and native English fallback', () => {
     expect(css).toContain("--font-ui: -apple-system, BlinkMacSystemFont, 'Inter'");
-    expect(css).toContain("--font-rtl: -apple-system, BlinkMacSystemFont, 'Vazirmatn', 'Noto Sans Arabic'");
+    expect(css).toContain("--font-rtl: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Noto Sans Arabic'");
     expect(css).toContain('html:lang(fa), html:lang(ar)');
     expect(css).toContain('--font-ui: var(--font-rtl)');
     expect(css).toContain('font-family: var(--font-ui)');
-    expect(css).not.toContain('@font-face');
+    expect(read('../src/vazirmatn.css')).toContain('@font-face');
+    expect(css).not.toContain('family=Vazirmatn');
     expect(css).not.toContain('SFPro');
   });
   it('uses bold headings, semibold controls and moderately weighted body text', () => {
