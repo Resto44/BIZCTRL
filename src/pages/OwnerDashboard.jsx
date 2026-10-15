@@ -3,11 +3,11 @@
  * Financial values use the shared ERP accounting engine; consumption and rate
  * reports are built only from recorded tenant/branch-scoped ERP rows.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { endOfMonth, format, startOfMonth } from 'date-fns';
-import { AlertCircle, AlertTriangle, BarChart3, Building2, CalendarDays, ChevronRight, CircleDollarSign, ClipboardList, Radio, ShoppingBasket, Target } from 'lucide-react';
+import { AlertCircle, AlertTriangle, BarChart3, Building2, CalendarDays, ChevronRight, CircleDollarSign, ClipboardList, FileDown, Loader2, Radio, ShoppingBasket, Target } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import OwnerReportCenter from '@/components/dashboard/OwnerReportCenter';
@@ -133,7 +133,7 @@ function OwnerDashboardContent() {
   const { currency, lang, isRTL } = useLanguage();
   const { branches, activeRestaurant, ownerFilter } = useTenant();
   const { user } = useAuth();
-  const { role } = useRole();
+  const { role, can } = useRole();
   const [searchParams, setSearchParams] = useSearchParams();
   const copy = COPY[lang] || COPY.en;
   const {
@@ -144,6 +144,14 @@ function OwnerDashboardContent() {
     setSelectedBranchId,
   } = useBranchScope();
   const [isQuickAddBranchOpen, setQuickAddBranchOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState(false);
+  const pdfBusy = useRef(false);
+  const pdfCopy = lang === 'fa'
+    ? { label: 'گزارش PDF', loading: 'در حال تهیهٔ گزارش…', error: 'تهیهٔ گزارش انجام نشد. دوباره تلاش کنید.' }
+    : lang === 'ar'
+      ? { label: 'تقرير PDF', loading: 'جارٍ إعداد التقرير…', error: 'تعذر إعداد التقرير. حاول مرة أخرى.' }
+      : { label: 'PDF report', loading: 'Preparing report…', error: 'Could not generate the report. Please try again.' };
   const pageParam = searchParams.get('report');
   const activePage = REPORT_KEYS.has(pageParam) ? pageParam : 'executive';
   const periodParam = searchParams.get('period');
@@ -155,6 +163,42 @@ function OwnerDashboardContent() {
   const { realtimeStatus } = useOwnerDashboardRealtime(activeRestaurant?.id, branches);
   const { alerts: persistedActiveAlerts, isLoading: loadingActiveAlerts } = useActiveAlerts();
   const { revenueSources } = useSalesSources({ branchId: isAllBranches ? undefined : selectedBranchId, branchKey: isAllBranches ? undefined : selectedBranchKey });
+
+  const handlePDF = async () => {
+    if (pdfBusy.current || !can.viewReports || !activeRestaurant?.id) return;
+    pdfBusy.current = true;
+    setPdfLoading(true);
+    setPdfError(false);
+    try {
+      const [{ fetchScheduledERPReportData }, { buildSalesReportSnapshot, salesReportGrowth },
+        { buildOperationsPdfReport }, { buildFullSalesAnalyticsReport }, { generateSalesAnalyticsPDF }] = await Promise.all([
+        import('@/lib/scheduledERPReportData'), import('@/lib/salesReportPeriod'),
+        import('@/lib/operationsPdfReport'), import('@/lib/fullSalesAnalyticsReport'), import('@/lib/salesAnalyticsPdf'),
+      ]);
+      const range = { from: period.currentStart, to: period.currentEnd,
+        previousFrom: period.previousStart, previousTo: period.previousEnd };
+      const data = await fetchScheduledERPReportData({ db: supabase, restaurantId: activeRestaurant.id,
+        allBranches: isAllBranches, branchId: selectedBranchId, branchKey: selectedBranchKey, range });
+      const snapshot = buildSalesReportSnapshot({ ...data, revenueSources, from: range.from, to: range.to });
+      const previousSnapshot = buildSalesReportSnapshot({ ...data, revenueSources,
+        from: range.previousFrom, to: range.previousTo });
+      const scopedBranches = (isAllBranches ? branches : branches.filter(branch => String(branch.id) === String(selectedBranchId)))
+        .map(branch => ({ ...branch, key: branch.branch_key || branch.key || String(branch.id),
+          label: branch.name || branch.label || branch.branch_key || branch.key }));
+      const operationsReport = buildOperationsPdfReport({ ...data, branches: scopedBranches, range, revenueSources });
+      await generateSalesAnalyticsPDF({ snapshot, previousSnapshot, growth: salesReportGrowth(snapshot, previousSnapshot),
+        range, branchLabel: isAllBranches ? copy.allBranches : selectedBranchLabel,
+        businessName: activeRestaurant.name || 'BizCTRL', currency, lang, dir: isRTL ? 'rtl' : 'ltr',
+        operationsReport, fullAnalytics: buildFullSalesAnalyticsReport({ ...data, snapshot, previousSnapshot,
+          operationsReport, range, revenueSources, lang, historyAvailable: true }), download: true });
+    } catch (error) {
+      console.error('Owner dashboard PDF failed:', error);
+      setPdfError(true);
+    } finally {
+      pdfBusy.current = false;
+      setPdfLoading(false);
+    }
+  };
 
   const today = period.currentEnd;
   const usesAllocatedFixedCosts = activePeriod === 'today' || activePeriod === 'week';
@@ -388,6 +432,15 @@ function OwnerDashboardContent() {
             <label className="relative w-32 min-w-0 shrink-0 sm:w-40"><span className="sr-only">{copy.choosePeriod}</span><CalendarDays className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-600" /><select data-testid="owner-period-selector" aria-label={copy.choosePeriod} value={activePeriod} onChange={(event) => changeReportPeriod(event.target.value)} className="h-11 w-full appearance-none truncate rounded-xl border border-border bg-background ps-9 pe-7 text-xs font-bold text-foreground shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">{REPORT_PERIODS.map((option) => <option key={option.key} value={option.key}>{copy[option.labelKey] || option.fallback}</option>)}</select><ChevronRight className="pointer-events-none absolute end-2.5 top-1/2 h-4 w-4 -translate-y-1/2 rotate-90 text-muted-foreground" /></label>
           </div>
         </div>
+        {can.viewReports && <div className="mt-4">
+          <button type="button" data-testid="owner-pdf-report" onClick={handlePDF}
+            disabled={pdfLoading || !activeRestaurant?.id} aria-busy={pdfLoading}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60 sm:w-auto">
+            {pdfLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileDown className="h-5 w-5" />}
+            {pdfLoading ? pdfCopy.loading : pdfCopy.label}
+          </button>
+          {pdfError && <p role="alert" className="mt-2 text-sm font-semibold text-red-600 dark:text-red-400">{pdfCopy.error}</p>}
+        </div>}
         {hasQueryError ? <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{copy.unable}</div> : null}
       </header>
 
