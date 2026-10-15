@@ -58,7 +58,7 @@ describe('central branch UUID scope contract', () => {
 
     expect(reports).toContain('useBranchScope');
     expect(reports).toContain("queryKey: ['sales', 'reports', activeRestaurant?.id, selectedBranchId]");
-    expect(reports).toContain("isAllBranches ? 'all' : selectedBranchKey");
+    expect(reports).toContain("queryKey: ['purchases_erp', activeRestaurant?.id, selectedBranchId]");
     expect(reports).toContain('const scopedBranches = useMemo(');
     expect(reports).toContain("String(branch.id) === String(selectedBranchId)");
     expect(reports).toContain('branchLabel:isAllBranches?copy.all:selectedBranchLabel');

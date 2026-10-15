@@ -1,3 +1,4 @@
+import { buildFullSalesAnalyticsReport } from '@/lib/fullSalesAnalyticsReport';
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -104,7 +105,7 @@ export default function ScheduledReports() {
         snapshot:periodSnapshot,previousSnapshot,growth,range:reportRange,
         branchLabel:isAllBranches?(lang==='ar'?'جميع الفروع':lang==='fa'?'تمام شعبه‌ها':'All branches'):selectedBranchLabel,
         businessName:activeRestaurant?.name||'BizCTRL',currency,lang,dir,
-        operationsReport,download:true,
+        operationsReport,fullAnalytics:buildFullSalesAnalyticsReport({...d,snapshot:periodSnapshot,previousSnapshot,operationsReport,range:reportRange,revenueSources,lang,historyAvailable:true}),download:true,
       });
 
       setPdfDone(true);

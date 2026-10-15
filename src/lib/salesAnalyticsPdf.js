@@ -10,7 +10,7 @@ import {drawTwoPageERPReport} from './twoPageERPReport';
  */
 export async function generateSalesAnalyticsPDF({
  snapshot,previousSnapshot=null,growth=null,range,branchLabel,businessName='BizCTRL',
- currency='SAR',lang='en',dir,operationsReport=null,download=true,
+ currency='SAR',lang='en',dir,operationsReport=null,fullAnalytics=null,download=true,
 }={}){
  if(!snapshot || !range?.from || !range?.to || !branchLabel)
    throw new Error('A verified report, period and selected branch are required');
@@ -20,7 +20,7 @@ export async function generateSalesAnalyticsPDF({
  const iconData=await loadERPReportIcon();
  drawTwoPageERPReport(doc,{
   snapshot,previousSnapshot,growth,range,report:operationsReport,branchLabel,
-  businessName,currency,lang:language,iconData,
+  businessName,currency,lang:language,iconData,fullAnalytics,
  });
 
  if(download)doc.save(safePdfFilename('BizCTRL-Sales-Analytics-'+range.from+'-'+range.to,language));

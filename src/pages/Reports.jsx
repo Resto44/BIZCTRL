@@ -1,3 +1,4 @@
+import { buildFullSalesAnalyticsReport } from '@/lib/fullSalesAnalyticsReport';
 import { fetchReportStockConsumption } from '@/lib/reportStockConsumption';
 /**
  * Reports.jsx — ERP Sales Analytics Dashboard
@@ -42,8 +43,8 @@ import { generateSalesAnalyticsPDF } from '@/lib/salesAnalyticsPdf';
 import { buildOperationsPdfReport } from '@/lib/operationsPdfReport';
 import PaymentAnalyticsERP from '@/components/reports/PaymentAnalyticsERP';
 import { SALES_REPORT_PERIODS, salesReportDateRange, buildSalesReportSnapshot, salesReportGrowth } from '@/lib/salesReportPeriod';
-import { formatPct, computeProductQuantityAnalytics } from '@/lib/helpers';
-import { format, startOfMonth } from 'date-fns';
+import { formatPct } from '@/lib/helpers';
+import { format } from 'date-fns';
 
 // ─── Color palette ────────────────────────────────────────────────────────────
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
@@ -236,7 +237,7 @@ export default function Reports() {
     enabled: hasScope,
   });
 
-  const { data: walletTransactions = [] } = useQuery({
+  const { data: walletTransactions = [], isLoading: loadingWallet, isError: walletError } = useQuery({
     queryKey: ['wallet_transactions', 'reports', activeRestaurant?.id, selectedBranchId],
     queryFn: () => fetchReportRows('wallet_transactions', 'branch', 'transaction_date'),
     staleTime: 60000,
@@ -271,9 +272,9 @@ export default function Reports() {
     queryFn:()=>fetchOperationsRows('debt_records'),enabled:hasScope,staleTime:60000,
   });
   const isLoading = loadingSales || loadingPurchases || loadingExpenses || loadingSources || loadingCategories ||
-    loadingInventory || loadingMovements || loadingDebts;
+    loadingInventory || loadingMovements || loadingDebts || loadingWallet;
   const hasReportError = salesError || purchasesError || expensesError || categoriesError ||
-    inventoryError || movementsError || debtsError;
+    inventoryError || movementsError || debtsError || walletError;
 
   const periodSnapshot = useMemo(() => buildSalesReportSnapshot({
     sales,purchases,expenses,expenseCategories,revenueSources,
@@ -339,12 +340,13 @@ export default function Reports() {
     [executive, cost, branchPerf]
   );
 
-  // ── Product Quantity Analytics ─────────────────────────────────────────────
-  const productQtyAnalytics = useMemo(() => {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-    return computeProductQuantityAnalytics(purchases, isAllBranches ? 'all' : selectedBranchKey, today, monthStart);
-  }, [purchases, isAllBranches, selectedBranchKey]);
+  const fullAnalytics = useMemo(()=>buildFullSalesAnalyticsReport({
+    sales,purchases,walletTransactions,snapshot:periodSnapshot,previousSnapshot,
+    operationsReport,range:reportRange,revenueSources,lang,historyAvailable:true,
+  }),[sales,purchases,walletTransactions,periodSnapshot,previousSnapshot,operationsReport,reportRange,revenueSources,lang]);
+  const productQtyAnalytics = {
+    monthlyProducts:fullAnalytics.products.map(p=>({productId:p.id,productName:p.name,totalQuantity:p.quantity,unit:p.unit,totalCost:p.cost})),
+  };
 
   // ── PDF Generation ─────────────────────────────────────────────────────────
   const [pdfStatus, setPdfStatus] = useState('idle'); // idle | generating | done | error
@@ -358,7 +360,7 @@ export default function Reports() {
         snapshot:periodSnapshot,previousSnapshot,growth:periodGrowth,
         range:reportRange, branchLabel:isAllBranches?copy.all:selectedBranchLabel,
         businessName:activeRestaurant?.name || 'BizCTRL', currency, lang, dir,
-        operationsReport,
+        operationsReport,fullAnalytics,
       });
       setPdfStatus('done');
     } catch (e) {
@@ -366,7 +368,7 @@ export default function Reports() {
       setPdfError(e.message || 'PDF generation failed');
       setPdfStatus('error');
     }
-  },[hasReportError,isLoading,periodSnapshot,previousSnapshot,periodGrowth,reportRange,isAllBranches,copy.all,selectedBranchLabel,activeRestaurant?.name,currency,lang,dir,operationsReport]);
+  },[hasReportError,isLoading,periodSnapshot,previousSnapshot,periodGrowth,reportRange,isAllBranches,copy.all,selectedBranchLabel,activeRestaurant?.name,currency,lang,dir,operationsReport,fullAnalytics]);
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (isLoading) {
@@ -732,40 +734,19 @@ export default function Reports() {
       </Section>
 
       {/* ── 9. PRODUCT CONSUMPTION ANALYTICS ────────────────────────────── */}
-      <Section title="Product Consumption Analytics" icon={Package}>
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          {productQtyAnalytics.topConsumedMonth && (
-            <div className="rounded-lg border border-purple-200 bg-purple-50 p-2.5 dark:border-purple-900/70 dark:bg-purple-950/40">
-              <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mb-1">Top Consumed (Month)</p>
-              <p className="text-xs font-bold text-foreground truncate">{productQtyAnalytics.topConsumedMonth.productName}</p>
-              <p className="text-sm font-black text-purple-700">
-                {productQtyAnalytics.topConsumedMonth.totalQuantity % 1 === 0
-                  ? productQtyAnalytics.topConsumedMonth.totalQuantity
-                  : productQtyAnalytics.topConsumedMonth.totalQuantity.toFixed(2)
-                } {productQtyAnalytics.topConsumedMonth.unit}
-              </p>
-            </div>
-          )}
-          {productQtyAnalytics.highestCostMonth && (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-2.5">
-              <p className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider mb-1">Highest Cost (Month)</p>
-              <p className="text-xs font-bold text-foreground truncate">{productQtyAnalytics.highestCostMonth.productName}</p>
-              <p className="text-sm font-black text-orange-700">{fmtC(productQtyAnalytics.highestCostMonth.totalCost, currency)}</p>
-            </div>
-          )}
-        </div>
+      <Section title={lang==='fa'?'خرید کالا و مصرف واقعی انبار':lang==='ar'?'مشتريات الأصناف والاستهلاك الفعلي':'Product purchases & actual consumption'} icon={Package}>
         {productQtyAnalytics.monthlyProducts.length > 0 && (
           <div className="mb-3">
-            <p className="text-xs font-semibold text-muted-foreground mb-2">Monthly Product Consumption</p>
+            <p className="text-xs font-semibold text-muted-foreground mb-2">{lang==='fa'?'کالاهای خریداری‌شده در دوره':lang==='ar'?'الأصناف المشتراة في الفترة':'Products purchased in selected period'}</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left py-1.5 px-2 font-semibold">#</th>
-                    <th className="text-left py-1.5 px-2 font-semibold">Product</th>
-                    <th className="text-right py-1.5 px-2 font-semibold">Qty</th>
-                    <th className="text-right py-1.5 px-2 font-semibold">Unit</th>
-                    <th className="text-right py-1.5 px-2 font-semibold">Total Cost</th>
+                    <th className="text-left py-1.5 px-2 font-semibold">{t('product')}</th>
+                    <th className="text-right py-1.5 px-2 font-semibold">{t('quantity')}</th>
+                    <th className="text-right py-1.5 px-2 font-semibold">{t('unit')}</th>
+                    <th className="text-right py-1.5 px-2 font-semibold">{lang==='fa'?'هزینه خرید':lang==='ar'?'تكلفة الشراء':'Purchase cost'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -777,7 +758,7 @@ export default function Reports() {
                         {p.totalQuantity % 1 === 0 ? p.totalQuantity : p.totalQuantity.toFixed(2)}
                       </td>
                       <td className="py-1.5 px-2 text-right text-muted-foreground">{p.unit}</td>
-                      <td className="py-1.5 px-2 text-right font-semibold">{fmtC(p.totalCost, currency)}</td>
+                      <td className="py-1.5 px-2 text-right font-semibold">{p.totalCost==null?'—':fmtC(p.totalCost, currency)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -785,27 +766,19 @@ export default function Reports() {
             </div>
           </div>
         )}
-        {productQtyAnalytics.todayProducts.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground mb-2">Today's Product Usage</p>
-            <div className="space-y-1.5">
-              {productQtyAnalytics.todayProducts.slice(0, 8).map((p) => (
-                <div key={p.productId} className="flex items-center justify-between rounded-lg border border-purple-100 bg-purple-50/60 px-2 py-1.5 dark:border-purple-900/70 dark:bg-purple-950/40">
-                  <div>
-                    <p className="text-xs font-semibold text-foreground">{p.productName}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      <span className="font-bold text-purple-700">{p.totalQuantity % 1 === 0 ? p.totalQuantity : p.totalQuantity.toFixed(2)}</span> {p.unit}
-                    </p>
-                  </div>
-                  <p className="text-xs font-bold">{fmtC(p.totalCost, currency)}</p>
-                </div>
-              ))}
+        {productQtyAnalytics.monthlyProducts.length === 0 && (
+          <p className="text-xs text-muted-foreground text-center py-4">{lang==='fa'?'جزئیات کالاهای خریداری‌شده موجود نیست.':lang==='ar'?'لا توجد تفاصيل للأصناف المشتراة.':'No purchased product line items.'}</p>
+        )}
+        <div className="mt-3 border-t pt-3 space-y-2">
+          <p className="text-xs font-semibold">{lang==='fa'?'مصرف و فروش ثبت‌شدهٔ انبار':lang==='ar'?'الاستهلاك والبيع المسجل للمخزون':'Recorded inventory usage and sales'}</p>
+          <p className="text-xs text-muted-foreground">{lang==='fa'?'خریداری به معنی مصرف نیست. واحدهای متفاوت جمع نمی‌شوند.':lang==='ar'?'الشراء لا يعني الاستهلاك. لا تُجمع الوحدات المختلفة.':'Purchases are not consumption. Different units are kept separate.'}</p>
+          {operationsReport.consumption.length ? operationsReport.consumption.map(p=>(
+            <div key={p.id+':'+p.unit} className="flex flex-wrap justify-between gap-2 text-xs border-b py-2">
+              <strong>{p.name}</strong><span>{lang==='fa'?'مصرف':lang==='ar'?'مستهلك':'Used'}: {p.usedQuantity} {p.unit}</span>
+              <span>{lang==='fa'?'فروش':lang==='ar'?'مباع':'Sold'}: {p.soldQuantity} {p.unit}</span>
             </div>
-          </div>
-        )}
-        {productQtyAnalytics.todayProducts.length === 0 && productQtyAnalytics.monthlyProducts.length === 0 && (
-          <p className="text-xs text-muted-foreground text-center py-4">No product consumption data. Add purchase invoices with line items.</p>
-        )}
+          )):<p className="text-xs text-muted-foreground">{lang==='fa'?'مصرف در این دوره ثبت نشده؛ خروج انبار یا دستور غذا را ثبت کنید.':lang==='ar'?'لا استهلاك مسجل في الفترة؛ سجّل الصرف أو الوصفات.':'No usage recorded in this period; record stock-out or recipes.'}</p>}
+        </div>
       </Section>
 
       {/* ── 10. PDF ERP REPORT ───────────────────────────────────────────── */}
