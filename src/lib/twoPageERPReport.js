@@ -242,13 +242,15 @@ export function drawTwoPageERPReport(doc, {
     const peak = Math.max(1, ...normalized.map(r => Math.abs(r.value)));
     normalized.forEach((r, i) => {
       const yy = startY + i * rowHeight;
-      txt(r.name, x + (rtl ? width * .52 : 1), yy, width * .47, 7.7, NAVY);
-      const valueX = x + (rtl ? 1 : width * .65);
-      txt(showCurrency ? num(r.value) : r.display || num(r.value), valueX, yy, width * .34, 7.7, MUTED, true);
-      doc.setFillColor(230, 237, 247); doc.roundedRect(x + width * .49, yy + 1.4, width * .35, 2, .8, .8, 'F');
-      const rw = width * .35 * Math.abs(r.value) / peak;
-      if (rw > 0.15) {
-        doc.setFillColor(...tone); doc.roundedRect(x + width * .49, yy + 1.4, rw, 2, .8, .8, 'F');
+      txt(r.name, x + 1, yy, width * .61, 7.3, NAVY);
+      txt(showCurrency ? num(r.value) : r.display || num(r.value),
+        x + width * .65, yy, width * .34, 7.3, MUTED, true, rtl ? 'left' : 'right');
+      // Bar is on its own baseline, never under a Persian label or amount.
+      const by = yy + 1.8, bw = width * .44;
+      doc.setFillColor(230, 237, 247); doc.roundedRect(x + 1, by, bw, 1.25, .5, .5, 'F');
+      const rw = bw * Math.abs(r.value) / peak;
+      if (rw > 1) {
+        doc.setFillColor(...tone); doc.roundedRect(x + 1, by, rw, 1.25, .5, .5, 'F');
       }
     });
   };
