@@ -100,13 +100,13 @@ export default function ScheduledReports() {
     }
     setPdfLoading(true);setPdfDone(false);
     try{
-      const doc=await generateSalesAnalyticsPDF({
+      await generateSalesAnalyticsPDF({
         snapshot:periodSnapshot,previousSnapshot,growth,range:reportRange,
         branchLabel:isAllBranches?(lang==='ar'?'جميع الفروع':lang==='fa'?'تمام شعبه‌ها':'All branches'):selectedBranchLabel,
         businessName:activeRestaurant?.name||'BizCTRL',currency,lang,dir,
         operationsReport,download:true,
       });
-      if(doc.getNumberOfPages()!==1)throw new Error('PDF must be one A4 page');
+
       setPdfDone(true);
       toast.success(lang==='ar'?'تم تنزيل تقرير المبيعات':lang==='fa'?'گزارش فروشات دانلود شد':'Sales Analytics PDF downloaded');
     }catch(e){
@@ -150,7 +150,7 @@ export default function ScheduledReports() {
       <Card className="p-4 mb-4 border-primary/20 bg-primary/5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h3 className="font-semibold text-sm">{lang==='ar'?'تقرير تحليلات المبيعات ERP (صفحة واحدة)':lang==='fa'?'گزارش تحلیل فروشات ERP (یک صفحه)':'ERP Sales Analytics PDF · One A4 page'}</h3>
+            <h3 className="font-semibold text-sm">{lang==='ar'?'تقرير تحليلات المبيعات ERP (تفصيلي)':lang==='fa'?'گزارش تحلیل فروشات ERP (تفصیلی)':'ERP Management PDF · Detailed report'}</h3>
             <p className="text-xs text-muted-foreground">{t('pdf_period')}: {fromStr} → {toStr}</p>
           </div>
           <button
@@ -248,7 +248,7 @@ export default function ScheduledReports() {
 
       <div className="mt-6 p-4 rounded-xl bg-muted text-xs text-muted-foreground">
         <p className="font-medium mb-1">📅 {t('scheduled_reports')}</p>
-        <p>{t('pdf_disclaimer')} · {"AR / EN / FA · PDF A4 · 1 / 1"}</p>
+        <p>{t('pdf_disclaimer')} · {"AR / EN / FA · PDF A4"}</p>
       </div>
     </div>
   );

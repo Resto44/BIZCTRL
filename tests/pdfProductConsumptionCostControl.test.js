@@ -60,11 +60,11 @@ describe('ERP one-page report product consumption and cost control',()=>{
    expect(complete.wasteCostComplete).toBe(true);
    expect(buildPdfConsumptionCostControl({snapshot,operationsReport:complete}).wasteCost).toBe(30);
  });
- it('renders both headings and verified analytics in each app language on exactly one A4 page',async()=>{
+ it('renders both headings and verified analytics in each app language on paginated A4 pages',async()=>{
    for(const lang of ['en','ar','fa']){
      const pdf=await generateSalesAnalyticsPDF({snapshot,previousSnapshot:prev,operationsReport:report,
        range:period,branchLabel:'فرع الريان',businessName:'مطاعم شمعة الريان',currency:'SAR',lang,download:false});
-     expect(pdf.getNumberOfPages()).toBe(1);
+     expect(pdf.getNumberOfPages()).toBeGreaterThan(1);
      expect(pdf.__erpPdfRTL).toBe(lang!=='en');
      expect(Buffer.from(pdf.output('arraybuffer')).subarray(0,5).toString()).toBe('%PDF-');
    }
