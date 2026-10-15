@@ -1,3 +1,4 @@
+import {fetchReportStockConsumption} from './reportStockConsumption';
 /**
  * Scheduled and on-demand PDF exports use the same tenant- and branch-scoped
  * financial records as the canonical Sales Analytics report.
@@ -39,13 +40,12 @@ export async function fetchScheduledERPReportData({
   read('supplier_invoices',{from:range.previousFrom,to:range.to}),
   read('expenses',{legacyColumn:'branch_key',from:firstMonthStart,to:range.to}),
   read('inventory',{dateColumn:null}),
-  read('inventory_transactions',{dateColumn:'created_date',from:range.from+'T00:00:00',
-    to:range.to+'T23:59:59.999',legacyColumn:null}),
+  fetchReportStockConsumption({db,restaurantId,branchId:allBranches?null:branchId,range}),
   read('debt_records',{dateColumn:null}),
   (async()=>{
    const {data,error}=await db.from('expense_categories').select('*').eq('restaurant_id',restaurantId);
    if(error)throw error;
-   return data||[];
+   return (data||[]).filter(c=>allBranches||!c.branch_id||String(c.branch_id)===String(branchId));
   })(),
  ]);
  return {sales,purchases,expenses,inventory,inventoryTransactions,customerDebts,expenseCategories};

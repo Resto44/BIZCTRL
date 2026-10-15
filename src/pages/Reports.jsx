@@ -1,3 +1,4 @@
+import { fetchReportStockConsumption } from '@/lib/reportStockConsumption';
 /**
  * Reports.jsx — ERP Sales Analytics Dashboard
  *
@@ -9,7 +10,6 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
@@ -245,10 +245,13 @@ export default function Reports() {
 
   // Expense categories — needed for fixed vs variable proration
   const { data: expenseCategories = [], isLoading: loadingCategories, isError: categoriesError } = useQuery({
-    queryKey: ['expense_categories_reports'],
-    queryFn: () => base44.entities.ExpenseCategory
-      ? base44.entities.ExpenseCategory.list('sort_order', 500)
-      : Promise.resolve([]),
+    queryKey: ['expense_categories_reports',activeRestaurant?.id,selectedBranchId],
+    queryFn: async () => {
+      const {data,error}=await supabase.from('expense_categories').select('*')
+        .eq('restaurant_id',activeRestaurant.id);
+      if(error)throw error;
+      return (data||[]).filter(c=>isAllBranches||!c.branch_id||String(c.branch_id)===String(selectedBranchId));
+    },
     staleTime: 300000,
     enabled: hasScope,
   });
@@ -259,7 +262,8 @@ export default function Reports() {
   });
   const {data: reportStockMovements = [],isLoading:loadingMovements,isError:movementsError} = useQuery({
     queryKey:['report_stock_movements',activeRestaurant?.id,selectedBranchId,reportRange.from,reportRange.to],
-    queryFn:()=>fetchOperationsRows('inventory_transactions',{legacyColumn:null,dateColumn:'created_date',isTimestamp:true}),
+    queryFn:()=>fetchReportStockConsumption({db:supabase,restaurantId:activeRestaurant.id,
+      branchId:isAllBranches?null:selectedBranchId,range:reportRange}),
     enabled:hasScope,staleTime:60000,
   });
   const {data: reportDebts = [],isLoading:loadingDebts,isError:debtsError} = useQuery({

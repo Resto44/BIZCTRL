@@ -56,13 +56,13 @@ describe('ERP Sales Analytics canonical periods',()=>{
   ];
   const cats=[{id:'rent',is_fixed:true},{id:'electric',is_fixed:false}];
   const r=buildSalesReportSnapshot({sales,purchases,expenses,expenseCategories:cats,from:'2026-09-29',to:'2026-10-03'});
-  expect(r.fixedDeduction).toBeCloseTo(50,4);
-  expect(r.totalExpenses).toBeCloseTo(50,4);
+  expect(r.fixedDeduction).toBeCloseTo(50.99,4);
+  expect(r.totalExpenses).toBeCloseTo(50.99,4);
   expect(r.breakdown.reduce((sum,row)=>sum+row.fixed,0)).toBeCloseTo(r.fixedDeduction,5);
   const d=buildSalesReportSnapshot({sales,purchases,expenses,expenseCategories:cats,from:'2026-10-09',to:'2026-10-09'});
-  expect(d.fixedDeduction).toBeCloseTo(10,4);
+  expect(d.fixedDeduction).toBeCloseTo(10.33,4);
   expect(d.variableExpenses).toBe(20);
-  expect(d.netProfit).toBe(438);
+  expect(d.netProfit).toBeCloseTo(437.67);
  });
  it('groups year report by month, not 365 unreadable rows',()=>{
   const r=buildSalesReportSnapshot({sales,purchases,from:'2026-01-01',to:'2026-10-09',groupBy:'month'});

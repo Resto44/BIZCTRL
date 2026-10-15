@@ -41,6 +41,7 @@ export default function InventoryTransactionForm({ product, onSuccess, onCancel 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['products'] });
       qc.invalidateQueries({ queryKey: ['inventory_transactions', product.id] });
+      qc.invalidateQueries({ queryKey: ['report_stock_movements'] });
       toast.success(t('stock_updated'));
       onSuccess?.();
     },
@@ -56,6 +57,7 @@ export default function InventoryTransactionForm({ product, onSuccess, onCancel 
     createMut.mutate({
       product_id: product.id,
       restaurant_id: activeRestaurant?.id,
+      branch_id: product.branch_id || null,
       transaction_type: form.transaction_type,
       quantity: Number(form.quantity),
       unit_cost: Number(form.unit_cost) || 0,
