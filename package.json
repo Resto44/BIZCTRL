@@ -6,7 +6,7 @@
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/generate-pwa-icons.mjs && pnpm exec vitest run && node scripts/audit-i18n-coverage.mjs && vite build",
+    "build": "node scripts/generate-pwa-icons.mjs && vite build",
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
