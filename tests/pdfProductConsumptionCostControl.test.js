@@ -64,7 +64,7 @@ describe('ERP one-page report product consumption and cost control',()=>{
    for(const lang of ['en','ar','fa']){
      const pdf=await generateSalesAnalyticsPDF({snapshot,previousSnapshot:prev,operationsReport:report,
        range:period,branchLabel:'فرع الريان',businessName:'مطاعم شمعة الريان',currency:'SAR',lang,download:false});
-     expect(pdf.getNumberOfPages()).toBeGreaterThan(1);
+     expect(pdf.getNumberOfPages()).toBe(2);
      expect(pdf.__erpPdfRTL).toBe(lang!=='en');
      expect(Buffer.from(pdf.output('arraybuffer')).subarray(0,5).toString()).toBe('%PDF-');
    }

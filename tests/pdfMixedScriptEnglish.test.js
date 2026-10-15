@@ -52,7 +52,7 @@ describe('English ERP PDF with Arabic/Persian database fields',()=>{
       snapshot,range,operationsReport:report,branchLabel:'فرع الريان',
       businessName:'مطاعم شمعة الريان',currency:'SAR',lang:'en',dir:'ltr',download:false,
     });
-    expect(pdf.getNumberOfPages()).toBeGreaterThan(1);
+    expect(pdf.getNumberOfPages()).toBe(2);
     expect(pdf.__erpPdfRTL).toBe(false);
     const buffer=Buffer.from(pdf.output('arraybuffer'));
     expect(buffer.subarray(0,8).toString()).toContain('%PDF-');

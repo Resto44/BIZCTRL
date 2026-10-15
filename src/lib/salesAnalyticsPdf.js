@@ -1,16 +1,16 @@
 import {jsPDF} from 'jspdf';
 import {prepareLocalizedPdf,safePdfFilename} from './pdfLocalization';
 import {loadERPReportIcon} from './erpPdfBrand';
-import {drawDetailedERPReport} from './detailedERPReport';
-import {drawSinglePageSalesAnalytics} from './singlePageSalesAnalyticsReport';
+import {drawTwoPageERPReport} from './twoPageERPReport';
+
 
 /**
- * Canonical paginated A4 Sales Analytics export for both Reports and Scheduled Reports.
- * Includes complete authorized report rows; compact mode remains available for integrations.
+ * Canonical two-page A4 Sales Analytics export for both Reports and Scheduled Reports.
+ * Summarizes all scoped data in sales and purchases/expenses pages.
  */
 export async function generateSalesAnalyticsPDF({
  snapshot,previousSnapshot=null,growth=null,range,branchLabel,businessName='BizCTRL',
- currency='SAR',lang='en',dir,operationsReport=null,download=true,compact=false,
+ currency='SAR',lang='en',dir,operationsReport=null,download=true,
 }={}){
  if(!snapshot || !range?.from || !range?.to || !branchLabel)
    throw new Error('A verified report, period and selected branch are required');
@@ -18,8 +18,7 @@ export async function generateSalesAnalyticsPDF({
  const doc=new jsPDF({unit:'mm',format:'a4',putOnlyUsedFonts:true});
  prepareLocalizedPdf(doc,{lang:language,dir:language==='en'?'ltr':'rtl'});
  const iconData=await loadERPReportIcon();
- const draw=compact?drawSinglePageSalesAnalytics:drawDetailedERPReport;
- draw(doc,{
+ drawTwoPageERPReport(doc,{
   snapshot,previousSnapshot,growth,range,report:operationsReport,branchLabel,
   businessName,currency,lang:language,iconData,
  });

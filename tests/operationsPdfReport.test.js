@@ -97,7 +97,7 @@ describe('Operations, Branches & Inventory ERP PDF',()=>{
     operationsReport:run(),businessName:'مطاعم شمعة الريان',
     branchLabel:'فرع الريان',currency:'SAR',lang,download:false,
    });
-   expect(doc.getNumberOfPages()).toBeGreaterThan(1);
+   expect(doc.getNumberOfPages()).toBe(2);
    expect(Buffer.from(doc.output('arraybuffer')).subarray(0,8).toString()).toContain('%PDF-');
    expect(doc.__erpPdfRTL).toBe(lang!=='en');
   }
@@ -117,7 +117,7 @@ describe('Operations, Branches & Inventory ERP PDF',()=>{
     snapshot:hugeSnapshot,operationsReport:hugeReport,range,branchLabel:'All branches',
     lang:'en',download:false,
   });
-  expect(doc.getNumberOfPages()).toBeGreaterThan(1);
+  expect(doc.getNumberOfPages()).toBe(2);
  });
 
  it('fetches inventory, movement and debt under tenant and branch access and blocks incomplete PDF',async()=>{
