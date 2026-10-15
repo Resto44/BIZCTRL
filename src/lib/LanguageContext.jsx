@@ -58,7 +58,7 @@ export function LanguageProvider({ children }) {
   }, []);
 
   const t = useCallback((key, values) => {
-    const message = translations[lang]?.[key] ?? translateInterface(translations.en?.[key] ?? key, lang);
+    const message = translateInterface(translations[lang]?.[key] ?? translations.en?.[key] ?? key, lang);
     return interpolate(message, values);
   }, [lang]);
 

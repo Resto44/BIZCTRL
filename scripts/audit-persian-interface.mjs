@@ -3,16 +3,24 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { translateInterface, normalizeInterfacePhrase } from '../src/lib/translateInterface.js';
+import arabicUiPhrases from '../src/lib/arabicUiPhrases.js';
 import persianUiPhrases from '../src/lib/persianUiPhrases.js';
+const language=process.argv.includes('--ar')?'ar':'fa';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const technical=new Set(['BizCTRL','Biz','CTRL','BIZCTRL ·','⌘K','-SM','field_key','PDF','CSV','A4','branch_1','supplier_code','Asia/Riyadh','YYYY-MM-DD','DD/MM/YYYY','MM/DD/YYYY','bar','x','SAVE20','SA...','05xxxxxxxx','+966 5x xxx xxxx','123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ']);
 for (const value of ["q", "topic", "ar", "fa", "ps", "ur", "insert", "bg-cyan-50 text-cyan-700", "bg-violet-50 text-violet-700", "bg-emerald-50 text-emerald-700", "bg-amber-50 text-amber-800", "USD", "AED", "EGP", "KWD", "QAR", "BHD", "OMR", "EUR", "GBP", "id", "result", "onHand", "picker", "visa", "mastercard", "actualCash", "erpData", "promise", "salesInvoicePrefix", "SAL", "purchaseInvoicePrefix", "PUR", "creditNotePrefix", "CRN", "Visa", "Mastercard", "STC Pay", "Apple Pay", "Tamara", "Tabby", "AFN", "snapshot", "companyName", "bankName", "accountHolder", "thisWeek", "lastWeek", "lastMonth", "sixMonths", "twelveMonths", "SUBSCRIBED", "occurredAt", "branchName", "deviceCode", "cashierName", "title"]) technical.add(value);
+// Literal plural suffixes and documented template/JSON examples are not interface sentences.
+for(const value of ['s','es','{name}','{amount}','{due_date}','{"branches": 10, "ai_requests": 500}']) technical.add(value);
 const exempt=s=>technical.has(s)||/^(?:(?:dark:)?text-[a-z]+-\d+\s*)+$/.test(s)||/^https?:\/\//.test(s)||/^[\w.+-]+@[\w.-]+\.[a-z]+$/i.test(s)||/^(SKU|INV|PUR|EMP)-[\d-]+$/.test(s);
 const candidates=new Map();let scannedFiles=0;
 function collect(source,file){
  const ast=ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
  function visit(node){let text;
   if(ts.isJsxText(node)) text=node.text;
+  if(ts.isStringLiteral(node)) {
+   const expression=ts.isJsxExpression(node.parent)?node.parent:(ts.isConditionalExpression(node.parent)&&node.parent.condition!==node?node.parent.parent:null);
+   if(expression&&ts.isJsxExpression(expression)&&(ts.isJsxElement(expression.parent)||ts.isJsxFragment(expression.parent)||(ts.isJsxAttribute(expression.parent)&&['placeholder','title','aria-label','alt','description','subtitle','eyebrow','label','hint','emptyText'].includes(expression.parent.name.text)))) text=node.text;
+  }
   if(ts.isJsxAttribute(node)&&['placeholder','title','aria-label','alt','description','subtitle','eyebrow','label','hint','emptyText'].includes(node.name.text)&&node.initializer&&ts.isStringLiteral(node.initializer))text=node.initializer.text;
   if(ts.isPropertyAssignment(node)&&['label','title','description','message','text'].includes(node.name?.text)&&ts.isStringLiteral(node.initializer))text=node.initializer.text;
   if(ts.isCallExpression(node)&&ts.isPropertyAccessExpression(node.expression)&&node.expression.expression.getText(ast)!=='console'&&['success','error','info','warning'].includes(node.expression.name.text)&&node.arguments[0]&&ts.isStringLiteral(node.arguments[0]))text=node.arguments[0].text;
@@ -26,9 +34,9 @@ function walk(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
  const target=path.join(dir,entry.name);if(entry.isDirectory()){if(!['dev','fixtures'].includes(entry.name))walk(target);}else if(/\.[jt]sx$/.test(target)&&!target.includes('.test.')){scannedFiles++;collect(fs.readFileSync(target,'utf8'),path.relative(root,target));}
 }}
 walk(path.join(root,'src'));
-const remaining=[...candidates].filter(([phrase])=>translateInterface(phrase,'fa')===phrase);
+const remaining=[...candidates].filter(([phrase])=>translateInterface(phrase,language)===phrase);
 const unresolved=remaining.filter(([phrase])=>!exempt(phrase)).map(([phrase,files])=>({phrase,files}));
-const report={scope:'Static JSX text, text/description props, string-array items, labelled configuration and literal toast messages. Dynamic/server messages, generated PDFs and user-entered data need separate runtime review.',scannedFiles,reviewedPersianEntries:Object.keys(persianUiPhrases).length,staticCandidates:candidates.size,translatedCandidates:candidates.size-remaining.length,technicalExceptions:remaining.filter(([phrase])=>exempt(phrase)).map(([phrase])=>phrase),unresolved};
-fs.writeFileSync(path.join(root,'reports/persian-interface-audit.json'),JSON.stringify(report,null,2)+'\n');
+const report={language,scope:'Static JSX text, text/description props, string-array items, labelled configuration and literal toast messages. Dynamic/server messages, generated PDFs and user-entered data need separate runtime review.',scannedFiles,reviewedEntries:Object.keys(language==='ar'?arabicUiPhrases:persianUiPhrases).length,staticCandidates:candidates.size,translatedCandidates:candidates.size-remaining.length,technicalExceptions:remaining.filter(([phrase])=>exempt(phrase)).map(([phrase])=>phrase),unresolved};
+fs.writeFileSync(path.join(root,`reports/${language==='ar'?'arabic':'persian'}-interface-audit.json`),JSON.stringify(report,null,2)+'\n');
 console.log(JSON.stringify(report,null,2));
 if(unresolved.length)process.exitCode=1;

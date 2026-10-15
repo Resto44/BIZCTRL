@@ -40,14 +40,16 @@ export function drawERPReportBrand(doc,{
     doc.setDrawColor(218,231,249);doc.line(7*u,23*u,w-7*u,23*u);
     drawBizCTRLReportIcon(doc,8*u,4*u,14*u,iconData);
     drawLocalizedPdfText(doc,'BizCTRL',25*u,12*u,{bold:true,size:15,color:[14,29,64],align:'left'});
-    drawLocalizedPdfText(doc,'Restaurant ERP System',25*u,18*u,{size:7,color:[95,112,137],align:'left'});
-    drawLocalizedPdfText(doc,title,w-8*u,10*u,{rtl,bold:true,size:11,color:[15,39,84],align:'right',maxWidth:92*u});
-    drawLocalizedPdfText(doc,[business,branch,period].filter(Boolean).join('  ·  '),w-8*u,18*u,{
-      rtl,bold:false,size:6.9,color:[87,104,130],align:'right',maxWidth:95*u});
+    drawLocalizedPdfText(doc,({en:'Business ERP System',ar:'نظام إدارة الأعمال',fa:'سیستم مدیریت کسب‌وکار'}[lang]||'Business ERP System'),25*u,18*u,{size:7,color:[95,112,137],align:'left'});
+    drawLocalizedPdfText(doc,title,w-8*u,10*u,{rtl,bold:true,size:11,color:[15,39,84],align:'right',fit:true,maxWidth:92*u});
+    drawLocalizedPdfText(doc,[business,branch].filter(Boolean).join('  ·  '),w-8*u,15.5*u,{
+      rtl,bold:true,size:7.5,color:[87,104,130],align:'right',fit:true,maxWidth:95*u});
+    drawLocalizedPdfText(doc,period,w-8*u,20*u,{
+      size:7,color:[87,104,130],align:'right',fit:true,maxWidth:95*u});
   }
   doc.setDrawColor(215,230,248);doc.line(7*u,h-13*u,w-7*u,h-13*u);
   drawBizCTRLReportIcon(doc,8*u,h-11*u,8*u,iconData);
-  drawLocalizedPdfText(doc,'BizCTRL  ·  ERP Financial Reporting',19*u,h-6*u,{
+  drawLocalizedPdfText(doc,({en:'BizCTRL  ·  ERP Financial Reporting',ar:'BizCTRL  ·  التقارير المالية',fa:'BizCTRL  ·  گزارش‌های مالی'}[lang]||'BizCTRL'),19*u,h-6*u,{
     size:7.4,bold:true,color:[30,97,214],align:'left'});
   if(pageLabel)drawLocalizedPdfText(doc,pageLabel,w-8*u,h-6*u,{size:7,color:[95,112,137],align:'right'});
 }
