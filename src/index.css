@@ -12,7 +12,9 @@
     /* Apple system UI (including its native Arabic/Persian glyph fallbacks) on
        iPhone/iPad; Inter/Vazirmatn on non-Apple browsers. Never bundle SF font files. */
     --font-ui: -apple-system, BlinkMacSystemFont, 'Inter', ui-sans-serif, system-ui, sans-serif;
-    --font-rtl: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Noto Sans Arabic', system-ui, sans-serif;
+    --font-rtl: -apple-system, BlinkMacSystemFont, 'Vazirmatn', 'Noto Sans Arabic', system-ui, sans-serif;
+    /* Screenshot-style RTL reading: stronger but not oversized. */
+    --erp-rtl-leading: 1.6;
     --erp-weight-body: 500;
     --erp-weight-control: 600;
     --erp-weight-heading: 700;
@@ -250,10 +252,56 @@
    text-xs/sm/... overrides; those made en/ar/fa mathematically inconsistent. */
 html:lang(fa), html:lang(ar) {
   --font-ui: var(--font-rtl);
+  --erp-line-body: var(--erp-rtl-leading);
 }
 [dir="rtl"] {
   text-align: right;
   font-family: var(--font-ui);
+}
+
+/* Reference: the bold, legible native iOS Arabic menu appearance.
+   Language switches the font family and spacing, not the font-size scale.
+   All ERP screens and body-portaled dialogs inherit the same font. */
+html:is(:lang(ar), :lang(fa)) :is(
+  h1, h2, h3, h4, h5, h6,
+  label, button, [role="tab"], [role="menuitem"], [role="option"],
+  summary, th
+) {
+  font-family: var(--font-ui);
+  letter-spacing: normal;
+}
+
+html:is(:lang(ar), :lang(fa)) :is(
+  h1, h2, h3, h4, h5, h6,
+  [data-erp-title="true"]
+) {
+  line-height: 1.38;
+  font-weight: 700;
+}
+
+html:is(:lang(ar), :lang(fa)) :is(
+  [data-erp-nav-label="true"],
+  [data-erp-section-label="true"],
+  [data-erp-control-label="true"]
+) {
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: normal;
+}
+
+html:is(:lang(ar), :lang(fa)) :is(
+  [role="dialog"], [data-radix-popper-content-wrapper]
+) {
+  font-family: var(--font-ui);
+}
+
+/* Keep meaningful Arabic/Persian glyph tops and diacritics visible on
+   compact UI labels; never make all financial amounts bold or reflow POS. */
+html:is(:lang(ar), :lang(fa)) :is(
+  [data-erp-nav-label="true"], [data-erp-section-label="true"]
+) {
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 /* Legacy micro text was 8–11px in reports, lists and navigation. Normalize
