@@ -53,12 +53,12 @@ export function translateInterface(value, language, values) {
   const counted = source.match(/^(.*?)\s*(\([\d,]+\)|[:：…]|\.\.\.|[()·—])$/);
   if (counted && lookup(counted[1]) !== undefined) return `${interpolate(lookup(counted[1]), values)}${counted[2].startsWith('(') ? ' ' : ''}${counted[2]}`;
   if (lang !== 'en') {
-    const numberFirst = source.match(/^([+-]?[\\d][\\d,.]*)\\s+([A-Za-z]+)$/);
+    const numberFirst = source.match(/^([+-]?\d[\d,.]*)\s+([A-Za-z]+)$/);
     if (numberFirst && LOCALIZED_COUNT_UNITS.has(numberFirst[2].toLowerCase())) {
       const unit = lookup(numberFirst[2]);
       if (unit && unit !== numberFirst[2]) return `${numberFirst[1]} ${unit}`;
     }
-    const metric = source.match(/^([A-Za-z][A-Za-z /&-]{1,35}):\\s*([+-]?(?:(?:SAR|USD|EUR|AED)\\s*)?[\\d,]+(?:\\.[\\d]+)?%?)$/);
+    const metric = source.match(/^([A-Za-z][A-Za-z /&-]{1,35}):\s*([+-]?(?:(?:SAR|USD|EUR|AED)\s*)?[\d,]+(?:\.[\d]+)?%?)$/);
     if (metric) {
       const translatedLabel = lookup(metric[1]) ?? lookup(metric[1] + ':');
       if (translatedLabel && translatedLabel !== metric[1] && translatedLabel !== metric[1] + ':')
