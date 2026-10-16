@@ -35,7 +35,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   ArrowDownLeft, ArrowUpRight, Wallet, Camera, ZoomIn, Loader2,
   Trash2, ShieldCheck, AlertTriangle, Download, RefreshCw,
-  CheckCircle2, Search, Receipt, TrendingUp, Info,
+  Search, TrendingUp, Info,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -185,7 +185,7 @@ const initialForm = () => ({
 const recordTypeLabel = (ui, type) => type === 'income' ? ui.income : type === 'withdrawal' ? ui.withdrawal : ui.expense;
 const walletLabel = (ui, value) => value === 'owner_network' ? ui.ownerNetwork : ui.ownerCash;
 
-function EntryRow({ entry, money, ui, lang, onDelete, onAttachment, integrity }) {
+function EntryRow({ entry, money, ui, onDelete, onAttachment, integrity }) {
   const type = entry.record_type || entry.type;
   const isIncome = type === 'income';
   const matched = type === 'withdrawal' && integrity?.get(entry.id);
@@ -310,8 +310,7 @@ export default function OwnerPersonalFinance() {
   };
   const openForm = (newType) => {
     pendingId.current = null;
-    setForm({ ...initialForm(), record_type: newType,
-      payment_method: newType === 'withdrawal' ? 'cash' : 'cash' });
+    setForm({ ...initialForm(), record_type: newType });
     setProofUrl(''); setSaveError(''); setFormType(newType);
   };
   const saveMessage = (error) => {
@@ -413,7 +412,11 @@ export default function OwnerPersonalFinance() {
     <Button type="button" variant="outline" onClick={refresh}><RefreshCw className="me-2 h-4 w-4"/>{ui.retry}</Button>
   </Card>;
 
-  const rowProps = { money, ui, lang, onDelete:setDeleteId, onAttachment:setAttachmentUrl,
+  if (isLoading) return <Card role="status" className="flex items-center gap-2 p-5 text-sm text-muted-foreground">
+    <Loader2 className="h-4 w-4 animate-spin"/>{ui.loading}
+  </Card>;
+
+  const rowProps = { money, ui, onDelete:setDeleteId, onAttachment:setAttachmentUrl,
     integrity: hasWithdrawals && !ledgerError && !ledgerLoading ? integrity : null };
 
   return <section dir={lang === 'en' ? 'ltr' : 'rtl'} className="min-w-0 space-y-4 pb-4">
