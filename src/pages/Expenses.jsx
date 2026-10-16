@@ -118,7 +118,7 @@ function ExpenseForm({ initial, onSubmit, onCancel, categories, isSaving = false
 }
 
 export default function Expenses() {
-  const { t, currency } = useLanguage();
+  const { t, currency, lang } = useLanguage();
   const { branches, ownerFilter, activeRestaurant } = useTenant();
   const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const qc = useQueryClient();
@@ -163,7 +163,7 @@ export default function Expenses() {
   const getCatById = (id) => categories.find(c => c.id === id);
   const getCatDisplayName = (categoryId) => {
     const cat = getCatById(categoryId);
-    return cat ? cat.name : t('uncategorized');
+    return cat ? (lang === 'fa' && cat.name_fa || lang === 'ar' && cat.name_ar || cat.name) : t('uncategorized');
   };
 
   const { activeRestaurantId, restaurants: tenantRestaurants } = useTenant();
@@ -203,7 +203,7 @@ export default function Expenses() {
         throw createErr;
       }
       try {
-        await notif.expense({ branch: d.branch_key, amount: d.amount, category: d.category_id, action: 'create' });
+        await notif.expense({ branch: d.branch_key, amount: d.amount, category: d.category_id ? getCatDisplayName(d.category_id) : '', action: 'create' });
       } catch (notifErr) {
         console.warn('[Expenses] notif.expense() failed (non-fatal):', notifErr?.message);
       }
@@ -224,7 +224,7 @@ export default function Expenses() {
   const updateMut = useMutation({
     mutationFn: async ({ id, data }) => {
       const exp = await base44.entities.Expense.update(id, data);
-      await notif.expense({ branch: data.branch_key, amount: data.amount, category: data.category_id, action: 'update' });
+      await notif.expense({ branch: data.branch_key, amount: data.amount, category: data.category_id ? getCatDisplayName(data.category_id) : '', action: 'update' });
       return exp;
     },
     onSuccess: () => {
