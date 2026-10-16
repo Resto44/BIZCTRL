@@ -105,6 +105,7 @@ export default function ManagerSubmitPanel() {
       return;
     }
     setSubmitting(true);
+    try {
 
     const accName = form.network_account_id && accountMap[form.network_account_id]
       ? accountMap[form.network_account_id].account_name
@@ -128,7 +129,7 @@ export default function ManagerSubmitPanel() {
       status: 'pending',
     });
 
-    await createNotification({
+    try { await createNotification({
       orgId,
       restaurantId: activeRestaurantId,
       type: 'branch_to_owner',
@@ -141,7 +142,7 @@ export default function ManagerSubmitPanel() {
       actorEmail: user?.email,
       actorName: user?.full_name || user?.email,
       metadata: { settlement_id: record.id, proof_url: proofUrl },
-    });
+    }); } catch (notificationError) { console.warn('Sponsor submission notification unavailable:', notificationError); }
 
     qc.invalidateQueries({ queryKey: ['sponsor-settlement-ledger', activeRestaurantId] });
     qc.invalidateQueries({ queryKey: ['settlements_mgr'] });
@@ -149,7 +150,11 @@ export default function ManagerSubmitPanel() {
     setForm({ date: format(new Date(), 'yyyy-MM-dd'), amount: '', branch: '', notes: '', reference_id: '', network_account_id: '' });
     setProofUrl('');
     setOcrVendor('');
-    setSubmitting(false);
+    } catch (error) {
+      toast.error(error?.message || 'Unable to submit sponsor settlement.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -162,14 +167,14 @@ export default function ManagerSubmitPanel() {
           Submit Nightly Network Settlement
         </p>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="min-w-0">
               <Label className="text-xs">Date *</Label>
-              <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+              <Input className="w-full min-w-0 max-w-full text-base [min-inline-size:0]" dir="ltr" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
             </div>
-            <div>
+            <div className="min-w-0">
               <Label className="text-xs">Network Amount *</Label>
-              <Input type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
+              <Input className="w-full min-w-0 max-w-full text-base [min-inline-size:0]" dir="ltr" type="number" inputMode="decimal" step="0.01" min="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
             </div>
           </div>
 
