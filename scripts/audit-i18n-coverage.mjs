@@ -79,3 +79,12 @@ console.log(`Report: ${path.join(reportRoot, 'i18n-coverage-audit.json')}`);
 console.log('Largest candidate files (manual review required):');
 console.log(JSON.stringify(report.slice().sort((a,b)=>b.phrases.length-a.phrases.length).slice(0,20).map(entry=>({file:entry.file,count:entry.phrases.length})),null,2));
 console.log('Untranslated catalog keys:', JSON.stringify(parity));
+
+// A matching key count is not sufficient, but a missing or untranslated base
+// translation is still a release-blocking regression. Actual JSX gaps are
+// reviewed separately in audit-runtime-translation-gaps.mjs.
+const localeFailures = languages.filter(lang => parity[lang].missing.length || parity[lang].untranslated.length);
+if (localeFailures.length) {
+  console.error('ERP release blocked: missing/untranslated Arabic or Persian catalog strings.', localeFailures.join(', '));
+  process.exitCode = 1;
+}
