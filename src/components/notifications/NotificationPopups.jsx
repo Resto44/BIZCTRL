@@ -50,7 +50,7 @@ const severityConfig = {
 };
 
 export default function NotificationPopups() {
-  const { popups, dismissPopup } = useNotifications();
+  const { popups, dismissPopup, expenseCategories } = useNotifications();
   const navigate = useNavigate();
   const { branches } = useTenant();
   const { lang, translateLiteral } = useLanguage();
@@ -65,7 +65,7 @@ export default function NotificationPopups() {
     <div className="pointer-events-none fixed bottom-24 end-3 z-[9999] flex w-[min(320px,calc(100vw-1.5rem))] max-w-full flex-col gap-2">
       <AnimatePresence mode="popLayout">
         {popups.map((raw) => {
-          const n = localizeNotificationContent(presentNotificationBranches(raw, branches, translateLiteral('Branch')), lang);
+          const n = localizeNotificationContent(presentNotificationBranches(raw, branches, translateLiteral('Branch'), { expenseCategories, lang }), lang);
           const Icon = typeIcons[n.type] || Activity;
           const cfg = severityConfig[n.severity] || severityConfig.info;
 

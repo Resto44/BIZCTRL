@@ -10,7 +10,7 @@ import { presentNotificationBranches, localizeNotificationContent } from '@/lib/
 import { notificationPanelGeometry } from '@/lib/notificationPanelGeometry';
 
 export default function NotificationBell() {
-  const { unreadCount, notifications, markRead } = useNotifications();
+  const { unreadCount, notifications, markRead, expenseCategories } = useNotifications();
   const { branches } = useTenant();
   const { lang, translateLiteral } = useLanguage();
   const route = useLocation();
@@ -69,7 +69,7 @@ export default function NotificationBell() {
 
   const recentNotifications = notifications.slice(0, 5).map(n =>
     localizeNotificationContent(
-      presentNotificationBranches(n, branches, translateLiteral('Branch')), lang));
+      presentNotificationBranches(n, branches, translateLiteral('Branch'), { expenseCategories, lang }), lang));
   const locale = lang === 'fa' ? 'fa-IR' : lang === 'ar' ? 'ar-SA' : 'en-US';
 
   return (

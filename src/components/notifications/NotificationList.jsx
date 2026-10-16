@@ -50,12 +50,12 @@ const SEVERITY_COLORS = {
 };
 
 export default function NotificationList({ notifications }) {
-  const { markRead, deleteNotification } = useNotifications();
+  const { markRead, deleteNotification, expenseCategories } = useNotifications();
   const navigate = useNavigate();
   const { branches } = useTenant();
   const { lang, translateLiteral } = useLanguage();
   const displayNotifications = notifications.map(n =>
-    localizeNotificationContent(presentNotificationBranches(n, branches, translateLiteral('Branch')), lang));
+    localizeNotificationContent(presentNotificationBranches(n, branches, translateLiteral('Branch'), { expenseCategories, lang }), lang));
 
   const handleClick = (n) => {
     if (!n.is_read) markRead(n.id);

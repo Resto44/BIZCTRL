@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
-import { base44 } from '@/api/base44Client';
+import { base44, supabase } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
 import { useTenant } from '@/lib/TenantContext';
 import { useRole } from '@/lib/RoleContext';
 import { soundEngine } from '@/lib/soundEngine';
 
 const NotificationContext = createContext({
   notifications: [],
+  expenseCategories: [],
   unreadCount: 0,
   popups: [],
   dismissPopup: () => {},
@@ -20,7 +22,18 @@ const NotificationContext = createContext({
 });
 
 export function NotificationProvider({ children }) {
-  const { orgId } = useTenant();
+  const { orgId, activeRestaurantId } = useTenant();
+  const { data: expenseCategories = [] } = useQuery({
+    queryKey: ['notification_expense_category_labels', activeRestaurantId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('expense_categories')
+        .select('id,name,name_ar,name_fa')
+        .eq('restaurant_id', activeRestaurantId).limit(500);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: Boolean(activeRestaurantId), staleTime: 120000, retry: 1,
+  });
   const { role, user } = useRole();
   const [notifications, setNotifications] = useState([]);
   const [popups, setPopups] = useState([]);
@@ -218,6 +231,7 @@ export function NotificationProvider({ children }) {
   return (
     <NotificationContext.Provider value={{
       notifications,
+      expenseCategories,
       unreadCount,
       popups,
       dismissPopup,

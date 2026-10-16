@@ -4,7 +4,7 @@
  * Real-time delivery is handled by base44 subscriptions in NotificationContext.
  */
 import { base44, supabase } from '@/api/base44Client';
-import { isTechnicalBranchKey } from '@/lib/notificationBranchDisplay';
+import { isTechnicalBranchKey, expenseCategorySuffix } from '@/lib/notificationBranchDisplay';
 
 /**
  * Core create function
@@ -165,8 +165,8 @@ export const notify = {
       title: action === 'delete'
         ? `🗑 مصارف حذف شد — ${branch || ''}`
         : action === 'update'
-          ? `✏️ مصارف تعديل شد — ${branch || ''} (${category || ''})`
-          : `💸 مصارف جديد — ${branch || ''} (${category || ''})`,
+          ? `✏️ مصارف تعديل شد — ${branch || ''}${expenseCategorySuffix(category)}`
+          : `💸 مصارف جديد — ${branch || ''}${expenseCategorySuffix(category)}`,
       message: action === 'delete'
         ? `مصرف حذف شد توسط ${actorName || actorEmail || 'کاربر'}`
         : `مبلغ: ${currency} ${Number(amount || 0).toLocaleString()}`,

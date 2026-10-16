@@ -27,6 +27,7 @@ import { Plus, ArrowDownLeft, ArrowUpRight,
 import useERPSettings from '@/hooks/useERPSettings';
 import {formatTreasuryCurrency,normalizeTreasuryCurrency,resolveTreasuryCurrency,treasuryCurrencyWarning} from '@/lib/treasuryCurrency';
 import { format } from 'date-fns';
+import { treasuryBranchDisplayName } from '@/lib/treasuryBranchDisplay';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
   LineChart, Line, CartesianGrid
@@ -334,10 +335,10 @@ export default function Treasury() {
   // ── Branch balance chart ──────────────────────────────────────────────
   const branchBalanceChart = useMemo(() => {
     return Object.entries(branchBalances).map(([key, balance]) => ({
-      name: branches.find(b => b.key === key)?.label || key,
+      name: treasuryBranchDisplayName(key, branches, lang),
       balance,
     }));
-  }, [branchBalances, branches]);
+  }, [branchBalances, branches, lang]);
 
   // ── Payroll obligation ────────────────────────────────────────────────
   // Base salaries are a monthly estimate, not an unpaid payroll liability.
@@ -649,7 +650,7 @@ export default function Treasury() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-2">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-950/40"><Landmark className="h-4 w-4 text-indigo-600" /></div>
-                        <div className="min-w-0"><p className="truncate text-sm font-semibold">{account.account_name}</p><p className="truncate text-xs text-muted-foreground">{local(accountType)}{account.branch_key ? ` · ${account.branch_key}` : ''}</p></div>
+                        <div className="min-w-0"><p className="truncate text-sm font-semibold">{account.account_name}</p><p className="truncate text-xs text-muted-foreground">{local(accountType)}{account.branch_key ? ` · ${treasuryBranchDisplayName({branch:account.branch_key,branch_id:account.branch_id},branches,lang)}` : ''}</p></div>
                       </div>
                       <div className="text-end"><Badge variant={account.is_active !== false ? 'outline' : 'secondary'}>{account.is_active !== false ? local('Active') : local('Inactive')}</Badge><p className={`mt-1 text-base font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{accountFmt(balance,account)}</p></div>
                     </div>
@@ -737,7 +738,7 @@ export default function Treasury() {
                         <p className="text-xs font-medium truncate">{local(meta?.label || transactionType(tx))}</p>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs text-muted-foreground">{transactionDate(tx)}</span>
-                          {tx.branch && <Badge variant="outline" className="text-xs py-0">{tx.branch}</Badge>}
+                          {(tx.branch || tx.branch_id) && <Badge variant="outline" className="max-w-full break-words text-xs py-0">{treasuryBranchDisplayName(tx,branches,lang)}</Badge>}
                           {transactionAccountName(tx, accounts) && <Badge variant="secondary" className="max-w-32 truncate text-xs py-0">{transactionAccountName(tx, accounts)}</Badge>}
                           {tx.description && <span className="text-xs text-muted-foreground truncate max-w-28">{tx.description}</span>}
                         </div>
