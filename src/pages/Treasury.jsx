@@ -834,9 +834,12 @@ export default function Treasury() {
 
       {/* Add transaction dialog */}
       <Dialog open={showForm} onOpenChange={v => { if(saveMut.isPending)return; setShowForm(v); if(!v){setForm(emptyForm);setTransactionError('');pendingTransactionId.current=null;} }}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-md overflow-y-auto">
-          <DialogHeader><DialogTitle>{t('add_transaction')}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+        <DialogContent dir={lang === 'ar' || lang === 'fa' ? 'rtl' : 'ltr'}
+          className="box-border !w-[calc(100vw-1.5rem)] !max-w-md min-w-0 max-h-[calc(100dvh-1.5rem)] overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl p-3 pt-5 sm:p-5">
+          <DialogHeader className={lang === 'ar' || lang === 'fa' ? 'ps-9' : 'pe-9'}>
+            <DialogTitle className="break-words text-base sm:text-lg">{t('add_transaction')}</DialogTitle>
+          </DialogHeader>
+          <div className="min-w-0 max-w-full space-y-3 [&_input]:min-w-0 [&_input]:max-w-full [&_button]:max-w-full">
             <div>
               <Label className="text-xs">{t('transaction_type')} *</Label>
               <Select value={form.type} onValueChange={v => {
@@ -846,10 +849,10 @@ export default function Treasury() {
                 setForm(current=>({...current,type:v,account_id:'',wallet:meta?.wallet||current.wallet,
                   branch:current.branch||(!isAllBranches?selectedBranchKey||'':'')}));
               }}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="mt-1 min-w-0 max-w-full [&>span]:truncate">
                   <SelectValue placeholder={local('Select transaction type')} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-w-[calc(100vw-2rem)] overflow-x-hidden">
                   <SelectItem value="__settle_header__" disabled className="font-semibold text-xs text-muted-foreground">— Branch ↔ Owner Settlement —</SelectItem>
                   {TX_TYPES.filter(t => !t.auto && t.settlement).map(t => (
                     <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
@@ -880,15 +883,20 @@ export default function Treasury() {
                   branch:current.branch||account?.branch_key||(!isAllBranches?selectedBranchKey||'':''),
                   wallet:account?accountWalletKey(account):current.wallet}));
               }}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder={local('Select account')} /></SelectTrigger>
-                <SelectContent>{matchingTxnAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.account_name} · {accountFmt(accountBalances[account.id]||0,account)}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="mt-1 min-w-0 max-w-full [&>span]:truncate"><SelectValue placeholder={local('Select account')} /></SelectTrigger>
+                <SelectContent className="max-w-[calc(100vw-2rem)] overflow-x-hidden">{matchingTxnAccounts.map((account) => <SelectItem key={account.id} value={account.id}><span className="inline-block max-w-[75vw] truncate align-middle">{account.account_name} · {accountFmt(accountBalances[account.id]||0,account)}</span></SelectItem>)}</SelectContent>
               </Select>
               {activeAccounts.length === 0 && <p className="mt-1 text-xs text-destructive">{local('No active Treasury account is available.')}</p>}
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div><Label className="text-xs">{local('Date')} *</Label><Input type="date" value={form.date} onChange={e => set('date', e.target.value)} /></div>
-              <div><Label className="text-xs">{local('Amount')} *</Label><Input type="number" inputMode="decimal" value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0" /></div>
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="min-w-0 max-w-full"><Label className="text-xs">{local('Date')} *</Label>
+                <Input dir="ltr" className="mt-1 box-border w-full min-w-0 max-w-full text-base [min-inline-size:0]" type="date"
+                  value={form.date} onChange={e => set('date', e.target.value)} /></div>
+              <div className="min-w-0 max-w-full"><Label className="text-xs">{local('Amount')} *</Label>
+                <Input dir="ltr" className="mt-1 box-border w-full min-w-0 max-w-full text-base tabular-nums [min-inline-size:0]"
+                  type="number" inputMode="decimal" min="0.01" step="0.01"
+                  value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0.00" /></div>
             </div>
 
             {form.account_id && typeConfig?.direction==='out' &&
@@ -900,7 +908,7 @@ export default function Treasury() {
                  ('Warning: current account balance '+fmt(accountBalances[form.account_id]||0)+' is below this outgoing amount. Projected balance: '+fmt(Number(accountBalances[form.account_id]||0)-Number(form.amount))+'.')}
               </p>}
             {showBranch && (
-              <div><Label className="text-xs">{local('Branch')}</Label><BranchSelect value={form.branch} onChange={(branchKey) => {
+              <div className="min-w-0"><Label className="text-xs">{local('Branch')}</Label><BranchSelect value={form.branch} onChange={(branchKey) => {
                 setTransactionError('');
                 set('branch', branchKey);
               }} /></div>
@@ -909,8 +917,8 @@ export default function Treasury() {
             <div>
               <Label className="text-xs">{local('Payment Method')}</Label>
               <Select value={form.payment_method} onValueChange={v => {setTransactionError('');set('payment_method',v);}}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="mt-1 min-w-0 max-w-full [&>span]:truncate"><SelectValue /></SelectTrigger>
+                <SelectContent className="max-w-[calc(100vw-2rem)] overflow-x-hidden">
                   <SelectItem value="cash">{local('Cash')}</SelectItem>
                   <SelectItem value="network">{local('Network')}</SelectItem>
                   <SelectItem value="both">{local('Both')} — {local('Split required')}</SelectItem>
@@ -923,12 +931,12 @@ export default function Treasury() {
               </p>}
             </div>
 
-            <div><Label className="text-xs">{local('Description / Notes')}</Label><Input value={form.description} onChange={e => set('description', e.target.value)} /></div>
+            <div className="min-w-0"><Label className="text-xs">{local('Description / Notes')}</Label><Input className="w-full min-w-0 max-w-full" dir="auto" value={form.description} onChange={e => set('description', e.target.value)} /></div>
 
             {transactionError&&<p role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs font-semibold text-rose-800">{transactionError}</p>}
-            <div className="flex flex-col gap-2 pt-1 sm:flex-row">
-              <Button className="w-full sm:flex-1" onClick={handleSave} disabled={saveMut.isPending || !form.type || !form.account_id || !form.amount || form.payment_method==='both'}>{saveMut.isPending?local('Saving...'):local('Save')}</Button>
-              <Button variant="outline" className="w-full sm:flex-1" onClick={() => setShowForm(false)}>{local('Cancel')}</Button>
+            <div className="sticky bottom-0 z-10 flex min-w-0 flex-col gap-2 border-t border-border bg-background/95 pt-3 pb-1 sm:flex-row">
+              <Button className="w-full min-w-0 sm:flex-1" onClick={handleSave} disabled={saveMut.isPending || !form.type || !form.account_id || !form.amount || form.payment_method==='both'}>{saveMut.isPending?local('Saving...'):local('Save')}</Button>
+              <Button variant="outline" className="w-full min-w-0 sm:flex-1" onClick={() => setShowForm(false)}>{local('Cancel')}</Button>
             </div>
           </div>
         </DialogContent>
