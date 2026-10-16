@@ -11,6 +11,12 @@ const AUTO_BRANCH_IN_TEXT = /main-[a-z0-9]{8,32}/gi;
 // Resolve names only against categories from the same active restaurant.
 const UUID_SUFFIX = /\s*\(([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\)\s*$/i;
 
+export function expenseCategorySuffix(value) {
+  const raw = String(value || '').trim();
+  if (!raw || UUID_SUFFIX.test('(' + raw + ')')) return '';
+  return ' (' + raw + ')';
+}
+
 export function resolveExpenseNotificationTitle(title, type, categories = [], lang = 'en') {
   if (type !== 'expense_recorded' || typeof title !== 'string') return title;
   return title.replace(UUID_SUFFIX, (_match, id) => {
