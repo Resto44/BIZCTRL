@@ -28,6 +28,12 @@ jobs:
           path: tmp/pdfs/complete-*.pdf
           retention-days: 7
       - run: node scripts/audit-i18n-coverage.mjs
+      - run: node scripts/audit-runtime-translation-gaps.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: erp-ar-fa-runtime-gaps
+          path: reports/erp-runtime-translation-gaps.json
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: language-coverage-audit
