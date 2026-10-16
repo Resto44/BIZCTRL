@@ -8,6 +8,7 @@ import ReviewPanel from '@/components/settlement/ReviewPanel';
 import BranchBalanceTracker from '@/components/settlement/BranchBalanceTracker';
 import SettlementAuditLog from '@/components/settlement/SettlementAuditLog';
 import SponsorLedger from '@/components/settlement/SponsorLedger';
+import SponsorOwnerBilateralLedger from '@/components/settlement/SponsorOwnerBilateralLedger';
 
 export default function SponsorTreasury() {
   const { role } = useRole();
@@ -33,7 +34,7 @@ export default function SponsorTreasury() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="mb-4 grid h-auto w-full grid-cols-2 gap-1 p-1 sm:grid-cols-5">
+        <TabsList className="mb-4 grid h-auto w-full grid-cols-2 gap-1 p-1 sm:grid-cols-6">
           <TabsTrigger value="submit" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
             <Send className="w-3 h-3" />Submit
           </TabsTrigger>
@@ -42,6 +43,9 @@ export default function SponsorTreasury() {
           </TabsTrigger>
           <TabsTrigger value="sponsor" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
             <Wallet className="w-3 h-3" />Sponsor
+          </TabsTrigger>
+          <TabsTrigger value="bilateral" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
+            <Wallet className="h-3 w-3" />Sponsor ↔ Owner
           </TabsTrigger>
           <TabsTrigger value="dashboard" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
             <BarChart2 className="w-3 h-3" />Balances
@@ -61,6 +65,10 @@ export default function SponsorTreasury() {
 
         <TabsContent value="sponsor">
           <SponsorLedger />
+        </TabsContent>
+
+        <TabsContent value="bilateral">
+          <SponsorOwnerBilateralLedger />
         </TabsContent>
 
         <TabsContent value="dashboard">
