@@ -124,7 +124,7 @@ mkdirSync(assetsDir, { recursive: true });
 for (const size of [16, 32, 72, 96, 128, 144, 152, 180, 192, 384, 512]) {
   const image = createPNG(size, renderSquare(icon, size));
   if (size === 16 || size === 32) writeFileSync(resolve(assetsDir, 'favicon-'+size+'-v3.png'), image);
-  if (size === 180) writeFileSync(resolve(assetsDir, 'apple-touch-icon-180-v2.png'), image);
+  if (size === 180) writeFileSync(resolve(assetsDir, 'apple-touch-icon-180-v3.png'), image);
   if (size === 192 || size === 512) writeFileSync(resolve(assetsDir, 'bizctrl-icon-'+size+'-v3.png'), image);
   if (![16, 32, 180].includes(size)) writeFileSync(resolve(assetsDir, 'icon-'+size+'.png'), image);
 }
