@@ -666,7 +666,7 @@ const BottomNav = memo(function BottomNav() {
                   }`}
                 >
                   <NavIcon className={`w-5 h-5 flex-shrink-0 ${showMore ? 'stroke-[2.5]' : ''}`} />
-                  <span className={`mt-0.5 w-full break-words text-center text-[9px] leading-tight ${showMore ? 'font-semibold' : 'font-medium'}`}>
+                  <span data-erp-nav-label="true" className={`mt-0.5 w-full break-words text-center text-xs leading-[1.35] ${showMore ? 'font-bold' : 'font-semibold'}`}>
                     {t(labelKey) || 'More'}
                   </span>
                 </button>
@@ -684,7 +684,7 @@ const BottomNav = memo(function BottomNav() {
                 }`}
               >
                 <NavIcon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'stroke-[2.5]' : ''}`} />
-                <span className={`mt-0.5 w-full break-words text-center text-[9px] leading-tight ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                <span data-erp-nav-label="true" className={`mt-0.5 w-full break-words text-center text-xs leading-[1.35] ${isActive ? 'font-bold' : 'font-semibold'}`}>
                   {t(labelKey) || labelKey.replace(/_/g, ' ')}
                 </span>
               </Link>
