@@ -1,10 +1,10 @@
 import { drawLocalizedPdfText } from './pdfLocalization';
 
-/** Shared BizCTRL report identity. Original PWA icon is fetched same-origin when available. */
+/** Shared BizCTRL report identity. User-approved glossy v3 PWA icon is fetched same-origin when available. */
 export async function loadERPReportIcon() {
   if(typeof window === 'undefined' || typeof fetch !== 'function' || typeof FileReader === 'undefined') return null;
   try {
-    const response=await fetch('/icons/bizctrl-icon-192-v2.png',{cache:'force-cache'});
+    const response=await fetch('/icons/bizctrl-icon-192-v3.png',{cache:'force-cache'});
     if(!response.ok) return null;
     const blob=await response.blob();
     return await new Promise(resolve=>{
