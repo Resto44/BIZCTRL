@@ -4,7 +4,8 @@
  */
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { readSponsorSettlementRows } from '@/lib/sponsorSettlementStatement';
 import { useLanguage } from '@/lib/LanguageContext';
 import { formatCurrency } from '@/lib/helpers';
 import { Card } from '@/components/ui/card';
@@ -38,16 +39,16 @@ const FLOW_COLOR = {
 
 export default function SettlementAuditLog() {
   const { currency } = useLanguage();
-  const { ownerFilter } = useTenant();
+  const { activeRestaurantId } = useTenant();
   const fmt = v => formatCurrency(v, currency);
   const [search, setSearch] = useState('');
   const [zoomImg, setZoomImg] = useState(null);
 
-  const { data: settlements = [], isLoading } = useQuery({
-    queryKey: ['settlements_all', ownerFilter],
-    queryFn: () => base44.entities.SettlementRecord.filter(ownerFilter, '-date', 500),
+  const { data: settlements = [], isLoading, isError } = useQuery({
+    queryKey: ['sponsor-settlement-ledger', activeRestaurantId],
+    queryFn: () => readSponsorSettlementRows(supabase, activeRestaurantId),
     staleTime: 30000,
-    enabled: !!ownerFilter.created_by,
+    enabled: Boolean(activeRestaurantId),
   });
 
   const stats = useMemo(() => ({
@@ -70,6 +71,8 @@ export default function SettlementAuditLog() {
       FLOW_LABEL[s.flow_type]?.toLowerCase().includes(q)
     );
   }, [settlements, search]);
+
+  if (isError) return <div role="alert" className="rounded-xl border border-rose-300 p-4 text-sm text-rose-700">Complete sponsor audit history could not be loaded. No partial report is shown.</div>;
 
   return (
     <div className="space-y-4">
