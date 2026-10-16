@@ -2315,7 +2315,7 @@ const translations = {
     tier_silver: 'فضي',
     tier_gold: 'ذهبي',
     tier_platinum: 'بلاتيني',
-    tier_vip: 'العضوية المميزة (VIP)',
+    tier_vip: 'عميل مميز',
     filter_all: 'الكل',
     filter_vip: 'VIP فقط',
     filter_outstanding: 'لديه رصيد',
