@@ -42,8 +42,11 @@ export function validateSponsorOwnerEntry({kind,amount,date,accountId,notes,refe
     return 'amount';
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return 'date';
   const d=new Date(date+'T00:00:00Z');
+  const now=new Date();
+  const localToday=[now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),
+    String(now.getDate()).padStart(2,'0')].join('-');
   if(Number.isNaN(d.valueOf())||d.toISOString().slice(0,10)!==date
-      ||date>new Date().toISOString().slice(0,10))return 'date';
+      ||date>localToday)return 'date';
   if(String(notes||'').length>1000 || String(reference||'').length>120)return 'notes';
   return null;
 }
