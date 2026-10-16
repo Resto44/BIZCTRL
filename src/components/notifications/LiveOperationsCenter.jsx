@@ -72,7 +72,7 @@ function StatCard({ label, value, color }) {
 }
 
 export default function LiveOperationsCenter() {
-  const { notifications } = useNotifications();
+  const { notifications, expenseCategories } = useNotifications();
   const { branches } = useTenant();
   const { lang, translateLiteral } = useLanguage();
   const navigate = useNavigate();
@@ -161,7 +161,7 @@ export default function LiveOperationsCenter() {
         <div className="space-y-2">
           <AnimatePresence mode="popLayout">
             {recent.map(raw => {
-              const n = localizeNotificationContent(presentNotificationBranches(raw, branches, translateLiteral('Branch')), lang);
+              const n = localizeNotificationContent(presentNotificationBranches(raw, branches, translateLiteral('Branch'), { expenseCategories, lang }), lang);
               const cfg = TYPE_ICONS[n.type] || TYPE_ICONS.info;
               const Icon = cfg.icon;
               const route = TYPE_ROUTE[n.type];
