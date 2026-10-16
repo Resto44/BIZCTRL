@@ -85,3 +85,14 @@ export const ownerReportPersian = Object.freeze({
  noRateChanges:'در این دوره تغییر قیمت تأمین‌کننده ثبت نشده است.',
  noPeriodData:'برای این دوره اطلاعات ثبت‌شده موجود نیست.',
 });
+
+import { translateInterface } from './translateInterface.js';
+
+/** Preserve page-specific human translations, fill every known English fallback. */
+export function completeOwnerReportCopy(copy, lang) {
+  if (lang === 'en') return copy;
+  const manual = lang === 'ar' ? ownerReportArabic : ownerReportPersian;
+  return Object.fromEntries(Object.entries(copy).map(([key, original]) => [
+    key, manual[key] ?? translateInterface(original, lang),
+  ]));
+}
