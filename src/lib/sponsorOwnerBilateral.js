@@ -72,6 +72,7 @@ export function sponsorOwnerError(error,labels) {
   if(s.includes('ERP_SPONSOR_OWNER_INSUFFICIENT_TREASURY'))return labels.funds;
   if(s.includes('ERP_SPONSOR_OWNER_ACCOUNT_INVALID')||s.includes('ERP_SPONSOR_OWNER_WALLET_INVALID'))return labels.accountInvalid;
   if(s.includes('ERP_SPONSOR_OWNER_OWNER_ONLY')||error?.code==='42501')return labels.permission;
+  if(s.includes('ERP_SPONSOR_OWNER_DUPLICATE_CUSTODY_REF'))return labels.custodyDuplicate;
   if(s.includes('ERP_SPONSOR_OWNER_IDEMPOTENCY_CONFLICT'))return labels.duplicate;
   return labels.saveFailed;
 }
