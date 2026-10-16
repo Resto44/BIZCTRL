@@ -6,6 +6,9 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { readSponsorSettlementRows } from '@/lib/sponsorSettlementStatement';
+import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
@@ -40,7 +43,7 @@ const STATUS_BADGE = {
 export default function ReviewPanel() {
   const { user } = useAuth();
   const { currency } = useLanguage();
-  const { orgId } = useTenant();
+  const { orgId, activeRestaurantId, branches } = useTenant();
   const fmt = v => formatCurrency(v, currency);
   const qc = useQueryClient();
 
@@ -55,11 +58,11 @@ export default function ReviewPanel() {
 
   const { ownerFilter } = useTenant();
 
-  const { data: settlements = [], isLoading } = useQuery({
-    queryKey: ['settlements_all', orgId],
-    queryFn: () => base44.entities.SettlementRecord.filter({ created_by: orgId }, '-date', 300),
+  const { data: settlements = [], isLoading, isError: settlementReadError } = useQuery({
+    queryKey: ['sponsor-settlement-ledger', activeRestaurantId],
+    queryFn: () => readSponsorSettlementRows(supabase, activeRestaurantId),
     staleTime: 20000,
-    enabled: !!orgId,
+    enabled: Boolean(activeRestaurantId),
   });
 
   const { data: networkAccounts = [] } = useQuery({
@@ -76,10 +79,11 @@ export default function ReviewPanel() {
 
   const updateMut = useMutation({
     mutationFn: ({ id, data }) => base44.entities.SettlementRecord.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['settlements_all'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sponsor-settlement-ledger', activeRestaurantId] }); qc.invalidateQueries({ queryKey: ['settlements_all'] }); },
   });
 
   const handleVerify = async (s) => {
+    if(settlementReadError || isLoading) return;
     await updateMut.mutateAsync({
       id: s.id,
       data: { status: 'verified', verified_by: user?.email, verified_at: new Date().toISOString() },
@@ -100,6 +104,7 @@ export default function ReviewPanel() {
   };
 
   const handleApprove = async (s) => {
+    if(settlementReadError || isLoading) return;
     await updateMut.mutateAsync({
       id: s.id,
       data: { status: 'approved', reviewed_by: user?.email, reviewed_at: new Date().toISOString(), is_locked: true },
@@ -121,7 +126,7 @@ export default function ReviewPanel() {
   };
 
   const handleReject = async () => {
-    if (!rejectReason.trim()) return;
+    if (settlementReadError || isLoading || !rejectReason.trim()) return;
     await updateMut.mutateAsync({
       id: rejectDialog.id,
       data: { status: 'rejected', rejection_reason: rejectReason, reviewed_by: user?.email, reviewed_at: new Date().toISOString() },
@@ -153,12 +158,22 @@ export default function ReviewPanel() {
   };
 
   const handleAddFlow = async () => {
-    if (!flowForm.amount || !flowForm.date) return;
+    const amount = Number(flowForm.amount);
+    const chosenBranch = branches.find(b => (b.key || b.branch_key) === flowForm.branch && b.id);
+    if (saving) return;
+    if (!activeRestaurantId || !chosenBranch || !flowForm.date ||
+        !Number.isFinite(amount) || amount <= 0 || Math.abs(amount*100-Math.round(amount*100))>0.00001 ||
+        settlementReadError) {
+      toast.error('Select a valid branch, date and amount. Complete sponsor ledger must be available.');
+      return;
+    }
     setSaving(true);
     const record = await base44.entities.SettlementRecord.create({
       flow_type: addFlowDialog,
+      restaurant_id: activeRestaurantId,
+      branch_id: chosenBranch.id,
       date: flowForm.date,
-      amount: parseFloat(flowForm.amount),
+      amount,
       branch: flowForm.branch,
       notes: flowForm.notes,
       reference_id: flowForm.reference_id,
@@ -188,9 +203,11 @@ export default function ReviewPanel() {
       branch: flowForm.branch,
       actorEmail: user?.email,
       actorName: user?.full_name,
+      restaurantId: activeRestaurantId,
       metadata: { settlement_id: record.id },
     });
 
+    qc.invalidateQueries({ queryKey: ['sponsor-settlement-ledger', activeRestaurantId] });
     qc.invalidateQueries({ queryKey: ['settlements_all'] });
     qc.invalidateQueries({ queryKey: ['settlements_dashboard'] });
     setSaving(false);
@@ -200,13 +217,14 @@ export default function ReviewPanel() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
+      {settlementReadError && <Card role="alert" className="border-rose-300 p-3 text-sm text-rose-700">Complete sponsor settlement history could not be loaded. Approval and transfers are disabled until it is restored.</Card>}
       {/* Action buttons */}
       <div className="flex gap-2 flex-wrap">
-        <Button size="sm" variant="outline" className="text-violet-700 border-violet-300" onClick={() => setAddFlowDialog('SPONSOR_TO_OWNER')}>
+        <Button size="sm" variant="outline" className="text-violet-700 border-violet-300" onClick={() => setAddFlowDialog('SPONSOR_TO_OWNER')} disabled={settlementReadError || isLoading}>
           + Sponsor → Owner Transfer
         </Button>
-        <Button size="sm" variant="outline" className="text-emerald-700 border-emerald-300" onClick={() => setAddFlowDialog('OWNER_TO_BRANCH')}>
+        <Button size="sm" variant="outline" className="text-emerald-700 border-emerald-300" onClick={() => setAddFlowDialog('OWNER_TO_BRANCH')} disabled={settlementReadError || isLoading}>
           + Owner → Branch Funding
         </Button>
       </div>
