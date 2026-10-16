@@ -98,7 +98,11 @@ export default function OwnerPersonalFinance() {
     return label('Saving failed. Check the amount and try again.', 'ذخیره ناموفق بود. مبلغ را بررسی کرده دوباره تلاش کنید.', 'تعذر الحفظ. تحقق من المبلغ وحاول مجددًا.');
   };
   const proofRef = useRef();
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k, v) => {
+    pendingRequestId.current = null;
+    setSaveError('');
+    setForm(previous => ({ ...previous, [k]: v }));
+  };
 
   const { data: records = [], isLoading, isError: recordsError, refetch: retryRead } = useQuery({
     queryKey: ['owner_personal_finance', activeRestaurantId, user?.email],
@@ -538,7 +542,7 @@ export default function OwnerPersonalFinance() {
               <Button className="flex-1" onClick={handleSave} disabled={saveMut.isPending || uploading || !form.amount}>
                 {saveMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
               </Button>
-              <Button variant="outline" className="flex-1" onClick={() => setShowForm(null)}>Cancel</Button>
+              <Button variant="outline" className="flex-1" disabled={saveMut.isPending} onClick={() => setShowForm(null)}>Cancel</Button>
             </div>
           </div>
         </DialogContent>
