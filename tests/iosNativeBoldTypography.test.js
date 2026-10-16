@@ -6,9 +6,9 @@ describe('Native iOS-style bold fonts for trilingual ERP', () => {
   const css = read('../src/index.css');
   const body = css.slice(css.indexOf('  body {', css.indexOf('@layer base {', css.indexOf(':root'))),
     css.indexOf('/* ─── Dark surface consistency'));
-  it('uses a bundled shared Persian/Arabic font and native English fallback', () => {
+  it('prefers iOS system glyphs with bundled Persian/Arabic fallback off Apple devices', () => {
     expect(css).toContain("--font-ui: -apple-system, BlinkMacSystemFont, 'Inter'");
-    expect(css).toContain("--font-rtl: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Noto Sans Arabic'");
+    expect(css).toContain("--font-rtl: -apple-system, BlinkMacSystemFont, 'Vazirmatn', 'Noto Sans Arabic'");
     expect(css).toContain('html:lang(fa), html:lang(ar)');
     expect(css).toContain('--font-ui: var(--font-rtl)');
     expect(css).toContain('font-family: var(--font-ui)');
@@ -25,7 +25,7 @@ describe('Native iOS-style bold fonts for trilingual ERP', () => {
     expect(body).toContain('font-weight: var(--erp-weight-body)');
     expect(read('../src/components/ui/button.jsx')).toContain('rounded-md text-sm font-semibold transition-colors');
     expect(read('../src/components/ui/tabs.jsx')).toContain('text-sm font-semibold ring-offset-background');
-    expect(read('../src/components/ui/label.jsx')).toContain('text-sm font-semibold leading-none');
+    expect(read('../src/components/ui/label.jsx')).toContain('text-sm font-semibold leading-normal');
     expect(read('../src/components/help/HelpCenter.jsx')).toContain('className="block text-sm font-semibold"');
   });
   it('does not reintroduce unequal per-language text sizes or iPhone input zoom', () => {
