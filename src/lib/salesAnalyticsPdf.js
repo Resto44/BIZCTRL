@@ -17,12 +17,20 @@ export async function generateSalesAnalyticsPDF({
  const language=['ar','fa','en'].includes(lang)?lang:'en';
  const doc=new jsPDF({unit:'mm',format:'a4',putOnlyUsedFonts:true});
  prepareLocalizedPdf(doc,{lang:language,dir:language==='en'?'ltr':'rtl'});
+ // Stamp the actual PDF export, independently from the app's browser fonts.
+ // Saved PDFs are immutable: changing the SaaS UI never edits an older file.
+ doc.__erpPdfTypographyVersion = '2026-10-16-modern';
+ doc.setProperties({
+  title: 'BizCTRL ERP | Two-page financial analytics',
+  subject: 'Modernized embedded Arabic/Persian PDF typography, revision 2026-10-16',
+  creator: 'BizCTRL ERP',
+ });
  const iconData=await loadERPReportIcon();
  drawTwoPageERPReport(doc,{
   snapshot,previousSnapshot,growth,range,report:operationsReport,branchLabel,
   businessName,currency,lang:language,iconData,fullAnalytics,
  });
 
- if(download)doc.save(safePdfFilename('BizCTRL-Sales-Analytics-'+range.from+'-'+range.to,language));
+ if(download)doc.save(safePdfFilename('BizCTRL-ERP-Analytics-v2-'+range.from+'-'+range.to,language));
  return doc;
 }
