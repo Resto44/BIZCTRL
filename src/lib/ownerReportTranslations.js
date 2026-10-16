@@ -1,0 +1,98 @@
+/**
+ * Explicit Owner ERP report translations for fields previously inherited
+ * untranslated from EN. Do not localize financial values or user-entered data.
+ */
+export const ownerReportArabic = Object.freeze({
+ sales:'المبيعات', netProfit:'صافي الربح', netMargin:'هامش صافي الربح',
+ profit:'الربح', health:'الحالة', executiveSnapshot:'الملخص التنفيذي',
+ verifiedERP:'بيانات ERP معتمدة', receivables:'الذمم المدينة',
+ payables:'الذمم الدائنة', activeRisks:'المخاطر النشطة',
+ branchCommand:'لوحة إدارة الفروع',
+ branchCommandHint:'ترتيب الفروع حسب المبيعات المعتمدة خلال الفترة المحددة',
+ noBranchData:'لا توجد مبيعات مسجلة للفروع خلال هذه الفترة.',
+ ownerAttention:'تتطلب انتباه المالك',
+ ownerAttentionHint:'أهم الحالات الاستثنائية في نظام ERP',
+ noRisks:'لا توجد مخاطر نشطة، وسير العمليات طبيعي.',
+ inventoryPulse:'مؤشرات المخزون',
+ inventoryPulseHint:'الحالة الحالية للمخزون في النطاق المحدد',
+ stockValue:'قيمة المخزون',activeProducts:'المنتجات النشطة',
+ lowStock:'مخزون منخفض',outOfStock:'نفاد المخزون',
+ addBranch:'إضافة فرع',compare:'مقارنة',scheduled:'المجدولة',
+ alerts:'التنبيهات',reportDirectory:'فهرس التقارير الكامل',
+ reportDirectoryHint:'افتح جميع تقارير ERP مباشرةً من لوحة التحكم',
+ branchAnalytics:'تحليلات الفروع',salesAnalytics:'تحليلات المبيعات',
+ biCenter:'مركز ذكاء الأعمال',activityLog:'سجل النشاط',
+ revenue:'الإيرادات',grossProfit:'إجمالي الربح',
+ operatingExpense:'المصروفات التشغيلية',
+ revenueTrend:'اتجاه الإيرادات',
+ revenueTrendHint:'الإيرادات اليومية المعتمدة في الفترة المحددة',
+ revenueMix:'توزيع الإيرادات',
+ revenueMixHint:'طرق الدفع ومصادر المبيعات المهيأة',
+ cash:'نقدي',network:'الشبكة',credit:'آجل',otherSources:'مصادر أخرى',
+ expenseControl:'مراقبة المصروفات',
+ expenseControlHint:'المصروفات حسب تصنيفات ERP في الفترة المحددة',
+ noExpenseData:'لا توجد مصروفات مسجلة خلال هذه الفترة.',
+ cashAndObligations:'السيولة والالتزامات',
+ cashAndObligationsHint:'السيولة والذمم المدينة ومستحقات الموردين',
+ register:'الصندوق النقدي',operatingCash:'النقد التشغيلي',
+ profitLoss:'الربح والخسارة',cashFlow:'التدفق النقدي',
+ balanceSheet:'الميزانية العمومية',expenses:'المصروفات',
+ purchases:'المشتريات',supplierLedger:'كشف حساب الموردين',
+ debts:'الديون والذمم',treasury:'الخزينة',
+ ingredientsUsed:'المكونات المستهلكة',
+ verifiedMovements:'حركات المخزون المعتمدة',
+ consumptionCost:'تكلفة الاستهلاك',wasteCost:'تكلفة الهدر',
+ units:'وحدات',
+ periodConsumptionHint:'محسوب من المبيعات المعتمدة وحركات المخزون للفترة المحددة، وليس من كميات الشراء',
+ product:'المنتج',used:'المستهلك',usageCost:'تكلفة الاستخدام',
+ stockLeft:'المخزون المتبقي',status:'الحالة',review:'مراجعة',
+ healthy:'سليم',
+ noConsumptionData:'لا توجد حركة لاستهلاك المكونات في الفترة المحددة. اضبط الوصفات أو الخصم من المخزون عند البيع لعرض التقرير.',
+ procurementPulse:'مؤشرات المشتريات',
+ procurementPulseHint:'إيصالات الموردين المعتمدة خلال الفترة المحددة',
+ purchasedQty:'الكمية المشتراة',purchaseCost:'تكلفة الشراء',
+ suppliers:'الموردون',stockHealth:'سلامة المخزون',
+ stockHealthHint:'مخاطر توفر المخزون في نطاق الفروع المحدد',
+ products:'المنتجات',inventoryCommand:'مركز إدارة المخزون',
+ inventoryLedger:'سجل حركة المخزون',wasteReport:'تقرير الهدر',
+ stockTransfers:'تحويلات المخزون',productMaster:'إدارة المنتجات الرئيسية',
+ procurement:'المشتريات والتوريد',peoplePayroll:'الموظفون والرواتب',
+ targetMargin:'هامش الربح المستهدف',averageMargin:'متوسط هامش الربح',
+ costIncreases:'ارتفاع تكاليف الشراء',needsAction:'يتطلب إجراءً',
+ critical:'حرج',watch:'للمتابعة','no-data':'لا توجد بيانات',
+ marginIntelligence:'تحليلات هوامش الربح',
+ marginIntelligenceHint:'التكلفة الحالية وسعر البيع والتوصية وفق الهامش المستهدف',
+ cost:'التكلفة',sellingPrice:'سعر البيع',margin:'الهامش',
+ suggestedPrice:'السعر المقترح',costChange:'تغير التكلفة',
+ noPriceData:'لا توجد بيانات أسعار للمنتجات. أضف التكلفة وسعر البيع في إدارة المنتجات الرئيسية.',
+ supplierComparison:'مقارنة أسعار الموردين',
+ supplierComparisonHint:'أحدث عرض مسجل لكل مورد ومنتج',
+ save:'وفّر',noSupplierComparison:'لا توجد أسعار من عدة موردين للمنتج نفسه خلال الفترة المحددة.',
+ branchRateConsistency:'اتساق الأسعار بين الفروع',
+ branchRateConsistencyHint:'المنتجات التي تختلف تكلفتها المسجلة بين الفروع',
+ consistentRates:'لا توجد فروق في التكاليف المسجلة بين الفروع ضمن السجل المحدد.',
+ rateAudit:'سجل مراجعة الأسعار',
+ rateAuditHint:'تغيرات تكلفة المورد المسجلة خلال الفترة المحددة',
+ noRateChanges:'لم تُسجل تغييرات في أسعار الموردين خلال هذه الفترة.',
+ priceOptimization:'تحسين الأسعار',purchaseOrders:'أوامر الشراء',
+ noPeriodData:'لا توجد بيانات مسجلة لهذه الفترة.',
+ unable:'تعذر تحديث بعض بيانات ERP. الأرقام المعروضة تستند فقط إلى السجلات المعتمدة المتاحة.',
+});
+export const ownerReportPersian = Object.freeze({
+ noPriceData:'اطلاعات قیمت محصولات موجود نیست. قیمت خرید و فروش را در مدیریت محصولات ثبت کنید.',
+ noSupplierComparison:'در دورهٔ انتخاب‌شده هیچ محصولی از چند تأمین‌کننده قیمت ثبت‌شده ندارد.',
+ consistentRates:'در سوابق انتخاب‌شده اختلاف هزینهٔ بین شعبه‌ها ثبت نشده است.',
+ noRateChanges:'در این دوره تغییر قیمت تأمین‌کننده ثبت نشده است.',
+ noPeriodData:'برای این دوره اطلاعات ثبت‌شده موجود نیست.',
+});
+
+import { translateInterface } from './translateInterface.js';
+
+/** Preserve page-specific human translations, fill every known English fallback. */
+export function completeOwnerReportCopy(copy, lang) {
+  if (lang === 'en') return copy;
+  const manual = lang === 'ar' ? ownerReportArabic : ownerReportPersian;
+  return Object.fromEntries(Object.entries(copy).map(([key, original]) => [
+    key, manual[key] ?? translateInterface(original, lang),
+  ]));
+}

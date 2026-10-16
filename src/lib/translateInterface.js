@@ -6,6 +6,14 @@ import persianUiPhrases from './persianUiPhrases.js';
 import erpInterfacePhrases from './erpInterfacePhrases.js';
 import { interpolate, normalizeLanguage } from './localization.js';
 
+// Numeric UI counters can render in the same DOM text node as the label.
+// Translate only known count-unit words; never parse arbitrary business data.
+const LOCALIZED_COUNT_UNITS = new Set([
+  'item','items','product','products','branch','branches','employee','employees',
+  'record','records','order','orders','day','days','ticket','tickets',
+  'notification','notifications','shift','shifts','driver','drivers',
+]);
+
 // Normalize typography, not business values. Matching stays whole-phrase only.
 export const normalizeInterfacePhrase = value => String(value).replace(/&amp;/g, '&').replace(/&apos;/g, "'").replace(/\s+/g, ' ').trim();
 const catalogs = { en: new Map(), fa: new Map(), ar: new Map() };
@@ -44,5 +52,18 @@ export function translateInterface(value, language, values) {
   // Preserve the numeric payload; never translate arbitrary substrings or IDs.
   const counted = source.match(/^(.*?)\s*(\([\d,]+\)|[:：…]|\.\.\.|[()·—])$/);
   if (counted && lookup(counted[1]) !== undefined) return `${interpolate(lookup(counted[1]), values)}${counted[2].startsWith('(') ? ' ' : ''}${counted[2]}`;
+  if (lang !== 'en') {
+    const numberFirst = source.match(/^([+-]?\d[\d,.]*)\s+([A-Za-z]+)$/);
+    if (numberFirst && LOCALIZED_COUNT_UNITS.has(numberFirst[2].toLowerCase())) {
+      const unit = lookup(numberFirst[2]);
+      if (unit && unit !== numberFirst[2]) return `${numberFirst[1]} ${unit}`;
+    }
+    const metric = source.match(/^([A-Za-z][A-Za-z /&-]{1,35}):\s*([+-]?(?:(?:SAR|USD|EUR|AED)\s*)?[\d,]+(?:\.[\d]+)?%?)$/);
+    if (metric) {
+      const translatedLabel = lookup(metric[1]) ?? lookup(metric[1] + ':');
+      if (translatedLabel && translatedLabel !== metric[1] && translatedLabel !== metric[1] + ':')
+        return `${translatedLabel.replace(/:$/, '')}: ${metric[2]}`;
+    }
+  }
   return interpolate(translateInterfaceDate(source, lang) ?? source, values);
 }
