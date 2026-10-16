@@ -6,6 +6,22 @@
 const AUTO_BRANCH_KEY = /^main-[a-z0-9]{8,32}$/i;
 const AUTO_BRANCH_IN_TEXT = /main-[a-z0-9]{8,32}/gi;
 
+// Older generated expense notifications append the category's UUID to the title.
+// The UUID belongs in storage/audit, not in the customer-facing notification.
+// Resolve names only against categories from the same active restaurant.
+const UUID_SUFFIX = /\s*\(([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\)\s*$/i;
+
+export function resolveExpenseNotificationTitle(title, type, categories = [], lang = 'en') {
+  if (type !== 'expense_recorded' || typeof title !== 'string') return title;
+  return title.replace(UUID_SUFFIX, (_match, id) => {
+    const category = (categories || []).find(c => String(c.id).toLowerCase() === id.toLowerCase());
+    const localized = lang === 'fa' ? category?.name_fa : lang === 'ar' ? category?.name_ar : null;
+    const label = String(localized || category?.name || '').trim();
+    return label ? ' (' + label + ')' : '';
+  });
+}
+
+
 export function isTechnicalBranchKey(value) {
   return AUTO_BRANCH_KEY.test(String(value || '').trim());
 }
@@ -21,7 +37,7 @@ export function resolveNotificationBranchName(value, branches = [], unknown = 'B
   return isTechnicalBranchKey(key) ? unknown : key;
 }
 
-export function presentNotificationBranches(notification, branches = [], unknown = 'Branch') {
+export function presentNotificationBranches(notification, branches = [], unknown = 'Branch', { expenseCategories = [], lang = 'en' } = {}) {
   if (!notification) return notification;
   const canonical = String(notification.branch || '').trim();
   const displayBranch = resolveNotificationBranchName(canonical, branches, unknown);
@@ -38,7 +54,7 @@ export function presentNotificationBranches(notification, branches = [], unknown
   return {
     ...notification,
     branch: displayBranch,
-    title: render(notification.title),
+    title: resolveExpenseNotificationTitle(render(notification.title), notification.type, expenseCategories, lang),
     message: render(notification.message),
   };
 }
