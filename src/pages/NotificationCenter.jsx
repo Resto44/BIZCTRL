@@ -15,7 +15,7 @@ import SoundSettings from '@/components/notifications/SoundSettings';
 import OwnerPushSettings from '@/components/notifications/OwnerPushSettings';
 
 export default function NotificationCenter() {
-  const { notifications, unreadCount, markAllRead } = useNotifications();
+  const { notifications, unreadCount, markAllRead, expenseCategories } = useNotifications();
   const { t, lang, translateLiteral } = useLanguage();
   const { branches } = useTenant();
   const [search, setSearch] = useState('');
@@ -31,13 +31,13 @@ export default function NotificationCenter() {
       if (filterBranch !== 'all' && n.branch !== filterBranch) return false;
       if (search) {
         const q = search.toLowerCase();
-        const display = localizeNotificationContent(presentNotificationBranches(n, branches, translateLiteral('Branch')), lang);
+        const display = localizeNotificationContent(presentNotificationBranches(n, branches, translateLiteral('Branch'), { expenseCategories, lang }), lang);
         if (!display.title?.toLowerCase().includes(q) && !display.message?.toLowerCase().includes(q)
           && !display.branch?.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [notifications, filterSeverity, filterRead, filterBranch, search, branches, translateLiteral, lang]);
+  }, [notifications, filterSeverity, filterRead, filterBranch, search, branches, expenseCategories, translateLiteral, lang]);
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-4">
