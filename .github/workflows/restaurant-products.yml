@@ -21,6 +21,12 @@ jobs:
       - run: npm install --global pnpm@11.19.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec vitest run
+      - run: node scripts/render-complete-analytics-fixtures.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bizctrl-erp-pdf-typography-preview
+          path: tmp/pdfs/complete-*.pdf
+          retention-days: 7
       - run: node scripts/audit-i18n-coverage.mjs
       - uses: actions/upload-artifact@v4
         with:

@@ -80,7 +80,11 @@ describe('Premium two-page vector ERP analytics PDF', () => {
     const calls = [];
     const original = doc.text.bind(doc);
     vi.spyOn(doc, 'text').mockImplementation((v, x, y, options = {}) => {
-      calls.push({ value: String(v), x, y, options });
+      // Text weight and font size now vary by semantic role. Measure the width
+      // at draw time with the actual active font; the last PDF font differs.
+      const value = String(v);
+      const measured = doc.getTextWidth(doc.processArabic(value));
+      calls.push({ value, x, y, options, measured });
       return original(v, x, y, options);
     });
     drawTwoPageERPReport(doc, {
@@ -94,8 +98,7 @@ describe('Premium two-page vector ERP analytics PDF', () => {
     expect(doc.getNumberOfPages()).toBe(2);
     expect(doc.internal.pageSize.getWidth()).toBeCloseTo(210, 0);
     expect(calls.length).toBeGreaterThan(60);
-    for (const { value, x, y, options } of calls) {
-      const measured = doc.getTextWidth(doc.processArabic(value));
+    for (const { value, x, y, options, measured } of calls) {
       const left = options.align === 'right' ? x - measured
         : options.align === 'center' ? x - measured / 2 : x;
       expect(left, value).toBeGreaterThanOrEqual(6.8);

@@ -30,15 +30,25 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
  const num=v=>v==null||!Number.isFinite(Number(v))?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:2});
  const money=v=>v==null?'—':num(v)+' '+currency;
  const pct=v=>v==null?'—':num(v)+'%';
- const text=(v,x,y,w,size=8,color=C.ink,align=rtl?'right':'left')=>drawLocalizedPdfText(doc,String(v??'—'),align==='right'?x+w:align==='center'?x+w/2:x,y,{rtl,bold:true,size,color,align,fit:true,maxWidth:w});
- const panel=(title,x,y,w,h)=>{doc.setFillColor(255,255,255);doc.setDrawColor(...C.line);doc.setLineWidth(.2);doc.roundedRect(x,y,w,h,2.5,2.5,'FD');if(title){doc.setFillColor(...C.bg);doc.roundedRect(x+1.5,y+1.5,w-3,7,1.5,1.5,'F');text(title,x+3,y+6,w-6,9,C.ink);}};
+ // PDF typography is independent from the browser's iOS font stack.
+ // Dense metadata uses a readable semibold face; section headings and KPIs
+ // use the embedded heavy face. Reserve 800 for emphasis, not every word.
+ const TYPO = Object.freeze({
+  section: 10.5, kpiLabel: 8.8, kpiValue: 15,
+  meta: 7.5, axis: 6.7, table: 7.8, legend: 7.5,
+ });
+ const text=(v,x,y,w,size=8.5,color=C.ink,align=rtl?'right':'left',weight='body')=>
+  drawLocalizedPdfText(doc,String(v??'—'),align==='right'?x+w:align==='center'?x+w/2:x,y,{
+   rtl,bold:weight==='heading'||weight==='kpi',size,color,align,fit:true,maxWidth:w,
+  });
+ const panel=(title,x,y,w,h)=>{doc.setFillColor(255,255,255);doc.setDrawColor(...C.line);doc.setLineWidth(.2);doc.roundedRect(x,y,w,h,2.5,2.5,'FD');if(title){doc.setFillColor(...C.bg);doc.roundedRect(x+1.5,y+1.5,w-3,7,1.5,1.5,'F');text(title,x+3,y+6,w-6,TYPO.section,C.ink,rtl?'right':'left','heading');}};
  const empty=(x,y,w)=>text(tr('No recorded data','اطلاعات ثبت نشده','لا بيانات مسجلة'),x,y,w,8,C.muted);
- const row=(label,value,x,y,w,color=C.blue)=>{text(label,x,y,w*.56,7.7,C.muted);text(value,x+w*.59,y,w*.41,8,color);};
+ const row=(label,value,x,y,w,color=C.blue)=>{text(label,x,y,w*.56,8.25,C.muted);text(value,x+w*.59,y,w*.41,8.6,color,rtl?'right':'left','heading');};
  const compact=(rows,limit,key='value')=>rows.length<=limit?rows:[...rows.slice(0,limit-1),{name:tr('Other / combined','سایر موارد / مجموع','أخرى / مجمعة'),[key]:rows.slice(limit-1).reduce((n,r)=>n+(Number(r[key])||0),0)}];
- const note=(value,y)=>{const active=detailViewport;detailViewport=false;text(value,8,y,194,6.7,C.muted);detailViewport=active;};
+ const note=(value,y)=>{const active=detailViewport;detailViewport=false;text(value,8,y,194,TYPO.meta,C.muted);detailViewport=active;};
  const band=()=>{panel('',7,27,196,15);
   const fields=[[tr('Business','کسب‌وکار','المنشأة'),businessName||'BizCTRL'],[tr('Branches','شعبه‌ها','الفروع'),branchLabel||tr('All branches','تمام شعبه‌ها','جميع الفروع')],[tr('Report period','دوره گزارش','فترة التقرير'),range.from+' / '+range.to],[tr('Currency','واحد پول','العملة'),currency]];
-  fields.forEach(([label,value],i)=>{const widths=[49,44,73,30],x=7+widths.slice(0,i).reduce((a,b)=>a+b,0);text(label,x+3,32,widths[i]-6,6.4,C.muted);text(value,x+3,38,widths[i]-6,7.4,C.ink);if(i){doc.setDrawColor(...C.line);doc.line(x,30,x,39);}});
+  fields.forEach(([label,value],i)=>{const widths=[49,44,73,30],x=7+widths.slice(0,i).reduce((a,b)=>a+b,0);text(label,x+3,32,widths[i]-6,7.6,C.muted);text(value,x+3,38,widths[i]-6,8.4,C.ink,rtl?'right':'left','heading');if(i){doc.setDrawColor(...C.line);doc.line(x,30,x,39);}});
  };
  const tint=(color,amount=.93)=>color.map(v=>Math.round(v+(255-v)*amount));
  const spark=(values,x,y,w,h,color)=>{
@@ -60,14 +70,14 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
  const kpis=(items,keys)=>{detailViewport=false;items.forEach(([label,value,color=C.blue],i)=>{
   const x=7+(rtl?2-i%3:i%3)*66,y=46+Math.floor(i/3)*25;
   doc.setFillColor(...tint(color));doc.setDrawColor(...tint(color,.78));doc.roundedRect(x,y,64,23,2.5,2.5,'FD');
-  text(label,x+3,y+5.5,58,8,C.ink);text(value,x+3,y+13,58,13,color);
+  text(label,x+3,y+5.5,58,TYPO.kpiLabel,C.ink);text(value,x+3,y+13,58,TYPO.kpiValue,color,rtl?'right':'left','kpi');
   const key=keys[i];
-  if(key==='growth'){text(growth==null?tr('No comparable prior sales','فروش قبلی قابل مقایسه نیست','لا مبيعات سابقة قابلة للمقارنة'):tr('Compared with prior period','مقایسه با دورهٔ قبلی','مقارنة بالفترة السابقة'),x+3,y+20,58,7,C.muted);return;}
+  if(key==='growth'){text(growth==null?tr('No comparable prior sales','فروش قبلی قابل مقایسه نیست','لا مبيعات سابقة قابلة للمقارنة'):tr('Compared with prior period','مقایسه با دورهٔ قبلی','مقارنة بالفترة السابقة'),x+3,y+20,58,7.2,C.muted);return;}
   const vals=key==='netMargin'?daily.map(d=>d.sales>0?100*(Number(d.netProfit)||0)/d.sales:0):points(daily,({fixedDeduction:'fixed',variableExpenses:'variable',averageDailySales:'sales',netMargin:'netProfit'})[key]||key);
   const now=key==='netMargin'?s.netMargin:key==='averageDailySales'?s.averageDailySales:s[key];
   const was=previous?.[key];const change=was>0?(now-was)/was*100:null;
   spark(vals,x+3,y+16,20,4,color);
-  text(change==null?tr('Period trend','روند دوره','اتجاه الفترة'):((change>0?'+':'')+pct(change)),x+26,y+20,35,6.8,change<0?C.red:C.green);
+  text(change==null?tr('Period trend','روند دوره','اتجاه الفترة'):((change>0?'+':'')+pct(change)),x+26,y+20,35,7.2,change<0?C.red:C.green);
  });detailViewport=true;};
  // Aggregate contiguous buckets without dropping values. Monetary axes include zero and corrections.
  const points=(rows,key,limit=31)=>{const n=Math.max(1,Math.ceil(rows.length/limit)),out=[];for(let i=0;i<rows.length;i+=n)out.push(rows.slice(i,i+n).reduce((v,r)=>v+(Number(r[key])||0),0));return out;};
@@ -75,24 +85,24 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnaps
  const legend=(items,x,y,w)=>items.forEach((item,i)=>{
   const cell=w/items.length,xx=x+i*cell;
   doc.setFillColor(...item.color);doc.rect(rtl?xx+cell-3:xx,y-1.5,1.8,1.8,'F');
-  text(item.name,rtl?xx:xx+3,y,cell-5,6.7,C.muted,rtl?'right':'left');
+  text(item.name,rtl?xx:xx+3,y,cell-5,TYPO.legend,C.muted,rtl?'right':'left');
  });
  const chart=(title,x,y,w,h,series,from=range.from,to=range.to)=>{
   panel(title,x,y,w,h);
   legend(series,x+3,y+11,w-6);
   const all=series.flatMap(s=>s.values),min=Math.min(0,...all),max=Math.max(1,...all),span=max-min;
   const left=x+17,right=x+w-4,top=y+15,bottom=y+h-7;
-  for(let i=0;i<=2;i++){const yy=bottom-(bottom-top)*i/2;doc.setDrawColor(...C.line);doc.setLineWidth(.15);doc.line(left,yy,right,yy);text(num(min+span*i/2),x+1,yy+.5,14,5.6,C.muted,'right');}
+  for(let i=0;i<=2;i++){const yy=bottom-(bottom-top)*i/2;doc.setDrawColor(...C.line);doc.setLineWidth(.15);doc.line(left,yy,right,yy);text(num(min+span*i/2),x+1,yy+.5,14,TYPO.axis,C.muted,'right');}
   for(const s of series){const py=v=>bottom-(bottom-top)*(v-min)/span,px=i=>left+(s.values.length===1?.5:i/(s.values.length-1))*(right-left);doc.setFillColor(...tint(s.color,.87));if(s.values.length)polygon([[px(0),py(0)],...s.values.map((v,i)=>[px(i),py(v)]),[px(s.values.length-1),py(0)]]);doc.setDrawColor(...s.color);doc.setFillColor(...s.color);doc.setLineWidth(.5);s.values.forEach((v,i)=>{if(i)doc.line(px(i-1),py(s.values[i-1]),px(i),py(v));doc.circle(px(i),py(v),.35,'F');});}
   if(!all.length)empty(x+19,y+h/2+3,w-24);
-  text(from,x+3,y+h-2,w/2-3,6,C.muted,'left');text(to,x+w/2,y+h-2,w/2-3,6,C.muted,'right');
+  text(from,x+3,y+h-2,w/2-3,7,C.muted,'left');text(to,x+w/2,y+h-2,w/2-3,7,C.muted,'right');
  };
  const table=(title,x,y,w,h,headers,rows,widths,limit=5)=>{
   panel(title,x,y,w,h);let xx=x+3;
-  headers.forEach((v,i)=>{text(v,xx,y+12,(w-6)*widths[i]-2,6.8,C.muted);xx+=(w-6)*widths[i];});
+  headers.forEach((v,i)=>{text(v,xx,y+12,(w-6)*widths[i]-2,TYPO.table,C.muted);xx+=(w-6)*widths[i];});
   if(!rows.length)empty(x+3,y+23,w-6);
-  rows.slice(0,limit).forEach((values,index)=>{let xx=x+3;const yy=y+19+index*6.3;values.forEach((v,i)=>{text(i===0&&String(v).length>42?String(v).slice(0,40)+'…':v,xx,yy,(w-6)*widths[i]-3,7.1,i?C.blue:C.ink);xx+=(w-6)*widths[i];});});
-  if(rows.length>limit)text(tr('Shown / total: ','نمایش / مجموع: ','المعروض / الإجمالي: ')+limit+' / '+rows.length,x+3,y+h-2,w-6,6,C.muted);
+  rows.slice(0,limit).forEach((values,index)=>{let xx=x+3;const yy=y+19+index*6.3;values.forEach((v,i)=>{text(i===0&&String(v).length>42?String(v).slice(0,40)+'…':v,xx,yy,(w-6)*widths[i]-3,TYPO.table,i?C.blue:C.ink);xx+=(w-6)*widths[i];});});
+  if(rows.length>limit)text(tr('Shown / total: ','نمایش / مجموع: ','المعروض / الإجمالي: ')+limit+' / '+rows.length,x+3,y+h-2,w-6,7,C.muted);
  };
  const daily=s.breakdown||[],prior=previous?.breakdown||[];
  const current=tr('Current','فعلی','الحالي'),before=tr('Previous','قبلی','السابق');
