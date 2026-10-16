@@ -168,6 +168,7 @@ export default function ReviewPanel() {
       return;
     }
     setSaving(true);
+    try {
     const record = await base44.entities.SettlementRecord.create({
       flow_type: addFlowDialog,
       restaurant_id: activeRestaurantId,
@@ -192,7 +193,7 @@ export default function ReviewPanel() {
       OWNER_TO_BRANCH: `Owner allocated ${currency} ${Number(flowForm.amount).toLocaleString()} to branch ${flowForm.branch}`,
     };
 
-    await createNotification({
+    try { await createNotification({
       orgId,
       type: 'branch_to_owner',
       severity: 'info',
@@ -205,15 +206,19 @@ export default function ReviewPanel() {
       actorName: user?.full_name,
       restaurantId: activeRestaurantId,
       metadata: { settlement_id: record.id },
-    });
+    }); } catch(notificationError) { console.warn('Sponsor transfer notification unavailable:',notificationError); }
 
     qc.invalidateQueries({ queryKey: ['sponsor-settlement-ledger', activeRestaurantId] });
     qc.invalidateQueries({ queryKey: ['settlements_all'] });
     qc.invalidateQueries({ queryKey: ['settlements_dashboard'] });
-    setSaving(false);
     setAddFlowDialog(null);
     setFlowForm({ date: format(new Date(), 'yyyy-MM-dd'), amount: '', branch: '', notes: '', reference_id: '' });
     setFlowProof('');
+    } catch(error) {
+      toast.error(error?.message || 'Could not post sponsor transfer.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
