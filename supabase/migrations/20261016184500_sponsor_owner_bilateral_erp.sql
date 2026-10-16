@@ -97,7 +97,6 @@ DECLARE
   v_due numeric;
   v_balance numeric;
   v_movement numeric;
-  v_cents numeric;
   v_is_out boolean;
 BEGIN
   IF auth.uid() IS NULL OR p_restaurant_id IS NULL OR
@@ -127,7 +126,8 @@ BEGIN
        v_existing.kind=p_kind AND v_existing.amount=p_amount AND
        v_existing.effective_date=p_date AND
        coalesce(v_existing.notes,'')=coalesce(nullif(trim(p_notes),''),'') AND
-       coalesce(v_existing.external_reference,'')=coalesce(nullif(trim(p_external_reference),''),'') THEN
+       coalesce(v_existing.external_reference,'')=coalesce(nullif(trim(p_external_reference),''),'') AND
+       coalesce(v_existing.proof_url,'')=coalesce(nullif(trim(p_proof_url),''),'') THEN
        RETURN v_existing; -- Repeated click / timeout: ZERO extra journal entries.
     END IF;
     RAISE EXCEPTION 'ERP_SPONSOR_OWNER_IDEMPOTENCY_CONFLICT' USING ERRCODE='23505';
