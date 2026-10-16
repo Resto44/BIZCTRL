@@ -21,6 +21,7 @@ import { useBranchScope } from '@/lib/BranchScopeContext';
 import { calculateERPAccounting, calculateSalesRevenue, tagExpensesWithCategories } from '@/lib/helpers';
 import { summarizeDrawerCash } from '@/lib/executiveDrawerCash';
 import { useLanguage } from '@/lib/LanguageContext';
+import { completeOwnerReportCopy } from '@/lib/ownerReportTranslations';
 import {
   aggregateDailyRevenue,
   buildBranchPriceInconsistencies,
@@ -135,7 +136,7 @@ function OwnerDashboardContent() {
   const { user } = useAuth();
   const { role, can } = useRole();
   const [searchParams, setSearchParams] = useSearchParams();
-  const copy = COPY[lang] || COPY.en;
+  const copy = useMemo(() => completeOwnerReportCopy(COPY[lang] || COPY.en, lang), [lang]);
   const {
     selectedBranchId,
     selectedBranchKey,
