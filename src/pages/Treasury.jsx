@@ -34,6 +34,7 @@ import {
 } from 'recharts';
 import BranchSelect from '@/components/shared/BranchSelect';
 import SponsorLedger from '@/components/settlement/SponsorLedger';
+import SponsorOwnerBilateralLedger from '@/components/settlement/SponsorOwnerBilateralLedger';
 import BranchSettlementLedger from '@/components/treasury/BranchSettlementLedger';
 import ReconciliationDashboard from '@/components/treasury/ReconciliationDashboard';
 import CashflowProjection from '@/components/treasury/CashflowProjection';
@@ -765,8 +766,9 @@ export default function Treasury() {
         </TabsContent>
 
         {/* ── SPONSOR LEDGER ──────────────────────────────────────────── */}
-        <TabsContent value="sponsor" className="mt-3">
+        <TabsContent value="sponsor" className="mt-3 space-y-4">
           <SponsorLedger />
+          <SponsorOwnerBilateralLedger />
         </TabsContent>
 
         {/* ── CASHFLOW FORECAST ────────────────────────────────────────── */}
