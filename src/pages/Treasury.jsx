@@ -72,6 +72,11 @@ const TX_TYPES = [
   // Pure owner
   { value: 'owner_external_debt',       label: 'External Debt (Owner)',           wallet: 'owner_network', direction: 'out' },
   { value: 'owner_personal_withdrawal', label: 'Personal Withdrawal',             wallet: 'owner_cash',    direction: 'out' },
+  // Posted through owner-only atomic Sponsor↔Owner RPC, never from manual TX form.
+  { value: 'sponsor_advance_to_owner', label: 'Sponsor Loan to Owner', direction: 'in', auto: true },
+  { value: 'owner_repay_sponsor', label: 'Owner Repayment to Sponsor', direction: 'out', auto: true },
+  { value: 'owner_advance_to_sponsor', label: 'Owner Loan to Sponsor', direction: 'out', auto: true },
+  { value: 'sponsor_repay_owner', label: 'Sponsor Repayment to Owner', direction: 'in', auto: true },
   { value: 'owner_investment',          label: 'Owner Investment In',             wallet: 'owner_cash',    direction: 'in' },
   { value: 'owner_capital_contribution',    label: 'Owner Capital Contribution',       wallet: 'owner_cash',    direction: 'in',  auto: true },
   // Cash Reconciliation audit entries (do NOT affect Sales Total)
