@@ -40,7 +40,7 @@ function InventoryItem({ item, currency }) {
             <p className={`text-sm font-bold ${isOut ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-foreground'}`}>
               {item.quantity} {item.unit || tr('units')}
             </p>
-            {isOut && <Badge variant="destructive" className="text-[10px] h-4 px-1">{tr('Out')}</Badge>}
+            {isOut && <Badge variant="destructive" className="text-[10px] h-4 px-1">{tr('Out of Stock')}</Badge>}
             {isLow && !isOut && <Badge className="bg-amber-500 text-white text-[10px] h-4 px-1">{tr('Low')}</Badge>}
           </div>
         </div>
