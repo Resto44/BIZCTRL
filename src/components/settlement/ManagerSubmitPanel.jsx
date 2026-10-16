@@ -5,6 +5,9 @@
 import React, { useState, useRef } from 'react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { readSponsorSettlementRows } from '@/lib/sponsorSettlementStatement';
+import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
@@ -35,7 +38,7 @@ const STATUS_CFG = {
 export default function ManagerSubmitPanel() {
   const { user } = useAuth();
   const { currency } = useLanguage();
-  const { orgId } = useTenant();
+  const { orgId, activeRestaurantId, branches } = useTenant();
   const fmt = v => formatCurrency(v, currency);
   const qc = useQueryClient();
 
@@ -57,14 +60,14 @@ export default function ManagerSubmitPanel() {
 
   const { ownerFilter } = useTenant();
 
-  const { data: settlements = [], isLoading } = useQuery({
-    queryKey: ['settlements_mgr', orgId],
-    queryFn: () => base44.entities.SettlementRecord.filter(
-      { created_by: orgId, flow_type: 'MANAGER_TO_SPONSOR' }, '-date', 100
-    ),
+  const { data: allSponsorRows = [], isLoading, isError: settlementReadError } = useQuery({
+    queryKey: ['sponsor-settlement-ledger', activeRestaurantId],
+    queryFn: () => readSponsorSettlementRows(supabase, activeRestaurantId),
     staleTime: 30000,
-    enabled: !!orgId,
+    enabled: Boolean(activeRestaurantId),
   });
+
+  const settlements = allSponsorRows.filter(s => s.flow_type === 'MANAGER_TO_SPONSOR');
 
   const { data: networkAccounts = [] } = useQuery({
     queryKey: ['network_accounts', ownerFilter],
@@ -87,6 +90,12 @@ export default function ManagerSubmitPanel() {
   };
 
   const handleSubmit = async () => {
+    const amount = Number(form.amount);
+    const chosenBranch = branches.find(b => (b.key || b.branch_key) === form.branch && b.id);
+    if (!activeRestaurantId || !chosenBranch || !Number.isFinite(amount) || amount <= 0 || !Number.isInteger(Math.round(amount * 100)) || Math.abs(amount * 100 - Math.round(amount * 100)) > 0.00001 || settlementReadError) {
+      toast.error('Select a valid business, branch and amount. Complete settlement history must be loaded.');
+      return;
+    }
     if (!form.amount || !form.date || !form.branch) {
       alert('Date, branch and amount are required.');
       return;
@@ -103,8 +112,10 @@ export default function ManagerSubmitPanel() {
 
     const record = await base44.entities.SettlementRecord.create({
       flow_type: 'MANAGER_TO_SPONSOR',
+      restaurant_id: activeRestaurantId,
+      branch_id: chosenBranch.id,
       date: form.date,
-      amount: parseFloat(form.amount),
+      amount,
       branch: form.branch,
       notes: form.notes,
       reference_id: form.reference_id,
@@ -119,6 +130,7 @@ export default function ManagerSubmitPanel() {
 
     await createNotification({
       orgId,
+      restaurantId: activeRestaurantId,
       type: 'branch_to_owner',
       severity: 'info',
       targetRole: 'all',
@@ -131,6 +143,7 @@ export default function ManagerSubmitPanel() {
       metadata: { settlement_id: record.id, proof_url: proofUrl },
     });
 
+    qc.invalidateQueries({ queryKey: ['sponsor-settlement-ledger', activeRestaurantId] });
     qc.invalidateQueries({ queryKey: ['settlements_mgr'] });
     qc.invalidateQueries({ queryKey: ['settlements_all'] });
     setForm({ date: format(new Date(), 'yyyy-MM-dd'), amount: '', branch: '', notes: '', reference_id: '', network_account_id: '' });
@@ -140,7 +153,8 @@ export default function ManagerSubmitPanel() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
+      {settlementReadError && <Card role="alert" className="border-rose-300 p-3 text-sm text-rose-700">Complete sponsor settlement history could not be loaded. Do not interpret missing entries as zero.</Card>}
       {/* Submit form */}
       <Card className="p-4 border-blue-200 bg-blue-50/30">
         <p className="text-sm font-semibold mb-3 flex items-center gap-2">
