@@ -259,6 +259,7 @@ html:lang(fa), html:lang(ar) {
   font-family: var(--font-ui);
 }
 
+@layer base {
 /* Reference: the bold, legible native iOS Arabic menu appearance.
    Language switches the font family and spacing, not the font-size scale.
    All ERP screens and body-portaled dialogs inherit the same font. */
@@ -302,6 +303,8 @@ html:is(:lang(ar), :lang(fa)) :is(
 ) {
   overflow-wrap: anywhere;
   word-break: normal;
+}
+
 }
 
 /* Legacy micro text was 8–11px in reports, lists and navigation. Normalize
