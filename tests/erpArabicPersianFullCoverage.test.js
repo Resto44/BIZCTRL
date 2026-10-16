@@ -5,7 +5,7 @@ import translations from '../src/lib/i18n.js';
 
 describe('ERP Arabic and Persian user-facing language contracts',()=>{
   it('localizes the previously untranslated VIP subscription tier',()=>{
-    expect(translations.ar.tier_vip).toContain('المميزة');
+    expect(translations.ar.tier_vip).toBe('عميل مميز');
     expect(translations.fa.tier_vip).toContain('ویژه');
     expect(translations.en.tier_vip).toBe('VIP');
   });
