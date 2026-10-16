@@ -6,6 +6,8 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
@@ -62,8 +64,8 @@ const emptyForm = {
 
 export default function OwnerPersonalFinance() {
   const { user } = useAuth();
-  const { currency } = useLanguage();
-  const { orgId } = useTenant();
+  const { currency, lang } = useLanguage();
+  const { orgId, activeRestaurantId } = useTenant();
   const fmt = v => formatCurrency(v, currency);
   const qc = useQueryClient();
 
@@ -75,74 +77,160 @@ export default function OwnerPersonalFinance() {
   const [deleteId, setDeleteId] = useState(null);
   const [zoomImg, setZoomImg] = useState(null);
   const [filterMonth, setFilterMonth] = useState(MONTH_OPTIONS[0].value);
+  const [saveError, setSaveError] = useState('');
+  const pendingRequestId = useRef(null);
+  const submissionLock = useRef(false);
+  const label = (en, fa, ar) => lang === 'fa' ? fa : lang === 'ar' ? ar : en;
+  const financialSaveMessage = (error) => {
+    const message = String(error?.message || '');
+    if (message.includes('ERP_PERSONAL_FINANCE_INSUFFICIENT_BALANCE')) {
+      return label('Insufficient Treasury account balance.', 'موجودی حساب خزانه کافی نیست.', 'رصيد حساب الخزينة غير كافٍ.');
+    }
+    if (message.includes('ERP_PERSONAL_FINANCE_WALLET_NOT_CONFIGURED')) {
+      return label('An active owner Treasury account is required.', 'حساب فعال خزانه مالک پیدا نشد.', 'يلزم حساب خزينة نشط للمالك.');
+    }
+    if (message.includes('ERP_PERSONAL_FINANCE_POSTED_IMMUTABLE')) {
+      return label('Posted withdrawals require an audited reversal.', 'برداشت ثبت‌شده باید با سند اصلاحی برگشت شود.', 'السحب المرحّل يحتاج إلى قيد عكسي موثق.');
+    }
+    if (message.includes('row-level security') || error?.code === '42501') {
+      return label('You do not have permission to post this entry.', 'اجازه ثبت این سند را ندارید.', 'لا تملك صلاحية تسجيل هذه العملية.');
+    }
+    return label('Saving failed. Check the amount and try again.', 'ذخیره ناموفق بود. مبلغ را بررسی کرده دوباره تلاش کنید.', 'تعذر الحفظ. تحقق من المبلغ وحاول مجددًا.');
+  };
   const proofRef = useRef();
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const { ownerFilter } = useTenant();
-
-  const { data: records = [], isLoading } = useQuery({
-    queryKey: ['owner_personal_finance', ownerFilter],
-    queryFn: () => base44.entities.OwnerPersonalFinance.filter(ownerFilter, '-date', 1000),
+  const { data: records = [], isLoading, isError: recordsError, refetch: retryRead } = useQuery({
+    queryKey: ['owner_personal_finance', activeRestaurantId, user?.email],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('owner_personal_finance')
+        .select('*').eq('restaurant_id', activeRestaurantId)
+        .eq('created_by', user.email)
+        .order('date', { ascending: false }).limit(1000);
+      if (error) throw error;
+      return data || [];
+    },
     staleTime: 30000,
-    enabled: !!ownerFilter.created_by,
+    enabled: Boolean(activeRestaurantId && user?.email && user?.role === 'owner'),
   });
 
   const saveMut = useMutation({
-    mutationFn: d => base44.entities.OwnerPersonalFinance.create(d),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['owner_personal_finance'] });
-      setShowForm(null);
-      setForm(emptyForm);
-      setProofUrl('');
+    mutationFn: async (record) => {
+      try {
+        return await base44.entities.OwnerPersonalFinance.create(record);
+      } catch (error) {
+        // A network timeout may hide an already committed entry. Reuse the
+        // identical UUID, then confirm its tenant/amount instead of re-posting.
+        if (error?.code === '23505' && record.id) {
+          const { data: existing, error: verifyError } = await supabase
+            .from('owner_personal_finance')
+            .select('id, restaurant_id, record_type, amount')
+            .eq('id', record.id).eq('restaurant_id', record.restaurant_id)
+            .eq('created_by', user.email).maybeSingle();
+          if (!verifyError && existing?.id === record.id &&
+              existing.record_type === record.record_type &&
+              Number(existing.amount) === record.amount) return existing;
+        }
+        throw error;
+      }
     },
   });
 
   const deleteMut = useMutation({
     mutationFn: id => base44.entities.OwnerPersonalFinance.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['owner_personal_finance'] }); setDeleteId(null); },
+    onError: error => toast.error(financialSaveMessage(error)),
   });
 
   const handleProofUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    setProofUrl(file_url);
-    setUploading(false);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      if (!file_url) throw new Error('Upload was not confirmed');
+      setProofUrl(file_url);
+    } catch (error) {
+      toast.error(label('File upload failed.', 'آپلود فایل ناموفق بود.', 'تعذر رفع الملف.'));
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSave = async () => {
-    if (!form.amount || !form.date) return;
-    const amount = parseFloat(form.amount);
-
-    // Alert on large withdrawal
-    if (form.record_type === 'withdrawal' && amount > 5000) {
-      await createNotification({
-        orgId,
-        type: 'info',
-        severity: 'warning',
-        targetRole: 'owner',
-        title: `⚠️ Large Personal Withdrawal`,
-        message: `Owner withdrew ${currency} ${amount.toLocaleString()} from treasury for personal use`,
-        amount,
-        actorEmail: user?.email,
-        actorName: user?.full_name,
-      });
+    if (submissionLock.current || saveMut.isPending) return;
+    setSaveError('');
+    const amountText = String(form.amount).trim();
+    const amount = Number(amountText);
+    if (!/^\\d+(?:\\.\\d{1,2})?$/.test(amountText) ||
+        !Number.isFinite(amount) || amount <= 0 || amount > 999999999.99 ||
+        !/^\\d{4}-\\d{2}-\\d{2}$/.test(form.date)) {
+      setSaveError(label('Enter a valid positive amount (up to 2 decimals) and date.',
+        'مبلغ مثبت معتبر (حداکثر دو رقم اعشار) و تاریخ وارد کنید.',
+        'أدخل مبلغًا موجبًا صالحًا (حتى منزلتين عشريتين) وتاريخًا.'));
+      return;
     }
-
-    saveMut.mutate({
-      ...form,
-      amount,
-      proof_url: proofUrl || undefined,
-      recorded_by: user?.email,
-    });
+    if (!activeRestaurantId || user?.role !== 'owner') {
+      setSaveError(label('Choose an owner business first.',
+        'ابتدا کسب‌وکار مالک را انتخاب کنید.', 'حدد منشأة المالك أولاً.'));
+      return;
+    }
+    submissionLock.current = true;
+    pendingRequestId.current ||= crypto.randomUUID();
+    try {
+      const record = {
+        ...form,
+        id: pendingRequestId.current,
+        restaurant_id: activeRestaurantId,
+        org_id: orgId,
+        type: form.record_type,
+        amount,
+        description: form.notes?.trim() || null,
+        notes: form.notes?.trim() || null,
+        source: form.source?.trim() || null,
+        proof_url: proofUrl || null,
+        recorded_by: user.email,
+      };
+      const confirmed = await saveMut.mutateAsync(record);
+      if (!confirmed?.id) throw new Error('Server did not confirm the record');
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['owner_personal_finance'] }),
+        qc.invalidateQueries({ queryKey: ['wallet_transactions'] }),
+        qc.invalidateQueries({ queryKey: ['treasury_owner_central_transactions'] }),
+        qc.invalidateQueries({ queryKey: ['treasury_accounts'] }),
+      ]);
+      pendingRequestId.current = null;
+      setShowForm(null);
+      setForm(emptyForm);
+      setProofUrl('');
+      toast.success(label('Entry saved.', 'سند ذخیره شد.', 'تم حفظ العملية.'));
+      // Push alerts are best-effort; they must never block a financial save.
+      if (form.record_type === 'withdrawal' && amount > 5000) {
+        try {
+          await createNotification({
+            orgId, type: 'info', severity: 'warning', targetRole: 'owner',
+            title: '⚠️ Large Personal Withdrawal',
+            message: `Owner withdrew ${currency} ${amount.toLocaleString()} from treasury for personal use`,
+            amount, actorEmail: user?.email, actorName: user?.full_name,
+          });
+        } catch (notificationError) {
+          console.warn('[OwnerPersonalFinance] optional notification failed:', notificationError);
+        }
+      }
+    } catch (error) {
+      const message = financialSaveMessage(error);
+      setSaveError(message);
+      toast.error(message);
+    } finally {
+      submissionLock.current = false;
+    }
   };
 
   // ── Derived totals ──────────────────────────────────────────────────────
   const totals = useMemo(() => {
-    const expenses = records.filter(r => r.record_type === 'expense').reduce((s, r) => s + (r.amount || 0), 0);
-    const income   = records.filter(r => r.record_type === 'income').reduce((s, r) => s + (r.amount || 0), 0);
-    const withdrawals = records.filter(r => r.record_type === 'withdrawal').reduce((s, r) => s + (r.amount || 0), 0);
+    const expenses = records.filter(r => r.record_type === 'expense').reduce((s, r) => s + Number(r.amount || 0), 0);
+    const income   = records.filter(r => r.record_type === 'income').reduce((s, r) => s + Number(r.amount || 0), 0);
+    const withdrawals = records.filter(r => r.record_type === 'withdrawal').reduce((s, r) => s + Number(r.amount || 0), 0);
     return { expenses, income, withdrawals, balance: income - expenses - withdrawals };
   }, [records]);
 
@@ -152,9 +240,9 @@ export default function OwnerPersonalFinance() {
       const m = records.filter(r => r.date?.startsWith(value));
       return {
         label,
-        Income: m.filter(r => r.record_type === 'income').reduce((s, r) => s + r.amount, 0),
-        Expenses: m.filter(r => r.record_type === 'expense').reduce((s, r) => s + r.amount, 0),
-        Withdrawals: m.filter(r => r.record_type === 'withdrawal').reduce((s, r) => s + r.amount, 0),
+        Income: m.filter(r => r.record_type === 'income').reduce((s, r) => s + Number(r.amount || 0), 0),
+        Expenses: m.filter(r => r.record_type === 'expense').reduce((s, r) => s + Number(r.amount || 0), 0),
+        Withdrawals: m.filter(r => r.record_type === 'withdrawal').reduce((s, r) => s + Number(r.amount || 0), 0),
       };
     }), [records]);
 
@@ -179,6 +267,8 @@ export default function OwnerPersonalFinance() {
   const openForm = (type) => {
     setForm({ ...emptyForm, record_type: type });
     setProofUrl('');
+    setSaveError('');
+    pendingRequestId.current = null;
     setShowForm(type);
   };
 
@@ -192,6 +282,15 @@ export default function OwnerPersonalFinance() {
           <p className="text-xs text-violet-600">Personal finances never affect restaurant P&L, branch balances, or operational analytics.</p>
         </div>
       </Card>
+
+      {recordsError && (
+        <Card role="alert" className="p-3 border-red-300 text-red-700">
+          {label('Personal finance data could not be loaded.', 'معلومات مالی شخصی بارگذاری نشد.', 'تعذر تحميل بيانات المالية الشخصية.')}
+          <Button type="button" variant="outline" className="ms-2" onClick={() => retryRead()}>
+            {label('Retry', 'تلاش دوباره', 'إعادة المحاولة')}
+          </Button>
+        </Card>
+      )}
 
       {/* Quick action buttons */}
       <div className="grid grid-cols-3 gap-2">
@@ -268,7 +367,7 @@ export default function OwnerPersonalFinance() {
           {filtered.length > 0 && (
             <div className="grid grid-cols-3 gap-2 text-center">
               {['expense','income','withdrawal'].map(type => {
-                const total = filtered.filter(r => r.record_type === type).reduce((s, r) => s + r.amount, 0);
+                const total = filtered.filter(r => r.record_type === type).reduce((s, r) => s + Number(r.amount || 0), 0);
                 const colors = { expense: 'text-red-600', income: 'text-emerald-600', withdrawal: 'text-amber-600' };
                 return (
                   <Card key={type} className="p-2">
@@ -336,7 +435,7 @@ export default function OwnerPersonalFinance() {
       </Tabs>
 
       {/* Add record dialog */}
-      <Dialog open={!!showForm} onOpenChange={v => { if (!v) { setShowForm(null); setProofUrl(''); } }}>
+      <Dialog open={!!showForm} onOpenChange={v => { if (!v && !saveMut.isPending) { setShowForm(null); setProofUrl(''); setSaveError(''); pendingRequestId.current = null; } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>
@@ -353,14 +452,17 @@ export default function OwnerPersonalFinance() {
               </Card>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Date *</Label>
-                <Input type="date" value={form.date} onChange={e => set('date', e.target.value)} />
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="min-w-0">
+                <Label className="text-xs">{label('Date *','تاریخ *','التاريخ *')}</Label>
+                <Input className="mt-1 w-full min-w-0 max-w-full text-base" type="date" dir="ltr"
+                  value={form.date} onChange={e => { pendingRequestId.current = null; set('date', e.target.value); }} />
               </div>
-              <div>
-                <Label className="text-xs">Amount *</Label>
-                <Input type="number" value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0" />
+              <div className="min-w-0">
+                <Label className="text-xs">{label('Amount *','مبلغ *','المبلغ *')}</Label>
+                <Input className="mt-1 w-full min-w-0 max-w-full text-base" type="number" inputMode="decimal"
+                  min="0.01" step="0.01" dir="ltr" value={form.amount}
+                  onChange={e => { pendingRequestId.current = null; set('amount', e.target.value); }} placeholder="0.00" />
               </div>
             </div>
 
@@ -386,7 +488,10 @@ export default function OwnerPersonalFinance() {
             {showForm === 'withdrawal' && (
               <div>
                 <Label className="text-xs">From Wallet</Label>
-                <Select value={form.wallet_source} onValueChange={v => set('wallet_source', v)}>
+                <Select value={form.wallet_source} onValueChange={v => {
+                  pendingRequestId.current = null;
+                  setForm(current => ({ ...current, wallet_source: v, payment_method: v === 'owner_network' ? 'network' : 'cash' }));
+                }}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="owner_cash">Owner Cash</SelectItem>
@@ -428,8 +533,9 @@ export default function OwnerPersonalFinance() {
               )}
             </div>
 
+            {saveError && <p role="alert" className="text-sm font-medium text-red-700">{saveError}</p>}
             <div className="flex gap-2 pt-1">
-              <Button className="flex-1" onClick={handleSave} disabled={saveMut.isPending || !form.amount}>
+              <Button className="flex-1" onClick={handleSave} disabled={saveMut.isPending || uploading || !form.amount}>
                 {saveMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
               </Button>
               <Button variant="outline" className="flex-1" onClick={() => setShowForm(null)}>Cancel</Button>
@@ -502,9 +608,11 @@ function RecordRow({ r, fmt, onDelete, onZoom, expanded = false }) {
           <span className={`text-sm font-bold ${TYPE_COLOR[r.record_type]}`}>
             {TYPE_SIGN[r.record_type]}{fmt(r.amount)}
           </span>
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => onDelete(r.id)}>
-            <Trash2 className="w-3 h-3" />
-          </Button>
+          {r.record_type !== 'withdrawal' && (
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => onDelete(r.id)}>
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          )}
         </div>
       </div>
     </Card>
