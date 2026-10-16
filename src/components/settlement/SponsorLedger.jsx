@@ -11,6 +11,7 @@ import { useTenant } from '@/lib/TenantContext';
 import { formatTreasuryCurrency, treasuryCurrencyWarning } from '@/lib/treasuryCurrency';
 import { sponsorStatement, readSponsorSettlementRows } from '@/lib/sponsorSettlementStatement';
 import { Card } from '@/components/ui/card';
+import SponsorOwnerBilateralLedger from './SponsorOwnerBilateralLedger';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, ShieldCheck, Clock, RefreshCw, Building2 } from 'lucide-react';
@@ -211,6 +212,7 @@ export default function SponsorLedger({view='ledger'}) {
           </div>}
         </Card>})}</div>}
     </div>
+    {view === 'ledger' && <SponsorOwnerBilateralLedger />}
     {chartRows.length>0&&<Card className="min-w-0 space-y-3 p-3 sm:p-4">
       <h4 className="text-sm font-bold">{ui.chart}</h4>
       <div dir="ltr" className="h-64 min-w-0">
