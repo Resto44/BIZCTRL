@@ -13,7 +13,7 @@ import { sponsorStatement, readSponsorSettlementRows } from '@/lib/sponsorSettle
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, ShieldCheck, Clock, RefreshCw, CheckCircle2, ArrowDownLeft, ArrowUpRight, Building2 } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Clock, RefreshCw, Building2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 
 const COPY = {
@@ -113,7 +113,7 @@ export default function SponsorLedger({view='ledger'}) {
   return <section dir={lang==='en'?'ltr':'rtl'} className="min-w-0 space-y-4 overflow-x-clip">
     <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
       <div className="min-w-0">
-        <h3 className="text-base font-extrabold">{ui.title}</h3>
+        <h3 className="text-base font-extrabold">{view === 'balances' ? ui.view : ui.title}</h3>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">{ui.help}</p>
       </div>
       <Button size="sm" type="button" variant="outline" disabled={isFetching} onClick={()=>refetch()} className="shrink-0">
