@@ -1,19 +1,21 @@
 import { drawLocalizedPdfText } from './pdfLocalization';
+import { APPROVED_BIZCTRL_PNG_BASE64 } from '../../scripts/approvedBizCTRLSource.mjs';
+const EMBEDDED_APPROVED_ICON = 'data:image/png;base64,' + APPROVED_BIZCTRL_PNG_BASE64;
 
-/** Shared BizCTRL report identity. Original PWA icon is fetched same-origin when available. */
+/** Shared BizCTRL report identity. User-approved glossy v3 PWA icon is fetched same-origin when available. */
 export async function loadERPReportIcon() {
-  if(typeof window === 'undefined' || typeof fetch !== 'function' || typeof FileReader === 'undefined') return null;
+  if(typeof window === 'undefined' || typeof fetch !== 'function' || typeof FileReader === 'undefined') return EMBEDDED_APPROVED_ICON;
   try {
-    const response=await fetch('/icons/bizctrl-icon-192-v2.png',{cache:'force-cache'});
-    if(!response.ok) return null;
+    const response=await fetch('/icons/bizctrl-icon-192-v3.png',{cache:'force-cache'});
+    if(!response.ok) return EMBEDDED_APPROVED_ICON;
     const blob=await response.blob();
     return await new Promise(resolve=>{
       const reader=new FileReader();
       reader.onload=()=>resolve(typeof reader.result==='string'?reader.result:null);
-      reader.onerror=()=>resolve(null);
+      reader.onerror=()=>resolve(EMBEDDED_APPROVED_ICON);
       reader.readAsDataURL(blob);
     });
-  } catch {return null;}
+  } catch {return EMBEDDED_APPROVED_ICON;}
 }
 export function drawBizCTRLReportIcon(doc,x,y,size=12,iconData=null){
   if(iconData){

@@ -4,10 +4,11 @@ import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { deflateSync, inflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
+import { APPROVED_BIZCTRL_PNG_BASE64 } from './approvedBizCTRLSource.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const assetsDir = resolve(here, '../public/icons');
-const source = resolve(assetsDir, 'bizctrl-original-source-96.png');
+// Source is the new approved glossy cyan/blue artwork, not the prior icon.
 
 function decodeIndexedPNG(buffer) {
   if (buffer.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') throw Error('Invalid app icon source PNG');
@@ -118,17 +119,17 @@ function createPNG(size, rgba) {
   ]);
 }
 
-const icon = decodeIndexedPNG(readFileSync(source));
+const icon = decodeIndexedPNG(Buffer.from(APPROVED_BIZCTRL_PNG_BASE64, 'base64'));
 mkdirSync(assetsDir, { recursive: true });
 for (const size of [16, 32, 72, 96, 128, 144, 152, 180, 192, 384, 512]) {
   const image = createPNG(size, renderSquare(icon, size));
-  if (size === 16 || size === 32) writeFileSync(resolve(assetsDir, 'favicon-'+size+'-v2.png'), image);
-  if (size === 180) writeFileSync(resolve(assetsDir, 'apple-touch-icon-180-v2.png'), image);
-  if (size === 192 || size === 512) writeFileSync(resolve(assetsDir, 'bizctrl-icon-'+size+'-v2.png'), image);
+  if (size === 16 || size === 32) writeFileSync(resolve(assetsDir, 'favicon-'+size+'-v3.png'), image);
+  if (size === 180) writeFileSync(resolve(assetsDir, 'apple-touch-icon-180-v3.png'), image);
+  if (size === 192 || size === 512) writeFileSync(resolve(assetsDir, 'bizctrl-icon-'+size+'-v3.png'), image);
   if (![16, 32, 180].includes(size)) writeFileSync(resolve(assetsDir, 'icon-'+size+'.png'), image);
 }
 for (const size of [192, 512]) {
-  writeFileSync(resolve(assetsDir, 'bizctrl-icon-maskable-'+size+'-v2.png'),
+  writeFileSync(resolve(assetsDir, 'bizctrl-icon-maskable-'+size+'-v3.png'),
     createPNG(size, renderSquare(icon, size, true)));
 }
-console.log('Generated BizCTRL favicon, Safari touch and Chrome PWA icons from the supplied logo.');
+console.log('Generated approved glossy BizCTRL v3 favicon, Safari touch and Chrome PWA icons.');
