@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS public.sponsor_owner_transactions (
   CONSTRAINT sponsor_owner_proof_length CHECK (length(coalesce(proof_url,'')) <= 2048),
   CONSTRAINT sponsor_owner_unique_tenant_id UNIQUE (restaurant_id,id)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS sponsor_owner_tenant_external_reference_uniq
+  ON public.sponsor_owner_transactions(restaurant_id,currency,lower(trim(external_reference)))
+  WHERE nullif(trim(external_reference),'') IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS sponsor_owner_tenant_currency_date_idx
   ON public.sponsor_owner_transactions(restaurant_id,currency,effective_date DESC,id DESC);
 
@@ -104,7 +108,7 @@ BEGIN
     RAISE EXCEPTION 'ERP_SPONSOR_OWNER_OWNER_ONLY' USING ERRCODE='42501';
   END IF;
   IF p_request_id IS NULL OR p_owner_account_id IS NULL OR
-     p_date IS NULL OR p_date > current_date OR
+     p_date IS NULL OR p_date > current_date + 1 OR
      p_kind NOT IN ('sponsor_advance_to_owner','owner_repay_sponsor',
                     'owner_advance_to_sponsor','sponsor_repay_owner') OR
      p_kind IS NULL OR p_amount IS NULL OR
@@ -131,6 +135,19 @@ BEGIN
        RETURN v_existing; -- Repeated click / timeout: ZERO extra journal entries.
     END IF;
     RAISE EXCEPTION 'ERP_SPONSOR_OWNER_IDEMPOTENCY_CONFLICT' USING ERRCODE='23505';
+  END IF;
+
+  -- A verified remittance of branch sales cannot simultaneously become a
+  -- personal loan. Match the user's bank/reference number exactly in the same
+  -- restaurant and fail closed instead of double-classifying the same money.
+  IF nullif(trim(p_external_reference),'') IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.settlement_records c
+    WHERE c.restaurant_id=p_restaurant_id
+      AND c.status='approved'
+      AND c.reference_id=trim(p_external_reference)
+      AND c.flow_type IN ('MANAGER_TO_SPONSOR','SPONSOR_TO_OWNER')
+  ) THEN
+    RAISE EXCEPTION 'ERP_SPONSOR_OWNER_DUPLICATE_CUSTODY_REF' USING ERRCODE='23505';
   END IF;
 
   SELECT * INTO v_account FROM public.treasury_accounts
