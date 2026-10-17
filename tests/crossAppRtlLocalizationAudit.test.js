@@ -56,6 +56,25 @@ describe('BizCTRL cross-app RTL, public marketing and global search quality', ()
     expect(header).toContain("!item.permission || can[item.permission]");
     expect(header).toContain('translateLiteral(item.label)');
   });
+  it.each(['ar','fa'])('does not show English generic error and drawer controls in %s', lang => {
+    for (const key of [
+      'Module not enabled','Navigation drawer','Close navigation drawer',
+      'Return to dashboard','Configure workspace',
+      'This organization removed the module from its active ERP workspace. Existing records remain preserved and permissions are unchanged.',
+    ]) {
+      expect(translateInterface(key, lang)).not.toEqual(key);
+    }
+  });
+  it('uses logical drawer positioning and preserves content in both RTL and LTR', () => {
+    const shell=read('../src/components/layout/ERPLayout.jsx');
+    expect(shell).toContain('fixed inset-y-0 start-0');
+    expect(shell).toContain('rtl:slide-in-from-right');
+    expect(shell).toContain("tr('Close navigation drawer')");
+    expect(shell).toContain("tr('Module not enabled')");
+    expect(shell).toContain("tr('Configure workspace')");
+    expect(shell).toContain('flex h-dvh min-h-0 w-full min-w-0 max-w-full overflow-hidden');
+    expect(shell).toContain('overflow-y-auto min-h-0 overflow-x-hidden');
+  });
   it('keeps search UI inside viewport and shows full RTL labels without breaking route identifiers', () => {
     expect(header).toContain('w-[calc(100%-2rem)] max-w-lg min-w-0');
     expect(header).toContain('min-w-0 flex-1 bg-transparent text-base md:text-sm');
