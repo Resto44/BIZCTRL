@@ -7,10 +7,8 @@
 import { supabase } from '@/api/supabaseClient';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
-import {drawBizCTRLReportIcon} from './erpPdfBrand';
+import { renderERPSalesInvoicePDF } from './erpSalesInvoicePdf';
 import {
-  drawLocalizedPdfText,
-  prepareLocalizedPdf,
   safePdfFilename,
 } from '@/lib/pdfLocalization';
 
@@ -177,56 +175,23 @@ export function buildInvoiceHTML(invoice, brandName = 'BizCTRL', currency = '', 
 </body></html>`;
 }
 
-export function createLocalizedInvoicePDF(invoice, brandName = 'BizCTRL', currency = '', options = {}) {
+/**
+ * All Sales Invoice download, share and upload paths use the same ERP A4
+ * landscape renderer. The reference image is a design guide only: no example
+ * amounts or cached screenshots are embedded in production documents.
+ */
+export function createLocalizedInvoicePDF(invoice, brandName = 'BizCTRL', currency = 'SAR', options = {}) {
   const resolved = optionsWithDefaults(options);
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
-  const { rtl } = prepareLocalizedPdf(doc, resolved);
-  const details = invoiceDetails(invoice, currency, resolved);
-  const W = 210;
-  const left = 16;
-  const right = W - left;
-  const mainX = rtl ? right : left;
-  let y = 20;
-  const draw = (value, x, yy, opts = {}) => drawLocalizedPdfText(doc, value, x, yy, { rtl, ...opts });
-  const drawRow = (label, value, total = false, color = [15, 23, 42]) => {
-    doc.setDrawColor(219, 234, 254);
-    doc.setLineWidth(total ? 0.7 : 0.25);
-    doc.line(left + 4, y + 2.5, right - 4, y + 2.5);
-    draw(label, mainX, y, { bold: total, size: total ? 12 : 10, color });
-    draw(value, rtl ? left + 5 : right - 5, y, { bold: total, size: total ? 12 : 10, color, align: rtl ? 'left' : 'right' });
-    y += total ? 10 : 8;
-  };
-
-  doc.setFillColor(37, 99, 235); doc.rect(0, 0, W, 33, 'F');
-  drawBizCTRLReportIcon(doc,2.5,5.5,12);
-  draw(brandName, mainX, 13, { bold: true, size: 18, color: [255, 255, 255] });
-  draw(details.title, mainX, 21, { bold: true, size: 10, color: [219, 234, 254] });
-  draw(invoice.invoice_number, rtl ? left : right, 21, { bold: true, size: 10, color: [255, 255, 255], align: rtl ? 'left' : 'right' });
-  y = 43;
-
-  details.information.forEach(([label, value], index) => {
-    const isRightColumn = index % 2 === 1;
-    const boxX = rtl ? (isRightColumn ? 16 : 108) : (isRightColumn ? 108 : 16);
-    doc.setFillColor(248, 250, 252); doc.roundedRect(boxX, y, 86, 19, 2, 2, 'F');
-    draw(label, rtl ? boxX + 82 : boxX + 4, y + 6, { bold: true, size: 8, color: [100, 116, 139] });
-    draw(value, rtl ? boxX + 82 : boxX + 4, y + 14, { bold: true, size: 10, color: [30, 41, 59] });
-    if (index % 2 === 1) y += 23;
+  const doc = new jsPDF({
+    orientation: 'landscape', unit: 'mm', format: 'a4', putOnlyUsedFonts: true,
   });
-  if (details.information.length % 2) y += 23;
-
-  const section = (title, color, background, rows, isSales = false) => {
-    doc.setFillColor(...background); doc.roundedRect(left, y, right - left, 11, 2, 2, 'F');
-    draw(title, mainX, y + 7, { bold: true, size: 11, color });
-    y += 16;
-    rows.forEach(([label, value], index) => drawRow(label, value, isSales && index === rows.length - 1, color));
-    y += 7;
+  renderERPSalesInvoicePDF(doc, invoice, {
+    brandName, currency, lang: resolved.lang, branches: resolved.branches || [],
+  });
+  return {
+    doc,
+    filename: safePdfFilename((invoice.invoice_number || 'sales-invoice') + '-erp-v2', resolved.lang),
   };
-  section(details.reconciliation.title, [6, 95, 70], [240, 253, 244], details.reconciliation.rows);
-  section(details.sales.title, [30, 64, 175], [239, 246, 255], details.sales.rows, true);
-
-  doc.setDrawColor(226, 232, 240); doc.line(left, 277, right, 277);
-  draw(`${details.generatedBy} ${brandName} • ${invoice.invoice_number}`, W / 2, 284, { bold: false, size: 8, color: [100, 116, 139], align: 'center' });
-  return { doc, filename: safePdfFilename(invoice.invoice_number || 'sales-invoice', resolved.lang) };
 }
 
 export async function generateAndUploadPDF(invoice, brandName, currency, options = {}) {
@@ -235,11 +200,19 @@ export async function generateAndUploadPDF(invoice, brandName, currency, options
     const { doc, filename } = createLocalizedInvoicePDF(invoice, brandName, currency, resolved);
     const pdfBlob = doc.output('blob');
     const filePath = `invoices/${invoice.restaurant_id || 'default'}/${resolved.lang}/${filename}`;
-    await supabase.storage.from('sales-invoices').upload(filePath, pdfBlob, { contentType: 'application/pdf', upsert: true });
+    const { error: uploadError } = await supabase.storage.from('sales-invoices')
+      .upload(filePath, pdfBlob, { contentType: 'application/pdf', upsert: true });
+    if (uploadError) throw uploadError;
     const { data: { publicUrl } } = supabase.storage.from('sales-invoices').getPublicUrl(filePath);
-    // Keep the most recently generated report URL for backwards compatibility;
-    // callers generate per-language URLs instead of treating this field as a locale cache.
-    await supabase.from('sales_invoices').update({ pdf_url: publicUrl }).eq('invoice_number', invoice.invoice_number);
+    // Tenant-bound update: different restaurants can issue the same number.
+    // Never update another tenant's invoice or overwrite its stored URL.
+    if (!invoice.restaurant_id) throw new Error('Restaurant-scoped invoice is required to update its PDF URL.');
+    let update = supabase.from('sales_invoices').update({ pdf_url: publicUrl })
+      .eq('restaurant_id', invoice.restaurant_id)
+      .eq('invoice_number', invoice.invoice_number);
+    if (invoice.id) update = update.eq('id', invoice.id);
+    const { error: urlError } = await update;
+    if (urlError) throw urlError;
     return publicUrl;
   } catch (err) {
     console.error('[salesInvoiceService] PDF failed:', err);
@@ -266,14 +239,19 @@ export async function shareInvoiceNative(invoice, brandName, currency, options =
 }
 
 export function openInvoicePrint(invoice, brandName, currency, options = {}) {
-  const html = buildInvoiceHTML(invoice, brandName, currency, optionsWithDefaults(options));
-  const win = window.open('', '_blank', 'noopener');
-  if (win) {
-    win.document.write(html);
-    win.document.close();
-    win.focus();
+  // The PDF preview is now exactly the document that Download and Share produce.
+  // The URL is local to this click and requires no public bucket round-trip.
+  const { doc } = createLocalizedInvoicePDF(invoice, brandName, currency, options);
+  const url = URL.createObjectURL(doc.output('blob'));
+  const win = window.open(url, '_blank');
+  if (!win) {
+    URL.revokeObjectURL(url);
+    throw new Error('Allow pop-ups to preview the PDF.');
   }
+  // Keep the blob URL valid while the browser PDF viewer is open.
+  // The browser releases it when this page is unloaded.
 }
+
 
 export async function downloadInvoicePDF(invoice, brandName, currency, options = {}) {
   try {
