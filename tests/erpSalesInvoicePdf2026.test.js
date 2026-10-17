@@ -57,19 +57,19 @@ describe('Premium one-page ERP Sales Invoice PDF', () => {
     }
   });
   it('all buttons and background jobs run one canonical renderer and tenant-scoped storage update',()=>{
-    const service=readFileSync(new URL('../src/lib/salesInvoiceService.js',import.meta.url),'utf8');
+    const service=readFileSync('src/lib/salesInvoiceService.js','utf8');
     expect(service).toContain('renderERPSalesInvoicePDF(doc, invoice');
     expect(service).toContain('openInvoicePrint(invoice, brandName, currency, options)');
     expect(service).toContain(".eq('restaurant_id', invoice.restaurant_id)");
     expect(service).toContain("if (uploadError) throw uploadError");
     expect(service).toContain("if (urlError) throw urlError");
-    const archive=readFileSync(new URL('../src/pages/SalesInvoices.jsx',import.meta.url),'utf8');
-    const sales=readFileSync(new URL('../src/pages/Sales.jsx',import.meta.url),'utf8');
+    const archive=readFileSync('src/pages/SalesInvoices.jsx','utf8');
+    const sales=readFileSync('src/pages/Sales.jsx','utf8');
     expect(archive).toContain('lang, dir, translateLiteral, branches');
     expect(sales).toContain('{ lang, dir, translateLiteral, branches }');
   });
   it('uses true source totals and an explicit reconciliation provenance disclaimer',()=>{
-    const design=readFileSync(new URL('../src/lib/erpSalesInvoicePdf.js',import.meta.url),'utf8');
+    const design=readFileSync('src/lib/erpSalesInvoicePdf.js','utf8');
     expect(design).toContain('model.cashDifference');
     expect(design).toContain('model.sourceStatus');
     expect(design).toContain("const sourceColor=accents");
