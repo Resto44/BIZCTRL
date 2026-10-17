@@ -198,7 +198,7 @@ function ActionDialog({ action, t, plans, pending, onClose, onConfirm, onDeleteR
       {t.language === 'زبان' ? 'حذف سازمان' : t.language === 'اللغة' ? 'حذف المنظمة' : 'Delete Organization'}
     </Button>
   </div>
-</div><Textarea placeholder={t.reason} value={reason} onChange={(event) => setReason(event.target.value)} /><div className="flex flex-col gap-2 sm:flex-row"><Button className="flex-1" disabled={pending || (action?.type === 'subscription' && ((operation === 'change-plan' && !plans.some(p => p.id === planId)) || (operation === 'extend' && !validTrialDays(days)))) || (action?.type === 'user' && userOperation === 'anonymize' && confirmation !== 'DELETE USER')} onClick={() => onConfirm({ reason, operation, days, planId, userStatus, userOperation, confirmation, organizationActive })}>{t.confirm}</Button><Button className="flex-1" variant="outline" onClick={onClose}>{t.close}</Button></div></DialogContent></Dialog>;
+</div>}<Textarea placeholder={t.reason} value={reason} onChange={(event) => setReason(event.target.value)} /><div className="flex flex-col gap-2 sm:flex-row"><Button className="flex-1" disabled={pending || (action?.type === 'subscription' && ((operation === 'change-plan' && !plans.some(p => p.id === planId)) || (operation === 'extend' && !validTrialDays(days)))) || (action?.type === 'user' && userOperation === 'anonymize' && confirmation !== 'DELETE USER')} onClick={() => onConfirm({ reason, operation, days, planId, userStatus, userOperation, confirmation, organizationActive })}>{t.confirm}</Button><Button className="flex-1" variant="outline" onClick={onClose}>{t.close}</Button></div></DialogContent></Dialog>;
 }
 function PlanEditor({ item, modules, t, pending, onClose, onSave }) {
   const [form, setForm] = useState(null);
