@@ -51,7 +51,7 @@ describe('Platform Owner guarded Organization deletion',()=>{
     expect(page).toContain("variant=\"destructive\"");
     expect(dialog).toContain('!w-[calc(100vw-1.5rem)]');
     expect(dialog).toContain('max-h-[88dvh]');
-    expect(dialog).toContain('dir={lang===\\'en\\'?\\'ltr\\':\\'rtl\\'}');
+    expect(dialog).toContain("dir={lang==='en'?'ltr':'rtl'}");
     expect(dialog).toContain('preview.data?.eligible===true');
     expect(dialog).toContain('blockers.slice(0,15)');
     expect(dialog).toContain('onDeleted?.(result)');
