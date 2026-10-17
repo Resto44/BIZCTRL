@@ -87,7 +87,6 @@ export function renderERPSalesInvoicePDF(doc, invoice, { lang = 'en', currency =
   };
   const txt=(str,x,y,{size=9,color=ink,bold=false,align='left',fit,maxWidth}={})=>
     drawLocalizedPdfText(doc,short(str),x,y,{rtl:false,size,color,bold,align,fit,maxWidth});
-  const side=(x,w)=>rtl ? x+w-5 : x+5;
   const textIn=(value,x,y,w,{size=9,color=ink,bold=false,pad=5,fit=true}={})=>
     txt(value,rtl?x+w-pad:x+pad,y,{size,color,bold,align:rtl?'right':'left',maxWidth:w-pad*2,fit});
   const alignedValue=(value,x,w,y,{size=10,color=ink,bold=true}={})=>
@@ -172,7 +171,7 @@ export function renderERPSalesInvoicePDF(doc, invoice, { lang = 'en', currency =
 
   const maxSourceRows=5;
   let splitRows=[...model.sources].slice(0,maxSourceRows-1);
-  if(model.sourceGap!==null && Math.abs(model.sourceGap)>0.005 && model.sourceStatus!=='incomplete'){
+  if(model.sourceGap!==null && Math.abs(model.sourceGap)>0.005 && model.sourceStatus!=='incomplete' && splitRows.length<4){
     splitRows.push({key:'adjust',amount:model.sourceGap,percent:100*(model.sourceGap/(model.total||1))});
   }
   const splitLabel=(key)=>t[key]||key;
@@ -181,7 +180,10 @@ export function renderERPSalesInvoicePDF(doc, invoice, { lang = 'en', currency =
     if(i)line(rightX+4,y-3.8,rightX+panelW-4,y-3.8);
     const sourceColor=accents[i%accents.length];
     rr(rightX+4.2,y-5.2,5.5,5.5,sourceColor,1.2);
-    textIn(splitLabel(source.key),rightX,y,panelW,{size:8.3,color:ink,pad:13});
+    // Keep source labels away from right-aligned numeric amounts in all locales.
+    txt(splitLabel(source.key),rtl?rightX+panelW-13:rightX+13,y,{
+      size:8.3,color:ink,align:rtl?'right':'left',maxWidth:59,fit:true,
+    });
     alignedValue(money(source.amount),rightX,panelW,y,{size:9.5,color:COLORS.navy});
     txt(invoicePercentLabel(source.percent),rtl?rightX+11:rightX+panelW-6,y+4.3,{
       size:6.8,color:sourceColor,align:rtl?'left':'right',
