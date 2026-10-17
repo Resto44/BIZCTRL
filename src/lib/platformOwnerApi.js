@@ -41,6 +41,11 @@ export const platformOwnerApi = {
   controlCenter: () => rpc('platform_owner_control_center'),
   modules: () => rpc('platform_owner_list_modules'),
   organizations: (query, status, limit, offset) => rpc('platform_owner_list_organizations', { p_query: query || null, p_status: status || null, p_limit: limit, p_offset: offset }),
+  organizationDeletionCheck: (restaurantId) => rpc('platform_owner_organization_deletion_check', { p_restaurant_id: restaurantId }),
+  deleteOrganization: (restaurantId, name, reason) => rpc('platform_owner_delete_organization', {
+    p_restaurant_id: restaurantId, p_confirm_name: name,
+    p_confirm_phrase: 'DELETE ORGANIZATION', p_reason: reason || null,
+  }),
   users: (query, status, limit, offset) => rpc('platform_owner_list_users', { p_query: query || null, p_status: status || null, p_limit: limit, p_offset: offset }),
   subscriptions: (status, limit, offset) => rpc('platform_owner_list_subscriptions', { p_status: status || null, p_limit: limit, p_offset: offset }),
   payments: (status, limit, offset) => rpc('platform_owner_list_payments', { p_status: status || null, p_limit: limit, p_offset: offset }),
