@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import './publicLandingTypography.css';
 
 export const PRODUCT_DESCRIPTION = 'BizCTRL is a multi-tenant ERP SaaS built for restaurants, retail stores, pharmacies, warehouses, factories, and more. Manage inventory, sales, purchasing, HR, finance, and suppliers — all in one place.';
 export const PUBLIC_APP_URL = (import.meta.env.VITE_PUBLIC_APP_URL || 'https://mybizctrl.site').replace(/\/$/, '');
@@ -62,10 +63,19 @@ function handlePublicHashLink(event, href) {
   window.history.pushState(null, '', `/#${encodeURIComponent(sectionId)}`);
 }
 
-function BrandMark() {
+function BrandMark({ compact = false }) {
   return (
-    <Link to="/" className="flex items-center gap-3 text-white" aria-label="BizCTRL home">
-      <BrandLogo className="h-12 w-auto" />
+    <Link
+      to="/"
+      dir="ltr"
+      translate="no"
+      className="public-brandmark inline-flex min-w-0 shrink-0 items-center justify-center gap-2 text-white"
+      aria-label="BizCTRL home"
+    >
+      <BrandLogo icon className={compact ? 'h-9 w-9 sm:h-10 sm:w-10' : 'h-10 w-10'} />
+      <span dir="ltr" className={`public-brand-wordmark whitespace-nowrap font-extrabold tracking-tight leading-none ${compact ? 'text-xl min-[380px]:text-2xl' : 'text-2xl'}`}>
+        <span className="text-white">Biz</span><span className="text-cyan-400">CTRL</span>
+      </span>
     </Link>
   );
 }
@@ -97,15 +107,27 @@ export function PublicLayout({ children }) {
   }, []);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-950 text-white">
+    <div className="public-landing min-h-screen overflow-x-hidden bg-slate-950 text-white">
       <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
+        {/* Mobile header has equal outer columns and an isolated LTR brand.
+            RTL translation no longer mirrors/collapses the company wordmark. */}
+        <div dir="ltr" className="mx-auto grid max-w-7xl grid-cols-[minmax(74px,1fr)_auto_minmax(74px,1fr)] items-center gap-1 px-3 py-3 md:hidden" data-testid="public-mobile-header">
+          <div className="flex min-w-0 items-center justify-start gap-1">
+            <button type="button" aria-label={menuOpen ? 'Close menu' : 'Open menu'} className="flex h-11 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:bg-white/10" onClick={() => setMenuOpen((open) => !open)}>
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+            <LanguageSwitcher compact className="min-h-11 min-w-10 shrink-0 text-slate-200 hover:bg-white/10 hover:text-white" />
+          </div>
+          <div className="min-w-0 justify-self-center"><BrandMark compact /></div>
+          <div aria-hidden="true" />
+        </div>
+        <div dir="ltr" className="mx-auto hidden max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 md:flex" data-testid="public-desktop-header">
           <BrandMark />
-          <LanguageSwitcher compact className="min-h-11 min-w-11 text-slate-200 hover:bg-white/10 hover:text-white" />
-          <div className="hidden items-center gap-6 md:flex">
+          <div className="flex items-center gap-5">
             {headerLinks.map((item) => <HeaderLink key={item.label} item={item} />)}
           </div>
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher compact className="min-h-11 min-w-11 text-slate-200 hover:bg-white/10 hover:text-white" />
             <Button asChild variant="ghost" className="text-slate-200 hover:bg-white/10 hover:text-white">
               <Link to="/erp-login">Login</Link>
             </Button>
@@ -113,9 +135,6 @@ export function PublicLayout({ children }) {
               Start Free <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
-          <button type="button" aria-label={menuOpen ? 'Close menu' : 'Open menu'} className="rounded-lg p-2 text-slate-300 hover:bg-white/10 md:hidden" onClick={() => setMenuOpen((open) => !open)}>
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
         </div>
         {menuOpen && (
           <div className="border-t border-white/10 bg-slate-950 px-4 py-5 md:hidden">
@@ -138,7 +157,6 @@ export function PublicLayout({ children }) {
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1.3fr_1fr_1fr]">
           <div>
             <BrandMark />
-          <LanguageSwitcher compact className="min-h-11 min-w-11 text-slate-200 hover:bg-white/10 hover:text-white" />
             <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Run Your Entire Business From One Platform.</p>
             <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">BizCTRL is a cloud-based multi-tenant ERP SaaS for modern, multi-branch businesses.</p>
           </div>
@@ -176,8 +194,8 @@ export function PublicHero({ eyebrow, title, description, children }) {
       </div>
       <div className="mx-auto max-w-4xl text-center">
         {eyebrow && <p className="mb-5 inline-flex rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.15em] text-cyan-300">{eyebrow}</p>}
-        <h1 className="text-balance text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">{title}</h1>
-        {description && <p className="mx-auto mt-6 max-w-3xl text-pretty text-lg leading-8 text-slate-300 sm:text-xl">{description}</p>}
+        <h1 className="public-hero-title text-balance text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">{title}</h1>
+        {description && <p className="public-hero-description mx-auto mt-6 max-w-3xl text-pretty text-lg leading-8 text-slate-300 sm:text-xl">{description}</p>}
         {children && <div className="mt-9">{children}</div>}
       </div>
     </section>
@@ -190,8 +208,8 @@ export function SectionHeading({ eyebrow, title, description, align = 'center' }
   return (
     <div className={`${alignment} ${maxWidth} mb-10 max-w-3xl`}>
       {eyebrow && <p className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-cyan-300">{eyebrow}</p>}
-      <h2 className="text-balance text-3xl font-black tracking-tight text-white sm:text-4xl">{title}</h2>
-      {description && <p className="mt-4 text-pretty leading-7 text-slate-400">{description}</p>}
+      <h2 className="public-section-heading text-balance text-3xl font-black tracking-tight text-white sm:text-4xl">{title}</h2>
+      {description && <p className="public-section-description mt-4 text-pretty leading-7 text-slate-400">{description}</p>}
     </div>
   );
 }
