@@ -54,7 +54,7 @@ describe('BizCTRL landing RTL logo and iPhone typography', () => {
     expect(layout).toContain("navigate('/erp-register?owner=1')");
     expect(layout).toContain('handlePublicHashLink(event, item.href)');
     expect(layout).toContain('menuOpen &&');
-    expect(layout).toContain('<Link to="/erp-login">Login</Link>');
+    expect(layout).toContain('<Link to="/erp-login">{tr(\'Login\')}</Link>');
     expect(layout).toContain('<main>{children}</main>');
   });
 });
