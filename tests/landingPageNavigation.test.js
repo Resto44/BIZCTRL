@@ -31,7 +31,7 @@ describe('Landing Page navigation', () => {
     expect(layout).toContain("handlePublicHashLink(event, '/#features')");
     expect(layout).toContain("handlePublicHashLink(event, '/#industries')");
     expect(layout).toContain("handlePublicHashLink(event, '/#pricing')");
-    expect(layout).toContain('<Link to="/contact" className="hover:text-white">Contact</Link>');
-    expect(layout).toContain('<Link to="/erp-login" className="hover:text-white">Login</Link>');
+    expect(layout).toContain('<Link to="/contact" className="hover:text-white">{tr(\'Contact\')}</Link>');
+    expect(layout).toContain('<Link to="/erp-login" className="hover:text-white">{tr(\'Login\')}</Link>');
   });
 });
