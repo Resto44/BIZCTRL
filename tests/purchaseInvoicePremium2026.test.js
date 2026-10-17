@@ -64,7 +64,7 @@ describe('Premium BizCTRL Purchase Invoice 2026 ERP reflow',()=>{
     expect(code).not.toContain('Math.max(183,y+3)');
     expect(code).toContain('size:9.2,bold:j===0');
     expect(code).toContain('const itemHeight=item=>13.4');
-    expect(code).toContain('size:10.8:9.2');
+    expect(code).toContain('size:i===3?10.8:9.2');
     expect(code).toContain("fit:Boolean(maxWidth)");
     expect(code).toContain("const payload='BizCTRL invoice reference: '+invoiceNumber;");
     expect(code).toContain('Internal reference QR only');
