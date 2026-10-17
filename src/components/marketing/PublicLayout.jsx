@@ -1,5 +1,6 @@
 import LanguageSwitcher from '@/components/shared/LanguageSwitcher';
 import BrandLogo from '@/components/BrandLogo';
+import { useLanguage } from '@/lib/LanguageContext';
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Menu, X } from 'lucide-react';
@@ -92,6 +93,7 @@ function HeaderLink({ item, onClick }) {
 
 export function PublicLayout({ children }) {
   const navigate = useNavigate();
+  const { lang } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
 
@@ -107,7 +109,7 @@ export function PublicLayout({ children }) {
   }, []);
 
   return (
-    <div className="public-landing min-h-screen overflow-x-hidden bg-slate-950 text-white">
+    <div data-public-language={lang} className="public-landing min-h-screen overflow-x-hidden bg-slate-950 text-white">
       <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/90 backdrop-blur-xl">
         {/* Mobile header has equal outer columns and an isolated LTR brand.
             RTL translation no longer mirrors/collapses the company wordmark. */}
@@ -118,7 +120,7 @@ export function PublicLayout({ children }) {
             </button>
             <LanguageSwitcher compact className="min-h-11 min-w-10 shrink-0 text-slate-200 hover:bg-white/10 hover:text-white" />
           </div>
-          <div className="min-w-0 justify-self-center"><BrandMark compact /></div>
+          <div className="min-w-0 max-w-full justify-self-center overflow-hidden"><BrandMark compact /></div>
           <div aria-hidden="true" />
         </div>
         <div dir="ltr" className="mx-auto hidden max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 md:flex" data-testid="public-desktop-header">

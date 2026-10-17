@@ -21,7 +21,7 @@ describe('BizCTRL landing RTL logo and iPhone typography', () => {
     expect(layout).toContain('<div aria-hidden="true" />');
     expect(layout).toContain('<BrandMark compact />');
     expect(layout).toContain('data-testid="public-desktop-header"');
-    expect(layout).toContain('min-w-0 justify-self-center');
+    expect(layout).toContain('min-w-0 max-w-full justify-self-center overflow-hidden');
     expect(layout).toContain('min-h-11 min-w-10 shrink-0');
     expect(layout).not.toContain('<BrandLogo className="h-12 w-auto" />');
   });
@@ -31,9 +31,13 @@ describe('BizCTRL landing RTL logo and iPhone typography', () => {
     expect(layout).toContain('public-hero-title');
     expect(layout).toContain('public-section-heading');
     expect(layout).toContain('public-hero-description');
-    expect(css).toContain('html:is(:lang(ar), :lang(fa)) .public-landing');
-    expect(css).toContain('font-weight: 800');
-    expect(css).toContain('line-height: 1.85');
+    expect(layout).toContain('data-public-language={lang}');
+    expect(css).toContain('.public-landing[data-public-language="ar"]');
+    expect(css).toContain('.public-landing[data-public-language="fa"]');
+    expect(css).toContain('font-weight: 700');
+    expect(css).toContain('font-weight: 600');
+    expect(css).toContain('font-weight: 500');
+    expect(css).toContain('line-height: 1.75');
     expect(css).not.toContain('!important');
     expect(css).not.toContain('@font-face');
   });
