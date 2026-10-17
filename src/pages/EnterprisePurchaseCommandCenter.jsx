@@ -123,7 +123,12 @@ function buildStatusPie(invoices) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function EnterprisePurchaseCommandCenter() {
-  const { t, currency, dir } = useLanguage();
+  const { t, currency, dir, lang } = useLanguage();
+  const mobileTabs = lang === 'fa'
+    ? { overview: 'خلاصه', invoices: 'فاکتورها', analytics: 'تحلیل‌ها' }
+    : lang === 'ar'
+      ? { overview: 'الملخص', invoices: 'الفواتير', analytics: 'التحليلات' }
+      : { overview: 'Overview', invoices: 'Invoices', analytics: 'Analytics' };
   const { ownerFilter, activeRestaurant } = useTenant();
   const procurementScope = useMemo(() => {
     if (ownerFilter?.branch) return { branch: ownerFilter.branch };
@@ -304,15 +309,15 @@ export default function EnterprisePurchaseCommandCenter() {
       dir={dir}
     >
       {/* ── Page container — no horizontal overflow ── */}
-      <div className="px-3 pt-4 pb-28 max-w-2xl mx-auto space-y-4 overflow-x-hidden">
+      <div className="min-w-0 px-3 pt-4 pb-24 max-w-2xl mx-auto space-y-4 overflow-x-clip">
 
         {/* ── Page Header ── */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold text-foreground tracking-tight leading-tight">
+        <div className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="break-words text-lg sm:text-xl font-bold text-foreground tracking-tight leading-tight">
               {t('procurement_center') || 'Purchase Command Center'}
             </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="mt-1 break-words text-xs leading-5 text-muted-foreground">
               {t('purchase_invoices') || 'Purchase Invoices'} · {t('procurement_analytics') || 'Analytics'}
             </p>
           </div>
@@ -340,25 +345,31 @@ export default function EnterprisePurchaseCommandCenter() {
         {/* ── Branch Filter ── */}
         <BranchSelect value={filterBranch} onChange={setFilterBranch} includeAll />
 
-        {/* ── Tabs ── */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-3 h-9">
-            <TabsTrigger value="overview" className="text-xs gap-1.5">
-              <LayoutGrid className="w-3.5 h-3.5" />
-              {t('overview') || 'Overview'}
+        {/* ── Mobile-safe tabs: compact labels at phone widths, full labels on tablet/desktop ── */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0 w-full">
+          <TabsList data-testid="procurement-tabs" className="grid h-auto min-h-12 w-full min-w-0 grid-cols-3 gap-1 overflow-hidden p-1">
+            <TabsTrigger value="overview" aria-label={t('overview') || 'Overview'}
+              className="h-10 min-w-0 max-w-full gap-1 px-1 text-[11px] font-bold leading-tight sm:gap-1.5 sm:px-2 sm:text-xs">
+              <LayoutGrid className="hidden h-3.5 w-3.5 shrink-0 sm:block" />
+              <span className="block min-w-0 truncate sm:hidden">{mobileTabs.overview}</span>
+              <span className="hidden min-w-0 truncate sm:block">{t('overview') || 'Overview'}</span>
             </TabsTrigger>
-            <TabsTrigger value="invoices" className="text-xs gap-1.5">
-              <Receipt className="w-3.5 h-3.5" />
-              {t('purchase_invoices') || 'Invoices'}
+            <TabsTrigger value="invoices" aria-label={t('purchase_invoices') || 'Purchase Invoices'}
+              className="h-10 min-w-0 max-w-full gap-1 px-1 text-[11px] font-bold leading-tight sm:gap-1.5 sm:px-2 sm:text-xs">
+              <Receipt className="hidden h-3.5 w-3.5 shrink-0 sm:block" />
+              <span className="block min-w-0 truncate sm:hidden">{mobileTabs.invoices}</span>
+              <span className="hidden min-w-0 truncate sm:block">{t('purchase_invoices') || 'Invoices'}</span>
               {filtered.length > 0 && (
-                <span className="ms-1 bg-primary/10 text-primary text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                <span className="ms-1 hidden shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary sm:inline-flex">
                   {filtered.length}
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="text-xs gap-1.5">
-              <BarChart3 className="w-3.5 h-3.5" />
-              {t('procurement_analytics') || 'Analytics'}
+            <TabsTrigger value="analytics" aria-label={t('procurement_analytics') || 'Procurement Analytics'}
+              className="h-10 min-w-0 max-w-full gap-1 px-1 text-[11px] font-bold leading-tight sm:gap-1.5 sm:px-2 sm:text-xs">
+              <BarChart3 className="hidden h-3.5 w-3.5 shrink-0 sm:block" />
+              <span className="block min-w-0 truncate sm:hidden">{mobileTabs.analytics}</span>
+              <span className="hidden min-w-0 truncate sm:block">{t('procurement_analytics') || 'Analytics'}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -708,16 +719,21 @@ export default function EnterprisePurchaseCommandCenter() {
                 </Tabs>
         
         {/* Bottom Spacer for Sticky Bar + BottomNav */}
-        <div className="h-32" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} />
+        {activeTab === 'invoices' && (
+          <div className="h-24" aria-hidden="true" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} />
+        )}
       </div>
-      {/* ── Section 14: Sticky Action Bar ── */}
-      <StickyActionBar
-        onAddInvoice={handleAddInvoice}
-        onViewDashboard={handleViewDashboard}
-        pendingCount={pendingApproval.length}
-        overdueCount={overdueInvoices.length}
-        t={t}
-      />
+      {/* Keep overview/analytics and KPI cards unobstructed; the header Add Invoice action
+          remains available on every tab. The bottom shortcut is invoice-only. */}
+      {activeTab === 'invoices' && (
+        <StickyActionBar
+          onAddInvoice={handleAddInvoice}
+          onViewDashboard={handleViewDashboard}
+          pendingCount={pendingApproval.length}
+          overdueCount={overdueInvoices.length}
+          t={t}
+        />
+      )}
 
       {/* ── Invoice Form Dialog ── */}
       <Dialog open={showForm} onOpenChange={open => !open && handleFormClose()}>
