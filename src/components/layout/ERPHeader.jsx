@@ -101,9 +101,14 @@ function GlobalSearch() {
 
   const results = useMemo(() => {
     if (!query.trim()) return allItems.slice(0, 8);
-    const q = query.toLowerCase();
-    return allItems.filter(i => i.label.toLowerCase().includes(q)).slice(0, 10);
-  }, [query, allItems]);
+    // Search both the canonical English label and the current UI language.
+    // Routes and permission checks still use canonical IDs, never translated paths.
+    const q = query.trim().toLocaleLowerCase();
+    return allItems.filter(item =>
+      item.label.toLocaleLowerCase().includes(q) ||
+      translateLiteral(item.label).toLocaleLowerCase().includes(q)
+    ).slice(0, 10);
+  }, [query, allItems, translateLiteral]);
 
   // Cmd+K shortcut
   useEffect(() => {
@@ -155,7 +160,7 @@ function GlobalSearch() {
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-lg mx-4 bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-fade-in-up">
+          <div className="relative z-10 w-[calc(100%-2rem)] max-w-lg min-w-0 bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-fade-in-up">
             <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
               <Search className="w-4 h-4 text-muted-foreground shrink-0" />
               <input
@@ -163,7 +168,7 @@ function GlobalSearch() {
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder={translateLiteral('Search pages, modules, actions...')}
-                className="flex-1 bg-transparent text-sm outline-none text-foreground placeholder:text-muted-foreground"
+                className="min-w-0 flex-1 bg-transparent text-base md:text-sm outline-none text-foreground placeholder:text-muted-foreground"
               />
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setOpen(false)}>
                 <X className="w-3.5 h-3.5" />
@@ -179,13 +184,13 @@ function GlobalSearch() {
                     <button
                       key={item.path}
                       onClick={() => handleSelect(item.path)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left"
+                      className="w-full min-w-0 flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-start"
                     >
                       <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
                         <Icon className="w-3.5 h-3.5 text-primary" />
                       </div>
-                      <span className="text-foreground">{translateLiteral(item.label)}</span>
-                      <span className="ml-auto text-xs text-muted-foreground font-mono">{item.path}</span>
+                      <span className="min-w-0 flex-1 whitespace-normal break-words text-foreground">{translateLiteral(item.label)}</span>
+                      <span dir="ltr" className="max-w-[35%] shrink-0 truncate text-end text-xs text-muted-foreground font-mono">{item.path}</span>
                     </button>
                   );
                 })
