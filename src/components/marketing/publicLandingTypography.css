@@ -26,18 +26,17 @@
   flex-shrink: 1;
 }
 .public-landing[data-public-language="fa"] {
-  --public-locale-font: "Vazirmatn", -apple-system, BlinkMacSystemFont, "Noto Sans Arabic", system-ui, sans-serif;
+  --public-locale-font: -apple-system, BlinkMacSystemFont, "Vazirmatn", "Noto Sans Arabic", system-ui, sans-serif;
 }
 .public-landing[data-public-language="ar"] {
-  --public-locale-font: "Noto Sans Arabic", "Vazirmatn", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --public-locale-font: -apple-system, BlinkMacSystemFont, "Noto Sans Arabic", "Vazirmatn", system-ui, sans-serif;
 }
 .public-landing:is([data-public-language="ar"], [data-public-language="fa"]) {
   font-family: var(--public-locale-font);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.65;
   font-synthesis: weight;
   font-feature-settings: "kern";
-  -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 .public-landing:is([data-public-language="ar"], [data-public-language="fa"]) :is(
@@ -59,8 +58,8 @@
 .public-landing:is([data-public-language="ar"], [data-public-language="fa"]) :is(
   .public-hero-description, .public-section-description
 ) {
-  font-weight: 500;
-  line-height: 1.75;
+  font-weight: 600;
+  line-height: 1.72;
   letter-spacing: 0;
   overflow-wrap: break-word;
   word-break: normal;
@@ -74,7 +73,7 @@
   button, [role="button"], [role="tab"], label,
   nav a
 ) {
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.5;
 }
 .public-landing:is([data-public-language="ar"], [data-public-language="fa"]) :is(
@@ -95,33 +94,30 @@
   min-width: 0;
 }
 .public-landing [data-testid="public-mobile-header"] .public-brandmark {
-  max-width: 100%;
-  overflow: hidden;
+  height: 3rem;
+  width: 3.5rem;
+  min-width: 3.5rem;
+  flex-shrink: 0;
+  overflow: visible;
+  justify-content: center;
 }
-/* Fit the actual iPhone viewport in all three languages; do not overlap
- * language/menu controls with the fixed-LTR brand. */
+.public-landing [data-testid="public-mobile-header"] .public-brandmark img {
+  display: block;
+  height: 2.75rem;
+  width: 2.75rem;
+  max-width: 100%;
+  object-fit: contain;
+}
+.public-landing [data-testid="public-mobile-brand-icon"] {
+  isolation: isolate;
+  overflow: visible;
+}
+/* The mobile center slot contains ONLY the app mark. Never squeeze a
+ * wordmark into the 56px slot or clip/mirror SVG text in Safari RTL.
+ * Larger screens retain the LTR BizCTRL wordmark next to the app mark. */
 @media (max-width: 430px) {
   .public-landing [data-testid="public-mobile-header"] {
-    grid-template-columns: minmax(78px, 1fr) minmax(0, auto) minmax(78px, 1fr);
-    column-gap: 0.25rem;
-  }
-  .public-landing [data-testid="public-mobile-header"] .public-brandmark {
-    gap: 0.25rem;
-  }
-  .public-landing [data-testid="public-mobile-header"] .public-brandmark svg {
-    width: 2rem;
-    height: 2rem;
-    flex-shrink: 0;
-  }
-  .public-landing [data-testid="public-mobile-header"] .public-brand-wordmark {
-    font-size: 1.05rem;
-  }
-}
-@media (max-width: 350px) {
-  .public-landing [data-testid="public-mobile-header"] .public-brand-wordmark {
-    font-size: 0.9rem;
-  }
-  .public-landing [data-testid="public-mobile-header"] {
-    column-gap: 0.125rem;
+    grid-template-columns: minmax(0,1fr) 56px minmax(0,1fr);
+    column-gap: .25rem;
   }
 }
