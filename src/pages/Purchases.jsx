@@ -241,7 +241,9 @@ export default function Purchases() {
   // ── Summary stats ──────────────────────────────────────────────────────
   const totalOutstanding = invoices
     .filter(i => i.status !== 'paid' && i.status !== 'cancelled')
-    .reduce((s, i) => s + ((i.total_amount || 0) - (i.paid_amount || 0)), 0);
+    // Do not net supplier overpayments against real unpaid invoices.
+    // A supplier credit is a separate receivable, not a negative payable.
+    .reduce((s, i) => s + Math.max(0, (Number(i.total_amount) || 0) - (Number(i.paid_amount) || 0)), 0);
 
   const overdueCount = invoices.filter(i => getOverdueInfo(i).isOverdue).length;
   const pendingApprovalCount = invoices.filter(i => i.approval_status === 'pending').length;
