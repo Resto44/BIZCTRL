@@ -62,12 +62,12 @@ describe('Premium BizCTRL Purchase Invoice 2026 ERP reflow',()=>{
     expect(code).toContain('summary(y);');
     expect(code).toContain('const summaryY=y+4;');
     expect(code).not.toContain('Math.max(183,y+3)');
-    expect(code).toContain('size:9.6');
+    expect(code).toContain('size:9.2,bold:j===0');
     expect(code).toContain('const itemHeight=item=>13.4');
     expect(code).toContain('size:10.8:9.2');
     expect(code).toContain("fit:Boolean(maxWidth)");
     expect(code).toContain("const payload='BizCTRL invoice reference: '+invoiceNumber;");
-    expect(code).not.toContain('ZATCA');
+    expect(code).toContain('Internal reference QR only');
   });
   it('does not create approval or payment records when downloading or sharing',()=>{
     const source=readFileSync('src/lib/purchaseInvoicePdf.js','utf8');
