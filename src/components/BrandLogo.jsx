@@ -1,16 +1,26 @@
-/** Single canonical BizCTRL corporate mark; tenant restaurant logos are separate. */
+/** The approved glossy icon is an ordinary HTML image: iOS Safari must not
+ * lay out Latin SVG text in an inherited RTL viewport. Business/tenant logos
+ * are separate and unaffected by this corporate mark.
+ */
 export default function BrandLogo({ icon = false, tone = 'dark', className = '' }) {
-  const foreground = tone === 'light' ? '#11274F' : '#FFFFFF';
-  return <svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="BizCTRL"
-    viewBox={icon ? '0 0 88 88' : '0 0 430 88'}
-    className={`shrink-0 ${className}`}
-    style={{ aspectRatio: icon ? '1' : '430 / 88' }}>
-    <image href="/icons/bizctrl-icon-192-v3.png" x="0" y="0" width="88" height="88"
-      preserveAspectRatio="xMidYMid meet" />
-    {!icon && <text x="100" y="67" textLength="320" lengthAdjust="spacingAndGlyphs"
-      fontFamily="-apple-system, BlinkMacSystemFont, Arial, sans-serif"
-      fontWeight="800" fontSize="76">
-      <tspan fill={foreground}>Biz</tspan><tspan fill="#00C5EC">CTRL</tspan>
-    </text>}
-  </svg>;
+  const file = '/icons/bizctrl-icon-192-v3.png';
+  if (icon) {
+    return (
+      <img src={file} width="88" height="88" alt="BizCTRL"
+        decoding="async" draggable="false" translate="no" dir="ltr"
+        className={`block aspect-square shrink-0 object-contain ${className}`} />
+    );
+  }
+
+  return (
+    <span dir="ltr" translate="no" aria-label="BizCTRL"
+      className={`inline-flex max-w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap align-middle notranslate ${className}`}>
+      <img src={file} width="88" height="88" alt="" aria-hidden="true"
+        decoding="async" draggable="false" className="block h-full max-h-20 w-auto shrink-0 aspect-square object-contain" />
+      <span dir="ltr" className="inline-flex shrink-0 items-baseline text-[clamp(1.1rem,2.5vw,2.4rem)] font-extrabold leading-none tracking-tight"
+        style={{ direction: 'ltr', unicodeBidi: 'isolate', fontFamily: '-apple-system, BlinkMacSystemFont, Inter, Arial, sans-serif' }}>
+        <span style={{ color: tone === 'light' ? '#11274F' : '#FFFFFF' }}>Biz</span><span style={{ color: '#00C5EC' }}>CTRL</span>
+      </span>
+    </span>
+  );
 }
