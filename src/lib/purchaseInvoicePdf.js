@@ -99,7 +99,7 @@ export function createBrandedPurchaseInvoicePDF(invoice,options={}){
    lang:language,business,brand,branch,
    payments:options.payments||[],auditEvents:options.auditEvents||[],
  });
- const filename=safePdfFilename('BizCTRL-Purchase-'+safe(invoice.invoice_number||invoice.id).replace(/[^a-zA-Z0-9_-]/g,''),language);
+ const filename=safePdfFilename('BizCTRL-Purchase-ERP-v2-'+safe(invoice.invoice_number||invoice.id).replace(/[^a-zA-Z0-9_-]/g,''),language);
  return {doc,filename,model:m};
 }
 export function downloadPurchaseInvoicePDF(invoice,options={}){

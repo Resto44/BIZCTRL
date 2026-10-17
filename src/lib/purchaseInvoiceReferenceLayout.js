@@ -93,212 +93,252 @@ export function invoicePaymentLabel(invoice,payments=[],language='en'){
  if(!methods.length)return firstStr(invoice.payment_method)||w.unknown;
  return methods.length===1?methods[0]:w.paymentMixed;
 }
-const pageLineFont=6.4;
-export function renderPurchaseInvoiceReference(doc,invoice,model,{lang='en',business,brand,branch,payments=[],auditEvents=[]}={}){
- const language=LANGUAGE[lang]?lang:'en',w=LANGUAGE[language];
- const rtl=language!=='en';
- const currency=model.currency, invoiceNumber=display(invoice.invoice_number||invoice.id);
- const L=9,R=201,CW=R-L;
- const txt=(v,x,y,{size=8,bold=false,color=NAVY,align,limit,maxWidth}={})=>
-   drawLocalizedPdfText(doc,limit?shorten(v,limit):display(v),x,y,
-    {rtl,bold,size,color,align:align||(rtl?'right':'left'),maxWidth});
- const roundedBox=(x,y,width,height,fill=[255,255,255],line=BORDER,radius=2.3)=>{
-  doc.setFillColor(...fill);if(line)doc.setDrawColor(...line);
-  doc.roundedRect(x,y,width,height,radius,radius,line?'FD':'F');
- };
- const field=(label,value,x,y,wid,{tone=NAVY,labelWidth=30}={})=>{
-  // Separating labels from values avoids bidi/font corruption in mixed records.
-  txt(label,x+2,y,{size:6.5,color:FADED,maxWidth:labelWidth,align:'left',limit:26});
-  txt(value,x+wid-2,y,{size:7.6,color:tone,bold:true,maxWidth:wid-labelWidth-6,align:'right',limit:32});
- };
- const icon=(x,y,kind='doc',color=BLUE)=>{
-  doc.setDrawColor(...color);doc.setLineWidth(.38);
-  if(kind==='check'){doc.circle(x+2,y-1.2,1.8);doc.line(x+1,y-1.2,x+1.8,y-.5);doc.line(x+1.8,y-.5,x+3.2,y-2);return;}
-  doc.roundedRect(x,y-3,4.4,5.6,.5,.5,'S');
-  doc.line(x+.9,y-1.8,x+3.4,y-1.8);doc.line(x+.9,y-.1,x+3,y-.1);
- };
- const brandMark=(x,y,scale=1)=>drawBizCTRLReportIcon(doc,x,y,11.9*scale);
- const smallHeading=(s,x,y,accent=BLUE)=>{roundedBox(x,y-5,5,5,[235,245,255],null,1);icon(x+.45,y-.2,'doc',accent);
-  txt(s,x+8,y,{size:8.8,bold:true,color:NAVY,limit:30,align:'left'});};
- const drawHeader=(continuation=false)=>{
-   doc.setFillColor(248,252,255);doc.rect(0,0,210,34,'F');
-   brandMark(10,7.2,1.5);
-   txt('Biz',30,17,{size:22,bold:true,align:'left',color:NAVY});
-   txt('CTRL',46.5,17,{size:22,bold:true,align:'left',color:CYAN});
-   txt('Restaurant ERP System',30,23,{size:7.2,align:'left',color:FADED});
-   txt(w.title,198,16,{size:16.8,bold:true,align:'right',color:NAVY});
-   txt(w.sub,198,23,{size:8.5,bold:true,align:'right',color:BLUE});
-   roundedBox(183,26,15,5.4,[227,243,255],null,1.4);
-   txt('ERP PDF',190.5,29.7,{size:6.5,bold:true,align:'center',color:BLUE});
-   doc.setDrawColor(...BORDER);doc.line(L,34,R,34);
-   if(continuation)txt(w.more+' • '+invoiceNumber,L+2,40,{size:7.2,color:BLUE,align:'left'});
- };
- const infoCards=()=>{
-  roundedBox(L,37,94,48,[248,252,255]);
-  roundedBox(106,37,95,48,[248,252,255]);
-  smallHeading(w.business,14,45);
-  const companyImage=firstStr(brand?.image_data,business?.image_data);
-  const hasCompanyImage=companyImage&&/^data:image\/(?:png|jpe?g);base64,/i.test(companyImage);
-  if(hasCompanyImage){
-    try{doc.addImage(companyImage,15,47.3,13,11.7);}catch{/* Logo unavailable in this PDF viewer */}
-  }
-  txt(model.businessName,hasCompanyImage?31:17,53,{size:hasCompanyImage?10.6:12,bold:true,color:NAVY,
-    limit:36,maxWidth:hasCompanyImage?70:83,align:'left'});
-  field(w.branch,model.branch,13,61,86,{labelWidth:25});
-  field(w.taxId,model.businessTax,13,69,86,{labelWidth:26});
-  field(w.address,model.address,13,77,86,{labelWidth:24});
-  smallHeading(w.details,111,45);
-  field(w.reference,invoiceNumber,110,53,88,{labelWidth:29,tone:BLUE});
-  field(w.date,invoice.date,110,61,88,{labelWidth:27});
-  field(w.supplier,invoice.supplier_name,110,69,88,{labelWidth:29});
-  field(w.payment,invoicePaymentLabel(invoice,payments,language),110,77,88,{labelWidth:29});
-  const statusLabel=model.status==='approved'?w.approved:w[model.status]||w.unknown;
-  roundedBox(155,79,43,5.2,model.status==='approved'?[225,249,240]:[238,244,255],null,1.5);
-  txt(w.status+': '+statusLabel,176.5,82.7,{size:6.8,bold:true,
-   align:'center',color:model.status==='approved'?GREEN:BLUE,limit:45});
- };
- const colSpecs=[
-  {key:'num',width:9,title:'#'},
-  {key:'item',width:48,title:w.item},
-  {key:'unit',width:15,title:w.unit},
-  {key:'qty',width:13,title:w.qty},
-  {key:'unit_cost',width:21,title:w.unitPrice},
-  {key:'discount',width:18,title:w.discount},
-  {key:'before',width:21,title:w.before},
-  {key:'vat',width:19,title:w.vat},
-  {key:'sum',width:28,title:w.lineTotal},
- ];
- // exact width = 192 mm. Printed physical order follows chosen UI direction.
- const tableColumns=rtl?[...colSpecs].reverse():colSpecs;
- const drawTableHead=(y)=>{
-  roundedBox(L,y,CW,11,[227,241,254],null,1.4);
-  let x=L;
-  for(const col of tableColumns){
-   txt(col.title,x+col.width/2,y+7,{size:6.2,bold:true,color:NAVY,align:'center',
-     limit:15,maxWidth:col.width-1});
-   x+=col.width;
-  }
- };
- const drawLine=(item,index,y)=>{
-  const nameLines=wrapWords(item.product_name||item.name||item.description,23);
-  const height=Math.max(12.5,2.3+5.1*nameLines.length);
-  roundedBox(L,y,CW,height,index%2===0?[251,253,255]:[246,250,254],null,0.6);
-  let x=L;
-  const result=calcPurchaseLine(item);
-  const values={
-   num:String(index+1),unit:item.unit||item.unit_name||'—',qty:String(item.quantity),
-   unit_cost:currencyAmount(item.unit_cost,''),discount:currencyAmount(result.discountAmount,''),
-   before:currencyAmount(result.discountedAmount,''),vat:currencyAmount(result.taxAmount,''),
-   sum:currencyAmount(item.line_total,''),
+/**
+ * BizCTRL Purchase Invoice ERP v2.
+ * Portrait A4; flowing items with real saved financial/accounting data.
+ * No PDF screenshot, invented tax rate, synthetic approval or fake payment.
+ */
+export function renderPurchaseInvoiceReference(doc,invoice,model,{
+  lang='en',business,brand,branch,payments=[],auditEvents=[],
+}={}) {
+  const language=LANGUAGE[lang]?lang:'en';
+  const w=LANGUAGE[language],rtl=language!=='en';
+  const invoiceNumber=display(invoice.invoice_number||invoice.id);
+  const money=value=>currencyAmount(value,model.currency);
+  const width=210,left=9,right=201,contentWidth=192;
+  const white=[255,255,255],ink=NAVY;
+  const paleBlue=[230,241,255],paleGreen=[231,248,241],palePurple=[242,237,255],paleAmber=[255,246,224];
+  const toneAmber=[180,116,12],tonePurple=[110,70,200];
+  const padding=4;
+  const print=(str,x,y,{size=9,color=ink,bold=false,align='left',maxWidth}={})=>
+    drawLocalizedPdfText(doc,display(str),x,y,{
+      rtl,bold,size,color,align,maxWidth,fit:Boolean(maxWidth),
+    });
+  const number=(str,x,y,{size=10,color=ink,bold=true,align='right',maxWidth}={})=>
+    drawLocalizedPdfText(doc,display(str),x,y,{
+      rtl:false,bold,size,color,align,maxWidth,fit:Boolean(maxWidth),
+    });
+  const panel=(x,y,wid,hei,bg=white,radius=2.4)=>{
+    doc.setFillColor(...bg);doc.roundedRect(x,y,wid,hei,radius,radius,'F');
   };
-  for(const col of tableColumns){
-   if(col.key==='item'){
-    const dataImage=firstStr(item.image_data,item.image_base64,item.imageData);
-    const imgX=x+(rtl?col.width-9:1.3);
-    if(dataImage&&/^data:image\/(?:png|jpe?g);base64,/i.test(dataImage)){
-      try{doc.addImage(dataImage,imgX,y+1.1,7.8,Math.min(9,height-2));}catch{/* no fake image */}}
-    for(let k=0;k<nameLines.length;k++){
-      txt(nameLines[k],x+col.width/2+(dataImage?(rtl?-4:4):0),y+5.1+k*4.9,
-        {size:7.3,bold:k===0,align:'center',maxWidth:col.width-(dataImage?13:5),limit:27});
+  const divider=(y,x=13,end=197)=>{
+    doc.setDrawColor(...BORDER);doc.setLineWidth(.22);doc.line(x,y,end,y);
+  };
+  const sectionTitle=(label,x,y,wid,bg=paleBlue)=>{
+    panel(x,y,wid,9,bg,1.9);
+    print(label,rtl?x+wid-4:x+4,y+6.2,{
+      size:10.2,bold:true,color:ink,align:rtl?'right':'left',maxWidth:wid-9,
+    });
+  };
+  const heading=(label,x,y,wid,secondary)=>{
+    print(label,rtl?x+wid-4:x+4,y+5.8,{
+      size:8.3,bold:true,color:FADED,align:rtl?'right':'left',maxWidth:wid-8,
+    });
+    print(secondary,rtl?x+wid-4:x+4,y+13.1,{
+      size:10.7,bold:true,color:ink,align:rtl?'right':'left',maxWidth:wid-8,
+    });
+  };
+  const approvals=invoiceApprovalSteps(invoice,auditEvents);
+  const payLabel=invoicePaymentLabel(invoice,payments,language);
+  const approvalLabel=model.status==='approved'?w.approved:w[model.status]||w.unknown;
+  const paidLabel=model.remaining<=.005&&model.total>0
+    ? (language==='ar'?'مدفوع':language==='fa'?'پرداخت‌شده':'Paid')
+    : model.paid>0?(language==='ar'?'مدفوع جزئياً':language==='fa'?'پرداخت جزئی':'Partially paid')
+    : (language==='ar'?'غير مدفوع':language==='fa'?'پرداخت‌نشده':'Unpaid');
+  const count=model.items.length;
+  const companyImage=firstStr(brand?.image_data,business?.image_data);
+  const hasCompanyImage=Boolean(companyImage&&/^data:image\/(?:png|jpe?g);base64,/i.test(companyImage));
+  const finishHeader=(continuation=false)=>{
+    doc.setFillColor(247,250,255);doc.rect(0,0,width,297,'F');
+    panel(left,7,contentWidth,31,[16,92,212],3.4);
+    panel(11,9,188,27,[15,82,193],2.6);
+    drawBizCTRLReportIcon(doc,15,15,11.5);
+    number('BizCTRL',31,24.4,{size:18,bold:true,color:white,align:'left',maxWidth:58});
+    number('SMART BUSINESS CONTROL',31,31.6,{size:7.7,bold:false,color:[211,238,255],align:'left'});
+    doc.setDrawColor(133,192,242);doc.line(101,14,101,33);
+    print(w.title,rtl?194:107,22,{
+      size:13.5,bold:true,color:white,align:rtl?'right':'left',maxWidth:86,
+    });
+    number(invoiceNumber,rtl?194:107,31,{
+      size:10.2,bold:true,color:white,align:rtl?'right':'left',maxWidth:85,
+    });
+    if(continuation){
+      print(w.more,rtl?194:107,36,{
+        size:7.5,color:[210,235,255],align:rtl?'right':'left',maxWidth:88,
+      });
     }
-   }else{
-    txt(values[col.key],x+col.width/2,y+Math.min(height/2+2,8),{
-      size:col.key==='sum'?7.6:7.1,bold:col.key==='sum',
-      color:col.key==='sum'?BLUE:NAVY,align:'center',maxWidth:col.width-1,limit:20});
-   }
-   x+=col.width;
-  }
-  doc.setDrawColor(...BORDER);doc.line(L,y+height,R,y+height);
-  return height;
- };
- const makeFooter=()=>{
-  for(let p=1;p<=doc.getNumberOfPages();p++){
-   doc.setPage(p);
-   doc.setDrawColor(...BORDER);doc.line(9,272,201,272);
-   brandMark(10,277,.9);txt('BizCTRL',24.7,283,{size:13.2,bold:true,color:NAVY,align:'left'});
-   txt('Restaurant ERP System',24.7,288,{size:6,color:FADED,align:'left'});
-   txt(w.generated,83,281,{size:7,bold:true,color:NAVY,align:'center',maxWidth:95});
-   txt(w.disclaimer,83,287,{size:5.8,color:FADED,align:'center',maxWidth:100});
-   // Pure reference QR. Not a tax validation QR or an official ZATCA stamp.
-   try{
-    const payload='BizCTRL invoice reference: '+invoiceNumber;
-    const qr=QRCode.create(payload,{errorCorrectionLevel:'M'}).modules;
-    const cell=16/qr.size,originX=162,originY=274;
-    doc.setFillColor(255,255,255);doc.rect(originX,originY,16,16,'F');
-    doc.setFillColor(...NAVY);
-    for(let j=0;j<qr.size;j++)for(let i=0;i<qr.size;i++)
-      if(qr.get(i,j))doc.rect(originX+i*cell,originY+j*cell,cell+.025,cell+.025,'F');
-    txt(w.qr,180,281,{size:5.8,color:FADED,align:'left',limit:27});
-   }catch{/* malformed missing reference has no QR */}
-   txt(invoiceNumber,198,286,{size:6.7,bold:true,color:BLUE,align:'right',limit:28});
-   txt(p+' / '+doc.getNumberOfPages(),198,292,{size:6.2,color:FADED,align:'right'});
-  }
- };
- const approvalSteps=invoiceApprovalSteps(invoice,auditEvents);
- const finishSummary=(y)=>{
-  const panelY=Math.max(183,y+3);
-  roundedBox(L,panelY,104,28,[248,252,255]);
-  smallHeading(w.notes,L+4,panelY+8);
-  const noteLines=wrapWords(invoice.notes||w.unknown,41).slice(0,3);
-  noteLines.forEach((line,i)=>txt(line,rtl?108:15,panelY+16+i*4,{size:7.1,color:FADED,
-    align:rtl?'right':'left',maxWidth:92}));
-  roundedBox(L,panelY+32,104,42,[248,252,255]);
-  smallHeading(w.workflow,L+4,panelY+40);
-  const shown=approvalSteps.length?approvalSteps.slice(0,3):[{type:'draft'}];
-  shown.forEach((step,i)=>{
-    const point=L+19+i*33.5;
-    if(i<shown.length-1){
-      doc.setDrawColor(...BORDER);doc.setLineWidth(.6);doc.line(point+2.1,panelY+53,point+31.4,panelY+53);
+  };
+  const infoCards=()=>{
+    const x=[9,107], y=[41,61];
+    const entries=[
+      [w.supplier,invoice.supplier_name],
+      [w.branch,model.branch],
+      [w.payment,payLabel],
+      [w.status,approvalLabel+' · '+paidLabel],
+    ];
+    entries.forEach(([label,value],i)=>{
+      const px=x[i%2],py=y[Math.floor(i/2)];
+      panel(px,py,94,18,white,2);
+      heading(label,px,py,94,value);
+    });
+    const smallBusiness=[model.businessName,model.businessTax,model.address].filter(x=>x&&x!=='—').join(' · ');
+    print(smallBusiness,rtl?196:14,83.5,{
+      size:8.7,color:FADED,align:rtl?'right':'left',maxWidth:183,
+    });
+  };
+  const metrics=()=>{
+    const totalItems=count;
+    const cards=[
+      [language==='en'?'Items':language==='ar'?'عدد الأصناف':'تعداد اقلام',String(totalItems),palePurple,tonePurple],
+      [w.subtotal,money(model.beforeVAT),paleBlue,BLUE],
+      [w.vatAmount,money(model.vat),[255,240,237],[194,69,48]],
+      [w.total,money(model.total),paleGreen,GREEN],
+    ];
+    const xs=[9,58,107,156];
+    cards.forEach(([title,value,bg,accent],i)=>{
+      const px=xs[i];panel(px,87,45,21,bg,2.2);
+      panel(px+3,90,4.8,4.8,accent,1.0);
+      print(title,rtl?px+42:px+10,95,{
+        size:8.5,bold:true,color:accent,align:rtl?'right':'left',maxWidth:32,
+      });
+      number(value,rtl?px+42:px+4,103.5,{
+        size:11,bold:true,color:ink,align:rtl?'right':'left',maxWidth:39,
+      });
+    });
+  };
+  const itemsTitle=()=>{
+    sectionTitle(w.item,9,110,192,paleBlue);
+    const a=language==='en'?['PRODUCT','QTY / UNIT','UNIT COST','LINE TOTAL']:
+      language==='ar'?['الصنف','الكمية / الوحدة','سعر الوحدة','الإجمالي']:
+      ['محصول','تعداد / واحد','قیمت واحد','مجموع'];
+    const cells=rtl?[[158,39],[113,43],[73,38],[12,59]]:
+      [[12,77],[91,30],[124,30],[157,41]];
+    a.forEach((label,i)=>{
+      const [x,cw]=cells[i];
+      print(label,rtl?x+cw-2:x+2,125.5,{
+        size:8.9,bold:true,color:ink,align:rtl?'right':'left',maxWidth:cw-4,
+      });
+    });
+    divider(127.7);
+  };
+  const toRows=item=>wrapWords(item.product_name||item.name||item.description,39);
+  const itemHeight=item=>13.4+Math.max(0,toRows(item).length-2)*3.8;
+  const drawItem=(item,index,y)=>{
+    const rows=toRows(item),h=itemHeight(item);
+    panel(9,y,192,h,index%2?[247,251,255]:white,1);
+    const nameX=rtl?196:14;
+    rows.forEach((value,j)=>{
+      print(value,nameX,y+4.3+j*3.7,{
+        size:9.2,bold:j===0,color:ink,align:rtl?'right':'left',maxWidth:74,
+      });
+    });
+    const qty=display(item.quantity)+' '+display(item.unit||item.unit_name);
+    number(qty,rtl?139:108,y+7,{
+      size:9.0,color:ink,align:'center',maxWidth:30,
+    });
+    number(currencyAmount(item.unit_cost,''),rtl?99:139,y+7,{
+      size:9.4,bold:true,align:'center',maxWidth:30,
+    });
+    number(currencyAmount(item.line_total,''),rtl?39:198,y+7,{
+      size:10,bold:true,color:BLUE,align:rtl?'left':'right',maxWidth:40,
+    });
+    const c=calcPurchaseLine(item);
+    const detailText=(language==='ar'?'الخصم: ':language==='fa'?'تخفیف: ':'Discount: ')+currencyAmount(c.discountAmount,'')+
+      '  ·  '+(language==='ar'?'قبل الضريبة: ':language==='fa'?'قبل از مالیات: ':'Before VAT: ')+currencyAmount(c.discountedAmount,'')+
+      '  ·  '+(language==='ar'?'الضريبة: ':language==='fa'?'مالیات: ':'VAT: ')+currencyAmount(c.taxAmount,'');
+    print(detailText,rtl?195:13,y+h-2,{
+      size:8.0,color:FADED,align:rtl?'right':'left',maxWidth:181,
+    });
+    divider(y+h,12,198);
+    return h;
+  };
+  const summaryNoteLines=wrapWords(invoice.notes||w.unknown,53);
+  const summaryHeight=Math.max(55,26+summaryNoteLines.length*4.4);
+  const summary=(y)=>{
+    const summaryY=y+4;
+    panel(9,summaryY,192,summaryHeight,white);
+    const leftWidth=93,rightX=106,rightWidth=95;
+    sectionTitle(w.financials,rightX,summaryY+1,rightWidth-1,paleBlue);
+    const details=[
+      [w.subtotal,model.beforeVAT],[w.vatAmount,model.vat],
+      [w.extras,model.additional],[w.total,model.total],
+      [w.paid,model.paid],[w.remaining,model.remaining],
+    ];
+    details.forEach(([name,val],i)=>{
+      const yy=summaryY+17+i*6.0;
+      if(i===3)panel(rightX+2,yy-4.4,89,6.5,paleBlue,1.1);
+      print(name,rtl?rightX+91:rightX+4,yy,{
+        size:9.1,bold:i===3,color:i===3?BLUE:FADED,
+        align:rtl?'right':'left',maxWidth:47,
+      });
+      number(money(val),rtl?rightX+4:rightX+91,yy,{
+        size:i===3?10.8:9.2,bold:i>=3,color:i===5?GREEN:ink,
+        align:rtl?'left':'right',maxWidth:43,
+      });
+    });
+    sectionTitle(w.notes,10,summaryY+1,91,paleBlue);
+    summaryNoteLines.forEach((line,j)=>print(line,rtl?98:14,summaryY+17+j*4.4,{
+      size:8.9,color:FADED,align:rtl?'right':'left',maxWidth:85,
+    }));
+    const auditTop=summaryY+Math.max(30,19+summaryNoteLines.length*4.4);
+    print(w.workflow,rtl?99:14,auditTop,{
+      size:9.2,bold:true,color:BLUE,align:rtl?'right':'left',maxWidth:82,
+    });
+    const flow=approvals.length?approvals:[{type:'draft',date:null,who:null}];
+    flow.slice(0,3).forEach((e,i)=>{
+      const label=(w[e.type]||w.unknown)+(e.date?' · '+String(e.date).slice(0,10):'');
+      print(label,rtl?98:15,auditTop+4.9+i*4.7,{
+        size:8.1,color:ink,align:rtl?'right':'left',maxWidth:82,
+      });
+    });
+    if(model.difference>.05){
+      print(w.mismatch,rtl?198:14,summaryY+summaryHeight+4,{
+        size:8.8,bold:true,color:RED,align:rtl?'right':'left',maxWidth:180,
+      });
     }
-    doc.setFillColor(...(step.type==='pending'?[227,238,255]:[220,248,234]));
-    doc.circle(point,panelY+53,3,'F');
-    icon(point-2.0,panelY+55,step.type==='pending'?'doc':'check',
-      step.type==='pending'?BLUE:GREEN);
-    txt(w[step.type]||w.unknown,point,panelY+62,{size:6.8,bold:true,
-      color:NAVY,align:'center',limit:19,maxWidth:30});
-    if(step.date)txt(String(step.date).slice(0,16).replace('T',' '),point,panelY+69,{
-      size:6,color:FADED,align:'center',limit:18});
-  });
-  const right=119;
-  roundedBox(right,panelY,82,74,[249,252,255]);
-  smallHeading(w.financials,right+4,panelY+8);
-  const financialRows=[
-   [w.subtotal,model.beforeVAT],
-   [w.vatAmount,model.vat],
-   [w.extras,model.additional],
-   [w.total,model.total],
-   [w.paid,model.paid],
-   [w.remaining,model.remaining],
-  ];
-  financialRows.forEach(([label,value],i)=>{
-    const ty=panelY+19+i*9.5;
-    if(i===3)roundedBox(right+2,ty-5.8,78,9.1,[224,241,255],null,1);
-    txt(label,right+5,ty,{size:7,bold:i===3,color:i===3?BLUE:FADED,align:'left',
-      maxWidth:40,limit:25});
-    txt(currencyAmount(value,currency),right+78,ty,{size:i===3?9.2:7.7,
-      color:i===5?GREEN:NAVY,bold:i>=3,align:'right',maxWidth:37});
-  });
-  if(model.difference>.05)txt(w.mismatch,L+3,panelY+78.5,{
-    size:6.4,color:RED,align:'left',maxWidth:105});
- };
- drawHeader();
- infoCards();
- let y=93;
- drawTableHead(y);y=105;
- const lines=model.items||[];
- if(!lines.length){txt(w.noItems,L+8,y+7,{size:8,color:FADED,align:'left'});y+=15;}
- for(let idx=0;idx<lines.length;idx++){
-  const item=lines[idx];
-  const needed=Math.max(12.5,2.3+5.1*wrapWords(item.product_name||item.name||item.description,23).length);
-  if(y+needed>191){
-   doc.addPage();drawHeader(true);drawTableHead(44);y=56;
+  };
+  const footer=()=>{
+    const pageCount=doc.getNumberOfPages();
+    for(let p=1;p<=pageCount;p++){
+      doc.setPage(p);
+      divider(275,9,201);
+      drawBizCTRLReportIcon(doc,11,280,8);
+      number('BizCTRL',22,286,{size:11.5,bold:true,color:ink,align:'left'});
+      print(w.generated,90,282.5,{size:8,color:ink,maxWidth:89,align:'center'});
+      print(w.disclaimer,90,289,{size:7.2,color:FADED,maxWidth:110,align:'center'});
+      // Internal reference QR only. It is not a ZATCA or VAT validation QR.
+      try{
+        const payload='BizCTRL invoice reference: '+invoiceNumber;
+        const grid=QRCode.create(payload,{errorCorrectionLevel:'M'}).modules;
+        const px=175,py=279,dim=12,cell=dim/grid.size;
+        doc.setFillColor(255,255,255);doc.rect(px,py,dim,dim,'F');
+        doc.setFillColor(...ink);
+        for(let yy=0;yy<grid.size;yy++)for(let xx=0;xx<grid.size;xx++){
+          if(grid.get(xx,yy))doc.rect(px+xx*cell,py+yy*cell,cell+.015,cell+.015,'F');
+        }
+      }catch{/* No reference: no QR, never manufacture a tax QR */}
+      number(p+' / '+pageCount,199,294,{size:8.8,bold:true,color:FADED});
+    }
+  };
+  finishHeader();
+  infoCards();metrics();itemsTitle();
+  let y=129;
+  const lines=model.items||[];
+  if(!lines.length){print(w.noItems,rtl?194:15,y+9,{size:10,color:FADED});y+=14;}
+  for(let i=0;i<lines.length;i++){
+    const item=lines[i],needed=itemHeight(item);
+    if(y+needed>264){
+      doc.addPage();finishHeader(true);itemsTitle();y=129;
+    }
+    y+=drawItem(item,i,y);
   }
-  y+=drawLine(item,idx,y);
- }
- if(Math.max(183,y+3)+75>270){
-  doc.addPage();drawHeader(true);y=56;
- }
- finishSummary(y);
- makeFooter();
- return doc;
+  // Tight layout: with one item the financial result starts immediately below
+  // that row instead of a huge unused blank mid-page.
+  const extraWarning=model.difference>.05?6:0;
+  if(y+4+summaryHeight+extraWarning>271){
+    doc.addPage();finishHeader(true);y=43;
+  }
+  summary(y);
+  footer();
+  return doc;
 }
