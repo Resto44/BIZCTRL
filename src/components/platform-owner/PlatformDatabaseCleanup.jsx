@@ -82,11 +82,14 @@ export default function PlatformDatabaseCleanup({lang='en'}){
     onError:error=>{setPreview(null);toast.error(error?.message||t.scanError);}
   });
   const cleanup=useMutation({
-    mutationFn:()=>platformOwnerApi.runDatabaseCleanup({
-      category,token:preview.preview_token,reason:reason.trim(),confirmation:phrase,
-    }),
-    onSuccess:async data=>{
+    mutationFn:async()=>{
+      const data=await platformOwnerApi.runDatabaseCleanup({
+        category,token:preview.preview_token,reason:reason.trim(),confirmation:phrase,
+      });
       if(data?.success!==true)throw new Error('CLEANUP_UNCONFIRMED');
+      return data;
+    },
+    onSuccess:async data=>{
       setPreview(null);setResult(data);setPhrase('');setReason('');setAck(false);
       await client.invalidateQueries({queryKey:['platform-owner','activity']});
       toast.success(t.done);
