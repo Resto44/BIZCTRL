@@ -14,7 +14,7 @@ const archived = {
 };
 const branches=[{key:'main-9a50614652',id:'branch-1',name:'فرع الريان',label:'فرع الريان'}];
 
-describe('Premium one-page ERP Sales Invoice PDF', () => {
+describe('Mobile-friendly one-page ERP Sales Invoice PDF', () => {
   it('uses persisted revenue, not cash drawer subtraction or mockup values', () => {
     const m=salesInvoiceERPModel(archived,{branches,lang:'fa'});
     expect(m.branch).toBe('فرع الريان');
@@ -43,14 +43,15 @@ describe('Premium one-page ERP Sales Invoice PDF', () => {
     expect(wrong.sourceStatus).toBe('mismatch');
     expect(wrong.sourceGap).toBe(-77);
   });
-  it('renders a single A4 landscape PDF for English, Arabic and Persian without mutating the invoice',()=>{
+  it('renders a single A4 portrait PDF for English, Arabic and Persian without mutating the invoice',()=>{
     for(const lang of ['en','ar','fa']){
       const original={...archived};
       const {doc,filename}=createLocalizedInvoicePDF(archived,'BizCTRL','SAR',{lang,branches});
       expect(doc.getNumberOfPages()).toBe(1);
-      expect(doc.internal.pageSize.getWidth()).toBeGreaterThan(290);
-      expect(doc.internal.pageSize.getHeight()).toBeLessThan(212);
-      expect(filename).toContain('-erp-v2-');
+      expect(doc.internal.pageSize.getWidth()).toBeGreaterThan(205);
+      expect(doc.internal.pageSize.getWidth()).toBeLessThan(215);
+      expect(doc.internal.pageSize.getHeight()).toBeGreaterThan(290);
+      expect(filename).toContain('-erp-v3-');
       expect(filename).toContain('-'+lang+'.pdf');
       expect(new Uint8Array(doc.output('arraybuffer')).length).toBeGreaterThan(18000);
       expect(archived).toEqual(original);
@@ -72,9 +73,36 @@ describe('Premium one-page ERP Sales Invoice PDF', () => {
     const design=readFileSync('src/lib/erpSalesInvoicePdf.js','utf8');
     expect(design).toContain('model.cashDifference');
     expect(design).toContain('model.sourceStatus');
-    expect(design).toContain("const sourceColor=accents");
-    expect(design).toContain('expected cash unavailable');
+    expect(design).toContain('const sourceColor={cash:C.green');
+    expect(design).toContain('const rowYs=[226,234,242,250]');
+    expect(design).toContain('Three fixed independent lanes');
+    expect(design).toContain('Source accounting. Three fixed independent lanes');
+    expect(design).toContain('The source table does not contain expected drawer cash');
     expect(design).not.toContain('1777');
     expect(design).not.toContain('3292');
   });
+  it('keeps numeric totals and every payment source on one page with long RTL names',()=>{
+    for(const lang of ['en','ar','fa']){
+      const invoice={
+        ...archived,other_sales:2000,sales_total:3777,
+        cashier_name:'عبدالرحمن عبداللطيف',
+        shift:'Evening',
+      };
+      const names=[{...branches[0],name:'فرع الريان البخاري في تبوك'}];
+      const {doc}=createLocalizedInvoicePDF(invoice,'BizCTRL','SAR',{lang,branches:names});
+      expect(doc.getNumberOfPages()).toBe(1);
+      expect(doc.internal.pageSize.getWidth()).toBeLessThan(doc.internal.pageSize.getHeight());
+    }
+  });
+  it('positions legible source amounts and percentage rows in distinct columns',()=>{
+    const file=readFileSync('src/lib/erpSalesInvoicePdf.js','utf8');
+    expect(file).toContain("write(invoicePercentLabel(source.percent),rtl?82:128,y");
+    expect(file).toContain("amount(formatMoney(source.amount),y,{size:10.6,maxWidth:65})");
+    expect(file).toContain("write(t[source.key]||source.key,rtl?184:23,y");
+    expect(file).toContain("box(10,203,190,60,C.white)");
+    expect(file).toContain("box(10,264.5,190,19,C.white)");
+    expect(file).not.toContain("size:6.8");
+    expect(file).not.toContain("const bottomMid");
+  });
+
 });

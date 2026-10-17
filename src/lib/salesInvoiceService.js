@@ -177,20 +177,20 @@ export function buildInvoiceHTML(invoice, brandName = 'BizCTRL', currency = '', 
 
 /**
  * All Sales Invoice download, share and upload paths use the same ERP A4
- * landscape renderer. The reference image is a design guide only: no example
+ * portrait renderer. The reference image is a design guide only: no example
  * amounts or cached screenshots are embedded in production documents.
  */
 export function createLocalizedInvoicePDF(invoice, brandName = 'BizCTRL', currency = 'SAR', options = {}) {
   const resolved = optionsWithDefaults(options);
   const doc = new jsPDF({
-    orientation: 'landscape', unit: 'mm', format: 'a4', putOnlyUsedFonts: true,
+    orientation: 'portrait', unit: 'mm', format: 'a4', putOnlyUsedFonts: true,
   });
   renderERPSalesInvoicePDF(doc, invoice, {
     brandName, currency, lang: resolved.lang, branches: resolved.branches || [],
   });
   return {
     doc,
-    filename: safePdfFilename((invoice.invoice_number || 'sales-invoice') + '-erp-v2', resolved.lang),
+    filename: safePdfFilename((invoice.invoice_number || 'sales-invoice') + '-erp-v3', resolved.lang),
   };
 }
 

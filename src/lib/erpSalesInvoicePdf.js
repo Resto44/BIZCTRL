@@ -68,185 +68,187 @@ const WORDS = {
   },
 };
 
-export function renderERPSalesInvoicePDF(doc, invoice, { lang = 'en', currency = 'SAR', branches = [], brandName = 'BizCTRL' } = {}) {
-  const language = WORDS[lang] ? lang : 'en';
-  const t=WORDS[language];
-  const rtl=language!=='en';
+/**
+ * One-page portrait ERP invoice (v3).
+ * Phone/PDF-first: financial labels, money and percentages occupy disjoint,
+ * fixed columns; there are no two-column nested ledgers or mini-font summaries.
+ * The positions below are A4 mm, not viewport pixels.
+ */
+export function renderERPSalesInvoicePDF(doc, invoice, { lang='en', currency='SAR', branches=[], brandName='BizCTRL' } = {}) {
+  const language=WORDS[lang] ? lang : 'en';
+  const t=WORDS[language], rtl=language!=='en';
   const model=salesInvoiceERPModel(invoice,{branches,lang:language});
   prepareLocalizedPdf(doc,{lang:language,dir:rtl?'rtl':'ltr'});
   const W=doc.internal.pageSize.getWidth();
   const H=doc.internal.pageSize.getHeight();
-  if(W < H) throw new Error('Sales Invoice ERP renderer requires landscape page');
-  const ink=COLORS.ink, muted=COLORS.muted;
-  const sum = (v) => Number(v ?? 0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2});
-  const money = v=>v===null?'—':String(currency||'SAR').trim()+' '+sum(v);
-  const short = v=>String(v??'—');
-  const setFill=rgb=>doc.setFillColor(...rgb);
-  const rr=(x,y,w,h,color,r=2.4)=>{
-    setFill(color);doc.roundedRect(x,y,w,h,r,r,'F');
+  if(W > H || W<205 || W>215) throw new Error('Sales Invoice PDF v3 requires A4 portrait');
+  const C=COLORS;
+  const asText=value=>String(value??'—');
+  const formatMoney=value => value===null || value===undefined || !Number.isFinite(Number(value))
+    ? '—' : String(currency||'SAR').trim()+' '+Number(value).toLocaleString('en-US',{maximumFractionDigits:2});
+  const fill=rgb=>doc.setFillColor(...rgb);
+  const box=(x,y,w,h,rgb,r=2.5)=>{fill(rgb);doc.roundedRect(x,y,w,h,r,r,'F');};
+  const line=(x1,y1,x2,y2)=>{doc.setDrawColor(...C.line);doc.setLineWidth(.25);doc.line(x1,y1,x2,y2);};
+  const write=(value,x,y,{size=10,bold=false,color=C.ink,align='left',maxWidth,fit=true}={})=>
+    drawLocalizedPdfText(doc,asText(value),x,y,{
+      rtl:false,size,bold,color,align,maxWidth,fit:Boolean(maxWidth)&&fit,
+    });
+  const startX=rtl?194:16, endX=rtl?16:194;
+  const label=(value,y,{size=10,bold=false,color=C.ink,maxWidth=102}={})=>
+    write(value,startX,y,{size,bold,color,align:rtl?'right':'left',maxWidth});
+  const amount=(value,y,{size=11,bold=true,color=C.navy,maxWidth=68}={})=>
+    write(value,endX,y,{size,bold,color,align:rtl?'left':'right',maxWidth});
+  const otherTxt=value=>value===null?'—':value;
+  const varianceColor=model.cashDifference>0?C.amber:
+    model.cashDifference<0?[182,45,58]:C.green;
+  const sourceKeys=['cash','network','credit','other'];
+  const sourceColor={cash:C.green,network:C.blue,credit:C.purple,other:C.amber};
+  const statusLabel=s=>{
+    const k=String(s||'').toLowerCase();
+    return k==='balanced'?t.balanced:k==='shortage'?t.shortage:k==='overage'?t.overage:(s||'—');
   };
-  const txt=(str,x,y,{size=9,color=ink,bold=false,align='left',fit,maxWidth}={})=>
-    drawLocalizedPdfText(doc,short(str),x,y,{rtl:false,size,color,bold,align,fit,maxWidth});
-  const textIn=(value,x,y,w,{size=9,color=ink,bold=false,pad=5,fit=true}={})=>
-    txt(value,rtl?x+w-pad:x+pad,y,{size,color,bold,align:rtl?'right':'left',maxWidth:w-pad*2,fit});
-  const alignedValue=(value,x,w,y,{size=10,color=ink,bold=true}={})=>
-    txt(value,rtl?x+6:x+w-6,y,{size,color,bold,align:rtl?'left':'right',maxWidth:w*.53,fit:true});
-  const line=(x1,y1,x2,y2,color=COLORS.line)=>{
-    doc.setDrawColor(...color);doc.setLineWidth(.25);doc.line(x1,y1,x2,y2);
-  };
-  const accents=[COLORS.green,COLORS.blue,COLORS.purple,COLORS.amber];
 
-  // A4 landscape, faithful to the approved one-page premium dashboard layout.
-  setFill(COLORS.paper);doc.rect(0,0,W,H,'F');
-  rr(8,6,W-16,34,COLORS.blue,3.5);
-  rr(W-88,9,80,27,COLORS.navy,3);
-  drawBizCTRLReportIcon(doc,15,15,13);
-  txt(brandName,32,24,{size:20,color:COLORS.white,bold:true,maxWidth:73,fit:true});
-  txt('SMART BUSINESS CONTROL',32,31,{size:7.4,color:[219,242,255]});
-  line(102,13,102,34,[152,201,255]);
-  txt(t.invoice,109,22,{size:17,color:COLORS.white,bold:true,maxWidth:83,fit:true});
-  txt(t.report,109,31,{size:8,color:[222,243,255],maxWidth:95,fit:true});
-  txt(t.number,W-83,16,{size:7.7,color:[218,238,255],bold:true});
-  txt(model.number,W-83,25,{size:12.8,color:COLORS.white,bold:true,maxWidth:70,fit:true});
-  txt(model.date,W-83,32,{size:8.2,color:[227,244,255]});
+  fill(C.paper);doc.rect(0,0,W,H,'F');
 
-  // Business metadata: NEVER hardcode a business, cashier, or shift from the mockup.
-  const margin=8,gap=2,totalWidth=W-16,col=(totalWidth-3*gap)/4;
-  const info=[
+  // Header: three bounded content lines, no overlapping invoice code/title.
+  box(8,8,194,39,C.blue,4);
+  box(10,10,190,35,[14,76,185],3);
+  drawBizCTRLReportIcon(doc,16,17,12);
+  write(brandName,32,25,{size:17,bold:true,color:C.white,maxWidth:64});
+  write('SMART BUSINESS CONTROL',32,33,{size:8,color:[210,235,255],maxWidth:66});
+  line(104,15,104,40);
+  write(t.invoice,110,23,{size:13.5,bold:true,color:C.white,maxWidth:85});
+  write(t.number+' · '+model.number,110,33,{
+    size:10,bold:true,color:C.white,maxWidth:84,
+  });
+  write(t.report,110,40,{size:8.4,color:[211,237,255],maxWidth:84});
+
+  // Metadata: 2x2 cards. Values are on a separate line from labels.
+  const cards=[
     [t.date,model.date],[t.branch,model.branch],
     [t.cashier,model.cashier],[t.shift,model.shift],
   ];
-  info.forEach(([label,value],i)=>{
-    const x=margin+i*(col+gap);
-    rr(x,43,col,24,COLORS.white,2.3);
-    rr(x+4,47,7,7,COLORS.paleBlue,1.6);
-    textIn(label,x,52,col,{size:8.5,color:muted,bold:true,pad:14});
-    textIn(value,x,61,col,{size:11.5,color:ink,bold:true,pad:5});
+  const cardX=[10,107],cardY=[51,75],cardW=93,cardH=21;
+  cards.forEach(([caption,value],i)=>{
+    const x=cardX[i%2], y=cardY[Math.floor(i/2)];
+    box(x,y,cardW,cardH,C.white);
+    box(x+4,y+4,5.5,5.5,C.paleBlue,1.3);
+    write(caption,rtl?x+cardW-5:x+13,y+9.5,{
+      size:9.2,color:C.muted,bold:true,align:rtl?'right':'left',maxWidth:72,
+    });
+    write(value,rtl?x+cardW-5:x+5,y+17,{
+      size:11.5,color:C.ink,bold:true,align:rtl?'right':'left',maxWidth:cardW-10,
+    });
   });
 
+  // Four summary cards; one label per line and one currency per line.
+  const findSource=key=>model.sources.find(s=>s.key===key)?.amount??null;
   const kpis=[
-    [t.cash,model.sources.find(s=>s.key==='cash')?.amount??null,COLORS.paleGreen,COLORS.green],
-    [t.network,model.sources.find(s=>s.key==='network')?.amount??null,COLORS.paleBlue,COLORS.blue],
-    [t.credit,model.sources.find(s=>s.key==='credit')?.amount??null,COLORS.palePurple,COLORS.purple],
-    [t.total,model.total,COLORS.paleAmber,COLORS.amber],
+    [t.cash,findSource('cash'),C.paleGreen,C.green],
+    [t.network,findSource('network'),C.paleBlue,C.blue],
+    [t.credit,findSource('credit'),C.palePurple,C.purple],
+    [t.total,model.total,C.paleAmber,C.amber],
   ];
-  kpis.forEach(([label,value,bg,accent],i)=>{
-    const x=margin+i*(col+gap);
-    rr(x,70,col,27,COLORS.white,2.6);
-    rr(x+1.5,71.5,col-3,24,bg,2.2);
-    rr(x+4.5,76,7.5,7.5,accent,1.7);
-    // Tiny decorative growth bars (not claimed as actual trend).
-    for(let j=0;j<3;j++)rr(x+col-14+j*3,89-(j*1.4),1.7,4+j*1.4,accent,.5);
-    textIn(label,x,80.6,col,{size:8.2,color:accent,bold:true,pad:14});
-    textIn(money(value),x,91.6,col,{size:14.2,color:ink,bold:true,pad:4});
-  });
-
-  const bodyY=100,bodyH=62,panelGap=4,panelW=(W-16-panelGap)/2;
-  const leftX=8,rightX=8+panelW+panelGap;
-  rr(leftX,bodyY,panelW,bodyH,COLORS.white,2.7);
-  rr(rightX,bodyY,panelW,bodyH,COLORS.white,2.7);
-  rr(leftX+2,bodyY+2,panelW-4,13,COLORS.paleGreen,2.1);
-  rr(rightX+2,bodyY+2,panelW-4,13,COLORS.paleBlue,2.1);
-  textIn(t.reconcile,leftX,109.5,panelW,{size:11,color:[6,94,77],bold:true});
-  textIn(t.summary,rightX,109.5,panelW,{size:11,color:COLORS.navy,bold:true});
-
-  const reconcile=[
-    [t.opening,model.openingCash,ink],
-    [t.closing,model.closingCash,ink],
-    [t.difference,model.cashDifference,model.cashDifference>0?COLORS.amber:model.cashDifference<0?[186,43,58]:COLORS.green],
-    [t.status,model.cashStatus,model.cashDifference>0?COLORS.amber:model.cashDifference<0?[186,43,58]:COLORS.green],
-  ];
-  const statusDisplay = (state)=>{
-    const s=String(state||'').toLowerCase();
-    return s==='overage'?t.overage:s==='shortage'?t.shortage:s==='balanced'?t.balanced:state||'—';
-  };
-  reconcile.forEach(([label,value,color],i)=>{
-    const y=118+i*9.4;
-    if(i) line(leftX+4,y-4.4,leftX+panelW-4,y-4.4);
-    textIn(label,leftX,y,panelW,{size:9,bold:i===2,color:ink,pad:6});
-    alignedValue(i===3?statusDisplay(value):money(value),leftX,panelW,y,{size:10.1,color,bold:true});
-  });
-  // Critical distinction: cash variance is a saved ledger snapshot, not closing−opening.
-  textIn(t.notes,leftX,158.4,panelW,{size:6.6,color:muted});
-
-  const maxSourceRows=5;
-  let splitRows=[...model.sources].slice(0,maxSourceRows-1);
-  if(model.sourceGap!==null && Math.abs(model.sourceGap)>0.005 && model.sourceStatus!=='incomplete' && splitRows.length<4){
-    splitRows.push({key:'adjust',amount:model.sourceGap,percent:100*(model.sourceGap/(model.total||1))});
-  }
-  const splitLabel=(key)=>t[key]||key;
-  splitRows.forEach((source,i)=>{
-    const y=119.3+i*7.7;
-    if(i)line(rightX+4,y-3.8,rightX+panelW-4,y-3.8);
-    const sourceColor=accents[i%accents.length];
-    rr(rightX+4.2,y-5.2,5.5,5.5,sourceColor,1.2);
-    // Keep source labels away from right-aligned numeric amounts in all locales.
-    txt(splitLabel(source.key),rtl?rightX+panelW-13:rightX+13,y,{
-      size:8.3,color:ink,align:rtl?'right':'left',maxWidth:59,fit:true,
+  const kpiY=[100,124];
+  kpis.forEach(([caption,value,background,accent],i)=>{
+    const x=cardX[i%2],y=kpiY[Math.floor(i/2)];
+    box(x,y,cardW,21,C.white);
+    box(x+1.7,y+1.7,cardW-3.4,17.6,background,2);
+    box(x+4.5,y+4.6,6,6,accent,1.5);
+    write(caption,rtl?x+cardW-5:x+14,y+10.3,{
+      size:9.5,color:accent,bold:true,align:rtl?'right':'left',maxWidth:73,
     });
-    alignedValue(money(source.amount),rightX,panelW,y,{size:9.5,color:COLORS.navy});
-    txt(invoicePercentLabel(source.percent),rtl?rightX+11:rightX+panelW-6,y+4.3,{
-      size:6.8,color:sourceColor,align:rtl?'left':'right',
+    write(formatMoney(value),rtl?x+cardW-5:x+5,y+17.4,{
+      size:12.3,color:C.ink,bold:true,align:rtl?'right':'left',maxWidth:82,
     });
   });
-  rr(rightX+4,151.1,panelW-8,8.5,COLORS.paleBlue,1.4);
-  textIn(t.total,rightX,157.3,panelW,{size:9.8,color:COLORS.blue,bold:true});
-  alignedValue(money(model.total),rightX,panelW,157.3,{size:11.8,color:COLORS.navy});
 
-  // Donut/legend and key-takeaways panel.
-  const bottomY=165,bottomH=32;
-  rr(8,bottomY, W-16,bottomH,COLORS.white,2.7);
-  const bottomMid=148;
-  line(bottomMid,bottomY+4,bottomMid,bottomY+bottomH-4);
-  textIn(t.methods,8,171,136,{size:9.2,color:COLORS.navy,bold:true});
-  textIn(t.insights,153,171,W-162,{size:9.2,color:COLORS.navy,bold:true});
-  const cx=28.5,cy=184.3,r=10;
+  // Full-width reconciliation, four rows; no unexplained "derived" difference.
+  box(10,149,190,51,C.white);
+  box(12,151,186,12,C.paleGreen,2);
+  write(t.reconcile,rtl?193:17,159.7,{
+    size:11.5,bold:true,color:[5,102,75],align:rtl?'right':'left',maxWidth:170,
+  });
+  const reconciliation=[
+    [t.opening,formatMoney(model.openingCash),C.navy],
+    [t.closing,formatMoney(model.closingCash),C.navy],
+    [t.difference,otherTxt(model.cashDifference===null?'—':
+      (model.cashDifference>0?'+':'')+formatMoney(model.cashDifference)),varianceColor],
+    [t.status,statusLabel(model.cashStatus),varianceColor],
+  ];
+  reconciliation.forEach(([caption,value,color],i)=>{
+    const y=171+i*7;
+    if(i)line(16,y-4.5,194,y-4.5);
+    label(caption,y,{size:10,bold:i===2,maxWidth:98});
+    amount(value,y,{size:10.7,color,maxWidth:70});
+  });
+
+  // Source accounting. Three fixed independent lanes:
+  // label [16..106], percentage [109..126], amount [132..194].
+  box(10,203,190,60,C.white);
+  box(12,205,186,12,C.paleBlue,2);
+  write(t.summary,rtl?193:17,213.8,{
+    size:11.5,bold:true,color:C.navy,align:rtl?'right':'left',maxWidth:170,
+  });
+  const split=[...model.sources];
+  const rowYs=[226,234,242,250];
+  split.slice(0,4).forEach((source,i)=>{
+    const y=rowYs[i], tone=sourceColor[source.key]||C.amber;
+    if(i)line(16,y-5.0,194,y-5.0);
+    box(rtl?190:16,y-3.9,4.2,4.2,tone,1.1);
+    write(t[source.key]||source.key,rtl?184:23,y,{
+      size:10.1,bold:false,color:C.ink,align:rtl?'right':'left',maxWidth:85,
+    });
+    write(invoicePercentLabel(source.percent),rtl?82:128,y,{
+      size:9.4,color:tone,align:rtl?'left':'right',maxWidth:25,
+    });
+    amount(formatMoney(source.amount),y,{size:10.6,maxWidth:65});
+  });
+  box(14,253.6,182,7.5,C.paleBlue,1.4);
+  write(t.total,rtl?191:19,259.1,{
+    size:10.5,bold:true,color:C.blue,align:rtl?'right':'left',maxWidth:89,
+  });
+  amount(formatMoney(model.total),259.1,{size:12,color:C.navy,maxWidth:75});
+
+  // Payment distribution as a real vector mini-chart (not invented trend
+  // bars), followed by two independently spaced notes with safe widths.
+  box(10,264.5,190,19,C.white);
   const parts=model.sources.filter(s=>s.amount!==null && s.amount>0);
-  const positiveSum=parts.reduce((a,s)=>a+s.amount,0);
-  let angle=-Math.PI/2;
-  // Small solid wedges drawn with triangles plus a white circle give a sharp,
-  // predictable vector PDF with no plugin dependency or external image.
-  parts.forEach(s=>{
-    const fraction=positiveSum>0?s.amount/positiveSum:0;
-    const end=angle+fraction*Math.PI*2;
-    const color=accents[['cash','network','credit','other'].indexOf(s.key)]||COLORS.amber;
-    setFill(color);
-    const segments=Math.max(1,Math.ceil((end-angle)*25));
-    for(let j=0;j<segments;j++){
-      const a1=angle+(end-angle)*j/segments, a2=angle+(end-angle)*(j+1)/segments;
-      doc.triangle(cx,cy,cx+r*Math.cos(a1),cy+r*Math.sin(a1),cx+r*Math.cos(a2),cy+r*Math.sin(a2),'F');
+  const sumOfParts=parts.reduce((total,source)=>total+source.amount,0);
+  const cx=26,cy=274.5,r=7.5;let angle=-Math.PI/2;
+  parts.forEach(source=>{
+    const share=sumOfParts?source.amount/sumOfParts:0;
+    const next=angle+share*Math.PI*2, segments=Math.max(1,Math.ceil(share*64));
+    fill(sourceColor[source.key]||C.amber);
+    for(let i=0;i<segments;i++){
+      const a=angle+(next-angle)*(i/segments);
+      const b=angle+(next-angle)*((i+1)/segments);
+      doc.triangle(cx,cy,cx+r*Math.cos(a),cy+r*Math.sin(a),cx+r*Math.cos(b),cy+r*Math.sin(b),'F');
     }
-    angle=end;
+    angle=next;
   });
-  setFill(COLORS.white);doc.circle(cx,cy,6.3,'F');
-  txt(money(model.total),cx,185.3,{size:7.5,bold:true,color:COLORS.navy,align:'center',maxWidth:12,fit:true});
-  parts.slice(0,4).forEach((s,i)=>{
-    const y=177+i*5.3;
-    rr(43,y-3.1,3.5,3.5,accents[['cash','network','credit','other'].indexOf(s.key)]||COLORS.amber,1.2);
-    txt(splitLabel(s.key),49,y,{size:8,color:ink,maxWidth:47,fit:true});
-    txt(money(s.amount),122,y,{size:8.5,bold:true,color:COLORS.navy,align:'right',maxWidth:28,fit:true});
-    txt(invoicePercentLabel(s.percent),141,y,{size:7.8,color:muted,align:'right'});
+  fill(C.white);doc.circle(cx,cy,4.7,'F');
+  const summaryStatus=model.sourceStatus==='matched'?t.matched:
+    model.sourceStatus==='incomplete'?t.incomplete:t.mismatch;
+  write(t.insights,40,271.6,{
+    size:9.1,bold:true,color:C.navy,maxWidth:156,
   });
-
-  const takeaways=[
-    [t.total,money(model.total)],
-    [t.recorded,model.cashDifference===null?'—':(model.cashDifference>0?'+':'')+money(model.cashDifference)],
-    [t.sources,model.sourceStatus==='matched'?t.matched:
-      model.sourceStatus==='incomplete'?t.incomplete:t.mismatch],
-  ];
-  takeaways.forEach(([label,value],i)=>{
-    const y=179+i*7;
-    rr(155,y-4.8,3.8,3.8,i===2&&model.sourceStatus!=='matched'?COLORS.amber:COLORS.blue,1.4);
-    txt(label,162,y-1.1,{size:7.8,color:muted,maxWidth:66,fit:true});
-    txt(value,162,y+2.6,{size:i===2?7.8:9.1,bold:true,color:COLORS.navy,maxWidth:125,fit:true});
+  write(summaryStatus,40,277.0,{
+    size:9.0,bold:true,
+    color:model.sourceStatus==='matched'?C.green:C.amber,maxWidth:156,
+  });
+  // The source table does not contain expected drawer cash, so don't present
+  // the recorded difference as closing minus opening or calculated here.
+  write(t.recorded+': '+(model.cashDifference===null?'—':
+    (model.cashDifference>0?'+':'')+formatMoney(model.cashDifference)),40,281.7,{
+    size:8.6,color:C.muted,maxWidth:155,
   });
 
-  // Footer is within the single landscape page, always above the edge.
-  drawBizCTRLReportIcon(doc,10,H-10.3,6.7);
-  txt(brandName,19,H-5.6,{size:9.6,bold:true,color:COLORS.navy});
-  txt(t.generated+' · '+model.number,W/2,H-5.6,{
-    size:8,color:muted,align:'center',maxWidth:129,fit:true,
+  line(10,286,200,286);
+  drawBizCTRLReportIcon(doc,12,288,5);
+  write(brandName,19,292.8,{size:9,bold:true,color:C.navy,maxWidth:50});
+  write(t.generated+' · '+model.number,198,292.8,{
+    size:8.5,color:C.muted,align:'right',maxWidth:122,
   });
-  txt(t.fromSystem,W-9,H-5.6,{size:7.5,color:muted,align:'right',maxWidth:65,fit:true});
   return model;
 }
