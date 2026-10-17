@@ -377,6 +377,7 @@ export default function Purchases() {
       ) : (
         <PurchaseInvoiceList
           invoices={filtered}
+          branches={branches}
           onEdit={(inv) => { setEditing(inv); setShowForm(true); }}
           onDelete={canDelete ? (inv) => setDeleting(inv) : null}
           onBulkDelete={canDelete ? (ids) => setBulkDeletingIds(ids) : null}
