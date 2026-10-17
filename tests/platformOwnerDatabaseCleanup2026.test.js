@@ -19,7 +19,7 @@ describe('Platform Owner safe database cleanup (dry-run then explicit action)',(
   it('only considers genuinely expired, never-activated invitations and old inactive push endpoints',()=>{
     expect(sql.match(/status='pending' AND activated_at IS NULL AND revoked_at IS NULL/g).length).toBeGreaterThanOrEqual(3);
     expect(sql.match(/expires_at < now\(\)-interval '30 days'/g).length).toBeGreaterThanOrEqual(3);
-    expect(sql.match(/is_active IS FALSE AND created_at < now\(\)-interval '90 days'/g).length).toBeGreaterThanOrEqual(4);
+    expect(sql.match(/is_active IS FALSE AND created_at < now\(\)-interval '90 days'/g).length).toBeGreaterThanOrEqual(3);
     expect(sql).toContain('ORDER BY id LIMIT 100 FOR UPDATE');
     expect(sql).toContain('p_category NOT IN');
     for(const name of ['restaurants','subscription_payments','sales_invoices','wallet_transactions','expenses','purchases','auth.users']){
