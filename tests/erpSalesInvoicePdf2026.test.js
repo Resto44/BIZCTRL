@@ -100,7 +100,7 @@ describe('Mobile-friendly one-page ERP Sales Invoice PDF', () => {
     expect(file).toContain("amount(formatMoney(source.amount),y,{size:10.6,maxWidth:65})");
     expect(file).toContain("write(t[source.key]||source.key,rtl?184:23,y");
     expect(file).toContain("box(10,203,190,60,C.white)");
-    expect(file).toContain("box(10,266,190,20,C.white)");
+    expect(file).toContain("box(10,264.5,190,19,C.white)");
     expect(file).not.toContain("size:6.8");
     expect(file).not.toContain("const bottomMid");
   });
