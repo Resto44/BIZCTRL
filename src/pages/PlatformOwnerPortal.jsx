@@ -12,10 +12,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Activity, BarChart3, Building2, ChevronLeft, ChevronRight, Download, FileCheck2, Landmark, Layers3, LayoutDashboard, LogOut, Menu, RefreshCw, ShieldCheck, SlidersHorizontal, Tag, Users, WalletCards, X } from 'lucide-react';
+import { Activity, BarChart3, Building2, ChevronLeft, ChevronRight, DatabaseZap, Download, FileCheck2, Landmark, Layers3, LayoutDashboard, LogOut, Menu, RefreshCw, ShieldCheck, SlidersHorizontal, Tag, Users, WalletCards, X } from 'lucide-react';
 import { toast } from 'sonner';
 import PlatformDashboard, { PlatformRevenue } from '@/components/platform-owner/PlatformDashboard';
 import OrganizationDeleteDialog from '@/components/platform-owner/OrganizationDeleteDialog';
+import PlatformDatabaseCleanup from '@/components/platform-owner/PlatformDatabaseCleanup';
 import { PLATFORM_STATUS_OPTIONS, formatPlatformMoney, validPlatformPlan, validPlatformPromotion, validTrialDays } from '@/lib/platformOwnerManagement';
 
 const LABELS = {
@@ -31,11 +32,14 @@ const LABELS = {
 };
 
 const NAV = [
-  ['dashboard', LayoutDashboard], ['organizations', Building2], ['users', Users], ['subscriptions', Layers3], ['trials', FileCheck2], ['plans', SlidersHorizontal], ['modules', Layers3], ['promotions', Tag], ['payments', WalletCards], ['access', ShieldCheck], ['reports', BarChart3], ['activity', Activity], ['settings', Landmark],
+  ['dashboard', LayoutDashboard], ['organizations', Building2], ['users', Users], ['subscriptions', Layers3], ['trials', FileCheck2], ['plans', SlidersHorizontal], ['modules', Layers3], ['promotions', Tag], ['payments', WalletCards], ['access', ShieldCheck], ['reports', BarChart3], ['activity', Activity], ['cleanup', DatabaseZap], ['settings', Landmark],
 ];
 Object.assign(LABELS.en, { settingsUnavailable: 'Settings could not be loaded. Refresh data before saving.', trialConversion: 'Active share of tracked subscriptions', paid: 'Paid', approved: 'Approved', failed: 'Failed', refunded: 'Refunded', openDocument: 'Open receipt', documentReady: 'The secure receipt link is valid for one minute.', refresh: 'Refresh data' });
 Object.assign(LABELS.ar, { settingsUnavailable: 'تعذر تحميل الإعدادات. حدّث البيانات قبل الحفظ.', trialConversion: 'حصة الاشتراكات النشطة من الاشتراكات المتتبعة', paid: 'مدفوع', approved: 'معتمد', failed: 'فشل', refunded: 'مسترد', openDocument: 'فتح الإيصال', documentReady: 'رابط الإيصال الآمن صالح لمدة دقيقة.', refresh: 'تحديث البيانات' });
 Object.assign(LABELS.fa, { settingsUnavailable: 'تنظیمات بارگذاری نشد. پیش از ذخیره، اطلاعات را تازه‌سازی کنید.', trialConversion: 'سهم اشتراک\u200cهای فعال از اشتراک\u200cهای پیگیری\u200cشده', paid: 'پرداخت‌شده', approved: 'تأییدشده', failed: 'ناموفق', refunded: 'برگشت‌شده', openDocument: 'بازکردن رسید', documentReady: 'لینک امن رسید یک دقیقه اعتبار دارد.', refresh: 'تازه‌سازی اطلاعات' });
+Object.assign(LABELS.en,{cleanup:'Database Cleanup'});
+Object.assign(LABELS.fa,{cleanup:'پاک‌سازی دیتابیس'});
+Object.assign(LABELS.ar,{cleanup:'تنظيف قاعدة البيانات'});
 const LIMIT = 25;
 const LOCALE = { en: 'en-US', fa: 'fa-IR', ar: 'ar-SA' };
 
@@ -160,6 +164,8 @@ export default function PlatformOwnerPortal() {
     content = promotions.isLoading ? <Empty text={t.loadingRecords} /> : promotions.isError ? <QueryError t={t} onRetry={() => promotions.refetch()} /> : <div><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><Title title={t.promotions} t={t} /><Button onClick={() => setPromotionOpen(true)}>{t.createPromotion}</Button></div>{list.length ? <><div className="grid gap-3 md:grid-cols-2">{list.map((item) => <div key={item.id} className="rounded-2xl border bg-white p-4"><div className="flex flex-wrap justify-between gap-2"><p className="font-bold">{item.name}</p><Badge className={item.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-800'}>{item.is_active ? t.activeLabel : t.inactiveLabel}</Badge></div><p className="mt-2 text-sm text-slate-500">{item.plan_name} · {item.percent_off ? `${item.percent_off}%` : currency(item.fixed_amount_cents, lang)}</p><p className="mt-2 text-xs text-slate-500">{dateTime(item.starts_at, lang)} → {dateTime(item.ends_at, lang)}</p></div>)}</div><Pager result={promotions.data} page={page} setPage={setPage} t={t} /></> : <><Empty text={t.noData} /><Pager result={promotions.data} page={page} setPage={setPage} t={t} /></>}</div>;
   } else if (active === 'access') {
     content = controlCenter.isLoading ? <Empty text={t.loadingRecords} /> : controlCenter.isError ? <QueryError t={t} onRetry={() => controlCenter.refetch()} /> : <FeatureAccess t={t} pending={mutation.isPending} modules={modulesData} run={(override) => mutation.mutate({ fn: platformOwnerApi.saveTenantFeatureOverride, args: [override] })} />;
+  } else if (active === 'cleanup') {
+    content = <PlatformDatabaseCleanup lang={lang} />;
   } else if (active === 'settings') {
     content = manualSettings.isLoading ? <Empty text={t.loadingRecords} /> : <div className="max-w-2xl"><Title title={t.settings} t={t} /><div className="mt-5 rounded-2xl border bg-white p-5"><h2 className="font-bold">{t.manualIban}</h2><p className="mt-1 text-sm text-slate-500">{t.manualIbanDescription}</p>{manualSettings.isError && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{t.settingsUnavailable}</p>}<div className="mt-5 grid gap-4 sm:grid-cols-2">{[['companyName', 'Company name'], ['bankName', t.bankName], ['accountHolder', 'Account holder'], ['iban', t.iban], ['currency', t.currency]].map(([key, label]) => <div key={key}><Label>{label}</Label><Input className="mt-2" dir={key === 'iban' ? 'ltr' : undefined} value={settings[key]} onChange={(event) => setSettings({ ...settings, [key]: event.target.value })} /></div>)}</div><div className="mt-4"><Label>{t.transferInstructions}</Label><Textarea className="mt-2" value={settings.instructions} onChange={(event) => setSettings({ ...settings, instructions: event.target.value })} /></div><div className="mt-4"><Label>Payment reference rules</Label><Textarea className="mt-2" value={settings.paymentReferenceRules} onChange={(event) => setSettings({ ...settings, paymentReferenceRules: event.target.value })} /></div><label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={settings.isActive} onChange={(event) => setSettings({ ...settings, isActive: event.target.checked })} />{t.enableManualIban}</label><Button className="mt-5" disabled={mutation.isPending || !manualSettings.isSuccess} onClick={() => mutation.mutate({ fn: platformOwnerApi.saveManualPaymentSettings, args: [settings] })}>{t.save}</Button></div></div>;
   } else if (active === 'activity') {
