@@ -67,8 +67,8 @@ BEGIN
       bool_or(a.attname='restaurant_id' AND a.atttypid='uuid'::regtype) AS restaurant_uuid,
       bool_or(a.attname='restaurant_id' AND a.atttypid<>'uuid'::regtype) AS restaurant_text,
       bool_or(a.attname='organization_id' AND a.atttypid='uuid'::regtype) AS organization_uuid,
-      bool_or(a.attname='org_id' AND a.atttypid='text'::regtype) AS org_text,
-      bool_or(a.attname='org_key' AND a.atttypid='text'::regtype) AS org_key_text,
+      bool_or(a.attname='org_id' AND a.atttypid IN ('text'::regtype,'character varying'::regtype)) AS org_text,
+      bool_or(a.attname='org_key' AND a.atttypid IN ('text'::regtype,'character varying'::regtype)) AS org_key_text,
       bool_or(a.attname='branch_id' AND a.atttypid='uuid'::regtype) AS branch_uuid
     FROM pg_class c
     JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -86,7 +86,7 @@ BEGIN
     IF v_ref.restaurant_uuid THEN
       v_where:=v_where||'restaurant_id = $1';
     ELSIF v_ref.restaurant_text THEN
-      v_where:=v_where||'restaurant_id = $2';
+      v_where:=v_where||'(restaurant_id = $2 OR restaurant_id = $3)';
     END IF;
     IF v_ref.organization_uuid THEN
       v_where:=v_where||CASE WHEN v_where='' THEN '' ELSE ' OR ' END||'organization_id = $1';
@@ -157,7 +157,7 @@ BEGIN
 
   -- Explicitly remove safe configuration rows whose FK uses NO ACTION.
   -- Everything else must be empty or CASCADE-protected by the DB schema.
-  DELETE FROM public.app_settings WHERE restaurant_id=p_restaurant_id;
+  DELETE FROM public.app_settings WHERE restaurant_id=p_restaurant_id OR (restaurant_id IS NULL AND org_id=v_org.org_id);
   UPDATE public.restaurants SET branch_id=NULL WHERE id=p_restaurant_id AND branch_id IS NOT NULL;
   DELETE FROM public.restaurants WHERE id=p_restaurant_id;
   GET DIAGNOSTICS v_count=ROW_COUNT;
