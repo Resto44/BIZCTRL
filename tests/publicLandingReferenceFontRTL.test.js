@@ -10,7 +10,7 @@ describe('Public landing iPhone-reference Persian/Arabic typography', () => {
 
   it('binds language to the public layout on every language switch, independent of DOM observer timing', () => {
     expect(layout).toContain("import { useLanguage } from '@/lib/LanguageContext'");
-    expect(layout).toContain('const { lang } = useLanguage()');
+    expect(layout).toContain('const { lang, translateLiteral: tr } = useLanguage()');
     expect(layout).toContain('data-public-language={lang}');
     expect(landing).toContain('.public-landing[data-public-language="ar"]');
     expect(landing).toContain('.public-landing[data-public-language="fa"]');

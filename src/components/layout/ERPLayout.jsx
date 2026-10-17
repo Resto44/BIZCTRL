@@ -16,6 +16,7 @@ import BottomNav from './BottomNav';
 import { useErpDocumentScrollLock } from './useErpDocumentScrollLock';
 import './erp-document.css';
 import { useRole, ROLES } from '@/lib/RoleContext';
+import { useLanguage } from '@/lib/LanguageContext';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import { getWorkspaceModuleForPath, isWorkspacePathEnabled } from '@/lib/workspaceCustomization';
 
@@ -38,6 +39,7 @@ export default function ERPLayout({ children }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { role } = useRole();
+  const { translateLiteral: tr } = useLanguage();
   const { configuration, canCustomize } = useWorkspaceCustomization();
 
   const showSidebar = ERP_SIDEBAR_ROLES.includes(role);
@@ -82,10 +84,10 @@ export default function ERPLayout({ children }) {
           <button
             type="button"
             className="fixed inset-0 z-[100] cursor-default touch-none overscroll-none bg-black/50 lg:hidden"
-            aria-label="Close navigation drawer"
+            aria-label={tr('Close navigation drawer')}
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 z-[110] w-[min(90vw,440px)] max-w-full min-w-0 animate-in slide-in-from-left duration-200 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation drawer">
+          <div className="fixed inset-y-0 start-0 z-[110] w-[min(90vw,440px)] max-w-full min-w-0 animate-in slide-in-from-left rtl:slide-in-from-right duration-200 lg:hidden" role="dialog" aria-modal="true" aria-label={tr('Navigation drawer')}>
             <ERPSidebar
               collapsed={false}
               mobile
@@ -113,11 +115,11 @@ export default function ERPLayout({ children }) {
             <section className="mx-auto flex min-h-[60vh] w-full max-w-2xl items-center justify-center p-4 text-center sm:p-8" aria-labelledby="disabled-module-title">
               <div className="w-full rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-10">
                 <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"><Settings2 className="h-7 w-7" /></span>
-                <h1 id="disabled-module-title" className="mt-4 text-xl font-black text-slate-950 dark:text-white">{activeModule?.label || 'This module'} is not enabled</h1>
-                <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">This organization removed the module from its active ERP workspace. Existing records remain preserved and permissions are unchanged.</p>
+                <h1 id="disabled-module-title" className="mt-4 text-xl font-black text-slate-950 dark:text-white">{tr(activeModule?.label || 'This module')} — {tr('Module not enabled')}</h1>
+                <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">{tr('This organization removed the module from its active ERP workspace. Existing records remain preserved and permissions are unchanged.')}</p>
                 <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
-                  <Link to="/owner-command-center" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200">Return to dashboard</Link>
-                  {canCustomize && <Link to="/customize-workspace" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700">Configure workspace</Link>}
+                  <Link to="/owner-command-center" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200">{tr('Return to dashboard')}</Link>
+                  {canCustomize && <Link to="/customize-workspace" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700">{tr('Configure workspace')}</Link>}
                 </div>
               </div>
             </section>

@@ -4,6 +4,11 @@
  * free-text business values or code identifiers.
  */
 export const erpInterfacePhrases = Object.freeze({
+  "All rights reserved.": { ar: "جميع الحقوق محفوظة.", fa: "تمام حقوق محفوظ است." },
+  "Module not enabled": { ar: "الوحدة غير مفعلة", fa: "ماژول فعال نیست" },
+  "This module": { ar: "هذه الوحدة", fa: "این ماژول" },
+  "BizCTRL — Multi-Tenant ERP SaaS": { ar: "BizCTRL — نظام ERP سحابي متعدد المستأجرين", fa: "BizCTRL — سیستم ERP ابری چندمشتری" },
+  "BizCTRL is a multi-tenant ERP SaaS built for restaurants, retail stores, pharmacies, warehouses, factories, and more. Manage inventory, sales, purchasing, HR, finance, and suppliers — all in one place.": { ar: "BizCTRL نظام ERP سحابي متعدد المستأجرين للمطاعم والمتاجر والصيدليات والمستودعات والمصانع وغيرها. أدر المخزون والمبيعات والمشتريات والموظفين والمالية والموردين في منصة واحدة.", fa: "BizCTRL یک سیستم ERP ابری چندمشتری برای رستورانت‌ها، فروشگاه‌ها، داروخانه‌ها، انبارها، کارخانه‌ها و کسب‌وکارهای دیگر است. موجودی، فروشات، خریداری، کارمندان، امور مالی و تأمین‌کنندگان را در یک پلتفرم مدیریت کنید." },
   "Record attendance": { ar: "تسجيل الحضور", fa: "ثبت حاضری" },
   "Payroll sections": { ar: "أقسام الرواتب", fa: "بخش‌های معاشات" },
   "PDF report": { ar: "تقرير PDF", fa: "گزارش PDF" },
