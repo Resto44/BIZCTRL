@@ -169,7 +169,7 @@ export function PublicLayout({ children }) {
               <a href="/#features" className="hover:text-white" onClick={(event) => handlePublicHashLink(event, '/#features')}>{tr('Features')}</a>
               <a href="/#industries" className="hover:text-white" onClick={(event) => handlePublicHashLink(event, '/#industries')}>{tr('Industries')}</a>
               <a href="/#pricing" className="hover:text-white" onClick={(event) => handlePublicHashLink(event, '/#pricing')}>{tr('Pricing')}</a>
-              <Link to="/erp-login" className="hover:text-white">Login</Link>
+              <Link to="/erp-login" className="hover:text-white">{tr('Login')}</Link>
             </div>
           </div>
           <div>
