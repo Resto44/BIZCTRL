@@ -73,10 +73,10 @@ function BrandMark({ compact = false }) {
       className="public-brandmark inline-flex min-w-0 shrink-0 items-center justify-center gap-2 text-white"
       aria-label="BizCTRL home"
     >
-      <BrandLogo icon className={compact ? 'h-9 w-9 sm:h-10 sm:w-10' : 'h-10 w-10'} />
-      <span dir="ltr" className={`public-brand-wordmark whitespace-nowrap font-extrabold tracking-tight leading-none ${compact ? 'text-xl min-[380px]:text-2xl' : 'text-2xl'}`}>
+      <BrandLogo icon className={compact ? 'h-11 w-11' : 'h-10 w-10'} />
+      {!compact && <span dir="ltr" translate="no" className="public-brand-wordmark whitespace-nowrap font-extrabold tracking-tight leading-none text-2xl">
         <span className="text-white">Biz</span><span className="text-cyan-400">CTRL</span>
-      </span>
+      </span>}
     </Link>
   );
 }
@@ -113,14 +113,14 @@ export function PublicLayout({ children }) {
       <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/90 backdrop-blur-xl">
         {/* Mobile header has equal outer columns and an isolated LTR brand.
             RTL translation no longer mirrors/collapses the company wordmark. */}
-        <div dir="ltr" className="mx-auto grid max-w-7xl grid-cols-[minmax(74px,1fr)_auto_minmax(74px,1fr)] items-center gap-1 px-3 py-3 md:hidden" data-testid="public-mobile-header">
+        <div dir="ltr" className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_56px_minmax(0,1fr)] items-center gap-1 px-3 py-3 md:hidden" data-testid="public-mobile-header">
           <div className="flex min-w-0 items-center justify-start gap-1">
             <button type="button" aria-label={menuOpen ? 'Close menu' : 'Open menu'} className="flex h-11 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:bg-white/10" onClick={() => setMenuOpen((open) => !open)}>
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
             <LanguageSwitcher compact className="min-h-11 min-w-10 shrink-0 text-slate-200 hover:bg-white/10 hover:text-white" />
           </div>
-          <div className="min-w-0 max-w-full justify-self-center overflow-hidden"><BrandMark compact /></div>
+          <div className="flex h-12 w-14 items-center justify-center justify-self-center" data-testid="public-mobile-brand-icon"><BrandMark compact /></div>
           <div aria-hidden="true" />
         </div>
         <div dir="ltr" className="mx-auto hidden max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 md:flex" data-testid="public-desktop-header">
