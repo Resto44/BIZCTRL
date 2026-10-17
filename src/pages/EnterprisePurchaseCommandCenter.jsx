@@ -33,6 +33,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
+import { treasuryBranchDisplayName } from '@/lib/treasuryBranchDisplay';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { Button } from '@/components/ui/button';
@@ -129,7 +130,7 @@ export default function EnterprisePurchaseCommandCenter() {
     : lang === 'ar'
       ? { overview: 'الملخص', invoices: 'الفواتير', analytics: 'التحليلات' }
       : { overview: 'Overview', invoices: 'Invoices', analytics: 'Analytics' };
-  const { ownerFilter, activeRestaurant } = useTenant();
+  const { ownerFilter, activeRestaurant, branches } = useTenant();
   const procurementScope = useMemo(() => {
     if (ownerFilter?.branch) return { branch: ownerFilter.branch };
     if (activeRestaurant?.id) return { restaurant_id: activeRestaurant.id };
@@ -235,10 +236,11 @@ export default function EnterprisePurchaseCommandCenter() {
       const searchMatch = !q ||
         (inv.supplier_name || '').toLowerCase().includes(q) ||
         (inv.invoice_number || '').toLowerCase().includes(q) ||
-        (inv.branch || '').toLowerCase().includes(q);
+        (inv.branch || '').toLowerCase().includes(q) ||
+        treasuryBranchDisplayName(inv, branches, lang).toLowerCase().includes(q);
       return statusMatch && searchMatch;
     });
-  }, [branchFiltered, filterStatus, searchQuery]);
+  }, [branchFiltered, filterStatus, searchQuery, branches, lang]);
 
   const kpis = useMemo(() =>
     computeProcurementKPIs(branchFiltered, payments),
@@ -482,6 +484,8 @@ export default function EnterprisePurchaseCommandCenter() {
               <MobileInvoiceList
                 invoices={branchFiltered.slice(0, 5)}
                 currency={currency}
+                lang={lang}
+                branches={branches}
                 isOwner={isOwner}
                 onView={handleEdit}
                 onEdit={handleEdit}
@@ -569,6 +573,8 @@ export default function EnterprisePurchaseCommandCenter() {
             <MobileInvoiceList
               invoices={filtered}
               currency={currency}
+              lang={lang}
+              branches={branches}
               isOwner={isOwner}
               onView={handleEdit}
               onEdit={handleEdit}
