@@ -97,8 +97,10 @@ function InvoiceCard({ invoice, currency, onView, onDownload, onPrint, onWhatsAp
 
 export default function SalesInvoices() {
   const { currency, lang, dir, translateLiteral } = useLanguage();
-  const invoiceOptions = useMemo(() => ({ lang, dir, translateLiteral }), [lang, dir, translateLiteral]);
   const { branches, activeRestaurant, ownerFilter } = useTenant();
+  const invoiceOptions = useMemo(() => ({
+    lang, dir, translateLiteral, branches,
+  }), [lang, dir, translateLiteral, branches]);
   const [search, setSearch] = useState('');
   const [filterBranch, setFilterBranch] = useState('all');
   const [filterFrom, setFilterFrom] = useState('');
