@@ -1,6 +1,6 @@
 import QRCode from 'qrcode';
 import { drawLocalizedPdfText } from './pdfLocalization';
-import {drawBizCTRLReportIcon} from './erpPdfBrand';
+import {drawApprovedBizCTRLIcon} from './erpPdfBrand';
 import { calcPurchaseLine } from './procurementEngine';
 
 const LANGUAGE = {
@@ -152,9 +152,9 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{
     doc.setFillColor(247,250,255);doc.rect(0,0,width,297,'F');
     panel(left,7,contentWidth,31,[16,92,212],3.4);
     panel(11,9,188,27,[15,82,193],2.6);
-    drawBizCTRLReportIcon(doc,15,15,11.5);
-    number('BizCTRL',31,24.4,{size:18,bold:true,color:white,align:'left',maxWidth:58});
-    number('SMART BUSINESS CONTROL',31,31.6,{size:7.7,bold:false,color:[211,238,255],align:'left'});
+    drawApprovedBizCTRLIcon(doc,15,14,14);
+    number('BizCTRL',34,24.4,{size:18,bold:true,color:white,align:'left',maxWidth:55});
+    number('SMART BUSINESS CONTROL',34,31.6,{size:7.7,bold:false,color:[211,238,255],align:'left',maxWidth:64});
     doc.setDrawColor(133,192,242);doc.line(101,14,101,33);
     print(w.title,rtl?194:107,22,{
       size:13.5,bold:true,color:white,align:rtl?'right':'left',maxWidth:86,
@@ -302,8 +302,8 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{
     for(let p=1;p<=pageCount;p++){
       doc.setPage(p);
       divider(275,9,201);
-      drawBizCTRLReportIcon(doc,11,280,8);
-      number('BizCTRL',22,286,{size:11.5,bold:true,color:ink,align:'left'});
+      drawApprovedBizCTRLIcon(doc,11,279.2,10);
+      number('BizCTRL',24,286,{size:11.5,bold:true,color:ink,align:'left'});
       print(w.generated,90,282.5,{size:8,color:ink,maxWidth:89,align:'center'});
       print(w.disclaimer,90,289,{size:7.2,color:FADED,maxWidth:110,align:'center'});
       // Internal reference QR only. It is not a ZATCA or VAT validation QR.
