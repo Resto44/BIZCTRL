@@ -17,6 +17,15 @@ export async function loadERPReportIcon() {
     });
   } catch {return EMBEDDED_APPROVED_ICON;}
 }
+/**
+ * Exact approved glossy blue/cyan BizCTRL icon supplied by the owner.
+ * Embedded from the same brand source as the PWA, so purchase invoices
+ * render offline with the actual artwork rather than the vector placeholder.
+ */
+export function drawApprovedBizCTRLIcon(doc,x,y,size=12) {
+  return drawBizCTRLReportIcon(doc,x,y,size,EMBEDDED_APPROVED_ICON);
+}
+
 export function drawBizCTRLReportIcon(doc,x,y,size=12,iconData=null){
   if(iconData){
     try {doc.addImage(iconData,'PNG',x,y,size,size);return;}catch{/* fallback */}

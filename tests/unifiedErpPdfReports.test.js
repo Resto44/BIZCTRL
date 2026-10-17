@@ -92,6 +92,6 @@ describe('Paginated unified BizCTRL ERP PDF reporting',()=>{
   expect(table).toContain('drawERPReportBrand');
   expect(profit).toContain('drawERPReportBrand');
   expect(supplier).toContain('drawERPReportBrand');
-  expect(invoice).toContain('drawBizCTRLReportIcon');
+  expect(invoice).toContain('drawApprovedBizCTRLIcon');
  });
 });

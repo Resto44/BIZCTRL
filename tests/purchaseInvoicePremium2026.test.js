@@ -36,7 +36,7 @@ describe('Premium BizCTRL Purchase Invoice 2026 ERP reflow',()=>{
       const {doc,filename}=createBrandedPurchaseInvoicePDF(sample,{...opts,lang});
       expect(doc.getNumberOfPages()).toBe(1);
       expect(doc.internal.pageSize.getWidth()).toBeLessThan(doc.internal.pageSize.getHeight());
-      expect(filename).toContain('ERP-v2');
+      expect(filename).toContain('ERP-v3');
       expect(doc.getFontList().Vazirmatn).toContain('bold');
     }
   });
