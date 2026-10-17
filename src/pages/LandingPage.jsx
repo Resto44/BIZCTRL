@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PublicPricingCards from '@/components/marketing/PublicPricingCards';
+import LandingMarketingShowcase from '@/components/marketing/LandingMarketingShowcase';
 import { useLanguage } from '@/lib/LanguageContext';
 import { supabase } from '@/api/supabaseClient';
 import { ContentSection, PRODUCT_DESCRIPTION, PublicHero, PublicLayout, SectionHeading, usePublicPageMetadata } from '@/components/marketing/PublicLayout';
@@ -121,6 +122,8 @@ export default function LandingPage() {
         </div>
         <p className="mt-7 flex items-center justify-center gap-2 text-sm font-medium text-slate-400"><CheckCircle2 className="h-4 w-4 text-emerald-400" />{tr('One platform. Multiple branches. Complete business control.')}</p>
       </PublicHero>
+
+      <LandingMarketingShowcase />
 
       <ContentSection className="pt-0" id="industries">
         <SectionHeading eyebrow="Industries" title="Built for Your Business" description="BizCTRL adapts its ERP foundation to different business operations. Restaurants are one supported industry—not the entire identity of the platform." />
