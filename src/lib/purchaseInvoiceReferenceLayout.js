@@ -112,11 +112,11 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{
   const padding=4;
   const print=(str,x,y,{size=9,color=ink,bold=false,align='left',maxWidth}={})=>
     drawLocalizedPdfText(doc,display(str),x,y,{
-      rtl,bold,size,color,align,maxWidth,
+      rtl,bold,size,color,align,maxWidth,fit:Boolean(maxWidth),
     });
   const number=(str,x,y,{size=10,color=ink,bold=true,align='right',maxWidth}={})=>
     drawLocalizedPdfText(doc,display(str),x,y,{
-      rtl:false,bold,size,color,align,maxWidth,
+      rtl:false,bold,size,color,align,maxWidth,fit:Boolean(maxWidth),
     });
   const panel=(x,y,wid,hei,bg=white,radius=2.4)=>{
     doc.setFillColor(...bg);doc.roundedRect(x,y,wid,hei,radius,radius,'F');
@@ -181,7 +181,7 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{
       panel(px,py,94,18,white,2);
       heading(label,px,py,94,value);
     });
-    const smallBusiness=model.businessName+' · '+model.address;
+    const smallBusiness=[model.businessName,model.businessTax,model.address].filter(x=>x&&x!=='—').join(' · ');
     print(smallBusiness,rtl?196:14,83.5,{
       size:8.7,color:FADED,align:rtl?'right':'left',maxWidth:183,
     });
