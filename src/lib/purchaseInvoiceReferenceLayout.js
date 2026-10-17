@@ -222,14 +222,14 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{
     divider(127.7);
   };
   const toRows=item=>wrapWords(item.product_name||item.name||item.description,39);
-  const itemHeight=item=>Math.max(16.4,12+3.8*(toRows(item).length-1));
+  const itemHeight=item=>13.4+Math.max(0,toRows(item).length-2)*3.8;
   const drawItem=(item,index,y)=>{
     const rows=toRows(item),h=itemHeight(item);
     panel(9,y,192,h,index%2?[247,251,255]:white,1);
     const nameX=rtl?196:14;
     rows.forEach((value,j)=>{
-      print(value,nameX,y+5.3+j*3.8,{
-        size:9.6,bold:j===0,color:ink,align:rtl?'right':'left',maxWidth:79,
+      print(value,nameX,y+4.3+j*3.7,{
+        size:9.2,bold:j===0,color:ink,align:rtl?'right':'left',maxWidth:74,
       });
     });
     const qty=display(item.quantity)+' '+display(item.unit||item.unit_name);
@@ -247,7 +247,7 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{
       '  ·  '+(language==='ar'?'قبل الضريبة: ':language==='fa'?'قبل از مالیات: ':'Before VAT: ')+currencyAmount(c.discountedAmount,'')+
       '  ·  '+(language==='ar'?'الضريبة: ':language==='fa'?'مالیات: ':'VAT: ')+currencyAmount(c.taxAmount,'');
     print(detailText,rtl?195:13,y+h-2,{
-      size:7.8,color:FADED,align:rtl?'right':'left',maxWidth:181,
+      size:8.0,color:FADED,align:rtl?'right':'left',maxWidth:181,
     });
     divider(y+h,12,198);
     return h;
