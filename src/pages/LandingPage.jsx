@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PublicPricingCards from '@/components/marketing/PublicPricingCards';
+import { useLanguage } from '@/lib/LanguageContext';
 import { supabase } from '@/api/supabaseClient';
 import { ContentSection, PRODUCT_DESCRIPTION, PublicHero, PublicLayout, SectionHeading, usePublicPageMetadata } from '@/components/marketing/PublicLayout';
 import { PUBLIC_PLAN_FIELDS } from '@/lib/pricingCatalog';
@@ -76,6 +77,7 @@ function DashboardPreview() {
 export default function LandingPage() {
   usePublicPageMetadata('BizCTRL — Multi-Tenant ERP SaaS', PRODUCT_DESCRIPTION);
   const navigate = useNavigate();
+  const { lang, translateLiteral: tr } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [catalogPlans, setCatalogPlans] = useState([]);
   const resumedCheckoutPlanId = useRef('');
@@ -110,14 +112,14 @@ export default function LandingPage() {
     <PublicLayout>
       <PublicHero
         eyebrow="Cloud-based business management"
-        title={<><span>Run Your Entire Business</span><br /><span className="bg-gradient-to-r from-cyan-300 via-blue-300 to-violet-300 bg-clip-text text-transparent">From One Platform</span></>}
-        description={PRODUCT_DESCRIPTION}
+        title={<><span>{tr('Run Your Entire Business')}</span><br /><span className="bg-gradient-to-r from-cyan-300 via-blue-300 to-violet-300 bg-clip-text text-transparent">{tr('From One Platform')}</span></>}
+        description={tr(PRODUCT_DESCRIPTION)}
       >
         <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Button onClick={() => navigate('/erp-register?owner=1')} className="h-13 min-h-13 w-full bg-cyan-500 px-7 py-3 text-base font-black text-slate-950 hover:bg-cyan-400 sm:w-auto">Start Free <ArrowRight className="ml-2 h-5 w-5" /></Button>
-          <Button variant="outline" className="h-13 min-h-13 w-full border-white/20 bg-transparent px-7 py-3 text-base font-bold text-white hover:bg-white/10 hover:text-white sm:w-auto" onClick={() => { document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); window.history.pushState(null, '', '/#pricing'); }}>View Pricing</Button>
+          <Button onClick={() => navigate('/erp-register?owner=1')} className="h-13 min-h-13 w-full bg-cyan-500 px-7 py-3 text-base font-black text-slate-950 hover:bg-cyan-400 sm:w-auto">{tr('Start Free')} <ArrowRight className="ml-2 h-5 w-5" /></Button>
+          <Button variant="outline" className="h-13 min-h-13 w-full border-white/20 bg-transparent px-7 py-3 text-base font-bold text-white hover:bg-white/10 hover:text-white sm:w-auto" onClick={() => { document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); window.history.pushState(null, '', '/#pricing'); }}>{tr('View Pricing')}</Button>
         </div>
-        <p className="mt-7 flex items-center justify-center gap-2 text-sm font-medium text-slate-400"><CheckCircle2 className="h-4 w-4 text-emerald-400" />One platform. Multiple branches. Complete business control.</p>
+        <p className="mt-7 flex items-center justify-center gap-2 text-sm font-medium text-slate-400"><CheckCircle2 className="h-4 w-4 text-emerald-400" />{tr('One platform. Multiple branches. Complete business control.')}</p>
       </PublicHero>
 
       <ContentSection className="pt-0" id="industries">
