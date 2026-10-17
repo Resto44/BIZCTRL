@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { getOverdueInfo } from '@/lib/procurementEngine';
+import { treasuryBranchDisplayName } from '@/lib/treasuryBranchDisplay';
 import {
   AlertCircle, CheckCircle2, Clock, Eye,
   Pencil, Plus, Receipt, Trash2, ChevronDown, ChevronUp,
@@ -39,13 +40,14 @@ const OVERDUE_BORDER = {
 
 // ── Mobile Invoice Card ───────────────────────────────────────────────────────
 const MobileInvoiceCard = memo(function MobileInvoiceCard({
-  inv, currency, isOwner, onView, onEdit, onDelete, onApprove, dir
+  inv, currency, isOwner, onView, onEdit, onDelete, onApprove, dir, lang, branches
 }) {
   const [expanded, setExpanded] = useState(false);
   const { isOverdue, daysOverdue, color } = useMemo(() => getOverdueInfo(inv), [inv]);
   const statusCfg = STATUS_CONFIG[inv.status] || STATUS_CONFIG.draft;
   const StatusIcon = statusCfg.Icon;
   const remaining = (inv.total_amount || 0) - (inv.paid_amount || 0);
+  const branchDisplayName = treasuryBranchDisplayName(inv, branches, lang);
 
   const toggleExpand = useCallback(() => setExpanded(e => !e), []);
 
@@ -75,9 +77,9 @@ const MobileInvoiceCard = memo(function MobileInvoiceCard({
           </p>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             <span className="text-xs text-muted-foreground">{inv.date}</span>
-            {inv.branch && (
-              <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">
-                {inv.branch}
+            {branchDisplayName && (
+              <span dir="auto" className="max-w-full break-words text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">
+                {branchDisplayName}
               </span>
             )}
             {isOverdue && (
@@ -263,7 +265,7 @@ export const StickyActionBar = memo(function StickyActionBar({
 
 // ── Mobile Invoice List ───────────────────────────────────────────────────────
 const MobileInvoiceList = memo(function MobileInvoiceList({
-  invoices, currency, isOwner, onView, onEdit, onDelete, onApprove, dir
+  invoices, currency, isOwner, onView, onEdit, onDelete, onApprove, dir, lang = 'en', branches = []
 }) {
   if (invoices.length === 0) {
     return (
@@ -281,6 +283,8 @@ const MobileInvoiceList = memo(function MobileInvoiceList({
         <MobileInvoiceCard
           key={inv.id}
           inv={inv}
+          branches={branches}
+          lang={lang}
           currency={currency}
           isOwner={isOwner}
           onView={onView}
