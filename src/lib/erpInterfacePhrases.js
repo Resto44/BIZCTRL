@@ -4,6 +4,13 @@
  * free-text business values or code identifiers.
  */
 export const erpInterfacePhrases = Object.freeze({
+  "Navigation drawer": { ar: "قائمة التنقل", fa: "منوی پیمایش" },
+  "Close navigation drawer": { ar: "إغلاق قائمة التنقل", fa: "بستن منوی پیمایش" },
+  "Module not enabled": { ar: "الوحدة غير مفعلة", fa: "ماژول فعال نیست" },
+  "This module": { ar: "هذه الوحدة", fa: "این ماژول" },
+  "This organization removed the module from its active ERP workspace. Existing records remain preserved and permissions are unchanged.": { ar: "أزالت هذه المنشأة الوحدة من مساحة عمل ERP النشطة. ستبقى السجلات السابقة محفوظة ولن تتغير الصلاحيات.", fa: "این کسب‌وکار ماژول را از فضای کاری فعال ERP برداشته است. رکوردهای قبلی محفوظ می‌مانند و صلاحیت‌ها تغییر نمی‌کنند." },
+  "Return to dashboard": { ar: "العودة إلى لوحة التحكم", fa: "بازگشت به داشبورد" },
+  "Configure workspace": { ar: "إعداد مساحة العمل", fa: "تنظیم فضای کاری" },
   "BizCTRL — Multi-Tenant ERP SaaS": { ar: "BizCTRL — نظام ERP سحابي متعدد المستأجرين", fa: "BizCTRL — سیستم ERP ابری چندمشتری" },
   "BizCTRL is a multi-tenant ERP SaaS built for restaurants, retail stores, pharmacies, warehouses, factories, and more. Manage inventory, sales, purchasing, HR, finance, and suppliers — all in one place.": { ar: "BizCTRL نظام ERP سحابي متعدد المستأجرين للمطاعم والمتاجر والصيدليات والمستودعات والمصانع وغيرها. أدر المخزون والمبيعات والمشتريات والموظفين والمالية والموردين في منصة واحدة.", fa: "BizCTRL یک سیستم ERP ابری چندمشتری برای رستورانت‌ها، فروشگاه‌ها، داروخانه‌ها، انبارها، کارخانه‌ها و کسب‌وکارهای دیگر است. موجودی، فروشات، خریداری، کارمندان، امور مالی و تأمین‌کنندگان را در یک پلتفرم مدیریت کنید." },
   "Record attendance": { ar: "تسجيل الحضور", fa: "ثبت حاضری" },
