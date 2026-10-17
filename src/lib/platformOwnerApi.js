@@ -41,6 +41,10 @@ export const platformOwnerApi = {
   controlCenter: () => rpc('platform_owner_control_center'),
   modules: () => rpc('platform_owner_list_modules'),
   organizations: (query, status, limit, offset) => rpc('platform_owner_list_organizations', { p_query: query || null, p_status: status || null, p_limit: limit, p_offset: offset }),
+  databaseCleanupPreview: (category = 'all') => rpc('platform_owner_cleanup_preview', { p_category: category }),
+  runDatabaseCleanup: ({ category, token, confirmation, reason }) => rpc('platform_owner_run_cleanup', {
+    p_category: category, p_preview_token: token, p_confirmation: confirmation, p_reason: reason,
+  }),
   organizationDeletionCheck: (restaurantId) => rpc('platform_owner_organization_deletion_check', { p_restaurant_id: restaurantId }),
   deleteOrganization: (restaurantId, name, reason) => rpc('platform_owner_delete_organization', {
     p_restaurant_id: restaurantId, p_confirm_name: name,
