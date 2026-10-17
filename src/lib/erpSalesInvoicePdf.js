@@ -212,10 +212,10 @@ export function renderERPSalesInvoicePDF(doc, invoice, { lang='en', currency='SA
 
   // Payment distribution as a real vector mini-chart (not invented trend
   // bars), followed by two independently spaced notes with safe widths.
-  box(10,266,190,20,C.white);
+  box(10,264.5,190,19,C.white);
   const parts=model.sources.filter(s=>s.amount!==null && s.amount>0);
   const sumOfParts=parts.reduce((total,source)=>total+source.amount,0);
-  const cx=26,cy=276,r=8;let angle=-Math.PI/2;
+  const cx=26,cy=274.5,r=7.5;let angle=-Math.PI/2;
   parts.forEach(source=>{
     const share=sumOfParts?source.amount/sumOfParts:0;
     const next=angle+share*Math.PI*2, segments=Math.max(1,Math.ceil(share*64));
@@ -230,24 +230,24 @@ export function renderERPSalesInvoicePDF(doc, invoice, { lang='en', currency='SA
   fill(C.white);doc.circle(cx,cy,4.7,'F');
   const summaryStatus=model.sourceStatus==='matched'?t.matched:
     model.sourceStatus==='incomplete'?t.incomplete:t.mismatch;
-  write(t.insights,40,273.0,{
+  write(t.insights,40,271.6,{
     size:9.1,bold:true,color:C.navy,maxWidth:156,
   });
-  write(summaryStatus,40,278.6,{
+  write(summaryStatus,40,277.0,{
     size:9.0,bold:true,
     color:model.sourceStatus==='matched'?C.green:C.amber,maxWidth:156,
   });
   // The source table does not contain expected drawer cash, so don't present
   // the recorded difference as closing minus opening or calculated here.
   write(t.recorded+': '+(model.cashDifference===null?'—':
-    (model.cashDifference>0?'+':'')+formatMoney(model.cashDifference)),40,283.1,{
+    (model.cashDifference>0?'+':'')+formatMoney(model.cashDifference)),40,281.7,{
     size:8.6,color:C.muted,maxWidth:155,
   });
 
-  line(10,289,200,289);
-  drawBizCTRLReportIcon(doc,12,291,4.8);
-  write(brandName,19,295,{size:9,bold:true,color:C.navy,maxWidth:50});
-  write(t.generated+' · '+model.number,198,294.9,{
+  line(10,286,200,286);
+  drawBizCTRLReportIcon(doc,12,288,5);
+  write(brandName,19,292.8,{size:9,bold:true,color:C.navy,maxWidth:50});
+  write(t.generated+' · '+model.number,198,292.8,{
     size:8.5,color:C.muted,align:'right',maxWidth:122,
   });
   return model;
