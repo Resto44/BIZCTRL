@@ -53,6 +53,7 @@ export const GlassKPICard = memo(function GlassKPICard({
   trendLabel,
   accentColor = 'blue',
   urgent = false,
+  isTextValue = false,
 }) {
   const accentMap = {
     blue:    { gradient: 'from-blue-500/10 to-blue-600/5',    icon: 'text-blue-600 dark:text-blue-400',    ring: 'ring-blue-500/20',    glow: 'shadow-blue-500/10' },
@@ -75,7 +76,7 @@ export const GlassKPICard = memo(function GlassKPICard({
         shadow-sm hover:shadow-md ${a.glow}
         transition-all duration-200
         ${urgent ? 'ring-2 ring-red-500/40 animate-pulse-subtle' : ''}
-        p-4
+        min-w-0 p-3 sm:p-4
       `}
     >
       {/* Background glow blob */}
@@ -83,7 +84,7 @@ export const GlassKPICard = memo(function GlassKPICard({
         className={`absolute -top-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br ${a.gradient} blur-2xl opacity-60 pointer-events-none`}
       />
 
-      <div className="relative z-10">
+      <div className="relative z-10 min-w-0">
         {/* Icon + trend row */}
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className={`w-10 h-10 rounded-xl bg-background/80 backdrop-blur-sm ring-1 ${a.ring} flex items-center justify-center shrink-0`}>
@@ -105,20 +106,22 @@ export const GlassKPICard = memo(function GlassKPICard({
         </div>
 
         {/* Value */}
-        <p className="text-2xl font-bold text-foreground leading-none tracking-tight truncate">
+        <p
+          dir={isTextValue ? 'auto' : 'ltr'}
+          title={isTextValue ? String(value) : undefined}
+          className={isTextValue
+            ? 'min-w-0 min-h-12 text-start text-[clamp(0.88rem,3.7vw,1.15rem)] sm:text-lg font-bold leading-6 text-foreground break-words [overflow-wrap:anywhere] line-clamp-2'
+            : 'min-w-0 text-start text-[clamp(0.95rem,4.5vw,1.5rem)] sm:text-2xl font-extrabold leading-tight tracking-tight text-foreground tabular-nums break-words [overflow-wrap:anywhere]'}
+        >
           {value}
         </p>
 
         {/* Label */}
-        <p className="text-xs font-medium text-muted-foreground mt-1 truncate">
-          {label}
-        </p>
+        <p className="min-w-0 mt-2 text-xs font-semibold leading-5 text-muted-foreground break-words">{label}</p>
 
         {/* Sublabel / trend label */}
         {(sublabel || trendLabel) && (
-          <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">
-            {sublabel || trendLabel}
-          </p>
+          <p className="min-w-0 mt-0.5 text-[11px] leading-4 text-muted-foreground/80 break-words">{sublabel || trendLabel}</p>
         )}
       </div>
     </div>
@@ -162,6 +165,7 @@ export const ExecutiveKPIGrid = memo(function ExecutiveKPIGrid({ kpis, currency,
       icon: Star,
       label: t?.('top_supplier') || 'Top Supplier',
       value: kpis.topSupplier || '—',
+      isTextValue: true,
       accentColor: 'cyan',
       sublabel: t?.('by_spend') || 'By spend',
     },
@@ -169,6 +173,7 @@ export const ExecutiveKPIGrid = memo(function ExecutiveKPIGrid({ kpis, currency,
       icon: Package,
       label: t?.('most_purchased') || 'Most Purchased',
       value: kpis.mostPurchasedProduct || '—',
+      isTextValue: true,
       accentColor: 'slate',
       sublabel: t?.('by_quantity') || 'By quantity',
     },
@@ -189,7 +194,7 @@ export const ExecutiveKPIGrid = memo(function ExecutiveKPIGrid({ kpis, currency,
   ], [kpis, currency, t]);
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-4">
+    <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
       {cards.map((card, i) => (
         <GlassKPICard key={i} {...card} />
       ))}
