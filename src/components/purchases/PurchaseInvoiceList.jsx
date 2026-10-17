@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/lib/LanguageContext';
+import { treasuryBranchDisplayName } from '@/lib/treasuryBranchDisplay';
 import { Pencil, Trash2, CheckCircle2, Clock, AlertCircle, Eye, FileDown, Share2, Square, CheckSquare } from 'lucide-react';
 import { getOverdueInfo } from '@/lib/procurementEngine';
 import { approveInvoice } from '@/lib/procurementEngine';
@@ -35,7 +36,7 @@ const OVERDUE_COLORS = {
 const isMutableDraft = (invoice) =>
   invoice?.status === 'draft' && !['approved', 'auto_approved'].includes(invoice?.approval_status);
 
-export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, onBulkDelete, onView, onDownloadPDF, onSharePDF }) {
+export default function PurchaseInvoiceList({ invoices = [], branches = [], onEdit, onDelete, onBulkDelete, onView, onDownloadPDF, onSharePDF }) {
   const { currency,lang } = useLanguage();
   const labels=({
     en:{pdf:'Download purchase PDF',share:'Share purchase PDF on WhatsApp'},
@@ -118,6 +119,7 @@ export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, o
         const statusCfg = STATUS_CONFIG[inv.status] || STATUS_CONFIG.draft;
         const StatusIcon = statusCfg.Icon;
         const remaining = (inv.total_amount || 0) - (inv.paid_amount || 0);
+        const branchDisplayName = treasuryBranchDisplayName(inv, branches, lang);
 
         return (
           <Card key={inv.id} className={`p-3 ${isOverdue ? OVERDUE_COLORS[color] : ''} ${selectedIds.has(inv.id) ? 'ring-2 ring-primary/50' : ''}`}>
@@ -152,7 +154,7 @@ export default function PurchaseInvoiceList({ invoices = [], onEdit, onDelete, o
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
                   {inv.invoice_number && <span>#{inv.invoice_number}</span>}
                   <span>{inv.date}</span>
-                  {inv.branch && <span className="bg-secondary px-1.5 py-0.5 rounded">{inv.branch}</span>}
+                  {branchDisplayName && <span dir="auto" className="max-w-full break-words bg-secondary px-1.5 py-0.5 rounded">{branchDisplayName}</span>}
                   {inv.due_date && <span>Due: {inv.due_date}</span>}
                 </div>
 
