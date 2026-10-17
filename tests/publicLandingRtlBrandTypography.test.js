@@ -11,17 +11,17 @@ describe('BizCTRL landing RTL logo and iPhone typography', () => {
     expect(layout).toContain('dir="ltr"');
     expect(layout).toContain('translate="no"');
     expect(layout).toContain('<BrandLogo icon');
-    expect(layout).toContain('<span className="text-white">Biz</span><span className="text-cyan-400">CTRL</span>');
+    expect(layout).toContain('!compact && <span dir="ltr" translate="no"');
     expect(brand).toContain('/icons/bizctrl-icon-192-v3.png');
     expect(css).toContain('unicode-bidi: isolate');
   });
   it('prevents the mobile language switcher and menu from squeezing the centered brand in Persian or Arabic', () => {
     expect(layout).toContain('data-testid="public-mobile-header"');
-    expect(layout).toContain('grid-cols-[minmax(74px,1fr)_auto_minmax(74px,1fr)]');
+    expect(layout).toContain('grid-cols-[minmax(0,1fr)_56px_minmax(0,1fr)]');
     expect(layout).toContain('<div aria-hidden="true" />');
     expect(layout).toContain('<BrandMark compact />');
     expect(layout).toContain('data-testid="public-desktop-header"');
-    expect(layout).toContain('min-w-0 max-w-full justify-self-center overflow-hidden');
+    expect(layout).toContain('data-testid="public-mobile-brand-icon"');
     expect(layout).toContain('min-h-11 min-w-10 shrink-0');
     expect(layout).not.toContain('<BrandLogo className="h-12 w-auto" />');
   });
@@ -36,10 +36,19 @@ describe('BizCTRL landing RTL logo and iPhone typography', () => {
     expect(css).toContain('.public-landing[data-public-language="fa"]');
     expect(css).toContain('font-weight: 700');
     expect(css).toContain('font-weight: 600');
-    expect(css).toContain('font-weight: 500');
-    expect(css).toContain('line-height: 1.75');
+    expect(css).toContain('font-weight: 600');
+    expect(css).toContain('line-height: 1.72');
     expect(css).not.toContain('!important');
     expect(css).not.toContain('@font-face');
+  });
+  it('uses a real raster image (no SVG text), with an icon-only fixed-width mobile brand', () => {
+    expect(brand).toContain('<img src={file}');
+    expect(brand).not.toContain('<svg');
+    expect(layout).toContain('{!compact && <span');
+    expect(layout).toContain('data-testid="public-mobile-brand-icon"');
+    expect(css).toContain('width: 3.5rem');
+    expect(css).toContain('overflow: visible');
+    expect(css).toContain('font-weight: 700');
   });
   it('preserves critical navigation and registration behavior', () => {
     expect(layout).toContain("navigate('/erp-register?owner=1')");
