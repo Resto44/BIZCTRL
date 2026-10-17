@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('@/api/supabaseClient', () => ({ supabase: {} }));
 import { readFileSync } from 'node:fs';
 import { salesInvoiceERPModel, invoicePercentLabel } from '../src/lib/salesInvoiceERPModel.js';
 import { createLocalizedInvoicePDF } from '../src/lib/salesInvoiceService.js';
