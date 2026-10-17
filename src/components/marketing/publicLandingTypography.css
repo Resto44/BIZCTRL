@@ -42,8 +42,8 @@
 }
 .public-landing:is([data-public-language="ar"], [data-public-language="fa"]) :is(
   h1, h2, h3, h4, h5, h6,
-  p, span, a, button, label, li, summary, input, textarea
-):not(.public-brand-wordmark):not(.public-brand-wordmark *) {
+  p, a, button, label, li, summary, input, textarea
+):not(.public-brand-wordmark) {
   font-family: var(--public-locale-font);
   letter-spacing: normal;
 }
