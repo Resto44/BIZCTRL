@@ -75,9 +75,9 @@ function DashboardPreview() {
 }
 
 export default function LandingPage() {
-  usePublicPageMetadata('BizCTRL — Multi-Tenant ERP SaaS', PRODUCT_DESCRIPTION);
-  const navigate = useNavigate();
   const { translateLiteral: tr } = useLanguage();
+  usePublicPageMetadata(tr('BizCTRL — Multi-Tenant ERP SaaS'), tr(PRODUCT_DESCRIPTION));
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [catalogPlans, setCatalogPlans] = useState([]);
   const resumedCheckoutPlanId = useRef('');
