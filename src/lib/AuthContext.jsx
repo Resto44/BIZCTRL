@@ -27,6 +27,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     mounted.current = true;
     checkAppState();
+    let authRefreshTimer;
     // Keep auth state in sync with Supabase session changes
     // NOTE: skip INITIAL_SESSION — checkAppState() is already called above
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -35,8 +36,13 @@ export const AuthProvider = ({ children }) => {
         navigator.serviceWorker.getRegistration('/').then(reg => reg?.pushManager?.getSubscription()).then(sub => sub?.unsubscribe()).catch(() => {});
       }
       if (_event === 'INITIAL_SESSION') { return; }
+      clearTimeout(authRefreshTimer);
       if (session) {
-        checkAppState();
+        // Supabase invokes listeners while holding its auth lock. Defer SDK
+        // calls until the callback has returned; coalesce same-tick events.
+        authRefreshTimer = setTimeout(() => {
+          if (mounted.current) checkAppState();
+        }, 0);
       } else {
         authRequestVersion.current += 1;
         setUser(null);
@@ -48,7 +54,7 @@ export const AuthProvider = ({ children }) => {
         }
       }
     });
-    return () => { mounted.current = false; authRequestVersion.current += 1; subscription.unsubscribe(); };
+    return () => { clearTimeout(authRefreshTimer); mounted.current = false; authRequestVersion.current += 1; subscription.unsubscribe(); };
   }, []);
 
   const checkAppState = async () => {
