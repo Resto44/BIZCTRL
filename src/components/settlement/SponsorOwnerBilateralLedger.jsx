@@ -12,11 +12,11 @@ import {Label} from '@/components/ui/label';
 import {Badge} from '@/components/ui/badge';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
 import {Dialog,DialogContent,DialogHeader,DialogTitle} from '@/components/ui/dialog';
-import {Wallet,ShieldCheck,AlertTriangle,Receipt,RefreshCw,Plus,ArrowDownLeft,ArrowUpRight,Camera,Loader2} from 'lucide-react';
+import {Wallet,ShieldCheck,Receipt,Plus,ArrowDownLeft,ArrowUpRight,Camera,Loader2} from 'lucide-react';
 import {toast} from 'sonner';
 import {format} from 'date-fns';
 import {readSponsorOwnerRows,sponsorOwnerSummary,
-  validateSponsorOwnerEntry,sponsorOwnerError,SPONSOR_OWNER_KIN} from '@/lib/sponsorOwnerBilateral';
+  validateSponsorOwnerEntry,sponsorOwnerError,SPONSOR_OWNER_KINDS} from '@/lib/sponsorOwnerBilateral';
 
 const UI={
   fa:{
