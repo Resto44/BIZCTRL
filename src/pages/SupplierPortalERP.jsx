@@ -108,7 +108,9 @@ export default function SupplierPortalERP() {
   });
 
   if (supplierProfileError || purchaseOrdersError || invoicesError) return <PortalDataState onRetry={() => {retrySupplierProfile();refetch();refetchInvoices();}}/>;
-  if (supplierProfileLoading || isLoading || invoicesLoading) return <PortalDataState loading/>;
+  // Supplier identity is the access boundary; history and invoice lists are
+  // independent widgets and should not hold the entire portal behind a spinner.
+  if (supplierProfileLoading) return <PortalDataState loading/>;
   if (!supplierProfile || !user?.branch_id) return <PortalDataState missing onRetry={retrySupplierProfile}/>;
 
   const filteredPOs = purchaseOrders.filter(po =>
@@ -169,24 +171,30 @@ export default function SupplierPortalERP() {
         {/* ── HOME ─────────────────────────────────────────────────────────── */}
         {activeTab === 'home' && (
           <>
+            {(isLoading || invoicesLoading) && (
+              <p role="status" className="flex items-center gap-2 text-xs text-slate-400">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                Loading purchase orders and invoices…
+              </p>
+            )}
             {/* Stats */}
             <div className="grid grid-cols-3 gap-3">
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-3 text-center">
-                  <p className="text-2xl font-black text-amber-400">{pending.length}</p>
+                  <p className="text-2xl font-black text-amber-400">{isLoading ? '…' : pending.length}</p>
                   <p className="text-slate-500 text-xs mt-0.5">Awaiting Ship</p>
                 </CardContent>
               </Card>
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-3 text-center">
-                  <p className="text-2xl font-black text-cyan-400">{invoices.length}</p>
+                  <p className="text-2xl font-black text-cyan-400">{invoicesLoading ? '…' : invoices.length}</p>
                   <p className="text-slate-500 text-xs mt-0.5">Invoices</p>
                 </CardContent>
               </Card>
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-3 text-center">
                   <p className="text-2xl font-black text-rose-400">
-                    {showTotal('outstanding')}
+                    {invoicesLoading ? '…' : showTotal('outstanding')}
                   </p>
                   <p className="text-slate-500 text-xs mt-0.5">Outstanding</p>
                 </CardContent>
@@ -194,7 +202,7 @@ export default function SupplierPortalERP() {
             </div>
 
             {/* Recent invoices */}
-            {invoices.length > 0 && (
+            {!invoicesLoading && invoices.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-white font-bold text-sm">Recent Invoices</h3>
@@ -214,7 +222,7 @@ export default function SupplierPortalERP() {
             )}
 
             {/* Pending shipments */}
-            {pending.length > 0 && (
+            {!isLoading && pending.length > 0 && (
               <div>
                 <h3 className="text-white font-bold text-sm mb-3">
                   Action Required — {pending.length} order{pending.length > 1 ? 's' : ''} to ship
@@ -232,7 +240,7 @@ export default function SupplierPortalERP() {
               </div>
             )}
 
-            {pending.length === 0 && invoices.length === 0 && (
+            {!isLoading && !invoicesLoading && pending.length === 0 && invoices.length === 0 && (
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-6 text-center">
                   <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
@@ -257,7 +265,7 @@ export default function SupplierPortalERP() {
               </Card>
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-3 text-center">
-                  <p className="text-xl font-black text-cyan-400">{showTotal('invoiced')}</p>
+                  <p className="text-xl font-black text-cyan-400">{invoicesLoading ? '…' : showTotal('invoiced')}</p>
                   <p className="text-slate-500 text-xs mt-0.5">Invoiced</p>
                 </CardContent>
               </Card>
