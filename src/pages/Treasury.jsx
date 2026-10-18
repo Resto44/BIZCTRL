@@ -1,3 +1,5 @@
+import PeopleCustodySummary from '@/components/settlement/PeopleCustodySummary';
+import {peopleText} from '@/lib/peopleAccounts';
 import React, { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -510,6 +512,7 @@ export default function Treasury() {
 
         {/* ── OVERVIEW ────────────────────────────────────────────────── */}
         <TabsContent value="overview" className="mt-3 space-y-3">
+          {isOwner&&<PeopleCustodySummary tenant={activeRestaurantId} t={peopleText(lang)}/>}
           {(transactionsError || accountsError) && (
             <Card className="border-rose-300 bg-rose-50 p-3 text-sm text-rose-700" role="alert">
               {lang==='ar'?'تعذر تحميل سجل الخزينة بالكامل؛ لا تعرض الأرصدة الجزئية.':
@@ -620,7 +623,7 @@ export default function Treasury() {
                       </div>
                     </div>
                     <span className={`text-sm font-semibold ${isIn ? 'text-emerald-600' : 'text-red-500'}`}>
-                      {isIn ? '+' : '-'}{fmt(tx.amount)}
+                      {isIn ? '+' : '-'}{accountFmt(tx.amount,{currency:tx.currency||accounts.find(a=>a.id===tx.account_id)?.currency})}
                     </span>
                   </div>
                 );
@@ -752,7 +755,7 @@ export default function Treasury() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className={`text-sm font-bold ${isIn ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {isIn ? '+' : '-'}{fmt(tx.amount)}
+                        {isIn ? '+' : '-'}{accountFmt(tx.amount,{currency:tx.currency||accounts.find(a=>a.id===tx.account_id)?.currency})}
                       </span>
                       <Badge variant="outline" className="shrink-0 text-[10px]" title="Posted ledger entries cannot be deleted. Corrections require an audited reversal.">
                         {local('Posted · Locked')}

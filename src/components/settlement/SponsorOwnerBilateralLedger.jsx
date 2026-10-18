@@ -1,4 +1,5 @@
-import {partnerRows,partnerText} from '@/lib/partnerTreasury';
+import {partnerRows} from '@/lib/partnerTreasury';
+import {peopleText} from '@/lib/peopleAccounts';
 import React,{useMemo,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
@@ -112,7 +113,7 @@ const blank=()=>({kind:'',date:format(new Date(),'yyyy-MM-dd'),amount:'',account
 export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=true}){
   const {lang,currency:appCurrency}=useLanguage();
   const base=UI[lang]||UI.en;
-  const pt=partnerText(lang);
+  const pt=peopleText(lang);
   const t=partner?{...base,title:partner.name,help:pt.help,ownerOwes:pt.ownerOwes,sponsorOwes:pt.partnerOwes,
     sponsorLent:pt.sponsor_advance_to_owner,ownerRepaid:pt.owner_repay_sponsor,
     ownerLent:pt.owner_advance_to_sponsor,sponsorRepaid:pt.sponsor_repay_owner}:base;
@@ -191,7 +192,7 @@ export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=tru
     if(code){setError(t[code+'Error']||t.saveFailed);return;}
     if(!form.confirm){setError(t.confirm);return;}
     const account=availableAccounts.find(a=>a.id===form.accountId);
-    if((partner&&!partner.is_active)||!owner||!activeRestaurantId||!account||sponsorOwnerAccountMethod(account)!==form.paymentMethod){setError(t.accountInvalid);return;}
+    if((partner&&(!partner.is_active||partner.allow_loans===false))||!owner||!activeRestaurantId||!account||sponsorOwnerAccountMethod(account)!==form.paymentMethod){setError(t.accountInvalid);return;}
     requestId.current ||= crypto.randomUUID();
     postingLock.current=true;setBusy(true);setError('');
     try{
@@ -237,7 +238,7 @@ export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=tru
           <h3 className="flex items-center gap-2 text-base font-extrabold"><Wallet className="h-5 w-5 text-indigo-600"/>{t.title}</h3>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">{t.help}</p>
         </div>
-        <Button type="button" size="sm" onClick={launch} disabled={!availableAccounts.length||(partner&&!partner.is_active)} className="w-full sm:w-auto">
+        <Button type="button" size="sm" onClick={launch} disabled={!availableAccounts.length||(partner&&(!partner.is_active||partner.allow_loans===false))} className="w-full sm:w-auto">
           <Plus className="me-1 h-4 w-4"/>{t.new}
         </Button>
       </div>
