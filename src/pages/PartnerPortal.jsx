@@ -6,6 +6,7 @@ import {partnerText,partnerError,readPartnerPreferences} from '@/lib/partnerTrea
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Card} from '@/components/ui/card';
+import PartnerTransactionRequests from '@/components/settlement/PartnerTransactionRequests';
 import PartnerWorkspace from '@/components/settlement/PartnerWorkspace';
 import {loadPartnerStatement} from '@/lib/partnerAnalytics';
 
@@ -57,6 +58,7 @@ export default function PartnerPortal(){
      <Card className="flex flex-wrap items-center justify-between gap-3 p-4"><select aria-label={t.partners} className="min-w-0 flex-1 rounded-xl border bg-background p-3" value={partner.id} onChange={e=>{setSelected(e.target.value);setError('');}}>
       {accounts.data.map(p=><option key={p.id} value={p.id}>{p.business} · {p.name}</option>)}
      </select><Button variant="outline" onClick={()=>{accounts.refetch();statement.refetch();}}>{t.refresh}</Button></Card>
+     <PartnerTransactionRequests key={`requests:${session.user.id}:${partner.id}`} partner={partner} t={t}/>
      {statement.isLoading?<p>{t.loading}</p>:statement.isError?<p role="alert">{t.failed}<Button onClick={()=>statement.refetch()}>{t.refresh}</Button></p>:statement.data&&<PartnerWorkspace key={`${session.user.id}:${partner.id}`} data={statement.data} partner={partner} t={t} lang={lang} preferences={preferences} updatePreference={updatePreference} confirm={confirm} busy={busy}/>}
 
     </>}

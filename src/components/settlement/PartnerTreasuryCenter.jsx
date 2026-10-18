@@ -5,6 +5,7 @@ import {useTenant} from '@/lib/TenantContext';
 import {useRole} from '@/lib/RoleContext';
 import {useLanguage} from '@/lib/LanguageContext';
 import {partnerText,partnerError} from '@/lib/partnerTreasury';
+import PartnerTransactionRequests from './PartnerTransactionRequests';
 import PartnerInvitationLink from './PartnerInvitationLink';
 import SponsorOwnerBilateralLedger from './SponsorOwnerBilateralLedger';
 import {Button} from '@/components/ui/button';
@@ -62,6 +63,7 @@ export default function PartnerTreasuryCenter(){
    {error&&<p role="alert" className="text-sm text-red-600">{error}</p>}
    {invitation&&<PartnerInvitationLink key={invitation} invitation={invitation} t={t}/>}
   </Card>
+  {partner&&<PartnerTransactionRequests key={`requests:${activeRestaurantId}:${partner.id}`} partner={partner} t={t} owner/>}
   {partner&&<SponsorOwnerBilateralLedger key={`${activeRestaurantId}:${partner.id}`} partner={partner}/>}
  </section>;
 }
