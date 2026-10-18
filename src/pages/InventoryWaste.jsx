@@ -1,6 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { useTenant } from '@/lib/TenantContext';
+import { useBranchScope } from '@/lib/BranchScopeContext';
+import { buildWastePayload, normalizeWasteRecord, describeWasteError } from '@/lib/inventoryWaste';
+import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { format } from 'date-fns';
 import PageHeader from '@/components/shared/PageHeader';
@@ -30,31 +34,49 @@ const emptyForm = {
 };
 
 export default function InventoryWaste() {
-  const { t, currency } = useLanguage();
+  const { t, currency, lang } = useLanguage();
+  const { activeRestaurant, branches } = useTenant();
+  const { selectedBranchKey, isAllBranches } = useBranchScope();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [saveError, setSaveError] = useState('');
   const [filterBranch, setFilterBranch] = useState('all');
   const [activeTab, setActiveTab] = useState('log'); // 'log' | 'report'
 
+  const restaurantId = activeRestaurant?.id;
+
   const { data: wastes = [], isLoading } = useQuery({
-    queryKey: ['inventory_waste'],
-    queryFn: () => base44.entities.InventoryWaste.list('-date', 500),
+    queryKey: ['inventory_waste', restaurantId],
+    queryFn: async () => {
+      const rows = await base44.entities.InventoryWaste.filter({ restaurant_id: restaurantId }, '-date', 500);
+      return rows.map(normalizeWasteRecord);
+    },
+    enabled: Boolean(restaurantId),
   });
 
   const { data: products = [] } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => base44.entities.Product.list('name', 500),
+    queryKey: ['products', restaurantId, 'inventory-waste'],
+    queryFn: () => base44.entities.Product.filter({ restaurant_id: restaurantId }, 'name', 500),
+    enabled: Boolean(restaurantId),
   });
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.InventoryWaste.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory_waste'] });
-      // Also invalidate purchases/inventory so stock engine re-computes
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['retail-inventory'] });
+      setSaveError('');
       setShowForm(false);
       setForm(emptyForm);
+      toast.success(lang === 'ar' ? 'تم تسجيل الهدر بنجاح' : lang === 'fa' ? 'ضایعات با موفقیت ثبت شد' : 'Inventory waste recorded');
+    },
+    onError: (error) => {
+      console.error('[InventoryWaste] Save failed:', error);
+      const message = describeWasteError(error, lang);
+      setSaveError(message);
+      toast.error(message);
     },
   });
 
@@ -64,22 +86,32 @@ export default function InventoryWaste() {
       queryClient.invalidateQueries({ queryKey: ['inventory_waste'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
     },
+    onError: (error) => toast.error(describeWasteError(error, lang)),
   });
 
+  const openForm = () => {
+    setSaveError('');
+    setForm({ ...emptyForm, date: format(new Date(), 'yyyy-MM-dd'), branch: isAllBranches ? (branches.length === 1 ? branches[0].key : '') : (selectedBranchKey || '') });
+    setShowForm(true);
+  };
+
   const handleProductChange = (productId) => {
-    const p = products.find(x => x.product_id === productId);
-    setForm(f => ({ ...f, product_id: productId, product_name: p?.name || '', unit_cost: p?.default_cost || '', unit: p?.unit || '' }));
+    const p = products.find(x => String(x.product_id || x.id) === productId);
+    setSaveError('');
+    setForm(f => ({ ...f, product_id: productId, product_name: p?.name || '', unit_cost: p?.default_cost ?? p?.purchase_cost ?? 0, unit: p?.unit || '' }));
   };
 
   const handleSubmit = () => {
-    if (!form.product_id || !form.qty || !form.branch) return;
-    const total_loss = parseFloat(form.qty) * parseFloat(form.unit_cost || 0);
-    createMutation.mutate({
-      ...form,
-      qty: parseFloat(form.qty),
-      unit_cost: parseFloat(form.unit_cost || 0),
-      total_loss,
-    });
+    if (createMutation.isPending) return;
+    setSaveError('');
+    try {
+      const branch = branches.find(b => b.key === form.branch && b.id && b.restaurant_id === restaurantId);
+      const product = products.find(p => String(p.product_id || p.id) === form.product_id);
+      const payload = buildWastePayload({ form, restaurantId, branch, product });
+      createMutation.mutate(payload);
+    } catch (error) {
+      setSaveError(error.message);
+    }
   };
 
   const filtered = useMemo(() =>
@@ -93,7 +125,7 @@ export default function InventoryWaste() {
     <div>
       <PageHeader
         title="Inventory Waste"
-        action={<Button size="sm" onClick={() => setShowForm(true)}><Plus className="w-4 h-4 mr-1" /> Log Waste</Button>}
+        action={<Button size="sm" onClick={openForm}><Plus className="w-4 h-4 mr-1" /> Log Waste</Button>}
       />
 
       {/* Tabs */}
@@ -152,7 +184,7 @@ export default function InventoryWaste() {
                     <Badge className={`text-xs ${reasonColors[w.reason]}`}>{w.reason}</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">{w.branch} · {w.date}</p>
-                  <p className="text-xs text-muted-foreground">Qty: {w.qty} {w.unit} · Loss: {currency}{(w.total_loss || 0).toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">Qty: {w.qty} {w.unit} · Loss: {currency}{Number(w.total_loss || 0).toFixed(2)}</p>
                   {w.notes && <p className="text-xs text-muted-foreground italic mt-1">{w.notes}</p>}
                 </div>
                 <Button size="icon" variant="ghost" className="text-destructive shrink-0" onClick={() => deleteMutation.mutate(w.id)}>
@@ -165,18 +197,18 @@ export default function InventoryWaste() {
       )}
 
       {/* Log Waste Form Dialog */}
-      <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-sm">
+      <Dialog open={showForm} onOpenChange={open => { if (!createMutation.isPending) setShowForm(open); }}>
+        <DialogContent className="max-w-sm max-h-[calc(100dvh-3rem)] overflow-y-auto">
           <DialogHeader><DialogTitle>Log Inventory Waste</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Date</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
-            <div><Label>Branch</Label><BranchSelect value={form.branch} onChange={v => setForm(f => ({ ...f, branch: v }))} /></div>
+            <div><Label>Branch</Label><BranchSelect value={form.branch} onChange={v => { setSaveError(''); setForm(f => ({ ...f, branch: v })); }} /></div>
             <div>
               <Label>Product</Label>
               <Select value={form.product_id} onValueChange={handleProductChange}>
                 <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
                 <SelectContent>
-                  {products.map(p => <SelectItem key={p.product_id} value={p.product_id}>{p.name}</SelectItem>)}
+                  {products.filter(p => p.product_id || p.id).map(p => <SelectItem key={p.id} value={String(p.product_id || p.id)}>{p.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -204,9 +236,12 @@ export default function InventoryWaste() {
             <p className="text-xs text-muted-foreground">
               ⚠️ Logging waste will automatically reduce this product's stock level.
             </p>
+            {saveError && <p role="alert" className="text-sm text-red-600 rounded-md bg-red-50 p-2">{saveError}</p>}
             <div className="flex gap-2 pt-1">
-              <Button className="flex-1" onClick={handleSubmit} disabled={createMutation.isPending}>Save</Button>
-              <Button variant="outline" className="flex-1" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button className="flex-1" onClick={handleSubmit} disabled={createMutation.isPending || !restaurantId}>
+                {createMutation.isPending ? (lang === 'ar' ? 'جارٍ الحفظ…' : lang === 'fa' ? 'در حال ذخیره…' : 'Saving…') : (lang === 'ar' ? 'حفظ' : lang === 'fa' ? 'ذخیره' : 'Save')}
+              </Button>
+              <Button variant="outline" className="flex-1" disabled={createMutation.isPending} onClick={() => setShowForm(false)}>Cancel</Button>
             </div>
           </div>
         </DialogContent>
