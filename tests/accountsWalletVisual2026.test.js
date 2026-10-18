@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
-import {readCashCustodyAndPending} from '../src/components/settlement/WalletPersonCustodyCards.jsx';
+import {readCashCustodyAndPending} from '../src/lib/walletPersonPresentation.js';
 const read=p=>readFileSync(p,'utf8');
 const page=read('src/components/settlement/PartnerTreasuryCenter.jsx');
 const ledger=read('src/components/settlement/SponsorOwnerBilateralLedger.jsx');
@@ -34,7 +34,7 @@ describe('Accounts & Wallet image-aligned ERP design',()=>{
     expect(readCashCustodyAndPending(sample,'EUR')).toEqual({cash:0,pending:0});
     expect(readCashCustodyAndPending(null,'SAR')).toBe(null);
     expect(status).toContain("erp_person_custody");
-    expect(status).toContain("payment_method==='cash'");
+    expect(read('src/lib/walletPersonPresentation.js')).toContain("payment_method==='cash'");
     expect(status).toContain("q.isPending?'…':q.isError?'—'");
     expect(status).toContain("Pending custody approvals");
     expect(status).not.toContain("supabase.from('wallet_transactions').insert");
