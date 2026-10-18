@@ -53,8 +53,8 @@ describe('Accounts & Wallet image-aligned ERP design',()=>{
     expect(ledger).toContain("grid grid-cols-2 gap-2.5");
     expect(ledger).toContain("bg-amber-50/90");
     expect(ledger).toContain("bg-blue-50/90");
-    expect(ledger).toContain("bg-emerald-50/90");
-    expect(ledger).toContain("bg-violet-50/90");
+    expect(status).toContain("bg-emerald-50/90");
+    expect(status).toContain("bg-violet-50/90");
     expect(ledger).toContain('overflow-y-auto overscroll-contain');
     expect(ledger).toContain("r.partner_confirmation?.confirmed_at");
     expect(ledger).toContain('r.effective_date');
