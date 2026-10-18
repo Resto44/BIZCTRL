@@ -29,6 +29,11 @@ beforeEach(async()=>{
 afterEach(()=>{tree.unmount();client.clear();});
 describe('Platform owner management interactions',()=>{
  it('retains the pending filter when drilling into payments from the dashboard',async()=>{
+  // React-query auth snapshot and owner metrics resolve independently. Wait for
+  // the actual authorized dashboard rather than assuming 25ms is enough on CI.
+  for(let attempt=0;attempt<20&&!tree.root.findAllByProps({'aria-label':'Platform overview'}).length;attempt++){
+    await settle();
+  }
   const card=tree.root.findByProps({'aria-label':'Platform overview'}).findAllByType('button')[3];
   await act(async()=>card.props.onClick());await settle();
   expect(api.payments.mock.lastCall).toEqual(['pending',25,0]);

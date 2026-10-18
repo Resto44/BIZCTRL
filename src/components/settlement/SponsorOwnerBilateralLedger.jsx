@@ -1,5 +1,6 @@
 import {partnerRows} from '@/lib/partnerTreasury';
 import {peopleText} from '@/lib/peopleAccounts';
+import WalletPersonCustodyCards from './WalletPersonCustodyCards';
 import React,{useMemo,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
@@ -14,7 +15,7 @@ import {Label} from '@/components/ui/label';
 import {Badge} from '@/components/ui/badge';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
 import {Dialog,DialogContent,DialogHeader,DialogTitle} from '@/components/ui/dialog';
-import {Wallet,ShieldCheck,Receipt,Plus,ArrowDownLeft,ArrowUpRight,Camera,Loader2} from 'lucide-react';
+import {Wallet,ShieldCheck,Receipt,Plus,ArrowDownLeft,ArrowUpRight,Camera,Loader2,Building2,Coins,BookOpen,CheckCircle2,CalendarDays,CreditCard} from 'lucide-react';
 import {toast} from 'sonner';
 import {format} from 'date-fns';
 import {readSponsorOwnerRows,sponsorOwnerSummary,
@@ -232,63 +233,105 @@ export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=tru
 
   const rtl=lang!=='en';
   return <section dir={rtl?'rtl':'ltr'} className="min-w-0 space-y-3 overflow-x-clip">
-    <Card className="min-w-0 space-y-3 rounded-2xl border-indigo-200 p-3 sm:p-4">
+    <Card className="min-w-0 space-y-5 rounded-[24px] border-slate-200 bg-white p-3.5 shadow-sm sm:p-6">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <h3 className="flex items-center gap-2 text-base font-extrabold"><Wallet className="h-5 w-5 text-indigo-600"/>{t.title}</h3>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">{t.help}</p>
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-blue-50 text-blue-600 sm:size-14"><Wallet className="size-7"/></span>
+          <div className="min-w-0">
+            <h3 className="break-words text-xl font-black tracking-tight text-slate-950 sm:text-2xl">{partner?pt.title:t.title}</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-600 sm:text-sm">{partner?.name?partner.name+' · ':''}{t.help}</p>
+          </div>
         </div>
-        <Button type="button" size="sm" onClick={launch} disabled={!availableAccounts.length||(partner&&(!partner.is_active||partner.allow_loans===false))} className="w-full sm:w-auto">
-          <Plus className="me-1 h-4 w-4"/>{t.new}
+        <Button type="button" onClick={launch} disabled={!availableAccounts.length||(partner&&(!partner.is_active||partner.allow_loans===false))} className="min-h-11 w-full gap-2 rounded-xl bg-blue-600 font-bold hover:bg-blue-700 sm:w-auto">
+          <Plus className="size-4"/>{t.new}
         </Button>
       </div>
-      <p className="rounded-lg bg-muted/40 px-3 py-2 text-xs leading-5"><ShieldCheck className="me-1 inline h-4 w-4"/>{t.separate}</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <Label className="text-xs">{t.currency}</Label>
-        <Select value={currentCurrency||undefined} onValueChange={setCurrency}>
-          <SelectTrigger className="h-9 w-40 max-w-full"><SelectValue placeholder={t.noCurrency}/></SelectTrigger>
-          <SelectContent>{currencies.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-        </Select>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">
+        <p className="flex min-w-0 items-center gap-1.5 text-xs leading-5 text-slate-600">
+          <ShieldCheck className="size-4 shrink-0 text-blue-600"/>{t.noNet}
+        </p>
+        <div className="flex shrink-0 items-center gap-2">
+          <Label className="text-xs font-semibold text-slate-600">{t.currency}</Label>
+          <Select value={currentCurrency||undefined} onValueChange={setCurrency}>
+            <SelectTrigger className="h-11 w-32 rounded-xl bg-white font-extrabold text-slate-950">
+              <SelectValue placeholder={t.noCurrency}/>
+            </SelectTrigger>
+            <SelectContent>{currencies.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3" aria-label={t.title}>
         {[
-          {key:'ownerOwes',style:'border-amber-200 bg-amber-50 text-amber-900'},
-          {key:'sponsorOwes',style:'border-blue-200 bg-blue-50 text-blue-900'},
-        ].map(x=><div key={x.key} className={'min-w-0 rounded-xl border p-3 '+x.style}>
-          <p className="text-xs font-bold leading-5">{t[x.key]}</p>
-          <p dir="ltr" className="mt-2 break-all text-start text-lg font-extrabold tabular-nums">{fmt(summary[x.key])}</p>
+          {key:'ownerOwes',icon:Coins,style:'border-amber-200 bg-amber-50/90 text-amber-900',iconStyle:'bg-amber-100 text-amber-700'},
+          {key:'sponsorOwes',icon:Building2,style:'border-blue-200 bg-blue-50/90 text-blue-900',iconStyle:'bg-blue-100 text-blue-700'},
+        ].map(x=><article key={x.key} className={'min-w-0 rounded-2xl border p-3.5 sm:p-5 '+x.style}>
+          <div className="flex items-start gap-2"><span className={'grid size-10 shrink-0 place-items-center rounded-xl '+x.iconStyle}><x.icon className="size-5"/></span>
+            <p className="min-w-0 text-xs font-extrabold leading-5 sm:text-sm">{t[x.key]}</p></div>
+          <p dir="ltr" className="mt-3 break-words text-start text-xl font-black tabular-nums sm:text-2xl">{currentCurrency?fmt(summary[x.key]):'—'}</p>
+        </article>)}
+        {partner&&<WalletPersonCustodyCards partner={partner} currency={currentCurrency} lang={lang}/>}
+      </div>
+    </Card>
+    <Card className="min-w-0 space-y-3 rounded-[24px] border-slate-200 bg-white p-3.5 shadow-sm sm:p-6">
+      <div className="flex items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600"><BookOpen className="size-5"/></span>
+        <div className="min-w-0"><h3 className="text-base font-black text-slate-950 sm:text-lg">{lang==='fa'?'جزئیات مانده‌ها':lang==='ar'?'تفاصيل الأرصدة':'Detailed balances'}</h3>
+        <p className="text-xs leading-5 text-slate-500">{t.noNet}</p></div>
+      </div>
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+        {[
+          {key:'sponsorLent',icon:ArrowDownLeft,color:'text-emerald-700',bg:'bg-emerald-50'},
+          {key:'ownerRepaid',icon:ArrowUpRight,color:'text-rose-700',bg:'bg-rose-50'},
+          {key:'ownerLent',icon:ArrowUpRight,color:'text-rose-700',bg:'bg-rose-50'},
+          {key:'sponsorRepaid',icon:ArrowDownLeft,color:'text-emerald-700',bg:'bg-emerald-50'},
+        ].map(x=><div key={x.key} className="min-w-0 rounded-2xl border border-slate-200 p-3 sm:p-4">
+          <div className="flex items-start gap-2">
+            <span className={'grid size-9 shrink-0 place-items-center rounded-xl '+x.bg+' '+x.color}><x.icon className="size-5"/></span>
+            <p className="min-w-0 text-xs font-semibold leading-5 text-slate-600 sm:text-sm">{t[x.key]}</p>
+          </div>
+          <p dir="ltr" className={'mt-2 break-words text-start text-base font-black tabular-nums sm:text-xl '+x.color}>{currentCurrency?fmt(summary[x.key]):'—'}</p>
         </div>)}
       </div>
-      <p className="text-xs text-muted-foreground">{t.noNet}</p>
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        {[['sponsorLent','text-emerald-700'],['ownerRepaid','text-rose-700'],
-          ['ownerLent','text-rose-700'],['sponsorRepaid','text-emerald-700']].map(([key,cls])=>
-          <div key={key} className="min-w-0 rounded-lg border p-2">
-            <p className="text-muted-foreground">{t[key]}</p><p dir="ltr" className={'mt-1 break-all text-start font-bold '+cls}>{fmt(summary[key])}</p>
-          </div>)}
+    </Card>
+    <Card className="min-w-0 space-y-4 rounded-[24px] border-slate-200 bg-white p-3.5 shadow-sm sm:p-6">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <h3 className="flex min-w-0 items-center gap-2 text-base font-black text-slate-950 sm:text-lg">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600"><Receipt className="size-5"/></span>{t.status}
+        </h3>
+        <Badge variant="outline" className="rounded-xl px-3 py-1.5 text-sm font-bold">{summary.count} {t.count}</Badge>
       </div>
-      <div className="flex items-center justify-between text-xs font-semibold">
-        <span>{t.status}</span><Badge variant="outline">{summary.count} {t.count}</Badge>
-      </div>
-      {scopedRecords.length===0?<p className="p-4 text-center text-xs text-muted-foreground">{t.empty}</p>:
-        <div className="max-h-[580px] space-y-2 overflow-y-auto">{scopedRecords.map(r=>{
+      {scopedRecords.length===0?<p className="rounded-xl border bg-slate-50 p-6 text-center text-sm text-slate-600">{t.empty}</p>:
+        <div className="max-h-[720px] space-y-3 overflow-y-auto overscroll-contain">{scopedRecords.map(r=>{
           const inward=SPONSOR_OWNER_KINDS[r.kind]?.direction==='in';
-          return <div key={r.id} className="flex min-w-0 items-start justify-between gap-2 rounded-xl border p-3">
-            <div className="min-w-0 flex-1">
-              <p className="flex flex-wrap items-center gap-1 text-xs font-bold">
-                {inward?<ArrowDownLeft className="h-4 w-4 text-emerald-600"/>:<ArrowUpRight className="h-4 w-4 text-rose-600"/>}
-                {t[labels[r.kind]]||r.kind}<Badge variant="outline" className="text-[10px]">{t.posted}</Badge>
-              </p>
-              <p className="mt-1 text-[11px] text-muted-foreground">{r.effective_date} · {t.audit}</p>
-              <p className="mt-1 text-xs font-semibold">{t.method}: {['cash','network'].includes(r.wallet_transaction?.payment_method)?t[r.wallet_transaction.payment_method]:t.unknownMethod}</p>
-              {r.external_reference&&<p dir="auto" className="mt-1 break-words text-[11px] text-muted-foreground">{r.external_reference}</p>}
-              {partner&&(r.partner_confirmation?.confirmed_at||r.partner_confirmation?.[0]?.confirmed_at)&&<p className="mt-1 text-xs font-bold text-green-700">{pt.confirmed}</p>}
-              {r.notes&&<p dir="auto" className="mt-1 break-words text-[11px] text-muted-foreground">{r.notes}</p>}
+          const postedColor=inward?'text-emerald-700':'text-rose-700';
+          return <article key={r.id} className="min-w-0 rounded-2xl border border-slate-200 p-3.5 sm:p-5">
+            <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+              <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                <span className={'grid size-11 shrink-0 place-items-center rounded-full '+(inward?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700')}>
+                  {inward?<ArrowDownLeft className="size-5"/>:<ArrowUpRight className="size-5"/>}
+                </span>
+                <div className="min-w-0">
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-black leading-6 text-slate-950">
+                    {t[labels[r.kind]]||r.kind}
+                    <Badge className="border border-blue-100 bg-blue-50 text-xs font-bold text-blue-700 hover:bg-blue-50">{t.posted}</Badge>
+                  </p>
+                  <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                    <CalendarDays className="size-3.5"/>{r.effective_date}
+                    <span className="mx-1">·</span><BookOpen className="size-3.5"/>{t.audit}
+                  </p>
+                  <p className="mt-2 flex items-start gap-1.5 text-xs font-semibold leading-5 text-slate-600">
+                    <CreditCard className="mt-0.5 size-3.5 shrink-0"/>{t.method}: {['cash','network'].includes(r.wallet_transaction?.payment_method)?t[r.wallet_transaction.payment_method]:t.unknownMethod}
+                  </p>
+                  {r.external_reference&&<p dir="auto" className="mt-2 break-words text-xs text-slate-500">{r.external_reference}</p>}
+                  {r.notes&&<p dir="auto" className="mt-2 break-words text-xs text-slate-500">{r.notes}</p>}
+                  {partner&&(r.partner_confirmation?.confirmed_at||r.partner_confirmation?.[0]?.confirmed_at)&&<p className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="size-4"/>{pt.confirmed}</p>}
+                </div>
+              </div>
+              <strong dir="ltr" className={'shrink-0 text-end text-base font-black tabular-nums sm:text-lg '+postedColor}>
+                {inward?'+':'−'}{fmt(r.amount,r.currency)}
+              </strong>
             </div>
-            <div dir="ltr" className={'shrink-0 text-end text-xs font-extrabold tabular-nums '+(inward?'text-emerald-700':'text-rose-700')}>
-              {inward?'+':'−'}{fmt(r.amount,r.currency)}
-            </div>
-          </div>
+          </article>
         })}</div>}
     </Card>
 

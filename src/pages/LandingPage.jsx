@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight, BarChart3, Building2, CheckCircle2, ChevronDown, ClipboardList,
   Factory, Landmark, Package, Pill, Receipt, ShoppingBag, Store, Truck, Users,
-  Warehouse, Zap,
+  Warehouse, Zap, Wallet, ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PublicPricingCards from '@/components/marketing/PublicPricingCards';
@@ -13,6 +13,33 @@ import { supabase } from '@/api/supabaseClient';
 import { ContentSection, PRODUCT_DESCRIPTION, PublicHero, PublicLayout, SectionHeading, usePublicPageMetadata } from '@/components/marketing/PublicLayout';
 import { PUBLIC_PLAN_FIELDS } from '@/lib/pricingCatalog';
 import { usePublicPlanCheckout } from '@/lib/publicPlanCheckout';
+
+const WALLET_LOGIN_COPY = {
+  en:{
+    eyebrow:'Secure role-based portal access',title:'Choose your BizCTRL workspace',
+    wallet:'Accounts & Wallet Login',
+    walletDescription:'Partners, managers and employees can request owner-approved access to their personal advances, custody and settlement records.',
+    erp:'ERP Login',erpDescription:'Authorized staff access their assigned ERP modules, POS, finance and branch operations.',
+    platform:'Platform Owner',platformDescription:'Restricted to BizCTRL platform administrators; not a business-owner login.',
+    view:'Open portal',notice:'Supplier invoices, customer credit and payroll remain in their dedicated ERP ledgers.'
+  },
+  ar:{
+    eyebrow:'دخول آمن حسب الصلاحيات',title:'اختر بوابة BizCTRL المناسبة',
+    wallet:'تسجيل دخول الحسابات والمحفظة',
+    walletDescription:'يمكن للشركاء والمديرين والموظفين طلب الوصول المعتمد من المالك للسلف والعهدة والتسويات الخاصة بهم.',
+    erp:'تسجيل دخول ERP',erpDescription:'وصول الموظفين المصرّح لهم إلى وحدات ERP ونقاط البيع والمالية والفروع.',
+    platform:'مالك المنصة',platformDescription:'مخصص لمسؤولي منصة BizCTRL فقط، وليس لمالك المنشأة.',
+    view:'فتح البوابة',notice:'تبقى فواتير الموردين وآجل العملاء والرواتب في دفاتر ERP المخصصة.'
+  },
+  fa:{
+    eyebrow:'ورود امن بر اساس صلاحیت',title:'پورتل مناسب BizCTRL را انتخاب کنید',
+    wallet:'ورود به حساب‌ها و والت',
+    walletDescription:'شریک، مدیر و کارمند می‌توانند با تأیید اونر به قرض شخصی، امانت و تسویه‌های مربوط خود دسترسی بگیرند.',
+    erp:'ورود به ERP',erpDescription:'کارمندان مجاز به ماژول‌های تعیین‌شده ERP، صندوق، مالی و شعبه‌ها دسترسی دارند.',
+    platform:'مالک پلتفرم',platformDescription:'تنها برای مدیران کل پلتفرم BizCTRL؛ نه مالک یک کسب‌وکار.',
+    view:'بازکردن پورتل',notice:'فاکتور تأمین‌کنندگان، نسیه مشتریان و معاش در دفترهای مخصوص ERP باقی می‌مانند.'
+  }
+};
 
 const INDUSTRIES = [
   { icon: Store, title: 'Restaurants', description: 'Manage branches, ingredients, inventory, purchasing, sales, expenses, and reports.' },
@@ -76,7 +103,8 @@ function DashboardPreview() {
 }
 
 export default function LandingPage() {
-  const { translateLiteral: tr } = useLanguage();
+  const { translateLiteral: tr, lang } = useLanguage();
+  const walletCopy = WALLET_LOGIN_COPY[lang] || WALLET_LOGIN_COPY.en;
   usePublicPageMetadata(tr('BizCTRL — Multi-Tenant ERP SaaS'), tr(PRODUCT_DESCRIPTION));
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -124,6 +152,31 @@ export default function LandingPage() {
       </PublicHero>
 
       <LandingMarketingShowcase />
+      <ContentSection id="portal-access" className="pt-0">
+        <div dir={lang==='en'?'ltr':'rtl'} className="mx-auto max-w-6xl space-y-5">
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-widest text-cyan-300">{walletCopy.eyebrow}</p>
+            <h2 className="mt-2 text-2xl font-black text-white sm:text-3xl">{walletCopy.title}</h2>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              {title:walletCopy.wallet,description:walletCopy.walletDescription,path:'/wallet-portal',Icon:Wallet,featured:true},
+              {title:walletCopy.erp,description:walletCopy.erpDescription,path:'/erp-login',Icon:Building2},
+              {title:walletCopy.platform,description:walletCopy.platformDescription,path:'/platform-owner/login',Icon:ShieldCheck},
+            ].map(({title,description,path,Icon,featured})=><Link key={path} to={path}
+              className={'group flex min-w-0 flex-col rounded-3xl border p-5 text-start shadow-sm transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 sm:p-6 '+(featured?'border-blue-400 bg-gradient-to-br from-blue-100 via-white to-blue-50 text-slate-950 shadow-blue-900/20':'border-slate-300/80 bg-white text-slate-950')}>
+              <div className="flex items-center justify-between gap-3">
+                <span className={'grid size-12 place-items-center rounded-2xl '+(featured?'bg-blue-100 text-blue-700':'bg-slate-100 text-slate-600')}><Icon className="size-6"/></span>
+                <ArrowRight className={'size-5 shrink-0 '+(featured?'text-blue-700':'text-slate-400')}/>
+              </div>
+              <h3 className="mt-5 break-words text-lg font-black">{title}</h3>
+              <p className="mt-2 flex-1 text-sm leading-6 text-slate-600">{description}</p>
+              <p className={'mt-5 text-sm font-bold '+(featured?'text-blue-700':'text-slate-700')}>{walletCopy.view} →</p>
+            </Link>)}
+          </div>
+          <p className="text-xs leading-6 text-slate-400">{walletCopy.notice}</p>
+        </div>
+      </ContentSection>
 
       <ContentSection className="pt-0" id="industries">
         <SectionHeading eyebrow="Industries" title="Built for Your Business" description="BizCTRL adapts its ERP foundation to different business operations. Restaurants are one supported industry—not the entire identity of the platform." />

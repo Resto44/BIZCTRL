@@ -1,5 +1,5 @@
 import {useLanguage} from '@/lib/LanguageContext';
-import {partnerText} from '@/lib/partnerTreasury';
+import {peopleText} from '@/lib/peopleAccounts';
 import HelpLink from '@/components/help/HelpLink';
 import BrandLogo from '@/components/BrandLogo';
 import React, { useState, useEffect } from 'react';
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Building2, UserCheck, User, Package,
-  Eye, EyeOff, Loader2, ArrowLeft, ShieldCheck, LogIn
+  Eye, EyeOff, Loader2, ArrowLeft, ShieldCheck, LogIn, Wallet
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { safeInternalReturnTo } from '@/lib/publicPlanCheckout';
@@ -61,7 +61,7 @@ const ROLE_CONFIG = [
 
 export default function ERPLogin() {
   const navigate = useNavigate();
-  const {lang}=useLanguage(); const partnerLabels=partnerText(lang);
+  const {lang}=useLanguage(); const partnerLabels=peopleText(lang);
   const [searchParams] = useSearchParams();
   const postAuthenticationDestination = safeInternalReturnTo(searchParams.get('returnTo') || searchParams.get('next'), '');
   const ownerRegistrationPath = `/erp-register?owner=1${postAuthenticationDestination ? `&returnTo=${encodeURIComponent(postAuthenticationDestination)}` : ''}`;
@@ -92,7 +92,7 @@ export default function ERPLogin() {
             navigate(postAuthenticationDestination || home, { replace: true });
           } else {
             const {data:partners}=await supabase.rpc('erp_partner_portal_accounts');
-            if(partners?.length) navigate('/partner-portal',{replace:true});
+            if(partners?.length) navigate('/wallet-portal',{replace:true});
           }
         } catch {}
       }
@@ -126,7 +126,7 @@ export default function ERPLogin() {
 
       if (contextError || !context) {
         const {data:partners}=await supabase.rpc('erp_partner_portal_accounts');
-        if(partners?.length){navigate('/partner-portal',{replace:true});return;}
+        if(partners?.length){navigate('/wallet-portal',{replace:true});return;}
         const { data: mem } = await supabase
           .from('erp_memberships')
           .select('status, role')
@@ -205,7 +205,10 @@ export default function ERPLogin() {
 
         {step === 'role' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button type="button" className="rounded-2xl border border-blue-500/40 bg-blue-500/10 p-4 text-start font-bold text-blue-200" onClick={()=>navigate('/partner-portal')}>{partnerLabels.portal}</button>
+            <button type="button" className="group flex min-h-24 min-w-0 items-start gap-3 rounded-2xl border border-blue-400/60 bg-gradient-to-r from-blue-600/25 to-indigo-700/20 p-4 text-start text-blue-100 transition-colors hover:bg-blue-500/30" onClick={()=>navigate('/wallet-portal')}>
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-500/20"><Wallet className="size-6"/></span>
+              <span className="min-w-0"><strong className="block text-base font-black">{partnerLabels.title} Login</strong><span className="mt-1 block text-xs leading-5 text-blue-100/80">{partnerLabels.accountHelp}</span></span>
+            </button>
             {ROLE_CONFIG.map((rc) => {
               const Icon = rc.icon;
               return (
