@@ -11,6 +11,15 @@ export const SPONSOR_OWNER_KINDS = Object.freeze({
   sponsor_repay_owner: {direction:'in', side:'sponsorOwes'},
 });
 
+// Match the server RPC's wallet classification; the server remains authoritative.
+export function sponsorOwnerAccountMethod(account) {
+  if (!account) return null;
+  if (account.legacy_wallet_key === 'owner_cash') return 'cash';
+  if (account.legacy_wallet_key === 'owner_network') return 'network';
+  if (account.legacy_wallet_key) return null;
+  return ['bank','network_pos','digital_wallet','clearing'].includes(account.account_type) ? 'network' : 'cash';
+}
+
 export function sponsorOwnerSummary(records = [], currency = '') {
   const result = {sponsorLent:0, ownerRepaid:0, ownerLent:0, sponsorRepaid:0,
     ownerOwes:0,sponsorOwes:0,count:0};
@@ -55,7 +64,7 @@ export async function readSponsorOwnerRows(db,restaurantId,{pageSize=500,maxPage
   if(!restaurantId)throw Error('RESTAURANT_REQUIRED');
   const rows=[];
   for(let p=0;p<maxPages;p++){
-    const {data,error}=await db.from('sponsor_owner_transactions').select('*')
+    const {data,error}=await db.from('sponsor_owner_transactions').select('*, wallet_transaction:wallet_transactions!wallet_transaction_id(payment_method)')
       .eq('restaurant_id',restaurantId).order('effective_date',{ascending:false})
       .order('id',{ascending:false})
       .range(p*pageSize,(p+1)*pageSize-1);
