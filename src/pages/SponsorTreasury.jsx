@@ -1,3 +1,6 @@
+import {useLanguage} from '@/lib/LanguageContext';
+import {partnerText} from '@/lib/partnerTreasury';
+import PartnerTreasuryCenter from '@/components/settlement/PartnerTreasuryCenter';
 import React, { useState } from 'react';
 import { useRole } from '@/lib/RoleContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -12,9 +15,10 @@ import SponsorOwnerBilateralLedger from '@/components/settlement/SponsorOwnerBil
 
 export default function SponsorTreasury() {
   const { role } = useRole();
+  const {lang}=useLanguage(); const t=partnerText(lang);
 
   // Managers see only submit tab by default
-  const defaultTab = role === 'manager' ? 'submit' : 'dashboard';
+  const defaultTab = role === 'manager' ? 'submit' : 'partners';
   const [tab, setTab] = useState(defaultTab);
 
   if (role === 'cashier') {
@@ -23,7 +27,9 @@ export default function SponsorTreasury() {
 
   return (
     <div>
-      <PageHeader title="Sponsor ↔ Owner Settlement" />
+      <PageHeader title={t.title} />
+      {role==='owner'&&<div className="mb-4"><button className="rounded-xl border px-4 py-2 font-bold" onClick={()=>setTab(tab==='partners'?'bilateral':'partners')}>{tab==='partners'?t.legacy:t.partners}</button></div>}
+      {tab==='partners'?<PartnerTreasuryCenter />:<><h2 className="mb-3 font-bold">{t.custody}</h2>
 
       <div className="mb-4 p-3 rounded-xl bg-violet-50 border border-violet-200 flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-violet-500 mt-0.5 shrink-0" />
@@ -68,7 +74,7 @@ export default function SponsorTreasury() {
         </TabsContent>
 
         <TabsContent value="bilateral">
-          <SponsorOwnerBilateralLedger />
+          <SponsorOwnerBilateralLedger legacyOnly />
         </TabsContent>
 
         <TabsContent value="dashboard">
@@ -79,6 +85,7 @@ export default function SponsorTreasury() {
           <SettlementAuditLog />
         </TabsContent>
       </Tabs>
+      </>}
     </div>
   );
 }

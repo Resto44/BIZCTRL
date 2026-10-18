@@ -93,6 +93,7 @@ const EmployeeAttendance  = lazy(() => import('@/pages/EmployeeAttendance'));
 const Payroll             = lazy(() => import('@/pages/Payroll'));
 
 const Treasury            = lazy(() => import('@/pages/Treasury'));
+const PartnerPortal = lazy(() => import('@/pages/PartnerPortal'));
 const SponsorTreasury     = lazy(() => import('@/pages/SponsorTreasury'));
 const DebtManagement      = lazy(() => import('@/pages/DebtManagement'));
 const NetworkManagement   = lazy(() => import('@/pages/NetworkManagement'));
@@ -378,7 +379,7 @@ const SubscribedRoutes = () => {
         <Route path="/erp-approval-center" element={<RoleGuard permission="manageSettings"><OwnerApprovalCenter /></RoleGuard>} />
         {/* ── Legacy role portals — redirect to new ERP dashboards ── */}
         <Route path="/employee-portal" element={<Navigate to="/employee-dashboard" replace />} />
-        <Route path="/sponsor-dashboard" element={<Navigate to="/erp-login" replace />} />
+        <Route path="/sponsor-dashboard" element={<Navigate to="/partner-portal" replace />} />
         <Route path="/customer-dashboard" element={<Navigate to="/erp-login" replace />} />
 
         {/* ── Enterprise Modules ── */}
@@ -625,6 +626,8 @@ function App() {
               <PlatformOwnerRecoveryCallbackRouter />
               <Routes>
               {/* ── NEW ERP Unified Auth (primary entry points) ── */}
+              <Route path="/sponsor-dashboard" element={<Navigate to="/partner-portal" replace />} />
+              <Route path="/partner-portal" element={<Suspense fallback={<PageLoader />}><PartnerPortal /></Suspense>} />
               <Route path="/erp-login" element={<ERPLogin />} />
               <Route path="/erp-register" element={<ERPRegister />} />
               <Route path="/platform-owner/login" element={<Suspense fallback={<PageLoader />}><PlatformOwnerLogin /></Suspense>} />

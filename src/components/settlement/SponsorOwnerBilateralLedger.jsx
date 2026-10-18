@@ -1,3 +1,4 @@
+import {partnerRows,partnerText} from '@/lib/partnerTreasury';
 import React,{useMemo,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
@@ -108,9 +109,13 @@ const labels={sponsor_advance_to_owner:'sponsorLent',owner_repay_sponsor:'ownerR
 const blank=()=>({kind:'',date:format(new Date(),'yyyy-MM-dd'),amount:'',accountId:'',paymentMethod:'cash',
   notes:'',reference:'',proofUrl:'',confirm:false});
 
-export default function SponsorOwnerBilateralLedger(){
+export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=true}){
   const {lang,currency:appCurrency}=useLanguage();
-  const t=UI[lang]||UI.en;
+  const base=UI[lang]||UI.en;
+  const pt=partnerText(lang);
+  const t=partner?{...base,title:partner.name,help:pt.help,ownerOwes:pt.ownerOwes,sponsorOwes:pt.partnerOwes,
+    sponsorLent:pt.sponsor_advance_to_owner,ownerRepaid:pt.owner_repay_sponsor,
+    ownerLent:pt.owner_advance_to_sponsor,sponsorRepaid:pt.sponsor_repay_owner}:base;
   const {role}=useRole();
   const {activeRestaurantId}=useTenant();
   const qc=useQueryClient();
@@ -124,10 +129,10 @@ export default function SponsorOwnerBilateralLedger(){
   const postingLock=useRef(false);
   const owner=role==='owner';
 
-  const {data:records=[],isLoading,isError,refetch}=useQuery({
+  const {data:allRecords=[],isLoading,isError,refetch}=useQuery({
     queryKey:['sponsor-owner-bilateral',activeRestaurantId],
     queryFn:()=>readSponsorOwnerRows(supabase,activeRestaurantId),
-    enabled:owner&&Boolean(activeRestaurantId),staleTime:30000,retry:1
+    enabled:owner&&Boolean(activeRestaurantId),staleTime:30000,retry:1,refetchInterval:15000
   });
   const {data:accounts=[],isLoading:accountLoading,isError:accountError}=useQuery({
     queryKey:['sponsor-owner-accounts',activeRestaurantId],
@@ -142,6 +147,7 @@ export default function SponsorOwnerBilateralLedger(){
     },
     enabled:owner&&Boolean(activeRestaurantId),staleTime:30000,retry:1
   });
+  const records=useMemo(()=>partner||legacyOnly?partnerRows(allRecords,partner?.id):allRecords,[allRecords,partner,legacyOnly]);
   const currencies=useMemo(()=>[...new Set([
     ...accounts.map(a=>a.currency),...records.map(r=>r.currency)
   ].filter(Boolean))].sort(),[accounts,records]);
@@ -184,14 +190,15 @@ export default function SponsorOwnerBilateralLedger(){
     if(code){setError(t[code+'Error']||t.saveFailed);return;}
     if(!form.confirm){setError(t.confirm);return;}
     const account=availableAccounts.find(a=>a.id===form.accountId);
-    if(!owner||!activeRestaurantId||!account||sponsorOwnerAccountMethod(account)!==form.paymentMethod){setError(t.accountInvalid);return;}
+    if((partner&&!partner.is_active)||!owner||!activeRestaurantId||!account||sponsorOwnerAccountMethod(account)!==form.paymentMethod){setError(t.accountInvalid);return;}
     requestId.current ||= crypto.randomUUID();
     postingLock.current=true;setBusy(true);setError('');
     try{
       const numeric=String(form.amount).trim().replace(/[٠-٩۰-۹]/g,c=>{
         const cp=c.charCodeAt(0);return String(cp>=0x06F0?cp-0x06F0:cp-0x0660);
       });
-      const {data,error:postError}=await supabase.rpc('erp_post_sponsor_owner_transaction',{
+      const {data,error:postError}=await supabase.rpc(partner?'erp_post_partner_transaction':'erp_post_sponsor_owner_transaction',{
+        ...(partner?{p_partner_id:partner.id}:{}),
         p_restaurant_id:activeRestaurantId,
         p_owner_account_id:account.id,
         p_kind:form.kind,p_amount:Number(numeric),p_date:form.date,
@@ -229,7 +236,7 @@ export default function SponsorOwnerBilateralLedger(){
           <h3 className="flex items-center gap-2 text-base font-extrabold"><Wallet className="h-5 w-5 text-indigo-600"/>{t.title}</h3>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">{t.help}</p>
         </div>
-        <Button type="button" size="sm" onClick={launch} disabled={!availableAccounts.length} className="w-full sm:w-auto">
+        <Button type="button" size="sm" onClick={launch} disabled={!availableAccounts.length||(partner&&!partner.is_active)} className="w-full sm:w-auto">
           <Plus className="me-1 h-4 w-4"/>{t.new}
         </Button>
       </div>
@@ -273,6 +280,7 @@ export default function SponsorOwnerBilateralLedger(){
               <p className="mt-1 text-[11px] text-muted-foreground">{r.effective_date} · {t.audit}</p>
               <p className="mt-1 text-xs font-semibold">{t.method}: {['cash','network'].includes(r.wallet_transaction?.payment_method)?t[r.wallet_transaction.payment_method]:t.unknownMethod}</p>
               {r.external_reference&&<p dir="auto" className="mt-1 break-words text-[11px] text-muted-foreground">{r.external_reference}</p>}
+              {partner&&(r.partner_confirmation?.confirmed_at||r.partner_confirmation?.[0]?.confirmed_at)&&<p className="mt-1 text-xs font-bold text-green-700">{pt.confirmed}</p>}
               {r.notes&&<p dir="auto" className="mt-1 break-words text-[11px] text-muted-foreground">{r.notes}</p>}
             </div>
             <div dir="ltr" className={'shrink-0 text-end text-xs font-extrabold tabular-nums '+(inward?'text-emerald-700':'text-rose-700')}>

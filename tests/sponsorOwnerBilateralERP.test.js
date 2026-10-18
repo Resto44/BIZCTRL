@@ -67,7 +67,7 @@ describe('Bilateral Sponsor-Owner ERP accounting',()=>{
   });
   it('atomic server RPC is the only posting path; client never writes or reassigns historical sponsor records',()=>{
     const ui=readFileSync(new URL('../src/components/settlement/SponsorOwnerBilateralLedger.jsx',import.meta.url),'utf8');
-    expect(ui).toContain("supabase.rpc('erp_post_sponsor_owner_transaction'");
+    expect(ui).toContain("supabase.rpc(partner?'erp_post_partner_transaction':'erp_post_sponsor_owner_transaction'");
     expect(ui).toContain("requestId.current ||= crypto.randomUUID()");
     expect(ui).not.toContain("from('sponsor_owner_transactions').insert(");
     const migration=readFileSync(new URL('../supabase/migrations/20261016184500_sponsor_owner_bilateral_erp.sql',import.meta.url),'utf8');

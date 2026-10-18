@@ -64,7 +64,7 @@ export async function readSponsorOwnerRows(db,restaurantId,{pageSize=500,maxPage
   if(!restaurantId)throw Error('RESTAURANT_REQUIRED');
   const rows=[];
   for(let p=0;p<maxPages;p++){
-    const {data,error}=await db.from('sponsor_owner_transactions').select('*, wallet_transaction:wallet_transactions!wallet_transaction_id(payment_method)')
+    const {data,error}=await db.from('sponsor_owner_transactions').select('*, wallet_transaction:wallet_transactions!wallet_transaction_id(payment_method), partner_confirmation:partner_transaction_confirmations(confirmed_at)')
       .eq('restaurant_id',restaurantId).order('effective_date',{ascending:false})
       .order('id',{ascending:false})
       .range(p*pageSize,(p+1)*pageSize-1);
