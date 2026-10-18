@@ -16,10 +16,11 @@ import {Wallet,ShieldCheck,Receipt,Plus,ArrowDownLeft,ArrowUpRight,Camera,Loader
 import {toast} from 'sonner';
 import {format} from 'date-fns';
 import {readSponsorOwnerRows,sponsorOwnerSummary,
-  validateSponsorOwnerEntry,sponsorOwnerError,SPONSOR_OWNER_KINDS} from '@/lib/sponsorOwnerBilateral';
+  validateSponsorOwnerEntry,sponsorOwnerError,SPONSOR_OWNER_KINDS,sponsorOwnerAccountMethod} from '@/lib/sponsorOwnerBilateral';
 
 const UI={
   fa:{
+    method:'روش پرداخت / دریافت',cash:'کاش / نقدی',network:'شبکه / بانک',unknownMethod:'روش ثبت نشده',noMethodAccount:'برای این روش و واحد پول، حساب فعال خزانه وجود ندارد.',
     title:'دادوگرفت سپانسر و مالک',help:'دفتر قرض و بازپرداخت دوطرفه، مستقل از پول فروشات رستورانت نزد کفیل',
     sponsorLent:'سپانسر به مالک قرض داد',ownerRepaid:'مالک به سپانسر بازپرداخت کرد',
     ownerLent:'مالک به سپانسر قرض داد',sponsorRepaid:'سپانسر به مالک بازپرداخت کرد',
@@ -46,6 +47,7 @@ const UI={
     count:'تعداد اسناد',directionIn:'دریافت',directionOut:'پرداخت'
   },
   ar:{
+    method:'طريقة الدفع / الاستلام',cash:'نقدي',network:'شبكة / بنك',unknownMethod:'الطريقة غير مسجلة',noMethodAccount:'لا يوجد حساب خزينة نشط لهذه الطريقة والعملة.',
     title:'حساب المعاملات بين الكفيل والمالك',help:'دفتر قروض وسداد متبادل مستقل عن أموال مبيعات الفروع لدى الكفيل',
     sponsorLent:'سلفة الكفيل للمالك',ownerRepaid:'سداد المالك للكفيل',
     ownerLent:'سلفة المالك للكفيل',sponsorRepaid:'سداد الكفيل للمالك',
@@ -72,6 +74,7 @@ const UI={
     count:'عدد القيود',directionIn:'استلام',directionOut:'صرف'
   },
   en:{
+    method:'Payment / receipt method',cash:'Cash',network:'Network / bank',unknownMethod:'Method not recorded',noMethodAccount:'No active treasury account for this method and currency.',
     title:'Sponsor ↔ Owner Transactions',help:'Separate bilateral advances and repayments, not branch sales held by sponsor',
     sponsorLent:'Sponsor advanced to owner',ownerRepaid:'Owner repaid sponsor',
     ownerLent:'Owner advanced to sponsor',sponsorRepaid:'Sponsor repaid owner',
@@ -102,16 +105,16 @@ const KIND_KEYS=['sponsor_advance_to_owner','owner_repay_sponsor',
   'owner_advance_to_sponsor','sponsor_repay_owner'];
 const labels={sponsor_advance_to_owner:'sponsorLent',owner_repay_sponsor:'ownerRepaid',
   owner_advance_to_sponsor:'ownerLent',sponsor_repay_owner:'sponsorRepaid'};
-const blank=()=>({kind:'',date:format(new Date(),'yyyy-MM-dd'),amount:'',accountId:'',
+const blank=()=>({kind:'',date:format(new Date(),'yyyy-MM-dd'),amount:'',accountId:'',paymentMethod:'cash',
   notes:'',reference:'',proofUrl:'',confirm:false});
 
 export default function SponsorOwnerBilateralLedger(){
-  const {lang}=useLanguage();
+  const {lang,currency:appCurrency}=useLanguage();
   const t=UI[lang]||UI.en;
   const {role}=useRole();
   const {activeRestaurantId}=useTenant();
   const qc=useQueryClient();
-  const [currency,setCurrency]=useState('');
+  const [currency,setCurrency]=useState(appCurrency||'');
   const [form,setForm]=useState(blank);
   const [open,setOpen]=useState(false);
   const [busy,setBusy]=useState(false);
@@ -144,6 +147,7 @@ export default function SponsorOwnerBilateralLedger(){
   ].filter(Boolean))].sort(),[accounts,records]);
   const currentCurrency=currencies.includes(currency)?currency:(currencies[0]||'');
   const availableAccounts=accounts.filter(a=>a.currency===currentCurrency);
+  const methodAccounts=availableAccounts.filter(a=>sponsorOwnerAccountMethod(a)===form.paymentMethod);
   const summary=useMemo(()=>sponsorOwnerSummary(records,currentCurrency),[records,currentCurrency]);
   const scopedRecords=records.filter(r=>r.currency===currentCurrency);
   const fmt=(amount,curr=currentCurrency)=>{
@@ -158,7 +162,8 @@ export default function SponsorOwnerBilateralLedger(){
     setForm(x=>({...x,[k]:v,confirm:k==='confirm'?v:false}));
   };
   const launch=()=>{
-    setForm({...blank(),accountId:availableAccounts[0]?.id||''});
+    const account=availableAccounts[0];
+    setForm({...blank(),accountId:account?.id||'',paymentMethod:sponsorOwnerAccountMethod(account)||'cash'});
     setError('');requestId.current=null;setOpen(true);
   };
   const upload=async(event)=>{
@@ -179,7 +184,7 @@ export default function SponsorOwnerBilateralLedger(){
     if(code){setError(t[code+'Error']||t.saveFailed);return;}
     if(!form.confirm){setError(t.confirm);return;}
     const account=availableAccounts.find(a=>a.id===form.accountId);
-    if(!owner||!activeRestaurantId||!account){setError(t.accountInvalid);return;}
+    if(!owner||!activeRestaurantId||!account||sponsorOwnerAccountMethod(account)!==form.paymentMethod){setError(t.accountInvalid);return;}
     requestId.current ||= crypto.randomUUID();
     postingLock.current=true;setBusy(true);setError('');
     try{
@@ -266,6 +271,7 @@ export default function SponsorOwnerBilateralLedger(){
                 {t[labels[r.kind]]||r.kind}<Badge variant="outline" className="text-[10px]">{t.posted}</Badge>
               </p>
               <p className="mt-1 text-[11px] text-muted-foreground">{r.effective_date} · {t.audit}</p>
+              <p className="mt-1 text-xs font-semibold">{t.method}: {['cash','network'].includes(r.wallet_transaction?.payment_method)?t[r.wallet_transaction.payment_method]:t.unknownMethod}</p>
               {r.external_reference&&<p dir="auto" className="mt-1 break-words text-[11px] text-muted-foreground">{r.external_reference}</p>}
               {r.notes&&<p dir="auto" className="mt-1 break-words text-[11px] text-muted-foreground">{r.notes}</p>}
             </div>
@@ -296,11 +302,21 @@ export default function SponsorOwnerBilateralLedger(){
               <Input dir="ltr" type="text" inputMode="decimal" className="mt-1 w-full min-w-0 max-w-full text-base"
                 value={form.amount} onChange={e=>edit('amount',e.target.value)} placeholder="0.00"/></div>
           </div>
+          <div><Label className="text-xs">{t.method} *</Label>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              {['cash','network'].map(method=><Button key={method} type="button" variant={form.paymentMethod===method?'default':'outline'}
+                aria-pressed={form.paymentMethod===method} disabled={busy} onClick={()=>{
+                  requestId.current=null;setError('');
+                  setForm(previous=>({...previous,paymentMethod:method,accountId:availableAccounts.find(a=>sponsorOwnerAccountMethod(a)===method)?.id||'',confirm:false}));
+                }}>{t[method]}</Button>)}
+            </div>
+            {!methodAccounts.length&&<p role="status" className="mt-2 text-xs text-amber-700">{t.noMethodAccount}</p>}
+          </div>
           <div><Label className="text-xs">{t.account} * ({currentCurrency})</Label>
             <Select value={form.accountId||undefined} onValueChange={v=>edit('accountId',v)}>
               <SelectTrigger className="mt-1 min-w-0"><SelectValue placeholder={t.account}/></SelectTrigger>
               <SelectContent className="max-w-[calc(100vw-2rem)]">
-                {availableAccounts.map(a=><SelectItem value={a.id} key={a.id}>{a.account_name} · {a.currency}</SelectItem>)}
+                {methodAccounts.map(a=><SelectItem value={a.id} key={a.id}>{a.account_name} · {a.currency}</SelectItem>)}
               </SelectContent>
             </Select><p className="mt-1 text-xs text-muted-foreground">{t.accountHelp}</p></div>
           <div><Label className="text-xs">{t.reference}</Label>
@@ -319,7 +335,7 @@ export default function SponsorOwnerBilateralLedger(){
           </label>
           {error&&<p role="alert" className="rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{error}</p>}
           <div className="sticky bottom-0 z-10 flex gap-2 border-t bg-background pt-3">
-            <Button type="button" className="min-w-0 flex-1" disabled={busy||uploading||!form.confirm} onClick={post}>
+            <Button type="button" className="min-w-0 flex-1" disabled={busy||uploading||!form.confirm||!methodAccounts.some(a=>a.id===form.accountId)} onClick={post}>
               {busy?<Loader2 className="me-1 h-4 w-4 animate-spin"/>:<Receipt className="me-1 h-4 w-4"/>}
               {busy?t.posting:t.save}
             </Button>

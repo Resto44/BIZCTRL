@@ -1,11 +1,19 @@
 import {describe,it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {sponsorOwnerSummary,validateSponsorOwnerEntry,readSponsorOwnerRows,
-  SPONSOR_OWNER_KINDS} from '../src/lib/sponsorOwnerBilateral.js';
+  SPONSOR_OWNER_KINDS,sponsorOwnerAccountMethod} from '../src/lib/sponsorOwnerBilateral.js';
 import {sponsorStatement} from '../src/lib/sponsorSettlementStatement.js';
 
 const tx=(kind,amount,currency='SAR')=>({kind,amount,currency,effective_date:'2026-10-16'});
 describe('Bilateral Sponsor-Owner ERP accounting',()=>{
+  it('classifies cash and network accounts exactly as the posting RPC does',()=>{
+    expect(sponsorOwnerAccountMethod({legacy_wallet_key:'owner_cash',account_type:'bank'})).toBe('cash');
+    expect(sponsorOwnerAccountMethod({legacy_wallet_key:'owner_network',account_type:'cash'})).toBe('network');
+    for(const account_type of ['bank','network_pos','digital_wallet','clearing']) expect(sponsorOwnerAccountMethod({account_type})).toBe('network');
+    expect(sponsorOwnerAccountMethod({account_type:'cash'})).toBe('cash');
+    expect(sponsorOwnerAccountMethod({legacy_wallet_key:'branch_cash'})).toBe(null);
+    expect(sponsorOwnerAccountMethod(null)).toBe(null);
+  });
   it('keeps each party receivable separate without netting unrelated claims',()=>{
     const rows=[tx('sponsor_advance_to_owner','500.00'),
       tx('owner_repay_sponsor','120.00'),tx('owner_advance_to_sponsor','700.00'),
