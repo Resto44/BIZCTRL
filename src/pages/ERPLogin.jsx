@@ -1,3 +1,5 @@
+import {useLanguage} from '@/lib/LanguageContext';
+import {partnerText} from '@/lib/partnerTreasury';
 import HelpLink from '@/components/help/HelpLink';
 import BrandLogo from '@/components/BrandLogo';
 import React, { useState, useEffect } from 'react';
@@ -59,6 +61,7 @@ const ROLE_CONFIG = [
 
 export default function ERPLogin() {
   const navigate = useNavigate();
+  const {lang}=useLanguage(); const partnerLabels=partnerText(lang);
   const [searchParams] = useSearchParams();
   const postAuthenticationDestination = safeInternalReturnTo(searchParams.get('returnTo') || searchParams.get('next'), '');
   const ownerRegistrationPath = `/erp-register?owner=1${postAuthenticationDestination ? `&returnTo=${encodeURIComponent(postAuthenticationDestination)}` : ''}`;
@@ -87,6 +90,9 @@ export default function ERPLogin() {
           if (!error && context?.role) {
             const home = context.home_path || ROLE_HOME[context.role] || '/owner-command-center';
             navigate(postAuthenticationDestination || home, { replace: true });
+          } else {
+            const {data:partners}=await supabase.rpc('erp_partner_portal_accounts');
+            if(partners?.length) navigate('/partner-portal',{replace:true});
           }
         } catch {}
       }
@@ -119,6 +125,8 @@ export default function ERPLogin() {
       const { data: context, error: contextError } = await supabase.rpc('erp_get_session_context');
 
       if (contextError || !context) {
+        const {data:partners}=await supabase.rpc('erp_partner_portal_accounts');
+        if(partners?.length){navigate('/partner-portal',{replace:true});return;}
         const { data: mem } = await supabase
           .from('erp_memberships')
           .select('status, role')
@@ -197,6 +205,7 @@ export default function ERPLogin() {
 
         {step === 'role' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button type="button" className="rounded-2xl border border-blue-500/40 bg-blue-500/10 p-4 text-start font-bold text-blue-200" onClick={()=>navigate('/partner-portal')}>{partnerLabels.portal}</button>
             {ROLE_CONFIG.map((rc) => {
               const Icon = rc.icon;
               return (
