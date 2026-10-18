@@ -2,6 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App.jsx';
 import '@/index.css';
+import {recoverModuleLoad} from '@/lib/moduleLoadRecovery';
+
+window.addEventListener('vite:preloadError', event => {
+  if (recoverModuleLoad(event.payload)) event.preventDefault();
+});
 
 class GlobalErrorBoundary extends React.Component {
   constructor(props) {
@@ -12,6 +17,7 @@ class GlobalErrorBoundary extends React.Component {
     return { hasError: true, error };
   }
   componentDidCatch(error, info) {
+    if (recoverModuleLoad(error)) return;
     console.error('[GlobalErrorBoundary]', error, info);
   }
   render() {
@@ -23,7 +29,7 @@ class GlobalErrorBoundary extends React.Component {
             {this.state.error?.message || 'An unexpected error occurred.'}
           </p>
           <button
-            onClick={() => { this.setState({ hasError: false, error: null }); window.location.href = '/'; }}
+            onClick={() => window.location.reload()}
             style={{ padding: '0.5rem 1.5rem', background: '#1d4ed8', color: '#fff', borderRadius: '0.5rem', border: 'none', cursor: 'pointer', fontWeight: 600 }}
           >
             Reload App
