@@ -308,12 +308,19 @@ function createEntity(tableName) {
 const auth = {
   async me() {
     try {
-      const { data: { user }, error } = await supabase.auth.getUser();
+      // These independent server checks used to run in sequence, making every
+      // portal entry wait for two full network round trips. Run them together.
+      // A session is accepted ONLY when both a verified auth user and the
+      // membership-authorized server RPC succeed — never trust browser metadata.
+      const [verifiedUserResult, contextResult] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.rpc('erp_get_session_context'),
+      ]);
+      const { data: { user } = {}, error } = verifiedUserResult || {};
       if (error || !user) return null;
-      // The database membership is the only authority for role, tenant, branch,
-      // status and permissions. auth.user_metadata is deliberately not used for
-      // authorization because users can edit it themselves.
-      const { data: sessionContext, error: contextError } = await supabase.rpc('erp_get_session_context');
+      // The DB membership remains the sole authority for role, tenant, branch,
+      // account status and effective permissions. No client-side role fallback.
+      const { data: sessionContext, error: contextError } = contextResult || {};
       if (contextError || !sessionContext) {
         if (contextError) console.warn('[auth.me] ERP session rejected:', contextError.message);
         return null;
