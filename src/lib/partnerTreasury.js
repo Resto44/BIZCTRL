@@ -1,5 +1,9 @@
 // Display preferences never grant permissions or alter financial balances.
 const messages = {
+ copyLink: ['Copy link','نسخ الرابط','کاپی لینک'],
+ shareLink: ['Share','مشاركة','اشتراک‌گذاری'],
+ copied: ['Link copied.','تم نسخ الرابط.','لینک کاپی شد.'],
+ copyManually: ['Automatic copying is unavailable. The full link is selected; press and hold it and choose Copy.','تعذر النسخ التلقائي. تم تحديد الرابط كاملًا؛ اضغط مطولًا واختر نسخ.','کاپی خودکار ممکن نشد. تمام لینک انتخاب شده؛ روی آن نگه دار و کاپی را انتخاب کن.'],
  title: ['Partner Treasury','خزينة الشركاء','خزانه شریک‌ها'],
  portal: ['Partner dashboard','لوحة الشريك','داشبورد شریک'],
  partners: ['Partners','الشركاء','شریک‌ها'],

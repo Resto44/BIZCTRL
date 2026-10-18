@@ -5,6 +5,7 @@ import {useTenant} from '@/lib/TenantContext';
 import {useRole} from '@/lib/RoleContext';
 import {useLanguage} from '@/lib/LanguageContext';
 import {partnerText,partnerError} from '@/lib/partnerTreasury';
+import PartnerInvitationLink from './PartnerInvitationLink';
 import SponsorOwnerBilateralLedger from './SponsorOwnerBilateralLedger';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -59,7 +60,7 @@ export default function PartnerTreasuryCenter(){
     <div className="flex gap-2"><Button type="submit" disabled={busy}>{busy?t.loading:t.save}</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>{setForm(null);setError('');}}>{t.cancel}</Button></div>
    </form>}
    {error&&<p role="alert" className="text-sm text-red-600">{error}</p>}
-   {invitation&&<div role="status" className="space-y-2 rounded-xl border border-green-300 p-3"><p className="text-sm">{t.inviteHelp}</p><Input aria-label={t.invite} dir="ltr" readOnly value={invitation} onFocus={e=>e.target.select()}/></div>}
+   {invitation&&<PartnerInvitationLink key={invitation} invitation={invitation} t={t}/>}
   </Card>
   {partner&&<SponsorOwnerBilateralLedger key={`${activeRestaurantId}:${partner.id}`} partner={partner}/>}
  </section>;
