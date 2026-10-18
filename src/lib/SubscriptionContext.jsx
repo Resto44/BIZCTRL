@@ -62,15 +62,15 @@ export function SubscriptionProvider({ children }) {
     if (!summaryRef.current?.found) setLoading(true);
     setError(null);
     try {
-      const [snapshotResult, planResult] = await Promise.all([
-        supabase.rpc('erp_subscription_snapshot'),
-        supabase
+      // Start the catalog alongside authorization, but do not let billing
+      // metadata or payment history delay entry to an authorized portal.
+      const planRequest = Promise.resolve(supabase
           .from('subscription_plans')
           .select('id, display_name, monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label, trial_days, billing_period_months, billing_product_key, paddle_price_id, max_restaurants, max_branches, max_employees, max_users, max_storage_mb, max_pdf_exports, max_ocr_scans, advanced_analytics, feature_flags, sort_order')
           .eq('is_active', true)
           .eq('is_public', true)
-          .order('sort_order'),
-      ]);
+          .order('sort_order')).catch(error => ({ data: [], error }));
+      const snapshotResult = await supabase.rpc('erp_subscription_snapshot');
 
       if (snapshotResult.error) throw snapshotResult.error;
 
@@ -78,7 +78,10 @@ export function SubscriptionProvider({ children }) {
       // Otherwise an already active ERP user is switched to the paywall while
       // Billing is still mounted, which presents as a flash/reload.
       const nextSummary = { ...EMPTY_SUMMARY, ...(snapshotResult.data || {}) };
+      summaryRef.current = nextSummary;
       setSummary(nextSummary);
+      setLoading(false);
+      const planResult = await planRequest;
       setPlans(planResult.data || []);
       if (planResult.error) setError(normalizeError(planResult.error));
 

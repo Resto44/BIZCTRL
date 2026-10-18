@@ -14,6 +14,22 @@ async function mount(){await act(async()=>{tree=create(<MemoryRouter><AuthProvid
 beforeEach(()=>{mocks.me.mockReset();snapshot=null;});
 afterEach(()=>{if(tree)act(()=>tree.unmount());});
 describe('portal auth lifecycle',()=>{
+ it('defers auth SDK work outside the auth callback and cancels queued refresh on signout',async()=>{
+  vi.useFakeTimers();
+  try {
+   mocks.me.mockResolvedValue({id:'user'});await mount();
+   const initialCalls=mocks.me.mock.calls.length;
+   await act(async()=>mocks.listener('SIGNED_IN',{user:{id:'user'}}));
+   expect(mocks.me).toHaveBeenCalledTimes(initialCalls);
+   await act(async()=>vi.advanceTimersByTimeAsync(0));
+   expect(mocks.me).toHaveBeenCalledTimes(initialCalls+1);
+   await act(async()=>mocks.listener('TOKEN_REFRESHED',{user:{id:'user'}}));
+   await act(async()=>mocks.listener('SIGNED_OUT',null));
+   await act(async()=>vi.advanceTimersByTimeAsync(0));
+   expect(mocks.me).toHaveBeenCalledTimes(initialCalls+1);
+   expect(snapshot.isAuthenticated).toBe(false);
+  } finally {vi.useRealTimers();}
+ });
  it('does not resurrect a user when a slow lookup resolves after signout',async()=>{
   let resolve;mocks.me.mockReturnValue(new Promise(r=>{resolve=r;}));await mount();
   await act(async()=>mocks.listener('SIGNED_OUT',null));
