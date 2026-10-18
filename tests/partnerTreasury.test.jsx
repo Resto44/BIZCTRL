@@ -56,3 +56,11 @@ describe('partner treasury isolation and portal',()=>{
   expect(readPartnerPreferences('b')).toEqual({title:'',showBalances:true,compact:false});
  });
 });
+
+it('navigates reports, transaction filters and account customization',async()=>{
+ await mount();const t=partnerText('fa');
+ const nav=label=>[...host.querySelectorAll('nav button')].find(b=>b.textContent===label);
+ await act(async()=>nav(t.reports).click());expect(host.textContent).toContain(t.balanceTrend);expect(host.textContent).toContain(t.distribution);
+ await act(async()=>nav(t.records).click());expect(host.querySelector('input[placeholder]')).not.toBeNull();
+ await act(async()=>nav(t.account).click());expect(host.textContent).toContain(t.customize);
+});
