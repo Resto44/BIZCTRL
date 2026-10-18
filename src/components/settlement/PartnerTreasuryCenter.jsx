@@ -45,11 +45,9 @@ export default function PartnerTreasuryCenter(){
   }catch(e){setError(partnerError(e,t));}finally{lock.current=false;setBusy(false);}
  };
  if(role!=='owner')return null;
- return <section className="space-y-4" dir={lang==='en'?'ltr':'rtl'}>
-  <PeopleCustodySummary tenant={activeRestaurantId} t={t}/>
-  <PeopleMemberships tenant={activeRestaurantId} t={t} branches={branches.data||[]}/>
-  <Card className="space-y-3 p-4">
-   <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-bold">{t.partners}</h2>
+ return <section className="mx-auto max-w-6xl min-w-0 space-y-4 pb-20" dir={lang==='en'?'ltr':'rtl'}>
+  <Card className="min-w-0 space-y-3 rounded-[24px] border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+   <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-black text-slate-950 sm:text-xl">{t.title}</h2><p className="mt-1 text-xs text-slate-600">{t.partners}</p></div>
     <Button onClick={()=>{setError('');setInvitation('');setForm({...newPersonPermissions(),id:crypto.randomUUID(),name:'',email:'',is_active:true,invite:true,isNew:true});}}>{t.add}</Button></div>
    <p className="text-sm text-muted-foreground">{t.help}</p>
    {isLoading?<p>{t.loading}</p>:isError?<div role="alert">{t.failed} <Button onClick={()=>refetch()}>{t.refresh}</Button></div>:
@@ -71,9 +69,11 @@ export default function PartnerTreasuryCenter(){
    {error&&<p role="alert" className="text-sm text-red-600">{error}</p>}
    {invitation&&<PartnerInvitationLink key={invitation} invitation={invitation} t={t}/>}
   </Card>
+  {partner&&<SponsorOwnerBilateralLedger key={`${activeRestaurantId}:${partner.id}`} partner={partner}/>}
+  <PeopleCustodySummary tenant={activeRestaurantId} t={t}/>
+  <PeopleMemberships tenant={activeRestaurantId} t={t} branches={branches.data||[]}/>
   {partner&&<PartnerTransactionRequests key={`custody:${activeRestaurantId}:${partner.id}`} partner={partner} t={t} owner custody/>}
   {partner&&<PartnerTransactionRequests key={`requests:${activeRestaurantId}:${partner.id}`} partner={partner} t={t} owner/>}
   <p className="rounded-xl border p-3 text-xs text-muted-foreground">{t.scopeNote}</p>
-  {partner&&<SponsorOwnerBilateralLedger key={`${activeRestaurantId}:${partner.id}`} partner={partner}/>}
  </section>;
 }
