@@ -2,6 +2,37 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import path from 'path'
 
+const vendorGroups = {
+  // Core React runtime
+  'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+  // Data fetching
+  'vendor-query': ['@tanstack/react-query'],
+  // Supabase
+  'vendor-supabase': ['@supabase/supabase-js'],
+  // Charts
+  'vendor-charts': ['recharts'],
+  // Date utilities
+  'vendor-date': ['date-fns'],
+  // PDF generation
+  'vendor-pdf': ['jspdf', 'html2canvas'],
+  // UI primitives (Radix)
+  'vendor-radix': [
+    '@radix-ui/react-dialog',
+    '@radix-ui/react-select',
+    '@radix-ui/react-tabs',
+    '@radix-ui/react-alert-dialog',
+    '@radix-ui/react-label',
+    '@radix-ui/react-switch',
+    '@radix-ui/react-tooltip',
+    '@radix-ui/react-popover',
+    '@radix-ui/react-progress',
+    '@radix-ui/react-separator',
+    '@radix-ui/react-slider',
+    '@radix-ui/react-toast',
+    '@radix-ui/react-toggle',
+  ],
+};
+
 // https://vite.dev/config/
 export default defineConfig(async ({ command }) => {
   // The Base44 development hooks can block Vite before it opens a local port
@@ -40,35 +71,14 @@ export default defineConfig(async ({ command }) => {
           chunkFileNames: 'assets/[name]-[hash].js',
           entryFileNames: 'assets/[name]-[hash].js',
           assetFileNames: 'assets/[name]-[hash].[ext]',
-          manualChunks: {
-            // Core React runtime
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            // Data fetching
-            'vendor-query': ['@tanstack/react-query'],
-            // Supabase
-            'vendor-supabase': ['@supabase/supabase-js'],
-            // Charts
-            'vendor-charts': ['recharts'],
-            // Date utilities
-            'vendor-date': ['date-fns'],
-            // PDF generation
-            'vendor-pdf': ['jspdf', 'html2canvas'],
-            // UI primitives (Radix)
-            'vendor-radix': [
-              '@radix-ui/react-dialog',
-              '@radix-ui/react-select',
-              '@radix-ui/react-tabs',
-              '@radix-ui/react-alert-dialog',
-              '@radix-ui/react-label',
-              '@radix-ui/react-switch',
-              '@radix-ui/react-tooltip',
-              '@radix-ui/react-popover',
-              '@radix-ui/react-progress',
-              '@radix-ui/react-separator',
-              '@radix-ui/react-slider',
-              '@radix-ui/react-toast',
-              '@radix-ui/react-toggle',
-            ],
+          // Do not pull shared helpers into PDF/chart vendors and force those
+          // optional libraries onto the initial portal dependency graph.
+          onlyExplicitManualChunks: false,
+          manualChunks(id) {
+            if (id.includes('vite/preload-helper') || id.includes('commonjsHelpers') || id.includes('/node_modules/@babel/runtime/') || id.includes('/node_modules/clsx/') || id.includes('/node_modules/fflate/')) return 'vendor-runtime';
+            for (const [name, packages] of Object.entries(vendorGroups)) {
+              if (packages.some(pkg => id.includes(`/node_modules/${pkg}/`))) return name;
+            }
           },
         },
       },

@@ -20,12 +20,14 @@ describe('Retail POS Control Center contract', () => {
     expect(sidebar).toContain('supermarketOnly: true');
   });
 
-  it('keeps all four POS pages navigation-safe inside one authenticated shell bundle', async () => {
+  it('loads all four POS control pages together without blocking other portals', async () => {
     const app = await source('../src/App.jsx');
+    const bundle = await source('../src/pages/retail/pos/controlRoutes.js');
     for (const page of ['POSExecutiveDashboard', 'POSBranchDevices', 'POSTerminalAccount', 'POSAuditCenter']) {
-      expect(app).toContain(`import ${page} from '@/pages/retail/pos/${page}'`);
-      expect(app).not.toContain(`const ${page} = lazy(`);
+      expect(bundle).toContain(`export { default as ${page} } from './${page}'`);
+      expect(app).toContain(`const ${page} = lazy(() => loadRetailControl()`);
     }
+    expect(app).toContain("retailControlModule ||= import('@/pages/retail/pos/controlRoutes')");
     expect(app).toContain("import RetailPOSPortalGuard from '@/components/retail-pos/RetailPOSPortalGuard'");
     expect(app).not.toContain('const RetailPOSPortalGuard  = lazy(');
     expect(app).toContain('onClick={() => window.location.reload()}');
