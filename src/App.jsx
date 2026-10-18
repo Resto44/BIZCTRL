@@ -1,4 +1,5 @@
 import React, { lazy, Suspense } from 'react';
+import {recoverModuleLoad} from '@/lib/moduleLoadRecovery';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -166,6 +167,7 @@ class RouteErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
   componentDidCatch(error, info) {
+    if (recoverModuleLoad(error)) return;
     console.error('[RouteErrorBoundary]', error, info);
     try {
       sessionStorage.setItem('bizctrl:last-route-error', JSON.stringify({
