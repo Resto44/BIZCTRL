@@ -94,10 +94,13 @@ export default function Inventory() {
         throw new Error('Stock values cannot be negative');
       }
       
-      const res = editing 
-        ? await base44.entities.Inventory.update(editing.id, data) 
+      // Live stock rows include computed display-only fields. Never send them
+      // to the inventory table during an opening-balance reconciliation.
+      const { purchasedQty, wastedQty, currentStock, isLow, ...record } = data;
+      const res = editing
+        ? await base44.entities.Inventory.update(editing.id, record)
         : await base44.entities.Inventory.create({
-          ...data,
+          ...record,
           restaurant_id: activeRestaurant?.id,
           branch_id: data.branch_id || (selectedBranchId === 'all' ? null : selectedBranchId),
         });
