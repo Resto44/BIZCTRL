@@ -19,8 +19,9 @@ describe('populated sponsor treasury ledger', () => {
   it.each(['en','ar','fa'])('renders all four transaction directions in %s without crashing', lang => {
     state.lang = lang;
     const html = renderToStaticMarkup(<SponsorOwnerBilateralLedger />);
-    expect(html.match(/lucide-arrow-down-left/g)).toHaveLength(2);
-    expect(html.match(/lucide-arrow-up-right/g)).toHaveLength(2);
+    // Four detailed-balance visual cues plus four posted-entry visual cues.
+    expect(html.match(/lucide-arrow-down-left/g)).toHaveLength(4);
+    expect(html.match(/lucide-arrow-up-right/g)).toHaveLength(4);
     expect(html).toContain('2026-10-18');
     expect(html).toContain('SAR');
     expect(html).toContain(lang==='ar'?'نقدي':lang==='fa'?'کاش / نقدی':'Cash');
