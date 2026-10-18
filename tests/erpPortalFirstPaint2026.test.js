@@ -30,7 +30,7 @@ describe('Enterprise portal first paint without prematurely granting access',()=
     expect(manager).toContain('const grossProfitLoading = loadingSales || loadingPurchases;');
     expect(manager).toContain('const netProfitLoading = grossProfitLoading || loadingExpenses;');
     expect(manager).toContain('loading={netProfitLoading}');
-    expect(manager).toContain('loading={loadingTreasury}');
+    expect(manager).toContain('loadingTreasury ? <Skeleton');
     expect(manager).toContain('salesTrendLoading ? <Skeleton');
     expect(manager).toContain('recentActivityLoading ? <Skeleton');
   });
