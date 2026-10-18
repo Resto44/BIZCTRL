@@ -2,21 +2,13 @@ import React from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
 import {Wallet,Clock3} from 'lucide-react';
+import {readCashCustodyAndPending} from '@/lib/walletPersonPresentation';
 
 /**
  * Wallet presentation is read-only. Custody is business money actually held
  * by the person; it MUST NOT be merged into the person's loan balance.
  * Pending is a count (not a monetary balance).
  */
-export function readCashCustodyAndPending(snapshot, currency) {
-  if (!snapshot || !Array.isArray(snapshot.balances)) return null;
-  const cash = snapshot.balances.filter(x=>x.currency===currency&&x.payment_method==='cash');
-  const pending = snapshot.balances.filter(x=>x.currency===currency);
-  return {
-    cash:cash.reduce((sum,x)=>sum+Number(x.held||0),0),
-    pending:pending.reduce((sum,x)=>sum+Number(x.pending||0),0),
-  };
-}
 export default function WalletPersonCustodyCards({partner, currency,lang='en'}){
   const t={
     en:{cash:'Cash in custody',pending:'Pending custody approvals',note:'Custody is separate from personal debts',unit:'requests',error:'Unable to load custody',retry:'Retry'},
