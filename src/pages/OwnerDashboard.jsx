@@ -272,7 +272,7 @@ function OwnerDashboardContent() {
   const productsQuery = useQuery({ queryKey: ['products', activeRestaurant?.id], queryFn: () => base44.entities.Product.filter({ restaurant_id: activeRestaurant.id }, 'name', 5000), staleTime: 60000, enabled });
   const inventoryTransactionsQuery = useQuery({ queryKey: ['inventory_transactions_report', activeRestaurant?.id, selectedBranchId, period.currentStartIso, period.currentEndIso], queryFn: fetchInventoryTransactions, staleTime: 15000, enabled });
   const priceHistoryQuery = useQuery({
-    queryKey: ['product_price_history', createdBy, selectedBranchId, period.currentStartIso, period.currentEndIso],
+    queryKey: ['product_price_history', activeRestaurant?.id, selectedBranchId, period.currentStartIso, period.currentEndIso],
     queryFn: async () => {
       if (!createdBy) return [];
       let query = supabase.from('product_price_history').select('*').eq('created_by', createdBy).gte('recorded_at', period.currentStartIso).lte('recorded_at', period.currentEndIso).order('recorded_at', { ascending: false }).limit(5000);

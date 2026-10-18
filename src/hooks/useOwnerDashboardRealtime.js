@@ -1,95 +1,25 @@
-/**
- * useOwnerDashboardRealtime
- *
- * Enterprise Real-Time synchronization for the Owner Dashboard.
- *
- * Architecture:
- *   • One Supabase Realtime channel per restaurant (scoped by restaurant_id filter).
- *   • All 26 ERP tables are subscribed in a single channel to minimise connection
- *     overhead and avoid duplicate subscriptions.
- *   • On any INSERT / UPDATE / DELETE the hook:
- *       1. Invalidates only the affected React Query cache keys.
- *       2. Appends a live event to the activity feed (capped at MAX_FEED_EVENTS).
- *   • The channel is created once when restaurantId is available and torn down
- *     on unmount or restaurantId change — no memory leaks.
- *   • Duplicate-subscription guard: the channel name encodes the restaurantId so
- *     React StrictMode double-invocations are safe (Supabase deduplicates by name).
- *
- * Usage:
- *   const { liveEvents, realtimeStatus } = useOwnerDashboardRealtime(restaurantId, branches);
- */
-
+/** Tenant-scoped dashboard updates with reconnect and polling recovery. */
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 
-// ─── Table → Query Key mapping ────────────────────────────────────────────────
-// Each entry maps a Postgres table name to the React Query prefixes that should
-// be invalidated when that table changes.  Prefixes are matched with
-// queryClient.invalidateQueries({ queryKey: [prefix], exact: false }).
-const TABLE_QUERY_MAP = {
-  // Sales
-  // BUG FIX: also invalidate 'sales' (history list) and 'sales_today_live' so that
-  // manager-created records immediately appear in Owner History and Live Summary.
-  daily_sales:            ['sales_today', 'sales_yesterday', 'sales_week', 'sales_month', 'sales_year', 'sales_prev_week', 'sales_prev_month', 'sales', 'sales_today_live', 'sales_yesterday_live', 'sales_month_live', 'mgr-today-sales', 'mgr-yesterday-sales', 'driver-performance', 'driver-sales', 'bi_sales', 'bm_sales'],
-  sales_invoices:         ['sales_invoices_today'],
-  sales_sources:          ['sales_sources'],
-  sales_categories:       ['sales_categories'],
-
-  // Purchases
-  // BUG FIX: also invalidate 'supplier_invoices' history list key
-  purchases:              ['purchases_week', 'purchases_month'],
-  supplier_invoices:      ['supplier_invoices', 'purchases', 'purchases_erp', 'product_price_history', 'bi_purchases', 'bm_purchases', 'mgr-today-purchases', 'mgr-pending-invoices'],
-  purchase_orders:        ['purchase_orders', 'mgr-pending-pos'],
-
-  // Expenses
-  // BUG FIX: also invalidate 'expenses' history list key and manager expense key
-  expenses:               ['expenses_today', 'expenses_yesterday', 'expenses_week', 'expenses_month', 'expenses_year', 'expenses_prev_month', 'expenses', 'bi_expenses', 'bm_expenses', 'mgr-today-expenses'],
-  expense_categories:     ['expense_categories_dash'],
-
-  // Products & Inventory
-  products:               ['products'],
-  product_categories:     ['product_categories'],
-  inventory:              ['inventory', 'inventory_dash'],
-  inventory_transfers:    ['inventory_dash'],
-  inventory_transactions: ['inventory_dash', 'inventory_transactions_report'],
-  inventory_waste:        ['inventory_dash'],
-
-  // Suppliers & Customers
-  suppliers:              ['suppliers'],
-  customers:              ['customers'],
-  debt_records:           ['debts_customer_dash'],
-  debt_payments:          ['debts_customer_dash'],
-  customer_collections:   ['debts_customer_dash'],
-
-  // Treasury / Cash
-  wallet_transactions:    ['wallet_transactions', 'wallet_transactions_dash'],
-  cash_movements:         ['cash_movements'],
-  cash_register_entries:  ['cash_register_entries'],
-  daily_cash_settlements: ['daily_cash_settlements'],
-  owner_cash_injections:  ['owner_cash_injections'],
-
-  // Network / POS
-  network_accounts:       ['network_accounts_dash'],
-  network_transfers:      ['network_accounts_dash'],
-
-  // Driver records remain managed through canonical Daily Sales attribution.
-  drivers:                ['drivers', 'driver-performance', 'driver-sales'],
-
-  // HR
-  employees:              ['employees'],
-  payroll_runs:           ['payroll_runs'],
-  attendance:             ['attendance'],
-  staff_attendance:       ['attendance'],
-
-  // Branches & Restaurants
-  branches:               ['branches'],
-  restaurants:            ['restaurants'],
-
-  // Notifications and canonical persisted Active Alerts
-  notifications:          ['notifications', 'active-alerts'],
-  active_alerts:          ['active-alerts'],
+// These prefixes match the current OwnerDashboard queries, not legacy cards.
+export const OWNER_DASHBOARD_TABLE_QUERIES = {
+  daily_sales: ['sales_report_period', 'sales_report_previous_period'],
+  supplier_invoices: ['supplier_invoices'],
+  expenses: ['expenses_report_period', 'expenses_report_previous_period', 'expenses_report_fixed_pool', 'expenses_report_previous_fixed_pool'],
+  expense_categories: ['expense_categories_dash'],
+  products: ['products'],
+  inventory: ['inventory_dash'],
+  inventory_transactions: ['inventory_transactions_report', 'inventory_dash'],
+  product_price_history: ['product_price_history'],
+  debt_records: ['debts_customer_dash'],
+  wallet_transactions: ['wallet_transactions_dash'],
+  branches: ['branches'],
 };
+const TABLE_QUERY_MAP = OWNER_DASHBOARD_TABLE_QUERIES;
+const DASHBOARD_KEYS = new Set(Object.values(TABLE_QUERY_MAP).flat());
+let channelSequence = 0;
 
 // ─── Human-readable event labels ─────────────────────────────────────────────
 const TABLE_LABELS = {
@@ -176,7 +106,6 @@ function buildEvent(table, eventType, record, branches) {
 // ─── Main hook ────────────────────────────────────────────────────────────────
 export function useOwnerDashboardRealtime(restaurantId, branches = []) {
   const qc = useQueryClient();
-  const channelRef  = useRef(null);
   const branchesRef = useRef(branches);
   const [liveEvents, setLiveEvents]       = useState([]);
   const [realtimeStatus, setRealtimeStatus] = useState('CONNECTING');
@@ -191,25 +120,31 @@ export function useOwnerDashboardRealtime(restaurantId, branches = []) {
     // 1. Invalidate affected query keys
     const keys = TABLE_QUERY_MAP[table] || [];
     keys.forEach(prefix => {
-      qc.invalidateQueries({ queryKey: [prefix], exact: false });
+      qc.invalidateQueries({ queryKey: [prefix, restaurantId], exact: false });
     });
 
     // 2. Append to live activity feed
     const event = buildEvent(table, eventType, record, branchesRef.current);
     setLiveEvents(prev => [event, ...prev].slice(0, MAX_FEED_EVENTS));
-  }, [qc]);
+  }, [qc, restaurantId]);
 
   // ── Channel lifecycle ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!restaurantId) return;
 
-    // Tear down any previous channel
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
-
-    const channelName = `owner-dashboard-rt-${restaurantId}`;
+    let disposed = false;
+    setLiveEvents([]);
+    setRealtimeStatus('CONNECTING');
+    const refreshDashboard = () => {
+      if (disposed || document.visibilityState === 'hidden') return;
+      qc.invalidateQueries({
+        predicate: query => DASHBOARD_KEYS.has(query.queryKey[0]) && query.queryKey[1] === restaurantId,
+        refetchType: 'active',
+      });
+    };
+    // A distinct channel per effect prevents adding handlers to an already
+    // subscribed channel during StrictMode or cached workspace tab mounts.
+    const channelName = `owner-dashboard-rt-${restaurantId}-${++channelSequence}`;
     let channel = supabase.channel(channelName);
 
     // Subscribe all tables in a single channel
@@ -223,31 +158,37 @@ export function useOwnerDashboardRealtime(restaurantId, branches = []) {
           filter: `restaurant_id=eq.${restaurantId}`,
         },
         (payload) => {
-          const record = payload.new || payload.old || {};
+          if (disposed) return;
+          const record = payload.eventType === 'DELETE' ? (payload.old || {}) : (payload.new || {});
           handleChange(table, payload.eventType, record);
         },
       );
     });
 
     channel.subscribe((status) => {
+      if (disposed) return;
       setRealtimeStatus(status);
       if (status === 'SUBSCRIBED') {
+        refreshDashboard();
         globalThis.console?.info(`[useOwnerDashboardRealtime] Subscribed to ${Object.keys(TABLE_QUERY_MAP).length} tables for restaurant ${restaurantId}`);
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         globalThis.console?.warn(`[useOwnerDashboardRealtime] Channel status: ${status}`);
       }
     });
 
-    channelRef.current = channel;
-
+    // Filtered DELETE events, interrupted sockets and mobile backgrounding can
+    // miss events. Re-fetch active tenant queries without remounting the page.
+    const timer = setInterval(refreshDashboard, 15000);
+    document.addEventListener('visibilitychange', refreshDashboard);
+    window.addEventListener('online', refreshDashboard);
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-      setRealtimeStatus('CLOSED');
+      disposed = true;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshDashboard);
+      window.removeEventListener('online', refreshDashboard);
+      supabase.removeChannel(channel);
     };
-  }, [restaurantId, handleChange]);
+  }, [restaurantId, handleChange, qc]);
 
   return { liveEvents, realtimeStatus };
 }
