@@ -332,8 +332,12 @@ function ManagerContent({ branchId, branchName, branchKey }) {
 
   if (todaySalesError || yesterdaySalesError || todayPurchasesError || todayExpensesError || inventoryError || pendingPOsError || pendingInvoicesError || treasuryError || recentActivityError || salesTrendError) return <PortalDataState onRetry={() => { retryTodaySales(); retryYesterdaySales(); retryTodayPurchases(); retryTodayExpenses(); retryInventory(); retryPendingPOs(); retryPendingInvoices(); retryTreasury(); retryRecentActivity(); retrySalesTrend(); }}/>;
 
-  if (loadingSales || loadingPurchases || loadingExpenses || loadingInventory || loadingPOs || loadingInvoices || loadingTreasury || yesterdaySalesLoading || recentActivityLoading || salesTrendLoading) return <PortalDataState loading/>;
-  const loading = false;
+  // Do not let inventory, treasury, audit history or 7-day trends block the
+  // manager's entire workspace. Each widget renders its own loading state.
+  // Finance amounts remain skeletons until *their own* verified queries finish.
+  const salesKpiLoading = loadingSales || yesterdaySalesLoading;
+  const grossProfitLoading = loadingSales || loadingPurchases;
+  const netProfitLoading = grossProfitLoading || loadingExpenses;
 
   return (
     <div className="space-y-6">
@@ -358,19 +362,19 @@ function ManagerContent({ branchId, branchName, branchKey }) {
       <div>
         <SectionHeader title="Today's Performance" icon={BarChart3} />
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KPICard label="Today's Sales"   value={formatCurrency(kpis.todayTotal)}  icon={TrendingUp}  colorClass="text-primary"     bgClass="bg-primary/10"     trend={kpis.salesTrendPct} loading={loading} />
-          <KPICard label="Cash sales today"    value={formatCurrency(kpis.cashTotal)}   icon={Banknote}    colorClass="text-green-600"   bgClass="bg-green-500/10"   loading={loading} />
-          <KPICard label="Network sales today"     value={formatCurrency(kpis.posTotal)}    icon={CreditCard}  colorClass="text-blue-600"    bgClass="bg-blue-500/10"    loading={loading} />
-          <KPICard label="Credit Sales"    value={formatCurrency(kpis.creditTotal)} icon={Receipt}     colorClass="text-amber-600"   bgClass="bg-amber-500/10"   loading={loading} />
-          <KPICard label="Purchases Today" value={formatCurrency(kpis.purchTotal)}  icon={ShoppingCart} colorClass="text-orange-600" bgClass="bg-orange-500/10"  loading={loading} />
-          <KPICard label="Expenses Today"  value={formatCurrency(kpis.expTotal)}    icon={DollarSign}  colorClass="text-red-600"     bgClass="bg-red-500/10"     loading={loading} />
+          <KPICard label="Today's Sales"   value={formatCurrency(kpis.todayTotal)}  icon={TrendingUp}  colorClass="text-primary"     bgClass="bg-primary/10"     trend={kpis.salesTrendPct} loading={salesKpiLoading} />
+          <KPICard label="Cash sales today"    value={formatCurrency(kpis.cashTotal)}   icon={Banknote}    colorClass="text-green-600"   bgClass="bg-green-500/10"   loading={loadingSales} />
+          <KPICard label="Network sales today"     value={formatCurrency(kpis.posTotal)}    icon={CreditCard}  colorClass="text-blue-600"    bgClass="bg-blue-500/10"    loading={loadingSales} />
+          <KPICard label="Credit Sales"    value={formatCurrency(kpis.creditTotal)} icon={Receipt}     colorClass="text-amber-600"   bgClass="bg-amber-500/10"   loading={loadingSales} />
+          <KPICard label="Purchases Today" value={formatCurrency(kpis.purchTotal)}  icon={ShoppingCart} colorClass="text-orange-600" bgClass="bg-orange-500/10"  loading={loadingPurchases} />
+          <KPICard label="Expenses Today"  value={formatCurrency(kpis.expTotal)}    icon={DollarSign}  colorClass="text-red-600"     bgClass="bg-red-500/10"     loading={loadingExpenses} />
         </div>
       </div>
 
       {/* Profit row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <KPICard label="Sales less purchases"    value={formatCurrency(kpis.grossProfit)} icon={TrendingUp}  colorClass={kpis.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'} bgClass={kpis.grossProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} loading={loading} />
-        <KPICard label="Before payroll and fixed costs"      value={formatCurrency(kpis.netProfit)}   icon={Activity}    colorClass={kpis.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}  bgClass={kpis.netProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}  loading={loading} />
+        <KPICard label="Sales less purchases"    value={formatCurrency(kpis.grossProfit)} icon={TrendingUp}  colorClass={kpis.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'} bgClass={kpis.grossProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} loading={grossProfitLoading} />
+        <KPICard label="Before payroll and fixed costs"      value={formatCurrency(kpis.netProfit)}   icon={Activity}    colorClass={kpis.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}  bgClass={kpis.netProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}  loading={netProfitLoading} />
         <KPICard label="Inventory Value" value={formatCurrency(kpis.invValue)}    icon={Package}     colorClass="text-purple-600"  bgClass="bg-purple-500/10" loading={loadingInventory} />
       </div>
 
@@ -388,7 +392,7 @@ function ManagerContent({ branchId, branchName, branchKey }) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
+              {salesTrendLoading ? <Skeleton className="h-[200px] w-full" /> : <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={salesTrend} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                   <defs>
                     <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
@@ -405,7 +409,7 @@ function ManagerContent({ branchId, branchName, branchKey }) {
                   <Area type="monotone" dataKey="pos"   stroke="hsl(199 89% 48%)" fill="transparent" strokeWidth={1.5} strokeDasharray="4 2" name="POS" />
                   <Legend />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ResponsiveContainer>}
             </CardContent>
           </Card>
 
@@ -417,7 +421,7 @@ function ManagerContent({ branchId, branchName, branchKey }) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {recentActivity.length === 0 ? (
+              {recentActivityLoading ? <Skeleton className="h-28 w-full" /> : recentActivity.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No activity yet</p>
               ) : (
                 <div className="space-y-0">
@@ -536,7 +540,7 @@ function ManagerContent({ branchId, branchName, branchKey }) {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Sales Records</span>
-                  <span className="text-sm font-medium">{todaySales.length}</span>
+                  <span className="text-sm font-medium">{loadingSales ? '…' : todaySales.length}</span>
                 </div>
                 <Separator />
                 <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => navigate('/sales')}>

@@ -32,8 +32,11 @@ function normalizeError(error) {
 
 export function SubscriptionProvider({ children }) {
   const { user, isLoadingAuth } = useAuth();
-  const { activeRestaurant, loadingRestaurants, loadingPortalIdentity } = useTenant();
-  const tenantReady = !isLoadingAuth && !loadingRestaurants && (!activeRestaurant?.id || !loadingPortalIdentity);
+  const { activeRestaurant, loadingRestaurants } = useTenant();
+  // Authorization is enforced by the server subscription snapshot RPC. It
+  // does not need to wait for the unrelated UI-facing portal identity lookup.
+  // Both requests can now run once the membership-backed tenant is resolved.
+  const tenantReady = !isLoadingAuth && !loadingRestaurants;
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const summaryRef = useRef(EMPTY_SUMMARY);
   const [plans, setPlans] = useState([]);
@@ -47,7 +50,7 @@ export function SubscriptionProvider({ children }) {
   }, [summary]);
 
   const refresh = useCallback(async () => {
-    if (isLoadingAuth || loadingRestaurants || loadingPortalIdentity) return null;
+    if (isLoadingAuth || loadingRestaurants) return null;
     if (!user?.id || !activeRestaurant?.id) {
       setSummary(EMPTY_SUMMARY);
       setPlans([]);
@@ -117,7 +120,7 @@ export function SubscriptionProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [activeRestaurant?.id, isLoadingAuth, loadingPortalIdentity, loadingRestaurants, user?.id]);
+  }, [activeRestaurant?.id, isLoadingAuth, loadingRestaurants, user?.id]);
 
   useEffect(() => {
     if (!tenantReady) return;

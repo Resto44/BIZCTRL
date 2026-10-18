@@ -58,8 +58,11 @@ describe('subscription UI and plan-change contract', () => {
       readFile(contextPath, 'utf8'),
       readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
     ]);
-    expect(context).toContain('const { activeRestaurant, loadingRestaurants, loadingPortalIdentity } = useTenant();');
-    expect(context).toContain('if (isLoadingAuth || loadingRestaurants || loadingPortalIdentity) return null;');
+    expect(context).toContain('const { activeRestaurant, loadingRestaurants } = useTenant();');
+    expect(context).toContain('// Authorization is enforced by the server subscription snapshot RPC.');
+    expect(context).toContain("supabase.rpc('erp_subscription_snapshot')");
+    expect(context).not.toContain("if (isLoadingAuth || loadingRestaurants || loadingPortalIdentity) return null;");
+    expect(context).toContain('if (isLoadingAuth || loadingRestaurants) return null;');
     expect(context).toContain('const tenantReady = !isLoadingAuth && !loadingRestaurants');
     expect(app).toContain('<TenantProvider>');
     expect(app).toContain('<SubscriptionProvider>');
