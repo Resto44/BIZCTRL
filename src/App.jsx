@@ -28,17 +28,17 @@ import PaywallScreen from '@/components/subscription/PaywallScreen';
 import FeatureRouteGuard from '@/components/subscription/FeatureRouteGuard';
 import SubscriptionErrorBoundary from '@/components/subscription/SubscriptionErrorBoundary';
 
-// Keep the four Retail POS pages in the authenticated shell bundle. They form
-// one control workspace and must switch without fetching a second route chunk;
-// otherwise a tab left open across a production deploy can request an obsolete
-// hashed chunk and fall into the route error boundary until the user refreshes.
-import POSExecutiveDashboard from '@/pages/retail/pos/POSExecutiveDashboard';
-import POSBranchDevices from '@/pages/retail/pos/POSBranchDevices';
-import POSTerminalAccount from '@/pages/retail/pos/POSTerminalAccount';
-import POSAuditCenter from '@/pages/retail/pos/POSAuditCenter';
-import RetailCashier from '@/pages/retail/pos/RetailCashier';
-import CustomerDisplay from '@/pages/retail/pos/CustomerDisplay';
-import RestaurantPOS from '@/pages/restaurant/RestaurantPOS';
+// Load the four control tabs together on first use so switching between them
+// never requests another route chunk. Other portals do not download POS code.
+let retailControlModule;
+const loadRetailControl = () => retailControlModule ||= import('@/pages/retail/pos/controlRoutes');
+const POSExecutiveDashboard = lazy(() => loadRetailControl().then(module => ({ default: module.POSExecutiveDashboard })));
+const POSBranchDevices = lazy(() => loadRetailControl().then(module => ({ default: module.POSBranchDevices })));
+const POSTerminalAccount = lazy(() => loadRetailControl().then(module => ({ default: module.POSTerminalAccount })));
+const POSAuditCenter = lazy(() => loadRetailControl().then(module => ({ default: module.POSAuditCenter })));
+const RetailCashier = lazy(() => import('@/pages/retail/pos/RetailCashier'));
+const CustomerDisplay = lazy(() => import('@/pages/retail/pos/CustomerDisplay'));
+const RestaurantPOS = lazy(() => import('@/pages/restaurant/RestaurantPOS'));
 import { restaurantRpc } from '@/lib/restaurantPOS';
 import RetailPOSPortalGuard from '@/components/retail-pos/RetailPOSPortalGuard';
 
