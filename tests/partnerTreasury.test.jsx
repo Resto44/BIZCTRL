@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import {peopleText} from '../src/lib/peopleAccounts';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
@@ -37,7 +38,7 @@ describe('partner treasury isolation and portal',()=>{
   expect(sponsorOwnerSummary(partnerRows(rows,null),'SAR').ownerOwes).toBe(50);
  });
  it.each(['fa','ar','en'])('renders the authorized statement and confirms through server in %s',async(lang)=>{
-  state.lang=lang;await mount();const t=partnerText(lang);
+  state.lang=lang;await mount();const t=peopleText(lang);
   expect(host.textContent).toContain(t.ownerOwes);expect(host.textContent).toContain(t.sponsor_advance_to_owner);
   expect(host.querySelector('main').dir).toBe(lang==='en'?'ltr':'rtl');
   const button=[...host.querySelectorAll('button')].find(b=>b.textContent===t.confirm);

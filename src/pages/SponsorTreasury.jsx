@@ -1,5 +1,5 @@
 import {useLanguage} from '@/lib/LanguageContext';
-import {partnerText} from '@/lib/partnerTreasury';
+import {peopleText} from '@/lib/peopleAccounts';
 import PartnerTreasuryCenter from '@/components/settlement/PartnerTreasuryCenter';
 import React, { useState } from 'react';
 import { useRole } from '@/lib/RoleContext';
@@ -15,7 +15,7 @@ import SponsorOwnerBilateralLedger from '@/components/settlement/SponsorOwnerBil
 
 export default function SponsorTreasury() {
   const { role } = useRole();
-  const {lang}=useLanguage(); const t=partnerText(lang);
+  const {lang}=useLanguage(); const t=peopleText(lang);
 
   // Managers see only submit tab by default
   const defaultTab = role === 'manager' ? 'submit' : 'partners';

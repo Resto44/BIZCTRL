@@ -629,6 +629,7 @@ function App() {
               <Routes>
               {/* ── NEW ERP Unified Auth (primary entry points) ── */}
               <Route path="/sponsor-dashboard" element={<Navigate to="/partner-portal" replace />} />
+              <Route path="/wallet-portal" element={<Suspense fallback={<PageLoader />}><PartnerPortal /></Suspense>} />
               <Route path="/partner-portal" element={<Suspense fallback={<PageLoader />}><PartnerPortal /></Suspense>} />
               <Route path="/erp-login" element={<ERPLogin />} />
               <Route path="/erp-register" element={<ERPRegister />} />
