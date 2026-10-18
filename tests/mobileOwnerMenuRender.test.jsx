@@ -16,6 +16,7 @@ const fixture = vi.hoisted(() => ({
     viewInventory: true,
     viewSuppliers: true,
     viewTreasury: true,
+    viewSponsorTreasury: true,
     viewDebts: true,
     viewNetworkAccounts: true,
     viewPayroll: true,
@@ -70,6 +71,17 @@ window.top = window;
 const { default: ERPSidebar } = await import('../src/components/layout/ERPSidebar.jsx');
 
 describe('mobile owner ERP menu render', () => {
+  it.each(['restaurant','retail','services'])('opens Finance and exposes the partner account page for %s', async portal => {
+    fixture.portal=portal; const client=new QueryClient(); let renderer;
+    await act(async()=>{renderer=TestRenderer.create(<QueryClientProvider client={client}><MemoryRouter><ERPSidebar collapsed={false} mobile onToggle={()=>{}} onNavigate={()=>{}} /></MemoryRouter></QueryClientProvider>);});
+    const section=renderer.root.findAllByType('button').find(button=>button.findAllByType('span').some(span=>span.children.includes('Finance & Treasury')));
+    await act(async()=>section.props.onClick());
+    const links=renderer.root.findAllByType('a').filter(link=>link.props.href==='/sponsor-treasury');
+    expect(links).toHaveLength(1);
+    expect(JSON.stringify(links[0].toJSON?.()||links[0].findAllByType('span').map(x=>x.children))).toContain('Partner Treasury');
+    await act(async()=>renderer.unmount());client.clear();fixture.portal='restaurant';
+  });
+
   it.each(['restaurant', 'retail'])('keeps the POS sales entry discoverable only for %s scope', async portal => {
     fixture.portal = portal;
     const client = new QueryClient(); let renderer;

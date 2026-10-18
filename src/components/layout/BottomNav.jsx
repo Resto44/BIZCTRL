@@ -105,6 +105,7 @@ const MORE_PERMISSION_BY_PATH = {
   '/driver-management': 'manageDrivers',
   '/debt-management': 'viewDebts',
   '/treasury': 'viewTreasury',
+  '/sponsor-treasury': 'viewSponsorTreasury',
   '/payroll': 'viewPayroll',
   '/settings': 'manageSettings',
   '/customize-workspace': 'manageDashboardCustomization',
@@ -163,6 +164,7 @@ const MORE_SECTIONS_OWNER_RESTAURANT = [
       { path: '/driver-management',         icon: Truck,       labelKey: 'driver_management' },
       { path: '/debt-management',           icon: CreditCard,  labelKey: 'debt_management' },
       { path: '/treasury',                  icon: Wallet,      labelKey: 'treasury' },
+      { path: '/sponsor-treasury', icon: Wallet, labelKey: 'sponsor_treasury' },
     ],
   },
   {
@@ -226,6 +228,7 @@ const MORE_SECTIONS_OWNER_RETAIL = [
       { path: '/customer-management',       icon: Star,        labelKey: 'customer_management' },
       { path: '/debt-management',           icon: CreditCard,  labelKey: 'debt_management' },
       { path: '/treasury',                  icon: Wallet,      labelKey: 'treasury' },
+      { path: '/sponsor-treasury', icon: Wallet, labelKey: 'sponsor_treasury' },
     ],
   },
   {
@@ -321,7 +324,7 @@ const CONTROL_GROUPS = [
     title: 'Finance & Treasury',
     icon: Wallet,
     iconClass: 'bg-violet-600 text-white',
-    paths: ['/network-management', '/profit-loss', '/debt-management', '/treasury', '/payroll'],
+    paths: ['/network-management', '/profit-loss', '/debt-management', '/treasury', '/sponsor-treasury', '/payroll'],
   },
   {
     key: 'team',
