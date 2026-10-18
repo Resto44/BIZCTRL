@@ -21,7 +21,7 @@ import {readSponsorOwnerRows,sponsorOwnerSummary,
 
 const UI={
   fa:{
-    method:'روش پرداخت / دریافت',cash:'کاش / نقدی',network:'شبکه / بانک',unknownMethod:'روش ثبت نشده',noMethodAccount:'برای این روش و واحد پول، حساب فعال خزانه وجود ندارد.',
+    method:'روش پرداخت / دریافت',cash:'کاش / نقدی',network:'شبکه / بانک',unknownMethod:'روش ثبت نشده',repaymentBalance:'حداکثر بازپرداخت بر اساس بدهی ثبت‌شده',repaymentHelp:'اگر این پول قرض جدید است، نوع «قرض داد» را انتخاب کنید؛ بازپرداخت فقط برای بدهی قبلی است.',noMethodAccount:'برای این روش و واحد پول، حساب فعال خزانه وجود ندارد.',
     title:'دادوگرفت سپانسر و مالک',help:'دفتر قرض و بازپرداخت دوطرفه، مستقل از پول فروشات رستورانت نزد کفیل',
     sponsorLent:'سپانسر به مالک قرض داد',ownerRepaid:'مالک به سپانسر بازپرداخت کرد',
     ownerLent:'مالک به سپانسر قرض داد',sponsorRepaid:'سپانسر به مالک بازپرداخت کرد',
@@ -48,7 +48,7 @@ const UI={
     count:'تعداد اسناد',directionIn:'دریافت',directionOut:'پرداخت'
   },
   ar:{
-    method:'طريقة الدفع / الاستلام',cash:'نقدي',network:'شبكة / بنك',unknownMethod:'الطريقة غير مسجلة',noMethodAccount:'لا يوجد حساب خزينة نشط لهذه الطريقة والعملة.',
+    method:'طريقة الدفع / الاستلام',cash:'نقدي',network:'شبكة / بنك',unknownMethod:'الطريقة غير مسجلة',repaymentBalance:'الحد المتاح للسداد حسب الدين المسجل',repaymentHelp:'إذا كان المبلغ سلفة جديدة فاختر نوع السلفة؛ السداد يتطلب دينًا سابقًا.',noMethodAccount:'لا يوجد حساب خزينة نشط لهذه الطريقة والعملة.',
     title:'حساب المعاملات بين الكفيل والمالك',help:'دفتر قروض وسداد متبادل مستقل عن أموال مبيعات الفروع لدى الكفيل',
     sponsorLent:'سلفة الكفيل للمالك',ownerRepaid:'سداد المالك للكفيل',
     ownerLent:'سلفة المالك للكفيل',sponsorRepaid:'سداد الكفيل للمالك',
@@ -75,7 +75,7 @@ const UI={
     count:'عدد القيود',directionIn:'استلام',directionOut:'صرف'
   },
   en:{
-    method:'Payment / receipt method',cash:'Cash',network:'Network / bank',unknownMethod:'Method not recorded',noMethodAccount:'No active treasury account for this method and currency.',
+    method:'Payment / receipt method',cash:'Cash',network:'Network / bank',unknownMethod:'Method not recorded',repaymentBalance:'Available repayment against recorded debt',repaymentHelp:'For a new advance, select an advance transaction type. Repayment requires an existing debt.',noMethodAccount:'No active treasury account for this method and currency.',
     title:'Sponsor ↔ Owner Transactions',help:'Separate bilateral advances and repayments, not branch sales held by sponsor',
     sponsorLent:'Sponsor advanced to owner',ownerRepaid:'Owner repaid sponsor',
     ownerLent:'Owner advanced to sponsor',sponsorRepaid:'Sponsor repaid owner',
@@ -155,6 +155,7 @@ export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=tru
   const availableAccounts=accounts.filter(a=>a.currency===currentCurrency);
   const methodAccounts=availableAccounts.filter(a=>sponsorOwnerAccountMethod(a)===form.paymentMethod);
   const summary=useMemo(()=>sponsorOwnerSummary(records,currentCurrency),[records,currentCurrency]);
+  const repaymentDue=form.kind==='owner_repay_sponsor'?summary.ownerOwes:form.kind==='sponsor_repay_owner'?summary.sponsorOwes:null;
   const scopedRecords=records.filter(r=>r.currency===currentCurrency);
   const fmt=(amount,curr=currentCurrency)=>{
     const n=Number(amount||0);
@@ -291,9 +292,9 @@ export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=tru
     </Card>
 
     <Dialog open={open} onOpenChange={v=>{if(!v&&!busy){setOpen(false);setError('');requestId.current=null}}}>
-      <DialogContent dir={rtl?'rtl':'ltr'} className="!w-[calc(100vw-1.5rem)] !max-w-md min-w-0 max-h-[88dvh] overflow-x-hidden overflow-y-auto rounded-2xl p-4">
-        <DialogHeader className="pe-8"><DialogTitle className="text-base">{t.new}</DialogTitle></DialogHeader>
-        <div className="min-w-0 space-y-3">
+      <DialogContent dir={rtl?'rtl':'ltr'} className="!flex !w-[calc(100vw-1.5rem)] !max-w-md min-w-0 max-h-[88dvh] flex-col gap-0 overflow-hidden rounded-2xl p-0">
+        <DialogHeader className="shrink-0 p-4 pe-12"><DialogTitle className="text-base">{t.new}</DialogTitle></DialogHeader>
+        <div className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-4">
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">{t.postedInfo}</div>
           <div><Label className="text-xs">{t.kind} *</Label>
             <Select value={form.kind||undefined} onValueChange={v=>edit('kind',v)}>
@@ -302,6 +303,7 @@ export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=tru
                 {KIND_KEYS.map(k=><SelectItem value={k} key={k}>{t[labels[k]]}</SelectItem>)}
               </SelectContent>
             </Select></div>
+          {repaymentDue!==null&&<div role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900"><p>{t.repaymentBalance}: <strong dir="ltr">{fmt(repaymentDue)}</strong></p><p className="mt-1">{t.repaymentHelp}</p></div>}
           <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="min-w-0"><Label className="text-xs">{t.date} *</Label>
               <Input dir="ltr" type="date" className="mt-1 w-full min-w-0 max-w-full text-base [min-inline-size:0]"
@@ -337,12 +339,14 @@ export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=tru
               {form.proofUrl?t.audit:t.upload}
               <input type="file" accept="image/*,.pdf" className="hidden" disabled={uploading} onChange={upload}/>
             </label></div>
-          <label className="flex items-start gap-2 rounded-lg border p-3 text-xs leading-5">
-            <input type="checkbox" checked={form.confirm} onChange={e=>edit('confirm',e.target.checked)} className="mt-1"/>
+        </div>
+        <div className="shrink-0 space-y-2 border-t bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg border p-2 text-xs leading-5">
+            <input type="checkbox" checked={form.confirm} onChange={e=>edit('confirm',e.target.checked)} className="mt-1 h-5 w-5 shrink-0" disabled={busy}/>
             <span>{t.confirm}</span>
           </label>
-          {error&&<p role="alert" className="rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{error}</p>}
-          <div className="sticky bottom-0 z-10 flex gap-2 border-t bg-background pt-3">
+          {error&&<p role="alert" className="max-h-24 overflow-y-auto rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{error}</p>}
+          <div className="flex gap-2">
             <Button type="button" className="min-w-0 flex-1" disabled={busy||uploading||!form.confirm||!methodAccounts.some(a=>a.id===form.accountId)} onClick={post}>
               {busy?<Loader2 className="me-1 h-4 w-4 animate-spin"/>:<Receipt className="me-1 h-4 w-4"/>}
               {busy?t.posting:t.save}
