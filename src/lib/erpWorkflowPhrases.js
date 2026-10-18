@@ -1,5 +1,6 @@
 // Interface copy only; business names and user-entered descriptions stay unchanged.
 export default {
+  "Partner Treasury": {"fa": "خزانه شریک‌ها", "ar": "خزينة الشركاء"},
   "Customer Credit — Unified From Debts & Receivables": {
     "fa": "اعتبار مشتری — متصل به بدهی‌ها و طلب‌ها",
     "ar": "ائتمان العملاء — مرتبط بالديون والذمم المدينة"

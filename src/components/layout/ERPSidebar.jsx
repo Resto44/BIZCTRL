@@ -114,6 +114,7 @@ export const ERP_NAV_GROUPS = [
     label: 'Finance',
     items: [
       { path: '/treasury',          label: 'Treasury',          icon: Wallet,    permission: 'viewTreasury' },
+      { path: '/sponsor-treasury', label: 'Partner Treasury', icon: Handshake, permission: 'viewSponsorTreasury', roles: ['owner'] },
       { path: '/profit-loss',       label: 'Profit & Loss',     icon: PieChart,  permission: 'viewReports' },
       { path: '/cashflow',          label: 'Cash Flow',         icon: Activity,  permission: 'viewReports' },
       { path: '/balance-sheet',     label: 'Balance Sheet',     icon: FileText,  permission: 'viewReports' },
@@ -185,7 +186,7 @@ const MOBILE_NAV_SECTIONS = [
     description: 'Cash, expenses & profitability',
     icon: Wallet,
     paths: [
-      '/expenses', '/treasury', '/profit-loss', '/cashflow', '/balance-sheet',
+      '/expenses', '/treasury', '/sponsor-treasury', '/profit-loss', '/cashflow', '/balance-sheet',
       '/debt-management', '/network-management', '/payroll',
     ],
   },
