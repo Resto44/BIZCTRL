@@ -186,7 +186,7 @@ const MOBILE_NAV_SECTIONS = [
     description: 'Cash, expenses & profitability',
     icon: Wallet,
     paths: [
-      '/expenses', '/treasury', '/sponsor-treasury', '/profit-loss', '/cashflow', '/balance-sheet',
+      '/expenses', '/treasury', '/wallet-banking', '/profit-loss', '/cashflow', '/balance-sheet',
       '/debt-management', '/network-management', '/payroll',
     ],
   },
