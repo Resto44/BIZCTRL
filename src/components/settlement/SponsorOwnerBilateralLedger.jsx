@@ -1,7 +1,7 @@
 import {partnerRows} from '@/lib/partnerTreasury';
 import {peopleText} from '@/lib/peopleAccounts';
 import WalletPersonCustodyCards from './WalletPersonCustodyCards';
-import React,{useMemo,useRef,useState} from 'react';
+import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
 import {base44} from '@/api/base44Client';
@@ -111,7 +111,7 @@ const labels={sponsor_advance_to_owner:'sponsorLent',owner_repay_sponsor:'ownerR
 const blank=()=>({kind:'',date:format(new Date(),'yyyy-MM-dd'),amount:'',accountId:'',paymentMethod:'cash',
   notes:'',reference:'',proofUrl:'',confirm:false});
 
-export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=true}){
+export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=true,openTransactionSignal=0}){
   const {lang,currency:appCurrency}=useLanguage();
   const base=UI[lang]||UI.en;
   const pt=peopleText(lang);
@@ -175,6 +175,14 @@ export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=tru
     setForm({...blank(),accountId:account?.id||'',paymentMethod:sponsorOwnerAccountMethod(account)||'cash'});
     setError('');requestId.current=null;setOpen(true);
   };
+  const lastOpenSignal=useRef(0);
+  useEffect(()=>{
+    if(openTransactionSignal>0 && openTransactionSignal!==lastOpenSignal.current
+       && !isLoading && !accountLoading && !isError && !accountError){
+      lastOpenSignal.current=openTransactionSignal;
+      if(availableAccounts.length && (!partner || (partner.is_active && partner.allow_loans!==false))) launch();
+    }
+  },[openTransactionSignal,isLoading,accountLoading,isError,accountError,availableAccounts.length,partner?.id]);
   const upload=async(event)=>{
     const file=event.target.files?.[0];if(!file)return;
     setUploading(true);
@@ -338,15 +346,20 @@ export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=tru
     <Dialog open={open} onOpenChange={v=>{if(!v&&!busy){setOpen(false);setError('');requestId.current=null}}}>
       <DialogContent dir={rtl?'rtl':'ltr'} className="!flex !w-[calc(100vw-1.5rem)] !max-w-md min-w-0 max-h-[88dvh] flex-col gap-0 overflow-hidden rounded-2xl p-0">
         <DialogHeader className="shrink-0 p-4 pe-12"><DialogTitle className="text-base">{t.new}</DialogTitle></DialogHeader>
-        <div className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-4">
+        <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 pb-4">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3.5">
+           <p className="text-xs font-bold text-slate-600">{lang==='fa'?'حساب انتخاب‌شده':lang==='ar'?'الحساب المحدد':'Selected account'}</p>
+           <p className="mt-1 text-base font-black text-slate-950">{partner?.name||t.title}</p>
+           <p className="mt-1 text-xs text-blue-800">{t.noNet}</p>
+          </div>
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">{t.postedInfo}</div>
           <div><Label className="text-xs">{t.kind} *</Label>
-            <Select value={form.kind||undefined} onValueChange={v=>edit('kind',v)}>
-              <SelectTrigger className="mt-1 min-w-0"><SelectValue placeholder={t.kind}/></SelectTrigger>
-              <SelectContent className="max-w-[calc(100vw-2rem)]">
-                {KIND_KEYS.map(k=><SelectItem value={k} key={k}>{t[labels[k]]}</SelectItem>)}
-              </SelectContent>
-            </Select></div>
+           <div className="mt-2 grid grid-cols-2 gap-2" role="group" aria-label={t.kind}>{KIND_KEYS.map((k,i)=>{
+             const Icon=i===0||i===3?ArrowDownLeft:ArrowUpRight;
+             return <button key={k} type="button" disabled={busy} aria-pressed={form.kind===k} onClick={()=>edit('kind',k)} className={`min-h-[76px] rounded-xl border p-2.5 text-start transition-colors ${form.kind===k?'border-blue-600 bg-blue-50 text-blue-800 ring-1 ring-blue-600':'border-slate-200 bg-white text-slate-700'}`}>
+               <Icon className={`mb-1 size-5 ${i===0||i===3?'text-emerald-600':'text-rose-600'}`}/><span className="text-xs font-extrabold leading-5">{t[labels[k]]}</span>
+             </button>;
+           })}</div></div>
           {repaymentDue!==null&&<div role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900"><p>{t.repaymentBalance}: <strong dir="ltr">{fmt(repaymentDue)}</strong></p><p className="mt-1">{t.repaymentHelp}</p></div>}
           <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="min-w-0"><Label className="text-xs">{t.date} *</Label>
