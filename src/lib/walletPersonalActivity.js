@@ -52,7 +52,7 @@ export function recentWalletActivity({loans=[],custody=[],currency='',limit=12}=
       direction:row.kind==='custody_received'?'incoming':'outgoing',
       currency:row.currency,date:row.effective_date,
       createdAt:row.created_at||row.effective_date,
-      method:row.payment_method,status:row.reversed_by||row.reverses_id?'reversed':row.status,
+      method:row.payment_method,status:row.reversed_by?'reversed':row.reverses_id?'reversal_posted':row.status,
       confirmation:row.status==='approved'?'owner_approved':null,
       reference:row.reference||'',notes:row.notes||'',
     });
