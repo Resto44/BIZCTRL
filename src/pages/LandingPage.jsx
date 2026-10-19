@@ -17,24 +17,24 @@ import { usePublicPlanCheckout } from '@/lib/publicPlanCheckout';
 const WALLET_LOGIN_COPY = {
   en:{
     eyebrow:'Secure role-based portal access',title:'Choose your BizCTRL workspace',
-    wallet:'Accounts & Wallet Login',
-    walletDescription:'Partners, managers and employees can request owner-approved access to their personal advances, custody and settlement records.',
+    wallet:'Wallet Banking Login',
+    walletDescription:'Verified people manage an internal wallet, funding requests, returns, statements and owner-approved transfers. Historical loans stay separate.',
     erp:'ERP Login',erpDescription:'Authorized staff access their assigned ERP modules, POS, finance and branch operations.',
     platform:'Platform Owner',platformDescription:'Restricted to BizCTRL platform administrators; not a business-owner login.',
     view:'Open portal',notice:'Supplier invoices, customer credit and payroll remain in their dedicated ERP ledgers.'
   },
   ar:{
     eyebrow:'دخول آمن حسب الصلاحيات',title:'اختر بوابة BizCTRL المناسبة',
-    wallet:'تسجيل دخول الحسابات والمحفظة',
-    walletDescription:'يمكن للشركاء والمديرين والموظفين طلب الوصول المعتمد من المالك للسلف والعهدة والتسويات الخاصة بهم.',
+    wallet:'تسجيل دخول المحفظة البنكية',
+    walletDescription:'حساب محفظة داخلي باسم صاحبه لطلبات التمويل والعودة وكشف الحساب بعد موافقة المالك؛ تبقى القروض القديمة منفصلة.',
     erp:'تسجيل دخول ERP',erpDescription:'وصول الموظفين المصرّح لهم إلى وحدات ERP ونقاط البيع والمالية والفروع.',
     platform:'مالك المنصة',platformDescription:'مخصص لمسؤولي منصة BizCTRL فقط، وليس لمالك المنشأة.',
     view:'فتح البوابة',notice:'تبقى فواتير الموردين وآجل العملاء والرواتب في دفاتر ERP المخصصة.'
   },
   fa:{
     eyebrow:'ورود امن بر اساس صلاحیت',title:'پورتل مناسب BizCTRL را انتخاب کنید',
-    wallet:'ورود به حساب‌ها و والت',
-    walletDescription:'شریک، مدیر و کارمند می‌توانند با تأیید اونر به قرض شخصی، امانت و تسویه‌های مربوط خود دسترسی بگیرند.',
+    wallet:'ورود به مرکز بانکداری والت',
+    walletDescription:'هر شخص صاحب والت داخلی خود است و درخواست دریافت، برگشت وجه و گردش حساب را با تأیید اونر مدیریت می‌کند؛ قرض قدیمی جدا می‌ماند.',
     erp:'ورود به ERP',erpDescription:'کارمندان مجاز به ماژول‌های تعیین‌شده ERP، صندوق، مالی و شعبه‌ها دسترسی دارند.',
     platform:'مالک پلتفرم',platformDescription:'تنها برای مدیران کل پلتفرم BizCTRL؛ نه مالک یک کسب‌وکار.',
     view:'بازکردن پورتل',notice:'فاکتور تأمین‌کنندگان، نسیه مشتریان و معاش در دفترهای مخصوص ERP باقی می‌مانند.'
