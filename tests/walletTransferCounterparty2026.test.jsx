@@ -37,8 +37,10 @@ describe('Canonical wallet transfer identity: person account ↔ business legal 
    expect(html).toContain(businessName);
    expect(html.match(new RegExp(accountReference,'g')).toHaveLength(2);
    expect(html.match(new RegExp(businessName,'g')).toHaveLength(2);
-   expect(html).toContain('-15.00'.replace('-','−'));
-   expect(html).toContain('+45.00');
+   const locale=lang==='fa'?'fa-AF':lang==='ar'?'ar-SA':'en-US';
+   const fmt=n=>new Intl.NumberFormat(locale,{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
+   expect(html).toContain('−'+fmt(15));
+   expect(html).toContain('+'+fmt(45));
    expect(html).not.toContain('Account or business identity is unavailable');
  });
  it('shows pending custody request as unposted, not received/spendable',()=>{
