@@ -51,9 +51,9 @@ describe('Verified named internal accounts cannot silently duplicate',()=>{
  });
  it('never presents incomplete or conflicting verified wallet identity data as a valid account',()=>{
   expect(portal).toContain('accountRowsUnique(accounts.data||[])');
-  expect(portal).toContain('integrityError?null:verifiedAccounts.find');
-  expect(portal).toContain('integrityError?<p role="alert"');
-  expect(portal).toContain('verifiedAccounts.map');
+  expect(portal).toContain('conflict?null:verified.find');
+  expect(portal).toContain('conflict?<p role="alert"');
+  expect(portal).toContain('verified.map');
   expect(card).toContain('partner.account_reference||walletAccountReference(partner.id)');
   expect(card).toContain('partner.login_email');
   expect(card).toContain('not a bank account');
