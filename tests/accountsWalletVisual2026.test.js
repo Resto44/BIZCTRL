@@ -44,7 +44,10 @@ describe('Accounts & Wallet image-aligned ERP design',()=>{
     expect(ledgerIndex).toBeGreaterThan(0);
     expect(ledgerIndex).toBeLessThan(page.indexOf('<PeopleMemberships'));
     expect(ledgerIndex).toBeLessThan(page.indexOf('<PartnerTransactionRequests'));
-    expect(page).toContain('<PeopleCustodySummary');
+    expect(page).toContain('<OwnerWalletOperations');
+    expect(page).toContain('onCustody={showCustody}');
+    expect(page).toContain('onAdvance={showFinance}');
+    expect(page).not.toContain("<PeopleCustodySummary tenant={activeRestaurantId} t={t}/>");
     expect(page).toContain('erp_save_person_account');
     expect(page).toContain("activeRestaurantId");
     expect(page).toContain("key={\u0060\u0024{activeRestaurantId}:\u0024{partner.id}\u0060}");
