@@ -3,6 +3,7 @@ import {useQuery} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
 import {readSponsorOwnerRows,sponsorOwnerSummary} from '@/lib/sponsorOwnerBilateral';
 import {ownerWalletSnapshot} from '@/lib/walletERPViewModel';
+import {walletAccountReference} from '@/lib/walletPersonalActivity';
 import {WalletCards,Users,ArrowDownLeft,ArrowUpRight,Clock3,Plus,BookOpen,ArrowLeftRight,ShieldCheck,ChevronRight,UserRound,Landmark,Activity,Search,FileClock} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 
@@ -61,11 +62,12 @@ export default function WalletERPOverview({restaurantId,partners=[],partner,onSe
     return <article key={p.id} className="py-2.5">
      <button type="button" aria-expanded={open} onClick={()=>setExpanded(open?'':p.id)} className="flex min-h-14 w-full min-w-0 items-center gap-2.5 text-start">
       <span className="grid size-10 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600"><UserRound className="size-5"/></span>
-      <span className="min-w-0 flex-1"><strong className="block truncate text-sm text-slate-950">{p.name}</strong><span className="mt-0.5 block truncate text-xs text-slate-500">{p.account_role==='partner'?m.partners:m.staff} · <span className={p.is_active?'text-emerald-700':'text-slate-500'}>{p.is_active?m.active:m.inactive}</span> · {p.user_id?m.login:m.unlinked}</span></span>
+      <span className="min-w-0 flex-1"><strong className="block truncate text-sm text-slate-950">{p.name}</strong><span className="mt-0.5 block truncate text-xs text-slate-500">{p.account_role==='partner'?m.partners:['supplier','customer'].includes(p.account_role)?p.account_role:m.staff} · <span className={p.is_active?'text-emerald-700':'text-slate-500'}>{p.is_active?m.active:m.inactive}</span> · {p.user_id?m.login:m.unlinked}</span></span>
       <ChevronRight className={`size-4 shrink-0 text-slate-400 transition-transform ${open?'rotate-90':''}`}/>
      </button>
      {open&&<div className="space-y-3 rounded-xl bg-slate-50 p-3">
        <p dir="ltr" className="break-all text-xs text-slate-500">{p.email}</p>
+       <p dir="ltr" className="break-all font-mono text-[11px] text-blue-700">{walletAccountReference(p.id)}</p>
        <div className="grid grid-cols-2 gap-2 text-xs"><div className="min-w-0 rounded-lg bg-white p-2"><p className="text-slate-500">{m.owed}</p><strong dir="ltr" className="mt-1 block break-words text-start text-sm">{ledger.isPending?'…':ledger.isError?'—':bill(values.ownerOwes,chosen,lang)}</strong></div><div className="min-w-0 rounded-lg bg-white p-2"><p className="text-slate-500">{m.receivable}</p><strong dir="ltr" className="mt-1 block break-words text-start text-sm">{ledger.isPending?'…':ledger.isError?'—':bill(values.sponsorOwes,chosen,lang)}</strong></div></div>
        <div className="grid grid-cols-2 gap-2"><Button type="button" size="sm" variant="outline" className="min-h-11 min-w-0 text-xs" onClick={()=>{onSelect(p.id);onEdit(p);}}>{m.edit}</Button><Button type="button" size="sm" className="min-h-11 min-w-0 bg-blue-600 text-xs" onClick={()=>{onSelect(p.id);onLedger();}}>{m.ledger}</Button></div>
        {p.is_active&&p.allow_loans!==false&&<button type="button" onClick={()=>{onSelect(p.id);onRecord();}} className="block w-full py-1 text-center text-xs font-bold text-blue-700">{m.record}</button>}
