@@ -66,11 +66,11 @@ export default function PartnerPortal(){
      <Card className="flex flex-wrap items-center justify-between gap-3 p-4"><select aria-label={t.partners} className="min-w-0 flex-1 rounded-xl border bg-background p-3" value={partner.id} onChange={e=>{setSelected(e.target.value);setError('');}}>
       {accounts.data.map(p=><option key={p.id} value={p.id}>{p.business} · {p.name}</option>)}
      </select><Button variant="outline" onClick={()=>{accounts.refetch();statement.refetch();}}>{t.refresh}</Button></Card>
-     <WalletPortalERPOverview partner={partner} statement={statement.data} lang={lang}
+     {statement.data&&<WalletPortalERPOverview partner={partner} statement={statement.data} lang={lang}
        onLoan={()=>{setLoanSignal(x=>x+1);scrollToSection('wallet-loan-requests');}}
        onCustody={()=>{setCustodySignal(x=>x+1);scrollToSection('wallet-custody-requests');}}
        onStatement={()=>{setStatementSignal(x=>x+1);scrollToSection('wallet-statement');}}
-       onAccount={()=>{setAccountSignal(x=>x+1);scrollToSection('wallet-statement');}}/>
+       onAccount={()=>{setAccountSignal(x=>x+1);scrollToSection('wallet-statement');}}/>}
      <div id="wallet-custody-requests" className="scroll-mt-4"><PartnerTransactionRequests key={`custody:${session.user.id}:${partner.id}`} partner={partner} t={t} custody openSignal={custodySignal}/></div>
      <div id="wallet-loan-requests" className="scroll-mt-4"><PartnerTransactionRequests key={`requests:${session.user.id}:${partner.id}`} partner={partner} t={t} openSignal={loanSignal}/></div>
      <div id="wallet-statement" className="scroll-mt-4">{statement.isLoading?<p>{t.loading}</p>:statement.isError?<p role="alert">{t.failed}<Button onClick={()=>statement.refetch()}>{t.refresh}</Button></p>:statement.data&&<PartnerWorkspace key={`${session.user.id}:${partner.id}`} data={statement.data} partner={partner} t={t} lang={lang} preferences={preferences} updatePreference={updatePreference} confirm={confirm} busy={busy} statementSignal={statementSignal} accountSignal={accountSignal}/>}</div>
