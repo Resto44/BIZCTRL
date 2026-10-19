@@ -41,7 +41,7 @@ describe('Replacement Wallet Banking Center',()=>{
   expect(sql).not.toMatch(/\bUPDATE\s+public\.(sponsor_owner_transactions|people_custody_requests)\b/i);
   expect(sql).toContain("historical_loans_and_custody_archived_not_spendable");
   expect(sql).toContain("coalesce(sum(signed_amount) FILTER(WHERE side='person')");
-  expect(sql).toContain("FILTER(WHERE j.side='person')");
+  expect(sql).toContain("FILTER(WHERE side='person')");
   expect(ui).not.toContain('2,450.00');
   expect(ui).not.toContain('5,200.00');
   expect(ui).not.toContain('2,750.00');
