@@ -88,7 +88,7 @@ export default function PartnerPortal(){
         {requestKind==='custody'?<PartnerTransactionRequests key={`custody:${session.user.id}:${partner.id}`} partner={partner} t={t} custody openSignal={custodySignal}/>:
          <PartnerTransactionRequests key={`requests:${session.user.id}:${partner.id}`} partner={partner} t={t} openSignal={loanSignal}/>}
        </section>}
-       {workspace==='statement'&&<PartnerWorkspace key={`${session.user.id}:${partner.id}`} data={statement.data} partner={partner} t={t} lang={lang} preferences={preferences} updatePreference={updatePreference} confirm={confirm} busy={busy} statementSignal={statementSignal} accountSignal={accountSignal}/>}
+       {workspace==='statement'&&<PartnerWorkspace key={`${session.user.id}:${partner.id}`} data={statement.data} partner={partner} t={t} lang={lang} preferences={preferences} updatePreference={updatePreference} confirm={confirm} busy={busy} statementSignal={statementSignal} accountSignal={accountSignal} initialTab="records" compactHeader/>}
      </>}
      {!joinToken&&<details className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600"><summary className="cursor-pointer font-bold">{labels.members}</summary><div className="mt-3"><PeopleMemberships key={session.user.id} userId={session.user.id} t={t}/></div></details>}
     </>}
