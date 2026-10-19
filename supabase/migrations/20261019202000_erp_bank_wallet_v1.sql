@@ -57,7 +57,7 @@ ALTER TABLE public.erp_bank_wallet_postings ENABLE ROW LEVEL SECURITY;
 -- Deferred invariant: every posted transfer has exactly two opposite, equal
 -- per-currency entries. This protects history independently of the UI.
 CREATE OR REPLACE FUNCTION public.erp_bank_wallet_verify_balanced()
-RETURNS trigger LANGUAGE plpgsql SET search_path=public,pg_temp AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path=public,pg_temp AS $balance$
 DECLARE v_count integer;v_sum numeric;v_req public.erp_bank_wallet_requests;
 BEGIN
  SELECT count(*),coalesce(sum(signed_amount),0) INTO v_count,v_sum
@@ -70,7 +70,7 @@ BEGIN
           abs(j.signed_amount)<>v_req.amount))
  THEN RAISE EXCEPTION 'WALLET_DOUBLE_ENTRY_UNBALANCED' USING ERRCODE='23514'; END IF;
  RETURN NULL;
-END;$;
+END;$balance$;
 DROP TRIGGER IF EXISTS erp_bank_wallet_double_entry_guard ON public.erp_bank_wallet_postings;
 CREATE CONSTRAINT TRIGGER erp_bank_wallet_double_entry_guard
  AFTER INSERT ON public.erp_bank_wallet_postings
