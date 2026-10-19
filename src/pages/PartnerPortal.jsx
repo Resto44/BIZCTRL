@@ -63,19 +63,19 @@ export default function PartnerPortal(){
    <label className="block">{t.password}<Input type="password" required value={password} autoComplete="current-password" dir="ltr" onChange={e=>setPassword(e.target.value)}/></label>
    <div className="flex flex-wrap gap-2"><Button disabled={busy} type="submit">{t.signIn}</Button>{<Button type="button" variant="outline" disabled={busy||!email.trim()||password.length<10} onClick={()=>authenticate(true)}>{t.signUp}</Button>}</div></form></Card>:
    <>
-    {(!accounts.data?.length||joinToken)?<PeopleMemberships key={session.user.id} userId={session.user.id} t={t} joinToken={joinToken} onJoined={()=>{setJoinToken('');sessionStorage.removeItem('people:join');setNotice(t.joinSent);}}/>:
+    {(accounts.isLoading||accounts.isError)?null:(!accounts.data?.length||joinToken)?<PeopleMemberships key={session.user.id} userId={session.user.id} t={t} joinToken={joinToken} onJoined={()=>{setJoinToken('');sessionStorage.removeItem('people:join');setNotice(t.joinSent);}}/>:
     <details className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600"><summary className="cursor-pointer font-bold">{labels.members}</summary><div className="mt-3"><PeopleMemberships key={session.user.id} userId={session.user.id} t={t}/></div></details>}
     {token&&<Card className="space-y-3 p-4"><p>{session.user.email}</p><Button disabled={busy} onClick={activate}>{t.accept}</Button></Card>}
     {accounts.isLoading?<p>{t.loading}</p>:accounts.isError?<p role="alert">{t.failed}<Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></p>:!partner?<p>{t.noAccounts}</p>:<>
      <div className="flex min-w-0 items-end gap-2 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm">
        <label className="min-w-0 flex-1 text-xs font-semibold text-slate-500">{labels.user}
-        <select aria-label={t.partners} className="mt-1 block min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-bold text-slate-900" value={partner.id} onChange={e=>{setSelected(e.target.value);setWorkspace('overview');setRequestKind('loan');setError('');}}>
+        <select aria-label={t.partners} className="mt-1 block min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-bold text-slate-900" value={partner.id} onChange={e=>{setSelected(e.target.value);setWorkspace('overview');setRequestKind('loan');setLoanSignal(0);setCustodySignal(0);setStatementSignal(0);setAccountSignal(0);setError('');}}>
          {accounts.data.map(p=><option key={p.id} value={p.id}>{p.business} · {p.name}</option>)}
         </select></label>
        <Button size="icon" variant="outline" aria-label={t.refresh} className="size-11 shrink-0" onClick={()=>{accounts.refetch();statement.refetch();}}><RefreshCw className="size-4"/></Button>
      </div>
      <nav aria-label={t.portal} className="grid grid-cols-3 gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
-       {[[ 'overview',Wallet],[ 'requests',Clock3],[ 'statement',FileText]].map(([key,Icon])=><button type="button" key={key} aria-current={workspace===key?'page':undefined} onClick={()=>setWorkspace(key)} className={`flex min-h-12 min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 text-xs font-bold sm:text-sm ${workspace===key?'bg-blue-600 text-white':'text-slate-600 hover:bg-blue-50'}`}><Icon className="size-4 shrink-0"/><span>{labels[key]}</span></button>)}
+       {[[ 'overview',Wallet],[ 'requests',Clock3],[ 'statement',FileText]].map(([key,Icon])=><button type="button" key={key} aria-current={workspace===key?'page':undefined} onClick={()=>{setWorkspace(key);setLoanSignal(0);setCustodySignal(0);}} className={`flex min-h-12 min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 text-xs font-bold sm:text-sm ${workspace===key?'bg-blue-600 text-white':'text-slate-600 hover:bg-blue-50'}`}><Icon className="size-4 shrink-0"/><span>{labels[key]}</span></button>)}
      </nav>
      {statement.isLoading?<p role="status">{t.loading}</p>:statement.isError?<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{t.failed} <Button variant="outline" size="sm" onClick={()=>statement.refetch()}>{t.refresh}</Button></p>:statement.data&&<>
        {workspace==='overview'&&<WalletPortalERPOverview partner={partner} statement={statement.data} lang={lang}
