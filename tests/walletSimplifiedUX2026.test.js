@@ -24,7 +24,7 @@ describe('Wallet Banking Center mobile progressive disclosure',()=>{
   expect(bank).toContain("key:'statement'");
   expect(bank).toContain("key:'beneficiaries'");
   expect(bank).toContain('setPanel(next)');
-  expect(bank).toContain('panel===\\'review\\'');
+  expect(bank).toContain("panel==='review'");
   expect(bank).toContain("supabase.rpc('erp_bank_wallet_review'");
   expect(bank).not.toContain('2,450.00');
   expect(bank).not.toContain('20.00 SAR');
