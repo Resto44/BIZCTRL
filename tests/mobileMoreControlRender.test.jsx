@@ -38,7 +38,7 @@ vi.mock('@/lib/RoleContext', () => ({
       viewDashboard: true, viewSales: true, viewPurchases: true, viewInventory: true,
       viewSuppliers: true, viewNetworkAccounts: true, viewReports: true, viewEmployees: true,
       manageUsers: true, manageCustomers: true, manageDrivers: true, viewDebts: true,
-      viewTreasury: true, viewPayroll: true, manageSettings: true, viewAlerts: true,
+      viewTreasury: true, viewSponsorTreasury: true, viewPayroll: true, manageSettings: true, viewAlerts: true,
       manageDashboardCustomization: true, manageBranches: true, viewBilling: true,
     },
   }),
