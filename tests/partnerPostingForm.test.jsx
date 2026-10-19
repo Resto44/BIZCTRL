@@ -18,7 +18,7 @@ it.each([false,true])('keeps confirmation and server errors beside submit; denie
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
  try{
  await act(async()=>root.render(<Ledger partner={{id:'partner',name:'Partner',is_active:true}}/>));
- await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent.includes('Record transaction')).click());
+ await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent.includes('Record personal advance / repayment')).click());
  const dialog=host.querySelector('[role="dialog"]');const kind=dialog.querySelector('select');
  await act(async()=>{kind.value='sponsor_repay_owner';kind.dispatchEvent(new Event('change',{bubbles:true}));});
  expect(dialog.textContent).toContain('100.00 SAR');

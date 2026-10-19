@@ -57,7 +57,8 @@ describe('Verified named internal accounts cannot silently duplicate',()=>{
   expect(card).toContain('partner.account_reference||walletAccountReference(partner.id)');
   expect(card).toContain('partner.login_email');
   expect(card).toContain('not a bank account');
-  expect(owner).toContain('walletAccountReference(p.id)');
+  expect(owner).toContain('<OwnerWalletPersonActivity');
+  expect(read('src/components/settlement/OwnerWalletPersonActivity.jsx')).toContain('walletAccountReference(person.id)');
  });
 });
 
