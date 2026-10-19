@@ -115,7 +115,7 @@ DECLARE
  v_wallet jsonb;
  v_history jsonb;
 BEGIN
- IF auth.uid() IS NULL OR p_person IS NULL OR p_limit NOT BETWEEN 1 AND 100
+ IF auth.uid() IS NULL OR p_person IS NULL OR p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100
  THEN RAISE EXCEPTION 'WALLET_ACCESS_DENIED' USING ERRCODE='42501';END IF;
  SELECT * INTO p FROM public.business_partners WHERE id=p_person;
  IF NOT FOUND OR NOT p.is_active OR NOT EXISTS(
@@ -128,16 +128,32 @@ BEGIN
  SELECT name INTO v_business FROM public.restaurants WHERE id=p.restaurant_id;
  SELECT coalesce(jsonb_agg(x ORDER BY x.currency),'[]'::jsonb) INTO v_wallet
  FROM (
-  SELECT a.id,a.currency,a.status,
-   coalesce(sum(j.signed_amount) FILTER(WHERE j.side='person'),0) balance,
-   (SELECT coalesce(sum(r.amount),0) FROM public.erp_bank_wallet_requests r
-    WHERE r.person_id=p.id AND r.currency=a.currency AND r.status='pending') pending_amount,
-   coalesce(sum(j.signed_amount) FILTER(WHERE j.side='person' AND j.signed_amount>0),0) transfers_in,
-   -coalesce(sum(j.signed_amount) FILTER(WHERE j.side='person' AND j.signed_amount<0),0) transfers_out
-  FROM public.erp_bank_wallet_accounts a
-  LEFT JOIN public.erp_bank_wallet_postings j ON j.wallet_account_id=a.id
-  WHERE a.restaurant_id=p.restaurant_id AND a.person_id=p.id
-  GROUP BY a.id,a.currency,a.status
+  -- Include currencies of pending requests before the first approved posting.
+  -- Account balances MUST still come solely from posted person-side entries.
+  SELECT c.currency,a.id,coalesce(a.status,'active') status,
+   coalesce(j.balance,0) balance,coalesce(pr.pending_amount,0) pending_amount,
+   coalesce(j.transfers_in,0) transfers_in,coalesce(j.transfers_out,0) transfers_out
+  FROM (
+   SELECT currency FROM public.erp_bank_wallet_accounts
+    WHERE restaurant_id=p.restaurant_id AND person_id=p.id
+   UNION
+   SELECT currency FROM public.erp_bank_wallet_requests
+    WHERE restaurant_id=p.restaurant_id AND person_id=p.id
+  )c
+  LEFT JOIN public.erp_bank_wallet_accounts a ON
+   a.restaurant_id=p.restaurant_id AND a.person_id=p.id AND a.currency=c.currency
+  LEFT JOIN LATERAL (
+   SELECT coalesce(sum(signed_amount) FILTER(WHERE side='person'),0) balance,
+    coalesce(sum(signed_amount) FILTER(WHERE side='person' AND signed_amount>0),0) transfers_in,
+    -coalesce(sum(signed_amount) FILTER(WHERE side='person' AND signed_amount<0),0) transfers_out
+   FROM public.erp_bank_wallet_postings WHERE wallet_account_id=a.id
+  )j ON true
+  LEFT JOIN LATERAL (
+   SELECT coalesce(sum(amount),0) pending_amount
+   FROM public.erp_bank_wallet_requests
+   WHERE restaurant_id=p.restaurant_id AND person_id=p.id
+    AND currency=c.currency AND status='pending'
+  )pr ON true
  )x;
  SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.created_at DESC),'[]'::jsonb)
  INTO v_history FROM (
@@ -170,7 +186,7 @@ SET search_path=public,pg_temp AS $$
 DECLARE p public.business_partners;r public.erp_bank_wallet_requests;
 BEGIN
  IF auth.uid() IS NULL OR p_person IS NULL OR p_request_id IS NULL OR
- p_kind NOT IN('fund_wallet','return_to_owner') OR p_amount IS NULL OR
+ p_kind IS NULL OR p_kind NOT IN('fund_wallet','return_to_owner') OR p_amount IS NULL OR
  p_amount<=0 OR p_amount>10000000 OR p_amount<>round(p_amount,2) OR
  p_currency IS NULL OR p_currency !~ '^[A-Z]{3}$' OR
  length(coalesce(p_note,''))>500
