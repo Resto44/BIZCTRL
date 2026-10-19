@@ -20,7 +20,7 @@ import {Card} from '@/components/ui/card';
 export default function PartnerTreasuryCenter(){
  const {activeRestaurantId}=useTenant();
  const {role}=useRole();
- const {lang}=useLanguage(); const t=peopleText(lang); const qc=useQueryClient();
+ const {lang,currency}=useLanguage(); const t=peopleText(lang); const qc=useQueryClient();
  const [selected,setSelected]=useState(''); const [form,setForm]=useState(null);
  const [view,setView]=useState('overview'); const [recordSignal,setRecordSignal]=useState(0);
  const [busy,setBusy]=useState(false); const lock=useRef(false);
@@ -52,7 +52,7 @@ export default function PartnerTreasuryCenter(){
  const tabs={en:{overview:'Overview',ledger:'Account details & ledger',requests:'Approvals & settlements',manage:'Account management'},ar:{overview:'نظرة عامة',ledger:'تفاصيل الحساب والدفتر',requests:'الطلبات والتسويات',manage:'إدارة الحسابات'},fa:{overview:'نمای کلی',ledger:'جزئیات حساب و دفتر',requests:'درخواست‌ها و تسویه',manage:'مدیریت حساب‌ها'}}[lang]||{overview:'Overview',ledger:'Account details & ledger',requests:'Approvals & settlements',manage:'Account management'};
  return <section className="mx-auto max-w-6xl min-w-0 space-y-4 pb-20" dir={lang==='en'?'ltr':'rtl'}>
   <nav aria-label={t.title} className="grid grid-cols-2 gap-2 rounded-2xl border bg-white p-2 sm:grid-cols-4">{['overview','ledger','requests','manage'].map(key=><button key={key} type="button" aria-current={view===key?'page':undefined} onClick={()=>{setView(key);setRecordSignal(0);setError('');}} className={`min-h-11 min-w-0 rounded-xl px-2 py-2 text-xs font-bold leading-5 sm:text-sm ${view===key?'bg-blue-600 text-white':'bg-slate-50 text-slate-600'}`}>{tabs[key]}</button>)}</nav>
-  {view==='overview'&&<WalletERPOverview restaurantId={activeRestaurantId} partners={partners} partner={partner} lang={lang}
+  {view==='overview'&&<WalletERPOverview restaurantId={activeRestaurantId} partners={partners} partner={partner} lang={lang} displayCurrency={currency}
     onSelect={setSelected} onAdd={newAccount} onEdit={editAccount}
     onLedger={()=>{setRecordSignal(0);setView('ledger');}}
     onRecord={()=>{setRecordSignal(x=>x+1);setView('ledger');}}
