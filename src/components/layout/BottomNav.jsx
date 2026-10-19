@@ -33,18 +33,18 @@ import { isRestaurantPOSPortal } from '@/lib/productImportAccess';
 
 const PRIMARY_NAV_OWNER_RESTAURANT = [
   { path: '/owner-command-center', icon: LayoutDashboard, labelKey: 'dashboard' },
-  { path: '/treasury',              icon: Wallet,           labelKey: 'treasury' },
-  { path: '/product-management',    icon: Package,          labelKey: 'product_management' },
-  { path: '/debt-management',       icon: CreditCard,       labelKey: 'debt_management' },
-  { path: '/more',                 icon: Grid3x3,          labelKey: 'more', isMore: true },
+  { path: '/treasury',              icon: Building2,       labelKey: 'treasury' },
+  { path: '/wallet-banking',        icon: Wallet,          labelKey: 'wallet_banking' },
+  { path: '/reports',               icon: BarChart3,       labelKey: 'reports' },
+  { path: '/more',                  icon: Grid3x3,        labelKey: 'more', isMore: true },
 ];
 
 const PRIMARY_NAV_OWNER_RETAIL = [
   { path: '/owner-command-center', icon: LayoutDashboard, labelKey: 'dashboard' },
-  { path: '/treasury',              icon: Wallet,           labelKey: 'treasury' },
-  { path: '/inventory',            icon: Boxes,            labelKey: 'inventory' },
-  { path: '/retail/pos-control',   icon: ScanLine,         labelKey: 'pos_control' },
-  { path: '/more',                 icon: Grid3x3,          labelKey: 'more', isMore: true },
+  { path: '/treasury',              icon: Building2,       labelKey: 'treasury' },
+  { path: '/wallet-banking',        icon: Wallet,          labelKey: 'wallet_banking' },
+  { path: '/reports',               icon: BarChart3,       labelKey: 'reports' },
+  { path: '/more',                  icon: Grid3x3,         labelKey: 'more', isMore: true },
 ];
 
 const PRIMARY_NAV_MANAGER_RESTAURANT = [
@@ -165,7 +165,7 @@ const MORE_SECTIONS_OWNER_RESTAURANT = [
       { path: '/driver-management',         icon: Truck,       labelKey: 'driver_management' },
       { path: '/debt-management',           icon: CreditCard,  labelKey: 'debt_management' },
       { path: '/treasury',                  icon: Wallet,      labelKey: 'treasury' },
-      { path: '/sponsor-treasury', icon: Wallet, labelKey: 'sponsor_treasury' },
+      { path: '/wallet-banking', icon: Wallet, labelKey: 'wallet_banking' },
     ],
   },
   {
@@ -229,7 +229,7 @@ const MORE_SECTIONS_OWNER_RETAIL = [
       { path: '/customer-management',       icon: Star,        labelKey: 'customer_management' },
       { path: '/debt-management',           icon: CreditCard,  labelKey: 'debt_management' },
       { path: '/treasury',                  icon: Wallet,      labelKey: 'treasury' },
-      { path: '/sponsor-treasury', icon: Wallet, labelKey: 'sponsor_treasury' },
+      { path: '/wallet-banking', icon: Wallet, labelKey: 'wallet_banking' },
     ],
   },
   {
@@ -325,7 +325,7 @@ const CONTROL_GROUPS = [
     title: 'Finance & Treasury',
     icon: Wallet,
     iconClass: 'bg-violet-600 text-white',
-    paths: ['/network-management', '/profit-loss', '/debt-management', '/treasury', '/sponsor-treasury', '/payroll'],
+    paths: ['/network-management', '/profit-loss', '/debt-management', '/treasury', '/wallet-banking', '/payroll'],
   },
   {
     key: 'team',
@@ -344,6 +344,7 @@ const CONTROL_GROUPS = [
 ];
 
 function readableLabel(t, labelKey) {
+  if(labelKey==='wallet_banking') return 'Wallet';
   const translated = t(labelKey);
   if (translated && translated !== labelKey) return translated;
   return labelKey
