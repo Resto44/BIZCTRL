@@ -106,6 +106,7 @@ const MORE_PERMISSION_BY_PATH = {
   '/debt-management': 'viewDebts',
   '/treasury': 'viewTreasury',
   '/sponsor-treasury': 'viewSponsorTreasury',
+  '/wallet-banking': 'viewSponsorTreasury',
   '/payroll': 'viewPayroll',
   '/settings': 'manageSettings',
   '/customize-workspace': 'manageDashboardCustomization',
