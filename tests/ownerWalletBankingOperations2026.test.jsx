@@ -29,7 +29,7 @@ describe('Owner Accounts & Wallet bank-style routing',()=>{
   await act(async()=>root.unmount());host.remove();
  });
  it('never presents personal loans as permitted when the account loan permission is disabled',async()=>{
-  const host=document.createElement('div');document.body.append(host),root=createRoot(host);
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
   await act(async()=>root.render(<OwnerWalletOperations partner={{id:'B',name:'Employee',is_active:true,allow_loans:false}} lang="en" onCustody={()=>{}} onAdvance={()=>{}} onStatement={()=>{}}/>));
   const buttons=[...host.querySelectorAll('button')];
   expect(buttons).toHaveLength(3);
@@ -45,7 +45,7 @@ describe('Owner Accounts & Wallet bank-style routing',()=>{
   expect(page).toContain("onAdvance={showFinance}");
   expect(page).toContain("requestTab==='custody'?<PartnerTransactionRequests");
   expect(page).toContain("view==='ledger'&&partner&&<SponsorOwnerBilateralLedger");
-  expect(page).toContain("onSelect(p.id)");
+  expect(summary).toContain("onSelect(p.id)");
   expect(page).not.toContain('erp_post_wallet_bank_transfer');
  });
  it('makes owner account KPIs visible and sources remain independently loading',()=>{
