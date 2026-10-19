@@ -70,7 +70,7 @@ export default function WalletPortalERPOverview({partner,statement,lang='en',onL
    {!permitted&&<p className="text-xs text-amber-700">{t.noAccess}</p>}
    <button type="button" onClick={onStatement} className="flex min-h-11 w-full items-center justify-between gap-2 border-t border-slate-100 pt-2 text-start text-sm font-bold text-blue-700"><span className="flex items-center gap-2"><FileText className="size-4"/>{t.statement}</span><ChevronDown className="size-4"/></button>
   </div>
-  {!query.isPending&&!query.isError&&<WalletUnifiedActivity loans={statement?.records||[]} custody={query.data?.records||[]} currency={selected} lang={lang} onStatement={onStatement} onRequests={onCustody}/>}
+  {!query.isPending&&!query.isError&&<WalletUnifiedActivity loans={statement?.records||[]} custody={query.data?.records||[]} account={partner} currency={selected} lang={lang} onStatement={onStatement} onRequests={onCustody}/>}
   <p className="flex items-start gap-2 text-xs leading-5 text-slate-500"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-blue-600"/>{t.policy}</p>
  </section>;
 }
