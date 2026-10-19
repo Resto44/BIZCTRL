@@ -85,7 +85,7 @@ function MoneyCard({label,value,currency,icon:Icon,tone,loading,onClick}){
 export default function WalletBankingCenter({person=null,owner=false,lang='en',onBeneficiaries,embedded=false}){
  const t=L[lang]||L.en,client=useQueryClient();
  const [currency,setCurrency]=useState('SAR'),[panel,setPanel]=useState('home'),[kind,setKind]=useState('fund_wallet');
- const [amount,setAmount]=useState(''),[note,setNote]=useState(''),[reviewId,setReviewId]=useState(null),[reviewNote,setReviewNote]=useState(''),[treasuryId,setTreasuryId]=useState('');
+ const [amount,setAmount]=useState(''),[note,setNote]=useState(''),[requestId,setRequestId]=useState(()=>crypto.randomUUID()),[reviewId,setReviewId]=useState(null),[reviewNote,setReviewNote]=useState(''),[treasuryId,setTreasuryId]=useState('');
  const [limit,setLimit]=useState(5),[message,setMessage]=useState('');
  const query=useQuery({queryKey:['erp-bank-wallet',person?.id],enabled:!!person?.id,
   queryFn:async()=>{
@@ -111,12 +111,12 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  const invalidate=async()=>{await client.invalidateQueries({queryKey:['erp-bank-wallet',person?.id]});};
  const request=useMutation({mutationFn:async()=>{
    const raw=Number(amount);
-   if(!Number.isFinite(raw)||raw<=0||raw>10000000||Math.round(raw*100)!==raw*100)throw Error('INVALID_AMOUNT');
+   if(!/^(?:0|[1-9][0-9]{0,7})(?:\.[0-9]{1,2})?$/.test(amount)||!Number.isFinite(raw)||raw<=0||raw>10000000)throw Error('INVALID_AMOUNT');
    const {error}=await supabase.rpc('erp_bank_wallet_request',{
     p_person:person.id,p_kind:kind,p_amount:raw,p_currency:activeCurrency,
-    p_request_id:crypto.randomUUID(),p_note:note.trim()
+    p_request_id:requestId,p_note:note.trim()
    });if(error)throw error;
-  },onSuccess:async()=>{setAmount('');setNote('');setPanel('home');setMessage(t.success);await invalidate();},
+  },onSuccess:async()=>{setAmount('');setNote('');setRequestId(crypto.randomUUID());setPanel('home');setMessage(t.success);await invalidate();},
    onError:e=>setMessage(e?.message||t.error)});
  const review=useMutation({mutationFn:async approved=>{
    const {error}=await supabase.rpc('erp_bank_wallet_review',{
@@ -129,7 +129,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
    setMessage('');request.mutate();
  };
  const selectReview=r=>{setReviewId(r.id);setReviewNote('');setTreasuryId('');setMessage('');setPanel('review');};
- const start=next=>{setMessage('');setPanel(next);if(next==='transfer')setKind('return_to_owner');if(next==='receive')setKind('fund_wallet');};
+ const start=next=>{setMessage('');setPanel(next);setRequestId(crypto.randomUUID());if(next==='transfer')setKind('return_to_owner');if(next==='receive')setKind('fund_wallet');};
  const loaded=!query.isPending&&!query.isError;
  const canSubmit=loaded&&!!person?.id&&!owner&&amount!==''&&Number(amount)>0&&!request.isPending;
  const canApprove=loaded&&owner&&!!selectedRequest&&reviewNote.trim().length>=8&&!review.isPending&&!!treasuryId;
