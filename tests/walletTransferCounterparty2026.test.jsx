@@ -35,8 +35,8 @@ describe('Canonical wallet transfer identity: person account ↔ business legal 
    const html=renderToStaticMarkup(React.createElement(WalletUnifiedActivity,{loans,currency:'SAR',lang,account:{id:accountId,business:businessName},onStatement:()=>{},onRequests:()=>{}}));
    expect(html).toContain(accountReference);
    expect(html).toContain(businessName);
-   expect(html.match(new RegExp(accountReference,'g')).toHaveLength(2);
-   expect(html.match(new RegExp(businessName,'g')).toHaveLength(2);
+   expect(html.match(new RegExp(accountReference,'g'))).toHaveLength(2);
+   expect(html.match(new RegExp(businessName,'g'))).toHaveLength(2);
    const locale=lang==='fa'?'fa-AF':lang==='ar'?'ar-SA':'en-US';
    const fmt=n=>new Intl.NumberFormat(locale,{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
    expect(html).toContain('−'+fmt(15));
