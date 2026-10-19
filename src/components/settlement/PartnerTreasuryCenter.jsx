@@ -51,12 +51,12 @@ export default function PartnerTreasuryCenter(){
  if(role!=='owner')return null;
  const tabs={en:{overview:'Overview',ledger:'Account details & ledger',requests:'Approvals & settlements',manage:'Account management'},ar:{overview:'نظرة عامة',ledger:'تفاصيل الحساب والدفتر',requests:'الطلبات والتسويات',manage:'إدارة الحسابات'},fa:{overview:'نمای کلی',ledger:'جزئیات حساب و دفتر',requests:'درخواست‌ها و تسویه',manage:'مدیریت حساب‌ها'}}[lang]||{overview:'Overview',ledger:'Account details & ledger',requests:'Approvals & settlements',manage:'Account management'};
  return <section className="mx-auto max-w-6xl min-w-0 space-y-4 pb-20" dir={lang==='en'?'ltr':'rtl'}>
-  <nav aria-label={t.title} className="grid grid-cols-2 gap-2 rounded-2xl border bg-white p-2 sm:grid-cols-4">{['overview','ledger','requests','manage'].map(key=><button key={key} type="button" aria-current={view===key?'page':undefined} onClick={()=>{setView(key);setError('');}} className={`min-h-11 min-w-0 rounded-xl px-2 py-2 text-xs font-bold leading-5 sm:text-sm ${view===key?'bg-blue-600 text-white':'bg-slate-50 text-slate-600'}`}>{tabs[key]}</button>)}</nav>
+  <nav aria-label={t.title} className="grid grid-cols-2 gap-2 rounded-2xl border bg-white p-2 sm:grid-cols-4">{['overview','ledger','requests','manage'].map(key=><button key={key} type="button" aria-current={view===key?'page':undefined} onClick={()=>{setView(key);setRecordSignal(0);setError('');}} className={`min-h-11 min-w-0 rounded-xl px-2 py-2 text-xs font-bold leading-5 sm:text-sm ${view===key?'bg-blue-600 text-white':'bg-slate-50 text-slate-600'}`}>{tabs[key]}</button>)}</nav>
   {view==='overview'&&<WalletERPOverview restaurantId={activeRestaurantId} partners={partners} partner={partner} lang={lang}
     onSelect={setSelected} onAdd={newAccount} onEdit={editAccount}
-    onLedger={()=>setView('ledger')}
+    onLedger={()=>{setRecordSignal(0);setView('ledger');}}
     onRecord={()=>{setRecordSignal(x=>x+1);setView('ledger');}}
-    onRequests={()=>setView('requests')} onMembers={()=>setView('manage')}/>}
+    onRequests={()=>{setRecordSignal(0);setView('requests');}} onMembers={()=>{setRecordSignal(0);setView('manage');}}/>}
   {view==='manage'&&<Card className="min-w-0 space-y-3 rounded-[24px] border-slate-200 bg-white p-4 shadow-sm sm:p-6">
    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-black text-slate-950 sm:text-xl">{t.title}</h2><p className="mt-1 text-xs text-slate-600">{t.partners}</p></div>
     <Button onClick={newAccount}>{t.add}</Button></div>
