@@ -43,7 +43,8 @@ describe('partner treasury isolation and portal',()=>{
   const statementTab=[...host.querySelectorAll('nav button')].find(b=>b.textContent===statementTitle);
   expect(statementTab).toBeTruthy();
   await act(async()=>statementTab.click());
-  expect(host.textContent).toContain(t.ownerOwes);expect(host.textContent).toContain(t.sponsor_advance_to_owner);
+  // Statement opens on the transaction list, not the balance-heavy overview.
+  expect(host.textContent).toContain(t.records);expect(host.textContent).toContain(t.sponsor_advance_to_owner);
   expect(host.querySelector('main').dir).toBe(lang==='en'?'ltr':'rtl');
   const button=[...host.querySelectorAll('button')].find(b=>b.textContent===t.confirm);
   await act(async()=>button.click());
