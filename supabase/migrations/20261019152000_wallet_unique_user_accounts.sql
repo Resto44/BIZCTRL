@@ -28,6 +28,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp
 AS $$
  SELECT coalesce(jsonb_agg(jsonb_build_object(
    'id',p.id,
+   'restaurant_id',p.restaurant_id,
    'account_reference','WLT-'||upper(replace(p.id::text,'-','')),
    'name',p.name,
    'login_email',u.email,
