@@ -80,6 +80,10 @@ export default function PartnerTreasuryCenter(){
    {error&&<p role="alert" className="text-sm text-red-600">{error}</p>}
    {invitation&&<PartnerInvitationLink key={invitation} invitation={invitation} t={t}/>}
   </Card>}
+  {(view==='ledger'||view==='requests')&&partners.length>0&&<label className="block rounded-xl border border-slate-200 bg-white p-3 text-xs font-semibold text-slate-600">
+    {t.partners}
+    <select aria-label={t.partners} value={partner?.id||''} onChange={e=>{setSelected(e.target.value);setRecordSignal(0);}} className="mt-1 block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950">{partners.map(p=><option key={p.id} value={p.id}>{p.name} · {t[p.account_role||'partner']}</option>)}</select>
+   </label>}
   {view==='ledger'&&partner&&<SponsorOwnerBilateralLedger key={`${activeRestaurantId}:${partner.id}`} partner={partner} openTransactionSignal={recordSignal}/>}
   {view==='ledger'&&<details className="rounded-xl border border-slate-200 bg-white p-3 text-xs"><summary className="cursor-pointer font-bold">{t.custodyTotal}</summary><div className="mt-3"><PeopleCustodySummary tenant={activeRestaurantId} t={t}/></div></details>}
   {view==='manage'&&<details className="rounded-xl border border-slate-200 bg-white p-3 text-sm"><summary className="cursor-pointer font-bold">{t.membership}</summary><div className="mt-3"><PeopleMemberships tenant={activeRestaurantId} t={t} branches={branches.data||[]}/></div></details>}
