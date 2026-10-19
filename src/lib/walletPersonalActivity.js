@@ -7,12 +7,13 @@ export const walletAccountReference=(uuid)=>{
     ?'WLT-'+id.replaceAll('-','').toUpperCase():'';
 };
 export const accountRowsUnique=(accounts=[])=>{
-  const seenIds=new Set(),seenReferences=new Set();
+  const seenIds=new Set(),seenReferences=new Set(),seenTenants=new Set();
   return accounts.filter(account=>{
     const id=account?.id;
     const ref=account?.account_reference||walletAccountReference(id);
-    if(!id||!ref||seenIds.has(id)||seenReferences.has(ref))return false;
-    seenIds.add(id);seenReferences.add(ref);return true;
+    const tenant=account?.restaurant_id;
+    if(!id||!ref||!tenant||seenIds.has(id)||seenReferences.has(ref)||seenTenants.has(tenant))return false;
+    seenIds.add(id);seenReferences.add(ref);seenTenants.add(tenant);return true;
   });
 };
 /**
