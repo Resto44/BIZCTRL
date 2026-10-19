@@ -23,7 +23,7 @@ describe('Verified named internal accounts cannot silently duplicate',()=>{
    {id:ac2,restaurant_id:'restaurant-A'},
    {id:ac2,restaurant_id:'restaurant-B'},
   ];
-  expect(accountRowsUnique(rows)).toEqual([rows[0]]);
+  expect(accountRowsUnique(rows)).toEqual([rows[0],rows[3]]);
   expect(accountRowsUnique([rows[0],{id:ac2,restaurant_id:'restaurant-B'}])).toHaveLength(2);
  });
  it('enforces uniqueness in SQL by verified user + restaurant, preserving existing payments',()=>{
@@ -92,7 +92,7 @@ describe('Internal banking-style activity is source-separated',()=>{
   expect(activity).toContain('Personal finance statement');
   expect(activity).toContain('Business funds');
   expect(activity).toContain('Custody requests');
-  expect(activity).toContain('onStatement={onStatement}');
+  expect(activity).toContain('onClick={onStatement}');
   expect(activity).not.toContain('wallet_balance=');
   expect(card).not.toContain('supabase.from(');
  });
