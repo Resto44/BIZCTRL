@@ -10,6 +10,7 @@ import {peopleText} from '@/lib/peopleAccounts';
 import PeopleMemberships from '@/components/settlement/PeopleMemberships';
 import PartnerTransactionRequests from '@/components/settlement/PartnerTransactionRequests';
 import PartnerWorkspace from '@/components/settlement/PartnerWorkspace';
+import WalletPortalERPOverview from '@/components/settlement/WalletPortalERPOverview';
 import {loadPartnerStatement} from '@/lib/partnerAnalytics';
 
 // Separate external portal: no staff membership, owner wallet access, or branch permissions.
@@ -21,6 +22,7 @@ export default function PartnerPortal(){
  const [joinToken,setJoinToken]=useState(()=>new URLSearchParams(window.location.hash.slice(1)).get('join')||new URLSearchParams(window.location.search).get('join')||sessionStorage.getItem('people:join')||'');
  const [busy,setBusy]=useState(false); const lock=useRef(false); const [error,setError]=useState(''); const [notice,setNotice]=useState('');
  const [selected,setSelected]=useState('');
+ const [loanSignal,setLoanSignal]=useState(0),[custodySignal,setCustodySignal]=useState(0),[statementSignal,setStatementSignal]=useState(0),[accountSignal,setAccountSignal]=useState(0);
  const [preferences,setPreferences]=useState({title:'',showBalances:true,compact:false});
  useEffect(()=>{let live=true;supabase.auth.getSession().then(({data,error})=>{if(live){setSession(data?.session||null);setAuthLoading(false);if(error)setError(t.failed);}});
   const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,next)=>{if(live){setSession(next);setAuthLoading(false);}});
@@ -33,6 +35,7 @@ export default function PartnerPortal(){
  const accounts=useQuery({queryKey:['partner-portal-accounts',session?.user?.id],enabled:!!session?.user?.id,
   queryFn:async()=>{const {data,error}=await supabase.rpc('erp_partner_portal_accounts');if(error)throw error;return data||[];},refetchInterval:15000});
  const partner=accounts.data?.find(p=>p.id===selected)||accounts.data?.[0];
+ const scrollToSection=id=>document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'});
  const statement=useQuery({queryKey:['partner-portal-statement',session?.user?.id,partner?.id],enabled:!!session?.user?.id&&!!partner?.id,
   queryFn:({signal})=>loadPartnerStatement(supabase,partner.id,signal),refetchInterval:30000});
  const run=async(fn)=>{if(lock.current)return;lock.current=true;setBusy(true);setError('');setNotice('');try{await fn();}catch(e){setError(partnerError(e,t));}finally{lock.current=false;setBusy(false);}};
@@ -63,11 +66,14 @@ export default function PartnerPortal(){
      <Card className="flex flex-wrap items-center justify-between gap-3 p-4"><select aria-label={t.partners} className="min-w-0 flex-1 rounded-xl border bg-background p-3" value={partner.id} onChange={e=>{setSelected(e.target.value);setError('');}}>
       {accounts.data.map(p=><option key={p.id} value={p.id}>{p.business} · {p.name}</option>)}
      </select><Button variant="outline" onClick={()=>{accounts.refetch();statement.refetch();}}>{t.refresh}</Button></Card>
-     <p className="text-sm font-bold">{t[partner.account_role||'partner']} {partner.branch?`· ${partner.branch}`:''}</p>
-     <p className="rounded-xl border p-3 text-xs text-muted-foreground">{t.scopeNote}</p>
-     <PartnerTransactionRequests key={`custody:${session.user.id}:${partner.id}`} partner={partner} t={t} custody/>
-     <PartnerTransactionRequests key={`requests:${session.user.id}:${partner.id}`} partner={partner} t={t}/>
-     {statement.isLoading?<p>{t.loading}</p>:statement.isError?<p role="alert">{t.failed}<Button onClick={()=>statement.refetch()}>{t.refresh}</Button></p>:statement.data&&<PartnerWorkspace key={`${session.user.id}:${partner.id}`} data={statement.data} partner={partner} t={t} lang={lang} preferences={preferences} updatePreference={updatePreference} confirm={confirm} busy={busy}/>}
+     {statement.data&&<WalletPortalERPOverview partner={partner} statement={statement.data} lang={lang}
+       onLoan={()=>{setLoanSignal(x=>x+1);scrollToSection('wallet-loan-requests');}}
+       onCustody={()=>{setCustodySignal(x=>x+1);scrollToSection('wallet-custody-requests');}}
+       onStatement={()=>{setStatementSignal(x=>x+1);scrollToSection('wallet-statement');}}
+       onAccount={()=>{setAccountSignal(x=>x+1);scrollToSection('wallet-statement');}}/>}
+     <div id="wallet-custody-requests" className="scroll-mt-4"><PartnerTransactionRequests key={`custody:${session.user.id}:${partner.id}`} partner={partner} t={t} custody openSignal={custodySignal}/></div>
+     <div id="wallet-loan-requests" className="scroll-mt-4"><PartnerTransactionRequests key={`requests:${session.user.id}:${partner.id}`} partner={partner} t={t} openSignal={loanSignal}/></div>
+     <div id="wallet-statement" className="scroll-mt-4">{statement.isLoading?<p>{t.loading}</p>:statement.isError?<p role="alert">{t.failed}<Button onClick={()=>statement.refetch()}>{t.refresh}</Button></p>:statement.data&&<PartnerWorkspace key={`${session.user.id}:${partner.id}`} data={statement.data} partner={partner} t={t} lang={lang} preferences={preferences} updatePreference={updatePreference} confirm={confirm} busy={busy} statementSignal={statementSignal} accountSignal={accountSignal}/>}</div>
 
     </>}
    </>}

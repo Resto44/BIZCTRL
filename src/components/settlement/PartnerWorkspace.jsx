@@ -1,11 +1,13 @@
-import React,{useMemo,useState} from 'react';
+import React,{useEffect,useMemo,useState} from 'react';
 import {LayoutDashboard,ArrowDownLeft,ArrowUpRight,BarChart3,List,User,Download,Clock,CheckCircle2,Search,Wallet,Building2} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {filterPartnerRecords,partnerBalanceTrend,partnerDirection,partnerPeriodStart,summarizePartnerRecords} from '@/lib/partnerAnalytics';
 
-export default function PartnerWorkspace({data,partner,t,lang,preferences,updatePreference,confirm,busy}){
+export default function PartnerWorkspace({data,partner,t,lang,preferences,updatePreference,confirm,busy,statementSignal=0,accountSignal=0}){
  const [tab,setTab]=useState('overview'),[period,setPeriod]=useState('month'),[chosenCurrency,setCurrency]=useState(''),[method,setMethod]=useState('all'),[status,setStatus]=useState('all'),[search,setSearch]=useState(''),[page,setPage]=useState(0),[exporting,setExporting]=useState(false),[exportError,setExportError]=useState('');
+ useEffect(()=>{if(statementSignal>0){setTab('records');setPeriod('all');setPage(0);}},[statementSignal]);
+ useEffect(()=>{if(accountSignal>0)setTab('account');},[accountSignal]);
  const currencies=[...new Set([...data.balances.map(b=>b.currency),...data.records.map(r=>r.currency)])].sort();
  const currency=currencies.includes(chosenCurrency)?chosenCurrency:currencies[0]||'';
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());

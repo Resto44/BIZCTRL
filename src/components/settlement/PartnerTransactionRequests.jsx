@@ -1,4 +1,4 @@
-import React,{useRef,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
 import {Button} from '@/components/ui/button';
@@ -6,10 +6,16 @@ import {Input} from '@/components/ui/input';
 import {sponsorOwnerAccountMethod} from '@/lib/sponsorOwnerBilateral';
 const loanKinds=['sponsor_advance_to_owner','owner_repay_sponsor','owner_advance_to_sponsor','sponsor_repay_owner'];
 const fresh=(custody)=>({kind:custody?'custody_received':'sponsor_advance_to_owner',amount:'',currency:'SAR',date:new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh'}).format(new Date()),method:'cash',notes:'',reference:'',confirm:false});
-export default function PartnerTransactionRequests({partner,t,owner=false,custody=false}){
+export default function PartnerTransactionRequests({partner,t,owner=false,custody=false,openSignal=0}){
  const kinds=custody?['custody_received','custody_returned']:loanKinds; const key=custody?'people-custody':'partner-requests';
  const qc=useQueryClient();const [form,setForm]=useState(null),[page,setPage]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[review,setReview]=useState({});const lock=useRef(false),requestId=useRef(null);
  const list=useQuery({queryKey:[key,partner.id,owner,page],queryFn:async()=>{const {data,error}=await supabase.rpc(custody?'erp_person_custody':'erp_list_partner_requests',custody?{p_person:partner.id,p_offset:page*20}:{p_partner_id:partner.id,p_offset:page*20});if(error)throw error;return data;},refetchInterval:15000});
+ const lastOpen=useRef(0);
+ useEffect(()=>{
+  if(!owner && openSignal>0 && openSignal!==lastOpen.current && partner.can_submit!==false && (custody?partner.allow_custody===true:partner.allow_loans!==false)){
+   lastOpen.current=openSignal;setForm(fresh(custody));setError('');setNotice('');requestId.current=null;
+  }
+ },[openSignal,owner,custody,partner.can_submit,partner.allow_custody,partner.allow_loans]);
  const accounts=useQuery({queryKey:['partner-request-accounts',partner.restaurant_id],enabled:owner,queryFn:async()=>{const {data,error}=await supabase.from('treasury_accounts').select('id,account_name,account_type,legacy_wallet_key,currency').eq('restaurant_id',partner.restaurant_id).eq('is_active',true).is('branch_id',null).is('branch_key',null);if(error)throw error;return (data||[]).filter(a=>!a.legacy_wallet_key||['owner_cash','owner_network'].includes(a.legacy_wallet_key));}});
  const refresh=async()=>{await Promise.all(['people-custody-totals','people-custody','partner-requests','partner-portal-statement','sponsor-owner-bilateral','wallet_transactions','treasury_accounts','treasury_owner_central_transactions'].map(key=>qc.invalidateQueries({queryKey:[key]})));};
  const run=async fn=>{if(lock.current)return;lock.current=true;setBusy(true);setError('');setNotice('');try{await fn();await refresh();}catch(e){const msg=String(e?.message||'');setError((msg.includes('INSUFFICIENT')||msg.includes('EXCEEDS_HELD'))?t.custodyFunds:msg.includes('CONFLICT')?t.requestConflict:msg.includes('INVALID')?t.invalidRequest:owner?t.reviewFailed:t.failed);}finally{lock.current=false;setBusy(false);}};
