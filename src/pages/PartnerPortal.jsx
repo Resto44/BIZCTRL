@@ -74,13 +74,13 @@ export default function PartnerPortal(){
        <Button size="icon" variant="outline" aria-label={t.refresh} className="size-11 shrink-0" onClick={()=>{accounts.refetch();statement.refetch();}}><RefreshCw className="size-4"/></Button>
      </div>
      <nav aria-label={t.portal} className="grid grid-cols-3 gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
-       {[[ 'overview',Wallet],[ 'requests',Clock3],[ 'statement',FileText]].map(([key,Icon])=><button type="button" key={key} aria-current={workspace===key?'page':undefined} onClick={()=>{setWorkspace(key);setLoanSignal(0);setCustodySignal(0);}} className={`flex min-h-12 min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 text-xs font-bold sm:text-sm ${workspace===key?'bg-blue-600 text-white':'text-slate-600 hover:bg-blue-50'}`}><Icon className="size-4 shrink-0"/><span>{labels[key]}</span></button>)}
+       {[[ 'overview',Wallet],[ 'requests',Clock3],[ 'statement',FileText]].map(([key,Icon])=><button type="button" key={key} aria-current={workspace===key?'page':undefined} onClick={()=>{setWorkspace(key);setLoanSignal(0);setCustodySignal(0);setStatementSignal(0);setAccountSignal(0);}} className={`flex min-h-12 min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 text-xs font-bold sm:text-sm ${workspace===key?'bg-blue-600 text-white':'text-slate-600 hover:bg-blue-50'}`}><Icon className="size-4 shrink-0"/><span>{labels[key]}</span></button>)}
      </nav>
      {statement.isLoading?<p role="status">{t.loading}</p>:statement.isError?<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{t.failed} <Button variant="outline" size="sm" onClick={()=>statement.refetch()}>{t.refresh}</Button></p>:statement.data&&<>
        {workspace==='overview'&&<WalletPortalERPOverview partner={partner} statement={statement.data} lang={lang}
         onLoan={()=>openRequest('loan')} onCustody={()=>openRequest('custody')}
-        onStatement={()=>{setWorkspace('statement');setStatementSignal(x=>x+1);}}
-        onAccount={()=>{setWorkspace('statement');setAccountSignal(x=>x+1);}}/>}
+        onStatement={()=>{setAccountSignal(0);setWorkspace('statement');setStatementSignal(x=>x+1);}}
+        onAccount={()=>{setStatementSignal(0);setWorkspace('statement');setAccountSignal(x=>x+1);}}/>}
        {workspace==='requests'&&<section className="min-w-0 space-y-3">
         <div className="grid grid-cols-2 gap-2 rounded-xl border bg-white p-1.5">
          {[['loan',t.loans],['custody',t.custodyTitle]].map(([key,label])=><button key={key} type="button" aria-pressed={requestKind===key} onClick={()=>setRequestKind(key)} className={`min-h-12 min-w-0 rounded-lg px-2 text-xs font-bold leading-5 ${requestKind===key?'bg-blue-50 text-blue-700 ring-1 ring-blue-400':'text-slate-600'}`}>{label}</button>)}
