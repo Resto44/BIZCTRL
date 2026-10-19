@@ -34,42 +34,44 @@ export default function WalletERPOverview({restaurantId,partners=[],partner,onSe
  const chosen=currencies.includes(currency)?currency:currencies.includes(displayCurrency)?displayCurrency:currencies[0]||'SAR';
  const summary=useMemo(()=>ownerWalletSnapshot({transactions:ledger.data||[],custodyBalances:custody.data||[],people:partners,currency:chosen}),[ledger.data,custody.data,partners,chosen]);
  const people=partners.filter(p=>(filter==='all'||(filter==='partners'?p.account_role==='partner':filter==='staff'?p.account_role!=='partner':filter==='active'?p.is_active:!p.is_active))&&([p.name,p.email].join(' ').toLowerCase().includes(search.trim().toLowerCase())));
- const history=summary.recentLoans;
- return <section className="min-w-0 space-y-4" dir={lang==='en'?'ltr':'rtl'}>
-  <div className="flex min-w-0 flex-wrap items-end justify-between gap-3"><div className="min-w-0"><h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{m.heading}</h2><p className="mt-1 text-sm leading-6 text-slate-500">{m.sub}</p></div>
-   <label className="text-xs font-semibold text-slate-500">{m.select}<select aria-label={m.select} value={chosen} onChange={e=>setCurrency(e.target.value)} className="mt-1 block min-h-11 min-w-28 rounded-xl border border-slate-200 bg-white px-3 font-black text-slate-800">{currencies.map(c=><option key={c}>{c}</option>)}</select></label></div>
-  {(ledger.isError||custody.isError)&&<div role="alert" className="space-y-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
-   {ledger.isError&&<p>{m.ledgerUnavailable}</p>}{custody.isError&&<p>{m.custodyUnavailable}</p>}
-   <Button size="sm" variant="outline" onClick={()=>{ledger.refetch();custody.refetch();}}>{m.retry}</Button></div>}
-  <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-   <Stat icon={WalletCards} label={m.custody} value={custody.isError?'—':bill(summary.custodyHeld,chosen,lang)} tone="blue" loading={custody.isPending}/>
-   <Stat icon={ArrowUpRight} label={m.owed} value={ledger.isError?'—':bill(summary.businessOwesPeople,chosen,lang)} tone="amber" loading={ledger.isPending}/>
-   <Stat icon={ArrowDownLeft} label={m.receivable} value={ledger.isError?'—':bill(summary.peopleOweBusiness,chosen,lang)} tone="green" loading={ledger.isPending}/>
-   <Stat icon={Clock3} label={m.pending} value={custody.isError?'—':summary.pendingCustodyCount} sub={m.notMoney} tone="violet" loading={custody.isPending}/>
+ const [expanded,setExpanded]=useState('');
+ return <section className="min-w-0 space-y-3.5" dir={lang==='en'?'ltr':'rtl'}>
+  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2"><div className="min-w-0"><h2 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">{m.heading}</h2><p className="mt-0.5 text-xs text-slate-500">{m.people} · {partners.length}</p></div>
+   <label className="text-xs font-semibold text-slate-500">{m.select}<select aria-label={m.select} value={chosen} onChange={e=>setCurrency(e.target.value)} className="mt-1 block min-h-11 min-w-24 rounded-xl border border-slate-200 bg-white px-2 font-black text-slate-800">{currencies.map(c=><option key={c}>{c}</option>)}</select></label>
   </div>
-  <p className="flex items-start gap-2 rounded-xl bg-blue-50 px-3 py-2.5 text-xs leading-5 text-blue-900"><ShieldCheck className="mt-0.5 size-4 shrink-0"/>{m.separate}</p>
-  <div className="min-w-0 space-y-3 rounded-[24px] border border-slate-200 bg-white p-3.5 shadow-sm sm:p-5">
-   <div className="flex items-center justify-between gap-3"><h3 className="flex items-center gap-2 text-lg font-black text-slate-950"><Users className="size-5 text-blue-600"/>{m.people}</h3><Button size="sm" onClick={onAdd} className="min-h-10 shrink-0 gap-1.5 bg-blue-600"><Plus className="size-4"/>{m.add}</Button></div>
-   <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3"><Search className="size-4 text-slate-400"/><input aria-label={m.search} placeholder={m.search} value={search} onChange={e=>setSearch(e.target.value)} className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none"/></label>
-   <div className="flex gap-2 overflow-x-auto pb-1">{['all','partners','staff','active','inactive'].map(k=><button key={k} type="button" aria-pressed={filter===k} onClick={()=>setFilter(k)} className={`min-h-10 shrink-0 rounded-xl border px-3 text-xs font-bold ${filter===k?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{m[k]} ({partners.filter(p=>k==='all'||(k==='partners'?p.account_role==='partner':k==='staff'?p.account_role!=='partner':k==='active'?p.is_active:!p.is_active)).length})</button>)}</div>
-   {!people.length?<p className="py-6 text-center text-sm text-slate-500">{m.empty}</p>:<div className="space-y-2.5">{people.map(p=>{
-    const amounts=sponsorOwnerSummary((ledger.data||[]).filter(r=>r.partner_id===p.id),chosen);
-    const selected=p.id===partner?.id;
-    return <article key={p.id} className={`min-w-0 space-y-3 rounded-2xl border p-3 sm:p-4 ${selected?'border-blue-300 bg-blue-50/30':'border-slate-200'}`}>
-     <button type="button" onClick={()=>{onSelect(p.id);onLedger();}} className="flex w-full min-w-0 items-start gap-2.5 text-start">
-      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-blue-100 text-blue-600"><UserRound className="size-5"/></span>
-      <span className="min-w-0 flex-1"><strong className="block break-words text-sm text-slate-950">{p.name}</strong><span className="mt-1 block break-all text-xs text-slate-500">{p.email}</span><span className="mt-1 block text-xs text-slate-600">{p.account_role==='partner'?m.partners:m.staff} · <span className={p.is_active?'text-emerald-700':'text-slate-500'}>{p.is_active?m.active:m.inactive}</span> · {p.user_id?m.login:m.unlinked}</span></span>
-      <span dir="ltr" className="max-w-[38%] shrink-0 text-end text-[11px] font-bold leading-5 text-blue-700">{ledger.isPending?'…':ledger.isError?'—':bill(amounts.sponsorOwes,chosen,lang)}<span className="block text-[10px] font-normal text-slate-500">{m.receivable}</span></span><ChevronRight className="size-4 shrink-0 text-slate-400"/>
+  {(ledger.isError||custody.isError)&&<div role="alert" className="space-y-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{ledger.isError&&<p>{m.ledgerUnavailable}</p>}{custody.isError&&<p>{m.custodyUnavailable}</p>}<Button size="sm" variant="outline" onClick={()=>{ledger.refetch();custody.refetch();}}>{m.retry}</Button></div>}
+  <div className="grid grid-cols-2 gap-2.5">
+   <Stat icon={WalletCards} label={m.custody} value={custody.isError?'—':bill(summary.custodyHeld,chosen,lang)} tone="blue" loading={custody.isPending}/>
+   <button type="button" onClick={onRequests} className="min-w-0 rounded-[20px] border border-slate-200 bg-white p-3.5 text-start shadow-sm">
+    <span className="grid size-10 place-items-center rounded-xl bg-violet-50 text-violet-700"><Clock3 className="size-5"/></span>
+    <p className="mt-2 text-xs font-bold leading-5 text-slate-600">{m.pending}</p><p className="mt-1 text-lg font-black text-slate-950">{custody.isPending?'…':custody.isError?'—':summary.pendingCustodyCount}</p>
+   </button>
+  </div>
+  <details className="rounded-xl border border-slate-200 bg-white p-3 text-sm"><summary className="cursor-pointer font-bold text-blue-700">{m.loans}</summary>
+   <div className="mt-3 grid grid-cols-2 gap-2"><Stat icon={ArrowUpRight} label={m.owed} value={ledger.isError?'—':bill(summary.businessOwesPeople,chosen,lang)} tone="amber" loading={ledger.isPending}/><Stat icon={ArrowDownLeft} label={m.receivable} value={ledger.isError?'—':bill(summary.peopleOweBusiness,chosen,lang)} tone="green" loading={ledger.isPending}/></div>
+  </details>
+  <div className="space-y-3 rounded-[24px] border border-slate-200 bg-white p-3.5 shadow-sm sm:p-5">
+   <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-black text-slate-950">{m.people}</h3><Button size="sm" onClick={onAdd} className="min-h-11 shrink-0 gap-1.5 bg-blue-600"><Plus className="size-4"/>{m.add}</Button></div>
+   <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-[1fr_auto]">
+    <label className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3"><Search className="size-4 shrink-0 text-slate-400"/><input aria-label={m.search} placeholder={m.search} value={search} onChange={e=>setSearch(e.target.value)} className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none"/></label>
+    <select aria-label={m.all} value={filter} onChange={e=>setFilter(e.target.value)} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold min-[420px]:w-32">{['all','partners','staff','active','inactive'].map(k=><option key={k} value={k}>{m[k]}</option>)}</select>
+   </div>
+   {!people.length?<p className="py-6 text-center text-sm text-slate-500">{m.empty}</p>:<div className="divide-y divide-slate-100">{people.map(p=>{
+    const open=expanded===p.id;const values=sponsorOwnerSummary((ledger.data||[]).filter(r=>r.partner_id===p.id),chosen);
+    return <article key={p.id} className="py-2.5">
+     <button type="button" aria-expanded={open} onClick={()=>setExpanded(open?'':p.id)} className="flex min-h-14 w-full min-w-0 items-center gap-2.5 text-start">
+      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600"><UserRound className="size-5"/></span>
+      <span className="min-w-0 flex-1"><strong className="block truncate text-sm text-slate-950">{p.name}</strong><span className="mt-0.5 block truncate text-xs text-slate-500">{p.account_role==='partner'?m.partners:m.staff} · <span className={p.is_active?'text-emerald-700':'text-slate-500'}>{p.is_active?m.active:m.inactive}</span> · {p.user_id?m.login:m.unlinked}</span></span>
+      <ChevronRight className={`size-4 shrink-0 text-slate-400 transition-transform ${open?'rotate-90':''}`}/>
      </button>
-     <div className="grid grid-cols-3 gap-2"><Button variant="outline" size="sm" className="min-h-10 min-w-0 px-1 text-xs" onClick={()=>{onSelect(p.id);onEdit(p);}}>{m.edit}</Button><Button variant="outline" size="sm" className="min-h-10 min-w-0 px-1 text-xs" onClick={()=>{onSelect(p.id);onLedger();}}>{m.ledger}</Button><Button size="sm" className="min-h-10 min-w-0 bg-blue-600 px-1 text-xs" disabled={!p.is_active||p.allow_loans===false} onClick={()=>{onSelect(p.id);onRecord();}}>{m.record}</Button></div>
+     {open&&<div className="space-y-3 rounded-xl bg-slate-50 p-3">
+       <p dir="ltr" className="break-all text-xs text-slate-500">{p.email}</p>
+       <div className="grid grid-cols-2 gap-2 text-xs"><div className="min-w-0 rounded-lg bg-white p-2"><p className="text-slate-500">{m.owed}</p><strong dir="ltr" className="mt-1 block break-words text-start text-sm">{ledger.isPending?'…':ledger.isError?'—':bill(values.ownerOwes,chosen,lang)}</strong></div><div className="min-w-0 rounded-lg bg-white p-2"><p className="text-slate-500">{m.receivable}</p><strong dir="ltr" className="mt-1 block break-words text-start text-sm">{ledger.isPending?'…':ledger.isError?'—':bill(values.sponsorOwes,chosen,lang)}</strong></div></div>
+       <div className="grid grid-cols-2 gap-2"><Button type="button" size="sm" variant="outline" className="min-h-11 min-w-0 text-xs" onClick={()=>{onSelect(p.id);onEdit(p);}}>{m.edit}</Button><Button type="button" size="sm" className="min-h-11 min-w-0 bg-blue-600 text-xs" onClick={()=>{onSelect(p.id);onLedger();}}>{m.ledger}</Button></div>
+       {p.is_active&&p.allow_loans!==false&&<button type="button" onClick={()=>{onSelect(p.id);onRecord();}} className="block w-full py-1 text-center text-xs font-bold text-blue-700">{m.record}</button>}
+      </div>}
     </article>})}</div>}
   </div>
-  <section className="space-y-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-   <h3 className="flex items-center gap-2 text-base font-black"><Landmark className="size-5 text-blue-600"/>{m.controls}</h3>
-   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[[m.add,Users,onAdd],[m.loans,BookOpen,onLedger],[m.requests,ArrowLeftRight,onRequests],[m.members,ShieldCheck,onMembers]].map(([label,Icon,fn])=><button key={label} type="button" onClick={fn} className="flex min-h-20 items-center gap-2 rounded-xl bg-slate-50 p-3 text-start text-xs font-bold text-slate-800 hover:bg-blue-50"><Icon className="size-6 shrink-0 text-blue-600"/><span>{label}</span></button>)}</div>
-  </section>
-  <section className="space-y-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"><h3 className="flex items-center gap-2 text-base font-black"><Activity className="size-5 text-blue-600"/>{m.activity}</h3>
-   {ledger.isError?<p className="text-sm text-rose-700">{m.ledgerUnavailable}</p>:ledger.isPending?<p>{m.loading||'…'}</p>:!history.length?<p className="py-3 text-sm text-slate-500">{m.empty}</p>:history.map(r=><div key={r.id} className="flex items-center gap-2 border-t border-slate-100 py-2.5"><span className="grid size-9 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600"><FileClock className="size-4"/></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{partners.find(p=>p.id===r.partner_id)?.name||m.account}</p><p className="text-[11px] text-slate-500">{r.effective_date} · {r.kind}</p></div><strong dir="ltr" className="shrink-0 text-xs tabular-nums">{bill(r.amount,r.currency,lang)}</strong></div>)}
-  </section>
+  <details className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-500"><summary className="cursor-pointer font-semibold">{m.separate}</summary><p className="mt-2">{m.sub}</p></details>
  </section>;
 }
