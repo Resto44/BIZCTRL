@@ -1,20 +1,25 @@
 import React from 'react';
 import {ArrowDownLeft,ArrowUpRight,BookOpen,CalendarDays,CheckCircle2,Clock3,Receipt,ShieldCheck} from 'lucide-react';
-import {recentWalletActivity} from '@/lib/walletPersonalActivity';
+import {recentWalletActivity,walletPartiesForKind,walletAccountReference} from '@/lib/walletPersonalActivity';
 
 const copy={
- en:{title:'Recent account activity',more:'Personal finance statement',custody:'Custody requests',loan:'Personal finance',business:'Business funds',posted:'Posted',approved:'Approved',pending:'Awaiting owner approval',rejected:'Rejected',reversed:'Reversed',reversalPosted:'Reversal entry posted',received:'Received business funds',returned:'Returned business funds',ownerLent:'Business lent to person',personRepaid:'Person repaid business',personLent:'Person lent to business',ownerRepaid:'Business repaid person',needsConfirm:'Awaiting your receipt confirmation',confirmed:'Receipt confirmed',empty:'No account activity for this currency',note:'Business custody is not personal spending balance. Entries from different sources are shown once and never netted.',source:'Source',cash:'Cash',network:'Bank / network'},
- ar:{title:'آخر حركة الحساب',more:'كشف التمويل الشخصي',custody:'طلبات العهدة',loan:'التمويل الشخصي',business:'أموال المنشأة',posted:'مرحل',approved:'معتمد',pending:'بانتظار موافقة المالك',rejected:'مرفوض',reversed:'معكوس',reversalPosted:'قيد عكسي مُرحّل',received:'استلام أموال المنشأة',returned:'إعادة أموال المنشأة',ownerLent:'أقرضت المنشأة الشخص',personRepaid:'سدد الشخص للمنشأة',personLent:'أقرض الشخص المنشأة',ownerRepaid:'سددت المنشأة للشخص',needsConfirm:'بانتظار تأكيد الاستلام',confirmed:'تأكيد الاستلام',empty:'لا توجد حركة بهذه العملة',note:'العهدة ليست رصيد إنفاق شخصي. كل حركة تظهر مرة واحدة فقط، ولا تتم مقاصة الأرصدة.',source:'المصدر',cash:'نقدي',network:'شبكة / بنك'},
- fa:{title:'آخرین گردش حساب',more:'صورت‌حساب قرض شخصی',custody:'درخواست‌های امانت',loan:'معاملات مالی شخصی',business:'پول کسب‌وکار',posted:'ثبت قطعی',approved:'تأییدشده',pending:'منتظر تأیید اونر',rejected:'ردشده',reversed:'برگشت‌شده',reversalPosted:'سند برگشتی ثبت شده',received:'دریافت پول کسب‌وکار',returned:'برگشت پول کسب‌وکار',ownerLent:'کسب‌وکار به شخص قرض داد',personRepaid:'شخص به کسب‌وکار بازپرداخت کرد',personLent:'شخص به کسب‌وکار قرض داد',ownerRepaid:'کسب‌وکار به شخص بازپرداخت کرد',needsConfirm:'منتظر تأیید دریافت شما',confirmed:'دریافت تأییدشده',empty:'در این ارز گردش حساب وجود ندارد',note:'امانت، موجودی قابل‌مصرف شخصی نیست. هر معامله فقط یک‌بار نمایش داده می‌شود و مانده‌ها تهاتر نمی‌شوند.',source:'منبع',cash:'نقد',network:'شبکه / بانک'}
+ en:{title:'Recent account activity',more:'Personal finance statement',custody:'Custody requests',loan:'Personal finance',business:'Business funds',posted:'Posted',approved:'Approved',pending:'Awaiting owner approval',rejected:'Rejected',reversed:'Reversed',reversalPosted:'Reversal entry posted',received:'Received business funds',returned:'Returned business funds',ownerLent:'Loan disbursement',personRepaid:'Loan repayment to business',personLent:'Loan provided to business',ownerRepaid:'Loan repayment from business',fromAccount:'From account',toAccount:'To account',walletId:'Personal wallet ID',payer:'Payer',payee:'Recipient',missingIdentity:'Account or business identity is unavailable; counterparty cannot be verified.',needsConfirm:'Awaiting your transaction acknowledgment',confirmed:'Transaction acknowledged',empty:'No account activity for this currency',note:'Business custody is not personal spending balance. Entries from different sources are shown once and never netted.',source:'Source',cash:'Cash',network:'Bank / network'},
+ ar:{title:'آخر حركة الحساب',more:'كشف التمويل الشخصي',custody:'طلبات العهدة',loan:'التمويل الشخصي',business:'أموال المنشأة',posted:'مرحل',approved:'معتمد',pending:'بانتظار موافقة المالك',rejected:'مرفوض',reversed:'معكوس',reversalPosted:'قيد عكسي مُرحّل',received:'استلام أموال المنشأة',returned:'إعادة أموال المنشأة',ownerLent:'صرف قرض',personRepaid:'سداد قرض للمنشأة',personLent:'قرض مقدّم للمنشأة',ownerRepaid:'استلام سداد قرض',fromAccount:'من حساب',toAccount:'إلى حساب',walletId:'معرف محفظة الشخص',payer:'المرسل',payee:'المستلم',missingIdentity:'تعذر التحقق من هوية الحساب أو المنشأة؛ لا يمكن تحديد طرفي المعاملة.',needsConfirm:'بانتظار إقرارك بالمعاملة',confirmed:'تم إقرار المعاملة',empty:'لا توجد حركة بهذه العملة',note:'العهدة ليست رصيد إنفاق شخصي. كل حركة تظهر مرة واحدة فقط، ولا تتم مقاصة الأرصدة.',source:'المصدر',cash:'نقدي',network:'شبكة / بنك'},
+ fa:{title:'آخرین گردش حساب',more:'صورت‌حساب قرض شخصی',custody:'درخواست‌های امانت',loan:'معاملات مالی شخصی',business:'پول کسب‌وکار',posted:'ثبت قطعی',approved:'تأییدشده',pending:'منتظر تأیید اونر',rejected:'ردشده',reversed:'برگشت‌شده',reversalPosted:'سند برگشتی ثبت شده',received:'دریافت پول کسب‌وکار',returned:'برگشت پول کسب‌وکار',ownerLent:'پرداخت قرض به حساب شما',personRepaid:'بازپرداخت قرض به بیزنس',personLent:'قرض پرداخت‌شده به بیزنس',ownerRepaid:'دریافت بازپرداخت قرض',fromAccount:'از حساب',toAccount:'به حساب',walletId:'شناسه حساب شخص',payer:'پرداخت‌کننده',payee:'دریافت‌کننده',missingIdentity:'هویت حساب یا نام بیزنس بارگذاری نشده؛ طرفین معامله قابل‌تأیید نیستند.',needsConfirm:'منتظر تأیید معامله شما',confirmed:'معامله از طرف شما تأیید شده',empty:'در این ارز گردش حساب وجود ندارد',note:'امانت، موجودی قابل‌مصرف شخصی نیست. هر معامله فقط یک‌بار نمایش داده می‌شود و مانده‌ها تهاتر نمی‌شوند.',source:'منبع',cash:'نقد',network:'شبکه / بانک'}
 };
 const nameKeys={
  custody_received:'received',custody_returned:'returned',
  owner_advance_to_sponsor:'ownerLent',sponsor_repay_owner:'personRepaid',
  sponsor_advance_to_owner:'personLent',owner_repay_sponsor:'ownerRepaid',
 };
-export default function WalletUnifiedActivity({loans=[],custody=[],currency='',lang='en',onStatement,onRequests}){
+export default function WalletUnifiedActivity({loans=[],custody=[],currency='',lang='en',account=null,onStatement,onRequests}){
  const t=copy[lang]||copy.en;
  const items=recentWalletActivity({loans,custody,currency,limit:10});
+ // The posted source row has partner_id; the current user/owner must supply
+ // that exact authorized person account and its verified business counterparty.
+ const walletId=account?.account_reference||walletAccountReference(account?.id);
+ const businessName=String(account?.business||'').trim();
+ const partiesFor=row=>walletPartiesForKind(row.kind,{accountReference:walletId,businessName});
  const fmt=v=>new Intl.NumberFormat(lang==='fa'?'fa-AF':lang==='ar'?'ar-SA':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
  const status=row=>row.status==='reversal_posted'?t.reversalPosted:row.status==='reversed'?t.reversed:row.status==='pending'?t.pending:
    row.status==='rejected'?t.rejected:row.status==='approved'?t.approved:t.posted;
@@ -25,18 +30,30 @@ export default function WalletUnifiedActivity({loans=[],custody=[],currency='',l
    </div>
    <p className="text-xs leading-5 text-slate-500">{t.note}</p>
    {!items.length?<p className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-600">{t.empty}</p>:
-     <div className="space-y-2.5">{items.map(row=><article key={row.key} className="min-w-0 rounded-2xl border border-slate-200 p-3.5">
+     <div className="space-y-2.5">{items.map(row=>{
+      const parties=partiesFor(row);
+      // A pending custody request has not moved any funds: never render
+      // a green received / red sent posted-payment badge for it.
+      const pendingMovement=row.source==='business_custody'&&row.status==='pending';
+      const direction=parties?.direction||row.direction;
+      return <article key={row.key} className="min-w-0 rounded-2xl border border-slate-200 p-3.5">
        <div className="flex min-w-0 items-start gap-2.5">
-         <span className={'grid size-10 shrink-0 place-items-center rounded-full '+(row.direction==='incoming'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700')}>
-           {row.direction==='incoming'?<ArrowDownLeft className="size-5"/>:<ArrowUpRight className="size-5"/>}
+         <span className={'grid size-10 shrink-0 place-items-center rounded-full '+(pendingMovement?'bg-violet-50 text-violet-700':direction==='incoming'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700')}>
+           {direction==='incoming'?<ArrowDownLeft className="size-5"/>:<ArrowUpRight className="size-5"/>}
          </span>
          <div className="min-w-0 flex-1">
            <div className="flex flex-wrap items-start justify-between gap-2">
              <p className="min-w-0 flex-1 break-words text-sm font-extrabold text-slate-900">{t[nameKeys[row.kind]]||row.kind}</p>
-             <strong dir="ltr" className={'shrink-0 text-sm font-black tabular-nums '+(row.direction==='incoming'?'text-emerald-700':'text-rose-700')}>
-               {row.direction==='incoming'?'+':'−'}{fmt(row.amount)} {row.currency}
+             <strong dir="ltr" className={'shrink-0 text-sm font-black tabular-nums '+(pendingMovement?'text-violet-700':direction==='incoming'?'text-emerald-700':'text-rose-700')}>
+               {pendingMovement?'':direction==='incoming'?'+':'−'}{fmt(row.amount)} {row.currency}
              </strong>
            </div>
+           {parties?
+             <div className="mt-2 grid min-w-0 gap-1.5 rounded-xl bg-slate-50 p-2.5 text-xs leading-5 text-slate-700">
+               <p className="min-w-0"><span className="font-semibold text-slate-500">{t.payer}: </span><b dir="auto" className={parties.fromType==='wallet'?'break-all font-mono text-[11px] text-blue-800':'break-words font-bold text-slate-950'}>{parties.from}</b></p>
+               <p className="min-w-0"><span className="font-semibold text-slate-500">{t.payee}: </span><b dir="auto" className={parties.toType==='wallet'?'break-all font-mono text-[11px] text-blue-800':'break-words font-bold text-slate-950'}>{parties.to}</b></p>
+             </div>
+           :<p role="alert" className="mt-2 text-xs text-amber-800">{t.missingIdentity}</p>}
            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
              <span className="flex items-center gap-1"><CalendarDays className="size-3.5"/>{row.date}</span>
              <span className="flex items-center gap-1"><Receipt className="size-3.5"/>{row.source==='business_custody'?t.business:t.loan}</span>
@@ -52,7 +69,7 @@ export default function WalletUnifiedActivity({loans=[],custody=[],currency='',l
            {row.notes&&<p dir="auto" className="mt-1 break-words text-xs text-slate-500">{row.notes}</p>}
          </div>
        </div>
-     </article>)}</div>}
+     </article>})}</div>}
    <div className="grid grid-cols-2 gap-2">
      <button type="button" onClick={onStatement} className="min-h-11 rounded-xl border border-blue-200 bg-blue-50 text-xs font-bold text-blue-700">{t.more}</button>
      <button type="button" onClick={onRequests} className="min-h-11 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">{t.custody}</button>
