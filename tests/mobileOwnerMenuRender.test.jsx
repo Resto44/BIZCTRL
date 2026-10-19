@@ -76,9 +76,9 @@ describe('mobile owner ERP menu render', () => {
     await act(async()=>{renderer=TestRenderer.create(<QueryClientProvider client={client}><MemoryRouter><ERPSidebar collapsed={false} mobile onToggle={()=>{}} onNavigate={()=>{}} /></MemoryRouter></QueryClientProvider>);});
     const section=renderer.root.findAllByType('button').find(button=>button.findAllByType('span').some(span=>span.children.includes('Finance & Treasury')));
     await act(async()=>section.props.onClick());
-    const links=renderer.root.findAllByType('a').filter(link=>link.props.href==='/sponsor-treasury');
+    const links=renderer.root.findAllByType('a').filter(link=>link.props.href==='/wallet-banking');
     expect(links).toHaveLength(1);
-    expect(JSON.stringify(links[0].toJSON?.()||links[0].findAllByType('span').map(x=>x.children))).toContain('Accounts & Wallet');
+    expect(JSON.stringify(links[0].toJSON?.()||links[0].findAllByType('span').map(x=>x.children))).toContain('Wallet Banking Center');
     await act(async()=>renderer.unmount());client.clear();fixture.portal='restaurant';
   });
 
