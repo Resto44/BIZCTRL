@@ -13,6 +13,7 @@ import PartnerWorkspace from '@/components/settlement/PartnerWorkspace';
 import WalletPortalERPOverview from '@/components/settlement/WalletPortalERPOverview';
 import {Wallet,FileText,Clock3,RefreshCw} from 'lucide-react';
 import {loadPartnerStatement} from '@/lib/partnerAnalytics';
+import {accountRowsUnique} from '@/lib/walletPersonalActivity';
 
 // Separate external portal: no staff membership, owner wallet access, or branch permissions.
 export default function PartnerPortal(){
@@ -36,7 +37,9 @@ export default function PartnerPortal(){
  const updatePreference=(key,value)=>setPreferences(p=>{const next={...p,[key]:value};try{localStorage.setItem(`partner-view:${session?.user?.id}:portal`,JSON.stringify(next));}catch{/* display still works */}return next;});
  const accounts=useQuery({queryKey:['partner-portal-accounts',session?.user?.id],enabled:!!session?.user?.id,
   queryFn:async()=>{const {data,error}=await supabase.rpc('erp_partner_portal_accounts');if(error)throw error;return data||[];},refetchInterval:15000});
- const partner=accounts.data?.find(p=>p.id===selected)||accounts.data?.[0];
+ const verifiedAccounts=accountRowsUnique(accounts.data||[]);
+ const integrityError=!!accounts.data&&verifiedAccounts.length!==accounts.data.length;
+ const partner=integrityError?null:verifiedAccounts.find(p=>p.id===selected)||verifiedAccounts[0];
  const openRequest=kind=>{setRequestKind(kind);setWorkspace('requests');if(kind==='custody')setCustodySignal(x=>x+1);else setLoanSignal(x=>x+1);};
  const labels={en:{overview:'Overview',requests:'Requests',statement:'Statement',members:'Join another business',user:'Wallet account'},ar:{overview:'الرئيسية',requests:'الطلبات',statement:'كشف الحساب',members:'الانضمام لمنشأة أخرى',user:'حساب المحفظة'},fa:{overview:'نمای کلی',requests:'درخواست‌ها',statement:'صورت‌حساب',members:'عضویت در کسب‌وکار دیگر',user:'حساب والت'}}[lang]||{overview:'Overview',requests:'Requests',statement:'Statement',members:'Membership',user:'Wallet account'};
  const statement=useQuery({queryKey:['partner-portal-statement',session?.user?.id,partner?.id],enabled:!!session?.user?.id&&!!partner?.id,
@@ -65,11 +68,11 @@ export default function PartnerPortal(){
    <>
     {!accounts.isLoading&&!accounts.isError&&(!accounts.data?.length||joinToken)&&<PeopleMemberships key={session.user.id} userId={session.user.id} t={t} joinToken={joinToken} onJoined={()=>{setJoinToken('');sessionStorage.removeItem('people:join');setNotice(t.joinSent);}}/>}
     {token&&<Card className="space-y-3 p-4"><p>{session.user.email}</p><Button disabled={busy} onClick={activate}>{t.accept}</Button></Card>}
-    {accounts.isLoading?<p>{t.loading}</p>:accounts.isError?<p role="alert">{t.failed}<Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></p>:!partner?<p>{t.noAccounts}</p>:<>
+    {accounts.isLoading?<p>{t.loading}</p>:accounts.isError?<p role="alert">{t.failed}<Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></p>:integrityError?<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{lang==='fa'?'خطا در شناسایی حساب والت: حساب تکراری یا اطلاعات هویتی ناقص است. برای بررسی با اونر تماس بگیرید.':lang==='ar'?'تعذر التحقق من حساب المحفظة: هناك سجل مكرر أو بيانات هوية غير مكتملة. راجع مالك المنشأة.':'Wallet account identity conflict or incomplete record. Contact the business owner.'}</p>:!partner?<p>{t.noAccounts}</p>:<>
      <div className="flex min-w-0 items-end gap-2 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm">
        <label className="min-w-0 flex-1 text-xs font-semibold text-slate-500">{labels.user}
         <select aria-label={t.partners} className="mt-1 block min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-bold text-slate-900" value={partner.id} onChange={e=>{setSelected(e.target.value);setWorkspace('overview');setRequestKind('loan');setLoanSignal(0);setCustodySignal(0);setStatementSignal(0);setAccountSignal(0);setError('');}}>
-         {accounts.data.map(p=><option key={p.id} value={p.id}>{p.business} · {p.name}</option>)}
+         {verifiedAccounts.map(p=><option key={p.id} value={p.id}>{p.business} · {p.name}</option>)}
         </select></label>
        <Button size="icon" variant="outline" aria-label={t.refresh} className="size-11 shrink-0" onClick={()=>{accounts.refetch();statement.refetch();}}><RefreshCw className="size-4"/></Button>
      </div>
