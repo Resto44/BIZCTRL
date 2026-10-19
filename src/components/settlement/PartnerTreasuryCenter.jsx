@@ -22,7 +22,7 @@ export default function PartnerTreasuryCenter(){
  const {role}=useRole();
  const {lang,currency}=useLanguage(); const t=peopleText(lang); const qc=useQueryClient();
  const [selected,setSelected]=useState(''); const [form,setForm]=useState(null);
- const [view,setView]=useState('overview'); const [recordSignal,setRecordSignal]=useState(0);
+ const [view,setView]=useState('overview'); const [recordSignal,setRecordSignal]=useState(0); const [requestTab,setRequestTab]=useState('custody');
  const [busy,setBusy]=useState(false); const lock=useRef(false);
  const [error,setError]=useState(''); const [invitation,setInvitation]=useState('');
  const {data:partners=[],isLoading,isError,refetch}=useQuery({
@@ -49,9 +49,9 @@ export default function PartnerTreasuryCenter(){
   }catch(e){setError(partnerError(e,t));}finally{lock.current=false;setBusy(false);}
  };
  if(role!=='owner')return null;
- const tabs={en:{overview:'Overview',ledger:'Account details & ledger',requests:'Approvals & settlements',manage:'Account management'},ar:{overview:'نظرة عامة',ledger:'تفاصيل الحساب والدفتر',requests:'الطلبات والتسويات',manage:'إدارة الحسابات'},fa:{overview:'نمای کلی',ledger:'جزئیات حساب و دفتر',requests:'درخواست‌ها و تسویه',manage:'مدیریت حساب‌ها'}}[lang]||{overview:'Overview',ledger:'Account details & ledger',requests:'Approvals & settlements',manage:'Account management'};
+ const tabs={en:{overview:'Accounts',ledger:'Ledger',requests:'Requests',manage:'Settings',custody:'Custody transfers',loans:'Personal advances'},ar:{overview:'الحسابات',ledger:'الدفتر',requests:'الطلبات',manage:'الإعدادات',custody:'حركة العهدة',loans:'السلف الشخصية'},fa:{overview:'حساب‌ها',ledger:'دفتر حساب',requests:'درخواست‌ها',manage:'تنظیمات',custody:'انتقال امانت',loans:'قرض شخصی'}}[lang]||{overview:'Accounts',ledger:'Ledger',requests:'Requests',manage:'Settings',custody:'Custody',loans:'Loans'};
  return <section className="mx-auto max-w-6xl min-w-0 space-y-4 pb-20" dir={lang==='en'?'ltr':'rtl'}>
-  <nav aria-label={t.title} className="grid grid-cols-2 gap-2 rounded-2xl border bg-white p-2 sm:grid-cols-4">{['overview','ledger','requests','manage'].map(key=><button key={key} type="button" aria-current={view===key?'page':undefined} onClick={()=>{setView(key);setRecordSignal(0);setError('');}} className={`min-h-11 min-w-0 rounded-xl px-2 py-2 text-xs font-bold leading-5 sm:text-sm ${view===key?'bg-blue-600 text-white':'bg-slate-50 text-slate-600'}`}>{tabs[key]}</button>)}</nav>
+  <nav aria-label={t.title} className="grid grid-cols-4 gap-1 rounded-2xl border bg-white p-1.5">{['overview','ledger','requests','manage'].map(key=><button key={key} type="button" aria-current={view===key?'page':undefined} onClick={()=>{setView(key);setRecordSignal(0);setError('');}} className={`min-h-11 min-w-0 rounded-xl px-1 py-2 text-[11px] font-bold leading-4 sm:text-sm ${view===key?'bg-blue-600 text-white':'bg-slate-50 text-slate-600'}`}>{tabs[key]}</button>)}</nav>
   {view==='overview'&&<WalletERPOverview restaurantId={activeRestaurantId} partners={partners} partner={partner} lang={lang} displayCurrency={currency}
     onSelect={setSelected} onAdd={newAccount} onEdit={editAccount}
     onLedger={()=>{setRecordSignal(0);setView('ledger');}}
@@ -80,11 +80,17 @@ export default function PartnerTreasuryCenter(){
    {error&&<p role="alert" className="text-sm text-red-600">{error}</p>}
    {invitation&&<PartnerInvitationLink key={invitation} invitation={invitation} t={t}/>}
   </Card>}
+  {(view==='ledger'||view==='requests')&&partners.length>0&&<label className="block rounded-xl border border-slate-200 bg-white p-3 text-xs font-semibold text-slate-600">
+    {t.partners}
+    <select aria-label={t.partners} value={partner?.id||''} onChange={e=>{setSelected(e.target.value);setRecordSignal(0);}} className="mt-1 block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950">{partners.map(p=><option key={p.id} value={p.id}>{p.name} · {t[p.account_role||'partner']}</option>)}</select>
+   </label>}
   {view==='ledger'&&partner&&<SponsorOwnerBilateralLedger key={`${activeRestaurantId}:${partner.id}`} partner={partner} openTransactionSignal={recordSignal}/>}
-  {view==='ledger'&&<PeopleCustodySummary tenant={activeRestaurantId} t={t}/>}
-  {view==='manage'&&<PeopleMemberships tenant={activeRestaurantId} t={t} branches={branches.data||[]}/>}
-  {view==='requests'&&partner&&<PartnerTransactionRequests key={`custody:${activeRestaurantId}:${partner.id}`} partner={partner} t={t} owner custody/>}
-  {view==='requests'&&partner&&<PartnerTransactionRequests key={`requests:${activeRestaurantId}:${partner.id}`} partner={partner} t={t} owner/>}
+  {view==='ledger'&&<details className="rounded-xl border border-slate-200 bg-white p-3 text-xs"><summary className="cursor-pointer font-bold">{t.custodyTotal}</summary><div className="mt-3"><PeopleCustodySummary tenant={activeRestaurantId} t={t}/></div></details>}
+  {view==='manage'&&<details className="rounded-xl border border-slate-200 bg-white p-3 text-sm"><summary className="cursor-pointer font-bold">{t.membership}</summary><div className="mt-3"><PeopleMemberships tenant={activeRestaurantId} t={t} branches={branches.data||[]}/></div></details>}
+  {view==='requests'&&partner&&<section className="min-w-0 space-y-3">
+    <div className="grid grid-cols-2 gap-2 rounded-xl border bg-white p-1.5">{[['custody',tabs.custody],['loans',tabs.loans]].map(([key,label])=><button type="button" key={key} aria-pressed={requestTab===key} onClick={()=>setRequestTab(key)} className={`min-h-11 rounded-lg px-2 text-xs font-bold ${requestTab===key?'bg-blue-50 text-blue-700 ring-1 ring-blue-400':'text-slate-600'}`}>{label}</button>)}</div>
+    {requestTab==='custody'?<PartnerTransactionRequests key={`custody:${activeRestaurantId}:${partner.id}`} partner={partner} t={t} owner custody/>:<PartnerTransactionRequests key={`requests:${activeRestaurantId}:${partner.id}`} partner={partner} t={t} owner/>}
+  </section>}
   <p className="rounded-xl border bg-blue-50 p-3 text-xs leading-5 text-blue-900">{t.scopeNote}</p>
  </section>;
 }
