@@ -69,14 +69,14 @@ describe('Accounts & Wallet image-aligned ERP design',()=>{
     expect(ledger).not.toContain("35.00 SAR");
   });
   it('renames landing and ERP sign-in while retaining old invitation URL',()=>{
-    expect(landing).toContain('Accounts & Wallet Login');
+    expect(landing).toContain('Wallet Banking Login');
     expect(landing).toContain("path:'/wallet-portal'");
     expect(landing).toContain("path:'/erp-login'");
     expect(landing).toContain("path:'/platform-owner/login'");
     expect(landing).toContain('Wallet');
     expect(landing).toContain('Supplier invoices, customer credit and payroll remain in their dedicated ERP ledgers.');
     expect(login).toContain("import {peopleText} from '@/lib/peopleAccounts'");
-    expect(login).toContain('partnerLabels.title} Login');
+    expect(login).toContain('Wallet Banking Login');
     expect(login).toContain("navigate('/wallet-portal')");
     expect(app).toContain('<Route path="/wallet-portal"');
     expect(app).toContain('<Route path="/partner-portal"');
