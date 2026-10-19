@@ -354,6 +354,12 @@ export default function SponsorOwnerBilateralLedger({partner=null,legacyOnly=tru
           </div>
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">{t.postedInfo}</div>
           <div><Label className="text-xs">{t.kind} *</Label>
+           <div className="sr-only focus-within:not-sr-only">
+             <Select value={form.kind||undefined} onValueChange={v=>edit('kind',v)}>
+               <SelectTrigger aria-label={t.kind}><SelectValue placeholder={t.kind}/></SelectTrigger>
+               <SelectContent>{KIND_KEYS.map(k=><SelectItem key={k} value={k}>{t[labels[k]]}</SelectItem>)}</SelectContent>
+             </Select>
+           </div>
            <div className="mt-2 grid grid-cols-2 gap-2" role="group" aria-label={t.kind}>{KIND_KEYS.map((k,i)=>{
              const Icon=i===0||i===3?ArrowDownLeft:ArrowUpRight;
              return <button key={k} type="button" disabled={busy} aria-pressed={form.kind===k} onClick={()=>edit('kind',k)} className={`min-h-[76px] rounded-xl border p-2.5 text-start transition-colors ${form.kind===k?'border-blue-600 bg-blue-50 text-blue-800 ring-1 ring-blue-600':'border-slate-200 bg-white text-slate-700'}`}>
