@@ -13,6 +13,7 @@ import PersonPermissions from './PersonPermissions';
 import PartnerTransactionRequests from './PartnerTransactionRequests';
 import PartnerInvitationLink from './PartnerInvitationLink';
 import SponsorOwnerBilateralLedger from './SponsorOwnerBilateralLedger';
+import OwnerWalletOperations from './OwnerWalletOperations';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Card} from '@/components/ui/card';
@@ -33,6 +34,9 @@ export default function PartnerTreasuryCenter(){
  useEffect(()=>{setForm(null);setInvitation('');setError('');setSelected('');setView('overview');setRecordSignal(0);},[activeRestaurantId]);
  const branches=useQuery({queryKey:['people-branches',activeRestaurantId],enabled:role==='owner'&&!!activeRestaurantId,queryFn:async()=>{const {data,error}=await supabase.from('branches').select('id,name').eq('restaurant_id',activeRestaurantId).eq('is_active',true);if(error)throw error;return data||[];}});
  const partner=partners.find(p=>p.id===selected)||partners[0];
+ const showCustody=()=>{setRecordSignal(0);setRequestTab('custody');setView('requests');};
+ const showFinance=()=>{setRecordSignal(x=>x+1);setView('ledger');};
+ const showStatement=()=>{setRecordSignal(0);setView('ledger');};
  const newAccount=()=>{setError('');setInvitation('');setForm({...newPersonPermissions(),id:crypto.randomUUID(),name:'',email:'',is_active:true,invite:true,isNew:true});setView('manage');};
  const editAccount=p=>{setError('');setInvitation('');setSelected(p.id);setForm({...p,invite:false});setView('manage');};
  const save=async(event)=>{
@@ -49,14 +53,16 @@ export default function PartnerTreasuryCenter(){
   }catch(e){setError(partnerError(e,t));}finally{lock.current=false;setBusy(false);}
  };
  if(role!=='owner')return null;
- const tabs={en:{overview:'Accounts',ledger:'Ledger',requests:'Requests',manage:'Settings',custody:'Custody transfers',loans:'Personal advances'},ar:{overview:'الحسابات',ledger:'الدفتر',requests:'الطلبات',manage:'الإعدادات',custody:'حركة العهدة',loans:'السلف الشخصية'},fa:{overview:'حساب‌ها',ledger:'دفتر حساب',requests:'درخواست‌ها',manage:'تنظیمات',custody:'انتقال امانت',loans:'قرض شخصی'}}[lang]||{overview:'Accounts',ledger:'Ledger',requests:'Requests',manage:'Settings',custody:'Custody',loans:'Loans'};
+ const tabs={en:{overview:'Accounts',ledger:'Account activity',requests:'Transfers & approvals',manage:'Account settings',custody:'Custody transfers',loans:'Personal advances'},ar:{overview:'الحسابات',ledger:'حركة الحساب',requests:'التحويلات والموافقات',manage:'إعدادات الحسابات',custody:'حركة العهدة',loans:'السلف الشخصية'},fa:{overview:'حساب‌ها',ledger:'گردش حساب',requests:'انتقال و تأیید',manage:'تنظیمات حساب',custody:'انتقال امانت',loans:'قرض شخصی'}}[lang]||{overview:'Accounts',ledger:'Ledger',requests:'Requests',manage:'Settings',custody:'Custody',loans:'Loans'};
  return <section className="mx-auto max-w-6xl min-w-0 space-y-4 pb-20" dir={lang==='en'?'ltr':'rtl'}>
   <nav aria-label={t.title} className="grid grid-cols-4 gap-1 rounded-2xl border bg-white p-1.5">{['overview','ledger','requests','manage'].map(key=><button key={key} type="button" aria-current={view===key?'page':undefined} onClick={()=>{setView(key);setRecordSignal(0);setError('');}} className={`min-h-11 min-w-0 rounded-xl px-1 py-2 text-[11px] font-bold leading-4 sm:text-sm ${view===key?'bg-blue-600 text-white':'bg-slate-50 text-slate-600'}`}>{tabs[key]}</button>)}</nav>
   {view==='overview'&&<WalletERPOverview restaurantId={activeRestaurantId} partners={partners} partner={partner} lang={lang} displayCurrency={currency}
     onSelect={setSelected} onAdd={newAccount} onEdit={editAccount}
-    onLedger={()=>{setRecordSignal(0);setView('ledger');}}
-    onRecord={()=>{setRecordSignal(x=>x+1);setView('ledger');}}
-    onRequests={()=>{setRecordSignal(0);setView('requests');}} onMembers={()=>{setRecordSignal(0);setView('manage');}}/>}
+    onLedger={showStatement}
+    onRecord={showFinance}
+    onRequests={showCustody} onMembers={()=>{setRecordSignal(0);setView('manage');}}/>}
+   {view==='overview'&&<OwnerWalletOperations partner={partner} lang={lang}
+     onCustody={showCustody} onAdvance={showFinance} onStatement={showStatement}/>}
   {view==='manage'&&<Card className="min-w-0 space-y-3 rounded-[24px] border-slate-200 bg-white p-4 shadow-sm sm:p-6">
    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-black text-slate-950 sm:text-xl">{t.title}</h2><p className="mt-1 text-xs text-slate-600">{t.partners}</p></div>
     <Button onClick={newAccount}>{t.add}</Button></div>
@@ -85,7 +91,6 @@ export default function PartnerTreasuryCenter(){
     <select aria-label={t.partners} value={partner?.id||''} onChange={e=>{setSelected(e.target.value);setRecordSignal(0);}} className="mt-1 block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950">{partners.map(p=><option key={p.id} value={p.id}>{p.name} · {t[p.account_role||'partner']}</option>)}</select>
    </label>}
   {view==='ledger'&&partner&&<SponsorOwnerBilateralLedger key={`${activeRestaurantId}:${partner.id}`} partner={partner} openTransactionSignal={recordSignal}/>}
-  {view==='ledger'&&<details className="rounded-xl border border-slate-200 bg-white p-3 text-xs"><summary className="cursor-pointer font-bold">{t.custodyTotal}</summary><div className="mt-3"><PeopleCustodySummary tenant={activeRestaurantId} t={t}/></div></details>}
   {view==='manage'&&<details className="rounded-xl border border-slate-200 bg-white p-3 text-sm"><summary className="cursor-pointer font-bold">{t.membership}</summary><div className="mt-3"><PeopleMemberships tenant={activeRestaurantId} t={t} branches={branches.data||[]}/></div></details>}
   {view==='requests'&&partner&&<section className="min-w-0 space-y-3">
     <div className="grid grid-cols-2 gap-2 rounded-xl border bg-white p-1.5">{[['custody',tabs.custody],['loans',tabs.loans]].map(([key,label])=><button type="button" key={key} aria-pressed={requestTab===key} onClick={()=>setRequestTab(key)} className={`min-h-11 rounded-lg px-2 text-xs font-bold ${requestTab===key?'bg-blue-50 text-blue-700 ring-1 ring-blue-400':'text-slate-600'}`}>{label}</button>)}</div>
