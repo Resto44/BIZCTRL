@@ -24,7 +24,7 @@ function Stat({icon:Icon,label,value,sub,tone='blue',loading=false}){
   {sub&&<p className="mt-1 text-[11px] leading-5 text-slate-500">{sub}</p>}
  </article>;
 }
-export default function WalletERPOverview({restaurantId,partners=[],partner,onSelect,onAdd,onEdit,onLedger,onRecord,onRequests,onMembers,lang='en',displayCurrency='SAR'}){
+export default function WalletERPOverview({restaurantId,businessName='',partners=[],partner,onSelect,onAdd,onEdit,onLedger,onRecord,onRequests,onMembers,lang='en',displayCurrency='SAR'}){
  const m=messages[lang]||messages.en;
  const [currency,setCurrency]=useState('');
  const [filter,setFilter]=useState('all');
@@ -71,7 +71,7 @@ export default function WalletERPOverview({restaurantId,partners=[],partner,onSe
        <div className="grid grid-cols-2 gap-2 text-xs"><div className="min-w-0 rounded-lg bg-white p-2"><p className="text-slate-500">{m.owed}</p><strong dir="ltr" className="mt-1 block break-words text-start text-sm">{ledger.isPending?'…':ledger.isError?'—':bill(values.ownerOwes,chosen,lang)}</strong></div><div className="min-w-0 rounded-lg bg-white p-2"><p className="text-slate-500">{m.receivable}</p><strong dir="ltr" className="mt-1 block break-words text-start text-sm">{ledger.isPending?'…':ledger.isError?'—':bill(values.sponsorOwes,chosen,lang)}</strong></div></div>
        <div className="grid grid-cols-2 gap-2"><Button type="button" size="sm" variant="outline" className="min-h-11 min-w-0 text-xs" onClick={()=>{onSelect(p.id);onEdit(p);}}>{m.edit}</Button><Button type="button" size="sm" className="min-h-11 min-w-0 bg-blue-600 text-xs" onClick={()=>{onSelect(p.id);onLedger();}}>{m.ledger}</Button></div>
        {p.is_active&&p.allow_loans!==false&&<button type="button" onClick={()=>{onSelect(p.id);onRecord();}} className="block w-full py-1 text-center text-xs font-bold text-blue-700">{m.record}</button>}
-       <OwnerWalletPersonActivity person={p} loans={(ledger.data||[]).filter(r=>r.partner_id===p.id)}
+       <OwnerWalletPersonActivity person={p} businessName={businessName} loans={(ledger.data||[]).filter(r=>r.partner_id===p.id)}
          currency={chosen} lang={lang}
          onStatement={()=>{onSelect(p.id);onLedger();}}
          onCustody={()=>{onSelect(p.id);onRequests();}}/>

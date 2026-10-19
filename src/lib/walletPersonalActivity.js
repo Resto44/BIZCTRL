@@ -61,3 +61,32 @@ export function recentWalletActivity({loans=[],custody=[],currency='',limit=12}=
     .sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))||b.key.localeCompare(a.key))
     .slice(0,Math.max(0,Math.min(50,limit)));
 }
+
+/**
+ * Canonical payer and payee in the PERSONAL ACCOUNT activity view.
+ * "Direction" here means inflow/outflow for the named person's wallet account,
+ * not the owner Treasury account and not an accounting profit/loss posting.
+ * Personal-loan entries are already scoped to business_partners.id server-side.
+ * Business custody is a separate business-owned ledger.
+ */
+export const walletPartiesForKind=(kind,{accountReference='',businessName=''}={})=>{
+  const account=String(accountReference||'').trim();
+  const business=String(businessName||'').trim();
+  if(!account||!business)return null;
+  const businessToPerson=new Set([
+    'owner_advance_to_sponsor','owner_repay_sponsor','custody_received'
+  ]);
+  const personToBusiness=new Set([
+    'sponsor_advance_to_owner','sponsor_repay_owner','custody_returned'
+  ]);
+  if(!businessToPerson.has(kind)&&!personToBusiness.has(kind))return null;
+  const incoming=businessToPerson.has(kind);
+  return Object.freeze({
+    from:incoming?business:account,
+    to:incoming?account:business,
+    fromType:incoming?'business':'wallet',
+    toType:incoming?'wallet':'business',
+    direction:incoming?'incoming':'outgoing',
+    businessOwned:kind.startsWith('custody_'),
+  });
+};
