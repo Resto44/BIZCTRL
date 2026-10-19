@@ -1,44 +1,68 @@
 import React,{useMemo,useState} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
-import {WalletCards,UserRound,HandCoins,Landmark,Clock3,ShieldCheck,ArrowLeftRight,FileText,LogIn,ArrowUpRight} from 'lucide-react';
+import {Wallet,UserRound,HandCoins,ShieldCheck,ArrowLeftRight,FileText,ChevronDown,Clock3,Landmark,ArrowUpRight} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {readCashCustodyAndPending} from '@/lib/walletPersonPresentation';
 
-const phrases={
- en:{title:'My Wallet',subtitle:'Your personal advances, business custody and requests',login:'Login activated',noLogin:'Account active — login pending',currency:'Currency',owed:'Business owes you',youOwe:'You owe business',cash:'Cash custody held',network:'Bank custody held',pending:'Pending custody requests',loan:'Request personal advance',custody:'Request custody transfer',statement:'View statement',account:'My account',separate:'Personal debts are not business cash. These figures are separate; requests do not change balances until approved.',error:'Balances cannot be loaded. Amounts are hidden to avoid misleading totals.',retry:'Retry',disable:'This account has no permission to submit requests.'},
- ar:{title:'محفظتي',subtitle:'سلفك الشخصية والعهد والطلبات',login:'الدخول مفعل',noLogin:'الحساب نشط والدخول بانتظار التفعيل',currency:'العملة',owed:'المستحق لك على المنشأة',youOwe:'المستحق للمنشأة عليك',cash:'عهدة نقدية لديك',network:'عهدة بنكية لديك',pending:'طلبات العهدة المعلقة',loan:'طلب سلفة شخصية',custody:'طلب تحويل عهدة',statement:'عرض كشف الحساب',account:'حسابي',separate:'الديون الشخصية ليست نقد المنشأة. الأرصدة منفصلة والطلبات لا تُرحّل قبل الموافقة.',error:'تعذر قراءة جميع الأرصدة، لن نعرض قيماً ناقصة.',retry:'إعادة المحاولة',disable:'ليس مسموحاً لهذا الحساب بإرسال طلبات.'},
- fa:{title:'والت من',subtitle:'قرض‌های شخصی، پول امانتی و درخواست‌های خودتان',login:'ورود فعال',noLogin:'حساب فعال؛ ورود در انتظار تأیید',currency:'ارز',owed:'طلب شما از کسب‌وکار',youOwe:'بدهی شما به کسب‌وکار',cash:'امانت نقدی نزد شما',network:'امانت بانکی نزد شما',pending:'درخواست‌های امانت منتظر تأیید',loan:'درخواست قرض شخصی',custody:'درخواست انتقال امانت',statement:'دیدن صورت‌حساب',account:'حساب من',separate:'قرض شخصی پول نقد کسب‌وکار نیست. مانده‌ها جدا هستند و درخواست تا تأیید، پول را جابه‌جا نمی‌کند.',error:'خواندن مانده‌ها ناموفق شد؛ رقم ناقص نمایش داده نمی‌شود.',retry:'تلاش دوباره',disable:'این حساب اجازه ارسال درخواست ندارد.'}
+// A user sees only the account already returned by the membership-scoped RPC.
+// Personal loan obligations and business custody must never be netted or described as spendable money.
+const text={
+ en:{title:'My Wallet',subtitle:'Your account at a glance',profile:'My account',owed:'Business owes you',youOwe:'You owe business',funds:'Business funds in your custody',cash:'Cash held',network:'Bank / network held',pending:'Awaiting approval',actions:'What would you like to do?',loan:'Request an advance / repayment',custody:'Request a custody handover',statement:'Open full statement',detail:'View custody details',policy:'Personal loans are separate from money held for the business. Requests never move money before owner approval.',unavailable:'Business custody could not be loaded. Amounts are hidden.',retry:'Try again',currency:'Currency',active:'Account active',noAccess:'Transaction requests are disabled for your account.'},
+ ar:{title:'محفظتي',subtitle:'ملخص حسابك بكل وضوح',profile:'حسابي',owed:'المستحق لك على المنشأة',youOwe:'المستحق للمنشأة عليك',funds:'أموال المنشأة بعهدتك',cash:'عهدة نقدية',network:'عهدة بنكية / شبكة',pending:'بانتظار الموافقة',actions:'ما الإجراء الذي تريده؟',loan:'طلب سلفة / سداد',custody:'طلب تسليم عهدة',statement:'فتح كشف الحساب الكامل',detail:'عرض تفاصيل العهدة',policy:'السلف الشخصية منفصلة عن أموال المنشأة بعهدتك. الطلب لا يحرك المال قبل اعتماد المالك.',unavailable:'تعذر تحميل أرصدة العهدة، لن تظهر أرقام ناقصة.',retry:'إعادة المحاولة',currency:'العملة',active:'الحساب نشط',noAccess:'لا يمكنك إرسال معاملات من هذا الحساب.'},
+ fa:{title:'والت من',subtitle:'خلاصه روشن حساب شما',profile:'حساب من',owed:'طلب شما از کسب‌وکار',youOwe:'بدهی شما به کسب‌وکار',funds:'پول کسب‌وکار به امانت نزد شما',cash:'امانت نقدی',network:'امانت بانکی / شبکه',pending:'منتظر تأیید',actions:'چه کاری می‌خواهید انجام دهید؟',loan:'درخواست قرض / بازپرداخت',custody:'درخواست تحویل امانت',statement:'بازکردن صورت‌حساب کامل',detail:'دیدن جزئیات امانت',policy:'قرض شخصی از پول امانتی کسب‌وکار جدا است. درخواست تا تأیید اونر پول را انتقال نمی‌دهد.',unavailable:'موجودی امانت بارگذاری نشد؛ رقم ناقص نمایش داده نمی‌شود.',retry:'تلاش دوباره',currency:'ارز',active:'حساب فعال',noAccess:'ارسال معامله برای این حساب غیرفعال است.'}
 };
-function format(value,currency,lang){return new Intl.NumberFormat(lang==='fa'?'fa-AF':lang==='ar'?'ar-SA':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value||0))+' '+currency;}
+const amount=(value,currency,lang)=>new Intl.NumberFormat(lang==='ar'?'ar-SA':lang==='fa'?'fa-AF':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value))+' '+currency;
 export default function WalletPortalERPOverview({partner,statement,lang='en',onLoan,onCustody,onStatement,onAccount}){
- const t=phrases[lang]||phrases.en;
- const [currency,setCurrency]=useState('');
- const custody=useQuery({queryKey:['people-custody',partner.id,'portal-summary'],queryFn:async()=>{const {data,error}=await supabase.rpc('erp_person_custody',{p_person:partner.id,p_offset:0});if(error)throw error;if(!data||!Array.isArray(data.balances))throw Error('INVALID_CUSTODY');return data;},refetchInterval:15000,staleTime:15000});
- const choices=useMemo(()=>[...new Set([...(statement?.balances||[]).map(r=>r.currency),...(custody.data?.balances||[]).map(r=>r.currency)].filter(Boolean))].sort(),[statement?.balances,custody.data?.balances]);
- const selected=choices.includes(currency)?currency:choices.includes('SAR')?'SAR':choices[0]||'SAR';
+ const t=text[lang]||text.en;
+ const [currency,setCurrency]=useState(''),[showCustody,setShowCustody]=useState(false);
+ const query=useQuery({
+  queryKey:['people-custody',partner.id,'portal-summary'],
+  queryFn:async()=>{const {data,error}=await supabase.rpc('erp_person_custody',{p_person:partner.id,p_offset:0});if(error)throw error;if(!data||!Array.isArray(data.balances))throw Error('INCOMPLETE_CUSTODY_SNAPSHOT');return data;},
+  refetchInterval:15000,staleTime:15000,
+ });
+ const currencies=useMemo(()=>[...new Set([...(statement?.balances||[]).map(r=>r.currency),...(query.data?.balances||[]).map(r=>r.currency)].filter(Boolean))].sort(),[statement?.balances,query.data]);
+ const selected=currencies.includes(currency)?currency:currencies.includes('SAR')?'SAR':currencies[0]||'';
  const loans=(statement?.balances||[]).find(r=>r.currency===selected);
- const balance=readCashCustodyAndPending(custody.data,selected);
- const network=(custody.data?.balances||[]).filter(r=>r.currency===selected&&r.payment_method==='network').reduce((n,r)=>n+Number(r.held||0),0);
- const cards=[
-  {label:t.owed,value:loans?.owner_owes,icon:HandCoins,cls:'bg-blue-50 text-blue-700',pending:!statement},
-  {label:t.youOwe,value:loans?.partner_owes,icon:ArrowUpRight,cls:'bg-orange-50 text-orange-700',pending:!statement},
-  {label:t.cash,value:balance?.cash,icon:WalletCards,cls:'bg-emerald-50 text-emerald-700',pending:custody.isPending},
-  {label:t.network,value:custody.isError?undefined:network,icon:Landmark,cls:'bg-violet-50 text-violet-700',pending:custody.isPending},
- ];
- return <section dir={lang==='en'?'ltr':'rtl'} className="min-w-0 space-y-3">
-  <div className="flex items-end justify-between gap-3"><div className="min-w-0"><h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{t.title}</h1><p className="mt-1 text-sm text-slate-500">{t.subtitle}</p></div>
-   <label className="text-xs font-semibold text-slate-600">{t.currency}<select className="mt-1 block min-h-11 w-24 rounded-xl border bg-white px-2 font-bold" value={selected} onChange={e=>setCurrency(e.target.value)}>{choices.length?choices.map(c=><option key={c}>{c}</option>):<option>SAR</option>}</select></label></div>
-  <div className="flex min-w-0 items-center gap-3 rounded-[24px] border border-blue-100 bg-gradient-to-r from-blue-50 to-white p-4 shadow-sm">
-   <span className="grid size-14 shrink-0 place-items-center rounded-full bg-blue-100 text-blue-600"><UserRound className="size-7"/></span>
-   <div className="min-w-0 flex-1"><p className="truncate text-lg font-black text-slate-950">{partner.name}</p><p className="text-sm font-semibold text-slate-500">{partner.account_role||'partner'} · {partner.business}</p><p className="mt-1 text-xs text-emerald-700">{partner.user_id?t.login:t.noLogin}</p></div>
-   <Button variant="outline" size="sm" className="min-h-11 shrink-0" onClick={onAccount}>{t.account}</Button>
+ const custody=readCashCustodyAndPending(query.data,selected);
+ const network=query.isError||query.isPending?null:(query.data.balances||[]).filter(r=>r.currency===selected&&r.payment_method==='network').reduce((n,r)=>n+Number(r.held||0),0);
+ const held=network!==null&&custody!==null?Number(custody.cash)+network:null;
+ const formatted=(v)=>selected&&v!==undefined&&v!==null?amount(v,selected,lang):'—';
+ const permitted=partner.can_submit!==false;
+ return <section className="min-w-0 space-y-3" dir={lang==='en'?'ltr':'rtl'}>
+  <div className="flex flex-wrap items-center justify-between gap-3">
+   <div className="min-w-0"><h1 className="text-2xl font-black tracking-tight text-slate-950">{t.title}</h1><p className="mt-0.5 text-sm text-slate-500">{t.subtitle}</p></div>
+   <label className="text-xs font-semibold text-slate-500">{t.currency}<select aria-label={t.currency} value={selected} onChange={e=>setCurrency(e.target.value)} className="mt-1 block min-h-11 min-w-24 rounded-xl border border-slate-200 bg-white px-2 font-bold" disabled={!currencies.length}>{currencies.map(c=><option key={c}>{c}</option>)}</select></label>
   </div>
-  {custody.isError&&<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{t.error}<Button variant="outline" size="sm" className="ms-2" onClick={()=>custody.refetch()}>{t.retry}</Button></div>}
-  <div className="grid grid-cols-2 gap-2.5">{cards.map(({label,value,icon:Icon,cls,pending})=><article key={label} className="min-w-0 rounded-[20px] border border-slate-200 bg-white p-3.5 shadow-sm"><span className={`grid size-10 place-items-center rounded-xl ${cls}`}><Icon className="size-5"/></span><p className="mt-2 text-xs font-semibold leading-5 text-slate-600">{label}</p><strong dir="ltr" className="mt-2 block break-words text-start text-lg font-black tabular-nums text-slate-950">{pending?'…':value===undefined?'—':format(value,selected,lang)}</strong></article>)}</div>
-  <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900"><span className="flex items-center gap-2"><Clock3 className="size-4"/>{t.pending}</span><span>{custody.isPending?'…':custody.isError?'—':balance?.pending??0}</span></div>
-  <div className="grid grid-cols-2 gap-2">{[[t.loan,HandCoins,onLoan,partner.allow_loans!==false],[t.custody,ArrowLeftRight,onCustody,partner.allow_custody===true],[t.statement,FileText,onStatement,true],[t.account,LogIn,onAccount,true]].map(([title,Icon,action,allowed])=><Button key={title} variant="outline" disabled={!allowed||(title!==t.statement&&title!==t.account&&partner.can_submit===false)} onClick={action} className="min-h-16 h-auto min-w-0 justify-start gap-2 whitespace-normal rounded-xl bg-white px-3 py-2 text-start text-xs font-bold text-blue-700"><Icon className="size-5 shrink-0"/><span>{title}</span></Button>)}</div>
-  {partner.can_submit===false&&<p className="text-xs text-amber-700">{t.disable}</p>}
-  <p className="flex items-start gap-2 rounded-xl bg-blue-50 p-3 text-xs leading-5 text-blue-900"><ShieldCheck className="mt-0.5 size-4 shrink-0"/>{t.separate}</p>
+  <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+   <span className="grid size-11 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-700"><UserRound className="size-5"/></span>
+   <div className="min-w-0 flex-1"><p className="truncate font-extrabold text-slate-950">{partner.name}</p><p className="truncate text-xs text-slate-500">{partner.business} · {partner.account_role||'partner'}</p><p className="text-xs text-emerald-700">{t.active}</p></div>
+   <Button type="button" variant="outline" size="sm" className="min-h-10 shrink-0" onClick={onAccount}>{t.profile}</Button>
+  </div>
+  <div className="grid grid-cols-2 gap-2.5">
+   {[[t.owed,loans?.owner_owes,HandCoins,'text-emerald-700 bg-emerald-50'],[t.youOwe,loans?.partner_owes,ArrowUpRight,'text-amber-700 bg-amber-50']].map(([label,value,Icon,tone])=><article key={label} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+    <span className={`grid size-9 place-items-center rounded-xl ${tone}`}><Icon className="size-5"/></span><p className="mt-2 min-h-9 text-xs font-semibold leading-4 text-slate-600">{label}</p><p dir="ltr" className="break-words text-start text-lg font-black tabular-nums text-slate-950">{formatted(value)}</p>
+   </article>)}
+  </div>
+  <div className="min-w-0 rounded-2xl border border-blue-100 bg-blue-50/40 p-3.5">
+   <button type="button" aria-expanded={showCustody} onClick={()=>setShowCustody(v=>!v)} className="flex w-full items-center gap-3 text-start">
+    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-100 text-blue-700"><Wallet className="size-5"/></span>
+    <span className="min-w-0 flex-1"><span className="block text-xs font-bold text-slate-600">{t.funds}</span><strong dir="ltr" className="mt-0.5 block text-start text-lg font-black tabular-nums text-slate-950">{query.isPending?'…':formatted(held)}</strong></span>
+    <ChevronDown className={`size-5 shrink-0 text-slate-500 transition-transform ${showCustody?'rotate-180':''}`}/>
+   </button>
+   <div className="mt-2 flex items-center justify-between border-t border-blue-100 pt-2 text-xs font-semibold text-slate-600"><span className="flex items-center gap-1"><Clock3 className="size-3.5"/>{t.pending}</span><strong>{query.isPending?'…':query.isError?'—':custody?.pending??'—'}</strong></div>
+   {query.isError&&<p role="alert" className="mt-2 text-xs text-rose-700">{t.unavailable} <Button type="button" size="sm" variant="outline" onClick={()=>query.refetch()}>{t.retry}</Button></p>}
+   {showCustody&&!query.isError&&!query.isPending&&<div className="mt-3 grid grid-cols-2 gap-2 border-t border-blue-100 pt-3">{[[t.cash,custody?.cash],[t.network,network]].map(([label,value])=><div key={label} className="rounded-xl bg-white p-2.5"><p className="text-xs text-slate-500">{label}</p><p dir="ltr" className="mt-1 break-words text-start text-sm font-extrabold">{formatted(value)}</p></div>)}</div>}
+  </div>
+  <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3.5">
+   <h2 className="text-sm font-black text-slate-900">{t.actions}</h2>
+   <div className="grid grid-cols-1 gap-2 min-[370px]:grid-cols-2">
+    {partner.allow_loans!==false&&<Button type="button" disabled={!permitted} onClick={onLoan} className="min-h-12 h-auto min-w-0 justify-start gap-2 whitespace-normal bg-blue-600 px-3 py-2 text-start text-xs"><HandCoins className="size-4 shrink-0"/>{t.loan}</Button>}
+    {partner.allow_custody===true&&<Button type="button" disabled={!permitted} variant="outline" onClick={onCustody} className="min-h-12 h-auto min-w-0 justify-start gap-2 whitespace-normal px-3 py-2 text-start text-xs"><ArrowLeftRight className="size-4 shrink-0"/>{t.custody}</Button>}
+   </div>
+   {!permitted&&<p className="text-xs text-amber-700">{t.noAccess}</p>}
+   <button type="button" onClick={onStatement} className="flex min-h-11 w-full items-center justify-between gap-2 border-t border-slate-100 pt-2 text-start text-sm font-bold text-blue-700"><span className="flex items-center gap-2"><FileText className="size-4"/>{t.statement}</span><ChevronDown className="size-4"/></button>
+  </div>
+  <p className="flex items-start gap-2 text-xs leading-5 text-slate-500"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-blue-600"/>{t.policy}</p>
  </section>;
 }
