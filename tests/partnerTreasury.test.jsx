@@ -16,7 +16,7 @@ let root,host,client;
 beforeEach(()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true; localStorage.clear();sessionStorage.clear();state.lang='fa';
  state.rpc.mockReset().mockImplementation(async(name)=>{
-  if(name==='erp_partner_portal_accounts')return {data:[{id:'a',name:'شریک اول',business:'کسب‌وکار'}]};
+  if(name==='erp_partner_portal_accounts')return {data:[{id:'a',restaurant_id:'r1',account_reference:'WLT-TESTA',name:'شریک اول',business:'کسب‌وکار',login_email:'partner@example.invalid'}]};
   if(name==='erp_partner_portal_statement')return {data:{balances:[{currency:'SAR',owner_owes:100,partner_owes:0}],count:1,records:[{id:'tx-a',kind:'sponsor_advance_to_owner',amount:100,currency:'SAR',effective_date:'2026-10-18',payment_method:'cash'}]}};
   return {data:null,error:null};
  });
@@ -52,7 +52,7 @@ describe('partner treasury isolation and portal',()=>{
   expect(state.rpc).toHaveBeenCalledWith('erp_partner_portal_statement',{p_partner_id:'a',p_offset:0});
  });
  it('does not invent or reuse balances after a denied server read',async()=>{
-  state.rpc.mockImplementation(async(name)=>name==='erp_partner_portal_accounts'?{data:[{id:'a',name:'A',business:'Business'}]}:{error:{message:'PARTNER_ACCESS_DENIED'}});
+  state.rpc.mockImplementation(async(name)=>name==='erp_partner_portal_accounts'?{data:[{id:'a',restaurant_id:'r1',account_reference:'WLT-TESTA',name:'A',business:'Business',login_email:'partner@example.invalid'}]}:{error:{message:'PARTNER_ACCESS_DENIED'}});
   await mount();expect(host.textContent).toContain(partnerText('fa').failed);
   expect(host.textContent).not.toContain('SAR');expect(host.querySelector('[role="alert"]')).not.toBeNull();
  });
@@ -77,12 +77,12 @@ it('navigates reports, transaction filters and account customization',async()=>{
 it('opens one user workflow at a time instead of stacking loan, custody and statement pages',async()=>{
  await mount();
  expect(host.querySelectorAll('nav[aria-label]')).toHaveLength(1);
- expect(host.textContent).toContain('خلاصه روشن حساب شما');
+ expect(host.textContent).toContain('حساب داخلی به نام خودتان برای معاملات با اونر کسب‌وکار');
  expect(host.textContent).not.toContain('آمار');
  const nav=label=>[...host.querySelectorAll('nav button')].find(b=>b.textContent===label);
  await act(async()=>nav('درخواست‌ها').click());
  expect(host.textContent).toContain(peopleText('fa').loans);
- expect(host.textContent).not.toContain('خلاصه روشن حساب شما');
+ expect(host.textContent).not.toContain('حساب داخلی به نام خودتان برای معاملات با اونر کسب‌وکار');
  expect(host.textContent).not.toContain(partnerText('fa').trend);
  await act(async()=>nav('صورت‌حساب').click());
  expect(host.textContent).toContain(partnerText('fa').pdf);
