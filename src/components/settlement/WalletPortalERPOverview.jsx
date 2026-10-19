@@ -24,7 +24,7 @@ export default function WalletPortalERPOverview({partner,statement,lang='en',onL
   {label:t.owed,value:loans?.owner_owes,icon:HandCoins,cls:'bg-blue-50 text-blue-700',pending:!statement},
   {label:t.youOwe,value:loans?.partner_owes,icon:ArrowUpRight,cls:'bg-orange-50 text-orange-700',pending:!statement},
   {label:t.cash,value:balance?.cash,icon:WalletCards,cls:'bg-emerald-50 text-emerald-700',pending:custody.isPending},
-  {label:t.network,value:network,icon:Landmark,cls:'bg-violet-50 text-violet-700',pending:custody.isPending},
+  {label:t.network,value:custody.isError?undefined:network,icon:Landmark,cls:'bg-violet-50 text-violet-700',pending:custody.isPending},
  ];
  return <section dir={lang==='en'?'ltr':'rtl'} className="min-w-0 space-y-3">
   <div className="flex items-end justify-between gap-3"><div className="min-w-0"><h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{t.title}</h1><p className="mt-1 text-sm text-slate-500">{t.subtitle}</p></div>
