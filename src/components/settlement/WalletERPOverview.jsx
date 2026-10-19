@@ -2,6 +2,7 @@ import React,{useMemo,useState} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
 import {readSponsorOwnerRows,sponsorOwnerSummary} from '@/lib/sponsorOwnerBilateral';
+import {ownerWalletSnapshot} from '@/lib/walletERPViewModel';
 import {WalletCards,Users,ArrowDownLeft,ArrowUpRight,Clock3,Plus,BookOpen,ArrowLeftRight,ShieldCheck,ChevronRight,UserRound,Landmark,Activity,Search,FileClock} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 
@@ -32,11 +33,9 @@ export default function WalletERPOverview({restaurantId,partners=[],partner,onSe
  const currencies=useMemo(()=>[...new Set([displayCurrency,...(ledger.data||[]).map(r=>r.currency),...(custody.data||[]).map(r=>r.currency)].filter(Boolean))].sort(),[displayCurrency,ledger.data,custody.data]);
  const chosen=currencies.includes(currency)?currency:currencies.includes(displayCurrency)?displayCurrency:currencies[0]||'SAR';
  const all=useMemo(()=>((ledger.data||[]).filter(r=>r.partner_id&&partners.some(p=>p.id===r.partner_id))),[ledger.data,partners]);
- const global=useMemo(()=>sponsorOwnerSummary(all,chosen),[all,chosen]);
- const totalCustody=useMemo(()=>((custody.data||[]).filter(r=>r.currency===chosen).reduce((n,r)=>n+Number(r.held||0),0)),[custody.data,chosen]);
- const totalPending=useMemo(()=>((custody.data||[]).filter(r=>r.currency===chosen).reduce((n,r)=>n+Number(r.pending||0),0)),[custody.data,chosen]);
+ const summary=useMemo(()=>ownerWalletSnapshot({transactions:ledger.data||[],custodyBalances:custody.data||[],people:partners,currency:chosen}),[ledger.data,custody.data,partners,chosen]);
  const people=partners.filter(p=>(filter==='all'||(filter==='partners'?p.account_role==='partner':filter==='staff'?p.account_role!=='partner':filter==='active'?p.is_active:!p.is_active))&&([p.name,p.email].join(' ').toLowerCase().includes(search.trim().toLowerCase())));
- const history=all.filter(r=>r.currency===chosen).slice(0,4);
+ const history=summary.recentLoans;
  return <section className="min-w-0 space-y-4" dir={lang==='en'?'ltr':'rtl'}>
   <div className="flex min-w-0 flex-wrap items-end justify-between gap-3"><div className="min-w-0"><h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{m.heading}</h2><p className="mt-1 text-sm leading-6 text-slate-500">{m.sub}</p></div>
    <label className="text-xs font-semibold text-slate-500">{m.select}<select aria-label={m.select} value={chosen} onChange={e=>setCurrency(e.target.value)} className="mt-1 block min-h-11 min-w-28 rounded-xl border border-slate-200 bg-white px-3 font-black text-slate-800">{currencies.map(c=><option key={c}>{c}</option>)}</select></label></div>
@@ -44,10 +43,10 @@ export default function WalletERPOverview({restaurantId,partners=[],partner,onSe
    {ledger.isError&&<p>{m.ledgerUnavailable}</p>}{custody.isError&&<p>{m.custodyUnavailable}</p>}
    <Button size="sm" variant="outline" onClick={()=>{ledger.refetch();custody.refetch();}}>{m.retry}</Button></div>}
   <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-   <Stat icon={WalletCards} label={m.custody} value={custody.isError?'—':bill(totalCustody,chosen,lang)} tone="blue" loading={custody.isPending}/>
-   <Stat icon={ArrowUpRight} label={m.owed} value={ledger.isError?'—':bill(global.ownerOwes,chosen,lang)} tone="amber" loading={ledger.isPending}/>
-   <Stat icon={ArrowDownLeft} label={m.receivable} value={ledger.isError?'—':bill(global.sponsorOwes,chosen,lang)} tone="green" loading={ledger.isPending}/>
-   <Stat icon={Clock3} label={m.pending} value={custody.isError?'—':totalPending} sub={m.notMoney} tone="violet" loading={custody.isPending}/>
+   <Stat icon={WalletCards} label={m.custody} value={custody.isError?'—':bill(summary.custodyHeld,chosen,lang)} tone="blue" loading={custody.isPending}/>
+   <Stat icon={ArrowUpRight} label={m.owed} value={ledger.isError?'—':bill(summary.businessOwesPeople,chosen,lang)} tone="amber" loading={ledger.isPending}/>
+   <Stat icon={ArrowDownLeft} label={m.receivable} value={ledger.isError?'—':bill(summary.peopleOweBusiness,chosen,lang)} tone="green" loading={ledger.isPending}/>
+   <Stat icon={Clock3} label={m.pending} value={custody.isError?'—':summary.pendingCustodyCount} sub={m.notMoney} tone="violet" loading={custody.isPending}/>
   </div>
   <p className="flex items-start gap-2 rounded-xl bg-blue-50 px-3 py-2.5 text-xs leading-5 text-blue-900"><ShieldCheck className="mt-0.5 size-4 shrink-0"/>{m.separate}</p>
   <div className="min-w-0 space-y-3 rounded-[24px] border border-slate-200 bg-white p-3.5 shadow-sm sm:p-5">
