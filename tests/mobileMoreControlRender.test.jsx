@@ -67,7 +67,7 @@ describe('mobile More and Control workspace', () => {
     tenantMocks.activeRestaurant.business_type = portal;
     const client = new QueryClient(); let renderer;
     await act(async () => { renderer = TestRenderer.create(<QueryClientProvider client={client}><MemoryRouter><BottomNav /></MemoryRouter></QueryClientProvider>); });
-    expect(renderer.root.findAllByType('a').some(link => link.props.href === '/restaurant/pos')).toBe(portal === 'restaurant');
+    expect(renderer.root.findAllByType('a').some(link => link.props.href === '/wallet-banking')).toBe(true);
     const more = renderer.root.findAllByType('button').find(button => button.findAllByType('span').some(span => span.children.includes('more')));
     await act(async () => more.props.onClick());
     const quick = renderer.root.findByProps({'aria-labelledby': 'more-quick-access-title'});
