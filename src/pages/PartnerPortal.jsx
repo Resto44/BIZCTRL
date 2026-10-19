@@ -11,6 +11,7 @@ import PeopleMemberships from '@/components/settlement/PeopleMemberships';
 import PartnerTransactionRequests from '@/components/settlement/PartnerTransactionRequests';
 import PartnerWorkspace from '@/components/settlement/PartnerWorkspace';
 import WalletPortalERPOverview from '@/components/settlement/WalletPortalERPOverview';
+import {Wallet,FileText,Clock3,RefreshCw} from 'lucide-react';
 import {loadPartnerStatement} from '@/lib/partnerAnalytics';
 
 // Separate external portal: no staff membership, owner wallet access, or branch permissions.
@@ -22,6 +23,7 @@ export default function PartnerPortal(){
  const [joinToken,setJoinToken]=useState(()=>new URLSearchParams(window.location.hash.slice(1)).get('join')||new URLSearchParams(window.location.search).get('join')||sessionStorage.getItem('people:join')||'');
  const [busy,setBusy]=useState(false); const lock=useRef(false); const [error,setError]=useState(''); const [notice,setNotice]=useState('');
  const [selected,setSelected]=useState('');
+ const [workspace,setWorkspace]=useState('overview'),[requestKind,setRequestKind]=useState('loan');
  const [loanSignal,setLoanSignal]=useState(0),[custodySignal,setCustodySignal]=useState(0),[statementSignal,setStatementSignal]=useState(0),[accountSignal,setAccountSignal]=useState(0);
  const [preferences,setPreferences]=useState({title:'',showBalances:true,compact:false});
  useEffect(()=>{let live=true;supabase.auth.getSession().then(({data,error})=>{if(live){setSession(data?.session||null);setAuthLoading(false);if(error)setError(t.failed);}});
@@ -30,12 +32,13 @@ export default function PartnerPortal(){
  },[]);
  useEffect(()=>{if(joinToken){sessionStorage.setItem('people:join',joinToken);if(!authLoading)history.replaceState(null,'',window.location.pathname);}},[joinToken,authLoading]);
  useEffect(()=>{if(token){sessionStorage.setItem('partner:invite',token);if(!authLoading)history.replaceState(null,'',window.location.pathname);} },[token,authLoading]);
- useEffect(()=>{setPreferences(readPartnerPreferences(session?.user?.id));setSelected('');},[session?.user?.id]);
+ useEffect(()=>{setPreferences(readPartnerPreferences(session?.user?.id));setSelected('');setWorkspace('overview');setRequestKind('loan');},[session?.user?.id]);
  const updatePreference=(key,value)=>setPreferences(p=>{const next={...p,[key]:value};try{localStorage.setItem(`partner-view:${session?.user?.id}:portal`,JSON.stringify(next));}catch{/* display still works */}return next;});
  const accounts=useQuery({queryKey:['partner-portal-accounts',session?.user?.id],enabled:!!session?.user?.id,
   queryFn:async()=>{const {data,error}=await supabase.rpc('erp_partner_portal_accounts');if(error)throw error;return data||[];},refetchInterval:15000});
  const partner=accounts.data?.find(p=>p.id===selected)||accounts.data?.[0];
- const scrollToSection=id=>document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'});
+ const openRequest=kind=>{setRequestKind(kind);setWorkspace('requests');if(kind==='custody')setCustodySignal(x=>x+1);else setLoanSignal(x=>x+1);};
+ const labels={en:{overview:'Overview',requests:'Requests',statement:'Statement',members:'Join another business',user:'Wallet account'},ar:{overview:'الرئيسية',requests:'الطلبات',statement:'كشف الحساب',members:'الانضمام لمنشأة أخرى',user:'حساب المحفظة'},fa:{overview:'نمای کلی',requests:'درخواست‌ها',statement:'صورت‌حساب',members:'عضویت در کسب‌وکار دیگر',user:'حساب والت'}}[lang]||{overview:'Overview',requests:'Requests',statement:'Statement',members:'Membership',user:'Wallet account'};
  const statement=useQuery({queryKey:['partner-portal-statement',session?.user?.id,partner?.id],enabled:!!session?.user?.id&&!!partner?.id,
   queryFn:({signal})=>loadPartnerStatement(supabase,partner.id,signal),refetchInterval:30000});
  const run=async(fn)=>{if(lock.current)return;lock.current=true;setBusy(true);setError('');setNotice('');try{await fn();}catch(e){setError(partnerError(e,t));}finally{lock.current=false;setBusy(false);}};
@@ -60,20 +63,34 @@ export default function PartnerPortal(){
    <label className="block">{t.password}<Input type="password" required value={password} autoComplete="current-password" dir="ltr" onChange={e=>setPassword(e.target.value)}/></label>
    <div className="flex flex-wrap gap-2"><Button disabled={busy} type="submit">{t.signIn}</Button>{<Button type="button" variant="outline" disabled={busy||!email.trim()||password.length<10} onClick={()=>authenticate(true)}>{t.signUp}</Button>}</div></form></Card>:
    <>
-    <PeopleMemberships key={session.user.id} userId={session.user.id} t={t} joinToken={joinToken} onJoined={()=>{setJoinToken('');sessionStorage.removeItem('people:join');setNotice(t.joinSent);}}/>
+    {(!accounts.data?.length||joinToken)?<PeopleMemberships key={session.user.id} userId={session.user.id} t={t} joinToken={joinToken} onJoined={()=>{setJoinToken('');sessionStorage.removeItem('people:join');setNotice(t.joinSent);}}/>:
+    <details className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600"><summary className="cursor-pointer font-bold">{labels.members}</summary><div className="mt-3"><PeopleMemberships key={session.user.id} userId={session.user.id} t={t}/></div></details>}
     {token&&<Card className="space-y-3 p-4"><p>{session.user.email}</p><Button disabled={busy} onClick={activate}>{t.accept}</Button></Card>}
     {accounts.isLoading?<p>{t.loading}</p>:accounts.isError?<p role="alert">{t.failed}<Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></p>:!partner?<p>{t.noAccounts}</p>:<>
-     <Card className="flex flex-wrap items-center justify-between gap-3 p-4"><select aria-label={t.partners} className="min-w-0 flex-1 rounded-xl border bg-background p-3" value={partner.id} onChange={e=>{setSelected(e.target.value);setError('');}}>
-      {accounts.data.map(p=><option key={p.id} value={p.id}>{p.business} · {p.name}</option>)}
-     </select><Button variant="outline" onClick={()=>{accounts.refetch();statement.refetch();}}>{t.refresh}</Button></Card>
-     {statement.data&&<WalletPortalERPOverview partner={partner} statement={statement.data} lang={lang}
-       onLoan={()=>{setLoanSignal(x=>x+1);scrollToSection('wallet-loan-requests');}}
-       onCustody={()=>{setCustodySignal(x=>x+1);scrollToSection('wallet-custody-requests');}}
-       onStatement={()=>{setStatementSignal(x=>x+1);scrollToSection('wallet-statement');}}
-       onAccount={()=>{setAccountSignal(x=>x+1);scrollToSection('wallet-statement');}}/>}
-     <div id="wallet-custody-requests" className="scroll-mt-4"><PartnerTransactionRequests key={`custody:${session.user.id}:${partner.id}`} partner={partner} t={t} custody openSignal={custodySignal}/></div>
-     <div id="wallet-loan-requests" className="scroll-mt-4"><PartnerTransactionRequests key={`requests:${session.user.id}:${partner.id}`} partner={partner} t={t} openSignal={loanSignal}/></div>
-     <div id="wallet-statement" className="scroll-mt-4">{statement.isLoading?<p>{t.loading}</p>:statement.isError?<p role="alert">{t.failed}<Button onClick={()=>statement.refetch()}>{t.refresh}</Button></p>:statement.data&&<PartnerWorkspace key={`${session.user.id}:${partner.id}`} data={statement.data} partner={partner} t={t} lang={lang} preferences={preferences} updatePreference={updatePreference} confirm={confirm} busy={busy} statementSignal={statementSignal} accountSignal={accountSignal}/>}</div>
+     <div className="flex min-w-0 items-end gap-2 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm">
+       <label className="min-w-0 flex-1 text-xs font-semibold text-slate-500">{labels.user}
+        <select aria-label={t.partners} className="mt-1 block min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-bold text-slate-900" value={partner.id} onChange={e=>{setSelected(e.target.value);setWorkspace('overview');setRequestKind('loan');setError('');}}>
+         {accounts.data.map(p=><option key={p.id} value={p.id}>{p.business} · {p.name}</option>)}
+        </select></label>
+       <Button size="icon" variant="outline" aria-label={t.refresh} className="size-11 shrink-0" onClick={()=>{accounts.refetch();statement.refetch();}}><RefreshCw className="size-4"/></Button>
+     </div>
+     <nav aria-label={t.portal} className="grid grid-cols-3 gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
+       {[[ 'overview',Wallet],[ 'requests',Clock3],[ 'statement',FileText]].map(([key,Icon])=><button type="button" key={key} aria-current={workspace===key?'page':undefined} onClick={()=>setWorkspace(key)} className={`flex min-h-12 min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 text-xs font-bold sm:text-sm ${workspace===key?'bg-blue-600 text-white':'text-slate-600 hover:bg-blue-50'}`}><Icon className="size-4 shrink-0"/><span>{labels[key]}</span></button>)}
+     </nav>
+     {statement.isLoading?<p role="status">{t.loading}</p>:statement.isError?<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{t.failed} <Button variant="outline" size="sm" onClick={()=>statement.refetch()}>{t.refresh}</Button></p>:statement.data&&<>
+       {workspace==='overview'&&<WalletPortalERPOverview partner={partner} statement={statement.data} lang={lang}
+        onLoan={()=>openRequest('loan')} onCustody={()=>openRequest('custody')}
+        onStatement={()=>{setWorkspace('statement');setStatementSignal(x=>x+1);}}
+        onAccount={()=>{setWorkspace('statement');setAccountSignal(x=>x+1);}}/>}
+       {workspace==='requests'&&<section className="min-w-0 space-y-3">
+        <div className="grid grid-cols-2 gap-2 rounded-xl border bg-white p-1.5">
+         {[['loan',t.loans],['custody',t.custodyTitle]].map(([key,label])=><button key={key} type="button" aria-pressed={requestKind===key} onClick={()=>setRequestKind(key)} className={`min-h-12 min-w-0 rounded-lg px-2 text-xs font-bold leading-5 ${requestKind===key?'bg-blue-50 text-blue-700 ring-1 ring-blue-400':'text-slate-600'}`}>{label}</button>)}
+        </div>
+        {requestKind==='custody'?<PartnerTransactionRequests key={`custody:${session.user.id}:${partner.id}`} partner={partner} t={t} custody openSignal={custodySignal}/>:
+         <PartnerTransactionRequests key={`requests:${session.user.id}:${partner.id}`} partner={partner} t={t} openSignal={loanSignal}/>}
+       </section>}
+       {workspace==='statement'&&<PartnerWorkspace key={`${session.user.id}:${partner.id}`} data={statement.data} partner={partner} t={t} lang={lang} preferences={preferences} updatePreference={updatePreference} confirm={confirm} busy={busy} statementSignal={statementSignal} accountSignal={accountSignal}/>}
+     </>}
 
     </>}
    </>}
