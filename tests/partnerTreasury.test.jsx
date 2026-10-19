@@ -39,6 +39,10 @@ describe('partner treasury isolation and portal',()=>{
  });
  it.each(['fa','ar','en'])('renders the authorized statement and confirms through server in %s',async(lang)=>{
   state.lang=lang;await mount();const t=peopleText(lang);
+  const statementTitle={en:'Statement',ar:'كشف الحساب',fa:'صورت‌حساب'}[lang];
+  const statementTab=[...host.querySelectorAll('nav button')].find(b=>b.textContent===statementTitle);
+  expect(statementTab).toBeTruthy();
+  await act(async()=>statementTab.click());
   expect(host.textContent).toContain(t.ownerOwes);expect(host.textContent).toContain(t.sponsor_advance_to_owner);
   expect(host.querySelector('main').dir).toBe(lang==='en'?'ltr':'rtl');
   const button=[...host.querySelectorAll('button')].find(b=>b.textContent===t.confirm);
@@ -61,7 +65,25 @@ describe('partner treasury isolation and portal',()=>{
 it('navigates reports, transaction filters and account customization',async()=>{
  await mount();const t=partnerText('fa');
  const nav=label=>[...host.querySelectorAll('nav button')].find(b=>b.textContent===label);
+ // The financial statement is now a separate intentional view.
+ expect(nav(t.reports)).toBeUndefined();
+ await act(async()=>nav('صورت‌حساب').click());
  await act(async()=>nav(t.reports).click());expect(host.textContent).toContain(t.balanceTrend);expect(host.textContent).toContain(t.distribution);
  await act(async()=>nav(t.records).click());expect(host.querySelector('input[placeholder]')).not.toBeNull();
  await act(async()=>nav(t.account).click());expect(host.textContent).toContain(t.customize);
+});
+
+it('opens one user workflow at a time instead of stacking loan, custody and statement pages',async()=>{
+ await mount();
+ expect(host.querySelectorAll('nav[aria-label]')).toHaveLength(1);
+ expect(host.textContent).toContain('خلاصه روشن حساب شما');
+ expect(host.textContent).not.toContain('آمار');
+ const nav=label=>[...host.querySelectorAll('nav button')].find(b=>b.textContent===label);
+ await act(async()=>nav('درخواست‌ها').click());
+ expect(host.textContent).toContain(peopleText('fa').loans);
+ expect(host.textContent).not.toContain('خلاصه روشن حساب شما');
+ expect(host.textContent).not.toContain(partnerText('fa').trend);
+ await act(async()=>nav('صورت‌حساب').click());
+ expect(host.textContent).toContain(partnerText('fa').pdf);
+ expect(host.textContent).not.toContain(peopleText('fa').custodyHelp);
 });
