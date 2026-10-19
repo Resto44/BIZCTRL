@@ -10,7 +10,7 @@ const text={
  ar:{account:'حساب المحفظة الداخلي',source:'صاحب الحساب',cash:'أموال المنشأة في العهدة',notice:'العهدة ملك للمنشأة ولا تصبح رصيد إنفاق شخصي.',error:'تعذر تحميل حركة العهدة. لن تُعرض حركة جزئية.'},
  fa:{account:'حساب داخلی والت',source:'صاحب حساب',cash:'پول کسب‌وکار در امانت شخص',notice:'امانت، مال کسب‌وکار است و موجودی مصرفی شخص محسوب نمی‌شود.',error:'گردش امانت بارگذاری نشد؛ گردش ناقص نمایش داده نمی‌شود.'},
 };
-export default function OwnerWalletPersonActivity({person,loans=[],currency='SAR',lang='en',onStatement,onCustody}){
+export default function OwnerWalletPersonActivity({person,businessName='',loans=[],currency='SAR',lang='en',onStatement,onCustody}){
  const t=text[lang]||text.en;
  const q=useQuery({queryKey:['people-custody',person.id,'owner-summary'],
   queryFn:async()=>{
@@ -27,7 +27,7 @@ export default function OwnerWalletPersonActivity({person,loans=[],currency='SAR
    </div>
    {q.isPending?<p role="status" className="rounded-xl border p-3 text-xs text-slate-600">…</p>:
      q.isError?<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{t.error}</p>:
-     <WalletUnifiedActivity loans={loans} custody={q.data.records} currency={currency} lang={lang} onStatement={onStatement} onRequests={onCustody}/>}
+     <WalletUnifiedActivity loans={loans} custody={q.data.records} account={{id:person.id,account_reference:walletAccountReference(person.id),business:businessName}} currency={currency} lang={lang} onStatement={onStatement} onRequests={onCustody}/>}
    <p className="flex items-start gap-1.5 text-xs leading-5 text-slate-500"><ShieldCheck className="mt-0.5 size-4 shrink-0"/>{t.notice}</p>
  </section>;
 }
