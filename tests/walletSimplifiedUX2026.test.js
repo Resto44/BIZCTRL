@@ -1,41 +1,49 @@
 import {describe,it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
-const src=path=>readFileSync(path,'utf8');
-const owner=src('src/components/settlement/WalletERPOverview.jsx');
-const center=src('src/components/settlement/PartnerTreasuryCenter.jsx');
+const src=p=>readFileSync(p,'utf8');
+const owner=src('src/components/wallet-banking/WalletBankingOwnerPortal.jsx');
+const wrapper=src('src/pages/SponsorTreasury.jsx');
 const portal=src('src/pages/PartnerPortal.jsx');
-const user=src('src/components/settlement/WalletPortalERPOverview.jsx');
+const bank=src('src/components/wallet-banking/WalletBankingCenter.jsx');
+const sql=src('supabase/migrations/20261019202000_erp_bank_wallet_v1.sql');
 
-describe('October wallet mobile progressive disclosure',()=>{
- it('keeps owner person rows collapsed by default and exposes actions only after opening that person',()=>{
-  expect(owner).toContain("const [expanded,setExpanded]=useState('')");
-  expect(owner).toContain('aria-expanded={open}');
-  expect(owner).toContain('{open&&<div');
-  expect(owner).toContain('onEdit(p)');
-  expect(owner).toContain('onLedger()');
-  expect(owner).toContain("value={filter}");
-  expect(owner).not.toContain("['all','partners','staff','active','inactive'].map(k=><button");
+describe('Wallet Banking Center mobile progressive disclosure',()=>{
+ it('owner selects one verified named person account without exposing unrelated tenants',()=>{
+  expect(owner).toContain("eq('restaurant_id',activeRestaurantId)");
+  expect(owner).toContain("eq('is_active',true)");
+  expect(owner).toContain("not('user_id','is',null)");
+  expect(owner).toContain("person=query.data?.find(p=>p.id===selected)");
+  expect(owner).toContain('<WalletBankingCenter key={person.id} owner person={person}');
+  expect(owner).toContain('PeopleMemberships');
+  expect(wrapper).toContain("role==='owner'");
+  expect(wrapper).not.toContain('SponsorOwnerBilateralLedger');
  });
- it('shows one approval type at a time and keeps person selection available on detail pages',()=>{
-  expect(center).toContain("requestTab==='custody'?");
-  expect(center).toContain("view==='ledger'||view==='requests'");
-  expect(center).toContain('onChange={e=>{setSelected(e.target.value);setRecordSignal(0);}}');
-  expect(center).toContain('erp_save_person_account');
+ it('contains real transfer, receive, statement and beneficiary actions without displaying fake account values',()=>{
+  expect(bank).toContain("key:'transfer'");
+  expect(bank).toContain("key:'receive'");
+  expect(bank).toContain("key:'statement'");
+  expect(bank).toContain("key:'beneficiaries'");
+  expect(bank).toContain('setPanel(next)');
+  expect(bank).toContain('panel===\\'review\\'');
+  expect(bank).toContain("supabase.rpc('erp_bank_wallet_review'");
+  expect(bank).not.toContain('2,450.00');
+  expect(bank).not.toContain('20.00 SAR');
  });
- it('mounts only the selected personal workflow with statement authorization',()=>{
-  expect(portal).toContain("workspace==='overview'&&<WalletPortalERPOverview");
-  expect(portal).toContain("workspace==='requests'&&<section");
-  expect(portal).toContain("workspace==='statement'&&<PartnerWorkspace");
-  expect(portal).toContain("statement.isError?");
-  expect(portal).toContain("requestKind==='custody'?");
-  expect(portal).not.toContain("supabase.from('wallet_transactions').insert");
+ it('person portal uses current auth account only, no Sponsor or old wallet components',()=>{
+  expect(portal).toContain("erp_partner_portal_accounts");
+  expect(portal).toContain('accountRowsUnique(accounts.data||[])');
+  expect(portal).toContain('conflict?null:verified.find');
+  expect(portal).toContain('<WalletBankingCenter key={person.id} person={person}');
+  expect(portal).not.toContain('<PartnerWorkspace');
+  expect(portal).not.toContain('<WalletPortalERPOverview');
+  expect(portal).not.toContain('<PartnerTransactionRequests');
  });
- it('never conflates personal principal and custody or reveals unknown values as zero',()=>{
-  expect(user).toContain("loans?.owner_owes");
-  expect(user).toContain("loans?.partner_owes");
-  expect(user).toContain("readCashCustodyAndPending");
-  expect(user).toContain("aria-expanded={showCustody}");
-  expect(user).toContain("query.isError?'—'");
-  expect(user).not.toContain('Available to Withdraw');
+ it('does not merge historic loans or custody into cash wallet or show missing data as zero',()=>{
+  expect(sql).toContain('legacy_migration');
+  expect(sql).toContain('historical_loans_and_custody_archived_not_spendable');
+  expect(sql).toContain("WHERE wallet_account_id=a.id");
+  expect(bank).toContain("query.isError");
+  expect(bank).toContain("value={loaded?(current?.balance??0):null}");
+  expect(bank).toContain("value===null?'—'");
  });
 });
