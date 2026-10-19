@@ -340,6 +340,7 @@ const SubscribedRoutes = () => {
 
         {/* ── Finance ── */}
         <Route path="/treasury" element={<RoleGuard permission="viewTreasury"><Treasury /></RoleGuard>} />
+        <Route path="/wallet-banking" element={<RoleGuard permission="viewSponsorTreasury"><SponsorTreasury /></RoleGuard>} />
         <Route path="/sponsor-treasury" element={<RoleGuard permission="viewSponsorTreasury"><SponsorTreasury /></RoleGuard>} />
         <Route path="/debts" element={<RoleGuard permission="viewDebts"><DebtManagement /></RoleGuard>} />
         <Route path="/debt-management" element={<RoleGuard permission="viewDebts"><DebtManagement /></RoleGuard>} />

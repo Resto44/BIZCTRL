@@ -200,7 +200,7 @@ export const ALL_NAV_ITEMS = [
     permission: 'viewInventory',
   },
 
-  { path: '/sponsor-treasury', label: 'Accounts & Wallet', icon: Wallet, mode: 'all', group: NAV_GROUPS.FINANCE, permission: 'viewSponsorTreasury', roles: ['owner'] },
+  { path: '/wallet-banking', label: 'Wallet Banking Center', icon: Wallet, mode: 'all', group: NAV_GROUPS.FINANCE, permission: 'viewSponsorTreasury', roles: ['owner'] },
 
   // ── FINANCE (Shared) ───────────────────────────────────────────────────────
   {

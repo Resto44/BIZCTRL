@@ -1,91 +1,19 @@
+import React from 'react';
+import {useRole} from '@/lib/RoleContext';
 import {useLanguage} from '@/lib/LanguageContext';
-import {peopleText} from '@/lib/peopleAccounts';
-import PartnerTreasuryCenter from '@/components/settlement/PartnerTreasuryCenter';
-import React, { useState } from 'react';
-import { useRole } from '@/lib/RoleContext';
-import PageHeader from '@/components/shared/PageHeader';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Send, CheckCircle2, BarChart2, ShieldCheck, Wallet } from 'lucide-react';
+import WalletBankingOwnerPortal from '@/components/wallet-banking/WalletBankingOwnerPortal';
 import ManagerSubmitPanel from '@/components/settlement/ManagerSubmitPanel';
-import ReviewPanel from '@/components/settlement/ReviewPanel';
-import BranchBalanceTracker from '@/components/settlement/BranchBalanceTracker';
-import SettlementAuditLog from '@/components/settlement/SettlementAuditLog';
-import SponsorLedger from '@/components/settlement/SponsorLedger';
-import SponsorOwnerBilateralLedger from '@/components/settlement/SponsorOwnerBilateralLedger';
 
-export default function SponsorTreasury() {
-  const { role } = useRole();
-  const {lang}=useLanguage(); const t=peopleText(lang);
-
-  // Managers see only submit tab by default
-  const defaultTab = role === 'manager' ? 'submit' : 'partners';
-  const [tab, setTab] = useState(defaultTab);
-
-  if (role === 'cashier') {
-    return <div className="text-center py-20 text-muted-foreground text-sm">Access restricted.</div>;
-  }
-
-  return (
-    <div>
-      <PageHeader title={t.title} />
-      {role==='owner'&&<div className="mb-4"><button className="rounded-xl border px-4 py-2 font-bold" onClick={()=>setTab(tab==='partners'?'bilateral':'partners')}>{tab==='partners'?t.legacy:t.partners}</button></div>}
-      {tab==='partners'?<PartnerTreasuryCenter />:<><h2 className="mb-3 font-bold">{t.custody}</h2>
-
-      <div className="mb-4 p-3 rounded-xl bg-violet-50 border border-violet-200 flex items-start gap-3">
-        <ShieldCheck className="w-5 h-5 text-violet-500 mt-0.5 shrink-0" />
-        <div className="text-xs text-violet-700">
-          <p className="font-semibold mb-0.5">3-Party Settlement: Branch Manager → Sponsor (كفيل) → Owner</p>
-          <p>Manager submits nightly network sales with proof → Sponsor reviews & approves → Owner receives settlement → Owner funds branches.</p>
-        </div>
-      </div>
-
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="mb-4 grid h-auto w-full grid-cols-2 gap-1 p-1 sm:grid-cols-6">
-          <TabsTrigger value="submit" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
-            <Send className="w-3 h-3" />Submit
-          </TabsTrigger>
-          <TabsTrigger value="review" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
-            <CheckCircle2 className="w-3 h-3" />Review
-          </TabsTrigger>
-          <TabsTrigger value="sponsor" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
-            <Wallet className="w-3 h-3" />Sponsor
-          </TabsTrigger>
-          <TabsTrigger value="bilateral" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
-            <Wallet className="h-3 w-3" />Sponsor ↔ Owner
-          </TabsTrigger>
-          <TabsTrigger value="dashboard" className="flex min-h-10 items-center gap-1 text-xs sm:min-h-9">
-            <BarChart2 className="w-3 h-3" />Balances
-          </TabsTrigger>
-          <TabsTrigger value="audit" className="col-span-2 flex min-h-10 items-center gap-1 text-xs sm:col-span-1 sm:min-h-9">
-            <ShieldCheck className="w-3 h-3" />Audit
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="submit">
-          <ManagerSubmitPanel />
-        </TabsContent>
-
-        <TabsContent value="review">
-          <ReviewPanel />
-        </TabsContent>
-
-        <TabsContent value="sponsor">
-          <SponsorLedger />
-        </TabsContent>
-
-        <TabsContent value="bilateral">
-          <SponsorOwnerBilateralLedger legacyOnly />
-        </TabsContent>
-
-        <TabsContent value="dashboard">
-          <BranchBalanceTracker />
-        </TabsContent>
-
-        <TabsContent value="audit">
-          <SettlementAuditLog />
-        </TabsContent>
-      </Tabs>
-      </>}
-    </div>
-  );
+// Historical sponsor/custody/loan tables remain read-only for accounting
+// reconciliation. The old Sponsor Treasury and Accounts & Wallet UI no longer
+// mounts on this route. Manager branch settlements retain their existing submit
+// workflow, which is separate from individual wallet banking.
+export default function SponsorTreasury(){
+ const {role}=useRole(),{lang}=useLanguage();
+ if(role==='owner')return <WalletBankingOwnerPortal/>;
+ if(role==='manager')return <section className="min-w-0 space-y-3 p-3 sm:p-5">
+  <h1 className="text-xl font-black">{lang==='fa'?'تسویه حساب شعبه':lang==='ar'?'تسوية الفرع':'Branch Settlement'}</h1>
+  <ManagerSubmitPanel/>
+ </section>;
+ return <p role="alert" className="p-5 text-sm">Access restricted.</p>;
 }

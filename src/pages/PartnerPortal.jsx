@@ -2,99 +2,119 @@ import React,{useEffect,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
 import {useLanguage} from '@/lib/LanguageContext';
-import {partnerError,readPartnerPreferences} from '@/lib/partnerTreasury';
-import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-import {Card} from '@/components/ui/card';
 import {peopleText} from '@/lib/peopleAccounts';
 import PeopleMemberships from '@/components/settlement/PeopleMemberships';
-import PartnerTransactionRequests from '@/components/settlement/PartnerTransactionRequests';
-import PartnerWorkspace from '@/components/settlement/PartnerWorkspace';
-import WalletPortalERPOverview from '@/components/settlement/WalletPortalERPOverview';
-import {Wallet,FileText,Clock3,RefreshCw} from 'lucide-react';
-import {loadPartnerStatement} from '@/lib/partnerAnalytics';
+import WalletBankingCenter from '@/components/wallet-banking/WalletBankingCenter';
 import {accountRowsUnique} from '@/lib/walletPersonalActivity';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
 
-// Separate external portal: no staff membership, owner wallet access, or branch permissions.
+const tr={
+ en:{error:'Account identity conflict. Contact the business owner.',choose:'Choose wallet account',loading:'Loading verified wallet…',signup:'Create account',signin:'Sign in',verify:'Check email for confirmation before requesting account access.',empty:'No owner-approved wallet account yet. Submit a membership request.',invalid:'Enter a valid email and password (at least 10 characters for registration).',failed:'Could not complete the request.',signout:'Sign out',access:'Wallet Banking Center',refresh:'Refresh'},
+ ar:{error:'تعارض في هوية الحساب. راجع مالك المنشأة.',choose:'اختيار حساب المحفظة',loading:'جارٍ تحميل المحفظة الموثقة…',signup:'إنشاء حساب',signin:'تسجيل الدخول',verify:'تحقق من رسالة تأكيد البريد قبل طلب العضوية.',empty:'لا يوجد حساب محفظة معتمد. قدم طلب انضمام.',invalid:'أدخل البريد وكلمة المرور (١٠ أحرف للتسجيل).',failed:'لم تكتمل العملية.',signout:'خروج',access:'مركز المحفظة البنكية',refresh:'تحديث'},
+ fa:{error:'شناسه حساب تکراری یا نامعتبر است؛ با اونر تماس بگیرید.',choose:'انتخاب حساب والت',loading:'در حال بارگذاری والت تأییدشده…',signup:'ایجاد حساب',signin:'ورود',verify:'پیش از درخواست عضویت، ایمیل خود را تأیید کنید.',empty:'هنوز والت مورد تأیید اونر ندارید؛ درخواست عضویت بفرستید.',invalid:'ایمیل و رمز صحیح (برای ثبت‌نام دست‌کم ۱۰ کاراکتر) وارد کنید.',failed:'اجرای درخواست ناموفق بود.',signout:'خروج',access:'مرکز بانکداری والت',refresh:'تازه‌سازی'},
+};
+const fromAddress=key=>{
+ const hash=new URLSearchParams(window.location.hash.slice(1));
+ const query=new URLSearchParams(window.location.search);
+ return hash.get(key)||query.get(key)||sessionStorage.getItem(key==='invite'?'partner:invite':'people:join')||'';
+};
 export default function PartnerPortal(){
- const {lang,setLang}=useLanguage(); const t=peopleText(lang); const qc=useQueryClient();
- const [session,setSession]=useState(null); const [authLoading,setAuthLoading]=useState(true);
- const [email,setEmail]=useState(''); const [password,setPassword]=useState('');
- const [token,setToken]=useState(()=>new URLSearchParams(window.location.hash.slice(1)).get('invite')||new URLSearchParams(window.location.search).get('invite')||sessionStorage.getItem('partner:invite')||'');
- const [joinToken,setJoinToken]=useState(()=>new URLSearchParams(window.location.hash.slice(1)).get('join')||new URLSearchParams(window.location.search).get('join')||sessionStorage.getItem('people:join')||'');
- const [busy,setBusy]=useState(false); const lock=useRef(false); const [error,setError]=useState(''); const [notice,setNotice]=useState('');
- const [selected,setSelected]=useState('');
- const [workspace,setWorkspace]=useState('overview'),[requestKind,setRequestKind]=useState('loan');
- const [loanSignal,setLoanSignal]=useState(0),[custodySignal,setCustodySignal]=useState(0),[statementSignal,setStatementSignal]=useState(0),[accountSignal,setAccountSignal]=useState(0);
- const [preferences,setPreferences]=useState({title:'',showBalances:true,compact:false});
- useEffect(()=>{let live=true;supabase.auth.getSession().then(({data,error})=>{if(live){setSession(data?.session||null);setAuthLoading(false);if(error)setError(t.failed);}});
-  const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,next)=>{if(live){setSession(next);setAuthLoading(false);}});
+ const {lang,setLang}=useLanguage();
+ const t=tr[lang]||tr.en,people=peopleText(lang),client=useQueryClient();
+ const [session,setSession]=useState(null),[authLoading,setAuthLoading]=useState(true);
+ const [email,setEmail]=useState(''),[password,setPassword]=useState('');
+ const [invite,setInvite]=useState(()=>fromAddress('invite')),[join,setJoin]=useState(()=>fromAddress('join'));
+ const [selected,setSelected]=useState(''),[busy,setBusy]=useState(false);
+ const [error,setError]=useState(''),[notice,setNotice]=useState('');
+ const lock=useRef(false);
+ useEffect(()=>{
+  let live=true;
+  supabase.auth.getSession().then(({data,error})=>{
+   if(live){setSession(data?.session||null);setAuthLoading(false);if(error)setError(t.failed);}
+  }).catch(()=>{if(live){setAuthLoading(false);setError(t.failed);}});
+  const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,next)=>{
+   if(live){setSession(next);setAuthLoading(false);}
+  });
   return()=>{live=false;subscription.unsubscribe();};
  },[]);
- useEffect(()=>{if(joinToken){sessionStorage.setItem('people:join',joinToken);if(!authLoading)history.replaceState(null,'',window.location.pathname);}},[joinToken,authLoading]);
- useEffect(()=>{if(token){sessionStorage.setItem('partner:invite',token);if(!authLoading)history.replaceState(null,'',window.location.pathname);} },[token,authLoading]);
- useEffect(()=>{setPreferences(readPartnerPreferences(session?.user?.id));setSelected('');setWorkspace('overview');setRequestKind('loan');},[session?.user?.id]);
- const updatePreference=(key,value)=>setPreferences(p=>{const next={...p,[key]:value};try{localStorage.setItem(`partner-view:${session?.user?.id}:portal`,JSON.stringify(next));}catch{/* display still works */}return next;});
- const accounts=useQuery({queryKey:['partner-portal-accounts',session?.user?.id],enabled:!!session?.user?.id,
-  queryFn:async()=>{const {data,error}=await supabase.rpc('erp_partner_portal_accounts');if(error)throw error;return data||[];},refetchInterval:15000});
- const verifiedAccounts=accountRowsUnique(accounts.data||[]);
- const integrityError=!!accounts.data&&verifiedAccounts.length!==accounts.data.length;
- const partner=integrityError?null:verifiedAccounts.find(p=>p.id===selected)||verifiedAccounts[0];
- const openRequest=kind=>{setRequestKind(kind);setWorkspace('requests');if(kind==='custody')setCustodySignal(x=>x+1);else setLoanSignal(x=>x+1);};
- const labels={en:{overview:'Overview',requests:'Requests',statement:'Statement',members:'Join another business',user:'Wallet account'},ar:{overview:'الرئيسية',requests:'الطلبات',statement:'كشف الحساب',members:'الانضمام لمنشأة أخرى',user:'حساب المحفظة'},fa:{overview:'نمای کلی',requests:'درخواست‌ها',statement:'صورت‌حساب',members:'عضویت در کسب‌وکار دیگر',user:'حساب والت'}}[lang]||{overview:'Overview',requests:'Requests',statement:'Statement',members:'Membership',user:'Wallet account'};
- const statement=useQuery({queryKey:['partner-portal-statement',session?.user?.id,partner?.id],enabled:!!session?.user?.id&&!!partner?.id,
-  queryFn:({signal})=>loadPartnerStatement(supabase,partner.id,signal),refetchInterval:30000});
- const run=async(fn)=>{if(lock.current)return;lock.current=true;setBusy(true);setError('');setNotice('');try{await fn();}catch(e){setError(partnerError(e,t));}finally{lock.current=false;setBusy(false);}};
- const authenticate=(signup)=>run(async()=>{
-  if(!email.trim()||!password||(signup&&password.length<10))throw Error('INVALID');
-  const payload={email:email.trim().toLowerCase(),password};
-  const result=signup?await supabase.auth.signUp({...payload,options:{emailRedirectTo:`${window.location.origin}/partner-portal?${token?'invite='+encodeURIComponent(token):'join='+encodeURIComponent(joinToken)}`,data:token?{partner_invitation_token:token}:{people_portal_registration:true}}}):await supabase.auth.signInWithPassword(payload);
-  if(result.error)throw result.error;
-  if(result.data.session)setSession(result.data.session);else setNotice(t.verify);
+ useEffect(()=>{setSelected('');},[session?.user?.id]);
+ useEffect(()=>{if(invite)sessionStorage.setItem('partner:invite',invite);if(join)sessionStorage.setItem('people:join',join);},[invite,join]);
+ const accounts=useQuery({
+  queryKey:['partner-portal-accounts',session?.user?.id],
+  enabled:!!session?.user?.id,
+  queryFn:async()=>{
+   const {data,error}=await supabase.rpc('erp_partner_portal_accounts');
+   if(error)throw error;if(!Array.isArray(data))throw Error('UNVERIFIED_ACCOUNT_DATA');
+   return data;
+  },refetchInterval:20000,staleTime:12000
  });
- const activate=()=>run(async()=>{const {data,error}=await supabase.rpc('erp_accept_partner_invitation',{p_token:token});if(error)throw error;
-  setSelected(data);setToken('');sessionStorage.removeItem('partner:invite');await accounts.refetch();});
- const confirm=(id)=>run(async()=>{const {error}=await supabase.rpc('erp_confirm_partner_transaction',{p_transaction_id:id});if(error)throw error;await statement.refetch();});
- const signOut=()=>run(async()=>{const {error}=await supabase.auth.signOut();if(error)throw error;setSession(null);for(const key of ['partner-portal-statement','partner-portal-accounts','people-memberships','people-custody','partner-requests'])qc.removeQueries({queryKey:[key]});});
- return <main dir={lang==='en'?'ltr':'rtl'} className="mx-auto min-h-screen max-w-5xl space-y-4 bg-background p-4 pb-12 sm:p-6">
-  <header className="flex flex-wrap items-center justify-between gap-3 border-b pb-4"><div><p className="font-bold text-blue-600">BizCTRL</p><h1 className="text-xl font-extrabold">{preferences.title||t.portal}</h1></div>
-   <div className="flex gap-2"><select aria-label="Language" className="rounded-lg border bg-background p-2" value={lang} onChange={e=>setLang(e.target.value)}><option value="fa">فارسی</option><option value="ar">العربية</option><option value="en">English</option></select>
-   {session&&<Button variant="outline" disabled={busy} onClick={signOut}>{t.signOut}</Button>}</div></header>
-  {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}{notice&&<p role="status" className="rounded-xl bg-green-50 p-3 text-green-800">{notice}</p>}
-  {authLoading?<p>{t.loading}</p>:!session?<Card className="mx-auto max-w-md space-y-4 p-5"><h2 className="font-bold">{t.signIn}</h2><p className="text-sm">{t.accountHelp}</p>
-   <form className="space-y-3" onSubmit={e=>{e.preventDefault();authenticate(false);}}><label className="block">{t.email}<Input type="email" required value={email} autoComplete="email" dir="ltr" onChange={e=>setEmail(e.target.value)}/></label>
-   <label className="block">{t.password}<Input type="password" required value={password} autoComplete="current-password" dir="ltr" onChange={e=>setPassword(e.target.value)}/></label>
-   <div className="flex flex-wrap gap-2"><Button disabled={busy} type="submit">{t.signIn}</Button>{<Button type="button" variant="outline" disabled={busy||!email.trim()||password.length<10} onClick={()=>authenticate(true)}>{t.signUp}</Button>}</div></form></Card>:
+ const verified=accountRowsUnique(accounts.data||[]);
+ const conflict=!!accounts.data&&verified.length!==accounts.data.length;
+ const person=conflict?null:verified.find(x=>x.id===selected)||verified[0];
+ const run=async fn=>{
+  if(lock.current)return;lock.current=true;setBusy(true);setError('');setNotice('');
+  try{await fn();}catch(e){setError(e?.message||t.failed);}
+  finally{lock.current=false;setBusy(false);}
+ };
+ const authenticate=signup=>run(async()=>{
+  if(!email.trim()||!password||(signup&&password.length<10))throw Error(t.invalid);
+  const credentials={email:email.trim().toLowerCase(),password};
+  const callback=invite?'invite='+encodeURIComponent(invite):join?'join='+encodeURIComponent(join):'';
+  const result=signup?await supabase.auth.signUp({...credentials,options:{
+    emailRedirectTo:window.location.origin+'/wallet-portal'+(callback?'?'+callback:''),
+    data:invite?{partner_invitation_token:invite}:{people_portal_registration:true}
+  }}):await supabase.auth.signInWithPassword(credentials);
+  if(result.error)throw result.error;
+  if(result.data?.session)setSession(result.data.session);
+  else setNotice(t.verify);
+ });
+ const activate=()=>run(async()=>{
+  const {data,error}=await supabase.rpc('erp_accept_partner_invitation',{p_token:invite});
+  if(error)throw error;
+  setSelected(data);setInvite('');sessionStorage.removeItem('partner:invite');
+  await accounts.refetch();
+ });
+ const signOut=()=>run(async()=>{
+  const {error}=await supabase.auth.signOut();if(error)throw error;
+  setSession(null);setSelected('');
+  for(const key of ['erp-bank-wallet','partner-portal-accounts','bank-wallet-owner-people','people-memberships','people-custody'])client.removeQueries({queryKey:[key]});
+ });
+ return <main dir={lang==='en'?'ltr':'rtl'} className="mx-auto min-h-screen max-w-6xl space-y-4 bg-slate-50 p-3 pb-20 sm:p-6">
+  <header className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+   <h1 className="font-black text-blue-900">BizCTRL · {t.access}</h1>
+   <div className="flex flex-wrap items-center gap-2">
+    <select aria-label="Language" className="min-h-11 rounded-xl border bg-white px-2 text-xs" value={lang} onChange={e=>setLang(e.target.value)}>
+     <option value="fa">فارسی</option><option value="ar">العربية</option><option value="en">English</option>
+    </select>
+    {session&&<Button variant="outline" disabled={busy} onClick={signOut}>{t.signout}</Button>}
+   </div>
+  </header>
+  {error&&<p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+  {notice&&<p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
+  {authLoading?<p role="status">{t.loading}</p>:!session?
+   <div className="mx-auto max-w-md space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+    <h2 className="text-xl font-black">{t.signin}</h2>
+    <form onSubmit={e=>{e.preventDefault();authenticate(false);}} className="space-y-3">
+      <label className="block text-sm">{people.email}<Input type="email" required autoComplete="email" dir="ltr" value={email} onChange={e=>setEmail(e.target.value)}/></label>
+      <label className="block text-sm">{people.password}<Input type="password" required autoComplete="current-password" dir="ltr" value={password} onChange={e=>setPassword(e.target.value)}/></label>
+      <div className="grid grid-cols-2 gap-2"><Button disabled={busy} type="submit" className="min-h-11">{t.signin}</Button><Button disabled={busy||password.length<10} type="button" variant="outline" className="min-h-11" onClick={()=>authenticate(true)}>{t.signup}</Button></div>
+    </form>
+   </div>:
    <>
-    {!accounts.isLoading&&!accounts.isError&&(!accounts.data?.length||joinToken)&&<PeopleMemberships key={session.user.id} userId={session.user.id} t={t} joinToken={joinToken} onJoined={()=>{setJoinToken('');sessionStorage.removeItem('people:join');setNotice(t.joinSent);}}/>}
-    {token&&<Card className="space-y-3 p-4"><p>{session.user.email}</p><Button disabled={busy} onClick={activate}>{t.accept}</Button></Card>}
-    {accounts.isLoading?<p>{t.loading}</p>:accounts.isError?<p role="alert">{t.failed}<Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></p>:integrityError?<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{lang==='fa'?'خطا در شناسایی حساب والت: حساب تکراری یا اطلاعات هویتی ناقص است. برای بررسی با اونر تماس بگیرید.':lang==='ar'?'تعذر التحقق من حساب المحفظة: هناك سجل مكرر أو بيانات هوية غير مكتملة. راجع مالك المنشأة.':'Wallet account identity conflict or incomplete record. Contact the business owner.'}</p>:!partner?<p>{t.noAccounts}</p>:<>
-     <div className="flex min-w-0 items-end gap-2 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm">
-       <label className="min-w-0 flex-1 text-xs font-semibold text-slate-500">{labels.user}
-        <select aria-label={t.partners} className="mt-1 block min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-bold text-slate-900" value={partner.id} onChange={e=>{setSelected(e.target.value);setWorkspace('overview');setRequestKind('loan');setLoanSignal(0);setCustodySignal(0);setStatementSignal(0);setAccountSignal(0);setError('');}}>
-         {verifiedAccounts.map(p=><option key={p.id} value={p.id}>{p.business} · {p.name}</option>)}
-        </select></label>
-       <Button size="icon" variant="outline" aria-label={t.refresh} className="size-11 shrink-0" onClick={()=>{accounts.refetch();statement.refetch();}}><RefreshCw className="size-4"/></Button>
-     </div>
-     <nav aria-label={t.portal} className="grid grid-cols-3 gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
-       {[[ 'overview',Wallet],[ 'requests',Clock3],[ 'statement',FileText]].map(([key,Icon])=><button type="button" key={key} aria-current={workspace===key?'page':undefined} onClick={()=>{setWorkspace(key);setLoanSignal(0);setCustodySignal(0);setStatementSignal(0);setAccountSignal(0);}} className={`flex min-h-12 min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 text-xs font-bold sm:text-sm ${workspace===key?'bg-blue-600 text-white':'text-slate-600 hover:bg-blue-50'}`}><Icon className="size-4 shrink-0"/><span>{labels[key]}</span></button>)}
-     </nav>
-     {statement.isLoading?<p role="status">{t.loading}</p>:statement.isError?<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{t.failed} <Button variant="outline" size="sm" onClick={()=>statement.refetch()}>{t.refresh}</Button></p>:statement.data&&<>
-       {workspace==='overview'&&<WalletPortalERPOverview partner={partner} statement={statement.data} lang={lang}
-        onLoan={()=>openRequest('loan')} onCustody={()=>openRequest('custody')}
-        onStatement={()=>{setAccountSignal(0);setWorkspace('statement');setStatementSignal(x=>x+1);}}
-        onAccount={()=>{setStatementSignal(0);setWorkspace('statement');setAccountSignal(x=>x+1);}}/>}
-       {workspace==='requests'&&<section className="min-w-0 space-y-3">
-        <div className="grid grid-cols-2 gap-2 rounded-xl border bg-white p-1.5">
-         {[['loan',t.loans],['custody',t.custodyTitle]].map(([key,label])=><button key={key} type="button" aria-pressed={requestKind===key} onClick={()=>setRequestKind(key)} className={`min-h-12 min-w-0 rounded-lg px-2 text-xs font-bold leading-5 ${requestKind===key?'bg-blue-50 text-blue-700 ring-1 ring-blue-400':'text-slate-600'}`}>{label}</button>)}
-        </div>
-        {requestKind==='custody'?<PartnerTransactionRequests key={`custody:${session.user.id}:${partner.id}`} partner={partner} t={t} custody openSignal={custodySignal}/>:
-         <PartnerTransactionRequests key={`requests:${session.user.id}:${partner.id}`} partner={partner} t={t} openSignal={loanSignal}/>}
-       </section>}
-       {workspace==='statement'&&<PartnerWorkspace key={`${session.user.id}:${partner.id}`} data={statement.data} partner={partner} t={t} lang={lang} preferences={preferences} updatePreference={updatePreference} confirm={confirm} busy={busy} statementSignal={statementSignal} accountSignal={accountSignal} initialTab="records" compactHeader/>}
+    {invite&&<div className="rounded-xl border bg-white p-3 text-sm"><p>{session.user.email}</p><Button className="mt-2" disabled={busy} onClick={activate}>{people.accept}</Button></div>}
+    {(!accounts.isLoading&&!accounts.isError&&(!verified.length||join))&&<PeopleMemberships userId={session.user.id} t={people} joinToken={join} onJoined={()=>{setJoin('');sessionStorage.removeItem('people:join');setNotice(people.joinSent);accounts.refetch();}}/>}
+    {accounts.isPending?<p role="status">{t.loading}</p>:
+     accounts.isError?<p role="alert" className="rounded-xl border bg-rose-50 p-3">{t.failed}<Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></p>:
+     conflict?<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4">{t.error}</p>:
+     !person?<p className="rounded-xl border bg-white p-4">{t.empty}</p>:
+     <>
+      {verified.length>1&&<label className="block rounded-xl border bg-white p-3 text-xs font-bold">{t.choose}
+        <select aria-label={t.choose} className="mt-1 min-h-11 w-full rounded-xl border bg-white p-2 text-sm" value={person.id} onChange={e=>setSelected(e.target.value)}>
+          {verified.map(x=><option value={x.id} key={x.id}>{x.business} · {x.name}</option>)}
+        </select></label>}
+      <WalletBankingCenter key={person.id} person={person} lang={lang}/>
      </>}
-     {!joinToken&&<details className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600"><summary className="cursor-pointer font-bold">{labels.members}</summary><div className="mt-3"><PeopleMemberships key={session.user.id} userId={session.user.id} t={t}/></div></details>}
-    </>}
    </>}
  </main>;
 }

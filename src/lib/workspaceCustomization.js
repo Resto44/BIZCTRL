@@ -14,7 +14,7 @@ export const WORKSPACE_MODULE_CATALOG = Object.freeze([
   { key: 'inventory', label: 'Inventory', group: 'Inventory', paths: ['/inventory', '/inventory-transfers', '/inventory-waste', '/inventory-forecast', '/inventory-command-center'] },
   { key: 'product_management', label: 'Products', group: 'Inventory', paths: ['/products', '/product-management'] },
   { key: 'supplier_management', label: 'Suppliers', group: 'Operations', paths: ['/suppliers', '/supplier-ledger', '/supplier-portal'] },
-  { key: 'treasury', label: 'Treasury', group: 'Finance', paths: ['/treasury', '/sponsor-treasury'] },
+  { key: 'treasury', label: 'Treasury', group: 'Finance', paths: ['/treasury', '/wallet-banking', '/sponsor-treasury'] },
   { key: 'debt_management', label: 'Debts & receivables', group: 'Finance', paths: ['/debts', '/debt-management', '/customer-management', '/loyalty-v2', '/loyalty-program'] },
   { key: 'network_settlement', label: 'Network settlement', group: 'Finance', paths: ['/network-management', '/network-accounts', '/network-analytics', '/network-hub'] },
   { key: 'payroll', label: 'Payroll', group: 'People', paths: ['/payroll'] },

@@ -207,7 +207,7 @@ export default function ERPLogin() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button type="button" className="group flex min-h-24 min-w-0 items-start gap-3 rounded-2xl border border-blue-400/60 bg-gradient-to-r from-blue-600/25 to-indigo-700/20 p-4 text-start text-blue-100 transition-colors hover:bg-blue-500/30" onClick={()=>navigate('/wallet-portal')}>
               <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-500/20"><Wallet className="size-6"/></span>
-              <span className="min-w-0"><strong className="block text-base font-black">{partnerLabels.title} Login</strong><span className="mt-1 block text-xs leading-5 text-blue-100/80">{partnerLabels.accountHelp}</span></span>
+              <span className="min-w-0"><strong className="block text-base font-black">{lang==='fa'?'ورود به مرکز بانکداری والت':lang==='ar'?'دخول المحفظة البنكية':'Wallet Banking Login'}</strong><span className="mt-1 block text-xs leading-5 text-blue-100/80">{partnerLabels.accountHelp}</span></span>
             </button>
             {ROLE_CONFIG.map((rc) => {
               const Icon = rc.icon;

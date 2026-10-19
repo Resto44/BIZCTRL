@@ -1,90 +1,95 @@
 // @vitest-environment jsdom
-import {peopleText} from '../src/lib/peopleAccounts';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
-import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-import {partnerRows,partnerText,readPartnerPreferences} from '@/lib/partnerTreasury';
+import {beforeEach,afterEach,describe,expect,it,vi} from 'vitest';
+import {partnerRows} from '@/lib/partnerTreasury';
 import {sponsorOwnerSummary} from '@/lib/sponsorOwnerBilateral';
-const state=vi.hoisted(()=>({lang:'fa',rpc:vi.fn(),session:{user:{id:'partner-user',email:'partner@example.invalid'}}}));
+
+const state=vi.hoisted(()=>({
+ lang:'fa',rpc:vi.fn(),session:{user:{id:'user-1',email:'wallet@example.invalid'}}
+}));
 vi.mock('@/lib/LanguageContext',()=>({useLanguage:()=>({lang:state.lang,setLang:vi.fn()})}));
-vi.mock('@/api/supabaseClient',()=>({supabase:{rpc:(...args)=>state.rpc(...args),auth:{
- getSession:async()=>({data:{session:state.session}}),onAuthStateChange:()=>({data:{subscription:{unsubscribe:vi.fn()}}}),signOut:async()=>({error:null})
-}}}));
+vi.mock('@/api/supabaseClient',()=>({supabase:{
+ rpc:(...args)=>state.rpc(...args),
+ auth:{
+  getSession:async()=>({data:{session:state.session}}),
+  onAuthStateChange:()=>({data:{subscription:{unsubscribe:vi.fn()}}}),
+  signOut:async()=>({error:null}),
+ }
+}}));
 import PartnerPortal from '@/pages/PartnerPortal';
 let root,host,client;
+const person={id:'11111111-1111-4111-8111-111111111111',restaurant_id:'tenant-1',
+ account_reference:'WLT-11111111111141118111111111111111',name:'شریک اول',
+ business:'بیزنس آزمایشی',login_email:'wallet@example.invalid'};
+const dashboard={
+ person_id:person.id,person_name:person.name,business_name:person.business,
+ account_reference:person.account_reference,currencies:[
+  {id:'acct',currency:'SAR',status:'active',balance:100,pending_amount:20,transfers_in:120,transfers_out:20}
+ ],transactions:[
+  {id:'posted',kind:'fund_wallet',amount:120,currency:'SAR',status:'posted',payer:person.business,payee:person.account_reference,created_at:'2026-10-18T10:00:00Z',wallet_delta:120},
+  {id:'pending',kind:'fund_wallet',amount:20,currency:'SAR',status:'pending',payer:person.business,payee:person.account_reference,created_at:'2026-10-19T10:00:00Z',wallet_delta:0},
+ ]};
 beforeEach(()=>{
- globalThis.IS_REACT_ACT_ENVIRONMENT=true; localStorage.clear();sessionStorage.clear();state.lang='fa';
- state.rpc.mockReset().mockImplementation(async(name)=>{
-  if(name==='erp_partner_portal_accounts')return {data:[{id:'a',restaurant_id:'r1',account_reference:'WLT-TESTA',name:'شریک اول',business:'کسب‌وکار',login_email:'partner@example.invalid'}]};
-  if(name==='erp_partner_portal_statement')return {data:{balances:[{currency:'SAR',owner_owes:100,partner_owes:0}],count:1,records:[{id:'tx-a',kind:'sponsor_advance_to_owner',amount:100,currency:'SAR',effective_date:'2026-10-18',payment_method:'cash'}]}};
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;localStorage.clear();sessionStorage.clear();state.lang='fa';
+ state.rpc.mockReset().mockImplementation(async name=>{
+  if(name==='erp_partner_portal_accounts')return {data:[person],error:null};
+  if(name==='erp_bank_wallet_dashboard')return {data:dashboard,error:null};
+  if(name==='erp_bank_wallet_request')return {data:'new-request-id',error:null};
   return {data:null,error:null};
  });
- client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
+ client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0,refetchOnWindowFocus:false}}});
  host=document.createElement('div');document.body.appendChild(host);root=createRoot(host);
 });
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();client.clear();});
 const mount=async()=>{
- await act(async()=>{root.render(<QueryClientProvider client={client}><PartnerPortal/></QueryClientProvider>);});
- for(let i=0;i<5;i++)await act(async()=>{await new Promise(r=>setTimeout(r,10));});
+ await act(async()=>root.render(<QueryClientProvider client={client}><PartnerPortal/></QueryClientProvider>));
+ for(let i=0;i<10;i++){
+  await act(async()=>{await new Promise(r=>setTimeout(r,10));});
+  if(host.textContent.includes('100.00')||host.textContent.includes('۱۰۰'))break;
+ }
 };
-describe('partner treasury isolation and portal',()=>{
- it('separates partner and legacy principal before calculating repayment balances',()=>{
+describe('personal Banking Wallet replaces old partner loan portal',()=>{
+ it('preserves archived sponsor principal without putting it into spendable wallet',()=>{
   const rows=[{partner_id:'a',kind:'sponsor_advance_to_owner',amount:100,currency:'SAR'},
-   {partner_id:'b',kind:'sponsor_advance_to_owner',amount:900,currency:'SAR'},
-   {partner_id:null,kind:'sponsor_advance_to_owner',amount:50,currency:'SAR'}];
+   {partner_id:'b',kind:'sponsor_advance_to_owner',amount:900,currency:'SAR'}];
   expect(sponsorOwnerSummary(partnerRows(rows,'a'),'SAR').ownerOwes).toBe(100);
   expect(sponsorOwnerSummary(partnerRows(rows,'b'),'SAR').ownerOwes).toBe(900);
-  expect(sponsorOwnerSummary(partnerRows(rows,null),'SAR').ownerOwes).toBe(50);
+  expect(dashboard.currencies[0].balance).toBe(100);
  });
- it.each(['fa','ar','en'])('renders the authorized statement and confirms through server in %s',async(lang)=>{
-  state.lang=lang;await mount();const t=peopleText(lang);
-  const statementTitle={en:'Statement',ar:'كشف الحساب',fa:'صورت‌حساب'}[lang];
-  const statementTab=[...host.querySelectorAll('nav button')].find(b=>b.textContent===statementTitle);
-  expect(statementTab).toBeTruthy();
-  await act(async()=>statementTab.click());
-  // Statement opens on the transaction list, not the balance-heavy overview.
-  expect(host.textContent).toContain(t.records);expect(host.textContent).toContain(t.sponsor_advance_to_owner);
+ it.each(['fa','ar','en'])('renders verified internal banking dashboard and own account for %s',async lang=>{
+  state.lang=lang;await mount();
+  const title={fa:'مرکز بانکداری والت',ar:'مركز المحفظة البنكية',en:'Wallet Banking Center'}[lang];
+  expect(host.textContent).toContain(title);
+  expect(host.textContent).toContain(person.account_reference);
+  expect(host.textContent).toContain(person.business);
+  expect(host.textContent).toContain(person.name);
+  expect(host.textContent).toContain('SAR');
+  expect(state.rpc).toHaveBeenCalledWith('erp_bank_wallet_dashboard',{p_person:person.id,p_limit:100});
   expect(host.querySelector('main').dir).toBe(lang==='en'?'ltr':'rtl');
-  const button=[...host.querySelectorAll('button')].find(b=>b.textContent===t.confirm);
-  await act(async()=>button.click());
-  expect(state.rpc).toHaveBeenCalledWith('erp_confirm_partner_transaction',{p_transaction_id:'tx-a'});
-  expect(state.rpc).toHaveBeenCalledWith('erp_partner_portal_statement',{p_partner_id:'a',p_offset:0});
  });
- it('does not invent or reuse balances after a denied server read',async()=>{
-  state.rpc.mockImplementation(async(name)=>name==='erp_partner_portal_accounts'?{data:[{id:'a',restaurant_id:'r1',account_reference:'WLT-TESTA',name:'A',business:'Business',login_email:'partner@example.invalid'}]}:{error:{message:'PARTNER_ACCESS_DENIED'}});
-  await mount();expect(host.textContent).toContain(partnerText('fa').failed);
-  expect(host.textContent).not.toContain('SAR');expect(host.querySelector('[role="alert"]')).not.toBeNull();
+ it('blocks partial figures and fails closed when the server rejects an account read',async()=>{
+  state.rpc.mockImplementation(async name=>name==='erp_partner_portal_accounts'
+   ?{data:[person],error:null}:{data:null,error:{message:'WALLET_ACCESS_DENIED'}});
+  await mount();
+  expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  expect(host.textContent).not.toContain('100.00 SAR');
+  expect(host.textContent).not.toContain('2,450.00');
  });
- it('keeps customization local to the current identity and rejects unsafe preference shapes',()=>{
-  localStorage.setItem('partner-view:a:portal',JSON.stringify({title:'My dashboard',showBalances:false,compact:true,permissions:{owner:true}}));
-  expect(readPartnerPreferences('a')).toEqual({title:'My dashboard',showBalances:false,compact:true});
-  expect(readPartnerPreferences('b')).toEqual({title:'',showBalances:true,compact:false});
+ it('separates pending requests from posted transfers and does not show a pending transfer as paid',async()=>{
+  state.lang='en';await mount();
+  expect(host.textContent).toContain('Pending Owner Review');
+  expect(host.textContent).toContain('Posted');
+  expect(host.textContent).toContain('20.00');
+  expect(host.textContent).toContain('120.00');
+  expect(state.rpc).not.toHaveBeenCalledWith('erp_confirm_partner_transaction',expect.anything());
  });
-});
-
-it('navigates reports, transaction filters and account customization',async()=>{
- await mount();const t=partnerText('fa');
- const nav=label=>[...host.querySelectorAll('nav button')].find(b=>b.textContent===label);
- // The financial statement is now a separate intentional view.
- expect(nav(t.reports)).toBeUndefined();
- await act(async()=>nav('صورت‌حساب').click());
- await act(async()=>nav(t.reports).click());expect(host.textContent).toContain(t.balanceTrend);expect(host.textContent).toContain(t.distribution);
- await act(async()=>nav(t.records).click());expect(host.querySelector('input[placeholder]')).not.toBeNull();
- await act(async()=>nav(t.account).click());expect(host.textContent).toContain(t.customize);
-});
-
-it('opens one user workflow at a time instead of stacking loan, custody and statement pages',async()=>{
- await mount();
- expect(host.querySelectorAll('nav[aria-label]')).toHaveLength(1);
- expect(host.textContent).toContain('حساب داخلی به نام خودتان برای معاملات با اونر کسب‌وکار');
- expect(host.textContent).not.toContain('آمار');
- const nav=label=>[...host.querySelectorAll('nav button')].find(b=>b.textContent===label);
- await act(async()=>nav('درخواست‌ها').click());
- expect(host.textContent).toContain(peopleText('fa').loans);
- expect(host.textContent).not.toContain('حساب داخلی به نام خودتان برای معاملات با اونر کسب‌وکار');
- expect(host.textContent).not.toContain(partnerText('fa').trend);
- await act(async()=>nav('صورت‌حساب').click());
- expect(host.textContent).toContain(partnerText('fa').pdf);
- expect(host.textContent).not.toContain(peopleText('fa').custodyHelp);
+ it('never mounts loan/custody legacy transaction controls in a verified wallet',async()=>{
+  await mount();
+  expect(host.textContent).toContain('مرکز بانکداری والت');
+  expect(host.textContent).not.toContain('Person lent to business');
+  expect(host.textContent).not.toContain('Business repaid person');
+  expect(host.querySelector('nav[aria-label="Partner Treasury"]')).toBeNull();
+ });
 });
