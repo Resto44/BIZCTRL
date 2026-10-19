@@ -32,7 +32,6 @@ export default function WalletERPOverview({restaurantId,partners=[],partner,onSe
  const custody=useQuery({queryKey:['people-custody-totals',restaurantId],enabled:!!restaurantId,queryFn:async()=>{const {data,error}=await supabase.rpc('erp_people_custody_totals',{p_restaurant_id:restaurantId});if(error)throw error;return data||[];},refetchInterval:15000,staleTime:15000});
  const currencies=useMemo(()=>[...new Set([displayCurrency,...(ledger.data||[]).map(r=>r.currency),...(custody.data||[]).map(r=>r.currency)].filter(Boolean))].sort(),[displayCurrency,ledger.data,custody.data]);
  const chosen=currencies.includes(currency)?currency:currencies.includes(displayCurrency)?displayCurrency:currencies[0]||'SAR';
- const all=useMemo(()=>((ledger.data||[]).filter(r=>r.partner_id&&partners.some(p=>p.id===r.partner_id))),[ledger.data,partners]);
  const summary=useMemo(()=>ownerWalletSnapshot({transactions:ledger.data||[],custodyBalances:custody.data||[],people:partners,currency:chosen}),[ledger.data,custody.data,partners,chosen]);
  const people=partners.filter(p=>(filter==='all'||(filter==='partners'?p.account_role==='partner':filter==='staff'?p.account_role!=='partner':filter==='active'?p.is_active:!p.is_active))&&([p.name,p.email].join(' ').toLowerCase().includes(search.trim().toLowerCase())));
  const history=summary.recentLoans;
