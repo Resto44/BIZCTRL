@@ -19,7 +19,7 @@ import {Input} from '@/components/ui/input';
 import {Card} from '@/components/ui/card';
 
 export default function PartnerTreasuryCenter(){
- const {activeRestaurantId}=useTenant();
+ const {activeRestaurantId,activeRestaurant}=useTenant();
  const {role}=useRole();
  const {lang,currency}=useLanguage(); const t=peopleText(lang); const qc=useQueryClient();
  const [selected,setSelected]=useState(''); const [form,setForm]=useState(null);
@@ -56,7 +56,7 @@ export default function PartnerTreasuryCenter(){
  const tabs={en:{overview:'Accounts',ledger:'Account activity',requests:'Transfers & approvals',manage:'Account settings',custody:'Custody transfers',loans:'Personal advances'},ar:{overview:'الحسابات',ledger:'حركة الحساب',requests:'التحويلات والموافقات',manage:'إعدادات الحسابات',custody:'حركة العهدة',loans:'السلف الشخصية'},fa:{overview:'حساب‌ها',ledger:'گردش حساب',requests:'انتقال و تأیید',manage:'تنظیمات حساب',custody:'انتقال امانت',loans:'قرض شخصی'}}[lang]||{overview:'Accounts',ledger:'Ledger',requests:'Requests',manage:'Settings',custody:'Custody',loans:'Loans'};
  return <section className="mx-auto max-w-6xl min-w-0 space-y-4 pb-20" dir={lang==='en'?'ltr':'rtl'}>
   <nav aria-label={t.title} className="grid grid-cols-4 gap-1 rounded-2xl border bg-white p-1.5">{['overview','ledger','requests','manage'].map(key=><button key={key} type="button" aria-current={view===key?'page':undefined} onClick={()=>{setView(key);setRecordSignal(0);setError('');}} className={`min-h-11 min-w-0 rounded-xl px-1 py-2 text-[11px] font-bold leading-4 sm:text-sm ${view===key?'bg-blue-600 text-white':'bg-slate-50 text-slate-600'}`}>{tabs[key]}</button>)}</nav>
-  {view==='overview'&&<WalletERPOverview restaurantId={activeRestaurantId} partners={partners} partner={partner} lang={lang} displayCurrency={currency}
+  {view==='overview'&&<WalletERPOverview restaurantId={activeRestaurantId} businessName={activeRestaurant?.name||''} partners={partners} partner={partner} lang={lang} displayCurrency={currency}
     onSelect={setSelected} onAdd={newAccount} onEdit={editAccount}
     onLedger={showStatement}
     onRecord={showFinance}
