@@ -88,7 +88,7 @@ describe('Replacement Wallet Banking Center',()=>{
   expect(ui).toContain("r.status==='pending'");
   expect(ui).toContain('r.payer');
   expect(ui).toContain('r.payee');
-  expect(ui).toContain('dir={lang===\\'en\\'?\\'ltr\\':\\'rtl\\'}');
+  expect(ui).toContain("dir={lang==='en'?'ltr':'rtl'}");
   expect(owner).toContain('PeopleMemberships');
   expect(personal).toContain('erp_partner_portal_accounts');
   expect(personal).toContain('erp_accept_partner_invitation');
