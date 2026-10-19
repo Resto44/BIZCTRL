@@ -3,7 +3,7 @@ import {useQuery} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
 import {readSponsorOwnerRows,sponsorOwnerSummary} from '@/lib/sponsorOwnerBilateral';
 import {ownerWalletSnapshot} from '@/lib/walletERPViewModel';
-import {walletAccountReference} from '@/lib/walletPersonalActivity';
+import OwnerWalletPersonActivity from './OwnerWalletPersonActivity';
 import {WalletCards,Users,ArrowDownLeft,ArrowUpRight,Clock3,Plus,BookOpen,ArrowLeftRight,ShieldCheck,ChevronRight,UserRound,Landmark,Activity,Search,FileClock} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 
@@ -67,10 +67,14 @@ export default function WalletERPOverview({restaurantId,partners=[],partner,onSe
      </button>
      {open&&<div className="space-y-3 rounded-xl bg-slate-50 p-3">
        <p dir="ltr" className="break-all text-xs text-slate-500">{p.email}</p>
-       <p dir="ltr" className="break-all font-mono text-[11px] text-blue-700">{walletAccountReference(p.id)}</p>
+       
        <div className="grid grid-cols-2 gap-2 text-xs"><div className="min-w-0 rounded-lg bg-white p-2"><p className="text-slate-500">{m.owed}</p><strong dir="ltr" className="mt-1 block break-words text-start text-sm">{ledger.isPending?'…':ledger.isError?'—':bill(values.ownerOwes,chosen,lang)}</strong></div><div className="min-w-0 rounded-lg bg-white p-2"><p className="text-slate-500">{m.receivable}</p><strong dir="ltr" className="mt-1 block break-words text-start text-sm">{ledger.isPending?'…':ledger.isError?'—':bill(values.sponsorOwes,chosen,lang)}</strong></div></div>
        <div className="grid grid-cols-2 gap-2"><Button type="button" size="sm" variant="outline" className="min-h-11 min-w-0 text-xs" onClick={()=>{onSelect(p.id);onEdit(p);}}>{m.edit}</Button><Button type="button" size="sm" className="min-h-11 min-w-0 bg-blue-600 text-xs" onClick={()=>{onSelect(p.id);onLedger();}}>{m.ledger}</Button></div>
        {p.is_active&&p.allow_loans!==false&&<button type="button" onClick={()=>{onSelect(p.id);onRecord();}} className="block w-full py-1 text-center text-xs font-bold text-blue-700">{m.record}</button>}
+       <OwnerWalletPersonActivity person={p} loans={(ledger.data||[]).filter(r=>r.partner_id===p.id)}
+         currency={chosen} lang={lang}
+         onStatement={()=>{onSelect(p.id);onLedger();}}
+         onCustody={()=>{onSelect(p.id);onRequests();}}/>
       </div>}
     </article>})}</div>}
   </div>
