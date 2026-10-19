@@ -83,6 +83,7 @@ describe('Bilateral Sponsor-Owner ERP accounting',()=>{
   it('module is discoverable from Treasury Sponsor and standalone Sponsor↔Owner',()=>{
     const source=path=>readFileSync(new URL(path,import.meta.url),'utf8');
     expect(source('../src/pages/Treasury.jsx')).toContain('<SponsorOwnerBilateralLedger />');
-    expect(source('../src/pages/SponsorTreasury.jsx')).toContain('<TabsContent value="bilateral">');
+    expect(source('../src/pages/SponsorTreasury.jsx')).toContain('<WalletBankingOwnerPortal/>');
+    expect(source('../src/pages/SponsorTreasury.jsx')).not.toContain('<TabsContent value="bilateral">');
   });
 });
