@@ -63,8 +63,7 @@ export default function PartnerPortal(){
    <label className="block">{t.password}<Input type="password" required value={password} autoComplete="current-password" dir="ltr" onChange={e=>setPassword(e.target.value)}/></label>
    <div className="flex flex-wrap gap-2"><Button disabled={busy} type="submit">{t.signIn}</Button>{<Button type="button" variant="outline" disabled={busy||!email.trim()||password.length<10} onClick={()=>authenticate(true)}>{t.signUp}</Button>}</div></form></Card>:
    <>
-    {(accounts.isLoading||accounts.isError)?null:(!accounts.data?.length||joinToken)?<PeopleMemberships key={session.user.id} userId={session.user.id} t={t} joinToken={joinToken} onJoined={()=>{setJoinToken('');sessionStorage.removeItem('people:join');setNotice(t.joinSent);}}/>:
-    <details className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600"><summary className="cursor-pointer font-bold">{labels.members}</summary><div className="mt-3"><PeopleMemberships key={session.user.id} userId={session.user.id} t={t}/></div></details>}
+    {!accounts.isLoading&&!accounts.isError&&(!accounts.data?.length||joinToken)&&<PeopleMemberships key={session.user.id} userId={session.user.id} t={t} joinToken={joinToken} onJoined={()=>{setJoinToken('');sessionStorage.removeItem('people:join');setNotice(t.joinSent);}}/>}
     {token&&<Card className="space-y-3 p-4"><p>{session.user.email}</p><Button disabled={busy} onClick={activate}>{t.accept}</Button></Card>}
     {accounts.isLoading?<p>{t.loading}</p>:accounts.isError?<p role="alert">{t.failed}<Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></p>:!partner?<p>{t.noAccounts}</p>:<>
      <div className="flex min-w-0 items-end gap-2 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm">
@@ -91,7 +90,7 @@ export default function PartnerPortal(){
        </section>}
        {workspace==='statement'&&<PartnerWorkspace key={`${session.user.id}:${partner.id}`} data={statement.data} partner={partner} t={t} lang={lang} preferences={preferences} updatePreference={updatePreference} confirm={confirm} busy={busy} statementSignal={statementSignal} accountSignal={accountSignal}/>}
      </>}
-
+     {!joinToken&&<details className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600"><summary className="cursor-pointer font-bold">{labels.members}</summary><div className="mt-3"><PeopleMemberships key={session.user.id} userId={session.user.id} t={t}/></div></details>}
     </>}
    </>}
  </main>;
