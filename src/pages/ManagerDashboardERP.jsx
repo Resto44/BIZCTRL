@@ -55,6 +55,7 @@ import {
 import { formatCurrency } from '@/lib/helpers';
 import { useLanguage } from '@/lib/LanguageContext';
 import { latestFinalizedDrawerCash, displayDrawerCash } from '@/lib/managerDrawerCash';
+import { latestInventorySnapshots } from '@/lib/inventorySnapshotView';
 
 // ─── Inline SVG icons not in lucide ──────────────────────────────────────────
 function ClipboardListIcon(props) {
@@ -263,7 +264,10 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
   const { data: inventory = [], isLoading: loadingInventory, isError: inventoryError, refetch: retryInventory } = useQuery({
     queryKey: ['mgr-inventory', branchId],
     queryFn: async () => {
-      return readAllPortalRows(() => supabase.from('inventory').select('id, name:product_name, quantity, unit, reorder_point:low_stock_threshold, cost_per_unit:average_cost').eq('branch_id', branchId).order('id'));
+      const snapshots = await readAllPortalRows(() => supabase.from('inventory')
+        .select('id, product_id, branch_id, branch, date, last_updated, updated_date, name:product_name, quantity, opening_stock, unit, reorder_point:low_stock_threshold, cost_per_unit:average_cost')
+        .eq('branch_id', branchId).order('date', { ascending: false }).order('id'));
+      return latestInventorySnapshots(snapshots);
     },
     enabled: !!branchId,
   });
@@ -357,7 +361,9 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
     return { todayTotal, cashTotal, posTotal, creditTotal, purchTotal, expTotal, grossProfit, netProfit, salesTrendPct, lowStock, outOfStock, invValue, treasuryIn, treasuryOut, treasuryNet };
   }, [todaySales, yesterdaySales, todayPurchases, todayExpenses, inventory, treasury]);
 
-  if (todaySalesError || yesterdaySalesError || todayPurchasesError || todayExpensesError || inventoryError || pendingPOsError || pendingInvoicesError || treasuryError || recentActivityError || salesTrendError) return <PortalDataState onRetry={() => { retryTodaySales(); retryYesterdaySales(); retryTodayPurchases(); retryTodayExpenses(); retryInventory(); retryPendingPOs(); retryPendingInvoices(); retryTreasury(); retryRecentActivity(); retrySalesTrend(); }}/>;
+  // Missing core financial records must never be shown as verified zero totals.
+  if (todaySalesError || todayPurchasesError || todayExpensesError) return <PortalDataState onRetry={() => { retryTodaySales(); retryTodayPurchases(); retryTodayExpenses(); }}/>;
+  const auxiliaryError = yesterdaySalesError || inventoryError || pendingPOsError || pendingInvoicesError || treasuryError || recentActivityError || salesTrendError;
 
   // Do not let inventory, treasury, audit history or 7-day trends block the
   // manager's entire workspace. Each widget renders its own loading state.
@@ -368,6 +374,20 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
 
   return (
     <div className="space-y-6">
+      {auxiliaryError && (
+        <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+          Some secondary branch widgets could not refresh. Core verified sales, purchases and expenses remain available.
+          <button type="button" className="ms-3 font-bold underline" onClick={() => {
+            if (yesterdaySalesError) retryYesterdaySales();
+            if (inventoryError) retryInventory();
+            if (pendingPOsError) retryPendingPOs();
+            if (pendingInvoicesError) retryPendingInvoices();
+            if (treasuryError) retryTreasury();
+            if (recentActivityError) retryRecentActivity();
+            if (salesTrendError) retrySalesTrend();
+          }}>Retry widgets</button>
+        </div>
+      )}
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
