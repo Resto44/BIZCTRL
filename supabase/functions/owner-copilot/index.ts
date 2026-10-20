@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const APP_ORIGIN = (Deno.env.get("APP_URL") ?? "https://mybizctrl.site").replace(/\\/$/, "");
+const APP_ORIGIN = (Deno.env.get("APP_URL") ?? "https://mybizctrl.site").replace(/\/$/, "");
 const TRUSTED_ORIGINS = new Set([APP_ORIGIN, "https://mybizctrl.site", "https://www.mybizctrl.site"]);
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_HISTORY = 20;
