@@ -19,12 +19,24 @@ describe('Owner AI Copilot contract', () => {
     expect(dashboard).toContain('data-testid="owner-mega-dashboard"');
     expect(dashboard).toContain('<OwnerCopilotPanel');
     expect(dashboard).toContain('role === \'owner\'');
+    expect(dashboard).toContain("hasFeature('ai_copilot')");
     const ownerCenter = await source('../src/components/dashboard/OwnerReportCenter.jsx');
     expect(ownerCenter).toContain('data-testid="owner-ai-copilot-quick-action"');
     expect(ownerCenter).toContain('model.openCopilot');
     expect(panel).toContain("supabase.functions.invoke('owner-copilot'");
     expect(panel).toContain('fixed inset-0 z-[130]');
     expect(panel).toContain('overflow-y-auto overscroll-contain');
+  });
+
+  it('replaces the old sample-only AI route with real authenticated Copilot for authorized SaaS users', async () => {
+    const page = await source('../src/pages/AIBusinessCopilot.jsx');
+    expect(page).toContain('OwnerCopilotPanel');
+    expect(page).toContain('useBranchScope');
+    expect(page).toContain('useTenant');
+    expect(page).toContain('useAuth');
+    expect(page).not.toContain('base44.entities');
+    expect(page).not.toContain('const QUICK_PROMPTS');
+    expect(page).toContain('data-testid="erp-authenticated-copilot"');
   });
 
   it('keeps the mobile panel within the viewport without converting the Copilot page into a horizontal scroller', async () => {
@@ -50,6 +62,8 @@ describe('Owner AI Copilot contract', () => {
     expect(edge).toContain('caller.auth.getUser()');
     expect(edge).toContain('erp_get_authenticated_portal_identity');
     expect(edge).toContain('erp_subscription_snapshot');
+    expect(edge).toContain('erp_require_subscription_feature');
+    expect(edge).toContain('COPILOT_FEATURE_NOT_INCLUDED');
     expect(edge).toContain('BRANCH_SCOPE_DENIED');
     expect(edge).toContain('GEMINI_API_KEY');
     expect(edge).toContain('AI_PROVIDER');
