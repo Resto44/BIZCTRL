@@ -1,13 +1,14 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
-import {ArrowDownLeft,ArrowRight,ArrowUpRight,Building2,CheckCircle2,Clock3,Copy,FileText,Landmark,Send,ShieldCheck,Users,Wallet} from 'lucide-react';
+import {ArrowDownLeft,ArrowRight,ArrowUpRight,Bell,Building2,CheckCircle2,Clock3,Copy,FileText,Landmark,Send,ShieldCheck,Users,Wallet} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
 import {WalletTrend,WalletPersonalCategories} from './WalletInsights';
 import {walletCopy,reasons,transferNote} from './walletPresentation';
 
+const notificationCopy={en:{title:'Wallet notifications',hint:'Latest 100 transfers · refreshes every 20 seconds',empty:'No transfer notifications',read:'Mark all read',details:'Account details'},ar:{title:'إشعارات المحفظة',hint:'آخر ١٠٠ تحويل · تحديث كل ٢٠ ثانية',empty:'لا توجد إشعارات تحويل',read:'تحديد الكل كمقروء',details:'تفاصيل الحساب'},fa:{title:'اعلان‌های والت',hint:'آخرین ۱۰۰ انتقال · تازه‌سازی هر ۲۰ ثانیه',empty:'اعلان انتقال موجود نیست',read:'همه خوانده شد',details:'جزئیات حساب'}};
 const L={
  en:{
   remaining:'Balance after',before:'Before',added:'Added',deducted:'Deducted',unposted:'No balance change',ownerHelp:'Review requests submitted by this wallet holder. Funds move only after your approval.',noRequests:'No pending requests in this direction.',walletIn:'Receive · requests into wallet',walletOut:'Transfer · requests from wallet',recipientHelp:'Your internal wallet transfers are between you and this linked business.',
@@ -76,6 +77,9 @@ const L={
 const num=(v,lang)=>new Intl.NumberFormat(lang==='ar'?'ar-SA':lang==='fa'?'fa-AF':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)||0);
 export default function WalletBankingCenter({person=null,owner=false,lang='en',onBeneficiaries}){
  const t=L[lang]||L.en,extra=walletCopy[lang]||walletCopy.en,client=useQueryClient();
+ const nt=notificationCopy[lang]||notificationCopy.en;
+ const [notificationsOpen,setNotificationsOpen]=useState(false),[seen,setSeen]=useState(()=>new Set()),[focusedTransaction,setFocusedTransaction]=useState(null);
+ const eventKey=r=>`${r.id}:${r.status}`;
  const actionRef=useRef(null);
  const [actionVersion,setActionVersion]=useState(0),[pendingKind,setPendingKind]=useState(null);
  useEffect(()=>{if(actionVersion){actionRef.current?.scrollIntoView?.({behavior:'smooth',block:'start'});actionRef.current?.focus?.({preventScroll:true});}},[actionVersion]);
@@ -133,7 +137,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  };
  const selectReview=r=>{setReviewId(r.id);setReviewNote('');setTreasuryId('');setReviewError('');setMessage('');setPanel('review');setActionVersion(v=>v+1);};
  const start=next=>{
-  setMessage('');setReviewId(null);setPendingKind(null);setRequestId(crypto.randomUUID());
+  setFocusedTransaction(null);setMessage('');setReviewId(null);setPendingKind(null);setRequestId(crypto.randomUUID());
   if(next==='transfer'||next==='receive'){
    setKind(next==='transfer'?'return_to_owner':'fund_wallet');
    setReasonId(next==='transfer'?'return':'funding');setNote('');
@@ -151,12 +155,24 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  const status=r=>r.status==='posted'?t.posted:r.status==='rejected'?t.rejected:t.pendingStatus;
  const direction=r=>r.kind==='fund_wallet'?'incoming':'outgoing';
  return <section dir={lang==='en'?'ltr':'rtl'} className="mx-auto max-w-6xl min-w-0 space-y-3 pb-20 sm:space-y-4">
-   <header className="flex min-w-0 items-center gap-3 rounded-2xl bg-slate-950 px-4 py-4 text-white">
+   <header className="flex min-w-0 items-center gap-2 px-1 py-1 text-slate-950">
      <Wallet className="size-6 shrink-0 text-blue-300"/>
-     <div className="min-w-0"><p className="text-xs font-bold tracking-wider text-blue-200">BizCTRL</p><h1 className="break-words text-xl font-black">{t.title}</h1></div>
+     <h1 className="min-w-0 flex-1 break-words text-base font-black">{t.title}</h1>
+     <button type="button" aria-label={nt.title} aria-expanded={notificationsOpen} aria-controls="wallet-notifications" onClick={()=>setNotificationsOpen(x=>!x)} className="relative grid size-11 shrink-0 place-items-center rounded-xl border bg-white text-blue-900"><Bell className="size-5"/>{loaded&&transactions.some(r=>!seen.has(eventKey(r)))&&<span className="absolute -end-1 -top-1 rounded-full bg-rose-600 px-1.5 text-xs font-bold text-white">{transactions.filter(r=>!seen.has(eventKey(r))).length}</span>}</button>
    </header>
    {!person?<p className="rounded-2xl border bg-white p-5 text-center text-sm">{t.noWallet}</p>:<>
-     <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+     {query.isError&&<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{t.error}<Button variant="outline" size="sm" className="ms-2" onClick={()=>query.refetch()}>{t.refresh}</Button></div>}
+     <div className="min-w-0 rounded-2xl bg-gradient-to-br from-slate-900 to-blue-950 p-5 text-white shadow-md">
+       <p dir="auto" className="mb-1 text-sm font-bold text-white">{query.data?.person_name||person.name}</p>
+       <p className="text-sm font-semibold text-slate-300">{t.balance}</p>
+       <strong dir="ltr" className="mt-2 block break-words text-4xl font-black tabular-nums">{loaded?num(current?.balance??0,lang):'—'} <small className="text-base text-slate-300">{activeCurrency}</small></strong>
+       <p className="mt-4 text-xs text-slate-300">{extra.allTime}</p>
+       <div className="mt-2 grid grid-cols-3 gap-2 border-t border-white/15 pt-3">
+        {[[t.pending,current?.pending_amount,'pending'],[t.received,current?.transfers_in,'statement'],[t.sent,current?.transfers_out,'statement']].map(([label,value,next])=><button key={label} type="button" onClick={()=>start(next)} className="min-w-0 rounded-lg py-1 text-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"><span className="block text-xs leading-5 text-slate-300">{label}</span><strong dir="ltr" className="mt-1 block break-words text-base tabular-nums">{loaded?num(value??0,lang):'—'}</strong><span className="text-xs text-slate-300">{activeCurrency}</span></button>)}
+       </div>
+     </div>
+     <details className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+       <summary className="cursor-pointer text-sm font-bold">{nt.details} · {query.data?.person_name||person.name}</summary>
        <div className="flex min-w-0 flex-wrap items-center gap-3">
          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-blue-950"><Users className="size-7"/></span>
          <div className="min-w-0 flex-1">
@@ -175,16 +191,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
            <select aria-label={t.currency} className="mt-1 block min-h-11 rounded-xl border bg-white px-3 text-sm font-black text-slate-900" value={activeCurrency} onChange={e=>{setCurrency(e.target.value);setPanel('home');}}>{currencies.map(c=><option key={c} value={c}>{c}</option>)}</select>
          </label>
        </div>
-     </div>
-     {query.isError&&<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{t.error}<Button variant="outline" size="sm" className="ms-2" onClick={()=>query.refetch()}>{t.refresh}</Button></div>}
-     <div className="min-w-0 rounded-2xl bg-gradient-to-br from-slate-900 to-blue-950 p-5 text-white shadow-md">
-       <p className="text-sm font-semibold text-slate-300">{t.balance}</p>
-       <strong dir="ltr" className="mt-2 block break-words text-4xl font-black tabular-nums">{loaded?num(current?.balance??0,lang):'—'} <small className="text-base text-slate-300">{activeCurrency}</small></strong>
-       <p className="mt-4 text-xs text-slate-300">{extra.allTime}</p>
-       <div className="mt-2 grid grid-cols-3 gap-2 border-t border-white/15 pt-3">
-        {[[t.pending,current?.pending_amount,'pending'],[t.received,current?.transfers_in,'statement'],[t.sent,current?.transfers_out,'statement']].map(([label,value,next])=><button key={label} type="button" onClick={()=>start(next)} className="min-w-0 rounded-lg py-1 text-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"><span className="block text-xs leading-5 text-slate-300">{label}</span><strong dir="ltr" className="mt-1 block break-words text-base tabular-nums">{loaded?num(value??0,lang):'—'}</strong><span className="text-xs text-slate-300">{activeCurrency}</span></button>)}
-       </div>
-     </div>
+     </details>
      <div className="min-w-0 rounded-2xl border bg-white p-3.5 shadow-sm sm:p-5">
        <h2 className="text-lg font-black text-slate-950">{t.actions}</h2>
        <div className="mt-3 grid grid-cols-4 gap-2">
@@ -198,6 +205,13 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
          </button>)}
        </div>
      </div>
+     {notificationsOpen&&<section id="wallet-notifications" className="rounded-2xl border bg-white p-3" aria-label={nt.title}>
+       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-black">{nt.title}</h2><Button variant="ghost" onClick={()=>setSeen(new Set(transactions.map(eventKey)))}>{nt.read}</Button></div>
+       <p className="mb-2 text-xs text-slate-500">{nt.hint}</p>
+       {query.isPending?<p role="status">{t.processing}</p>:query.isError?<p role="alert">{t.error}</p>:!transactions.length?<p>{nt.empty}</p>:<div className="max-h-80 overflow-y-auto divide-y">{transactions.map(r=><button key={eventKey(r)} type="button" className={'block w-full rounded-lg p-3 text-start text-sm '+(seen.has(eventKey(r))?'text-slate-600':'bg-blue-50 font-bold text-blue-950')} onClick={()=>{setSeen(prev=>new Set([...prev,eventKey(r)]));setNotificationsOpen(false);setCurrency(r.currency);if(owner&&r.status==='pending')selectReview(r);else{setPanel('statement');setFocusedTransaction(r.id);setActionVersion(v=>v+1);}}}>
+         <span className="block">{status(r)} · {r.kind==='fund_wallet'?t.received:t.sent}</span><span dir="ltr">{num(r.amount,lang)} {r.currency}</span><span className="ms-2 text-xs">{new Date(r.posted_at||r.created_at).toLocaleDateString(lang==='en'?'en-GB':lang==='ar'?'ar-SA':'fa-IR')}</span>
+       </button>)}</div>}
+     </section>}
      <div ref={actionRef} tabIndex={-1} className="scroll-mt-44 space-y-3 rounded-2xl focus:outline-none" aria-live="polite">
      {message&&<p role="status" className="rounded-xl border bg-blue-50 p-3 text-sm text-blue-900">{message}</p>}
      {(panel==='transfer'||panel==='receive')&&!owner&&<div className="space-y-3 rounded-2xl border border-blue-200 bg-white p-4 shadow-sm">
@@ -254,8 +268,8 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
          <Button variant="ghost" onClick={()=>{start(panel==='statement'?'home':'statement');}}>{panel==='statement'?t.cancel:t.all}<ArrowRight className="ms-1 size-4"/></Button>
        </div>
        {query.isPending?<p className="p-4 text-sm text-slate-500">{t.processing}</p>:
-        loaded&&!(panel==='pending'?pending:transactions.slice(0,panel==='statement'?100:5)).length?<p className="p-5 text-center text-sm text-slate-600">{panel==='pending'?t.noRequests:t.none}</p>:
-        <div className="divide-y">{(panel==='pending'?pending:transactions.slice(0,panel==='statement'?100:5)).map(r=>{
+        loaded&&!(panel==='pending'?pending:transactions.filter(r=>!focusedTransaction||r.id===focusedTransaction).slice(0,panel==='statement'?100:5)).length?<p className="p-5 text-center text-sm text-slate-600">{panel==='pending'?t.noRequests:t.none}</p>:
+        <div className="divide-y">{(panel==='pending'?pending:transactions.filter(r=>!focusedTransaction||r.id===focusedTransaction).slice(0,panel==='statement'?100:5)).map(r=>{
           const incoming=direction(r)==='incoming',isPosted=r.status==='posted';
           return <article key={r.id} className="min-w-0 space-y-1 px-3 py-2.5 sm:px-4">
             <div className="flex min-w-0 items-start gap-2.5">

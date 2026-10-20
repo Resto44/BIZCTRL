@@ -25,6 +25,27 @@ async function mount(owner=false,extraTransactions=[],onBeneficiaries){const scr
  return {tree,client,scrollIntoView,focus};
 }
 describe('Wallet interactions with mocked RPC transport',()=>{
+ it('puts balance before collapsed identity and opens the exact notified transaction',async()=>{
+  const {tree,client}=await mount(true);
+  const output=textOf(tree.root);expect(output.indexOf('Available Wallet Balance')).toBeLessThan(output.indexOf('Account details'));
+  const bell=()=>tree.root.findAllByType('button').find(b=>b.props['aria-label']==='Wallet notifications');
+  await act(async()=>bell().props.onClick());
+  const notifications=tree.root.findAllByType('section').find(s=>s.props.id==='wallet-notifications');
+  await act(async()=>notifications.findAllByType('button').find(b=>textOf(b).includes('Posted')).props.onClick());
+  expect(bell().props['aria-expanded']).toBe(false);
+  expect(tree.root.findAllByType('article')).toHaveLength(1);
+  expect(textOf(tree.root.findByType('article'))).toContain('Salary');
+  tree.unmount();client.clear();
+ });
+ it('opens a pending notification for review without executing approval',async()=>{
+  const {tree,client}=await mount(true,[{...transaction,id:'pending',status:'pending'}]);
+  await act(async()=>tree.root.findAllByType('button').find(b=>b.props['aria-label']==='Wallet notifications').props.onClick());
+  const notifications=tree.root.findAllByType('section').find(s=>s.props.id==='wallet-notifications');
+  await act(async()=>notifications.findAllByType('button').find(b=>textOf(b).includes('Pending Owner Review')).props.onClick());
+  expect(textOf(tree.root)).toContain('Owner Treasury account');
+  expect(rpc.mock.calls.some(c=>c[0]==='erp_bank_wallet_review')).toBe(false);
+  tree.unmount();client.clear();
+ });
  it('requires Other details and submits generated note with the original amount',async()=>{const {tree,client}=await mount();await act(async()=>button(tree.root,'Receive').props.onClick());await act(async()=>{tree.root.findAllByType('input').find(x=>x.props.type==='number').props.onChange({target:{value:'25'}});tree.root.findAllByType('select').find(x=>x.props.value==='funding').props.onChange({target:{value:'other'}});});expect(button(tree.root,'Submit for owner approval').props.disabled).toBe(true);await act(async()=>tree.root.findAllByType('textarea')[0].props.onChange({target:{value:'Family request'}}));expect(button(tree.root,'Submit for owner approval').props.disabled).toBe(false);await act(async()=>button(tree.root,'Submit for owner approval').props.onClick());expect(rpc).toHaveBeenCalledWith('erp_bank_wallet_request',expect.objectContaining({p_person:'p1',p_amount:25,p_currency:'SAR',p_note:'Other: Family request'}));tree.unmount();client.clear();});
  it('creates, renames and assigns a private category through the API',async()=>{const {tree,client}=await mount();const nameInput=()=>tree.root.findAllByType('input').find(x=>x.props.placeholder==='Category name');await act(async()=>nameInput().props.onChange({target:{value:'Family'}}));await act(async()=>button(tree.root,'Save category').props.onClick());await act(async()=>{await new Promise(r=>setTimeout(r,20));});await act(async()=>tree.root.findAllByType('button').find(x=>x.props['aria-label']==='Edit: Family').props.onClick());await act(async()=>nameInput().props.onChange({target:{value:'Home'}}));await act(async()=>button(tree.root,'Save category').props.onClick());expect(rpc).toHaveBeenCalledWith('erp_wallet_personal_labels',expect.objectContaining({p_action:'save',p_category:'cat1',p_name:'Home'}));await act(async()=>{await new Promise(r=>setTimeout(r,20));});const requestSelect=tree.root.findAllByType('select').find(x=>x.findAllByType('option').some(o=>o.props.value==='tx1'));await act(async()=>requestSelect.props.onChange({target:{value:'tx1'}}));const categorySelect=tree.root.findAllByType('select').find(x=>x.findAllByType('option').some(o=>o.props.value==='cat1'));await act(async()=>categorySelect.props.onChange({target:{value:'cat1'}}));await act(async()=>button(tree.root,'Save label').props.onClick());expect(rpc).toHaveBeenCalledWith('erp_wallet_personal_labels',expect.objectContaining({p_action:'tag',p_category:'cat1',p_request:'tx1'}));tree.unmount();client.clear();});
  it('does not request or show another person’s private categories in owner mode',async()=>{const {tree,client}=await mount(true);expect(rpc.mock.calls.some(c=>c[0]==='erp_wallet_personal_labels')).toBe(false);expect(JSON.stringify(tree.toJSON())).not.toContain('Personal categories');tree.unmount();client.clear();});
