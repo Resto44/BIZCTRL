@@ -11,6 +11,7 @@ import {
   subMonths,
   subYears,
 } from 'date-fns';
+import { latestInventorySnapshots } from '@/lib/inventorySnapshotView';
 
 const CONSUMPTION_TYPES = new Set(['recipe_consumption', 'sale', 'stock_out']);
 
@@ -95,7 +96,7 @@ export function buildInventoryConsumption(transactions = [], products = [], inve
   const productMap = buildProductMap(products);
   const stockMap = new Map();
 
-  (inventory || []).forEach((item) => {
+  latestInventorySnapshots(inventory).forEach((item) => {
     const key = productKey(item);
     const current = stockMap.get(key) || 0;
     stockMap.set(key, current + reportNumber(item.current_stock ?? item.quantity ?? item.opening_stock));
@@ -145,13 +146,13 @@ export function buildInventoryConsumption(transactions = [], products = [], inve
   };
 }
 
-export function buildInventoryOverview(inventory = [], products = []) {
+export function buildInventoryOverview(inventory = [], products = [], branches = []) {
   const productMap = buildProductMap(products);
   let totalValue = 0;
   let lowStock = 0;
   let outOfStock = 0;
 
-  (inventory || []).forEach((item) => {
+  latestInventorySnapshots(inventory, branches).forEach((item) => {
     const product = productMap.get(productKey(item)) || item;
     const quantity = reportNumber(item.current_stock ?? item.quantity ?? item.opening_stock);
     const threshold = reportNumber(item.low_stock_threshold ?? item.min_quantity ?? item.reorder_point ?? product?.min_stock);
