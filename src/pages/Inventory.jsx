@@ -90,20 +90,47 @@ export default function Inventory() {
       if (!data.product_id || !data.branch) {
         throw new Error('Product and Branch are required');
       }
-      if (data.opening_stock < 0 || data.low_stock_threshold < 0) {
+      if (!Number.isFinite(Number(data.opening_stock)) || !Number.isFinite(Number(data.low_stock_threshold)) || data.opening_stock < 0 || data.low_stock_threshold < 0) {
         throw new Error('Stock values cannot be negative');
       }
       
       // Live stock rows include computed display-only fields. Never send them
       // to the inventory table during an opening-balance reconciliation.
-      const { purchasedQty, wastedQty, currentStock, isLow, ...record } = data;
-      const res = editing
-        ? await base44.entities.Inventory.update(editing.id, record)
-        : await base44.entities.Inventory.create({
+      const { purchasedQty, wastedQty, currentStock, isLow, ...displayRecord } = data;
+      // The stock engine can merge rows by product and branch; its display
+      // object is not necessarily the underlying inventory table record.
+      // Only persist known columns and require exactly one scoped row on edit.
+      const record = {
+        product_id: displayRecord.product_id,
+        product_name: displayRecord.product_name,
+        branch: displayRecord.branch,
+        branch_id: displayRecord.branch_id || selectedBranchId,
+        unit: displayRecord.unit,
+        opening_stock: Number(displayRecord.opening_stock),
+        low_stock_threshold: Number(displayRecord.low_stock_threshold),
+        date: displayRecord.date,
+      };
+      if (!activeRestaurant?.id || !record.branch_id || record.branch_id === 'all') {
+        throw new Error('Select a valid branch before saving stock.');
+      }
+      let res;
+      if (editing) {
+        if (!editing.id) throw new Error('Inventory row has no database ID. Refresh and select the item again.');
+        const { data: rows, error } = await supabase.from('inventory')
+          .update(record)
+          .eq('id', editing.id)
+          .eq('restaurant_id', activeRestaurant.id)
+          .eq('branch_id', record.branch_id)
+          .select('*');
+        if (error) throw error;
+        if (rows?.length !== 1) throw new Error('Inventory update did not match exactly one authorized item. Refresh and retry.');
+        res = rows[0];
+      } else {
+        res = await base44.entities.Inventory.create({
           ...record,
-          restaurant_id: activeRestaurant?.id,
-          branch_id: data.branch_id || (selectedBranchId === 'all' ? null : selectedBranchId),
+          restaurant_id: activeRestaurant.id,
         });
+      }
       
       // Check if current stock is low and notify
       const updatedLiveStock = computeLiveStock([res], [], []);
