@@ -112,8 +112,14 @@ export default function Inventory() {
           }, { count: 'exact' });
       const { data: savedRows, error, count } = await query.select('*');
       if (error) throw error;
-      if (count !== 1 || savedRows?.length !== 1) {
-        throw new Error('Inventory save did not affect exactly one accessible row. Check branch permissions and record ID.');
+      if (savedRows?.length !== 1) {
+        // A zero-row update is commonly caused by a stale inventory ID or
+        // branch-scoped RLS. Never report it as a successful save.
+        throw new Error(lang === 'ar'
+          ? 'لم يتم حفظ المخزون. تحقق من صلاحية تعديل المخزون لهذا الفرع ثم أعد تحميل الصفحة.'
+          : lang === 'fa'
+            ? 'موجودی ذخیره نشد. دسترسی ویرایش انبار این شعبه را بررسی و صفحه را تازه کنید.'
+            : 'Inventory was not saved. Verify this branch has updateInventory permission and refresh.');
       }
       const res = savedRows[0];
       
