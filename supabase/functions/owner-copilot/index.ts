@@ -1,7 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const APP_ORIGIN = Deno.env.get("APP_URL") ?? "https://mybizctrl.site";
+const APP_ORIGIN = (Deno.env.get("APP_URL") ?? "https://mybizctrl.site").replace(/\\/$/, "");
+const TRUSTED_ORIGINS = new Set([APP_ORIGIN, "https://mybizctrl.site", "https://www.mybizctrl.site"]);
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_HISTORY = 20;
 
@@ -49,7 +50,7 @@ function getProvider(): ProviderConfig {
 }
 
 const corsHeaders = (origin: string | null) => ({
-  "Access-Control-Allow-Origin": origin === APP_ORIGIN ? origin : APP_ORIGIN,
+  "Access-Control-Allow-Origin": origin && TRUSTED_ORIGINS.has(origin) ? origin : APP_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Vary": "Origin",
@@ -419,6 +420,7 @@ async function supplierPayables(caller: ReturnType<typeof createClient>, scope: 
   const totals = new Map<string, number>();
   const unpaid: Array<{ supplier: string; outstanding: number; currency: string; status: string; date: string }> = [];
   for (const row of rows) {
+    if (["cancelled", "canceled", "void", "rejected"].includes(String(row.status || "").toLowerCase())) continue;
     const remaining = Math.max(0, asNumber(row.total_amount) - asNumber(row.paid_amount));
     if (remaining === 0) continue;
     const currency = String(row.currency || scope.currency);
@@ -571,6 +573,15 @@ async function chat(caller: ReturnType<typeof createClient>, scope: Scope, userI
   const language = normaliseLanguage(input.language);
   const message = trimText(input.message);
   if (!message) throw new Error("MESSAGE_REQUIRED");
+  // Bound inference cost per authenticated user without exposing any other tenant's chat.
+  const { count: recentCount, error: rateError } = await caller.from("copilot_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("restaurant_id", scope.restaurantId)
+    .eq("user_id", userId)
+    .eq("role", "user")
+    .gte("created_at", new Date(Date.now() - 60_000).toISOString());
+  if (rateError) throw new Error("COPILOT_RATE_CHECK_FAILED");
+  if ((recentCount || 0) >= 10) throw new Error("AI_COPILOT_RATE_LIMITED");
   let conversationId = trimText(input.conversationId, 100);
   if (conversationId) {
     const { data: existing } = await caller.from("copilot_conversations").select("id").eq("id", conversationId).eq("restaurant_id", scope.restaurantId).eq("user_id", userId).maybeSingle();
@@ -591,7 +602,8 @@ async function chat(caller: ReturnType<typeof createClient>, scope: Scope, userI
   messages.push(modelMessage);
 
   const actionRequests: any[] = [];
-  for (const call of (modelMessage.tool_calls || []).slice(0, 6)) {
+  if ((modelMessage.tool_calls || []).length > 6) throw new Error("AI_COPILOT_TOOL_LIMIT_EXCEEDED");
+  for (const call of modelMessage.tool_calls || []) {
     const args = JSON.parse(call.function?.arguments || "{}");
     const result = await executeTool(caller, scope, userId, call.function?.name, args);
     if ((result as any)?.action_request_id) actionRequests.push(result);
@@ -665,6 +677,7 @@ Deno.serve(async (req: Request) => {
     const message = error instanceof Error ? error.message : "AI_COPILOT_UNAVAILABLE";
     const status = error instanceof ProviderCallError
       ? error.status
+      : message === "AI_COPILOT_RATE_LIMITED" ? 429
       : ["UNAUTHENTICATED", "TENANT_SCOPE_DENIED", "BRANCH_SCOPE_DENIED", "CONVERSATION_SCOPE_DENIED"].includes(message)
         ? 403
         : message === "MESSAGE_REQUIRED"
