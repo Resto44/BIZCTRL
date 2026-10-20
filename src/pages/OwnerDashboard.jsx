@@ -380,8 +380,8 @@ function OwnerDashboardContent() {
     return () => { cancelled = true; };
   }, [activeAlertCandidates, activeAlertSignature, activeRestaurant.id, canReconcileAlerts]);
 
-  const consumption = useMemo(() => buildInventoryConsumption(inventoryTransactions, products, inventory), [inventory, inventoryTransactions, products]);
-  const inventoryOverview = useMemo(() => buildInventoryOverview(inventory, products), [inventory, products]);
+  const consumption = useMemo(() => buildInventoryConsumption(inventoryTransactions, products, inventory, normalizedBranches), [inventory, inventoryTransactions, normalizedBranches, products]);
+  const inventoryOverview = useMemo(() => buildInventoryOverview(inventory, products, normalizedBranches), [inventory, normalizedBranches, products]);
   const priceReport = useMemo(() => buildPriceControlReport(products, priceHistory), [priceHistory, products]);
   const supplierComparisons = useMemo(() => buildSupplierPriceComparisons(priceHistory), [priceHistory]);
   const branchPriceInconsistencies = useMemo(() => buildBranchPriceInconsistencies(priceHistory), [priceHistory]);
