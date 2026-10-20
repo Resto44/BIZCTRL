@@ -30,6 +30,7 @@ import {
   Users,
   WalletCards,
   Warehouse,
+  Sparkles,
 } from 'lucide-react';
 import {
   Bar,
@@ -199,6 +200,7 @@ function ExecutiveReport({ model, copy }) {
       </div>
 
       <nav data-testid="owner-mega-actions" aria-label="ERP dashboard actions" className="grid grid-cols-2 gap-2 rounded-[1.45rem] border border-border/80 bg-card p-3 shadow-sm sm:grid-cols-4">
+        {model.canOpenCopilot ? <button type="button" data-testid="owner-ai-copilot-quick-action" onClick={model.openCopilot} className="col-span-2 flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-700 to-blue-700 px-3 text-sm font-black text-white shadow-sm transition hover:from-violet-800 hover:to-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 sm:col-span-1"><Sparkles className="h-5 w-5 shrink-0" />{model.copilotLabel}</button> : null}
         {model.canAddBranch ? <button type="button" onClick={openQuickAddBranch} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-border/70 bg-background px-3 text-xs font-black"><Building2 className="h-4 w-4 text-emerald-600" />{text(copy, 'addBranch', 'Add branch')}</button> : null}
         <button type="button" onClick={() => navigate('/branch-analytics')} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-border/70 bg-background px-3 text-xs font-black"><Scale className="h-4 w-4 text-blue-600" />{text(copy, 'compare', 'Compare')}</button>
         <button type="button" onClick={() => navigate('/scheduled-reports')} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-border/70 bg-background px-3 text-xs font-black"><FileBarChart className="h-4 w-4 text-violet-600" />{text(copy, 'scheduled', 'Scheduled')}</button>
