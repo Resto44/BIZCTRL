@@ -28,6 +28,22 @@ const COPY = {
     unavailable: 'AI Copilot temporarily unavailable.',
     confirm: 'Confirm & Create',
     cancel: 'Cancel',
+    history: 'History',
+    noHistory: 'No saved conversations yet.',
+    thinking: 'Checking authorized ERP records…',
+    allBranches: 'All authorized branches',
+    expensePreview: 'Expense draft — nothing has been saved yet',
+    amount: 'Amount',
+    branch: 'Branch',
+    description: 'Description',
+    confirmationCreated: 'Expense saved after your confirmation',
+    confirmationCancelled: 'Draft cancelled; no expense was created.',
+    serviceSetup: 'AI service is not configured. The administrator must configure a supported model API key on the server.',
+    serviceLimited: 'AI provider is currently unavailable. Check provider status and try again.',
+    notAuthorized: 'Your organization or selected branch access could not be verified.',
+    notEnoughData: 'I could not read authorized records for this question.',
+    rateLimited: 'The AI provider is rate limited. Try again later.',
+    historyLabel: 'Conversation history',
   },
   ar: {
     title: 'مساعد الذكاء الاصطناعي',
@@ -41,6 +57,22 @@ const COPY = {
     unavailable: 'مساعد الذكاء الاصطناعي غير متاح مؤقتًا.',
     confirm: 'تأكيد وإنشاء',
     cancel: 'إلغاء',
+    history: 'المحادثات السابقة',
+    noHistory: 'لا توجد محادثات محفوظة بعد.',
+    thinking: 'أراجع بيانات ERP المصرح بها…',
+    allBranches: 'كل الفروع المصرح بها',
+    expensePreview: 'مسودة مصروف — لم يُحفظ شيء بعد',
+    amount: 'المبلغ',
+    branch: 'الفرع',
+    description: 'الوصف',
+    confirmationCreated: 'تم حفظ المصروف بعد موافقتك',
+    confirmationCancelled: 'أُلغيت المسودة ولم يُنشأ مصروف.',
+    serviceSetup: 'خدمة الذكاء الاصطناعي غير مهيأة. يجب أن يضبط المسؤول مفتاح خدمة النموذج على الخادم.',
+    serviceLimited: 'مزود الذكاء الاصطناعي غير متاح حالياً. تحقق من حالة الخدمة وحاول مجدداً.',
+    notAuthorized: 'تعذر التحقق من صلاحية المنشأة أو الفرع المحدد.',
+    notEnoughData: 'تعذر قراءة السجلات المصرح بها لهذا السؤال.',
+    rateLimited: 'بلغت خدمة الذكاء الاصطناعي حد الطلبات. حاول لاحقاً.',
+    historyLabel: 'سجل المحادثات',
   },
   fa: {
     title: 'دستیار هوش مصنوعی',
@@ -54,6 +86,22 @@ const COPY = {
     unavailable: 'دستیار هوش مصنوعی موقتاً در دسترس نیست.',
     confirm: 'تأیید و ایجاد',
     cancel: 'لغو',
+    history: 'تاریخچه گفتگو',
+    noHistory: 'هنوز گفتگویی ذخیره نشده است.',
+    thinking: 'در حال بررسی داده‌های مجاز ERP…',
+    allBranches: 'تمام شعبه‌های مجاز',
+    expensePreview: 'پیش‌نویس مصرف — هنوز هیچ چیز ذخیره نشده است',
+    amount: 'مبلغ',
+    branch: 'شعبه',
+    description: 'توضیحات',
+    confirmationCreated: 'مصرف پس از تأیید شما ذخیره شد',
+    confirmationCancelled: 'پیش‌نویس لغو شد؛ مصرفی ثبت نشد.',
+    serviceSetup: 'سرویس AI تنظیم نشده است. مدیر سیستم باید کلید API مدل را در سرور تنظیم کند.',
+    serviceLimited: 'سرویس AI فعلاً در دسترس نیست. وضعیت ارائه‌دهنده را بررسی و دوباره تلاش کنید.',
+    notAuthorized: 'دسترسی کسب‌وکار یا شعبه انتخاب‌شده قابل تأیید نیست.',
+    notEnoughData: 'رکوردهای مجاز برای پاسخ به این سوال قابل خواندن نبود.',
+    rateLimited: 'سرویس AI به محدودیت درخواست رسیده است. بعداً تلاش کنید.',
+    historyLabel: 'تاریخچه گفتگو',
   },
 };
 
@@ -66,6 +114,11 @@ const SUGGESTIONS = {
     'Show my unpaid customer debt',
     'How do I add an expense?',
     'Why can’t I access this module?',
+    'Which items are below the stock threshold?',
+    'Summarize purchases this month',
+    'Which supplier invoices remain unpaid?',
+    'Why won't inventory save in Branch Manager?',
+    'How does Wallet approval work?',
   ],
   ar: [
     'أعطني ملخص أعمال اليوم',
@@ -74,6 +127,11 @@ const SUGGESTIONS = {
     'ما أكبر مصروفاتي هذا الشهر؟',
     'أظهر ديون العملاء غير المسددة',
     'كيف أضيف مصروفًا؟',
+    'ما الأصناف الأقل من حد المخزون؟',
+    'لخّص مشتريات هذا الشهر',
+    'ما فواتير الموردين غير المسددة؟',
+    'لماذا لا يحفظ المخزون عند مدير الفرع؟',
+    'كيف تتم الموافقة على تحويل المحفظة؟',
   ],
   fa: [
     'خلاصه کسب‌وکار امروز را نشان بده',
@@ -82,26 +140,42 @@ const SUGGESTIONS = {
     'بزرگ‌ترین هزینه‌های این ماه چیست؟',
     'بدهی پرداخت‌نشده مشتریان را نشان بده',
     'چگونه هزینه اضافه کنم؟',
+    'کدام محصولات کمبود موجودی دارند؟',
+    'خریدهای این ماه را خلاصه کن',
+    'کدام فاکتورهای سپلایر پرداخت نشده‌اند؟',
+    'چرا انبار در Branch Manager ذخیره نمی‌شود؟',
+    'تأیید معامله والت چگونه است؟',
   ],
 };
 
 const QUICK_ACTIONS = [
-  { label: 'Add Sale', path: '/sales' },
-  { label: 'Add Purchase', path: '/enterprise-purchases' },
-  { label: 'Add Expense', path: '/expenses' },
-  { label: 'Cash Register', path: '/cash-register' },
-  { label: 'Receive Debt', path: '/debts' },
-  { label: 'Supplier Payment', path: '/suppliers' },
-  { label: 'Create Customer', path: '/customer-management' },
+  { key: 'sale', label: { en: 'Sales', ar: 'المبيعات', fa: 'فروشات' }, path: '/sales' },
+  { key: 'purchase', label: { en: 'Purchases', ar: 'المشتريات', fa: 'خریدها' }, path: '/enterprise-purchases' },
+  { key: 'expense', label: { en: 'Expenses', ar: 'المصروفات', fa: 'مصارف' }, path: '/expenses' },
+  { key: 'inventory', label: { en: 'Inventory', ar: 'المخزون', fa: 'انبار' }, path: '/inventory' },
+  { key: 'suppliers', label: { en: 'Suppliers', ar: 'الموردون', fa: 'سپلایرها' }, path: '/suppliers' },
+  { key: 'wallet', label: { en: 'Wallet', ar: 'المحفظة', fa: 'والت' }, path: '/sponsor-treasury' },
+  { key: 'help', label: { en: 'Help Center', ar: 'مركز المساعدة', fa: 'مرکز راهنما' }, path: '/help' },
 ];
 
-function asErrorMessage(error) {
-  const value = error?.message || error?.context?.error || error?.error || '';
-  if (!value) return null;
-  if (value === 'AI_COPILOT_PROVIDER_NOT_CONFIGURED' || value === 'AI_COPILOT_PROVIDER_UNAVAILABLE') return null;
-  if (value === 'AUTHORIZED_DATA_UNAVAILABLE') return 'I do not have enough authorized data to answer that right now.';
-  if (value === 'TENANT_SCOPE_DENIED' || value === 'BRANCH_SCOPE_DENIED') return 'Your current organization or branch scope could not be verified.';
-  return String(value).replace(/_/g, ' ');
+function asErrorMessage(error, copy) {
+  const value = String(error?.message || error?.error || error?.context?.error || '');
+  if (value.includes('AI_COPILOT_PROVIDER_NOT_CONFIGURED') || value.includes('AI_COPILOT_PROVIDER_UNSUPPORTED')) return copy.serviceSetup;
+  if (value.includes('AI_COPILOT_PROVIDER_RATE_LIMITED')) return copy.rateLimited;
+  if (value.includes('AI_COPILOT_PROVIDER_UNAVAILABLE') || value.includes('AI_COPILOT_PROVIDER_AUTH_FAILED')) return copy.serviceLimited;
+  if (value.includes('AUTHORIZED_DATA_UNAVAILABLE')) return copy.notEnoughData;
+  if (value.includes('TENANT_SCOPE_DENIED') || value.includes('BRANCH_SCOPE_DENIED')) return copy.notAuthorized;
+  return copy.unavailable;
+}
+
+async function copilotError(error, copy) {
+  if (error?.context?.json) {
+    try {
+      const detail = await error.context.json();
+      if (detail?.error) return asErrorMessage(detail, copy);
+    } catch { /* The provider did not return readable JSON. */ }
+  }
+  return asErrorMessage(error, copy);
 }
 
 export default function OwnerCopilotPanel({
@@ -171,7 +245,7 @@ export default function OwnerCopilotPanel({
       .order('created_at', { ascending: true })
       .limit(100);
     if (loadError) {
-      setError(asErrorMessage(loadError) || copy.unavailable);
+      setError(asErrorMessage(loadError, copy));
       return;
     }
     setConversationId(id);
@@ -191,7 +265,7 @@ export default function OwnerCopilotPanel({
       .eq('restaurant_id', restaurantId)
       .eq('user_id', userId);
     if (clearError) {
-      setError(asErrorMessage(clearError) || copy.unavailable);
+      setError(asErrorMessage(clearError, copy));
       return;
     }
     setMessages([]);
@@ -219,7 +293,7 @@ export default function OwnerCopilotPanel({
     });
     setLoading(false);
     if (invokeError || data?.error) {
-      setError(asErrorMessage(invokeError || data) || copy.unavailable);
+      setError(await copilotError(invokeError || data, copy));
       return;
     }
     setConversationId(data.conversation_id || conversationId);
@@ -258,12 +332,12 @@ export default function OwnerCopilotPanel({
     });
     setProcessingActionId(null);
     if (invokeError || data?.error) {
-      setError(asErrorMessage(invokeError || data) || copy.unavailable);
+      setError(await copilotError(invokeError || data, copy));
       return;
     }
     const confirmation = decision === 'confirm'
-      ? `Expense created successfully: ${currency}${Number(data?.expense?.amount || 0).toLocaleString()} — ${data?.expense?.description || ''}`
-      : 'The prepared action was cancelled. No expense was created.';
+      ? `${copy.confirmationCreated}: ${Number(data?.expense?.amount || 0).toLocaleString()} ${currency} — ${data?.expense?.description || ''}`
+      : copy.confirmationCancelled;
     setMessages((current) => [...current, { id: `decision-${Date.now()}`, role: 'assistant', content: confirmation, kind: 'message' }]);
   };
 
@@ -284,7 +358,7 @@ export default function OwnerCopilotPanel({
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-sm font-black text-foreground">{copy.title}</h2>
-            <p className="truncate text-xs text-muted-foreground">{selectedBranchLabel || 'All authorized branches'} · {copy.subtitle}</p>
+            <p className="truncate text-xs text-muted-foreground">{selectedBranchLabel || copy.allBranches} · {copy.subtitle}</p>
           </div>
           <Button variant="ghost" size="icon" type="button" className="h-10 w-10 shrink-0" aria-label={copy.newConversation} onClick={() => { setConversationId(null); setMessages([]); setError(null); }}>
             <MessageSquarePlus className="h-4 w-4" />
@@ -296,7 +370,7 @@ export default function OwnerCopilotPanel({
 
         <div className="flex min-w-0 max-w-full shrink-0 flex-wrap items-center gap-1.5 overflow-visible border-b border-border px-2 py-2 sm:gap-2 sm:px-3 md:flex-nowrap md:overflow-x-auto md:[scrollbar-width:none]">
           <Button variant="outline" size="sm" type="button" className="h-auto min-h-8 max-w-full min-w-0 shrink whitespace-normal px-2 py-1 text-center text-[11px] leading-tight md:h-8 md:shrink-0 md:whitespace-nowrap md:px-3 md:py-0 md:text-xs" onClick={() => setShowHistory((current) => !current)}>
-            <ChevronLeft className={`me-1 h-3.5 w-3.5 transition-transform ${showHistory ? 'rotate-[-90deg]' : 'rotate-0'}`} /> History
+            <ChevronLeft className={`me-1 h-3.5 w-3.5 transition-transform ${showHistory ? 'rotate-[-90deg]' : 'rotate-0'}`} /> {copy.history}
           </Button>
           <Button variant="ghost" size="sm" type="button" className="h-auto min-h-8 max-w-full min-w-0 shrink whitespace-normal px-2 py-1 text-center text-[11px] leading-tight md:h-8 md:shrink-0 md:whitespace-nowrap md:px-3 md:py-0 md:text-xs" onClick={clearConversation} disabled={!messages.length}>
             <Trash2 className="me-1 h-3.5 w-3.5" /> {copy.clear}
@@ -341,11 +415,11 @@ export default function OwnerCopilotPanel({
                 </div>
                 {message.kind === 'action' && message.action && (
                   <div className="mt-2 min-w-0 max-w-full rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
-                    <p className="font-bold">Create expense after confirmation</p>
+                    <p className="font-bold">{copy.expensePreview}</p>
                     <dl className="mt-2 grid min-w-0 grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-1">
-                      <dt className="text-amber-700 dark:text-amber-300">Amount</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{currency}{Number(message.action.payload?.amount || 0).toLocaleString()}</dd>
-                      <dt className="text-amber-700 dark:text-amber-300">Branch</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{message.action.payload?.branch_key}</dd>
-                      <dt className="text-amber-700 dark:text-amber-300">Description</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{message.action.payload?.description}</dd>
+                      <dt className="text-amber-700 dark:text-amber-300">{copy.amount}</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{currency}{Number(message.action.payload?.amount || 0).toLocaleString()}</dd>
+                      <dt className="text-amber-700 dark:text-amber-300">{copy.branch}</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{message.action.payload?.branch_key}</dd>
+                      <dt className="text-amber-700 dark:text-amber-300">{copy.description}</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{message.action.payload?.description}</dd>
                     </dl>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button size="sm" type="button" variant="outline" onClick={() => decideAction(message.action.action_request_id, 'cancel')} disabled={processingActionId === message.action.action_request_id}>{copy.cancel}</Button>
@@ -357,7 +431,7 @@ export default function OwnerCopilotPanel({
                 )}
               </div>
             ))}
-            {loading && <div className="me-auto flex min-w-0 max-w-full items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 shrink-0 animate-spin" /> <span className="min-w-0 break-words">Thinking with authorized data…</span></div>}
+            {loading && <div className="me-auto flex min-w-0 max-w-full items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 shrink-0 animate-spin" /> <span className="min-w-0 break-words">{copy.thinking}</span></div>}
             {error && <div className="flex min-w-0 max-w-full items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /> <span className="min-w-0 break-words [overflow-wrap:anywhere]">{error}</span></div>}
             <div ref={endRef} />
           </div>
