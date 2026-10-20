@@ -43,6 +43,7 @@ const COPY = {
     notAuthorized: 'Your organization or selected branch access could not be verified.',
     notEnoughData: 'I could not read authorized records for this question.',
     rateLimited: 'The AI provider is rate limited. Try again later.',
+    planRequired: 'AI Copilot is not included in your current subscription. See Billing for plan options.',
     historyLabel: 'Conversation history',
   },
   ar: {
@@ -72,6 +73,7 @@ const COPY = {
     notAuthorized: 'تعذر التحقق من صلاحية المنشأة أو الفرع المحدد.',
     notEnoughData: 'تعذر قراءة السجلات المصرح بها لهذا السؤال.',
     rateLimited: 'بلغت خدمة الذكاء الاصطناعي حد الطلبات. حاول لاحقاً.',
+    planRequired: 'المساعد الذكي غير مشمول في اشتراكك الحالي. راجع خطط الاشتراك في الفوترة.',
     historyLabel: 'سجل المحادثات',
   },
   fa: {
@@ -101,6 +103,7 @@ const COPY = {
     notAuthorized: 'دسترسی کسب‌وکار یا شعبه انتخاب‌شده قابل تأیید نیست.',
     notEnoughData: 'رکوردهای مجاز برای پاسخ به این سوال قابل خواندن نبود.',
     rateLimited: 'سرویس AI به محدودیت درخواست رسیده است. بعداً تلاش کنید.',
+    planRequired: 'AI Copilot در پلان فعلی شما شامل نیست. گزینه‌های اشتراک را در Billing ببینید.',
     historyLabel: 'تاریخچه گفتگو',
   },
 };
@@ -164,6 +167,7 @@ function asErrorMessage(error, copy) {
   if (value.includes('AI_COPILOT_PROVIDER_RATE_LIMITED') || value.includes('AI_COPILOT_RATE_LIMITED')) return copy.rateLimited;
   if (value.includes('AI_COPILOT_PROVIDER_UNAVAILABLE') || value.includes('AI_COPILOT_PROVIDER_AUTH_FAILED')) return copy.serviceLimited;
   if (value.includes('AUTHORIZED_DATA_UNAVAILABLE')) return copy.notEnoughData;
+  if (value.includes('COPILOT_FEATURE_NOT_INCLUDED')) return copy.planRequired;
   if (value.includes('TENANT_SCOPE_DENIED') || value.includes('BRANCH_SCOPE_DENIED')) return copy.notAuthorized;
   return copy.unavailable;
 }
