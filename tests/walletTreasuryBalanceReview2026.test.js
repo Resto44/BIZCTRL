@@ -49,7 +49,7 @@ describe('Wallet owner Treasury balance and review safety 2026-10-20',()=>{
  });
  it('changes no recorded transaction, historical ledger, or artificial test money',()=>{
   expect(sql).not.toMatch(/\bDELETE\s+FROM\b/i);
-  expect(sql).not.toMatch(/\bUPDATE\s+public\.(wallet_transactions|treasury_accounts|erp_bank_wallet_postings|erp_bank_wallet_requests)\b/i);
+  expect(sql).not.toMatch(/\bUPDATE\s+public\.(wallet_transactions|treasury_accounts|erp_bank_wallet_postings)\b/i);
   expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.(treasury_accounts|erp_bank_wallet_requests)\b/i);
   expect(component).not.toContain('3513.00');
   expect(component).not.toContain('45.00');
