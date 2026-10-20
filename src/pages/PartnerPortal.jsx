@@ -1,5 +1,6 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
+import {withPortalReadDeadline} from '@/lib/portalReadDeadline';
 import {supabase} from '@/api/supabaseClient';
 import {useLanguage} from '@/lib/LanguageContext';
 import {peopleText} from '@/lib/peopleAccounts';
@@ -33,7 +34,7 @@ export default function PartnerPortal(){
  const lock=useRef(false);
  useEffect(()=>{
   let live=true;
-  supabase.auth.getSession().then(({data,error})=>{
+  withPortalReadDeadline(supabase.auth.getSession(),8000,'WALLET_SESSION_TIMEOUT').then(({data,error})=>{
    if(live){setSession(data?.session||null);setAuthLoading(false);if(error)setError(t.failed);}
   }).catch(()=>{if(live){setAuthLoading(false);setError(t.failed);}});
   const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,next)=>{
@@ -47,7 +48,7 @@ export default function PartnerPortal(){
   queryKey:['partner-portal-accounts',session?.user?.id],
   enabled:!!session?.user?.id,
   queryFn:async()=>{
-   const {data,error}=await supabase.rpc('erp_partner_portal_accounts');
+   const {data,error}=await withPortalReadDeadline(supabase.rpc('erp_partner_portal_accounts'),9000,'WALLET_ACCOUNTS_TIMEOUT');
    if(error)throw error;if(!Array.isArray(data))throw Error('UNVERIFIED_ACCOUNT_DATA');
    return data;
   },refetchInterval:20000,staleTime:12000
