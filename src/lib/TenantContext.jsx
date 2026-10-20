@@ -207,8 +207,9 @@ export function TenantProvider({ children }) {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'branches', filter: `restaurant_id=eq.${restaurantId}` },
         () => {
+          // Branch table events do not mutate restaurant identity. Avoid a second
+          // membership/restaurant lookup for every stock or branch update.
           queryClient.invalidateQueries({ queryKey: ['branches', restaurantId] });
-          queryClient.invalidateQueries({ queryKey: ['restaurants'] });
         },
       )
       .subscribe();
