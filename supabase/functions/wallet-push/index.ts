@@ -46,8 +46,9 @@ Deno.serve(async req=>{
   if(action==='language'||action==='unsubscribe'){
    if(typeof body.endpoint!=='string'||body.endpoint.length>4096)return reply({error:'INVALID_REQUEST'},400);
    if(action==='language'&&!['en','ar','fa'].includes(body.language))return reply({error:'INVALID_LANGUAGE'},400);
-   let update=db.from('wallet_push_devices').update(action==='language'?{language:body.language}:{enabled:false}).eq('user_id',user.id).eq('endpoint',body.endpoint);
-   if(body.restaurantId)update=update.eq('restaurant_id',body.restaurantId);
+   let update=db.from('wallet_push_devices').update(action==='language'?{language:body.language}:{enabled:false}).eq('user_id',user.id);
+   if(action==='unsubscribe')update=update.eq('endpoint',body.endpoint);
+   if(action==='unsubscribe'&&body.restaurantId)update=update.eq('restaurant_id',body.restaurantId);
    const {error}=await update;if(error)throw error;return reply({ok:true});
   }
   if(!isWalletId(body.restaurantId))return reply({error:'INVALID_REQUEST'},400);

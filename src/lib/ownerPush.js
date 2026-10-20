@@ -31,6 +31,12 @@ export async function disableDevicePush() {
  }
 }
 
+let walletLanguageQueue=Promise.resolve();
+export function syncWalletPushLanguage(endpoint,language) {
+ walletLanguageQueue=walletLanguageQueue.catch(()=>{}).then(()=>pushRequest('language',{endpoint,language:['en','ar','fa'].includes(language)?language:'en'},'wallet-push'));
+ return walletLanguageQueue;
+}
+
 // Serialize changes so a slow previous-language request cannot win a later change.
 let languageQueue=Promise.resolve();
 export function syncPushLanguage(language) {
@@ -39,7 +45,7 @@ export function syncPushLanguage(language) {
   const {data:{session}}=await supabase.auth.getSession();
   if(!session) return;
   const sub=await currentPushSubscription();
-  if(sub){const results=await Promise.allSettled(['owner-push','wallet-push'].map(service=>pushRequest('language',{endpoint:sub.endpoint,language:['en','ar','fa'].includes(language)?language:'en'},service)));const failed=results.find(r=>r.status==='rejected');if(failed)throw failed.reason;}
+  if(sub){const results=await Promise.allSettled([pushRequest('language',{endpoint:sub.endpoint,language:['en','ar','fa'].includes(language)?language:'en'},'owner-push'),syncWalletPushLanguage(sub.endpoint,language)]);const failed=results.find(r=>r.status==='rejected');if(failed)throw failed.reason;}
  });
  return languageQueue;
 }

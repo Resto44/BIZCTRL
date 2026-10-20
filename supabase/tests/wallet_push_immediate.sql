@@ -155,7 +155,11 @@ BEGIN
  ASSERT NOT EXISTS(SELECT 1 FROM public.wallet_push_events e JOIN public.erp_bank_wallet_requests q ON q.id=e.request_id
  WHERE e.restaurant_id=tenant AND ((e.status='pending' AND q.initiated_by_owner AND e.recipient_id<>pu)
  OR (e.status='pending' AND NOT q.initiated_by_owner AND e.recipient_id<>u)
- OR (e.status<>'pending' AND e.recipient_id<>q.created_by))),'wrong notification recipient';
+ OR (e.status<>'pending' AND e.recipient_id NOT IN(u,pu)))),'wrong notification recipient';
+ ASSERT NOT EXISTS(SELECT 1 FROM public.erp_bank_wallet_requests q WHERE q.restaurant_id=tenant AND q.status IN('posted','rejected')
+ AND (SELECT count(*) FROM public.wallet_push_events e WHERE e.request_id=q.id AND e.status=q.status)<>2),'missing receipt for either participant';
+ ASSERT NOT EXISTS(SELECT 1 FROM public.erp_bank_wallet_requests q WHERE q.restaurant_id=tenant AND q.status IN('posted','rejected')
+ AND (SELECT count(*) FROM public.wallet_push_deliveries d JOIN public.wallet_push_events e ON e.id=d.event_id WHERE e.request_id=q.id AND e.status=q.status)<>2),'missing result delivery';
  ASSERT NOT EXISTS(SELECT 1 FROM public.wallet_push_events WHERE restaurant_id=tenant GROUP BY request_id,status,recipient_id HAVING count(*)>1),'duplicate event';
  ASSERT NOT has_function_privilege('authenticated','public.wallet_push_claim()','execute'),'client can claim queue';
  ASSERT NOT has_function_privilege('authenticated','public.wallet_push_register(uuid,uuid,jsonb,text)','execute'),'client bypasses registration checks';
