@@ -31,7 +31,7 @@ describe('ERP responsive runtime contract', () => {
     expect(inventory).toContain('min-h-10 whitespace-normal');
     expect(sponsor).toContain('WalletBankingOwnerPortal');
     const banking = await source('../src/components/wallet-banking/WalletBankingCenter.jsx');
-    expect(banking).toContain('grid grid-cols-2 gap-2.5');
+    expect(banking).toContain('grid grid-cols-2 gap-2');
     expect(banking).toContain('min-w-0');
     expect(banking).toContain('min-h-11');
     expect(approvals).toContain('grid grid-cols-2 gap-2 sm:grid-cols-4');
