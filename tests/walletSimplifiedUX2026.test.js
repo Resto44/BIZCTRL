@@ -43,7 +43,6 @@ describe('Wallet Banking Center mobile progressive disclosure',()=>{
   expect(sql).toContain('historical_loans_and_custody_archived_not_spendable');
   expect(sql).toContain("WHERE wallet_account_id=a.id");
   expect(bank).toContain("query.isError");
-  expect(bank).toContain("value={loaded?(current?.balance??0):null}");
-  expect(bank).toContain("value===null?'—'");
+  // Missing-balance rendering is exercised in walletNavy2026.test.jsx.
  });
 });
