@@ -11,6 +11,9 @@ import { AlertCircle, AlertTriangle, BarChart3, Building2, CalendarDays, Chevron
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import OwnerReportCenter from '@/components/dashboard/OwnerReportCenter';
+
+// Load the authenticated Copilot chat only when the owner opens it.
+const OwnerCopilotPanel = React.lazy(() => import('@/components/dashboard/OwnerCopilotPanel'));
 import QuickAddBranchDialog from '@/components/dashboard/QuickAddBranchDialog';
 import { useActiveAlerts } from '@/hooks/useActiveAlerts';
 import { useOwnerDashboardRealtime } from '@/hooks/useOwnerDashboardRealtime';
@@ -145,6 +148,8 @@ function OwnerDashboardContent() {
     setSelectedBranchId,
   } = useBranchScope();
   const [isQuickAddBranchOpen, setQuickAddBranchOpen] = useState(false);
+  const [isCopilotOpen, setCopilotOpen] = useState(false);
+  const copilotLabel = lang === 'ar' ? 'المساعد الذكي' : lang === 'fa' ? 'دستیار هوشمند' : 'AI Copilot';
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState(false);
   const pdfBusy = useRef(false);
@@ -415,8 +420,10 @@ function OwnerDashboardContent() {
     consumption, priceReport, supplierComparisons, branchPriceInconsistencies, priceHistory,
     expenseGroups, revenueTrend, periodPurchaseQuantity, periodPurchaseCost: periodMetrics.totalPurchaseCost,
     supplierCount, selectBranch: setSelectedBranchId, canAddBranch: role === 'owner',
+    canOpenCopilot: role === 'owner' && Boolean(activeRestaurant?.id) && Boolean(user?.id),
+    openCopilot: () => setCopilotOpen(true), copilotLabel,
     openQuickAddBranch: () => setQuickAddBranchOpen(true), loadingActiveAlerts, hasQueryError,
-  }), [branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, loadingActiveAlerts, payables, periodLabel, activePeriod, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount]);
+  }), [branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, loadingActiveAlerts, payables, periodLabel, activePeriod, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel]);
 
   if (loading) return <DashboardSkeleton />;
 
@@ -457,6 +464,15 @@ function OwnerDashboardContent() {
 
       <OwnerReportCenter activePage={activePage} model={model} copy={copy} />
       <QuickAddBranchDialog open={isQuickAddBranchOpen} onOpenChange={setQuickAddBranchOpen} />
+      {isCopilotOpen && role === 'owner' && activeRestaurant?.id && user?.id && (
+        <React.Suspense fallback={<div role="status" className="p-3 text-sm">{copilotLabel}…</div>}>
+          <OwnerCopilotPanel open={isCopilotOpen} onOpenChange={setCopilotOpen}
+            restaurantId={activeRestaurant.id}
+            selectedBranchId={isAllBranches ? 'all' : selectedBranchId}
+            selectedBranchLabel={isAllBranches ? copy.allBranches : selectedBranchLabel}
+            role={role} can={can} currency={currency} lang={lang} userId={user.id} />
+        </React.Suspense>
+      )}
     </div>
   );
 }
