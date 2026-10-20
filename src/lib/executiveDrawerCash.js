@@ -67,3 +67,29 @@ export function summarizeDrawerCash(sales = []) {
     complete: latest.size > 0 && missingBranches === 0,
   };
 }
+
+
+/**
+ * Last recorded branch drawer count, not a live estimate or cash revenue.
+ *
+ * As cash movements may have occurred after a finalized closing, callers must
+ * display the recorded business date. Incomplete newer closings suppress older
+ * balances rather than silently showing a misleading stale value as current.
+ */
+export function latestBranchDrawerCash(records = [], asOfDate = '') {
+  const possible = (Array.isArray(records) ? records : [])
+    .filter(record => record?.closing_state === 'finalized'
+      && (!asOfDate || String(record.business_date || record.date || '').slice(0, 10) <= asOfDate))
+    .sort((a, b) => businessTime(b) - businessTime(a) || savedTime(b) - savedTime(a));
+
+  const latest = possible[0];
+  if (!latest) return { amount: null, date: null, complete: false, current: false };
+  const amount = enteredDrawerCash(latest);
+  const date = String(latest.business_date || latest.date || '').slice(0, 10);
+  return {
+    amount,
+    date,
+    complete: amount !== null,
+    current: amount !== null && date === asOfDate,
+  };
+}
