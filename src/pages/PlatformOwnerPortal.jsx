@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
 import { platformOwnerApi } from '@/lib/platformOwnerApi';
+import { withPortalReadDeadline } from '@/lib/portalReadDeadline';
 import { useLanguage } from '@/lib/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -94,7 +95,7 @@ export default function PlatformOwnerPortal() {
   const changeSearch = value => { setPage(0); setSearch(value); };
   const changeStatus = value => { setPage(0); setStatus(value); };
 
-  const snapshot = useQuery({ queryKey: ['platform-owner', 'snapshot'], queryFn: platformOwnerApi.snapshot, retry: false, staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: true });
+  const snapshot = useQuery({ queryKey: ['platform-owner', 'snapshot'], queryFn: () => withPortalReadDeadline(platformOwnerApi.snapshot(), 9000, 'PLATFORM_OWNER_AUTH_TIMEOUT'), retry: false, staleTime: 15000, refetchOnMount: 'always', refetchOnWindowFocus: false });
   const ownerReady = snapshot.isSuccess && snapshot.data?.authenticated && snapshot.data?.authorized && (!snapshot.data?.mfa_required || snapshot.data?.mfa_verified);
   const dashboard = useQuery({ queryKey: ['platform-owner', 'dashboard'], queryFn: platformOwnerApi.dashboard, enabled: ownerReady && (active === 'dashboard' || active === 'reports'), retry: false, refetchOnMount: 'always' });
   const organizations = useQuery({ queryKey: ['platform-owner', 'organizations', search, status, page], queryFn: () => platformOwnerApi.organizations(search, status, LIMIT, page * LIMIT), enabled: ownerReady && active === 'organizations', retry: false });
