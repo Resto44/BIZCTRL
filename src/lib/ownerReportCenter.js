@@ -92,11 +92,11 @@ function buildProductMap(products = []) {
   return map;
 }
 
-export function buildInventoryConsumption(transactions = [], products = [], inventory = []) {
+export function buildInventoryConsumption(transactions = [], products = [], inventory = [], branches = []) {
   const productMap = buildProductMap(products);
   const stockMap = new Map();
 
-  latestInventorySnapshots(inventory).forEach((item) => {
+  latestInventorySnapshots(inventory, branches).forEach((item) => {
     const key = productKey(item);
     const current = stockMap.get(key) || 0;
     stockMap.set(key, current + reportNumber(item.current_stock ?? item.quantity ?? item.opening_stock));
