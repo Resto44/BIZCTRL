@@ -268,8 +268,13 @@ async function resolveScope(caller: ReturnType<typeof createClient>, userId: str
     branchName = branch.name;
   }
 
-  const { data: subscription, error: subscriptionError } = await caller.rpc("erp_subscription_snapshot");
+  const [{ data: subscription, error: subscriptionError }, { data: featureAccess, error: featureError }] = await Promise.all([
+    caller.rpc("erp_subscription_snapshot"),
+    caller.rpc("erp_require_subscription_feature", { p_feature: "ai_copilot" }),
+  ]);
   if (subscriptionError) throw new Error("SUBSCRIPTION_CONTEXT_UNAVAILABLE");
+  // The Copilot quick action must never bypass the canonical paid-feature guard.
+  if (featureError || featureAccess?.allowed !== true) throw new Error("COPILOT_FEATURE_NOT_INCLUDED");
 
   return {
     restaurantId: identity.restaurant_id,
@@ -678,7 +683,7 @@ Deno.serve(async (req: Request) => {
     const status = error instanceof ProviderCallError
       ? error.status
       : message === "AI_COPILOT_RATE_LIMITED" ? 429
-      : ["UNAUTHENTICATED", "TENANT_SCOPE_DENIED", "BRANCH_SCOPE_DENIED", "CONVERSATION_SCOPE_DENIED"].includes(message)
+      : ["UNAUTHENTICATED", "TENANT_SCOPE_DENIED", "BRANCH_SCOPE_DENIED", "CONVERSATION_SCOPE_DENIED", "COPILOT_FEATURE_NOT_INCLUDED"].includes(message)
         ? 403
         : message === "MESSAGE_REQUIRED"
           ? 400
