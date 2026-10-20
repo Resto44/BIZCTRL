@@ -178,7 +178,8 @@ export function useOwnerDashboardRealtime(restaurantId, branches = []) {
 
     // Filtered DELETE events, interrupted sockets and mobile backgrounding can
     // miss events. Re-fetch active tenant queries without remounting the page.
-    const timer = setInterval(refreshDashboard, 15000);
+    // Real-time events update immediately; use a low-frequency safety sweep for missed events.
+    const timer = setInterval(refreshDashboard, 60000);
     document.addEventListener('visibilitychange', refreshDashboard);
     window.addEventListener('online', refreshDashboard);
     return () => {
