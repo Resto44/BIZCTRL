@@ -61,3 +61,14 @@ describe('record notification navigation',()=>{
   for(const entity of ['daily_sales','sales_invoices','driver_sales_entries','expenses','product_categories','purchases','supplier_invoices','suppliers','supplier_payments','purchase_orders','products','inventory','network_accounts','driver_debts','debt_records','customer_notes','cash_movements','sponsor_transactions','salary_advances','staff_attendance','employees','branches','brand_settings','approval_policies','role_templates','erp_invitations','subscriptions','app_settings','tasks','support_tickets','scheduled_reports','active_alerts','promotions','retail_pos_transactions','orders','unknown']) expect(app).toContain(`path="${recordRoute(entity)}"`);
  });
 });
+
+describe('wallet notification links',()=>{
+ it.each(['/wallet-portal','/sponsor-treasury'])('opens an exact wallet request on %s without mutation flags',async path=>{
+  const {self,handlers}=worker();await click(handlers,{url:path+'?wallet_request='+eventId+'&approve=true&redirect=https://evil.invalid'});
+  expect(self.clients.openWindow).toHaveBeenCalledWith('https://mybizctrl.site'+path+'?wallet_request='+eventId);
+ });
+ it('strips invalid wallet identifiers',async()=>{
+  const {self,handlers}=worker();await click(handlers,{url:'/wallet-portal?wallet_request=invalid'});
+  expect(self.clients.openWindow).toHaveBeenCalledWith('https://mybizctrl.site/wallet-portal');
+ });
+});

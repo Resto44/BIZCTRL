@@ -1,5 +1,5 @@
 // Service Worker — network-first for JS/CSS, cache-first for images/fonts only
-const CACHE_VERSION = 'v14';
+const CACHE_VERSION = 'v15';
 const CACHE_NAME = `app-cache-${CACHE_VERSION}`;
 
 // On install: skip waiting so the new SW activates immediately
@@ -66,13 +66,17 @@ self.addEventListener('fetch', (event) => {
 
 
 // Only known ERP routes on this application's origin may be opened by a push.
-const PUSH_ROUTES = new Set(['/notifications','/sales','/sales/invoices','/sales-sources','/purchases','/purchase-orders','/supplier-ledger','/suppliers','/expenses','/product-management','/inventory','/network-management','/driver-management','/debt-management','/customer-management','/treasury','/sponsor-treasury','/payroll','/employee-attendance','/employees','/branch-management','/brand','/approval-policy','/role-permissions','/erp-approval-center','/billing','/settings','/tasks','/support','/scheduled-reports','/alerts','/promotions','/retail/pos-control','/restaurant/pos','/activity-logs']);
+const PUSH_ROUTES = new Set(['/wallet-portal','/notifications','/sales','/sales/invoices','/sales-sources','/purchases','/purchase-orders','/supplier-ledger','/suppliers','/expenses','/product-management','/inventory','/network-management','/driver-management','/debt-management','/customer-management','/treasury','/sponsor-treasury','/payroll','/employee-attendance','/employees','/branch-management','/brand','/approval-policy','/role-permissions','/erp-approval-center','/billing','/settings','/tasks','/support','/scheduled-reports','/alerts','/promotions','/retail/pos-control','/restaurant/pos','/activity-logs']);
 function pushTarget(value, eventId) {
   const validId = typeof eventId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId);
   const fallback = '/notifications' + (validId ? `?notification=${encodeURIComponent(eventId)}` : '');
   try {
     const target = new URL(value || fallback, self.location.origin);
     if (target.origin !== self.location.origin || !PUSH_ROUTES.has(target.pathname)) return fallback;
+    if(['/wallet-portal','/sponsor-treasury'].includes(target.pathname) && target.searchParams.has('wallet_request')) {
+      const request = target.searchParams.get('wallet_request');
+      return target.pathname + (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request) ? `?wallet_request=${encodeURIComponent(request)}` : '');
+    }
     const id = target.searchParams.get('notification') || (validId ? eventId : '');
     // Drop all other query parameters (including redirects and mutation flags).
     return target.pathname + (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ? `?notification=${encodeURIComponent(id)}` : '');

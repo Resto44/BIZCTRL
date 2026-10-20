@@ -7,6 +7,9 @@ import PeopleMemberships from '@/components/settlement/PeopleMemberships';
 import WalletBankingCenter from '@/components/wallet-banking/WalletBankingCenter';
 import {accountRowsUnique} from '@/lib/walletPersonalActivity';
 import {Button} from '@/components/ui/button';
+import WalletPushSettings from '@/components/wallet-banking/WalletPushSettings';
+import {walletRequestId,walletPushRecord} from '@/lib/walletPushLink';
+import {disableDevicePush} from '@/lib/ownerPush';
 import {Input} from '@/components/ui/input';
 
 const tr={
@@ -49,6 +52,9 @@ export default function PartnerPortal(){
    return data;
   },refetchInterval:20000,staleTime:12000
  });
+ const deepLinkId=walletRequestId();
+ const deepLink=useQuery({queryKey:['erp-wallet-push-record',deepLinkId],queryFn:()=>walletPushRecord(deepLinkId),enabled:!!session?.user?.id&&!!deepLinkId,retry:false});
+ useEffect(()=>{if(deepLink.data&&!deepLink.data.is_owner)setSelected(deepLink.data.person_id);},[deepLink.data]);
  const verified=accountRowsUnique(accounts.data||[]);
  const conflict=!!accounts.data&&verified.length!==accounts.data.length;
  const person=conflict?null:verified.find(x=>x.id===selected)||verified[0];
@@ -76,6 +82,7 @@ export default function PartnerPortal(){
   await accounts.refetch();
  });
  const signOut=()=>run(async()=>{
+  await disableDevicePush().catch(()=>{});
   const {error}=await supabase.auth.signOut();if(error)throw error;
   setSession(null);setSelected('');
   for(const key of ['erp-bank-wallet','partner-portal-accounts','bank-wallet-owner-people','people-memberships','people-custody'])client.removeQueries({queryKey:[key]});
@@ -113,7 +120,9 @@ export default function PartnerPortal(){
         <select aria-label={t.choose} className="mt-1 min-h-11 w-full rounded-xl border bg-white p-2 text-sm" value={person.id} onChange={e=>setSelected(e.target.value)}>
           {verified.map(x=><option value={x.id} key={x.id}>{x.business} · {x.name}</option>)}
         </select></label>}
-      <WalletBankingCenter key={person.id} person={person} lang={lang}/>
+      <WalletPushSettings key={`push:${person.restaurant_id}`} restaurantId={person.restaurant_id} lang={lang}/>
+      {deepLink.isError&&<p role="alert" className="rounded-xl bg-rose-50 p-3">{t.failed}</p>}
+      <WalletBankingCenter key={person.id} person={person} lang={lang} initialCurrency={deepLink.data?.currency||'SAR'} initialRequestId={deepLinkId}/>
      </>}
    </>}
  </main>;
