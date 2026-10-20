@@ -94,20 +94,27 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
    if(!data||!Array.isArray(data.currencies)||!Array.isArray(data.transactions))throw Error('WALLET_INCOMPLETE_SNAPSHOT');
    return data;
   },staleTime:10000,refetchInterval:20000});
- const accounts=useQuery({queryKey:['erp-bank-wallet-treasury',person?.restaurant_id],enabled:owner&&!!person?.restaurant_id,
-  queryFn:async()=>{
-   const {data,error}=await supabase.from('treasury_accounts')
-    .select('id,account_name,currency,account_type,is_active,branch_id,branch_key,legacy_wallet_key')
-    .eq('restaurant_id',person.restaurant_id).eq('is_active',true).is('branch_id',null).is('branch_key',null);
-   if(error)throw error;return (data||[]).filter(x=>!x.legacy_wallet_key||['owner_cash','owner_network'].includes(x.legacy_wallet_key));
-  },staleTime:15000});
  const currencies=useMemo(()=>[...new Set(['SAR',...(query.data?.currencies||[]).map(x=>x.currency),...(query.data?.transactions||[]).map(x=>x.currency)])], [query.data]);
  const activeCurrency=currencies.includes(currency)?currency:currencies[0]||'SAR';
+ // Funding sources must use the same authoritative posted balance calculation
+ // as the owner approval RPC; opening_balance alone is often zero in legacy data.
+ const accounts=useQuery({queryKey:['erp-bank-wallet-treasury',person?.restaurant_id,activeCurrency],
+  enabled:owner&&!!person?.restaurant_id&&!!activeCurrency,
+  queryFn:async()=>{
+   const {data,error}=await supabase.rpc('erp_bank_wallet_owner_funding_accounts',{
+    p_restaurant:person.restaurant_id,p_currency:activeCurrency
+   });
+   if(error)throw error;
+   if(!Array.isArray(data)||data.some(a=>!a.id||a.currency!==activeCurrency||!Number.isFinite(Number(a.available_balance))))throw Error('WALLET_FUNDING_SNAPSHOT_INVALID');
+   return data;
+  },staleTime:10000,refetchInterval:15000});
  const current=(query.data?.currencies||[]).find(x=>x.currency===activeCurrency);
  const transactions=(query.data?.transactions||[]).filter(x=>x.currency===activeCurrency);
  const pending=transactions.filter(x=>x.status==='pending');
  const selectedRequest=transactions.find(x=>x.id===reviewId&&x.status==='pending');
  const eligible=(accounts.data||[]).filter(x=>x.currency===activeCurrency);
+ const selectedTreasury=eligible.find(x=>x.id===treasuryId);
+ const sufficientForFunding=!!selectedRequest&&selectedRequest.kind!=='fund_wallet'||(!!selectedTreasury&&Number(selectedTreasury.available_balance)>=Number(selectedRequest.amount));
  const invalidate=async()=>{await client.invalidateQueries({queryKey:['erp-bank-wallet',person?.id]});};
  const request=useMutation({mutationFn:async()=>{
    const raw=Number(amount);
@@ -123,7 +130,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
     p_request_id:reviewId,p_approve:approved,p_treasury_account:approved?treasuryId:null,
     p_review_note:reviewNote.trim()
    });if(error)throw error;
-  },onSuccess:async()=>{setReviewId(null);setReviewNote('');setTreasuryId('');setPanel('home');setMessage(t.reviewed);await invalidate();},
+  },onSuccess:async()=>{setReviewId(null);setReviewNote('');setTreasuryId('');setPanel('home');setMessage(t.reviewed);await Promise.all([invalidate(),client.invalidateQueries({queryKey:['erp-bank-wallet-treasury',person?.restaurant_id]})]);},
    onError:e=>setMessage(e?.message||t.error)});
  const submit=()=>{
    setMessage('');request.mutate();
@@ -132,7 +139,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  const start=next=>{setMessage('');setPanel(next);setRequestId(crypto.randomUUID());if(next==='transfer')setKind('return_to_owner');if(next==='receive')setKind('fund_wallet');};
  const loaded=!query.isPending&&!query.isError;
  const canSubmit=loaded&&!!person?.id&&!owner&&amount!==''&&Number(amount)>0&&!request.isPending;
- const canApprove=loaded&&owner&&!!selectedRequest&&reviewNote.trim().length>=8&&!review.isPending&&!!treasuryId;
+ const canApprove=loaded&&owner&&!!selectedRequest&&reviewNote.trim().length>=8&&!review.isPending&&!accounts.isFetching&&!accounts.isError&&!!selectedTreasury&&sufficientForFunding;
  const canReject=loaded&&owner&&!!selectedRequest&&reviewNote.trim().length>=8&&!review.isPending;
  const status=r=>r.status==='posted'?t.posted:r.status==='rejected'?t.rejected:t.pendingStatus;
  const direction=r=>r.kind==='fund_wallet'?'incoming':'outgoing';
@@ -208,14 +215,19 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
        <label className="block text-xs font-bold">{t.source}
          <select value={treasuryId} onChange={e=>setTreasuryId(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border p-2">
            <option value="">{t.select}</option>
-           {(accounts.data||[]).filter(x=>x.currency===selectedRequest.currency).map(x=><option key={x.id} value={x.id}>{x.account_name} · {x.currency}</option>)}
+           {eligible.filter(x=>x.currency===selectedRequest.currency).map(x=><option key={x.id} value={x.id} disabled={selectedRequest.kind==='fund_wallet'&&Number(x.available_balance)<Number(selectedRequest.amount)}>{x.account_name} · {new Intl.NumberFormat(lang==='ar'?'ar-SA':lang==='fa'?'fa-AF':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(x.available_balance))} {x.currency}</option>)}
          </select>
        </label>
-       {accounts.isError&&<p role="alert" className="text-xs text-rose-700">{t.error}</p>}
+       {accounts.isPending&&<p role="status" className="text-xs text-slate-600">{t.processing}</p>}
+       {accounts.isError&&<p role="alert" className="text-xs text-rose-700">{t.error} <Button type="button" variant="outline" size="sm" onClick={()=>accounts.refetch()}>{t.refresh}</Button></p>}
        {accounts.isSuccess&&!eligible.length&&<p className="text-xs text-orange-700">{t.noSource}</p>}
+       {selectedTreasury&&<p className="rounded-lg bg-blue-50 p-2 text-xs font-semibold text-blue-950">{selectedTreasury.account_name} · {new Intl.NumberFormat(lang==='ar'?'ar-SA':lang==='fa'?'fa-AF':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(selectedTreasury.available_balance))} {selectedTreasury.currency}</p>}
+       {accounts.isSuccess&&selectedRequest.kind==='fund_wallet'&&eligible.every(a=>Number(a.available_balance)<Number(selectedRequest.amount))&&<p role="alert" className="text-xs text-amber-800">{t.insufficient}</p>}
+       {accounts.isSuccess&&selectedTreasury&&!sufficientForFunding&&<p role="alert" className="text-xs text-amber-800">{t.insufficient}</p>}
        <label className="block text-xs font-bold">{t.approvalNote}
          <Textarea rows={2} maxLength={500} value={reviewNote} onChange={e=>setReviewNote(e.target.value)} className="mt-1"/>
        </label>
+       {reviewNote.trim().length<8&&<p className="text-xs font-semibold text-amber-800">{t.approvalNote}</p>}
        <p className="text-xs text-slate-600">{t.postedOnce}</p>
        <div className="flex flex-wrap gap-2"><Button disabled={!canApprove} onClick={()=>review.mutate(true)} className="min-h-11 bg-emerald-700">{t.approve}</Button><Button variant="destructive" disabled={!canReject} onClick={()=>review.mutate(false)} className="min-h-11">{t.reject}</Button><Button variant="outline" onClick={()=>setPanel('home')}>{t.cancel}</Button></div>
      </div>}
