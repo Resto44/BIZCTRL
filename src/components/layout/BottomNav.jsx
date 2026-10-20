@@ -597,7 +597,7 @@ function MoreMenu({ sections, can, onClose }) {
 
 const BottomNav = memo(function BottomNav() {
   const location = useLocation();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { role, can } = useRole();
   const { isRetailLike } = useBusinessMode();
   const { activeRestaurant } = useTenant();
@@ -690,7 +690,7 @@ const BottomNav = memo(function BottomNav() {
               >
                 <NavIcon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'stroke-[2.5]' : ''}`} />
                 <span data-erp-nav-label="true" className={`mt-0.5 w-full break-words text-center text-xs leading-[1.35] ${isActive ? 'font-bold' : 'font-semibold'}`}>
-                  {t(labelKey) || labelKey.replace(/_/g, ' ')}
+                  {labelKey==='wallet_banking' ? (lang==='ar'?'المحفظة':lang==='fa'?'والت':'Wallet') : (t(labelKey) || labelKey.replace(/_/g, ' '))}
                 </span>
               </Link>
             );
