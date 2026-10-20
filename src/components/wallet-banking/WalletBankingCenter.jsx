@@ -86,7 +86,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  const t=L[lang]||L.en,client=useQueryClient();
  const [currency,setCurrency]=useState('SAR'),[panel,setPanel]=useState('home'),[kind,setKind]=useState('fund_wallet');
  const [amount,setAmount]=useState(''),[note,setNote]=useState(''),[requestId,setRequestId]=useState(()=>crypto.randomUUID()),[reviewId,setReviewId]=useState(null),[reviewNote,setReviewNote]=useState(''),[treasuryId,setTreasuryId]=useState('');
- const [limit,setLimit]=useState(5),[message,setMessage]=useState('');
+ const [limit,setLimit]=useState(5),[message,setMessage]=useState(''),[reviewError,setReviewError]=useState('');
  const query=useQuery({queryKey:['erp-bank-wallet',person?.id],enabled:!!person?.id,
   queryFn:async()=>{
    const {data,error}=await supabase.rpc('erp_bank_wallet_dashboard',{p_person:person.id,p_limit:100});
@@ -130,12 +130,12 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
     p_request_id:reviewId,p_approve:approved,p_treasury_account:approved?treasuryId:null,
     p_review_note:reviewNote.trim()
    });if(error)throw error;
-  },onSuccess:async()=>{setReviewId(null);setReviewNote('');setTreasuryId('');setPanel('home');setMessage(t.reviewed);await Promise.all([invalidate(),client.invalidateQueries({queryKey:['erp-bank-wallet-treasury',person?.restaurant_id]})]);},
-   onError:e=>setMessage(e?.message||t.error)});
+  },onSuccess:async()=>{setReviewError('');setReviewId(null);setReviewNote('');setTreasuryId('');setPanel('home');setMessage(t.reviewed);await Promise.all([invalidate(),client.invalidateQueries({queryKey:['erp-bank-wallet-treasury',person?.restaurant_id]})]);},
+   onError:e=>{setReviewError(e?.message||t.error);setMessage('');}});
  const submit=()=>{
    setMessage('');request.mutate();
  };
- const selectReview=r=>{setReviewId(r.id);setReviewNote('');setTreasuryId('');setMessage('');setPanel('review');};
+ const selectReview=r=>{setReviewId(r.id);setReviewNote('');setTreasuryId('');setReviewError('');setMessage('');setPanel('review');};
  const start=next=>{setMessage('');setPanel(next);setRequestId(crypto.randomUUID());if(next==='transfer')setKind('return_to_owner');if(next==='receive')setKind('fund_wallet');};
  const loaded=!query.isPending&&!query.isError;
  const canSubmit=loaded&&!!person?.id&&!owner&&amount!==''&&Number(amount)>0&&!request.isPending;
@@ -229,7 +229,8 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
        </label>
        {reviewNote.trim().length<8&&<p className="text-xs font-semibold text-amber-800">{t.approvalNote}</p>}
        <p className="text-xs text-slate-600">{t.postedOnce}</p>
-       <div className="flex flex-wrap gap-2"><Button disabled={!canApprove} onClick={()=>review.mutate(true)} className="min-h-11 bg-emerald-700">{t.approve}</Button><Button variant="destructive" disabled={!canReject} onClick={()=>review.mutate(false)} className="min-h-11">{t.reject}</Button><Button variant="outline" onClick={()=>setPanel('home')}>{t.cancel}</Button></div>
+       {reviewError&&<p role="alert" aria-live="assertive" className="break-words rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{reviewError}</p>}
+       <div className="flex flex-wrap gap-2"><Button type="button" disabled={!canApprove} aria-busy={review.isPending} onClick={()=>{setReviewError('');review.mutate(true);}} className="min-h-11 bg-emerald-700">{review.isPending?t.processing:t.approve}</Button><Button type="button" variant="destructive" disabled={!canReject} aria-busy={review.isPending} onClick={()=>{setReviewError('');review.mutate(false);}} className="min-h-11">{t.reject}</Button><Button type="button" variant="outline" onClick={()=>setPanel('home')}>{t.cancel}</Button></div>
      </div>}
      <section className="min-w-0 rounded-2xl border bg-white shadow-sm">
        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
