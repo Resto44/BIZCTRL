@@ -53,6 +53,8 @@ import {
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { formatCurrency } from '@/lib/helpers';
+import { useLanguage } from '@/lib/LanguageContext';
+import { latestFinalizedDrawerCash, displayDrawerCash } from '@/lib/managerDrawerCash';
 
 // ─── Inline SVG icons not in lucide ──────────────────────────────────────────
 function ClipboardListIcon(props) {
@@ -160,7 +162,8 @@ function LowStockItem({ item }) {
 }
 
 // ─── Main dashboard content ───────────────────────────────────────────────────
-function ManagerContent({ branchId, branchName, branchKey }) {
+function ManagerContent({ branchId, branchName, branchKey, restaurantId, businessCurrency }) {
+  const { lang } = useLanguage();
   const navigate = useNavigate();
   const today     = format(new Date(), 'yyyy-MM-dd');
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
@@ -184,6 +187,30 @@ function ManagerContent({ branchId, branchName, branchKey }) {
       return data || [];
     },
     enabled: !!branchId,
+  });
+
+  // A finalized, physically counted closing is the source of truth for money
+  // remaining in the branch drawer. Today's cash sales are a flow, never a
+  // drawer balance. Legacy branch-key records are scoped to the same tenant.
+  const { data: drawerCash, isPending: drawerCashLoading, isError: drawerCashError, refetch: retryDrawerCash } = useQuery({
+    queryKey: ['mgr-verified-drawer-cash', restaurantId, branchId, branchKey, today],
+    enabled: !!restaurantId && !!branchId,
+    queryFn: async () => {
+      const base = () => supabase.from('daily_sales')
+        .select('id,date,closing_state,actual_cash,closing_cash,owner_cash_injection,finalized_at,updated_date,created_date')
+        .eq('restaurant_id', restaurantId)
+        .eq('closing_state', 'finalized')
+        .lte('date', today);
+      const canonical = base().eq('branch_id', branchId).order('date', { ascending: false }).order('finalized_at', { ascending: false }).limit(25);
+      const legacy = branchKey
+        ? base().eq('branch', branchKey).is('branch_id', null).order('date', { ascending: false }).order('finalized_at', { ascending: false }).limit(25)
+        : null;
+      const results = await Promise.all(legacy ? [canonical, legacy] : [canonical]);
+      for (const result of results) if (result.error) throw result.error;
+      return latestFinalizedDrawerCash(results.flatMap(result => result.data || []), today);
+    },
+    staleTime: 20000,
+    refetchInterval: 60000,
   });
 
   const { data: todayPurchases = [], isLoading: loadingPurchases, isError: todayPurchasesError, refetch: retryTodayPurchases } = useQuery({
@@ -370,6 +397,44 @@ function ManagerContent({ branchId, branchName, branchKey }) {
           <KPICard label="Expenses Today"  value={formatCurrency(kpis.expTotal)}    icon={DollarSign}  colorClass="text-red-600"     bgClass="bg-red-500/10"     loading={loadingExpenses} />
         </div>
       </div>
+
+      {/* Physically counted cash left in the assigned branch drawer.
+          This is not today's cash sales, the Treasury net, or a draft
+          register expected balance. Count timestamp is always shown. */}
+      <Card className="border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/70 shadow-sm">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700">
+              <Banknote className="size-6" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black leading-6 text-slate-900">
+                {lang === 'fa' ? 'پول باقی‌مانده داخل صندوق' : lang === 'ar' ? 'النقد المتبقي في الصندوق' : 'Cash remaining in drawer'}
+              </p>
+              {drawerCashLoading ? <Skeleton className="mt-3 h-9 w-40" /> :
+                <p dir="ltr" className="mt-1 break-words text-start text-3xl font-black tabular-nums text-emerald-800">
+                  {drawerCashError || !drawerCash || drawerCash.amount === null
+                    ? '—'
+                    : displayDrawerCash(drawerCash.amount, businessCurrency) || '—'}
+                </p>}
+              <p className="mt-2 text-xs leading-5 text-slate-600">
+                {drawerCashError
+                  ? (lang === 'fa' ? 'دریافت مانده صندوق ناموفق شد؛ عدد صفر فرض نشده است.' : lang === 'ar' ? 'تعذر قراءة رصيد الصندوق؛ لا نفترض أن الرصيد صفر.' : 'Drawer count unavailable; no zero balance is assumed.')
+                  : drawerCash?.amount === null
+                  ? (lang === 'fa' ? 'شمارش نهایی تأییدشده برای این شعبه موجود نیست.' : lang === 'ar' ? 'لا توجد جردة نهائية مسجلة لهذا الفرع.' : 'No finalized physical count recorded for this branch.')
+                  : (lang === 'fa' ? 'آخرین شمارش ثبت‌شده، نه مانده لحظه‌ای' : lang === 'ar' ? 'آخر مبلغ معدود ومسجل، وليس رصيداً لحظياً' : 'Last finalized physical count — not a live drawer reading')
+                }
+                {drawerCash?.date && <span dir="ltr" className="ms-2 inline-block font-bold tabular-nums">{drawerCash.date}</span>}
+              </p>
+              {!drawerCashLoading && !drawerCashError && drawerCash?.amount !== null && drawerCash?.amount !== undefined && !displayDrawerCash(drawerCash.amount, businessCurrency) &&
+                <p role="alert" className="mt-1 text-xs text-amber-700">Unsupported business currency; verify organization settings.</p>}
+            </div>
+            <Button type="button" variant="ghost" size="icon" aria-label="Refresh drawer cash" className="shrink-0" onClick={() => retryDrawerCash()}>
+              <RefreshCw className="size-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Profit row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -665,7 +730,7 @@ function ManagerContent({ branchId, branchName, branchKey }) {
 
 // ─── Root export ──────────────────────────────────────────────────────────────
 export default function ManagerDashboardERP() {
-  const { managerBranchObject, loadingRestaurants } = useTenant();
+  const { managerBranchObject, activeRestaurant, activeRestaurantId, loadingRestaurants } = useTenant();
   if (!managerBranchObject) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center p-6 text-center">
@@ -682,6 +747,8 @@ export default function ManagerDashboardERP() {
       branchId={managerBranchObject.id}
       branchName={managerBranchObject.name || managerBranchObject.label}
       branchKey={managerBranchObject.branch_key || managerBranchObject.key || ''}
+      restaurantId={managerBranchObject.restaurant_id || activeRestaurantId}
+      businessCurrency={activeRestaurant?.currency || ''}
     />
   );
 }
