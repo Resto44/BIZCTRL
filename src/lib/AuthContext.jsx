@@ -78,11 +78,14 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (e) {
         if (!mounted.current || version !== authRequestVersion.current) return;
-        // timeout or auth error — treat as unauthenticated
+        // A timeout is not a revoked session: fail closed, but offer retry
+        // instead of redirecting a valid ERP user to the sign-in page.
         setUser(null);
         setIsAuthenticated(false);
-        if (e.status === 403) {
+        if (e.status === 401 || e.status === 403) {
           setAuthError({ type: 'auth_required', message: 'Authentication required' });
+        } else {
+          setAuthError({ type: 'network_unavailable', message: 'Authentication verification timed out or is unavailable.' });
         }
       }
     } catch (error) {
@@ -113,7 +116,9 @@ export const AuthProvider = ({ children }) => {
       if (!mounted.current || version !== authRequestVersion.current) return;
       setUser(null);
       setIsAuthenticated(false);
-      setAuthError({ type: 'auth_required', message: 'Authentication required' });
+      setAuthError(error?.status === 401 || error?.status === 403
+        ? { type: 'auth_required', message: 'Authentication required' }
+        : { type: 'network_unavailable', message: 'Unable to verify the current session.' });
     } finally {
       if (mounted.current && version === authRequestVersion.current) {
         setIsLoadingAuth(false);
