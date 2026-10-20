@@ -46,6 +46,35 @@ describe('ERP portal startup reliability', () => {
     expect(subscription).not.toContain("window.addEventListener('focus', refreshWhenVisible)");
   });
 
+  it('loads wallet and platform-owner sessions within a bounded wait', async () => {
+    const [wallet, platform] = await Promise.all([
+      source('../src/pages/PartnerPortal.jsx'),
+      source('../src/pages/PlatformOwnerPortal.jsx'),
+    ]);
+    expect(wallet).toContain('WALLET_SESSION_TIMEOUT');
+    expect(wallet).toContain('WALLET_ACCOUNTS_TIMEOUT');
+    expect(platform).toContain('PLATFORM_OWNER_AUTH_TIMEOUT');
+    expect(platform).toContain('refetchOnWindowFocus: false');
+  });
+
+  it('defers hidden, heavy owner report datasets and uses client-side redirects', async () => {
+    const [owner, app] = await Promise.all([
+      source('../src/pages/OwnerDashboard.jsx'),
+      source('../src/App.jsx'),
+    ]);
+    expect(owner).toContain("enabled: enabled && activePage === 'operations'");
+    expect(owner).toContain("enabled: Boolean(createdBy) && activePage === 'price-control'");
+    expect(app).toContain("navigate(home, { replace: true })");
+    expect(app).toContain('<Navigate to="/onboarding" replace />');
+  });
+
+  it('refuses a supplier invoice with an existing matching number before creating it', async () => {
+    const invoiceForm = await source('../src/components/purchases/PurchaseInvoiceForm.jsx');
+    expect(invoiceForm).toContain("if (!isEdit && !submissionRef.current.invoice && restaurantId && supplierId && branchId && invoiceNumber)");
+    expect(invoiceForm).toContain(".eq('invoice_number', invoiceNumber)");
+    expect(invoiceForm).toContain('Open Supplier Ledger and review the existing invoice');
+  });
+
   it('shows canonical branch rows only once and refuses to remove financial source records automatically', async () => {
     const [tenant, owner, manager] = await Promise.all([
       source('../src/lib/TenantContext.jsx'),
