@@ -44,15 +44,18 @@ export default function WalletBankingOwnerPortal(){
  if(role!=='owner')return <p role="alert" className="p-5 text-sm">Access restricted.</p>;
  const person=query.data?.find(p=>p.id===selected)||query.data?.[0]||null;
  return <div dir={lang==='en'?'ltr':'rtl'} className="min-w-0 space-y-4">
-  <div className="flex min-w-0 flex-wrap items-end gap-2 rounded-2xl border bg-white p-3 shadow-sm">
-   <label className="min-w-0 flex-1 text-xs font-bold text-slate-600">{t.label}
+  <div className="grid min-w-0 grid-cols-1 gap-3 rounded-2xl border bg-white p-3 shadow-sm">
+   <label className="block min-w-0 text-sm font-bold text-slate-600">{t.label}
     <select value={person?.id||''} onChange={e=>setSelected(e.target.value)}
-     aria-label={t.choose} className="mt-1 min-h-11 w-full min-w-0 rounded-xl border bg-white p-2 text-sm font-bold text-slate-950">
-     {(query.data||[]).map(x=><option key={x.id} value={x.id}>{x.name} · {x.account_role}</option>)}
+     aria-label={t.choose} dir="auto" className="mt-2 min-h-12 w-full min-w-0 rounded-xl border bg-white px-3 py-2 text-base font-bold text-slate-950">
+     {(query.data||[]).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
     </select>
    </label>
-   <Button variant="outline" className="min-h-11" onClick={()=>setMembers(x=>!x)}>{t.membership}</Button>
-   <Button variant="outline" className="min-h-11" onClick={()=>query.refetch()}>{t.refresh}</Button>
+   {person&&<p dir="auto" className="min-w-0 whitespace-normal break-words text-base font-bold leading-7 text-slate-950">{person.name}</p>}
+   <div className="flex min-w-0 flex-wrap gap-2">
+    <Button variant="outline" className="h-auto min-h-11 min-w-0 flex-1 whitespace-normal break-words px-3 py-2 text-center" onClick={()=>setMembers(x=>!x)}>{t.membership}</Button>
+    <Button variant="outline" className="min-h-11 shrink-0" onClick={()=>query.refetch()}>{t.refresh}</Button>
+   </div>
   </div>
   {query.isError?<p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{String(query.error?.message||'Unable to load beneficiaries')}</p>:null}
   {query.isPending?<p className="rounded-xl border bg-white p-4 text-sm">…</p>:!person?<p className="rounded-xl border bg-white p-4 text-sm">{t.empty}</p>:
