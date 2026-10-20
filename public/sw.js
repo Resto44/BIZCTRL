@@ -91,6 +91,8 @@ self.addEventListener('push', (event) => {
     body: payload.body || 'New business activity · رویداد جدید کسب‌وکار',
     icon: '/icons/bizctrl-icon-192-v3.png', badge: '/icons/icon-96.png',
     tag: payload.tag || undefined,
+    lang: ['en','ar','fa'].includes(payload.lang)?payload.lang:undefined,
+    dir: payload.dir==='rtl'?'rtl':payload.dir==='ltr'?'ltr':'auto',
     data: { url: pushTarget(payload.url, payload.eventId || payload.tag) },
   }));
 });

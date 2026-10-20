@@ -2,8 +2,8 @@
 import React from 'react';
 import {act,create} from 'react-test-renderer';
 import {describe,it,expect,vi,afterEach} from 'vitest';
-const mocks=vi.hoisted(()=>({request:vi.fn(),current:vi.fn(),supported:vi.fn()}));
-vi.mock('@/lib/ownerPush',()=>({pushRequest:mocks.request,currentPushSubscription:mocks.current,pushSupported:mocks.supported,applicationKey:()=>new Uint8Array([1])}));
+const mocks=vi.hoisted(()=>({request:vi.fn(),current:vi.fn(),supported:vi.fn(),sync:vi.fn().mockResolvedValue({ok:true})}));
+vi.mock('@/lib/ownerPush',()=>({pushRequest:mocks.request,currentPushSubscription:mocks.current,pushSupported:mocks.supported,syncWalletPushLanguage:mocks.sync,applicationKey:()=>new Uint8Array([1])}));
 import WalletPushSettings from '../src/components/wallet-banking/WalletPushSettings';
 const text=n=>typeof n==='string'?n:(n.children||[]).map(text).join('');
 const button=(t,label)=>t.root.findAllByType('button').find(b=>text(b)===label);
@@ -34,5 +34,17 @@ describe('Wallet device push controls',()=>{
  });
  it('explains unsupported browsers without requesting permission',async()=>{
   const {tree,requestPermission}=await setup({supported:false});expect(button(tree,'Enable notifications').props.disabled).toBe(true);expect(requestPermission).not.toHaveBeenCalled();tree.unmount();
+ });
+});
+
+describe('Wallet notification language visibility',()=>{
+ it('shows active language and synchronizes a change without sending a test',async()=>{
+  const {tree,sub}=await setup({enabled:true});
+  await act(async()=>tree.update(<WalletPushSettings restaurantId="tenant" lang="fa"/>));
+  expect(mocks.sync).toHaveBeenLastCalledWith(sub.endpoint,'fa');
+  expect(text(tree.root)).toContain('فارسی');expect(text(tree.root)).toContain('مطابق زبان انتخاب‌شدۀ برنامه');
+  expect(text(tree.root)).toContain('پیش از تأیید');expect(text(tree.root)).toContain('پس از تأیید یا رد');
+  expect(mocks.request.mock.calls.some(c=>c[0]==='test')).toBe(false);
+  tree.unmount();
  });
 });
