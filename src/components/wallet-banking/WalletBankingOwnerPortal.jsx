@@ -7,6 +7,7 @@ import {useRole} from '@/lib/RoleContext';
 import {peopleText} from '@/lib/peopleAccounts';
 import PeopleMemberships from '@/components/settlement/PeopleMemberships';
 import WalletBankingCenter from './WalletBankingCenter';
+import OwnerWalletDashboard,{ownerCopy} from './OwnerWalletDashboard';
 import {Button} from '@/components/ui/button';
 
 const locale={
@@ -17,7 +18,9 @@ const locale={
 export default function WalletBankingOwnerPortal(){
  const {activeRestaurantId}=useTenant();
  const {role}=useRole();
- const {lang}=useLanguage();
+ const {lang,currency}=useLanguage();
+ const [view,setView]=useState('owner'),[operation,setOperation]=useState(null);
+ const ot=ownerCopy[lang]||ownerCopy.en;
  const t=locale[lang]||locale.en;
  const membersRef=useRef(null);
  const [membersVersion,setMembersVersion]=useState(0);
@@ -47,14 +50,21 @@ export default function WalletBankingOwnerPortal(){
  if(role!=='owner')return <p role="alert" className="p-5 text-sm">Access restricted.</p>;
  const person=query.data?.find(p=>p.id===selected)||query.data?.[0]||null;
  return <div dir={lang==='en'?'ltr':'rtl'} className="min-w-0 space-y-4">
+  <nav aria-label={ot.title} className="grid grid-cols-2 gap-2">
+   <Button variant={view==='owner'?'default':'outline'} className="h-auto min-h-11 whitespace-normal" onClick={()=>{setOperation(null);setView('owner');}}>{ot.title}</Button>
+   <Button variant={view==='person'?'default':'outline'} className="h-auto min-h-11 whitespace-normal" onClick={()=>setView('person')}>{ot.wallets}</Button>
+  </nav>
+  {view==='owner'&&<OwnerWalletDashboard key={`${activeRestaurantId}:${operation?.currency||currency}:${operation?.kind||'home'}:${operation?.person||''}`} tenant={activeRestaurantId} lang={lang} currency={operation?.currency||currency||'SAR'} initialPerson={operation?.person||person?.id||''} initialKind={operation?.kind||null} onOpenWallet={id=>{setSelected(id);setView('person');}}/>}
+  {view==='person'&&<>
   {query.isError?<p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{String(query.error?.message||'Unable to load beneficiaries')}</p>:null}
   {query.isPending?<p className="rounded-xl border bg-white p-4 text-sm">…</p>:!person?<p className="rounded-xl border bg-white p-4 text-sm">{t.empty}</p>:
-   <WalletBankingCenter key={person.id} owner person={person} lang={lang} headerControl={<label className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold text-slate-600">
+   <WalletBankingCenter key={`${activeRestaurantId}:${person.id}`} owner person={person} lang={lang} initialCurrency={currency} onOwnerTransfer={(kind,selectedCurrency)=>{setOperation({kind,person:person.id,currency:selectedCurrency});setView('owner');window.scrollTo?.({top:0,behavior:'smooth'});}} headerControl={<label className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold text-slate-600">
      <span className="shrink-0">{t.beneficiary}</span>
      <select aria-label={t.beneficiary} value={person.id} onChange={e=>setSelected(e.target.value)} dir="auto" className="h-11 min-w-0 flex-1 rounded-xl border bg-white px-2 text-base font-bold text-slate-950">
       {(query.data||[]).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
      </select>
     </label>} onBeneficiaries={()=>{setBeneficiariesOpen(true);setMembers(true);setMembersVersion(v=>v+1);}}/>}
+  </>}
   <details open={beneficiariesOpen} onToggle={e=>setBeneficiariesOpen(e.currentTarget.open)} ref={membersRef} tabIndex={-1} className="scroll-mt-44 focus:outline-none grid min-w-0 grid-cols-1 gap-3 rounded-2xl border bg-white p-3 shadow-sm">
    <summary className="cursor-pointer py-1 text-sm font-bold">{t.label} · {person?.name}</summary>
    <div className="flex min-w-0 flex-wrap gap-2">
