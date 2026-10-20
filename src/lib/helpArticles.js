@@ -1367,7 +1367,6 @@ export const helpArticles = [
     "id": "wallet-history-analytics",
     "category": "money",
     "roles": [
-      "owner",
       "manager",
       "employee"
     ],
@@ -1407,7 +1406,6 @@ export const helpArticles = [
     "id": "wallet-notifications",
     "category": "money",
     "roles": [
-      "owner",
       "manager",
       "employee"
     ],
@@ -1440,6 +1438,44 @@ export const helpArticles = [
           "با Send test اعلان آزمایشی بفرستید. اعلان قبل از تأیید و نتیجه قبول/رد مطابق زبان برنامه است. اگر نرسید، اجازه دستگاه، حساب والت و اینترنت را بررسی و لیست درخواست‌های منتظر را مستقیم باز کنید."
         ],
         "note": "زنگوله فقط فعالیت‌های اخیر والت را نشان می‌دهد و وضعیت خوانده‌شدن ممکن است پس از رفرش پاک شود. پوش به پشتیبانی دستگاه و مرورگر وابسته است؛ حالت واقعی معامله را همیشه داخل والت تأیید کنید."
+      }
+    }
+  },
+  {
+    "id": "wallet-owner-history-alerts",
+    "category": "money",
+    "roles": [
+      "owner"
+    ],
+    "route": "/sponsor-treasury",
+    "source": "src/components/wallet-banking/OwnerWalletDashboard.jsx",
+    "content": {
+      "en": {
+        "title": "Owner wallet: transaction timeline and alerts",
+        "steps": [
+          "Open Owner wallet dashboard → Transaction history. Filter by month, beneficiary name, Incoming, Outgoing or Pending; expand any dated transaction to review its reason, status and recorded balances.",
+          "Use the Beneficiary wallets tab to select a person, inspect their Statement and the wallet bell. An alert opens the matching pending request or transaction without approving it.",
+          "To receive push alerts, expand Wallet push notifications, enable notifications on your device and send a test. On iPhone, first install BizCTRL to the Home Screen, open it there, then allow notifications. Alerts follow the app language."
+        ],
+        "note": "From the owner's Treasury perspective, funding is outgoing and a returned amount is incoming. Pending or rejected requests do not move funds; confirm posting in history before repeating a transfer."
+      },
+      "ar": {
+        "title": "المالك: سجل المحفظة والتنبيهات",
+        "steps": [
+          "افتح لوحة محفظة المالك ← سجل المعاملات، واستخدم الشهر والبحث باسم المستفيد وفلاتر الوارد والصادر والمعلق. افتح يوم المعاملة لمراجعة السبب والحالة والأرصدة المسجلة.",
+          "من تبويب محافظ المستفيدين اختر الشخص وافحص كشف حسابه وجرس المحفظة. فتح التنبيه يوجّه إلى الطلب أو العملية المقصودة دون الموافقة تلقائياً.",
+          "لتلقي إشعارات الجهاز افتح إشعارات المحفظة الفورية وفعّلها وأرسل اختباراً. على آيفون أضف BizCTRL للشاشة الرئيسية وافتحه من الأيقونة ثم اسمح بالإشعارات. لغة الإشعارات تتبع لغة التطبيق."
+        ],
+        "note": "من منظور خزينة المالك، تمويل المستفيد مبلغ صادر وإرجاعه مبلغ وارد. الطلب المعلق أو المرفوض لا يغيّر الرصيد؛ راجع السجل قبل إعادة العملية."
+      },
+      "fa": {
+        "title": "اونر: تاریخچه معاملات والت و اعلان‌ها",
+        "steps": [
+          "Owner wallet dashboard ← Transaction history را باز کنید. با ماه، نام مستفید و فیلترهای Incoming، Outgoing و Pending جست‌وجو کنید؛ هر معامله روزانه را برای دیدن دلیل، وضعیت و مانده باز کنید.",
+          "از تب Beneficiary wallets شخص را انتخاب و Statement و زنگوله والت او را ببینید. کلیک روی اعلان درخواست یا معامله مشخص را باز می‌کند ولی خودکار Approve نمی‌کند.",
+          "برای پوش نوتیفیکیشن، Wallet push notifications را باز و اعلان را فعال و آزمایش کنید. در آیفون نخست BizCTRL را به Home Screen اضافه کنید، از آیکون اجرا و اجازه اعلان را فعال سازید. زبان اعلان مطابق زبان برنامه است."
+        ],
+        "note": "از نگاه خزانه اونر، تمویل مستفید خروج پول و برگشت او ورود پول است. Pending و Rejected موجودی را تغییر نمی‌دهند؛ پیش از تکرار معامله، تاریخچه را بررسی کنید."
       }
     }
   }
