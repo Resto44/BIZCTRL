@@ -3,6 +3,7 @@ import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { withPortalReadDeadline } from '@/lib/portalReadDeadline';
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 
@@ -38,9 +39,9 @@ export function TenantProvider({ children }) {
   const isCustomer = normalizedRole === ROLES.CUSTOMER;
   const isSponsor = normalizedRole === ROLES.SPONSOR;
 
-  const { data: restaurantsData, isLoading: loadingRestaurants, refetch: refetchRestaurants } = useQuery({
+  const { data: restaurantsData, isLoading: loadingRestaurants, error: restaurantLoadError, refetch: refetchRestaurants } = useQuery({
     queryKey: ['restaurants', user?.id, user?.role],
-    queryFn: async () => {
+    queryFn: () => withPortalReadDeadline((async () => {
       if (!user?.id) return [];
 
       // Owners resolve their approved canonical memberships. This keeps the
@@ -73,7 +74,8 @@ export function TenantProvider({ children }) {
       }
 
       return [];
-    },
+    })(), 9000, 'ERP_RESTAURANTS_TIMEOUT'),
+    retry: 0,
     enabled: !!user?.id && !isLoadingAuth,
     staleTime: 60000,
   });
@@ -96,14 +98,15 @@ export function TenantProvider({ children }) {
     refetch: refetchPortalIdentity,
   } = useQuery({
     queryKey: ['portal-identity', user?.id, activeRestaurant?.id],
-    queryFn: async () => {
+    queryFn: () => withPortalReadDeadline((async () => {
       if (!activeRestaurant?.id) return null;
       const { data, error } = await supabase.rpc('erp_get_authenticated_portal_identity', {
         p_restaurant_id: activeRestaurant.id,
       });
       if (error) throw error;
       return asRecordArray(data).at(0) || null;
-    },
+    })(), 9000, 'ERP_IDENTITY_TIMEOUT'),
+    retry: 0,
     enabled: !!user?.id && !!activeRestaurant?.id && !isLoadingAuth,
     staleTime: 60000,
   });
@@ -174,15 +177,21 @@ export function TenantProvider({ children }) {
       };
     });
 
-    // Existing organizations may still have legacy JSON-only branches. Keep them
-    // visible until the next branch save synchronizes them into the table.
-    return [
-      ...databaseBranches,
-      ...branchesFromJSON.filter(branch => {
-        const key = branch?.key || branch?.branch_key;
-        return key && !databaseKeys.has(key);
-      }),
-    ];
+    // Canonical rows are authoritative. One old branch may be present in both
+    // metadata sources (sometimes with a renamed key); never render it twice.
+    // Historical JSON-only branches remain visible, but only once per key/UUID.
+    const databaseIds = new Set(databaseBranches.map(branch => String(branch.id || '')).filter(Boolean));
+    const seenLegacyKeys = new Set(databaseKeys);
+    const seenLegacyIds = new Set(databaseIds);
+    const legacyOnly = branchesFromJSON.filter(branch => {
+      const key = String(branch?.key || branch?.branch_key || '').trim();
+      const id = String(branch?.id || '').trim();
+      if (!key || seenLegacyKeys.has(key) || (id && seenLegacyIds.has(id))) return false;
+      seenLegacyKeys.add(key);
+      if (id) seenLegacyIds.add(id);
+      return true;
+    });
+    return [...databaseBranches, ...legacyOnly];
   }, [branchesFromDB, branchesFromJSON]);
   const branches = allBranches.filter(b => b.is_active !== false);
 
@@ -380,6 +389,7 @@ export function TenantProvider({ children }) {
     <TenantContext.Provider value={{
       restaurants,
       loadingRestaurants: loadingRestaurants || isLoadingAuth,
+    restaurantLoadError,
       activeRestaurant,
       activeRestaurantId: activeRestaurant?.id || null,
       setActiveRestaurant,
