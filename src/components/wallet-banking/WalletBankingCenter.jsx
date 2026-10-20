@@ -6,6 +6,7 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
 import {WalletTrend,WalletPersonalCategories} from './WalletInsights';
+import {walletPushRecord} from '@/lib/walletPushLink';
 import {walletCopy,reasons,transferNote} from './walletPresentation';
 
 const notificationCopy={en:{title:'Wallet notifications',hint:'Latest 100 transfers · refreshes every 20 seconds',empty:'No transfer notifications',read:'Mark all read',details:'Account details'},ar:{title:'إشعارات المحفظة',hint:'آخر ١٠٠ تحويل · تحديث كل ٢٠ ثانية',empty:'لا توجد إشعارات تحويل',read:'تحديد الكل كمقروء',details:'تفاصيل الحساب'},fa:{title:'اعلان‌های والت',hint:'آخرین ۱۰۰ انتقال · تازه‌سازی هر ۲۰ ثانیه',empty:'اعلان انتقال موجود نیست',read:'همه خوانده شد',details:'جزئیات حساب'}};
@@ -75,7 +76,7 @@ const L={
  }
 };
 const num=(v,lang)=>new Intl.NumberFormat(lang==='ar'?'ar-SA':lang==='fa'?'fa-AF':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)||0);
-export default function WalletBankingCenter({person=null,owner=false,lang='en',onBeneficiaries,headerControl=null,onOwnerTransfer,initialCurrency='SAR'}){
+export default function WalletBankingCenter({person=null,owner=false,lang='en',onBeneficiaries,headerControl=null,onOwnerTransfer,initialCurrency='SAR',initialRequestId=null}){
  const t=L[lang]||L.en,extra=walletCopy[lang]||walletCopy.en,client=useQueryClient();
  const nt=notificationCopy[lang]||notificationCopy.en;
  const [notificationsOpen,setNotificationsOpen]=useState(false),[seen,setSeen]=useState(()=>new Set()),[focusedTransaction,setFocusedTransaction]=useState(null);
@@ -109,7 +110,10 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
    return data;
   },staleTime:10000,refetchInterval:15000});
  const current=(query.data?.currencies||[]).find(x=>x.currency===activeCurrency);
- const transactions=(query.data?.transactions||[]).filter(x=>x.currency===activeCurrency);
+ const linked=useQuery({queryKey:['erp-wallet-push-record',initialRequestId],queryFn:()=>walletPushRecord(initialRequestId),enabled:!!initialRequestId&&!!person?.id,retry:false});
+ const linkedRecord=linked.data?.person_id===person?.id?linked.data:null;
+ const recent=query.data?.transactions||[];
+ const transactions=(linkedRecord&&!recent.some(r=>r.id===linkedRecord.id)?[linkedRecord,...recent]:recent).filter(x=>x.currency===activeCurrency);
  const pendingRequests=(query.data?.pending_requests||transactions).filter(r=>r.status==='pending'&&r.currency===activeCurrency);
  const canReviewRequest=r=>r?.status==='pending'&&(owner?!r.initiated_by_owner:!!r.initiated_by_owner);
  const pending=pendingRequests.filter(x=>x.status==='pending'&&(!pendingKind||x.kind===pendingKind));
@@ -117,7 +121,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  const eligible=(accounts.data||[]).filter(x=>x.currency===activeCurrency);
  const selectedTreasury=eligible.find(x=>x.id===treasuryId);
  const sufficientForFunding=!!selectedRequest&&selectedRequest.kind!=='fund_wallet'||(!!selectedTreasury&&Number(selectedTreasury.available_balance)>=Number(selectedRequest?.amount));
- const invalidate=async()=>{await Promise.all([client.invalidateQueries({queryKey:['erp-bank-wallet',person?.id]}),client.invalidateQueries({queryKey:['erp-wallet-trend',person?.id]}),client.invalidateQueries({queryKey:['erp-owner-wallet',person?.restaurant_id]}),client.invalidateQueries({queryKey:['erp-owner-wallet-timeline',person?.restaurant_id]})]);};
+ const invalidate=async()=>{await Promise.all([client.invalidateQueries({queryKey:['erp-bank-wallet',person?.id]}),client.invalidateQueries({queryKey:['erp-wallet-push-record']}),client.invalidateQueries({queryKey:['erp-wallet-trend',person?.id]}),client.invalidateQueries({queryKey:['erp-owner-wallet',person?.restaurant_id]}),client.invalidateQueries({queryKey:['erp-owner-wallet-timeline',person?.restaurant_id]})]);};
  const request=useMutation({mutationFn:async()=>{
    const raw=Number(amount);
    if(!/^(?:0|[1-9][0-9]{0,7})(?:\.[0-9]{1,2})?$/.test(amount)||!Number.isFinite(raw)||raw<=0||raw>10000000)throw Error('INVALID_AMOUNT');
@@ -158,6 +162,8 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  const canReject=loaded&&canReviewRequest(selectedRequest)&&reviewNote.trim().length>=8&&!review.isPending;
  const status=r=>r.status==='posted'?t.posted:r.status==='rejected'?t.rejected:r.initiated_by_owner?t.userPending:t.pendingStatus;
  const direction=r=>r.kind==='fund_wallet'?'incoming':'outgoing';
+ const openedRequest=useRef(null);
+ useEffect(()=>{if(!linkedRecord||openedRequest.current===linkedRecord.id)return;openedRequest.current=linkedRecord.id;setCurrency(linkedRecord.currency);if(canReviewRequest(linkedRecord))selectReview(linkedRecord);else{setPanel('statement');setFocusedTransaction(linkedRecord.id);setActionVersion(v=>v+1);}},[linkedRecord]);
  return <section dir={lang==='en'?'ltr':'rtl'} className="mx-auto max-w-6xl min-w-0 space-y-3 pb-20 sm:space-y-4">
    <header className="flex min-w-0 items-center gap-2 px-1 py-1 text-slate-950">
      {!headerControl&&<Wallet className="size-6 shrink-0 text-blue-300"/>}

@@ -15,10 +15,11 @@ describe('device language synchronization',()=>{
  it('updates only the existing device, in language-change order',async()=>{
   const first=syncPushLanguage('fa');const second=syncPushLanguage('ar');
   await Promise.all([first,second]);
-  expect(fetch.mock.calls.map(c=>JSON.parse(c[1].body))).toEqual([
+  expect(fetch.mock.calls.filter(c=>c[0].includes('/owner-push/')).map(c=>JSON.parse(c[1].body))).toEqual([
    {endpoint:'https://web.push.apple.com/device-one',language:'fa'},
    {endpoint:'https://web.push.apple.com/device-one',language:'ar'},
   ]);
+  expect(fetch.mock.calls.filter(c=>c[0].includes('/wallet-push/')).map(c=>JSON.parse(c[1].body).language)).toEqual(['fa','ar']);
   expect(fetch.mock.calls[0][0]).toBe('https://example.test/functions/v1/owner-push/language');
   expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer user-token');
  });
@@ -32,6 +33,6 @@ describe('device language synchronization',()=>{
   fetch.mockRejectedValueOnce(new Error('Offline'));
   await expect(syncPushLanguage('fa')).rejects.toThrow('Offline');
   await expect(syncPushLanguage('en')).resolves.toBeUndefined();
-  expect(JSON.parse(fetch.mock.calls[1][1].body).language).toBe('en');
+  expect(JSON.parse(fetch.mock.calls[2][1].body).language).toBe('en');
  });
 });

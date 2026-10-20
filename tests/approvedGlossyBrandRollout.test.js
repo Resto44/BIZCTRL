@@ -26,7 +26,7 @@ describe('Approved glossy BizCTRL brand across all SaaS entrypoints', () => {
     expect(manifest.icons).toHaveLength(4);
     expect(manifest.icons.every(icon => icon.src.endsWith('-v3.png'))).toBe(true);
     expect(manifest.icons.map(icon => icon.purpose)).toEqual(['any','any','maskable','maskable']);
-    expect(sw).toContain("const CACHE_VERSION = 'v14'");
+    expect(sw).toContain("const CACHE_VERSION = 'v15'");
     expect(sw).toContain('/icons/bizctrl-icon-192-v3.png');
   });
   it('embeds approved image into PDF even if the network cannot load images', async () => {
