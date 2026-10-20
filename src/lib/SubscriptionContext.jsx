@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
+import { withPortalReadDeadline } from '@/lib/portalReadDeadline';
 
 const SubscriptionContext = createContext(null);
 
@@ -39,6 +40,7 @@ export function SubscriptionProvider({ children }) {
   const tenantReady = !isLoadingAuth && !loadingRestaurants;
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const summaryRef = useRef(EMPTY_SUMMARY);
+  const lastVisibilityRefreshRef = useRef(0);
   const [plans, setPlans] = useState([]);
   const [payments, setPayments] = useState([]);
   const [events, setEvents] = useState([]);
@@ -49,7 +51,7 @@ export function SubscriptionProvider({ children }) {
     summaryRef.current = summary;
   }, [summary]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async ({ skipBilling = false } = {}) => {
     if (isLoadingAuth || loadingRestaurants) return null;
     if (!user?.id || !activeRestaurant?.id) {
       setSummary(EMPTY_SUMMARY);
@@ -67,13 +69,13 @@ export function SubscriptionProvider({ children }) {
     try {
       // Start the catalog alongside authorization, but do not let billing
       // metadata or payment history delay entry to an authorized portal.
-      const planRequest = Promise.resolve(supabase
+      const planRequest = skipBilling ? null : Promise.resolve(supabase
           .from('subscription_plans')
           .select('id, display_name, monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label, trial_days, billing_period_months, billing_product_key, paddle_price_id, max_restaurants, max_branches, max_employees, max_users, max_storage_mb, max_pdf_exports, max_ocr_scans, advanced_analytics, feature_flags, sort_order')
           .eq('is_active', true)
           .eq('is_public', true)
           .order('sort_order')).catch(error => ({ data: [], error }));
-      const snapshotResult = await supabase.rpc('erp_subscription_snapshot');
+      const snapshotResult = await withPortalReadDeadline(supabase.rpc('erp_subscription_snapshot'), 9000, 'ERP_SUBSCRIPTION_TIMEOUT');
 
       if (snapshotResult.error) throw snapshotResult.error;
 
@@ -84,6 +86,7 @@ export function SubscriptionProvider({ children }) {
       summaryRef.current = nextSummary;
       setSummary(nextSummary);
       setLoading(false);
+      if (skipBilling) return nextSummary;
       const planResult = await planRequest;
       setPlans(planResult.data || []);
       if (planResult.error) setError(normalizeError(planResult.error));
@@ -124,20 +127,25 @@ export function SubscriptionProvider({ children }) {
 
   useEffect(() => {
     if (!tenantReady) return;
+    lastVisibilityRefreshRef.current = Date.now();
     refresh();
   }, [refresh, tenantReady]);
 
+  // Mobile Safari fires focus and visibilitychange together. A single throttled
+  // refresh on visibility avoids duplicate authorization, plan, and history
+  // requests every time the owner switches apps. Explicit Billing refresh still
+  // reloads full payment history.
   useEffect(() => {
     if (!tenantReady) return undefined;
     const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') refresh();
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastVisibilityRefreshRef.current < 60_000) return;
+      lastVisibilityRefreshRef.current = now;
+      refresh({ skipBilling: true });
     };
-    window.addEventListener('focus', refreshWhenVisible);
     document.addEventListener('visibilitychange', refreshWhenVisible);
-    return () => {
-      window.removeEventListener('focus', refreshWhenVisible);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
-    };
+    return () => document.removeEventListener('visibilitychange', refreshWhenVisible);
   }, [refresh, tenantReady]);
 
   const invoke = useCallback(async (name, args = {}) => {
