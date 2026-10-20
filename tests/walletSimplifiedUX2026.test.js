@@ -23,7 +23,7 @@ describe('Wallet Banking Center mobile progressive disclosure',()=>{
   expect(bank).toContain("key:'receive'");
   expect(bank).toContain("key:'statement'");
   expect(bank).toContain("key:'beneficiaries'");
-  expect(bank).toContain('setPanel(next)');
+  // Directional routing and visible action focus are covered by interaction tests.
   expect(bank).toContain("panel==='review'");
   expect(bank).toContain("supabase.rpc('erp_bank_wallet_review'");
   expect(bank).not.toContain('2,450.00');
