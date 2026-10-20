@@ -42,6 +42,7 @@ import { Separator } from '@/components/ui/separator';
 import { useTenant } from '@/lib/TenantContext';
 import {useLanguage} from '@/lib/LanguageContext';
 import {latestBranchDrawerCash} from '@/lib/executiveDrawerCash';
+import {formatCurrency} from '@/lib/helpers';
 import {
   TrendingUp, DollarSign, ShoppingCart, Package,
   Users, Clock, RefreshCw, BarChart3,
@@ -164,7 +165,11 @@ function LowStockItem({ item }) {
 // ─── Main dashboard content ───────────────────────────────────────────────────
 function ManagerContent({ branchId, branchName, branchKey }) {
   const navigate = useNavigate();
-  const {lang,formatMoney} = useLanguage();
+  const {lang='en',currency='SAR',formatMoney:appFormatMoney} = useLanguage();
+  // Normal runtime uses localized app formatter. The currency-aware fallback
+  // also keeps legacy/partial portal shells and isolated read-failure tests safe.
+  const formatMoney = typeof appFormatMoney==='function'
+    ? appFormatMoney : value=>formatCurrency(value,currency);
   const today     = format(new Date(), 'yyyy-MM-dd');
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
