@@ -37,6 +37,7 @@ import {
   reportNumber,
 } from '@/lib/ownerReportCenter';
 import { useRole } from '@/lib/RoleContext';
+import { useSubscription } from '@/lib/SubscriptionContext';
 import { normalizeSalesDashboardBranches } from '@/lib/salesDashboardBranches';
 import { useTenant } from '@/lib/TenantContext';
 
@@ -138,6 +139,7 @@ function OwnerDashboardContent() {
   const { branches, activeRestaurant, ownerFilter } = useTenant();
   const { user } = useAuth();
   const { role, can } = useRole();
+  const { isActive: subscriptionActive, hasFeature } = useSubscription();
   const [searchParams, setSearchParams] = useSearchParams();
   const copy = useMemo(() => completeOwnerReportCopy(COPY[lang] || COPY.en, lang), [lang]);
   const {
@@ -420,10 +422,10 @@ function OwnerDashboardContent() {
     consumption, priceReport, supplierComparisons, branchPriceInconsistencies, priceHistory,
     expenseGroups, revenueTrend, periodPurchaseQuantity, periodPurchaseCost: periodMetrics.totalPurchaseCost,
     supplierCount, selectBranch: setSelectedBranchId, canAddBranch: role === 'owner',
-    canOpenCopilot: role === 'owner' && Boolean(activeRestaurant?.id) && Boolean(user?.id),
+    canOpenCopilot: role === 'owner' && subscriptionActive && hasFeature('ai_copilot') && Boolean(activeRestaurant?.id) && Boolean(user?.id),
     openCopilot: () => setCopilotOpen(true), copilotLabel,
     openQuickAddBranch: () => setQuickAddBranchOpen(true), loadingActiveAlerts, hasQueryError,
-  }), [branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, loadingActiveAlerts, payables, periodLabel, activePeriod, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel]);
+  }), [branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, loadingActiveAlerts, payables, periodLabel, activePeriod, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel, subscriptionActive, hasFeature]);
 
   if (loading) return <DashboardSkeleton />;
 
