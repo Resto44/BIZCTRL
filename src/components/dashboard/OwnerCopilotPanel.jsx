@@ -117,7 +117,7 @@ const SUGGESTIONS = {
     'Which items are below the stock threshold?',
     'Summarize purchases this month',
     'Which supplier invoices remain unpaid?',
-    'Why won't inventory save in Branch Manager?',
+    "Why won't inventory save in Branch Manager?",
     'How does Wallet approval work?',
   ],
   ar: [
@@ -377,7 +377,7 @@ export default function OwnerCopilotPanel({
           </Button>
           {QUICK_ACTIONS.map((action) => (
             <Button key={action.path} variant="outline" size="sm" type="button" className="h-auto min-h-8 max-w-full min-w-0 shrink whitespace-normal px-2 py-1 text-center text-[11px] leading-tight md:h-8 md:shrink-0 md:whitespace-nowrap md:px-3 md:py-0 md:text-xs" onClick={() => leaveToAction(action.path)}>
-              {action.label}
+              {action.label[lang] || action.label.en}
             </Button>
           ))}
         </div>
