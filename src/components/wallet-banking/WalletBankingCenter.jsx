@@ -115,7 +115,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  const eligible=(accounts.data||[]).filter(x=>x.currency===activeCurrency);
  const selectedTreasury=eligible.find(x=>x.id===treasuryId);
  const sufficientForFunding=!!selectedRequest&&selectedRequest.kind!=='fund_wallet'||(!!selectedTreasury&&Number(selectedTreasury.available_balance)>=Number(selectedRequest?.amount));
- const invalidate=async()=>{await Promise.all([client.invalidateQueries({queryKey:['erp-bank-wallet',person?.id]}),client.invalidateQueries({queryKey:['erp-wallet-trend',person?.id]}),client.invalidateQueries({queryKey:['erp-owner-wallet',person?.restaurant_id]})]);};
+ const invalidate=async()=>{await Promise.all([client.invalidateQueries({queryKey:['erp-bank-wallet',person?.id]}),client.invalidateQueries({queryKey:['erp-wallet-trend',person?.id]}),client.invalidateQueries({queryKey:['erp-owner-wallet',person?.restaurant_id]}),client.invalidateQueries({queryKey:['erp-owner-wallet-timeline',person?.restaurant_id]})]);};
  const request=useMutation({mutationFn:async()=>{
    const raw=Number(amount);
    if(!/^(?:0|[1-9][0-9]{0,7})(?:\.[0-9]{1,2})?$/.test(amount)||!Number.isFinite(raw)||raw<=0||raw>10000000)throw Error('INVALID_AMOUNT');

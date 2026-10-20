@@ -4,6 +4,7 @@ import {supabase} from '@/api/supabaseClient';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
+import OwnerWalletTimeline from './OwnerWalletTimeline';
 import {reasons,transferNote} from './walletPresentation';
 
 export const ownerCopy={
@@ -15,11 +16,11 @@ const format=(v,lang)=>new Intl.NumberFormat(lang==='ar'?'ar-SA':lang==='fa'?'fa
 const initialForm=(person='',kind='fund_wallet')=>({person,kind,account:'',amount:'',reason:kind==='fund_wallet'?'funding':'return',details:'',id:crypto.randomUUID()});
 export default function OwnerWalletDashboard({tenant,lang='en',currency='SAR',onOpenWallet,initialPerson='',initialKind=null}){
  const t=ownerCopy[lang]||ownerCopy.en,client=useQueryClient();
- const [status,setStatus]=useState('all'),[offset,setOffset]=useState(0),[form,setForm]=useState(()=>initialForm(initialPerson,initialKind||'fund_wallet'));
+ const [form,setForm]=useState(()=>initialForm(initialPerson,initialKind||'fund_wallet'));
  const [editing,setEditing]=useState(!!initialKind),[confirming,setConfirming]=useState(false),[message,setMessage]=useState(''),[failure,setFailure]=useState('');
  const [review,setReview]=useState(null),[reviewAccount,setReviewAccount]=useState(''),[reviewNote,setReviewNote]=useState(''),[reviewError,setReviewError]=useState('');
- const query=useQuery({queryKey:['erp-owner-wallet',tenant,currency,status,offset],enabled:!!tenant,
- queryFn:async()=>{const {data,error}=await supabase.rpc('erp_bank_wallet_owner_overview',{p_restaurant:tenant,p_currency:currency,p_status:status,p_offset:offset});if(error)throw error;if(!data||!Array.isArray(data.accounts)||!Array.isArray(data.people)||!Array.isArray(data.transactions)||!data.summary)throw Error('WALLET_INVALID_SNAPSHOT');return data;},refetchInterval:20000});
+ const query=useQuery({queryKey:['erp-owner-wallet',tenant,currency],enabled:!!tenant,
+ queryFn:async()=>{const {data,error}=await supabase.rpc('erp_bank_wallet_owner_overview',{p_restaurant:tenant,p_currency:currency,p_status:'all',p_offset:0});if(error)throw error;if(!data||!Array.isArray(data.accounts)||!Array.isArray(data.people)||!Array.isArray(data.transactions)||!data.summary)throw Error('WALLET_INVALID_SNAPSHOT');return data;},refetchInterval:20000});
  const data=query.data,ready=query.isSuccess&&!query.isError,accounts=data?.accounts||[],people=data?.people||[];
  const person=people.find(x=>x.id===form.person),account=accounts.find(x=>x.id===form.account),amount=Number(form.amount),funding=form.kind==='fund_wallet';
  const available=funding?Number(account?.available_balance):Number(person?.balance);
@@ -30,10 +31,10 @@ export default function OwnerWalletDashboard({tenant,lang='en',currency='SAR',on
   const {data:result,error}=await supabase.rpc('erp_bank_wallet_owner_transfer',{p_person:form.person,p_kind:form.kind,p_amount:amount,p_currency:currency,p_request_id:form.id,p_treasury_account:form.account,p_note:transferNote(form.reason,form.details,lang,form.kind)});
   if(error)throw error;if(result!==form.id)throw Error('WALLET_UNCONFIRMED');return result;
  },onSuccess:async()=>{setEditing(false);setConfirming(false);setForm(initialForm());setFailure('');setMessage(t.success);await Promise.all([
- client.invalidateQueries({queryKey:['erp-owner-wallet',tenant]}),client.invalidateQueries({queryKey:['erp-bank-wallet']}),client.invalidateQueries({queryKey:['erp-bank-wallet-treasury']}),client.invalidateQueries({queryKey:['erp-wallet-trend']}),client.invalidateQueries({queryKey:['wallet_transactions']})]);},onError:e=>{setFailure(e.message?.includes('INSUFFICIENT')?t.insufficient:t.failure);}});
+ client.invalidateQueries({queryKey:['erp-owner-wallet',tenant]}),client.invalidateQueries({queryKey:['erp-owner-wallet-timeline',tenant]}),client.invalidateQueries({queryKey:['erp-bank-wallet']}),client.invalidateQueries({queryKey:['erp-bank-wallet-treasury']}),client.invalidateQueries({queryKey:['erp-wallet-trend']}),client.invalidateQueries({queryKey:['wallet_transactions']})]);},onError:e=>{setFailure(e.message?.includes('INSUFFICIENT')?t.insufficient:t.failure);}});
  const reviewMutation=useMutation({mutationFn:async approve=>{
   const {error}=await supabase.rpc('erp_bank_wallet_review',{p_request_id:review,p_approve:approve,p_treasury_account:approve?reviewAccount:null,p_review_note:reviewNote.trim()});if(error)throw error;
- },onSuccess:async()=>{setReview(null);setReviewNote('');setReviewAccount('');setMessage(t.reviewed);await Promise.all([client.invalidateQueries({queryKey:['erp-owner-wallet',tenant]}),client.invalidateQueries({queryKey:['erp-bank-wallet']}),client.invalidateQueries({queryKey:['erp-bank-wallet-treasury']}),client.invalidateQueries({queryKey:['erp-wallet-trend']})]);},onError:()=>setReviewError(t.failure)});
+ },onSuccess:async()=>{setReview(null);setReviewNote('');setReviewAccount('');setMessage(t.reviewed);await Promise.all([client.invalidateQueries({queryKey:['erp-owner-wallet',tenant]}),client.invalidateQueries({queryKey:['erp-owner-wallet-timeline',tenant]}),client.invalidateQueries({queryKey:['erp-bank-wallet']}),client.invalidateQueries({queryKey:['erp-bank-wallet-treasury']}),client.invalidateQueries({queryKey:['erp-wallet-trend']})]);},onError:()=>setReviewError(t.failure)});
  const change=(key,value)=>{setForm(f=>({...f,[key]:value,id:crypto.randomUUID()}));setConfirming(false);setFailure('');};
  const start=kind=>{setForm(initialForm(initialPerson,kind));setEditing(true);setConfirming(false);setMessage('');setFailure('');};
  return <section className="min-w-0 space-y-3" dir={lang==='en'?'ltr':'rtl'}>
@@ -59,17 +60,14 @@ export default function OwnerWalletDashboard({tenant,lang='en',currency='SAR',on
    <div className="flex flex-wrap gap-2">{confirming?<><Button type="button" disabled={!valid||mutation.isPending||query.isFetching} onClick={()=>mutation.mutate()}>{mutation.isPending?t.loading:t.confirm}</Button><Button type="button" variant="outline" disabled={mutation.isPending} onClick={()=>setConfirming(false)}>{t.back}</Button></>:<Button type="submit" disabled={!valid||mutation.isPending}>{t.review}</Button>}<Button type="button" variant="outline" disabled={mutation.isPending} onClick={()=>{setEditing(false);setConfirming(false);}}>{t.cancel}</Button></div>
   </form>}
   <details className="rounded-xl border bg-white p-3"><summary className="cursor-pointer font-bold">{t.account}</summary>{ready&&accounts.map(a=><div key={a.id} className="flex flex-wrap justify-between gap-2 border-t py-3 text-sm"><span>{a.account_name}</span><b dir="ltr">{money(a.available_balance)}</b></div>)}</details>
-  <section className="rounded-2xl border bg-white p-3"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-black">{t.history}</h2><select aria-label={t.history} value={status} onChange={e=>{setStatus(e.target.value);setOffset(0);}} className="h-11 rounded-xl border bg-white px-2">{['all','pending','posted','rejected'].map(s=><option key={s} value={s}>{t[s]}</option>)}</select></div>
-   {ready&&!data.transactions.length&&<p className="p-3 text-sm">{t.empty}</p>}
-   {ready&&data.transactions.map(r=><article key={r.id} className="space-y-1 border-b py-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><b dir="auto">{r.person_name}</b><strong dir="ltr" className={r.kind==='fund_wallet'?'text-rose-700':'text-emerald-700'}>{r.status==='posted'?(r.kind==='fund_wallet'?'−':'+'):''}{money(r.amount)}</strong></div><p>{r.kind==='fund_wallet'?t.pay:t.receive} · {t[r.status]}</p><p className="text-xs text-slate-500">{new Date(r.activity_at).toLocaleString(lang==='fa'?'fa-AF':lang==='ar'?'ar-SA':'en-GB')} · {r.initiated_by_owner?t.owner:t.request}</p>{r.status==='posted'&&<p className="text-xs">{t.balance} · {t.before}: {money(r.balance_before)} · {t.after}: {money(r.balance_after)}</p>}<p dir="auto" className="break-words text-xs text-slate-500">{r.note}</p>{r.account_name&&<p className="text-xs">{t.account}: {r.account_name}</p>}{r.is_active&&<Button variant="outline" size="sm" disabled={mutation.isPending||reviewMutation.isPending} onClick={()=>{if(r.status==='pending'){setReview(r.id);setReviewAccount('');setReviewNote('');setReviewError('');}else onOpenWallet(r.person_id);}}>{r.status==='pending'?t.review:t.open}</Button>}
-    {review===r.id&&r.status==='pending'&&<div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+  <OwnerWalletTimeline tenant={tenant} currency={currency} lang={lang} t={t} money={money} onOpenWallet={onOpenWallet} busy={mutation.isPending||reviewMutation.isPending}
+   onReview={r=>{setReview(r.id);setReviewAccount('');setReviewNote('');setReviewError('');}}
+   renderReview={r=>(review===r.id&&r.status==='pending'&&<div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
      <label className="block text-xs font-bold">{t.account}<select aria-label={t.account} disabled={reviewMutation.isPending} value={reviewAccount} onChange={e=>setReviewAccount(e.target.value)} className="mt-1 h-12 w-full min-w-0 rounded-xl border bg-white px-2 text-base"><option value="">{t.choose}</option>{accounts.map(a=><option key={a.id} value={a.id}>{a.account_name} · {money(a.available_balance)}</option>)}</select></label>
      <label className="block text-xs font-bold">{t.reviewNote}<Textarea disabled={reviewMutation.isPending} value={reviewNote} maxLength={500} rows={2} onChange={e=>setReviewNote(e.target.value)} className="mt-1 text-base"/></label>
      {reviewError&&<p role="alert" className="text-rose-700">{reviewError}</p>}
      <div className="flex flex-wrap gap-2"><Button disabled={!ready||query.isFetching||reviewMutation.isPending||mutation.isPending||reviewNote.trim().length<8||!accounts.some(a=>a.id===reviewAccount&&(r.kind!=='fund_wallet'||Number(a.available_balance)>=Number(r.amount)))} onClick={()=>reviewMutation.mutate(true)}>{t.approve}</Button><Button variant="destructive" disabled={reviewMutation.isPending||mutation.isPending||reviewNote.trim().length<8} onClick={()=>reviewMutation.mutate(false)}>{t.reject}</Button><Button variant="outline" disabled={reviewMutation.isPending} onClick={()=>setReview(null)}>{t.cancel}</Button></div>
-    </div>}</article>)}
-   <div className="mt-3 flex items-center justify-between gap-2"><Button variant="outline" disabled={offset===0||query.isFetching} onClick={()=>setOffset(x=>Math.max(0,x-50))}>{t.previous}</Button><span className="text-xs">{ready?`${Math.min(offset+1,data.total)}–${Math.min(offset+50,data.total)} / ${data.total}`:'—'}</span><Button variant="outline" disabled={!ready||offset+50>=data.total||query.isFetching} onClick={()=>setOffset(x=>x+50)}>{t.next}</Button></div>
-  </section>
+    </div>)} />
   <p className="rounded-xl bg-blue-50 p-3 text-xs leading-6 text-blue-950">{t.policy}</p>
  </section>;
 }
