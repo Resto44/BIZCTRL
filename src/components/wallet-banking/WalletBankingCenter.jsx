@@ -94,6 +94,8 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
    if(!data||!Array.isArray(data.currencies)||!Array.isArray(data.transactions))throw Error('WALLET_INCOMPLETE_SNAPSHOT');
    return data;
   },staleTime:10000,refetchInterval:20000});
+ const currencies=useMemo(()=>[...new Set(['SAR',...(query.data?.currencies||[]).map(x=>x.currency),...(query.data?.transactions||[]).map(x=>x.currency)])], [query.data]);
+ const activeCurrency=currencies.includes(currency)?currency:currencies[0]||'SAR';
  // Funding sources must use the same authoritative posted balance calculation
  // as the owner approval RPC; opening_balance alone is often zero in legacy data.
  const accounts=useQuery({queryKey:['erp-bank-wallet-treasury',person?.restaurant_id,activeCurrency],
@@ -106,8 +108,6 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
    if(!Array.isArray(data)||data.some(a=>!a.id||a.currency!==activeCurrency||!Number.isFinite(Number(a.available_balance))))throw Error('WALLET_FUNDING_SNAPSHOT_INVALID');
    return data;
   },staleTime:10000,refetchInterval:15000});
- const currencies=useMemo(()=>[...new Set(['SAR',...(query.data?.currencies||[]).map(x=>x.currency),...(query.data?.transactions||[]).map(x=>x.currency)])], [query.data]);
- const activeCurrency=currencies.includes(currency)?currency:currencies[0]||'SAR';
  const current=(query.data?.currencies||[]).find(x=>x.currency===activeCurrency);
  const transactions=(query.data?.transactions||[]).filter(x=>x.currency===activeCurrency);
  const pending=transactions.filter(x=>x.status==='pending');
