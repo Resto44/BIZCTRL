@@ -161,7 +161,7 @@ const QUICK_ACTIONS = [
 function asErrorMessage(error, copy) {
   const value = String(error?.message || error?.error || error?.context?.error || '');
   if (value.includes('AI_COPILOT_PROVIDER_NOT_CONFIGURED') || value.includes('AI_COPILOT_PROVIDER_UNSUPPORTED')) return copy.serviceSetup;
-  if (value.includes('AI_COPILOT_PROVIDER_RATE_LIMITED')) return copy.rateLimited;
+  if (value.includes('AI_COPILOT_PROVIDER_RATE_LIMITED') || value.includes('AI_COPILOT_RATE_LIMITED')) return copy.rateLimited;
   if (value.includes('AI_COPILOT_PROVIDER_UNAVAILABLE') || value.includes('AI_COPILOT_PROVIDER_AUTH_FAILED')) return copy.serviceLimited;
   if (value.includes('AUTHORIZED_DATA_UNAVAILABLE')) return copy.notEnoughData;
   if (value.includes('TENANT_SCOPE_DENIED') || value.includes('BRANCH_SCOPE_DENIED')) return copy.notAuthorized;
@@ -388,7 +388,7 @@ export default function OwnerCopilotPanel({
               <button key={item.id} type="button" className="block w-full truncate rounded-md px-3 py-2 text-start text-xs font-medium text-foreground hover:bg-muted" onClick={() => loadConversation(item.id)}>
                 {item.title}
               </button>
-            )) : <p className="px-3 py-2 text-xs text-muted-foreground">No saved conversations yet.</p>}
+            )) : <p className="px-3 py-2 text-xs text-muted-foreground">{copy.noHistory}</p>}
           </div>
         )}
 
