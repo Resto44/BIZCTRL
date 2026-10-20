@@ -1,4 +1,4 @@
-import React,{useMemo,useState} from 'react';
+import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
 import {ArrowDownLeft,ArrowRight,ArrowUpRight,Building2,CheckCircle2,Clock3,Copy,FileText,Landmark,Send,ShieldCheck,Users,Wallet} from 'lucide-react';
@@ -10,6 +10,7 @@ import {walletCopy,reasons,transferNote} from './walletPresentation';
 
 const L={
  en:{
+  remaining:'Balance after',before:'Before',added:'Added',deducted:'Deducted',unposted:'No balance change',ownerHelp:'Review requests submitted by this wallet holder. Funds move only after your approval.',noRequests:'No pending requests in this direction.',walletIn:'Receive · requests into wallet',walletOut:'Transfer · requests from wallet',recipientHelp:'Your internal wallet transfers are between you and this linked business.',
   title:'Wallet Banking Center',arabic:'مركز المحفظة البنكية',sub:'Internal business wallet for verified people and owner-approved transfers',
   account:'Wallet Account ID',linked:'Linked Business',active:'Active',currency:'Currency',
   balance:'Available Wallet Balance',pending:'Pending Transfers',received:'Transfers In',sent:'Transfers Out',
@@ -30,6 +31,7 @@ const L={
   waiting:'Awaiting verification',reason:'Explain the transfer',activeAccount:'Selected wallet account',postedOnce:'Each approval creates one linked Treasury transaction and two balancing wallet entries.',
  },
  ar:{
+  remaining:'الرصيد بعد',before:'قبل',added:'مضاف',deducted:'مخصوم',unposted:'لا تغيير في الرصيد',ownerHelp:'راجع طلبات صاحب المحفظة. لا تتحرك الأموال إلا بعد موافقتك.',noRequests:'لا توجد طلبات معلقة بهذا الاتجاه.',walletIn:'استلام · طلبات واردة للمحفظة',walletOut:'تحويل · طلبات صادرة من المحفظة',recipientHelp:'التحويلات الداخلية بينك وبين المنشأة المرتبطة.',
   title:'مركز المحفظة البنكية',arabic:'Wallet Banking Center',sub:'محفظة داخلية للأشخاص المعتمدين وتحويلات تحت موافقة المالك',
   account:'رقم حساب المحفظة',linked:'المنشأة المرتبطة',active:'نشط',currency:'العملة',
   balance:'الرصيد المتاح بالمحفظة',pending:'التحويلات قيد المعالجة',received:'التحويلات الواردة',sent:'التحويلات الصادرة',
@@ -50,6 +52,7 @@ const L={
   waiting:'بانتظار التحقق',reason:'سبب التحويل',activeAccount:'الحساب المختار',postedOnce:'كل اعتماد ينتج حركة خزينة واحدة وقيدين متوازنين في المحفظة.',
  },
  fa:{
+  remaining:'مانده پس از معامله',before:'موجودی قبلی',added:'اضافه‌شده',deducted:'کسرشده',unposted:'بدون تغییر موجودی',ownerHelp:'درخواست‌های صاحب والت را بررسی کنید. وجه پس از تأیید شما ثبت می‌شود.',noRequests:'در این جهت درخواست در انتظار نیست.',walletIn:'دریافت · درخواست‌های ورودی والت',walletOut:'انتقال · درخواست‌های خروجی والت',recipientHelp:'انتقال‌های داخلی والت میان شما و این کسب‌وکار انجام می‌شود.',
   title:'مرکز بانکداری والت',arabic:'Wallet Banking Center',sub:'والت داخلی برای اشخاص تأییدشده و انتقال‌های دارای تأیید اونر',
   account:'شناسه حساب والت',linked:'بیزنس مرتبط',active:'فعال',currency:'ارز',
   balance:'موجودی قابل‌استفاده والت',pending:'انتقال‌های در انتظار',received:'انتقال‌های ورودی',sent:'انتقال‌های خروجی',
@@ -73,10 +76,13 @@ const L={
 const num=(v,lang)=>new Intl.NumberFormat(lang==='ar'?'ar-SA':lang==='fa'?'fa-AF':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)||0);
 export default function WalletBankingCenter({person=null,owner=false,lang='en',onBeneficiaries}){
  const t=L[lang]||L.en,extra=walletCopy[lang]||walletCopy.en,client=useQueryClient();
+ const actionRef=useRef(null);
+ const [actionVersion,setActionVersion]=useState(0),[pendingKind,setPendingKind]=useState(null);
+ useEffect(()=>{if(actionVersion){actionRef.current?.scrollIntoView?.({behavior:'smooth',block:'start'});actionRef.current?.focus?.({preventScroll:true});}},[actionVersion]);
  const [reasonId,setReasonId]=useState('funding');
  const [currency,setCurrency]=useState('SAR'),[panel,setPanel]=useState('home'),[kind,setKind]=useState('fund_wallet');
  const [amount,setAmount]=useState(''),[note,setNote]=useState(''),[requestId,setRequestId]=useState(()=>crypto.randomUUID()),[reviewId,setReviewId]=useState(null),[reviewNote,setReviewNote]=useState(''),[treasuryId,setTreasuryId]=useState('');
- const [limit,setLimit]=useState(5),[message,setMessage]=useState(''),[reviewError,setReviewError]=useState('');
+ const [message,setMessage]=useState(''),[reviewError,setReviewError]=useState('');
  const query=useQuery({queryKey:['erp-bank-wallet',person?.id],enabled:!!person?.id,
   queryFn:async()=>{
    const {data,error}=await supabase.rpc('erp_bank_wallet_dashboard',{p_person:person.id,p_limit:100});
@@ -100,7 +106,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
   },staleTime:10000,refetchInterval:15000});
  const current=(query.data?.currencies||[]).find(x=>x.currency===activeCurrency);
  const transactions=(query.data?.transactions||[]).filter(x=>x.currency===activeCurrency);
- const pending=transactions.filter(x=>x.status==='pending');
+ const pending=transactions.filter(x=>x.status==='pending'&&(!pendingKind||x.kind===pendingKind));
  const selectedRequest=transactions.find(x=>x.id===reviewId&&x.status==='pending');
  const eligible=(accounts.data||[]).filter(x=>x.currency===activeCurrency);
  const selectedTreasury=eligible.find(x=>x.id===treasuryId);
@@ -125,8 +131,19 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  const submit=()=>{
    setMessage('');request.mutate();
  };
- const selectReview=r=>{setReviewId(r.id);setReviewNote('');setTreasuryId('');setReviewError('');setMessage('');setPanel('review');};
- const start=next=>{setMessage('');setPanel(next);setRequestId(crypto.randomUUID());if(next==='transfer'){setKind('return_to_owner');setReasonId('return');setNote('');}if(next==='receive'){setKind('fund_wallet');setReasonId('funding');setNote('');}};
+ const selectReview=r=>{setReviewId(r.id);setReviewNote('');setTreasuryId('');setReviewError('');setMessage('');setPanel('review');setActionVersion(v=>v+1);};
+ const start=next=>{
+  setMessage('');setReviewId(null);setPendingKind(null);setRequestId(crypto.randomUUID());
+  if(next==='transfer'||next==='receive'){
+   setKind(next==='transfer'?'return_to_owner':'fund_wallet');
+   setReasonId(next==='transfer'?'return':'funding');setNote('');
+   if(owner)setPendingKind(next==='transfer'?'return_to_owner':'fund_wallet');
+  }
+  setPanel(owner&&(next==='transfer'||next==='receive')?'pending':next);
+  setActionVersion(v=>v+1);
+ };
+ const displayParty=value=>value?.startsWith('WLT-')?(query.data?.person_name||person?.name):value;
+
  const loaded=!query.isPending&&!query.isError;
  const canSubmit=loaded&&!!person?.id&&!owner&&amount!==''&&Number(amount)>0&&!request.isPending&&(reasonId!=='other'||!!note.trim());
  const canApprove=loaded&&owner&&!!selectedRequest&&reviewNote.trim().length>=8&&!review.isPending&&!accounts.isFetching&&!accounts.isError&&!!selectedTreasury&&sufficientForFunding;
@@ -176,16 +193,12 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
            {key:'receive',icon:ArrowDownLeft,active:'bg-emerald-50 text-emerald-700'},
            {key:'statement',icon:FileText,active:'bg-slate-50 text-blue-950'},
            {key:'beneficiaries',icon:Users,active:'bg-slate-50 text-blue-950'},
-         ].map(({key,icon:Icon,active})=><button key={key} type="button" onClick={()=>key==='beneficiaries'&&onBeneficiaries?onBeneficiaries():start(owner&&(key==='transfer'||key==='receive')?'pending':key)} className={'flex min-h-20 min-w-0 flex-col items-center justify-center gap-2 rounded-xl p-2 text-center text-xs font-black leading-5 '+active}>
+         ].map(({key,icon:Icon,active})=><button key={key} type="button" onClick={()=>key==='beneficiaries'&&onBeneficiaries?onBeneficiaries():start(key)} className={'flex min-h-20 min-w-0 flex-col items-center justify-center gap-2 rounded-xl p-2 text-center text-xs font-black leading-5 '+active}>
            <span className="grid size-11 place-items-center rounded-full bg-white/80"><Icon className="size-5"/></span><span className="break-words">{t[key]}</span>
          </button>)}
        </div>
      </div>
-     <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-2xl border bg-white p-4 shadow-sm">
-       <span className="grid size-12 shrink-0 place-items-center rounded-full bg-blue-100 text-blue-700"><Landmark className="size-6"/></span>
-       <div className="min-w-0 flex-1"><h3 className="text-sm font-black text-slate-900">{t.treasury}</h3><p className="mt-1 text-xs leading-5 text-slate-600">{t.treasurySub}</p></div>
-       <span className="flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="size-4"/> ERP</span>
-     </div>
+     <div ref={actionRef} tabIndex={-1} className="scroll-mt-44 space-y-3 rounded-2xl focus:outline-none" aria-live="polite">
      {message&&<p role="status" className="rounded-xl border bg-blue-50 p-3 text-sm text-blue-900">{message}</p>}
      {(panel==='transfer'||panel==='receive')&&!owner&&<div className="space-y-3 rounded-2xl border border-blue-200 bg-white p-4 shadow-sm">
        <h3 className="text-lg font-black">{panel==='transfer'?t.transferTitle:t.receiveTitle}</h3>
@@ -205,7 +218,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
      </div>}
      {panel==='review'&&owner&&selectedRequest&&<div className="space-y-3 rounded-2xl border border-orange-200 bg-white p-4">
        <h3 className="font-black">{t.reviews}</h3>
-       <p className="text-xs">{selectedRequest.payer} → {selectedRequest.payee} · {num(selectedRequest.amount,lang)} {selectedRequest.currency}</p>
+       <p className="text-xs">{displayParty(selectedRequest.payer)} → {displayParty(selectedRequest.payee)} · {num(selectedRequest.amount,lang)} {selectedRequest.currency}</p>
        <label className="block text-xs font-bold">{t.source}
          <select value={treasuryId} onChange={e=>setTreasuryId(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border p-2">
            <option value="">{t.select}</option>
@@ -226,37 +239,58 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
        {reviewError&&<p role="alert" aria-live="assertive" className="break-words rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{reviewError}</p>}
        <div className="flex flex-wrap gap-2"><Button type="button" disabled={!canApprove} aria-busy={review.isPending} onClick={()=>{setReviewError('');review.mutate(true);}} className="min-h-11 bg-emerald-700">{review.isPending?t.processing:t.approve}</Button><Button type="button" variant="destructive" disabled={!canReject} aria-busy={review.isPending} onClick={()=>{setReviewError('');review.mutate(false);}} className="min-h-11">{t.reject}</Button><Button type="button" variant="outline" onClick={()=>setPanel('home')}>{t.cancel}</Button></div>
      </div>}
-     <WalletTrend person={person} currency={activeCurrency} lang={lang}/>
+     {panel==='beneficiaries'&&<div className="rounded-2xl border bg-white p-4">
+       <h2 className="font-bold">{t.beneficiaries}</h2><p className="mt-2 text-sm text-slate-600">{t.recipientHelp}</p>
+       <p dir="auto" className="mt-3 font-bold">{query.data?.business_name||person.business||'—'}</p>
+       <Button className="mt-3" onClick={()=>start('transfer')}>{t.transfer}</Button>
+     </div>}
+     {panel==='pending'&&owner&&<div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm">
+       <h2 className="font-bold">{pendingKind==='fund_wallet'?t.walletIn:pendingKind==='return_to_owner'?t.walletOut:t.reviews}</h2>
+       <p className="mt-1 text-slate-600">{t.ownerHelp}</p>
+     </div>}
      <section className="min-w-0 rounded-2xl border bg-white shadow-sm">
        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-         <h2 className="text-lg font-black text-slate-950">{panel==='pending'?t.reviews:t.recent}</h2>
-         <Button variant="ghost" onClick={()=>{setPanel(panel==='statement'?'home':'statement');setLimit(100);}}>{t.all}<ArrowRight className="ms-1 size-4"/></Button>
+         <h2 className="text-lg font-black text-slate-950">{panel==='pending'?t.reviews:panel==='statement'?t.statement:t.recent}</h2>
+         <Button variant="ghost" onClick={()=>{start(panel==='statement'?'home':'statement');}}>{panel==='statement'?t.cancel:t.all}<ArrowRight className="ms-1 size-4"/></Button>
        </div>
        {query.isPending?<p className="p-4 text-sm text-slate-500">{t.processing}</p>:
-        loaded&&!(panel==='pending'?pending:transactions.slice(0,panel==='statement'?100:limit)).length?<p className="p-5 text-center text-sm text-slate-600">{t.none}</p>:
-        <div className="divide-y">{(panel==='pending'?pending:transactions.slice(0,panel==='statement'?100:limit)).map(r=>{
+        loaded&&!(panel==='pending'?pending:transactions.slice(0,panel==='statement'?100:5)).length?<p className="p-5 text-center text-sm text-slate-600">{panel==='pending'?t.noRequests:t.none}</p>:
+        <div className="divide-y">{(panel==='pending'?pending:transactions.slice(0,panel==='statement'?100:5)).map(r=>{
           const incoming=direction(r)==='incoming',isPosted=r.status==='posted';
-          return <article key={r.id} className="min-w-0 space-y-2 p-3.5 sm:p-4">
+          return <article key={r.id} className="min-w-0 space-y-1 px-3 py-2.5 sm:px-4">
             <div className="flex min-w-0 items-start gap-2.5">
-              <span className={'grid size-10 shrink-0 place-items-center rounded-full '+(r.status==='pending'?'bg-orange-50 text-orange-700':incoming?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700')}>
+              <span className={'grid size-8 shrink-0 place-items-center rounded-lg '+(r.status==='pending'?'bg-orange-50 text-orange-700':incoming?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700')}>
                 {r.status==='pending'?<Clock3 className="size-5"/>:incoming?<ArrowDownLeft className="size-5"/>:<ArrowUpRight className="size-5"/>}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="grid min-w-0 gap-1 sm:grid-cols-[1fr_auto] sm:items-center">
-                  <div className="min-w-0 text-xs leading-6"><span dir="auto" className="break-all font-bold text-slate-900">{r.payer}</span><span className="mx-2 text-slate-400">→</span><span dir="auto" className="break-all font-bold text-slate-900">{r.payee}</span></div>
-                  <strong dir="ltr" className={'text-start text-sm font-black tabular-nums '+(r.status==='pending'?'text-orange-700':incoming?'text-emerald-700':'text-rose-700')}>{!isPosted?'':incoming?'+':'−'}{num(r.amount,lang)} {r.currency}</strong>
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                  <div className="min-w-0 text-xs leading-6"><span dir="auto" className="break-words font-bold text-slate-900">{displayParty(r.payer)}</span><span className="mx-2 text-slate-400">→</span><span dir="auto" className="break-words font-bold text-slate-900">{displayParty(r.payee)}</span></div>
+                  <strong dir="ltr" className={'text-start text-sm font-black tabular-nums '+(r.status==='pending'?'text-orange-700':incoming?'text-emerald-700':'text-rose-700')}><span className="sr-only">{isPosted?(incoming?t.added:t.deducted):t.amount} </span>{!isPosted?'':incoming?'+':'−'}{num(r.amount,lang)} {r.currency}</strong>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <span>{new Date(r.created_at).toLocaleDateString(lang==='en'?'en-GB':lang==='ar'?'ar-SA':'fa-IR')}</span>
+                  <span>{new Date(r.posted_at||r.created_at).toLocaleDateString(lang==='en'?'en-GB':lang==='ar'?'ar-SA':'fa-IR')}</span>
                   <span className={'rounded-lg px-2 py-0.5 font-bold '+(r.status==='pending'?'bg-orange-50 text-orange-700':r.status==='posted'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700')}>{status(r)}</span>
                 </div>
-                {r.note&&<p dir="auto" className="mt-1 break-words text-xs text-slate-500">{r.note}</p>}
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
+                  {isPosted?<>
+                    <span className="text-slate-500">{t.before}: <b dir="ltr">{r.balance_before!=null?num(r.balance_before,lang):'—'}</b></span>
+                    <span className="font-semibold text-blue-950">{t.remaining}: <b dir="ltr">{r.balance_after!=null?num(r.balance_after,lang):'—'} {r.currency}</b></span>
+                  </>:<span className="text-slate-500">{t.unposted}</span>}
+                </div>
+                {r.note&&<p dir="auto" title={r.note} className="mt-1 line-clamp-1 break-words text-xs text-slate-500">{r.note}</p>}
                 {owner&&r.status==='pending'&&<Button size="sm" variant="outline" onClick={()=>selectReview(r)} className="mt-2 min-h-10">{t.reviews}</Button>}
               </div>
             </div>
           </article>;
         })}</div>}
      </section>
+     </div>
+     <WalletTrend person={person} currency={activeCurrency} lang={lang}/>
+     <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-2xl border bg-white p-4 shadow-sm">
+       <span className="grid size-12 shrink-0 place-items-center rounded-full bg-blue-100 text-blue-700"><Landmark className="size-6"/></span>
+       <div className="min-w-0 flex-1"><h3 className="text-sm font-black text-slate-900">{t.treasury}</h3><p className="mt-1 text-xs leading-5 text-slate-600">{t.treasurySub}</p></div>
+       <span className="flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="size-4"/> ERP</span>
+     </div>
      {!owner&&loaded&&<WalletPersonalCategories key={`${person.id}:${activeCurrency}`} person={person} transactions={transactions} lang={lang}/>}
      <p className="flex items-start gap-1.5 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-xs leading-5 text-blue-950"><ShieldCheck className="mt-0.5 size-4 shrink-0"/>{t.bankNotice} {t.currencySafe}</p>
    </>}
