@@ -573,6 +573,25 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
         branch_id: branchId,
       };
 
+      // Prevent the common accidental duplicate when an invoice number is
+      // reused for the same supplier/branch. Keep existing ledger history intact.
+      // This is an early UX safeguard, not a replacement for DB idempotency.
+      const invoiceNumber = String(invoicePayload.invoice_number || '').trim();
+      if (!isEdit && !submissionRef.current.invoice && restaurantId && supplierId && branchId && invoiceNumber) {
+        const { data: existingInvoice, error: duplicateLookupError } = await supabase
+          .from('supplier_invoices')
+          .select('id, invoice_number')
+          .eq('restaurant_id', restaurantId)
+          .eq('supplier_id', supplierId)
+          .eq('branch_id', branchId)
+          .eq('invoice_number', invoiceNumber)
+          .limit(1);
+        if (duplicateLookupError) throw new Error('Could not verify the invoice number. Retry before saving; no new invoice was posted.');
+        if (existingInvoice?.length) {
+          throw new Error(`Invoice ${invoiceNumber} already exists for this supplier and branch. Open Supplier Ledger and review the existing invoice instead of posting a duplicate.`);
+        }
+      }
+
       const validPayments = isDraft ? [] : payments.filter(p => parseFloat(p.amount) > 0);
       const savedInvoice = await resumePurchaseSubmission({
         state: submissionRef.current,
