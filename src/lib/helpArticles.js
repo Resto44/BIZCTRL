@@ -1,5 +1,5 @@
 // Reviewed against the linked application source; update guides when workflows change.
-export const HELP_REVIEWED_AT = "2026-10-13";
+export const HELP_REVIEWED_AT = "2026-10-21";
 export const helpArticles = [
   {
     "id": "start",
@@ -1245,6 +1245,201 @@ export const helpArticles = [
           "رسیدن پیام به مقصد درست و صحت نام کسب‌وکار، شعبه و ارقام را تأیید کنید."
         ],
         "note": "مشخصات محرمانه بات را محفوظ نگه دارید. ذخیره اتصال ثابت نمی‌کند پیام‌ها می‌رسند؛ اول نتیجه آزمایش را ببینید."
+      }
+    }
+  },
+  {
+    "id": "wallet-enrollment",
+    "category": "money",
+    "roles": [
+      "owner"
+    ],
+    "route": "/sponsor-treasury",
+    "source": "src/components/settlement/PeopleMemberships.jsx",
+    "content": {
+      "en": {
+        "title": "Wallet: invite users and approve accounts",
+        "steps": [
+          "Open Finance & Treasury → Accounts & Wallet as the owner. Choose Beneficiaries and open Membership requests and approvals; create or copy the wallet registration link and share it privately with the intended person.",
+          "The recipient opens /wallet-portal, signs up or signs in, confirms their email and submits a membership request. Review the pending request, verified identity and intended account category.",
+          "Approve the request with the appropriate partner, manager or employee category, branch if applicable, and submission/transfer permissions. Return to Beneficiaries to confirm the person's linked, active wallet."
+        ],
+        "note": "An invitation or registered login alone does not authorize financial access. Only approve known people and grant the minimum permissions needed; never share the owner's login."
+      },
+      "ar": {
+        "title": "المحفظة: دعوة المستخدمين واعتماد حساباتهم",
+        "steps": [
+          "بصفتك المالك افتح المالية والخزينة ← الحسابات والمحفظة، ثم المستفيدون ← طلبات العضوية والموافقة. أنشئ رابط التسجيل أو انسخه وأرسله للشخص المقصود بشكل خاص.",
+          "يفتح المستفيد /wallet-portal ويسجّل حساباً أو يدخل بحسابه، ويؤكد البريد الإلكتروني ثم يرسل طلب العضوية. راجع الطلب وهوية الشخص وفئة الحساب المناسبة.",
+          "وافق مع تحديد فئة شريك أو مدير أو موظف، والفرع عند الحاجة، وصلاحيات إرسال الطلبات والتحويلات. ارجع إلى المستفيدين وتأكد من ربط المحفظة وتفعيلها."
+        ],
+        "note": "الرابط أو إنشاء حساب دخول لا يمنح صلاحيات مالية تلقائياً. اعتمد الأشخاص المعروفين فقط ولا تشارك حساب المالك مع أحد."
+      },
+      "fa": {
+        "title": "والت: دعوت کاربر و تأیید حساب",
+        "steps": [
+          "با حساب اونر وارد Finance & Treasury ← Accounts & Wallet شوید. از Beneficiaries بخش درخواست‌های عضویت و تأیید را باز کنید؛ لینک ثبت‌نام والت را بسازید یا کاپی کنید و خصوصی برای شخص مربوط بفرستید.",
+          "مستفید لینک /wallet-portal را باز کند، حساب بسازد یا وارد شود، ایمیل را تأیید کند و درخواست عضویت بفرستد. درخواست منتظر و هویت شخص را بررسی کنید.",
+          "درخواست را با دسته حساب شریک، مدیر یا کارمند، شعبه در صورت نیاز و صلاحیت‌های مناسب تأیید کنید. به Beneficiaries برگردید و فعال بودن والت وصل‌شده را بررسی کنید."
+        ],
+        "note": "لینک دعوت یا ثبت‌نام به‌تنهایی مجوز مالی نمی‌دهد. تنها افراد شناخته‌شده را با حداقل صلاحیت لازم تأیید کنید و حساب اونر را شریک نسازید."
+      }
+    }
+  },
+  {
+    "id": "wallet-user-transfer",
+    "category": "money",
+    "roles": [
+      "manager",
+      "employee"
+    ],
+    "route": "/wallet-portal",
+    "source": "src/components/wallet-banking/WalletBankingCenter.jsx",
+    "content": {
+      "en": {
+        "title": "Wallet user: balance, request funds and return funds",
+        "steps": [
+          "Open /wallet-portal with your verified, owner-approved wallet account. Check the person name, linked business, currency and Available Wallet Balance before taking action.",
+          "Use Receive to request funds from the owner, or Transfer to request returning funds to the business. Enter an amount, select an appropriate reason, add details if needed (required for Other) and submit once.",
+          "Find your request in Pending Transfers or Statement. The owner's approval is needed for requests you initiate; the wallet and Treasury balances change only after approval. Check the posted entry before submitting again."
+        ],
+        "note": "Receive and Transfer are requests for internal business funds, not external bank payments. Use the same currency and do not treat a pending request as available money."
+      },
+      "ar": {
+        "title": "المستفيد: الرصيد وطلب الاستلام وإرجاع الأموال",
+        "steps": [
+          "افتح /wallet-portal بحساب المحفظة الذي اعتمده المالك. راجع اسم المستفيد والمنشأة والعملة والرصيد المتاح قبل أي عملية.",
+          "اختر استلام لطلب تمويل من المالك، أو تحويل لطلب إعادة أموال المحفظة للمنشأة. أدخل المبلغ وحدد السبب من القائمة وأضف التفاصيل؛ خيار أخرى يتطلب توضيحاً، ثم أرسل الطلب مرة واحدة.",
+          "تابع الطلب في التحويلات المعلقة أو كشف الحساب. الطلب الصادر منك يحتاج موافقة المالك، ولا يتغير رصيد المحفظة والخزينة حتى اعتماد المعاملة. راجع السجل قبل التكرار."
+        ],
+        "note": "الاستلام والتحويل طلبات داخلية وليست حوالات بنكية خارجية. لا تعتبر المبلغ المعلق رصيداً متاحاً، وتحقق من تطابق العملة."
+      },
+      "fa": {
+        "title": "کاربر والت: موجودی، درخواست دریافت و برگشت پول",
+        "steps": [
+          "با حساب والت تأییدشده توسط اونر وارد /wallet-portal شوید. نام مستفید، نام کسب‌وکار، ارز و Available Wallet Balance را پیش از معامله بررسی کنید.",
+          "برای درخواست پول از اونر Receive و برای برگشت پول به کسب‌وکار Transfer را بزنید. مبلغ، دلیل مناسب از منوی انتخاب و توضیحات را درج کنید؛ برای Other توضیح الزامی است. درخواست را یک‌بار ارسال کنید.",
+          "درخواست را در Pending Transfers یا Statement پیگیری کنید. درخواست کاربر تا تأیید اونر موجودی والت و خزانه را تغییر نمی‌دهد. قبل از ارسال دوباره، رکورد ثبت‌شده را بررسی کنید."
+        ],
+        "note": "Receive و Transfer انتقال بانکی واقعی نیستند؛ درخواست انتقال داخلی پول کسب‌وکار هستند. موجودی منتظر تأیید را پول قابل مصرف حساب نکنید و ارز را یکسان نگه دارید."
+      }
+    }
+  },
+  {
+    "id": "wallet-owner-transfers",
+    "category": "money",
+    "roles": [
+      "owner"
+    ],
+    "route": "/sponsor-treasury",
+    "source": "src/components/wallet-banking/OwnerWalletDashboard.jsx",
+    "content": {
+      "en": {
+        "title": "Owner wallet: fund, receive and review transfers",
+        "steps": [
+          "In Finance & Treasury → Accounts & Wallet, open Owner wallet dashboard. Review available owner Treasury, beneficiary balances and Pending requests for the selected currency.",
+          "To pay a beneficiary or receive funds back, select Pay beneficiary or Receive from beneficiary. Choose the person, matching-currency Treasury account, amount and reason/details; review and send for beneficiary approval.",
+          "Owner-created requests remain pending until the beneficiary approves or rejects them. For beneficiary-created requests, open a pending item in Transaction history, select the eligible Treasury account when approving, enter a review reason of at least eight characters and Approve & post or Reject."
+        ],
+        "note": "Do not confuse a request with a posted transaction. Rejections and pending requests change no balance. Wallet transfers are internal settlements and do not create sales, expenses, payroll or personal debt."
+      },
+      "ar": {
+        "title": "محفظة المالك: التمويل والاستلام ومراجعة التحويلات",
+        "steps": [
+          "من المالية والخزينة ← الحسابات والمحفظة افتح لوحة محفظة المالك. راجع خزينة المالك المتاحة وأرصدة المستفيدين والطلبات المعلقة للعملة المختارة.",
+          "اختر دفع للمستفيد أو استلام من المستفيد، ثم حدد الشخص وحساب الخزينة بنفس العملة والمبلغ والسبب والتفاصيل. راجع البيانات وأرسل طلب التحويل لموافقة المستفيد.",
+          "طلب المالك يبقى معلقاً حتى موافقة المستفيد أو رفضه. أما طلب المستفيد فافتحه من سجل المعاملات؛ عند الموافقة اختر حساب الخزينة المناسب واكتب سبب مراجعة لا يقل عن ٨ أحرف، ثم اعتماد وترحيل أو رفض."
+        ],
+        "note": "الطلب المعلق أو المرفوض لا يغيّر الرصيد. التحويلات الداخلية ليست مبيعات أو مصروفات أو رواتب أو ديوناً شخصية، ولا ينبغي تسجيلها مرة أخرى في تلك الأقسام."
+      },
+      "fa": {
+        "title": "والت اونر: تمویل، دریافت و تأیید انتقال‌ها",
+        "steps": [
+          "از Finance & Treasury ← Accounts & Wallet داشبورد والت اونر را باز کنید. موجودی قابل‌استفاده خزانه، مانده والت مستفیدان و درخواست‌های منتظر را با ارز انتخابی بررسی کنید.",
+          "برای پرداخت به مستفید یا دریافت پول از او، Pay beneficiary یا Receive from beneficiary را انتخاب کنید. شخص، حساب خزانه با همان ارز، مبلغ، دلیل و توضیحات را درج کنید و پس از بررسی برای تأیید مستفید بفرستید.",
+          "درخواست ساخته‌شده توسط اونر تا قبول یا رد مستفید منتظر می‌ماند. برای درخواست ساخته‌شده توسط مستفید، از تاریخچه درخواست منتظر را باز، حساب خزانه مناسب را انتخاب و دلیل بررسی حداقل ۸ حرف بنویسید؛ سپس Approve & post یا Reject را بزنید."
+        ],
+        "note": "درخواست منتظر یا ردشده موجودی را تغییر نمی‌دهد. انتقال والت معامله داخلی است و فروش، مصرف، معاش یا قرض شخصی نمی‌سازد؛ در ماژول‌های دیگر دوباره ثبتش نکنید."
+      }
+    }
+  },
+  {
+    "id": "wallet-history-analytics",
+    "category": "money",
+    "roles": [
+      "owner",
+      "manager",
+      "employee"
+    ],
+    "route": "/wallet-portal",
+    "source": "src/components/wallet-banking/WalletBankingCenter.jsx",
+    "content": {
+      "en": {
+        "title": "Wallet statement, transaction history and analytics",
+        "steps": [
+          "In your wallet, choose Statement to inspect transfers and their Pending, Posted or Rejected status. Posted entries show money in/out and the recorded balance after each transfer; pending and rejected requests do not change the balance.",
+          "Open Wallet Trend / analytics, choose the available date range and currency, and review opening balance, incoming/outgoing totals and closing balance. Do not combine different currencies.",
+          "Personal wallet holders can create private categories and attach them to recent entries. Owners instead use Owner wallet dashboard → Transaction history to search by name, month and Incoming/Outgoing/Pending filters, and expand daily entries."
+        ],
+        "note": "Personal tags only organize your view: they do not change ledger entries or appear in the owner's private-tag view. For an owner-specific history, use Accounts & Wallet rather than the personal portal."
+      },
+      "ar": {
+        "title": "كشف المحفظة وسجل الحركات والتحليلات",
+        "steps": [
+          "من المحفظة افتح كشف الحساب لمراجعة حالات الطلب: معلق أو مرحّل أو مرفوض. تظهر الحركات المرحّلة بإشارة الدخول أو الخروج والرصيد بعد الحركة؛ لا يتغير الرصيد للطلبات المعلقة أو المرفوضة.",
+          "افتح اتجاهات المحفظة أو التحليلات وحدد نطاق التاريخ والعملة لمراجعة الرصيد الافتتاحي والتحويلات الواردة والصادرة والرصيد الختامي. لا تجمع عملات مختلفة.",
+          "يمكن لصاحب المحفظة إنشاء تصنيفات شخصية خاصة وربطها بالمعاملات الحديثة. أما المالك فيستخدم لوحة المالك ← سجل المعاملات للبحث بالاسم والشهر والفلترة بحسب الوارد والصادر والمعلق وفتح التفاصيل اليومية."
+        ],
+        "note": "التصنيفات الشخصية للتنظيم فقط ولا تغيّر القيود المالية ولا تظهر للمالك. سجل المالك الكامل داخل الحسابات والمحفظة، وليس بوابة المستفيد."
+      },
+      "fa": {
+        "title": "صورت‌حساب، تاریخچه و ترند انالیتیکس والت",
+        "steps": [
+          "در والت Statement را باز کنید و حالت معامله را ببینید: Pending، Posted یا Rejected. معامله ثبت قطعی مبلغ ورودی/خروجی و موجودی بعد از انتقال را نشان می‌دهد؛ درخواست منتظر یا ردشده موجودی را تغییر نمی‌دهد.",
+          "Wallet Trend یا Analytics را باز کنید، بازه تاریخ و ارز را انتخاب و موجودی آغاز، مجموع ورودی، مجموع خروجی و مانده پایان دوره را بررسی کنید. ارزهای مختلف را باهم جمع نکنید.",
+          "صاحب والت می‌تواند دسته‌بندی شخصی بسازد و به تراکنش‌های اخیر وصل کند. اونر از Owner wallet dashboard ← Transaction history برای فیلتر ماه، نام شخص، ورودی، خروجی و منتظر و مشاهده جزئیات هر روز استفاده کند."
+        ],
+        "note": "دسته‌بندی شخصی فقط برای تنظیم نمایش است؛ رکورد مالی را تغییر نمی‌دهد و برای اونر قابل دیدن نیست. تاریخچه مخصوص اونر در Accounts & Wallet است."
+      }
+    }
+  },
+  {
+    "id": "wallet-notifications",
+    "category": "money",
+    "roles": [
+      "owner",
+      "manager",
+      "employee"
+    ],
+    "route": "/wallet-portal",
+    "source": "src/components/wallet-banking/WalletPushSettings.jsx",
+    "content": {
+      "en": {
+        "title": "Wallet alerts, approval links and iPhone push",
+        "steps": [
+          "Open the wallet bell to see recent pending, posted and rejected transfers. Selecting an alert opens the related transaction or approval form; opening it does not approve the transfer.",
+          "To receive device push alerts, open Wallet push notifications and tap Enable notifications. On iPhone, first add BizCTRL to the Home Screen and launch it from its icon, then allow notifications in device settings.",
+          "Use Send test to check the device. Transfer alerts before approval and results after approval/rejection follow the selected app language. If no alert arrives, verify device permission, wallet account, network connection and open the pending list directly."
+        ],
+        "note": "The in-app bell shows only recent wallet activity and its read state may reset when you reload. Device push delivery depends on browser/OS support; always confirm transaction status in the wallet itself."
+      },
+      "ar": {
+        "title": "تنبيهات المحفظة وروابط الموافقة وإشعارات آيفون",
+        "steps": [
+          "افتح جرس المحفظة لمراجعة التحويلات الحديثة المعلقة والمرحلة والمرفوضة. الضغط على التنبيه يفتح المعاملة أو شاشة الموافقة المقصودة دون اعتمادها تلقائياً.",
+          "لتفعيل الإشعارات على الجهاز افتح إشعارات المحفظة الفورية واضغط تفعيل الإشعارات. على آيفون أضف BizCTRL للشاشة الرئيسية وافتحه من أيقونته، ثم اسمح بالإشعارات من إعدادات الجهاز.",
+          "استخدم إرسال اختبار لفحص الجهاز. تنبيهات ما قبل الموافقة ونتائج الموافقة أو الرفض تتبع لغة التطبيق. إذا لم تصل، راجع إذن الجهاز والحساب والاتصال وافتح الطلبات المعلقة مباشرة."
+        ],
+        "note": "جرس التطبيق يعرض أحدث المعاملات فقط وقد يعيد تعيين حالة القراءة عند إعادة التحميل. وصول الإشعارات يعتمد على الجهاز والمتصفح؛ تحقق دائماً من حالة المعاملة داخل المحفظة."
+      },
+      "fa": {
+        "title": "اعلان والت، لینک تأیید و پوش نوتیفیکیشن آیفون",
+        "steps": [
+          "زنگوله والت را باز کنید تا درخواست‌های منتظر، ثبت قطعی و ردشده را ببینید. با کلیک روی اعلان، همان معامله یا فورم تأیید باز می‌شود؛ بازکردن اعلان به معنی تأیید معامله نیست.",
+          "برای پوش نوتیفیکیشن، Wallet push notifications را باز و Enable notifications را بزنید. در آیفون نخست BizCTRL را به Home Screen اضافه کنید، از آیکون آن باز کنید و اجازه اعلان را در تنظیمات دستگاه فعال سازید.",
+          "با Send test اعلان آزمایشی بفرستید. اعلان قبل از تأیید و نتیجه قبول/رد مطابق زبان برنامه است. اگر نرسید، اجازه دستگاه، حساب والت و اینترنت را بررسی و لیست درخواست‌های منتظر را مستقیم باز کنید."
+        ],
+        "note": "زنگوله فقط فعالیت‌های اخیر والت را نشان می‌دهد و وضعیت خوانده‌شدن ممکن است پس از رفرش پاک شود. پوش به پشتیبانی دستگاه و مرورگر وابسته است؛ حالت واقعی معامله را همیشه داخل والت تأیید کنید."
       }
     }
   }
