@@ -13,7 +13,7 @@ describe('Wallet Banking Center mobile progressive disclosure',()=>{
   expect(owner).toContain("eq('is_active',true)");
   expect(owner).toContain("not('user_id','is',null)");
   expect(owner).toContain("person=query.data?.find(p=>p.id===selected)");
-  expect(owner).toContain('<WalletBankingCenter key={person.id} owner person={person}');
+  expect(owner).toContain('<WalletBankingCenter key={`${activeRestaurantId}:${person.id}`} owner person={person}');
   expect(owner).toContain('PeopleMemberships');
   expect(wrapper).toContain("role==='owner'");
   expect(wrapper).not.toContain('SponsorOwnerBilateralLedger');

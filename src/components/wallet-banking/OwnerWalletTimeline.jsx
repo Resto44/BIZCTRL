@@ -39,14 +39,14 @@ export default function OwnerWalletTimeline({tenant,currency,lang,t,money,onOpen
       <span className={`z-10 grid size-9 shrink-0 place-items-center rounded-full ${iconBg} ${color}`}><Icon aria-hidden="true" className="size-5"/></span>
       <span className="min-w-0 flex-1">
        <span className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5"><b dir="auto" className="break-words text-sm font-black text-slate-950">{r.person_name}</b><strong dir="ltr" className={`whitespace-nowrap text-sm font-black tabular-nums ${color}`}>{posted?(incoming?'+':'−'):''}{money(r.amount)}</strong></span>
-       <span className="mt-0.5 block text-[11px] leading-5 text-slate-500">{incoming?c.incoming:c.outgoing} · {t[r.status]||c.pending} · {new Date(r.activity_at).toLocaleTimeString(locale,{timeZone:timezone,hour:'2-digit',minute:'2-digit'})}</span>
+       <span className="mt-0.5 block text-[11px] leading-5 text-slate-500">{incoming?c.incoming:c.outgoing} · {r.status==='pending'&&r.initiated_by_owner?t.userPending:t[r.status]||c.pending} · {new Date(r.activity_at).toLocaleTimeString(locale,{timeZone:timezone,hour:'2-digit',minute:'2-digit'})}</span>
        <span className="block text-[11px] leading-5 text-slate-600">{posted?<>{c.balance}: <span dir="ltr" className="inline-block font-semibold tabular-nums text-slate-800"><span className="sr-only">{c.before} </span>{r.balance_before==null?'—':money(r.balance_before)} → <span className="sr-only">{c.after} </span>{r.balance_after==null?'—':money(r.balance_after)}</span></>:c.unchanged}</span>
       </span>
       {isOpen?<ChevronDown aria-hidden="true" className="mt-1 size-4 shrink-0 text-slate-400"/>:<ChevronRight aria-hidden="true" className="mt-1 size-4 shrink-0 text-slate-400 rtl:rotate-180"/>}
      </button>
      {isOpen&&<div id={`owner-history-${r.id}`} className="ms-11 mb-2 space-y-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
       <p>{r.initiated_by_owner?t.owner:t.request}</p>{r.note&&<p dir="auto" className="break-words">{r.note}</p>}{r.account_name&&<p>{t.account}: <b dir="auto">{r.account_name}</b></p>}{r.review_note&&<p dir="auto" className="break-words">{r.review_note}</p>}
-      {r.is_active&&<button type="button" disabled={busy} className="min-h-10 text-sm font-bold text-blue-700 disabled:opacity-50" onClick={()=>r.status==='pending'?onReview(r):onOpenWallet(r.person_id)}>{r.status==='pending'?t.review:t.open}</button>}
+      {r.is_active&&<button type="button" disabled={busy} className="min-h-10 text-sm font-bold text-blue-700 disabled:opacity-50" onClick={()=>r.status==='pending'&&!r.initiated_by_owner?onReview(r):onOpenWallet(r.person_id)}>{r.status==='pending'&&!r.initiated_by_owner?t.review:t.open}</button>}
       {renderReview(r)}
      </div>}
     </article>;

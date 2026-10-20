@@ -62,7 +62,8 @@ describe('personal Banking Wallet replaces old partner loan portal',()=>{
   state.lang=lang;await mount();
   const title={fa:'مرکز بانکداری والت',ar:'مركز المحفظة البنكية',en:'Wallet Banking Center'}[lang];
   expect(host.textContent).toContain(title);
-  expect(host.textContent).toContain(person.account_reference);
+  expect(host.querySelector('[title="'+person.account_reference+'"]')).not.toBeNull();
+  expect(host.textContent).toContain('WLT-1111…1111');
   expect(host.textContent).toContain(person.business);
   expect(host.textContent).toContain(person.name);
   expect(host.textContent).toContain('SAR');
@@ -84,6 +85,13 @@ describe('personal Banking Wallet replaces old partner loan portal',()=>{
   expect(host.textContent).toContain('20.00');
   expect(host.textContent).toContain('120.00');
   expect(state.rpc).not.toHaveBeenCalledWith('erp_confirm_partner_transaction',expect.anything());
+ });
+ it('keeps the wallet usable when category data is null',async()=>{
+  state.lang='en';await mount();
+  for(let i=0;i<10;i++)await act(async()=>{await new Promise(r=>setTimeout(r,10));});
+  expect(host.textContent).toContain('Personal categories');
+  expect(host.textContent).toContain('Unable to load or save');
+  expect(host.textContent).toContain('Available Wallet Balance');
  });
  it('never mounts loan/custody legacy transaction controls in a verified wallet',async()=>{
   await mount();

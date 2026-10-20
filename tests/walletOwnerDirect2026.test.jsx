@@ -25,25 +25,25 @@ async function fill(tree,amount='20'){
  tree.root.findByType('textarea').props.onChange({target:{value:'Operational funding'}});
  });}
 describe('Owner direct wallet UI',()=>{
- it('separates treasury and wallet totals and only posts after explicit review and confirmation',async()=>{
+ it('separates treasury and wallet totals and only submits a pending request after explicit review and confirmation',async()=>{
  const {tree,client}=await mount();expect(text(tree.root)).toContain('100.00 SAR');expect(text(tree.root)).toContain('30.00 SAR');
  await fill(tree);expect(rpc.mock.calls.filter(c=>c[0]==='erp_bank_wallet_owner_transfer')).toHaveLength(0);
  await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));
- expect(text(tree.root)).toContain('Treasury after: 80.00 SAR');expect(text(tree.root)).toContain('Balance after: 50.00 SAR');
- await act(async()=>button(tree,'Confirm & post').props.onClick());
+ expect(text(tree.root)).toContain('Treasury after approval: 80.00 SAR');expect(text(tree.root)).toContain('Balance after approval: 50.00 SAR');
+ await act(async()=>button(tree,'Send for beneficiary approval').props.onClick());
  expect(rpc).toHaveBeenCalledWith('erp_bank_wallet_owner_transfer',expect.objectContaining({p_kind:'fund_wallet',p_person:'person',p_amount:20,p_treasury_account:'cash',p_currency:'SAR'}));
- expect(text(tree.root)).toContain('Transaction posted');tree.unmount();client.clear();
+ expect(text(tree.root)).toContain('Request sent');tree.unmount();client.clear();
  });
  it('receives against beneficiary funds and blocks overdrawing that wallet',async()=>{
  const {tree,client}=await mount({kind:'return_to_owner'});await fill(tree,'31');expect(button(tree,'Review transaction').props.disabled).toBe(true);
  await fill(tree,'10');await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));
- expect(text(tree.root)).toContain('Treasury after: 110.00 SAR');expect(text(tree.root)).toContain('Balance after: 20.00 SAR');
- await act(async()=>button(tree,'Confirm & post').props.onClick());expect(rpc).toHaveBeenCalledWith('erp_bank_wallet_owner_transfer',expect.objectContaining({p_kind:'return_to_owner',p_amount:10}));tree.unmount();client.clear();
+ expect(text(tree.root)).toContain('Treasury after approval: 110.00 SAR');expect(text(tree.root)).toContain('Balance after approval: 20.00 SAR');
+ await act(async()=>button(tree,'Send for beneficiary approval').props.onClick());expect(rpc).toHaveBeenCalledWith('erp_bank_wallet_owner_transfer',expect.objectContaining({p_kind:'return_to_owner',p_amount:10}));tree.unmount();client.clear();
  });
  it('reuses the exact idempotency key after transport failure',async()=>{
  const {tree,client}=await mount({fail:true});await fill(tree);await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));
- await act(async()=>button(tree,'Confirm & post').props.onClick());expect(text(tree.root)).toContain('Posting could not be confirmed');
- await act(async()=>button(tree,'Confirm & post').props.onClick());const calls=rpc.mock.calls.filter(c=>c[0]==='erp_bank_wallet_owner_transfer');expect(calls).toHaveLength(2);expect(calls[0][1]).toEqual(calls[1][1]);tree.unmount();client.clear();
+ await act(async()=>button(tree,'Send for beneficiary approval').props.onClick());expect(text(tree.root)).toContain('Request submission could not be confirmed');
+ await act(async()=>button(tree,'Send for beneficiary approval').props.onClick());const calls=rpc.mock.calls.filter(c=>c[0]==='erp_bank_wallet_owner_transfer');expect(calls).toHaveLength(2);expect(calls[0][1]).toEqual(calls[1][1]);tree.unmount();client.clear();
  });
  it('reviews an exact pending record from owner history without creating another transfer',async()=>{
  const {tree,client}=await mount({kind:null,pending:true});

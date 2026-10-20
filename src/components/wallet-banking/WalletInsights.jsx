@@ -27,8 +27,8 @@ export function WalletPersonalCategories({person,transactions,lang}){
  const t=walletCopy[lang]||walletCopy.en,client=useQueryClient();
  const [name,setName]=useState(''),[editing,setEditing]=useState(null),[transaction,setTransaction]=useState(''),[category,setCategory]=useState(''),[notice,setNotice]=useState('');
  const key=['erp-wallet-personal',person.id];
- const query=useQuery({queryKey:key,queryFn:async()=>{const {data,error}=await supabase.rpc('erp_wallet_personal_labels',{p_person:person.id});if(error)throw error;return data;}});
- const mutation=useMutation({mutationFn:async payload=>{const {data,error}=await supabase.rpc('erp_wallet_personal_labels',{p_person:person.id,...payload});if(error)throw error;return data;},onSuccess:(data,variables)=>{client.setQueryData(key,data);setNotice(t.saved);if(variables.p_action==='save'){setName('');setEditing(null);}},onError:()=>setNotice(t.error)});
+ const query=useQuery({queryKey:key,queryFn:async()=>{const {data,error}=await supabase.rpc('erp_wallet_personal_labels',{p_person:person.id});if(error)throw error;if(!Array.isArray(data?.categories)||!data?.tags||typeof data.tags!=='object')throw Error('INVALID_PERSONAL_LABELS');return data;}});
+ const mutation=useMutation({mutationFn:async payload=>{const {data,error}=await supabase.rpc('erp_wallet_personal_labels',{p_person:person.id,...payload});if(error)throw error;if(!Array.isArray(data?.categories)||!data?.tags||typeof data.tags!=='object')throw Error('INVALID_PERSONAL_LABELS');return data;},onSuccess:(data,variables)=>{client.setQueryData(key,data);setNotice(t.saved);if(variables.p_action==='save'){setName('');setEditing(null);}},onError:()=>setNotice(t.error)});
  return <section className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
  <h2 className="text-lg font-black">{t.categories}</h2><p className="text-xs leading-5 text-slate-500">{t.private}</p>
  {query.isPending?<p>{t.loading}</p>:query.isError?<p role="alert">{t.error} <Button onClick={()=>query.refetch()}>{t.retry}</Button></p>:<>
