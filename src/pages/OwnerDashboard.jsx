@@ -277,7 +277,7 @@ function OwnerDashboardContent() {
   const customerDebtsQuery = useQuery({ queryKey: ['debts_customer_dash', activeRestaurant?.id, selectedBranchId], queryFn: () => fetchBranchScopedRows('debt_records', { legacyColumn: 'branch', filters: { type: 'receivable', party_type: 'customer' }, limit: 2000 }), staleTime: 30000, enabled });
   const inventoryQuery = useQuery({ queryKey: ['inventory_dash', activeRestaurant?.id, selectedBranchId], queryFn: () => fetchBranchScopedRows('inventory', { legacyColumn: 'branch', orderColumn: 'product_name', ascending: true, limit: 5000 }), staleTime: 60000, enabled });
   const productsQuery = useQuery({ queryKey: ['products', activeRestaurant?.id], queryFn: () => base44.entities.Product.filter({ restaurant_id: activeRestaurant.id }, 'name', 5000), staleTime: 60000, enabled });
-  const inventoryTransactionsQuery = useQuery({ queryKey: ['inventory_transactions_report', activeRestaurant?.id, selectedBranchId, period.currentStartIso, period.currentEndIso], queryFn: fetchInventoryTransactions, staleTime: 15000, enabled });
+  const inventoryTransactionsQuery = useQuery({ queryKey: ['inventory_transactions_report', activeRestaurant?.id, selectedBranchId, period.currentStartIso, period.currentEndIso], queryFn: fetchInventoryTransactions, staleTime: 15000, enabled: enabled && activePage === 'operations' });
   const priceHistoryQuery = useQuery({
     queryKey: ['product_price_history', activeRestaurant?.id, selectedBranchId, period.currentStartIso, period.currentEndIso],
     queryFn: async () => {
@@ -289,7 +289,7 @@ function OwnerDashboardContent() {
       return data || [];
     },
     staleTime: 30000,
-    enabled: Boolean(createdBy),
+    enabled: Boolean(createdBy) && activePage === 'price-control',
   });
 
   const periodSales = periodSalesQuery.data || [];
