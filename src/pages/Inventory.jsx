@@ -122,12 +122,18 @@ export default function Inventory() {
       const updatedLiveStock = computeLiveStock([res], [], []);
       const item = updatedLiveStock[0];
       if (item && item.currentStock <= item.low_stock_threshold) {
-        await notif.lowStock({
-          branch: res.branch,
-          productName: res.product_name,
-          currentQty: item.currentStock,
-          unit: res.unit
-        });
+        // Stock is already committed. A notification failure must not
+        // make the UI report that the database write failed.
+        try {
+          await notif.lowStock({
+            branch: res.branch,
+            productName: res.product_name,
+            currentQty: item.currentStock,
+            unit: res.unit,
+          });
+        } catch (notificationError) {
+          console.warn('[Inventory] Stock saved, low-stock notification failed:', notificationError);
+        }
       }
       return res;
     },
