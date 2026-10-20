@@ -1478,6 +1478,45 @@ export const helpArticles = [
         "note": "از نگاه خزانه اونر، تمویل مستفید خروج پول و برگشت او ورود پول است. Pending و Rejected موجودی را تغییر نمی‌دهند؛ پیش از تکرار معامله، تاریخچه را بررسی کنید."
       }
     }
+  },
+  {
+    "id": "ai-copilot-erp",
+    "category": "reports",
+    "roles": [
+      "owner",
+      "manager"
+    ],
+    "route": "/ai-copilot",
+    "source": "src/pages/AIBusinessCopilot.jsx",
+    "content": {
+      "en": {
+        "title": "AI Copilot: ask about real ERP records and troubleshoot modules",
+        "steps": [
+          "From the Owner dashboard, open AI Copilot in Quick Actions. Other authorized users can open AI Copilot from their available navigation. The assistant uses the selected business and permitted branch scope.",
+          "Ask specific questions about sales, purchases, expense records, inventory snapshots, supplier invoices, customer receivables, role access or how to use modules. Choose a suggested question or type your own; check the date, currency and source limitations stated in the answer.",
+          "For a problem, share the module, action, exact error and selected branch. Follow the suggested Help Center page and verify the result in the real module. An optional expense draft is never posted until you explicitly confirm it."
+        ],
+        "note": "AI Copilot cannot see every screen or every ERP table and cannot independently edit code or fix production bugs. Only authorized read tools return business values. Recorded inventory snapshots may differ from live stock; large queries may be partial. Never share passwords, API keys or sensitive customer details in chat."
+      },
+      "ar": {
+        "title": "المساعد الذكي: بيانات ERP الحقيقية وحل مشكلات الوحدات",
+        "steps": [
+          "من لوحة المالك افتح المساعد الذكي في الإجراءات السريعة. يمكن للمستخدمين المصرح لهم فتحه من التنقل المتاح. يعمل المساعد ضمن المنشأة والفرع والصلاحيات المحددة.",
+          "اسأل عن المبيعات والمشتريات والمصروفات ولقطات المخزون وفواتير الموردين وديون العملاء والوصول للوحدات وخطوات استخدامها. اختر سؤالاً مقترحاً أو اكتب سؤالك، وراجع التاريخ والعملة وحدود البيانات في الجواب.",
+          "عند وجود عطل اذكر الوحدة والإجراء ونص الخطأ والفرع. استخدم رابط مركز المساعدة وتحقق من النتيجة في الوحدة الأصلية. مسودة المصروف لا تُسجل إلا بعد موافقتك الصريحة."
+        ],
+        "note": "المساعد لا يرى كل الشاشات ولا كل جداول ERP، ولا يصلح الكود أو أعطال الإنتاج تلقائياً. القراءات من الأدوات المصرح بها فقط. المخزون المسجل قد يختلف عن المتاح فعلياً وقد تكون نتائج البحث الكبيرة جزئية. لا ترسل كلمات مرور أو مفاتيح API أو بيانات حساسة في المحادثة."
+      },
+      "fa": {
+        "title": "AI Copilot: پرسش از رکوردهای واقعی ERP و راهنمای رفع خطا",
+        "steps": [
+          "در داشبورد اونر، AI Copilot را از Quick Actions باز کنید. کاربران دارای صلاحیت می‌توانند از منوی مجاز خود وارد شوند. کاپلوت تنها اطلاعات کسب‌وکار و شعبه مجاز را می‌خواند.",
+          "درباره فروش، خرید، مصرف، موجودی ثبت‌شده، فاکتور سپلایر، طلب مشتری، دسترسی ماژول‌ها و روش کار سؤال کنید. سؤال پیشنهادی انتخاب کنید یا بنویسید و تاریخ، ارز و محدودیت داده‌های جواب را بررسی کنید.",
+          "برای مشکل فنی، نام ماژول، عملیاتی که ناکام شد، متن دقیق خطا و شعبه را بنویسید. راهنمای Help Center را دنبال و نتیجه را در صفحه اصلی بررسی کنید. پیش‌نویس مصرف بدون تأیید روشن شما ثبت نمی‌شود."
+        ],
+        "note": "AI تمام صفحات و جدول‌های SaaS را مستقیم نمی‌بیند و نمی‌تواند خودسرانه کد یا باگ سرور را اصلاح کند. فقط ابزارهای داده مجاز پاسخ عددی می‌دهند؛ موجودی ثبت‌شده ممکن است با موجودی زنده فرق کند و نتایج بزرگ ممکن است کامل نباشند. رمز، کلید API و اطلاعات حساس مشتری را در گفتگو نفرستید."
+      }
+    }
   }
 ];
 
