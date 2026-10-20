@@ -75,7 +75,7 @@ const L={
  }
 };
 const num=(v,lang)=>new Intl.NumberFormat(lang==='ar'?'ar-SA':lang==='fa'?'fa-AF':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)||0);
-export default function WalletBankingCenter({person=null,owner=false,lang='en',onBeneficiaries,headerControl=null}){
+export default function WalletBankingCenter({person=null,owner=false,lang='en',onBeneficiaries,headerControl=null,onOwnerTransfer,initialCurrency='SAR'}){
  const t=L[lang]||L.en,extra=walletCopy[lang]||walletCopy.en,client=useQueryClient();
  const nt=notificationCopy[lang]||notificationCopy.en;
  const [notificationsOpen,setNotificationsOpen]=useState(false),[seen,setSeen]=useState(()=>new Set()),[focusedTransaction,setFocusedTransaction]=useState(null);
@@ -84,7 +84,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  const [actionVersion,setActionVersion]=useState(0),[pendingKind,setPendingKind]=useState(null);
  useEffect(()=>{if(actionVersion){actionRef.current?.scrollIntoView?.({behavior:'smooth',block:'start'});actionRef.current?.focus?.({preventScroll:true});}},[actionVersion]);
  const [reasonId,setReasonId]=useState('funding');
- const [currency,setCurrency]=useState('SAR'),[panel,setPanel]=useState('home'),[kind,setKind]=useState('fund_wallet');
+ const [currency,setCurrency]=useState(initialCurrency||'SAR'),[panel,setPanel]=useState('home'),[kind,setKind]=useState('fund_wallet');
  const [amount,setAmount]=useState(''),[note,setNote]=useState(''),[requestId,setRequestId]=useState(()=>crypto.randomUUID()),[reviewId,setReviewId]=useState(null),[reviewNote,setReviewNote]=useState(''),[treasuryId,setTreasuryId]=useState('');
  const [message,setMessage]=useState(''),[reviewError,setReviewError]=useState('');
  const query=useQuery({queryKey:['erp-bank-wallet',person?.id],enabled:!!person?.id,
@@ -94,7 +94,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
    if(!data||!Array.isArray(data.currencies)||!Array.isArray(data.transactions))throw Error('WALLET_INCOMPLETE_SNAPSHOT');
    return data;
   },staleTime:10000,refetchInterval:20000});
- const currencies=useMemo(()=>[...new Set(['SAR',...(query.data?.currencies||[]).map(x=>x.currency),...(query.data?.transactions||[]).map(x=>x.currency)])], [query.data]);
+ const currencies=useMemo(()=>[...new Set([initialCurrency||'SAR','SAR',...(query.data?.currencies||[]).map(x=>x.currency),...(query.data?.transactions||[]).map(x=>x.currency)])], [query.data,initialCurrency]);
  const activeCurrency=currencies.includes(currency)?currency:currencies[0]||'SAR';
  // Funding sources must use the same authoritative posted balance calculation
  // as the owner approval RPC; opening_balance alone is often zero in legacy data.
@@ -115,7 +115,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  const eligible=(accounts.data||[]).filter(x=>x.currency===activeCurrency);
  const selectedTreasury=eligible.find(x=>x.id===treasuryId);
  const sufficientForFunding=!!selectedRequest&&selectedRequest.kind!=='fund_wallet'||(!!selectedTreasury&&Number(selectedTreasury.available_balance)>=Number(selectedRequest?.amount));
- const invalidate=async()=>{await Promise.all([client.invalidateQueries({queryKey:['erp-bank-wallet',person?.id]}),client.invalidateQueries({queryKey:['erp-wallet-trend',person?.id]})]);};
+ const invalidate=async()=>{await Promise.all([client.invalidateQueries({queryKey:['erp-bank-wallet',person?.id]}),client.invalidateQueries({queryKey:['erp-wallet-trend',person?.id]}),client.invalidateQueries({queryKey:['erp-owner-wallet',person?.restaurant_id]})]);};
  const request=useMutation({mutationFn:async()=>{
    const raw=Number(amount);
    if(!/^(?:0|[1-9][0-9]{0,7})(?:\.[0-9]{1,2})?$/.test(amount)||!Number.isFinite(raw)||raw<=0||raw>10000000)throw Error('INVALID_AMOUNT');
@@ -137,6 +137,8 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  };
  const selectReview=r=>{setReviewId(r.id);setReviewNote('');setTreasuryId('');setReviewError('');setMessage('');setPanel('review');setActionVersion(v=>v+1);};
  const start=next=>{
+  if(owner&&onOwnerTransfer&&(next==='transfer'||next==='receive')){onOwnerTransfer(next==='transfer'?'fund_wallet':'return_to_owner',activeCurrency);return;}
+
   setFocusedTransaction(null);setMessage('');setReviewId(null);setPendingKind(null);setRequestId(crypto.randomUUID());
   if(next==='transfer'||next==='receive'){
    setKind(next==='transfer'?'return_to_owner':'fund_wallet');
