@@ -96,14 +96,26 @@ export default function Inventory() {
       
       // Live stock rows include computed display-only fields. Never send them
       // to the inventory table during an opening-balance reconciliation.
-      const { purchasedQty, wastedQty, currentStock, isLow, ...record } = data;
-      const res = editing
-        ? await base44.entities.Inventory.update(editing.id, record)
-        : await base44.entities.Inventory.create({
-          ...record,
-          restaurant_id: activeRestaurant?.id,
-          branch_id: data.branch_id || (selectedBranchId === 'all' ? null : selectedBranchId),
-        });
+      const { id, restaurant_id, created_at, updated_at, created_date, updated_date,
+        purchasedQty, wastedQty, currentStock, isLow, ...record } = data;
+      if (!activeRestaurant?.id) throw new Error('Restaurant is not selected');
+      const branchId = record.branch_id || branches.find(b => (b.key || b.branch_key) === record.branch)?.id || null;
+      if (!branchId) throw new Error('Select a valid branch before saving');
+      const payload = { ...record, branch_id: branchId };
+      // Avoid a singular response: a manager's RLS policy may hide the updated row.
+      // Check the affected row count explicitly rather than treating zero rows as success.
+      const query = editing
+        ? supabase.from('inventory').update(payload, { count: 'exact' })
+            .eq('id', editing.id).eq('restaurant_id', activeRestaurant.id)
+        : supabase.from('inventory').insert({
+            ...payload, restaurant_id: activeRestaurant.id,
+          }, { count: 'exact' });
+      const { data: savedRows, error, count } = await query.select('*');
+      if (error) throw error;
+      if (count !== 1 || savedRows?.length !== 1) {
+        throw new Error('Inventory save did not affect exactly one accessible row. Check branch permissions and record ID.');
+      }
+      const res = savedRows[0];
       
       // Check if current stock is low and notify
       const updatedLiveStock = computeLiveStock([res], [], []);
@@ -118,7 +130,7 @@ export default function Inventory() {
       }
       return res;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); closeForm(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); qc.invalidateQueries({ queryKey: ['inventory_dashboard'] }); closeForm(); },
     onError: (err) => {
       console.error('[Inventory] Save error:', err);
       alert(err.message || 'Failed to save inventory item');
