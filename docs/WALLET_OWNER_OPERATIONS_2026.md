@@ -14,3 +14,18 @@ The existing beneficiary view is retained as a tab. Its owner Transfer/Receive a
 - React tests: separate Treasury/wallet balances, explicit confirmation, both directions, insufficient funds/precision validation and same-key retry after transport error, plus existing wallet regressions.
 - Supabase advisors reviewed: wallet tables intentionally have no direct read policies; narrowly authorized SECURITY DEFINER RPCs are the only client access path. The corresponding advisor notices are expected for this architecture. See https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy .
 - Physical iPhone and a real user's authenticated transaction were not exercised. Synthetic financial test data was rolled back. Cross-module concurrent Treasury writers were not stress-tested; the new flow follows the existing Treasury row-lock convention.
+
+## Daily transaction timeline
+
+Owner history now uses compact date groups with expandable details, a month selector,
+name search and All / Incoming / Outgoing / Pending filters. Directions are from the
+owner Treasury perspective: posted funding is negative/outgoing; posted returns are
+positive/incoming. Pending and rejected requests have no signed movement or balance change.
+
+`erp_bank_wallet_owner_timeline` enforces owner and tenant access, computes full-ledger
+balances before filtering, and paginates 50 records. Month boundaries and day groups
+use the browser timezone. The overview remains independent of history filters.
+Migration: `20261020133549_wallet_owner_daily_timeline.sql`.
+
+Validated with rollback SQL assertions (filters, pagination, full-ledger balances,
+timezone and cross-tenant denial), 23 UI tests, targeted ESLint and production build.

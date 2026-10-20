@@ -10,6 +10,7 @@ const text=node=>typeof node==='string'?node:(node.children||[]).map(text).join(
 const button=(tree,label)=>tree.root.findAllByType('button').find(b=>text(b)===label);
 const snapshot={accounts:[{id:'cash',account_name:'Owner cash',available_balance:100}],people:[{id:'person',name:'Person',balance:30,is_active:true,linked:true,status:'active'}],summary:{wallet_balance:30,pending_count:0,pending_amount:0,funded:30,returned:0},transactions:[],total:0};
 async function mount({kind='fund_wallet',fail=false,pending=false}={}){rpc.mockReset();let calls=0;rpc.mockImplementation(async(name,args)=>{
+ if(name==='erp_bank_wallet_owner_timeline')return {data:{transactions:pending?[{id:'pending-1',person_id:'person',person_name:'Person',is_active:true,status:'pending',kind:'fund_wallet',amount:5,currency:'SAR',activity_at:'2026-10-20T12:00:00Z',activity_day:'2026-10-20',note:'Requested funding'}]:[],total:pending?1:0}};
  if(name==='erp_bank_wallet_owner_overview')return {data:pending?{...snapshot,transactions:[{id:'pending-1',person_id:'person',person_name:'Person',is_active:true,status:'pending',kind:'fund_wallet',amount:5,currency:'SAR',activity_at:'2026-10-20T12:00:00Z',note:'Requested funding'}],total:1}:snapshot};
  if(name==='erp_bank_wallet_owner_transfer'){calls++;if(fail&&calls===1)return {error:{message:'network timeout'}};return {data:args.p_request_id};}
  if(name==='erp_bank_wallet_review')return {data:args.p_request_id};
@@ -20,7 +21,7 @@ async function mount({kind='fund_wallet',fail=false,pending=false}={}){rpc.mockR
 async function fill(tree,amount='20'){
  await act(async()=>{
  tree.root.findAllByType('select').find(n=>n.props['aria-label']==='Treasury account').props.onChange({target:{value:'cash'}});
- tree.root.findByType('input').props.onChange({target:{value:amount}});
+ tree.root.findAllByType('input').find(n=>n.props.type==='number').props.onChange({target:{value:amount}});
  tree.root.findByType('textarea').props.onChange({target:{value:'Operational funding'}});
  });}
 describe('Owner direct wallet UI',()=>{
@@ -47,6 +48,7 @@ describe('Owner direct wallet UI',()=>{
  it('reviews an exact pending record from owner history without creating another transfer',async()=>{
  const {tree,client}=await mount({kind:null,pending:true});
  const row=tree.root.findByType('article');await act(async()=>row.findByType('button').props.onClick());
+ await act(async()=>button(tree,'Review transaction').props.onClick());
  await act(async()=>{row.findByType('select').props.onChange({target:{value:'cash'}});row.findByType('textarea').props.onChange({target:{value:'Approved owner review'}});});
  await act(async()=>button(tree,'Approve & post').props.onClick());
  expect(rpc).toHaveBeenCalledWith('erp_bank_wallet_review',{p_request_id:'pending-1',p_approve:true,p_treasury_account:'cash',p_review_note:'Approved owner review'});

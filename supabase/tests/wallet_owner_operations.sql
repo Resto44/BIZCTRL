@@ -2,7 +2,7 @@ BEGIN;
 DO $test$
 DECLARE u uuid:=gen_random_uuid(); pu uuid:=gen_random_uuid(); outsider uuid:=gen_random_uuid(); tenant uuid; person uuid:=gen_random_uuid();
  cash uuid:=gen_random_uuid(); usd uuid:=gen_random_uuid(); tx uuid:=gen_random_uuid(); rtn uuid:=gen_random_uuid(); req uuid:=gen_random_uuid();
- snap jsonb; denied boolean; n integer;
+ snap jsonb; full_history jsonb; denied boolean; n integer;
 BEGIN
  INSERT INTO auth.users(id,email,email_confirmed_at,raw_user_meta_data) VALUES
  (u,'wallet-owner-qa-'||u||'@example.invalid',now(),'{"role":"owner","full_name":"QA","company_name":"Wallet rollback QA","branch_name":"QA","business_type":"services"}');
@@ -50,15 +50,34 @@ BEGIN
  SET LOCAL ROLE authenticated;
  snap:=public.erp_bank_wallet_owner_overview(tenant,'SAR','pending');
  ASSERT (snap->>'total')::int=1 AND (snap->'summary'->>'wallet_balance')::numeric=30,'pending affects balance';
+ snap:=public.erp_bank_wallet_owner_timeline(tenant,'SAR','pending');
+ ASSERT (snap->>'total')::int=1,'pending timeline count';
+ ASSERT snap->'transactions'->0->>'balance_after' IS NULL,'pending fabricated balance';
  PERFORM public.erp_bank_wallet_review(req,true,cash,'Approve beneficiary QA');
  SET CONSTRAINTS ALL IMMEDIATE;
  SET CONSTRAINTS ALL DEFERRED;
  snap:=public.erp_bank_wallet_owner_overview(tenant,'SAR');
  ASSERT (snap->'summary'->>'wallet_balance')::numeric=35,'review regression';
+ full_history:=public.erp_bank_wallet_owner_timeline(tenant,'SAR');
+ snap:=public.erp_bank_wallet_owner_timeline(tenant,'SAR','incoming',0,'','Asia/Riyadh','Wallet QA');
+ ASSERT (snap->>'total')::int=1,'incoming filter';
+ ASSERT snap->'transactions'->0->'balance_after'=(SELECT x->'balance_after' FROM jsonb_array_elements(full_history->'transactions')x WHERE x->>'id'=rtn::text),'filter corrupts running balance';
+ ASSERT (snap->'transactions'->0->>'balance_before')::numeric-(snap->'transactions'->0->>'balance_after')::numeric=10,'return balance delta';
+ ASSERT snap->'transactions'->0->>'activity_day'=to_char(now() AT TIME ZONE 'Asia/Riyadh','YYYY-MM-DD'),'local day mismatch';
+ snap:=public.erp_bank_wallet_owner_timeline(tenant,'SAR','outgoing');
+ ASSERT (snap->>'total')::int=2,'outgoing filter';
+ snap:=public.erp_bank_wallet_owner_timeline(tenant,'SAR','all',50);
+ ASSERT (snap->>'total')::int=3 AND jsonb_array_length(snap->'transactions')=0,'pagination count';
+ snap:=public.erp_bank_wallet_owner_timeline(tenant,'SAR','all',0,'1900-01');
+ ASSERT (snap->>'total')::int=0,'month filter';
  RESET ROLE;
  SELECT count(*) INTO n FROM public.erp_bank_wallet_postings WHERE restaurant_id=tenant;ASSERT n=6,'wrong double entry count';
  ASSERT (SELECT sum(signed_amount) FROM public.erp_bank_wallet_postings WHERE restaurant_id=tenant)=0,'unbalanced ledger';
  ASSERT NOT EXISTS(SELECT 1 FROM public.daily_sales WHERE restaurant_id=tenant::text),'wallet created sales';
+ PERFORM set_config('request.jwt.claims',jsonb_build_object('sub',outsider,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ denied:=false;BEGIN PERFORM public.erp_bank_wallet_owner_timeline(tenant,'SAR'); EXCEPTION WHEN insufficient_privilege THEN denied:=true; END;ASSERT denied,'timeline tenant leak';
+ RESET ROLE;
  ASSERT NOT has_function_privilege('anon','public.erp_bank_wallet_owner_transfer(uuid,text,numeric,text,uuid,uuid,text)','execute'),'anonymous grant';
 END $test$;
 ROLLBACK;
