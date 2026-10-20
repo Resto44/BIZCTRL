@@ -243,14 +243,15 @@ function OnboardingGate({ children }) {
   const needsOnboarding = isOwner && restaurants.length === 0;
   const onOnboardingPage = location.pathname === '/onboarding';
 
-  if (needsOnboarding && !onOnboardingPage) { window.location.replace('/onboarding'); return null; }
-  if (!needsOnboarding && onOnboardingPage) { window.location.replace('/owner-command-center'); return null; }
+  if (needsOnboarding && !onOnboardingPage) return <Navigate to="/onboarding" replace />;
+  if (!needsOnboarding && onOnboardingPage) return <Navigate to="/owner-command-center" replace />;
 
   return children;
 }
 
 // ── Role-based home redirect ──────────────────────────────────────────────────
 function RoleHomeRedirect() {
+  const navigate = useNavigate();
   const { role } = useRole();
   const { restaurants, loadingRestaurants } = useTenant();
   // Use ROLE_HOME directly — all roles now have explicit non-root paths
@@ -262,9 +263,9 @@ function RoleHomeRedirect() {
     const currentPath = window.location.pathname;
     // Redirect from root or auth to the role's home page
     if (currentPath === '/' || currentPath === '/auth' || currentPath === '/erp-login' || currentPath === '/dashboard') {
-      window.location.replace(home);
+      navigate(home, { replace: true });
     }
-  }, [home, loadingRestaurants, restaurants.length]);
+  }, [home, loadingRestaurants, navigate, restaurants.length]);
   return null;
 }
 
