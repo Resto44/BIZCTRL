@@ -40,6 +40,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { useTenant } from '@/lib/TenantContext';
+import {useLanguage} from '@/lib/LanguageContext';
+import {latestBranchDrawerCash} from '@/lib/executiveDrawerCash';
 import {
   TrendingUp, DollarSign, ShoppingCart, Package,
   Users, Clock, RefreshCw, BarChart3,
@@ -52,7 +54,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { formatCurrency } from '@/lib/helpers';
+
 
 // ─── Inline SVG icons not in lucide ──────────────────────────────────────────
 function ClipboardListIcon(props) {
@@ -162,6 +164,7 @@ function LowStockItem({ item }) {
 // ─── Main dashboard content ───────────────────────────────────────────────────
 function ManagerContent({ branchId, branchName, branchKey }) {
   const navigate = useNavigate();
+  const {lang,formatMoney} = useLanguage();
   const today     = format(new Date(), 'yyyy-MM-dd');
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
@@ -175,6 +178,33 @@ function ManagerContent({ branchId, branchName, branchKey }) {
     enabled: !!branchId,
     refetchInterval: 60000,
   });
+
+  // Financial flow (cash sales) is not drawer stock. Read the latest *finalized*
+  // physical count from the same daily_sales records trusted by Owner Dashboard.
+  // The latest record may be from an earlier date; UI labels it as last recorded,
+  // never real-time. Branch/RLS is scoped to the authenticated manager's assignment.
+  const {data: drawerClosings = [], isPending: drawerLoading, isError: drawerError, refetch: retryDrawer} = useQuery({
+    queryKey:['mgr-drawer-cash',branchId,today],
+    enabled:!!branchId,
+    queryFn:async()=>{
+      const {data,error}=await supabase.from('daily_sales')
+        .select('id,branch_id,date,business_date,closing_state,actual_cash,closing_cash,owner_cash_injection,finalized_at,updated_date')
+        .eq('branch_id',branchId).eq('closing_state','finalized').lte('date',today)
+        .order('date',{ascending:false}).order('finalized_at',{ascending:false})
+        .limit(50);
+      if(error)throw error;
+      return data||[];
+    },
+    staleTime:15000,refetchInterval:30000
+  });
+  const drawerCash=useMemo(()=>latestBranchDrawerCash(drawerClosings,today),[drawerClosings,today]);
+  const drawerCopy={
+    en:{title:'Cash remaining in drawer',current:'Latest recorded cash count today',past:'Last counted on',missing:'Not recorded yet',unavailable:'Unable to verify drawer cash',hint:'Physical count only · excludes owner cash handovers and sales totals',retry:'Retry'},
+    ar:{title:'النقد المتبقي في الصندوق',current:'آخر جرد نقدي مسجل اليوم',past:'آخر جرد بتاريخ',missing:'لم يُسجل بعد',unavailable:'تعذر التحقق من النقد المتبقي',hint:'جرد النقد الفعلي فقط، دون المبالغ المسلّمة للمالك أو إجمالي المبيعات',retry:'إعادة المحاولة'},
+    fa:{title:'پول باقی‌مانده در صندوق',current:'آخرین شمارش نقدی امروز',past:'آخرین شمارش به تاریخ',missing:'هنوز ثبت نشده',unavailable:'موجودی صندوق قابل‌تأیید نیست',hint:'فقط پول واقعاً شمارش‌شده؛ بدون جمع‌کردن تحویل اونر و فروش نقدی',retry:'تلاش دوباره'}
+  }[lang]||{
+    title:'Cash remaining in drawer',current:'Latest recorded cash count today',past:'Last counted on',missing:'Not recorded yet',unavailable:'Unable to verify drawer cash',hint:'Physical count only · excludes owner handovers and sales totals',retry:'Retry'
+  };
 
   const { data: yesterdaySales = [], isError: yesterdaySalesError, refetch: retryYesterdaySales, isLoading: yesterdaySalesLoading } = useQuery({
     queryKey: ['mgr-yesterday-sales', branchId, yesterday],
@@ -362,20 +392,41 @@ function ManagerContent({ branchId, branchName, branchKey }) {
       <div>
         <SectionHeader title="Today's Performance" icon={BarChart3} />
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KPICard label="Today's Sales"   value={formatCurrency(kpis.todayTotal)}  icon={TrendingUp}  colorClass="text-primary"     bgClass="bg-primary/10"     trend={kpis.salesTrendPct} loading={salesKpiLoading} />
-          <KPICard label="Cash sales today"    value={formatCurrency(kpis.cashTotal)}   icon={Banknote}    colorClass="text-green-600"   bgClass="bg-green-500/10"   loading={loadingSales} />
-          <KPICard label="Network sales today"     value={formatCurrency(kpis.posTotal)}    icon={CreditCard}  colorClass="text-blue-600"    bgClass="bg-blue-500/10"    loading={loadingSales} />
-          <KPICard label="Credit Sales"    value={formatCurrency(kpis.creditTotal)} icon={Receipt}     colorClass="text-amber-600"   bgClass="bg-amber-500/10"   loading={loadingSales} />
-          <KPICard label="Purchases Today" value={formatCurrency(kpis.purchTotal)}  icon={ShoppingCart} colorClass="text-orange-600" bgClass="bg-orange-500/10"  loading={loadingPurchases} />
-          <KPICard label="Expenses Today"  value={formatCurrency(kpis.expTotal)}    icon={DollarSign}  colorClass="text-red-600"     bgClass="bg-red-500/10"     loading={loadingExpenses} />
+          <KPICard label="Today's Sales"   value={formatMoney(kpis.todayTotal)}  icon={TrendingUp}  colorClass="text-primary"     bgClass="bg-primary/10"     trend={kpis.salesTrendPct} loading={salesKpiLoading} />
+          <KPICard label="Cash sales today"    value={formatMoney(kpis.cashTotal)}   icon={Banknote}    colorClass="text-green-600"   bgClass="bg-green-500/10"   loading={loadingSales} />
+          <KPICard label="Network sales today"     value={formatMoney(kpis.posTotal)}    icon={CreditCard}  colorClass="text-blue-600"    bgClass="bg-blue-500/10"    loading={loadingSales} />
+          <KPICard label="Credit Sales"    value={formatMoney(kpis.creditTotal)} icon={Receipt}     colorClass="text-amber-600"   bgClass="bg-amber-500/10"   loading={loadingSales} />
+          <KPICard label="Purchases Today" value={formatMoney(kpis.purchTotal)}  icon={ShoppingCart} colorClass="text-orange-600" bgClass="bg-orange-500/10"  loading={loadingPurchases} />
+          <KPICard label="Expenses Today"  value={formatMoney(kpis.expTotal)}    icon={DollarSign}  colorClass="text-red-600"     bgClass="bg-red-500/10"     loading={loadingExpenses} />
         </div>
       </div>
 
+      {/* Drawer cash must never be inferred from cash-sales revenue or limited
+          treasury history. The recorded physical count can be older than today. */}
+      <Card data-testid="manager-drawer-cash" className="overflow-hidden border-emerald-200 bg-gradient-to-r from-emerald-50/90 to-white shadow-sm">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><Banknote className="size-6"/></span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-black text-emerald-950 sm:text-base">{drawerCopy.title}</h2>
+              <div dir="ltr" className="mt-1 break-words text-start text-2xl font-black tabular-nums text-emerald-900 sm:text-3xl">
+                {drawerLoading?<Skeleton className="mt-2 h-9 w-32"/>:drawerError||!drawerCash.complete?'—':formatMoney(drawerCash.amount)}
+              </div>
+              <p className="mt-2 text-xs font-semibold text-emerald-800">
+                {drawerError?drawerCopy.unavailable:drawerLoading?'…':!drawerCash.complete?drawerCopy.missing:drawerCash.current?drawerCopy.current:`${drawerCopy.past} ${drawerCash.date}`}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-emerald-700">{drawerCopy.hint}</p>
+            </div>
+            {drawerError&&<Button variant="outline" size="sm" onClick={()=>retryDrawer()}>{drawerCopy.retry}</Button>}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Profit row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <KPICard label="Sales less purchases"    value={formatCurrency(kpis.grossProfit)} icon={TrendingUp}  colorClass={kpis.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'} bgClass={kpis.grossProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} loading={grossProfitLoading} />
-        <KPICard label="Before payroll and fixed costs"      value={formatCurrency(kpis.netProfit)}   icon={Activity}    colorClass={kpis.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}  bgClass={kpis.netProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}  loading={netProfitLoading} />
-        <KPICard label="Inventory Value" value={formatCurrency(kpis.invValue)}    icon={Package}     colorClass="text-purple-600"  bgClass="bg-purple-500/10" loading={loadingInventory} />
+        <KPICard label="Sales less purchases"    value={formatMoney(kpis.grossProfit)} icon={TrendingUp}  colorClass={kpis.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'} bgClass={kpis.grossProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} loading={grossProfitLoading} />
+        <KPICard label="Before payroll and fixed costs"      value={formatMoney(kpis.netProfit)}   icon={Activity}    colorClass={kpis.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}  bgClass={kpis.netProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}  loading={netProfitLoading} />
+        <KPICard label="Inventory Value" value={formatMoney(kpis.invValue)}    icon={Package}     colorClass="text-purple-600"  bgClass="bg-purple-500/10" loading={loadingInventory} />
       </div>
 
       {/* Main grid */}
@@ -403,7 +454,7 @@ function ManagerContent({ branchId, branchName, branchKey }) {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(v) => formatCurrency(v)} />
+                  <Tooltip formatter={(v) => formatMoney(v)} />
                   <Area type="monotone" dataKey="sales" stroke="hsl(217 91% 50%)" fill="url(#salesGrad)" strokeWidth={2} name="Sales" />
                   <Area type="monotone" dataKey="cash"  stroke="hsl(142 71% 45%)" fill="transparent" strokeWidth={1.5} strokeDasharray="4 2" name="Cash" />
                   <Area type="monotone" dataKey="pos"   stroke="hsl(199 89% 48%)" fill="transparent" strokeWidth={1.5} strokeDasharray="4 2" name="POS" />
@@ -443,7 +494,7 @@ function ManagerContent({ branchId, branchName, branchKey }) {
                           <p className="text-xs text-muted-foreground">{format(new Date(item.time), 'HH:mm')}</p>
                         </div>
                         <span className={cn('text-sm font-semibold shrink-0', cfg.colorClass)}>
-                          {item.type === 'expense' ? '-' : '+'}{formatCurrency(item.amount)}
+                          {item.type === 'expense' ? '-' : '+'}{formatMoney(item.amount)}
                         </span>
                       </div>
                     );
@@ -470,7 +521,7 @@ function ManagerContent({ branchId, branchName, branchKey }) {
                      <div key={po.id} className="flex items-center justify-between text-sm">
                        <span className="text-foreground truncate">{po.order_number || 'PO'}</span>
                        <div className="flex items-center gap-2 shrink-0">
-                         <span className="text-muted-foreground">{formatCurrency(po.total_amount)}</span>
+                         <span className="text-muted-foreground">{formatMoney(po.total_amount)}</span>
                          <Badge variant="secondary" className="text-[10px] capitalize">{po.status}</Badge>
                        </div>
                      </div>
@@ -503,7 +554,7 @@ function ManagerContent({ branchId, branchName, branchKey }) {
                          {inv.due_date && <p className="text-xs text-muted-foreground">Due {format(new Date(inv.due_date + 'T12:00:00'), 'MMM d')}</p>}
                        </div>
                        <div className="flex items-center gap-2 shrink-0">
-                         <span className="text-muted-foreground">{formatCurrency(inv.total_amount - (inv.paid_amount || 0))}</span>
+                         <span className="text-muted-foreground">{formatMoney(inv.total_amount - (inv.paid_amount || 0))}</span>
                          <Badge variant="secondary" className="text-[10px] capitalize">{inv.status}</Badge>
                        </div>
                      </div>
@@ -562,17 +613,17 @@ function ManagerContent({ branchId, branchName, branchKey }) {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Inflows</span>
-                    <span className="text-sm font-semibold text-green-600">+{formatCurrency(kpis.treasuryIn)}</span>
+                    <span className="text-sm font-semibold text-green-600">+{formatMoney(kpis.treasuryIn)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Outflows</span>
-                    <span className="text-sm font-semibold text-red-600">-{formatCurrency(kpis.treasuryOut)}</span>
+                    <span className="text-sm font-semibold text-red-600">-{formatMoney(kpis.treasuryOut)}</span>
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-foreground">Net</span>
                     <span className={cn('text-sm font-bold', kpis.treasuryNet >= 0 ? 'text-green-600' : 'text-red-600')}>
-                      {formatCurrency(kpis.treasuryNet)}
+                      {formatMoney(kpis.treasuryNet)}
                     </span>
                   </div>
                   <Button variant="ghost" size="sm" className="w-full text-xs mt-1" onClick={() => navigate('/treasury')}>
