@@ -32,6 +32,29 @@ describe('Help Center guide integrity', () => {
     expect(searchHelpArticles({ query: 'shipment confirmation' }).map(a => a.id)).toContain('supplier-portal');
     expect(searchHelpArticles({ query: 'zzzz-no-results' })).toEqual([]);
   });
+  it('includes role-scoped wallet onboarding, transfer, approvals, history and notification guides in all languages', () => {
+    const walletIds = [
+      'wallet-enrollment', 'wallet-user-transfer', 'wallet-owner-transfers',
+      'wallet-history-analytics', 'wallet-notifications', 'wallet-owner-history-alerts',
+    ];
+    const guides = helpArticles.filter(article => walletIds.includes(article.id));
+    expect(guides).toHaveLength(walletIds.length);
+    for (const guide of guides) {
+      expect(guide.category).toBe('money');
+      expect(['/wallet-portal', '/sponsor-treasury']).toContain(guide.route);
+      for (const lang of ['en', 'ar', 'fa']) {
+        expect(guide.content[lang].steps).toHaveLength(3);
+        expect(guide.content[lang].note.length).toBeGreaterThan(30);
+      }
+    }
+    expect(searchHelpArticles({ query: 'wallet', category: 'money' }).length).toBeGreaterThanOrEqual(5);
+    expect(searchHelpArticles({ query: 'والت', category: 'money' }).map(a => a.id)).toContain('wallet-user-transfer');
+    expect(searchHelpArticles({ query: 'المحفظة', category: 'money' }).map(a => a.id)).toContain('wallet-enrollment');
+    expect(searchHelpArticles({ role: 'owner', category: 'money' }).map(a => a.id)).toContain('wallet-owner-transfers');
+    expect(searchHelpArticles({ role: 'owner', category: 'money' }).map(a => a.id)).not.toContain('wallet-user-transfer');
+    expect(searchHelpArticles({ role: 'employee', category: 'money' }).map(a => a.id)).toContain('wallet-notifications');
+    expect(searchHelpArticles({ role: 'employee', category: 'money' }).map(a => a.id)).not.toContain('wallet-owner-history-alerts');
+  });
   it('combines role and topic filters without implying permissions', () => {
     const found = searchHelpArticles({ role: 'supplier', category: 'portals' });
     expect(found.map(a => a.id)).toEqual(['supplier-portal']);
