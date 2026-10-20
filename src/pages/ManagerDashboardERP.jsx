@@ -52,7 +52,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { formatCurrency } from '@/lib/helpers';
+import { useLanguage } from '@/lib/LanguageContext';
+import ManagerDrawerCashCard from '@/components/dashboard/ManagerDrawerCashCard';
 
 // ─── Inline SVG icons not in lucide ──────────────────────────────────────────
 function ClipboardListIcon(props) {
@@ -161,6 +162,7 @@ function LowStockItem({ item }) {
 
 // ─── Main dashboard content ───────────────────────────────────────────────────
 function ManagerContent({ branchId, branchName, branchKey }) {
+  const {formatMoney:formatCurrency}=useLanguage();
   const navigate = useNavigate();
   const today     = format(new Date(), 'yyyy-MM-dd');
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
@@ -357,6 +359,8 @@ function ManagerContent({ branchId, branchName, branchKey }) {
           <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
         </Button>
       </div>
+
+      <ManagerDrawerCashCard branchId={branchId} asOf={today}/>
 
       {/* KPI row — 6 primary metrics */}
       <div>
