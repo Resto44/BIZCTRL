@@ -165,14 +165,29 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
    </header>
    {!person?<p className="rounded-2xl border bg-white p-5 text-center text-sm">{t.noWallet}</p>:<>
      {query.isError&&<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{t.error}<Button variant="outline" size="sm" className="ms-2" onClick={()=>query.refetch()}>{t.refresh}</Button></div>}
-     <div className="min-w-0 rounded-2xl bg-gradient-to-br from-slate-900 to-blue-950 p-5 text-white shadow-md">
-       <p dir="auto" className="mb-1 text-sm font-bold text-white">{query.data?.person_name||person.name}</p>
-       <p className="text-sm font-semibold text-slate-300">{t.balance}</p>
-       <strong dir="ltr" className="mt-2 block break-words text-4xl font-black tabular-nums">{loaded?num(current?.balance??0,lang):'—'} <small className="text-base text-slate-300">{activeCurrency}</small></strong>
-       <p className="mt-4 text-xs text-slate-300">{extra.allTime}</p>
-       <div className="mt-2 grid grid-cols-3 gap-2 border-t border-white/15 pt-3">
-        {[[t.pending,current?.pending_amount,'pending'],[t.received,current?.transfers_in,'statement'],[t.sent,current?.transfers_out,'statement']].map(([label,value,next])=><button key={label} type="button" onClick={()=>start(next)} className="min-w-0 rounded-lg py-1 text-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"><span className="block text-xs leading-5 text-slate-300">{label}</span><strong dir="ltr" className="mt-1 block break-words text-base tabular-nums">{loaded?num(value??0,lang):'—'}</strong><span className="text-xs text-slate-300">{activeCurrency}</span></button>)}
+     <div aria-label={t.balance} aria-busy={query.isPending} className="min-w-0 overflow-hidden rounded-2xl border border-blue-900/20 bg-gradient-to-br from-slate-900 to-blue-950 text-white shadow-md">
+       <div className="p-4 sm:p-5">
+         <div className="flex min-w-0 items-center gap-3">
+           <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/10"><Wallet aria-hidden="true" className="size-5 text-blue-200"/></span>
+           <p dir="auto" className="min-w-0 flex-1 break-words text-sm font-bold">{query.data?.person_name||person.name}</p>
+           <span dir="ltr" translate="no" className="shrink-0 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-bold tracking-wide">{activeCurrency}</span>
+         </div>
+         <p className="mt-4 text-xs font-semibold text-slate-300">{t.balance}</p>
+         <strong dir="ltr" className="mt-1 block break-words text-start text-3xl font-black leading-tight tabular-nums sm:text-4xl">{loaded?num(current?.balance??0,lang):'—'}</strong>
+         <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/15 pt-3 text-[11px] text-slate-300">
+           <span>{extra.allTime}</span><span dir="ltr" translate="no">{activeCurrency}</span>
+         </div>
+         <div className="mt-2 grid grid-cols-2 gap-2">
+           {[[t.received,current?.transfers_in,ArrowDownLeft,'text-emerald-300','bg-emerald-400/10'],[t.sent,current?.transfers_out,ArrowUpRight,'text-rose-300','bg-rose-400/10']].map(([label,value,Icon,color,background])=><button key={label} type="button" onClick={()=>start('statement')} className={`min-w-0 rounded-xl border border-white/10 p-3 text-start transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${background}`}>
+             <span className="flex items-start gap-1.5 text-xs leading-5 text-slate-200"><Icon aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${color}`}/><span>{label}</span></span>
+             <strong dir="ltr" className={`mt-1 block break-words text-start text-lg font-bold tabular-nums ${color}`}>{loaded?num(value??0,lang):'—'}</strong>
+           </button>)}
+         </div>
        </div>
+       <button type="button" onClick={()=>start('pending')} className="flex min-h-12 w-full flex-wrap items-center gap-x-2 gap-y-1 border-t border-white/10 bg-white/5 px-4 py-3 text-start text-xs hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-white sm:px-5">
+         <Clock3 aria-hidden="true" className="size-4 shrink-0 text-amber-300"/><span className="min-w-0 flex-1 text-slate-200">{t.pending}</span>
+         <strong dir="ltr" className="max-w-full break-words font-bold tabular-nums text-amber-200">{loaded?num(current?.pending_amount??0,lang):'—'} <span translate="no">{activeCurrency}</span></strong>
+       </button>
      </div>
      <details className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
        <summary className="cursor-pointer text-sm font-bold">{nt.details} · {query.data?.person_name||person.name}</summary>
