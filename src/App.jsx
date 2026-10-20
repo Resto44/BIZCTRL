@@ -6,7 +6,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, useNavig
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-import { LanguageProvider } from '@/lib/LanguageContext';
+import { LanguageProvider, useLanguage } from '@/lib/LanguageContext';
 import { SubscriptionProvider, useSubscription } from '@/lib/SubscriptionContext';
 import { RoleProvider } from '@/lib/RoleContext';
 import RoleGuard from '@/components/rbac/RoleGuard';
@@ -162,6 +162,24 @@ const PageLoader = () => (
   </div>
 );
 
+// Never mistake an unavailable authorization read for an empty business or
+// expired subscription. Provide a retry without clearing local user preferences.
+function PortalStartupRecovery({ onRetry }) {
+  const { lang } = useLanguage();
+  const copy = lang === 'ar'
+    ? { title: 'تعذر تحميل بوابة ERP', detail: 'تعذر التحقق من بيانات المؤسسة أو الاشتراك. لم تتغير صلاحياتك أو بياناتك.', retry: 'إعادة المحاولة' }
+    : lang === 'fa'
+      ? { title: 'بارگذاری پورتل ERP انجام نشد', detail: 'تأیید رستوران یا اشتراک از سرور موفق نبود. اطلاعات و صلاحیت شما تغییر نکرده است.', retry: 'تلاش دوباره' }
+      : { title: 'ERP portal temporarily unavailable', detail: 'Business or subscription verification did not complete. Your data and permissions are unchanged.', retry: 'Retry connection' };
+  return (
+    <main role="alert" className="flex min-h-[60dvh] flex-col items-center justify-center gap-3 p-6 text-center">
+      <p className="text-base font-bold text-foreground">{copy.title}</p>
+      <p className="max-w-md text-sm text-muted-foreground">{copy.detail}</p>
+      <button type="button" onClick={() => onRetry?.()} className="min-h-11 rounded-xl bg-primary px-5 py-2 text-sm font-bold text-primary-foreground">{copy.retry}</button>
+    </main>
+  );
+}
+
 // ── Route-level error boundary ────────────────────────────────────────────────
 class RouteErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -202,7 +220,7 @@ class RouteErrorBoundary extends React.Component {
 
 // ── Onboarding gate ───────────────────────────────────────────────────────────
 function OnboardingGate({ children }) {
-  const { restaurants, loadingRestaurants } = useTenant();
+  const { restaurants, loadingRestaurants, restaurantLoadError, refetchRestaurants } = useTenant();
   const { user, isLoadingAuth } = useAuth();
   const location = window.location;
 
@@ -214,6 +232,8 @@ function OnboardingGate({ children }) {
       </div>
     );
   }
+
+  if (restaurantLoadError) return <PortalStartupRecovery onRetry={refetchRestaurants} />;
 
   // Non-owner ERP roles must never be redirected to onboarding
   const restrictedRole = NON_OWNER_ROLES.has(user?.role);
@@ -250,8 +270,8 @@ function RoleHomeRedirect() {
 
 // ── Subscribed routes (all protected pages) ───────────────────────────────────
 const SubscribedRoutes = () => {
-  const { isActive, loading } = useSubscription();
-  const { loadingRestaurants } = useTenant();
+  const { isActive, loading, error: subscriptionError, summary, refresh } = useSubscription();
+  const { loadingRestaurants, restaurantLoadError, refetchRestaurants } = useTenant();
 
   if (loading || loadingRestaurants) {
     return (
@@ -259,6 +279,11 @@ const SubscribedRoutes = () => {
         <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
       </div>
     );
+  }
+
+  if (restaurantLoadError) return <PortalStartupRecovery onRetry={refetchRestaurants} />;
+  if (!isActive && subscriptionError && !summary?.found) {
+    return <PortalStartupRecovery onRetry={refresh} />;
   }
 
   if (!isActive) {
@@ -552,7 +577,7 @@ function RootEntryRoute() {
 
 // ── Authenticated app shell ───────────────────────────────────────────────────
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, authError, user, navigateToLogin } = useAuth();
+  const { isLoadingAuth, authError, user, navigateToLogin, checkUserAuth } = useAuth();
   const [timedOut, setTimedOut] = React.useState(false);
 
   React.useEffect(() => {
@@ -577,8 +602,8 @@ const AuthenticatedApp = () => {
         <p className="text-sm text-muted-foreground">This may be a network or session issue.</p>
         <button
           className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium"
-          onClick={() => { localStorage.clear(); sessionStorage.clear(); window.location.reload(); }}
-        >Reset &amp; Reload</button>
+          onClick={checkUserAuth}
+        >Retry authorization</button>
       </div>
     );
   }
@@ -592,6 +617,7 @@ const AuthenticatedApp = () => {
   }
 
   if (authError) {
+    if (authError.type === 'network_unavailable') return <PortalStartupRecovery onRetry={checkUserAuth} />;
     if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
   }
 
