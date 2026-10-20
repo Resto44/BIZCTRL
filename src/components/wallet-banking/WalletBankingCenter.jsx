@@ -75,7 +75,7 @@ const L={
  }
 };
 const num=(v,lang)=>new Intl.NumberFormat(lang==='ar'?'ar-SA':lang==='fa'?'fa-AF':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)||0);
-export default function WalletBankingCenter({person=null,owner=false,lang='en',onBeneficiaries}){
+export default function WalletBankingCenter({person=null,owner=false,lang='en',onBeneficiaries,headerControl=null}){
  const t=L[lang]||L.en,extra=walletCopy[lang]||walletCopy.en,client=useQueryClient();
  const nt=notificationCopy[lang]||notificationCopy.en;
  const [notificationsOpen,setNotificationsOpen]=useState(false),[seen,setSeen]=useState(()=>new Set()),[focusedTransaction,setFocusedTransaction]=useState(null);
@@ -156,8 +156,9 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
  const direction=r=>r.kind==='fund_wallet'?'incoming':'outgoing';
  return <section dir={lang==='en'?'ltr':'rtl'} className="mx-auto max-w-6xl min-w-0 space-y-3 pb-20 sm:space-y-4">
    <header className="flex min-w-0 items-center gap-2 px-1 py-1 text-slate-950">
-     <Wallet className="size-6 shrink-0 text-blue-300"/>
-     <h1 className="min-w-0 flex-1 break-words text-base font-black">{t.title}</h1>
+     {!headerControl&&<Wallet className="size-6 shrink-0 text-blue-300"/>}
+     <h1 className={headerControl?"sr-only":"min-w-0 flex-1 break-words text-base font-black"}>{t.title}</h1>
+     {headerControl}
      <button type="button" aria-label={nt.title} aria-expanded={notificationsOpen} aria-controls="wallet-notifications" onClick={()=>setNotificationsOpen(x=>!x)} className="relative grid size-11 shrink-0 place-items-center rounded-xl border bg-white text-blue-900"><Bell className="size-5"/>{loaded&&transactions.some(r=>!seen.has(eventKey(r)))&&<span className="absolute -end-1 -top-1 rounded-full bg-rose-600 px-1.5 text-xs font-bold text-white">{transactions.filter(r=>!seen.has(eventKey(r))).length}</span>}</button>
    </header>
    {!person?<p className="rounded-2xl border bg-white p-5 text-center text-sm">{t.noWallet}</p>:<>

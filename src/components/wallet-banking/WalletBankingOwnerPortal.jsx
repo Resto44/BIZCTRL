@@ -10,9 +10,9 @@ import WalletBankingCenter from './WalletBankingCenter';
 import {Button} from '@/components/ui/button';
 
 const locale={
- en:{label:'Wallet beneficiaries',membership:'Membership requests and approvals',empty:'No wallet users enrolled yet.',choose:'Choose a person',refresh:'Refresh',security:'Only approved owners can see other user accounts.'},
- ar:{label:'المستفيدون من المحفظة',membership:'طلبات العضوية والموافقة',empty:'لا يوجد أصحاب محافظ معتمدون.',choose:'اختر الشخص',refresh:'تحديث',security:'المالك المصرح فقط يمكنه مراجعة حسابات الآخرين.'},
- fa:{label:'صاحبان حساب والت',membership:'درخواست‌های عضویت و تأیید',empty:'هنوز حساب کاربری مجاز وجود ندارد.',choose:'شخص را انتخاب کنید',refresh:'تازه‌سازی',security:'فقط اونر دارای صلاحیت می‌تواند حساب دیگران را ببیند.'}
+ en:{beneficiary:'Beneficiary',label:'Wallet beneficiaries',membership:'Membership requests and approvals',empty:'No wallet users enrolled yet.',choose:'Choose a person',refresh:'Refresh',security:'Only approved owners can see other user accounts.'},
+ ar:{beneficiary:'المستفيد',label:'المستفيدون من المحفظة',membership:'طلبات العضوية والموافقة',empty:'لا يوجد أصحاب محافظ معتمدون.',choose:'اختر الشخص',refresh:'تحديث',security:'المالك المصرح فقط يمكنه مراجعة حسابات الآخرين.'},
+ fa:{beneficiary:'مستفید',label:'صاحبان حساب والت',membership:'درخواست‌های عضویت و تأیید',empty:'هنوز حساب کاربری مجاز وجود ندارد.',choose:'شخص را انتخاب کنید',refresh:'تازه‌سازی',security:'فقط اونر دارای صلاحیت می‌تواند حساب دیگران را ببیند.'}
 };
 export default function WalletBankingOwnerPortal(){
  const {activeRestaurantId}=useTenant();
@@ -49,15 +49,14 @@ export default function WalletBankingOwnerPortal(){
  return <div dir={lang==='en'?'ltr':'rtl'} className="min-w-0 space-y-4">
   {query.isError?<p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{String(query.error?.message||'Unable to load beneficiaries')}</p>:null}
   {query.isPending?<p className="rounded-xl border bg-white p-4 text-sm">…</p>:!person?<p className="rounded-xl border bg-white p-4 text-sm">{t.empty}</p>:
-   <WalletBankingCenter key={person.id} owner person={person} lang={lang} onBeneficiaries={()=>{setBeneficiariesOpen(true);setMembers(true);setMembersVersion(v=>v+1);}}/>}
+   <WalletBankingCenter key={person.id} owner person={person} lang={lang} headerControl={<label className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold text-slate-600">
+     <span className="shrink-0">{t.beneficiary}</span>
+     <select aria-label={t.beneficiary} value={person.id} onChange={e=>setSelected(e.target.value)} dir="auto" className="h-11 min-w-0 flex-1 rounded-xl border bg-white px-2 text-base font-bold text-slate-950">
+      {(query.data||[]).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
+     </select>
+    </label>} onBeneficiaries={()=>{setBeneficiariesOpen(true);setMembers(true);setMembersVersion(v=>v+1);}}/>}
   <details open={beneficiariesOpen} onToggle={e=>setBeneficiariesOpen(e.currentTarget.open)} ref={membersRef} tabIndex={-1} className="scroll-mt-44 focus:outline-none grid min-w-0 grid-cols-1 gap-3 rounded-2xl border bg-white p-3 shadow-sm">
    <summary className="cursor-pointer py-1 text-sm font-bold">{t.label} · {person?.name}</summary>
-   <label className="block min-w-0 text-sm font-bold text-slate-600">{t.label}
-    <select value={person?.id||''} onChange={e=>setSelected(e.target.value)}
-     aria-label={t.choose} dir="auto" className="mt-2 min-h-12 w-full min-w-0 rounded-xl border bg-white px-3 py-2 text-base font-bold text-slate-950">
-     {(query.data||[]).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
-    </select>
-   </label>
    <div className="flex min-w-0 flex-wrap gap-2">
     <Button variant="outline" className="h-auto min-h-11 min-w-0 flex-1 whitespace-normal break-words px-3 py-2 text-center" onClick={()=>setMembers(x=>!x)}>{t.membership}</Button>
     <Button variant="outline" className="min-h-11 shrink-0" onClick={()=>query.refetch()}>{t.refresh}</Button>
