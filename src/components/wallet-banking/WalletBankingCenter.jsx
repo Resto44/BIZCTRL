@@ -11,12 +11,12 @@ import {walletCopy,reasons,transferNote} from './walletPresentation';
 const notificationCopy={en:{title:'Wallet notifications',hint:'Latest 100 transfers · refreshes every 20 seconds',empty:'No transfer notifications',read:'Mark all read',details:'Account details'},ar:{title:'إشعارات المحفظة',hint:'آخر ١٠٠ تحويل · تحديث كل ٢٠ ثانية',empty:'لا توجد إشعارات تحويل',read:'تحديد الكل كمقروء',details:'تفاصيل الحساب'},fa:{title:'اعلان‌های والت',hint:'آخرین ۱۰۰ انتقال · تازه‌سازی هر ۲۰ ثانیه',empty:'اعلان انتقال موجود نیست',read:'همه خوانده شد',details:'جزئیات حساب'}};
 const L={
  en:{
-  remaining:'Balance after',before:'Before',added:'Added',deducted:'Deducted',unposted:'No balance change',ownerHelp:'Review requests submitted by this wallet holder. Funds move only after your approval.',noRequests:'No pending requests in this direction.',walletIn:'Receive · requests into wallet',walletOut:'Transfer · requests from wallet',recipientHelp:'Your internal wallet transfers are between you and this linked business.',
-  title:'Wallet Banking Center',arabic:'مركز المحفظة البنكية',sub:'Internal business wallet for verified people and owner-approved transfers',
+  userPending:'Awaiting beneficiary approval',userHelp:'Review the owner’s transfer. Your balance changes only after you approve.',reviewAction:'Review transfer',remaining:'Balance after',before:'Before',added:'Added',deducted:'Deducted',unposted:'No balance change',ownerHelp:'Review requests submitted by this wallet holder. Funds move only after your approval.',noRequests:'No pending requests in this direction.',walletIn:'Receive · requests into wallet',walletOut:'Transfer · requests from wallet',recipientHelp:'Your internal wallet transfers are between you and this linked business.',
+  title:'Wallet Banking Center',arabic:'مركز المحفظة البنكية',sub:'Internal business wallet with counterparty-approved transfers',
   account:'Wallet Account ID',linked:'Linked Business',active:'Active',currency:'Currency',
   balance:'Available Wallet Balance',pending:'Pending Transfers',received:'Transfers In',sent:'Transfers Out',
   actions:'Quick Actions',transfer:'Transfer',receive:'Receive',statement:'Statement',beneficiaries:'Beneficiaries',
-  treasury:'Linked to Owner Treasury',treasurySub:'Owner-approved internal transfers are posted with a linked Treasury movement.',
+  treasury:'Linked to Owner Treasury',treasurySub:'Approved internal transfers are posted with a linked Treasury movement.',
   recent:'Recent Transactions',all:'View all',payer:'Payer',payee:'Recipient',
   posted:'Posted',rejected:'Rejected',pendingStatus:'Pending Owner Review',note:'Note',today:'Date',
   transferTitle:'Return wallet funds to business',receiveTitle:'Request funds from business',
@@ -28,12 +28,12 @@ const L={
   noSource:'No eligible, same-currency Treasury account exists.',insufficient:'Please confirm available Treasury balance before approving.',
   select:'Select account',accounts:'Wallet accounts',ownerInfo:'Select a person to review their wallet and pending transactions.',
   bankNotice:'This is an internal ERP ledger, not a bank account or external payment system. Old loans and custody stay archived, never added to spendable funds.',
-  processing:'Processing…',refresh:'Refresh',error:'Unable to load verified wallet records. No balance is assumed.',success:'The request was submitted.',reviewed:'Owner review completed.',currencySafe:'Each currency is accounted for separately.',copy:'Copy internal wallet ID',empty:'No personal wallets yet. Add/approve a person in membership management.',
+  processing:'Processing…',refresh:'Refresh',error:'Unable to load verified wallet records. No balance is assumed.',success:'The request was submitted.',reviewed:'Transfer review completed.',currencySafe:'Each currency is accounted for separately.',copy:'Copy internal wallet ID',empty:'No personal wallets yet. Add/approve a person in membership management.',
   waiting:'Awaiting verification',reason:'Explain the transfer',activeAccount:'Selected wallet account',postedOnce:'Each approval creates one linked Treasury transaction and two balancing wallet entries.',
  },
  ar:{
-  remaining:'الرصيد بعد',before:'قبل',added:'مضاف',deducted:'مخصوم',unposted:'لا تغيير في الرصيد',ownerHelp:'راجع طلبات صاحب المحفظة. لا تتحرك الأموال إلا بعد موافقتك.',noRequests:'لا توجد طلبات معلقة بهذا الاتجاه.',walletIn:'استلام · طلبات واردة للمحفظة',walletOut:'تحويل · طلبات صادرة من المحفظة',recipientHelp:'التحويلات الداخلية بينك وبين المنشأة المرتبطة.',
-  title:'مركز المحفظة البنكية',arabic:'Wallet Banking Center',sub:'محفظة داخلية للأشخاص المعتمدين وتحويلات تحت موافقة المالك',
+  userPending:'بانتظار موافقة المستفيد',userHelp:'راجع تحويل المالك. لا يتغير رصيدك إلا بعد موافقتك.',reviewAction:'مراجعة التحويل',remaining:'الرصيد بعد',before:'قبل',added:'مضاف',deducted:'مخصوم',unposted:'لا تغيير في الرصيد',ownerHelp:'راجع طلبات صاحب المحفظة. لا تتحرك الأموال إلا بعد موافقتك.',noRequests:'لا توجد طلبات معلقة بهذا الاتجاه.',walletIn:'استلام · طلبات واردة للمحفظة',walletOut:'تحويل · طلبات صادرة من المحفظة',recipientHelp:'التحويلات الداخلية بينك وبين المنشأة المرتبطة.',
+  title:'مركز المحفظة البنكية',arabic:'Wallet Banking Center',sub:'محفظة داخلية للأشخاص المعتمدين وتحويلات بموافقة الطرف الآخر',
   account:'رقم حساب المحفظة',linked:'المنشأة المرتبطة',active:'نشط',currency:'العملة',
   balance:'الرصيد المتاح بالمحفظة',pending:'التحويلات قيد المعالجة',received:'التحويلات الواردة',sent:'التحويلات الصادرة',
   actions:'إجراءات سريعة',transfer:'تحويل',receive:'استلام',statement:'كشف الحساب',beneficiaries:'المستفيدون',
@@ -49,16 +49,16 @@ const L={
   noSource:'لا يوجد حساب خزينة مؤهل بهذه العملة.',insufficient:'تحقق من توفر رصيد الخزينة قبل الاعتماد.',
   select:'اختر الحساب',accounts:'حسابات المحفظة',ownerInfo:'اختر شخصاً لمراجعة محفظته والتحويلات المعلقة.',
   bankNotice:'دفتر داخلي في ERP، ليس حساباً بنكياً أو نظام دفع خارجي. القروض والعهد القديمة مؤرشفة ولا تدخل في الرصيد المتاح.',
-  processing:'جاري التنفيذ…',refresh:'تحديث',error:'تعذر قراءة المحفظة الموثقة. لن نفترض رصيداً صفرياً.',success:'تم إرسال الطلب.',reviewed:'اكتملت مراجعة المالك.',currencySafe:'تُحاسب كل عملة على حدة.',copy:'نسخ المعرف الداخلي',empty:'لا توجد محفظة شخصية. أضف أو اعتمد عضوية الشخص أولاً.',
+  processing:'جاري التنفيذ…',refresh:'تحديث',error:'تعذر قراءة المحفظة الموثقة. لن نفترض رصيداً صفرياً.',success:'تم إرسال الطلب.',reviewed:'اكتملت مراجعة التحويل.',currencySafe:'تُحاسب كل عملة على حدة.',copy:'نسخ المعرف الداخلي',empty:'لا توجد محفظة شخصية. أضف أو اعتمد عضوية الشخص أولاً.',
   waiting:'بانتظار التحقق',reason:'سبب التحويل',activeAccount:'الحساب المختار',postedOnce:'كل اعتماد ينتج حركة خزينة واحدة وقيدين متوازنين في المحفظة.',
  },
  fa:{
-  remaining:'مانده پس از معامله',before:'موجودی قبلی',added:'اضافه‌شده',deducted:'کسرشده',unposted:'بدون تغییر موجودی',ownerHelp:'درخواست‌های صاحب والت را بررسی کنید. وجه پس از تأیید شما ثبت می‌شود.',noRequests:'در این جهت درخواست در انتظار نیست.',walletIn:'دریافت · درخواست‌های ورودی والت',walletOut:'انتقال · درخواست‌های خروجی والت',recipientHelp:'انتقال‌های داخلی والت میان شما و این کسب‌وکار انجام می‌شود.',
-  title:'مرکز بانکداری والت',arabic:'Wallet Banking Center',sub:'والت داخلی برای اشخاص تأییدشده و انتقال‌های دارای تأیید اونر',
+  userPending:'منتظر تأیید مستفید',userHelp:'معاملۀ اونر را بررسی کنید. موجودی فقط پس از تأیید شما تغییر می‌کند.',reviewAction:'بررسی معامله',remaining:'مانده پس از معامله',before:'موجودی قبلی',added:'اضافه‌شده',deducted:'کسرشده',unposted:'بدون تغییر موجودی',ownerHelp:'درخواست‌های صاحب والت را بررسی کنید. وجه پس از تأیید شما ثبت می‌شود.',noRequests:'در این جهت درخواست در انتظار نیست.',walletIn:'دریافت · درخواست‌های ورودی والت',walletOut:'انتقال · درخواست‌های خروجی والت',recipientHelp:'انتقال‌های داخلی والت میان شما و این کسب‌وکار انجام می‌شود.',
+  title:'مرکز بانکداری والت',arabic:'Wallet Banking Center',sub:'والت داخلی با تأیید طرف مقابل برای انتقال‌ها',
   account:'شناسه حساب والت',linked:'بیزنس مرتبط',active:'فعال',currency:'ارز',
   balance:'موجودی قابل‌استفاده والت',pending:'انتقال‌های در انتظار',received:'انتقال‌های ورودی',sent:'انتقال‌های خروجی',
   actions:'عملیات سریع',transfer:'انتقال',receive:'دریافت',statement:'صورت‌حساب',beneficiaries:'حساب‌های اشخاص',
-  treasury:'مرتبط به خزانه اونر',treasurySub:'انتقال داخلی پس از تأیید اونر با یک حرکت خزانه مرتبط ثبت می‌شود.',
+  treasury:'مرتبط به خزانه اونر',treasurySub:'انتقال داخلی پس از تأیید طرف مقابل با یک حرکت خزانه مرتبط ثبت می‌شود.',
   recent:'آخرین معاملات',all:'نمایش همه',payer:'از حساب',payee:'به حساب',
   posted:'ثبت قطعی',rejected:'ردشده',pendingStatus:'منتظر تأیید اونر',note:'یادداشت',today:'تاریخ',
   transferTitle:'برگشت موجودی والت به کسب‌وکار',receiveTitle:'درخواست دریافت وجه از بیزنس',
@@ -70,7 +70,7 @@ const L={
   noSource:'حساب خزانه مناسب با همین ارز موجود نیست.',insufficient:'پیش از تأیید، موجودی خزانه را بررسی کنید.',
   select:'انتخاب حساب',accounts:'حساب‌های والت',ownerInfo:'شخص موردنظر را برای بررسی موجودی و درخواست‌هایش انتخاب کنید.',
   bankNotice:'این یک دفتر داخلی ERP است، نه حساب بانکی یا سیستم پرداخت خارجی. قرض و امانت قدیمی فقط در آرشیو محفوظ‌اند و به موجودی قابل‌مصرف تبدیل نمی‌شوند.',
-  processing:'در حال اجرا…',refresh:'تازه‌سازی',error:'خواندن اطلاعات معتبر والت ناموفق شد؛ موجودی فرضی نشان داده نمی‌شود.',success:'درخواست ثبت شد.',reviewed:'بررسی اونر انجام شد.',currencySafe:'هر ارز حساب جداگانه دارد.',copy:'کاپی شناسه والت',empty:'هنوز والت شخصی نیست. ابتدا عضویت شخص را اضافه یا تأیید کنید.',
+  processing:'در حال اجرا…',refresh:'تازه‌سازی',error:'خواندن اطلاعات معتبر والت ناموفق شد؛ موجودی فرضی نشان داده نمی‌شود.',success:'درخواست ثبت شد.',reviewed:'بررسی معامله انجام شد.',currencySafe:'هر ارز حساب جداگانه دارد.',copy:'کاپی شناسه والت',empty:'هنوز والت شخصی نیست. ابتدا عضویت شخص را اضافه یا تأیید کنید.',
   waiting:'منتظر تأیید',reason:'دلیل انتقال',activeAccount:'حساب انتخاب‌شده',postedOnce:'هر تأیید یک حرکت خزانه و دو سطر مالی متوازن ثبت می‌کند.',
  }
 };
@@ -110,8 +110,10 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
   },staleTime:10000,refetchInterval:15000});
  const current=(query.data?.currencies||[]).find(x=>x.currency===activeCurrency);
  const transactions=(query.data?.transactions||[]).filter(x=>x.currency===activeCurrency);
- const pending=transactions.filter(x=>x.status==='pending'&&(!pendingKind||x.kind===pendingKind));
- const selectedRequest=transactions.find(x=>x.id===reviewId&&x.status==='pending');
+ const pendingRequests=(query.data?.pending_requests||transactions).filter(r=>r.status==='pending'&&r.currency===activeCurrency);
+ const canReviewRequest=r=>r?.status==='pending'&&(owner?!r.initiated_by_owner:!!r.initiated_by_owner);
+ const pending=pendingRequests.filter(x=>x.status==='pending'&&(!pendingKind||x.kind===pendingKind));
+ const selectedRequest=pendingRequests.find(x=>x.id===reviewId&&x.status==='pending');
  const eligible=(accounts.data||[]).filter(x=>x.currency===activeCurrency);
  const selectedTreasury=eligible.find(x=>x.id===treasuryId);
  const sufficientForFunding=!!selectedRequest&&selectedRequest.kind!=='fund_wallet'||(!!selectedTreasury&&Number(selectedTreasury.available_balance)>=Number(selectedRequest?.amount));
@@ -127,7 +129,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
    onError:e=>setMessage(e?.message||t.error)});
  const review=useMutation({mutationFn:async approved=>{
    const {error}=await supabase.rpc('erp_bank_wallet_review',{
-    p_request_id:reviewId,p_approve:approved,p_treasury_account:approved?treasuryId:null,
+    p_request_id:reviewId,p_approve:approved,p_treasury_account:approved&&owner?treasuryId:null,
     p_review_note:reviewNote.trim()
    });if(error)throw error;
   },onSuccess:async()=>{setReviewError('');setReviewId(null);setReviewNote('');setTreasuryId('');setPanel('home');setMessage(t.reviewed);await Promise.all([invalidate(),client.invalidateQueries({queryKey:['erp-bank-wallet-treasury',person?.restaurant_id]})]);},
@@ -152,9 +154,9 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
 
  const loaded=!query.isPending&&!query.isError;
  const canSubmit=loaded&&!!person?.id&&!owner&&amount!==''&&Number(amount)>0&&!request.isPending&&(reasonId!=='other'||!!note.trim());
- const canApprove=loaded&&owner&&!!selectedRequest&&reviewNote.trim().length>=8&&!review.isPending&&!accounts.isFetching&&!accounts.isError&&!!selectedTreasury&&sufficientForFunding;
- const canReject=loaded&&owner&&!!selectedRequest&&reviewNote.trim().length>=8&&!review.isPending;
- const status=r=>r.status==='posted'?t.posted:r.status==='rejected'?t.rejected:t.pendingStatus;
+ const canApprove=loaded&&canReviewRequest(selectedRequest)&&reviewNote.trim().length>=8&&!review.isPending&&(!owner||(!accounts.isFetching&&!accounts.isError&&!!selectedTreasury&&sufficientForFunding));
+ const canReject=loaded&&canReviewRequest(selectedRequest)&&reviewNote.trim().length>=8&&!review.isPending;
+ const status=r=>r.status==='posted'?t.posted:r.status==='rejected'?t.rejected:r.initiated_by_owner?t.userPending:t.pendingStatus;
  const direction=r=>r.kind==='fund_wallet'?'incoming':'outgoing';
  return <section dir={lang==='en'?'ltr':'rtl'} className="mx-auto max-w-6xl min-w-0 space-y-3 pb-20 sm:space-y-4">
    <header className="flex min-w-0 items-center gap-2 px-1 py-1 text-slate-950">
@@ -189,6 +191,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
          <strong dir="ltr" className="max-w-full break-words font-bold tabular-nums text-amber-200">{loaded?num(current?.pending_amount??0,lang):'—'} <span translate="no">{activeCurrency}</span></strong>
        </button>
      </div>
+     {!owner&&loaded&&pendingRequests.some(canReviewRequest)&&<button type="button" onClick={()=>start('pending')} className="flex min-h-12 w-full items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-start text-sm font-bold text-amber-900"><span>{t.userPending} · {pendingRequests.filter(canReviewRequest).length}</span><span>{t.reviewAction}</span></button>}
      <details className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
        <summary className="cursor-pointer text-sm font-bold">{nt.details} · {query.data?.person_name||person.name}</summary>
        <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -226,7 +229,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
      {notificationsOpen&&<section id="wallet-notifications" className="rounded-2xl border bg-white p-3" aria-label={nt.title}>
        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-black">{nt.title}</h2><Button variant="ghost" onClick={()=>setSeen(new Set(transactions.map(eventKey)))}>{nt.read}</Button></div>
        <p className="mb-2 text-xs text-slate-500">{nt.hint}</p>
-       {query.isPending?<p role="status">{t.processing}</p>:query.isError?<p role="alert">{t.error}</p>:!transactions.length?<p>{nt.empty}</p>:<div className="max-h-80 overflow-y-auto divide-y">{transactions.map(r=><button key={eventKey(r)} type="button" className={'block w-full rounded-lg p-3 text-start text-sm '+(seen.has(eventKey(r))?'text-slate-600':'bg-blue-50 font-bold text-blue-950')} onClick={()=>{setSeen(prev=>new Set([...prev,eventKey(r)]));setNotificationsOpen(false);setCurrency(r.currency);if(owner&&r.status==='pending')selectReview(r);else{setPanel('statement');setFocusedTransaction(r.id);setActionVersion(v=>v+1);}}}>
+       {query.isPending?<p role="status">{t.processing}</p>:query.isError?<p role="alert">{t.error}</p>:!transactions.length?<p>{nt.empty}</p>:<div className="max-h-80 overflow-y-auto divide-y">{transactions.map(r=><button key={eventKey(r)} type="button" className={'block w-full rounded-lg p-3 text-start text-sm '+(seen.has(eventKey(r))?'text-slate-600':'bg-blue-50 font-bold text-blue-950')} onClick={()=>{setSeen(prev=>new Set([...prev,eventKey(r)]));setNotificationsOpen(false);setCurrency(r.currency);if(canReviewRequest(r))selectReview(r);else{setPanel('statement');setFocusedTransaction(r.id);setActionVersion(v=>v+1);}}}>
          <span className="block">{status(r)} · {r.kind==='fund_wallet'?t.received:t.sent}</span><span dir="ltr">{num(r.amount,lang)} {r.currency}</span><span className="ms-2 text-xs">{new Date(r.posted_at||r.created_at).toLocaleDateString(lang==='en'?'en-GB':lang==='ar'?'ar-SA':'fa-IR')}</span>
        </button>)}</div>}
      </section>}
@@ -248,9 +251,12 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
        {reasonId==='other'&&!note.trim()&&<p className="text-xs text-amber-800">{extra.otherRequired}</p>}
        <div className="flex gap-2"><Button type="button" disabled={!canSubmit} onClick={submit} className="min-h-11 flex-1">{request.isPending?t.processing:t.submit}</Button><Button variant="outline" type="button" onClick={()=>setPanel('home')}>{t.cancel}</Button></div>
      </div>}
-     {panel==='review'&&owner&&selectedRequest&&<div className="space-y-3 rounded-2xl border border-orange-200 bg-white p-4">
+     {panel==='review'&&canReviewRequest(selectedRequest)&&<div className="space-y-3 rounded-2xl border border-orange-200 bg-white p-4">
        <h3 className="font-black">{t.reviews}</h3>
        <p className="text-xs">{displayParty(selectedRequest.payer)} → {displayParty(selectedRequest.payee)} · {num(selectedRequest.amount,lang)} {selectedRequest.currency}</p>
+       <p dir="auto" className="break-words rounded-xl bg-slate-50 p-3 text-sm">{selectedRequest.note}</p>
+       {!owner&&<p className="text-sm text-amber-800">{t.userHelp}</p>}
+       {owner&&<>
        <label className="block text-xs font-bold">{t.source}
          <select value={treasuryId} onChange={e=>setTreasuryId(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border p-2">
            <option value="">{t.select}</option>
@@ -263,6 +269,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
        {selectedTreasury&&<p className="rounded-lg bg-blue-50 p-2 text-xs font-semibold text-blue-950">{selectedTreasury.account_name} · {new Intl.NumberFormat(lang==='ar'?'ar-SA':lang==='fa'?'fa-AF':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(selectedTreasury.available_balance))} {selectedTreasury.currency}</p>}
        {accounts.isSuccess&&selectedRequest.kind==='fund_wallet'&&eligible.every(a=>Number(a.available_balance)<Number(selectedRequest.amount))&&<p role="alert" className="text-xs text-amber-800">{t.insufficient}</p>}
        {accounts.isSuccess&&selectedTreasury&&!sufficientForFunding&&<p role="alert" className="text-xs text-amber-800">{t.insufficient}</p>}
+       </>}
        <label className="block text-xs font-bold">{t.approvalNote}
          <Textarea rows={2} maxLength={500} value={reviewNote} onChange={e=>setReviewNote(e.target.value)} className="mt-1"/>
        </label>
@@ -310,7 +317,7 @@ export default function WalletBankingCenter({person=null,owner=false,lang='en',o
                   </>:<span className="text-slate-500">{t.unposted}</span>}
                 </div>
                 {r.note&&<p dir="auto" title={r.note} className="mt-1 line-clamp-1 break-words text-xs text-slate-500">{r.note}</p>}
-                {owner&&r.status==='pending'&&<Button size="sm" variant="outline" onClick={()=>selectReview(r)} className="mt-2 min-h-10">{t.reviews}</Button>}
+                {canReviewRequest(r)&&<Button size="sm" variant="outline" onClick={()=>selectReview(r)} className="mt-2 min-h-10">{t.reviews}</Button>}
               </div>
             </div>
           </article>;
