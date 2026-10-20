@@ -48,7 +48,8 @@ describe('ERP manager: recorded cash remaining in assigned branch drawer',()=>{
   expect(manager).toContain('پول باقی‌مانده در صندوق');
   expect(manager).toContain('النقد المتبقي في الصندوق');
   expect(manager).toContain('formatMoney(drawerCash.amount)');
-  expect(manager).toContain("const {lang,formatMoney} = useLanguage()");
+  expect(manager).toContain("formatMoney:appFormatMoney");
+  expect(manager).toContain("formatCurrency(value,currency)");
   expect(manager).not.toContain('kpis.cashTotal-kpis.expTotal');
   expect(manager).not.toContain('kpis.cashTotal + kpis.treasuryIn');
   expect(manager).not.toContain("drawerCash.amount||0");
