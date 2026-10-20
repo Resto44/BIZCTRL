@@ -104,25 +104,20 @@ export default function Inventory() {
       const payload = { ...record, branch_id: branchId };
       // Avoid a singular response: a manager's RLS policy may hide the updated row.
       // Check the affected row count explicitly rather than treating zero rows as success.
+      // Use the write count, not a returned row that can be hidden by RLS.
       const query = editing
         ? supabase.from('inventory').update(payload, { count: 'exact' })
             .eq('id', editing.id).eq('restaurant_id', activeRestaurant.id)
         : supabase.from('inventory').insert({
             ...payload, restaurant_id: activeRestaurant.id,
           }, { count: 'exact' });
-      const { data: savedRows, error, count } = await query.select('*');
+      const { error, count } = await query;
       if (error) throw error;
-      if (savedRows?.length !== 1) {
-        // A zero-row update is commonly caused by a stale inventory ID or
-        // branch-scoped RLS. Never report it as a successful save.
-        throw new Error(lang === 'ar'
-          ? 'لم يتم حفظ المخزون. تحقق من صلاحية تعديل المخزون لهذا الفرع ثم أعد تحميل الصفحة.'
-          : lang === 'fa'
-            ? 'موجودی ذخیره نشد. دسترسی ویرایش انبار این شعبه را بررسی و صفحه را تازه کنید.'
-            : 'Inventory was not saved. Verify this branch has updateInventory permission and refresh.');
+      if (count !== 1) {
+        throw new Error('Inventory write affected no row. Verify updateInventory permission and branch scope.');
       }
-      const res = savedRows[0];
-      
+      const res = { ...payload, id: editing?.id, restaurant_id: activeRestaurant.id };
+
       // Check if current stock is low and notify
       const updatedLiveStock = computeLiveStock([res], [], []);
       const item = updatedLiveStock[0];
