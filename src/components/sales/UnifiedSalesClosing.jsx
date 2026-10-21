@@ -1714,6 +1714,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                     <Input id="opening-verification-reason" value={openingVerificationReason} onChange={event => setOpeningVerificationReason(event.target.value)} placeholder="Physical starting drawer count verified by owner" className="mt-1 min-h-11" disabled={openingVerificationBusy} />
                   </label>
                 </div>
+                <p className="text-[11px] font-semibold leading-5 text-amber-900">Enter the cash verified at the START of this shift from a signed handover or reliable source record, not the cash currently in the drawer (Actual Cash). If the starting amount cannot be substantiated, do not approve it.</p>
                 <p className="text-[11px]">This creates an immutable owner-approved opening record. It does not overwrite earlier closings or add sales revenue.</p>
                 {openingVerificationError && <p role="alert" className="text-xs font-bold text-red-700">{openingVerificationError}</p>}
                 <Button type="button" size="sm" data-testid="verify-opening-cash-button" disabled={openingVerificationBusy || !openingVerificationAmount.trim() || openingVerificationReason.trim().length < 10} onClick={verifyOpeningCash}>
