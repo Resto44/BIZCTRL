@@ -91,7 +91,7 @@ describe('mobile owner ERP menu render', () => {
     expect(renderer.root.findAllByType('a').some(link => link.props.href === '/restaurant/pos')).toBe(portal === 'restaurant');
     await act(async () => renderer.unmount()); client.clear(); fixture.portal = 'restaurant';
   });
-  it('opens without throwing and keeps the two quick-entry actions available', async () => {
+  it('opens without throwing and shows four permission-controlled Quick Entry actions', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
@@ -111,7 +111,37 @@ describe('mobile owner ERP menu render', () => {
     const links = renderer.root.findAllByType('a');
     expect(links.some((link) => link.props.href === '/sales')).toBe(true);
     expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
+    expect(links.some((link) => link.props.href === '/sales-sources')).toBe(true);
+    expect(links.some((link) => link.props.href === '/product-management?create=1')).toBe(true);
+    expect(renderer.root.findAllByProps({ 'data-testid': 'mobile-quick-sales-sources' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ 'data-testid': 'mobile-quick-add-product' })).toHaveLength(1);
     expect(renderer.root.findAllByProps({ 'aria-label': 'Search modules and actions' })).toHaveLength(1);
+    await act(async () => renderer.unmount());
+    queryClient.clear();
+  });
+
+  it('does not expose restricted quick actions if ERP permissions are missing', async () => {
+    const previousPermissions = fixture.can;
+    fixture.can = { ...previousPermissions, viewInventory: false, viewSales: false };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let renderer;
+    try {
+      await act(async () => {
+        renderer = TestRenderer.create(
+          <QueryClientProvider client={client}>
+            <MemoryRouter><ERPSidebar mobile collapsed={false} onToggle={() => {}} onNavigate={() => {}} /></MemoryRouter>
+          </QueryClientProvider>,
+        );
+      });
+      const links = renderer.root.findAllByType('a');
+      expect(links.some((link) => link.props.href === '/sales-sources')).toBe(false);
+      expect(links.some((link) => link.props.href === '/product-management?create=1')).toBe(false);
+      expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
+    } finally {
+      if (renderer) await act(async () => renderer.unmount());
+      fixture.can = previousPermissions;
+      client.clear();
+    }
   });
 
   it('shows safe navigation instead of crashing the application when the rich menu fails', async () => {
@@ -136,6 +166,8 @@ describe('mobile owner ERP menu render', () => {
     const links = renderer.root.findAllByType('a');
     expect(links.some((link) => link.props.href === '/sales')).toBe(true);
     expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
+    expect(links.some((link) => link.props.href === '/sales-sources')).toBe(true);
+    expect(links.some((link) => link.props.href === '/product-management?create=1')).toBe(true);
     expect(consoleError).toHaveBeenCalledWith(
       '[mobile-erp-menu] render failed; showing safe navigation',
       expect.any(Error),
