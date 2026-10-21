@@ -61,7 +61,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('data-testid="owner-verify-opening-cash"');
     expect(workspace).toContain("supabase.rpc('erp_verify_sales_closing_opening_count'");
     expect(workspace).toContain('p_request_id: requestId');
-    expect(workspace).toContain('!cashContextReady || !allValid');
+    expect(workspace).toContain('!cashContextReady || ledgerOverdrawn || !allValid');
     expect(panel).toContain('data-testid="opening-cash-provenance"');
     expect(panel).toContain('data-testid="closing-cash-preview"');
     expect(migration).toContain('CREATE TRIGGER opening_verifications_immutable');
@@ -77,7 +77,7 @@ describe('Unified Sales Closing workflow contract', () => {
 
     expect(workspace).toContain('cashSales + networkTotal + creditTotal + otherPaymentTotal');
     expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
-    expect(workspace).toContain('const cashDifference = !cashContextReady ? null : reconciliation.difference;');
+    expect(workspace).toContain('const cashDifference = !cashContextReady || ledgerOverdrawn ? null : reconciliation.difference;');
     expect(workspace).toContain('const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;');
     expect(workspace).toContain('const operatingResult = totalSales - totalDailyExpenses;');
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
@@ -208,7 +208,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('automaticClosingUnavailable');
     expect(workspace).toContain('Retry ERP data');
     expect(workspace).toContain('cashLedgerLoading || autoSourceLoading');
-    expect(workspace).toContain('cashLedgerUnavailable || !cashContextReady || !allValid');
+    expect(workspace).toContain('cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn || !allValid');
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
   });
 
