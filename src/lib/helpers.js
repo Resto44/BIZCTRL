@@ -36,7 +36,9 @@ export const getSaleNetwork = r => Number(r.restaurant_network ?? r.network ?? 0
 /**
  * Shared ERP accounting engine.
  *
- * Gross Profit = Sales - Purchases.  Expenses never affect Gross Profit.
+ * Management operating estimate = finalized Sales - approved Purchases
+ * - recorded Expenses. Purchases are not COGS until stock consumption is
+ * matched to inventory, so this is NOT audited accrual net profit.
  * Daily and weekly fixed-cost deductions are allocated from the complete
  * calendar-month fixed-expense pool; variable expenses are deducted only when
  * they are recorded inside the requested period.
@@ -71,10 +73,14 @@ export function calculateERPAccounting({
     totalCustomSources += revenue.customSources;
   });
 
-  const totalPurchaseCost = safePurchases.reduce(
-    (sum, record) => sum + (Number(record?.total_amount) || (Number(record?.qty) || 0) * (Number(record?.used_price ?? record?.current_price) || 0)),
-    0,
-  );
+  const totalPurchaseCost = safePurchases.reduce((sum, record) => {
+    // A valid zero-value purchase must remain zero, not be replaced by
+    // quantity * price due to JS falsy fallback.
+    const explicit = record?.total_amount;
+    const calculated = Number(record?.qty) * Number(record?.used_price ?? record?.current_price);
+    const value = explicit != null && explicit !== '' ? Number(explicit) : calculated;
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0);
 
   const isFixedExpense = expense => Boolean(expense?._is_fixed || expense?.is_fixed);
   const amountOf = expense => Number(expense?.amount) || 0;
@@ -111,6 +117,8 @@ export function calculateERPAccounting({
     totalNetwork,
     totalAdditionalSources: totalCustomSources,
     totalPurchaseCost,
+    accountingBasis: 'sales_less_approved_purchases_and_recorded_expenses',
+    requiresInventoryCogs: true,
     totalExpenses,
     totalExpensesAll: totalFixedExpenses + totalVariableExpenses,
     totalFixedExpenses,
@@ -205,10 +213,13 @@ export function calculateSalesRevenue(record, revenueSources = []) {
   const network = getSaleNetwork(record);
   const credit = Number(record.credit) || 0;
 
-  // Check if base sources should be included in revenue
-  const cashIncluded = !revenueSources.length || revenueSources.find(s => s.system_key === 'cash')?.included_in_revenue !== false;
-  const networkIncluded = !revenueSources.length || revenueSources.find(s => s.system_key === 'network')?.included_in_revenue !== false;
-  const creditIncluded = !revenueSources.length || revenueSources.find(s => s.system_key === 'credit')?.included_in_revenue !== false;
+  // Once a Closing is finalized, its persisted payment buckets are an
+  // immutable posting snapshot. Changing Sales Source settings next week
+  // cannot retroactively remove a historical cash/card/credit sale.
+  const posted = record?.closing_state === 'finalized';
+  const cashIncluded = posted || !revenueSources.length || revenueSources.find(s => s.system_key === 'cash')?.included_in_revenue !== false;
+  const networkIncluded = posted || !revenueSources.length || revenueSources.find(s => s.system_key === 'network')?.included_in_revenue !== false;
+  const creditIncluded = posted || !revenueSources.length || revenueSources.find(s => s.system_key === 'credit')?.included_in_revenue !== false;
 
   const baseSales = (cashIncluded ? cash : 0) + (networkIncluded ? network : 0) + (creditIncluded ? credit : 0);
 
