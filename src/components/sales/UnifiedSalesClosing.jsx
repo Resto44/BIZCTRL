@@ -539,13 +539,17 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
   // ── POS entries ───────────────────────────────────────────────────────────
   const parsePosEntries = () => {
-    if (initial?.pos_entries_json) {
-      try {
-        const parsed = asRecordArray(JSON.parse(initial.pos_entries_json));
-        if (parsed.length) return parsed.map((e, i) => ({ ...e, id: Date.now() + i }));
-      } catch { /* ignore */ }
-    }
-    return [{ id: Date.now(), device_id: '', device_name: '', amount: '', notes: '' }];
+    // Supabase JSONB is already an array; legacy rows may contain a string.
+    // JSON.parse(array) silently breaks reopening saved network POS totals.
+    const raw = initial?.pos_entries_json;
+    try {
+      const parsed = asRecordArray(typeof raw === 'string' ? JSON.parse(raw) : raw);
+      if (parsed.length) return parsed.map((entry, index) => ({
+        ...entry,
+        id: entry.id || newStableRowId(`saved-pos-${index}`),
+      }));
+    } catch { /* invalid legacy JSON: empty editable entry */ }
+    return [{ id: newStableRowId('pos'), device_id: '', device_name: '', amount: '', notes: '' }];
   };
   const [posEntries, setPosEntries] = useState(parsePosEntries);
 
