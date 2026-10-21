@@ -22,7 +22,7 @@ import { buildActiveAlertCandidates, reconcileActiveAlerts } from '@/lib/activeA
 import { useAuth } from '@/lib/AuthContext';
 import { useBranchScope } from '@/lib/BranchScopeContext';
 import { calculateERPAccounting, calculateSalesRevenue, tagExpensesWithCategories } from '@/lib/helpers';
-import { summarizeDrawerCash } from '@/lib/executiveDrawerCash';
+import { normalizeDrawerCashAsOf } from '@/lib/executiveDrawerCash';
 import { useLanguage } from '@/lib/LanguageContext';
 import { completeOwnerReportCopy } from '@/lib/ownerReportTranslations';
 import {
@@ -268,6 +268,23 @@ function OwnerDashboardContent() {
 
   const periodSalesQuery = useQuery({ queryKey: ['sales_report_period', activeRestaurant?.id, selectedBranchId, period.currentStart, period.currentEnd], queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: period.currentStart, dateTo: period.currentEnd, filters: { closing_state: 'finalized' }, limit: 10000 }), staleTime: 15000, enabled });
   const previousPeriodSalesQuery = useQuery({ queryKey: ['sales_report_previous_period', activeRestaurant?.id, selectedBranchId, period.previousStart, period.previousEnd], queryFn: () => fetchBranchScopedRows('daily_sales', { dateColumn: 'date', dateFrom: period.previousStart, dateTo: period.previousEnd, filters: { closing_state: 'finalized' }, limit: 10000 }), staleTime: 60000, enabled });
+  // Physical drawer cash is a point-in-time balance, NOT a sum of sales in the
+  // selected reporting period. The scoped database view returns only the most
+  // recent count per permitted branch and marks ambiguous/legacy draws unknown.
+  const drawerCashQuery = useQuery({
+    queryKey: ['owner_drawer_cash_asof', activeRestaurant?.id, selectedBranchId, branchSignature, period.currentEnd],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('erp_owner_drawer_cash_asof', {
+        p_restaurant_id: activeRestaurant.id,
+        p_as_of_date: period.currentEnd,
+        p_branch_id: isAllBranches ? null : selectedBranchId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 15000,
+    enabled,
+  });
   const periodExpensesQuery = useQuery({ queryKey: ['expenses_report_period', activeRestaurant?.id, selectedBranchId, period.currentStart, period.currentEnd], queryFn: () => fetchBranchScopedRows('expenses', { legacyColumn: 'branch_key', dateColumn: 'date', dateFrom: period.currentStart, dateTo: period.currentEnd, limit: 10000 }), staleTime: 30000, enabled });
   const previousPeriodExpensesQuery = useQuery({ queryKey: ['expenses_report_previous_period', activeRestaurant?.id, selectedBranchId, period.previousStart, period.previousEnd], queryFn: () => fetchBranchScopedRows('expenses', { legacyColumn: 'branch_key', dateColumn: 'date', dateFrom: period.previousStart, dateTo: period.previousEnd, limit: 10000 }), staleTime: 60000, enabled });
   const currentFixedExpensePoolQuery = useQuery({ queryKey: ['expenses_report_fixed_pool', activeRestaurant?.id, selectedBranchId, currentReferenceMonthStart, period.currentEnd], queryFn: () => fetchBranchScopedRows('expenses', { legacyColumn: 'branch_key', dateColumn: 'date', dateFrom: currentReferenceMonthStart, dateTo: period.currentEnd, limit: 5000 }), staleTime: 60000, enabled: enabled && usesAllocatedFixedCosts });
@@ -389,16 +406,28 @@ function OwnerDashboardContent() {
   const revenueTrend = useMemo(() => aggregateDailyRevenue(periodSales, (sale) => calculateSalesRevenue(sale, revenueSources).total), [periodSales, revenueSources]);
   const receivables = customerDebts.reduce((sum, debt) => sum + numeric(debt.remaining_amount ?? debt.balance ?? debt.total_amount), 0);
   const payables = supplierInvoices.filter(approvedPurchase).reduce((sum, invoice) => sum + Math.max(0, numeric(invoice.remaining_amount ?? invoice.balance ?? (numeric(invoice.total_amount) - numeric(invoice.paid_amount ?? invoice.amount_paid)))), 0);
-  const drawerCash = useMemo(() => summarizeDrawerCash(periodSales), [periodSales]);
+  const drawerCash = useMemo(
+    () => normalizeDrawerCashAsOf(drawerCashQuery.data, {
+      loading: drawerCashQuery.isLoading || drawerCashQuery.isFetching && !drawerCashQuery.data,
+      error: drawerCashQuery.isError,
+    }),
+    [drawerCashQuery.data, drawerCashQuery.isLoading, drawerCashQuery.isFetching, drawerCashQuery.isError],
+  );
   const cashRegister = drawerCash.amount;
   const periodSalesChange = percentageChange(periodMetrics.totalSales, previousPeriodMetrics.totalSales);
   const periodPurchaseQuantity = periodPurchases.reduce((sum, invoice) => sum + (Array.isArray(invoice.items) ? invoice.items.reduce((itemSum, item) => itemSum + numeric(item?.quantity), 0) : numeric(invoice.qty ?? invoice.quantity)), 0);
   const supplierCount = new Set(periodPurchases.map((invoice) => invoice.supplier_id || invoice.supplier_name).filter(Boolean)).size;
 
-  const coreQueries = [periodSalesQuery, previousPeriodSalesQuery, periodExpensesQuery, previousPeriodExpensesQuery, expenseCategoriesQuery, supplierInvoicesQuery, customerDebtsQuery, inventoryQuery];
+  const coreQueries = [periodSalesQuery, previousPeriodSalesQuery, periodExpensesQuery, previousPeriodExpensesQuery, expenseCategoriesQuery, supplierInvoicesQuery, customerDebtsQuery, inventoryQuery, drawerCashQuery];
   if (usesAllocatedFixedCosts) coreQueries.push(currentFixedExpensePoolQuery, previousFixedExpensePoolQuery);
   const loading = coreQueries.some((query) => query.isLoading);
   const hasQueryError = [...coreQueries, inventoryTransactionsQuery, productsQuery, priceHistoryQuery].some((query) => query.isError);
+  // Expenses with pending status are operational entries, not approved
+  // accrual ledgers. Disclose that the calculated surplus is provisional.
+  const pendingExpenseCount = periodExpenses.filter((row) =>
+    row.status && !['approved', 'paid', 'posted', 'settled'].includes(String(row.status).toLowerCase())
+  ).length;
+  const accountingProvisional = pendingExpenseCount > 0 || hasQueryError;
   const displayScope = isAllBranches ? copy.allBranches : selectedBranchLabel;
   const isLive = realtimeStatus === 'SUBSCRIBED';
 
@@ -424,8 +453,8 @@ function OwnerDashboardContent() {
     supplierCount, selectBranch: setSelectedBranchId, canAddBranch: role === 'owner',
     canOpenCopilot: role === 'owner' && subscriptionActive && hasFeature('ai_copilot') && Boolean(activeRestaurant?.id) && Boolean(user?.id),
     openCopilot: () => setCopilotOpen(true), copilotLabel,
-    openQuickAddBranch: () => setQuickAddBranchOpen(true), loadingActiveAlerts, hasQueryError,
-  }), [branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, loadingActiveAlerts, payables, periodLabel, activePeriod, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel, subscriptionActive, hasFeature]);
+    openQuickAddBranch: () => setQuickAddBranchOpen(true), loadingActiveAlerts, hasQueryError, accountingProvisional, pendingExpenseCount,
+  }), [branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, accountingProvisional, pendingExpenseCount, loadingActiveAlerts, payables, periodLabel, activePeriod, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel, subscriptionActive, hasFeature]);
 
   if (loading) return <DashboardSkeleton />;
 
