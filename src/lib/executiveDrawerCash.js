@@ -25,14 +25,10 @@ const savedTime = (record) => {
 };
 
 export function enteredDrawerCash(record) {
-  // Actual Cash is the physical count entered by the cashier. The saved
-  // closing_cash may include owner cash injections, so only use it as a
-  // legacy fallback if no owner injection can distort the physical balance.
-  const entered = moneyOrNull(record?.actual_cash);
-  if (entered !== null) return entered;
-  const ownerInjection = moneyOrNull(record?.owner_cash_injection);
-  if (ownerInjection !== null && ownerInjection > 0) return null;
-  return moneyOrNull(record?.closing_cash);
+  // Only the physical count is verifiable. Legacy closing_cash is often
+  // derived from expected cash, an owner injection or a prior settlement, so
+  // falling back to it misrepresents uncounted money as cash in the drawer.
+  return moneyOrNull(record?.actual_cash);
 }
 
 /**
@@ -65,5 +61,32 @@ export function summarizeDrawerCash(sales = []) {
     branches: latest.size,
     missingBranches,
     complete: latest.size > 0 && missingBranches === 0,
+  };
+}
+
+/**
+ * Normalizes the tenant-scoped owner cash-as-of RPC. A period flow is not a
+ * cash balance: null/ambiguous/uncounted results MUST stay unknown, never 0.
+ */
+export function normalizeDrawerCashAsOf(payload, { loading = false, error = false } = {}) {
+  const data = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : null;
+  const count = Number(data?.branches);
+  const missing = Number(data?.missingBranches);
+  const cash = moneyOrNull(data?.amount);
+  const details = Array.isArray(data?.details) ? data.details : [];
+  const complete = !loading && !error && data?.basis === 'last_verified_physical_count_not_live_bank_balance'
+    && data?.complete === true && Number.isInteger(count) && count > 0
+    && Number.isInteger(missing) && missing === 0 && cash !== null
+    && details.length === count
+    && details.every(row => row?.status === 'verified' && moneyOrNull(row.cash) !== null);
+  return {
+    amount: complete ? cash : null,
+    branches: Number.isInteger(count) && count >= 0 ? count : 0,
+    missingBranches: Number.isInteger(missing) && missing >= 0 ? missing : 0,
+    complete,
+    asOfDate: typeof data?.asOfDate === 'string' ? data.asOfDate : null,
+    details,
+    loading: Boolean(loading),
+    error: Boolean(error),
   };
 }
