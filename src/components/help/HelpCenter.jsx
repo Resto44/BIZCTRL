@@ -39,6 +39,15 @@ export default function HelpCenter() {
       <p className="mt-2 text-sm leading-6 text-muted-foreground">{c.intro}</p>
       <p className="mt-3 text-xs leading-6 text-muted-foreground">{c.scope}</p>
     </div>
+    <nav aria-label="Quick start guides" className="flex flex-wrap gap-2">
+      {[
+        ['new-user-essentials', language === 'ar' ? 'البدء للمستخدم الجديد' : language === 'fa' ? 'شروع کاربر جدید' : 'New user'],
+        ['closing-field-builder-reference', 'Sales Closing Customization'],
+        ['product-identity-reference', 'Product Management'],
+        ['pwa-install-ios', 'iPhone / Safari'],
+        ['pwa-install-android', 'Android / Chrome'],
+      ].map(([id, label]) => <Link key={id} to={`/help?guide=${id}`} className="inline-flex min-h-11 items-center rounded-xl border border-primary/25 bg-card px-3 py-2 text-xs font-semibold text-primary">{label}</Link>)}
+    </nav>
     <div className="space-y-3">
       <label className="block text-sm font-semibold" htmlFor="help-search">{c.search}</label>
       <div className="relative"><Search className="pointer-events-none absolute start-3 top-3 h-5 w-5 text-muted-foreground" aria-hidden="true" /><input id="help-search" type="search" value={query} onChange={event => change('q', event.target.value)} className="min-h-11 w-full rounded-xl border bg-background py-3 pe-3 ps-10 text-base" /></div>
