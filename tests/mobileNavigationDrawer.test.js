@@ -54,11 +54,11 @@ describe('mobile navigation drawer contract', () => {
     expect(sidebar).toContain('QUICK ENTRY');
     expect(sidebar).toContain('to="/sales"');
     expect(sidebar).toContain('to="/purchases?create=1"');
-    expect(sidebar).toContain('data-testid="mobile-quick-sales-sources"');
-    expect(sidebar).toContain('to="/sales-sources?create=1"');
+    expect(sidebar).toContain('data-testid="mobile-quick-sales-closing-customization"');
+    expect(sidebar).toContain('to="/sales-closing-customization"');
     expect(sidebar).toContain('data-testid="mobile-quick-add-product"');
     expect(sidebar).toContain('to="/product-management"');
-    expect(sidebar).toContain('salesSourcesLabel');
+    expect(sidebar).toContain('salesClosingCustomizationLabel');
     expect(sidebar).toContain('addProductLabel');
     expect(purchases).toContain("searchParams.get('create') !== '1'");
     expect(purchases).toContain('setShowForm(true)');
@@ -91,23 +91,18 @@ describe('mobile navigation drawer contract', () => {
   });
 
 
-  it('routes Product Management to the page, but opens Add Sales Source directly', async () => {
-    const [sidebar, sources, app] = await Promise.all([
+  it('opens Sales Closing Customization and the full Product Management page with guard checks', async () => {
+    const [sidebar, app] = await Promise.all([
       source('../src/components/layout/ERPSidebar.jsx'),
-      source('../src/pages/SalesSourceManagement.jsx'),
       source('../src/App.jsx'),
     ]);
     expect(sidebar).toContain('to="/product-management"');
-    expect(sidebar).not.toContain('to="/product-management?create=1"');
-    expect(sidebar).toContain('to="/sales-sources?create=1"');
+    expect(sidebar).toContain('to="/sales-closing-customization"');
+    expect(sidebar).not.toContain('to="/sales-sources?create=1"');
+    expect(sidebar).toContain('salesClosingCustomizationLabel');
+    expect(sidebar).toContain('can.manageSettings && (');
     expect(app).toContain('<Route path="/product-management" element={<RoleGuard permission="viewInventory">');
-    expect(app).toContain('<Route path="/sales-sources" element={<RoleGuard permission="viewSales">');
-    expect(sources).toContain("search.get('create') !== '1'");
-    expect(sources).toContain("setTab('sources')");
-    expect(sources).toContain("if (canManage)");
-    expect(sources).toContain("setSourceEditor({ mode: 'create'");
-    expect(sources).toContain("search.delete('create')");
-    expect(sources).toContain("{ replace: true }");
+    expect(app).toContain('<Route path="/sales-closing-customization" element={<RoleGuard permission="manageSettings">');
   });
 
   it('imports every icon used by the expanded mobile module registry', async () => {
