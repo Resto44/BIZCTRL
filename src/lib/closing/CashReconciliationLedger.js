@@ -119,7 +119,7 @@ export const cashReconciliationSnapshot = ({
   // a normal cash overage. Finalization is blocked independently by the RPC.
   const expectedCash = Math.round((opening + ledger.cashIn + cashSales - ledger.cashOut) * 100) / 100;
   const actual = actualCash === '' || actualCash === null || actualCash === undefined ? null : money(actualCash);
-  const difference = actual === null ? null : Math.round((actual - expectedCash) * 100) / 100;
+  const difference = actual === null || expectedCash < 0 ? null : Math.round((actual - expectedCash) * 100) / 100;
   const shortage = difference !== null && difference < 0 ? Math.abs(difference) : 0;
   const overage = difference !== null && difference > 0 ? difference : 0;
   const cashFundingRequired = money(ledger.cashOut - (opening + ledger.cashIn + cashSales));
