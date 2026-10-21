@@ -5,8 +5,19 @@ import { cva } from "class-variance-authority";
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { useWorkspaceTabActive } from "@/lib/WorkspaceTabVisibilityContext"
 
-const Sheet = SheetPrimitive.Root
+// Dialog portals live in document.body, outside cached Owner tab panels. An
+// inactive tab must not retain a global overlay, focus trap or scroll lock.
+// Keep the caller's open state unchanged so it is restored on tab reactivation.
+function Sheet({ open, onOpenChange, ...props }) {
+  const active = useWorkspaceTabActive();
+  return <SheetPrimitive.Root
+    {...props}
+    open={active ? open : false}
+    onOpenChange={active ? onOpenChange : undefined}
+  />;
+}
 
 const SheetTrigger = SheetPrimitive.Trigger
 
