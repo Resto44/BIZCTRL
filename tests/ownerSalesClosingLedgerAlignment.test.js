@@ -43,7 +43,7 @@ describe('ERP contract: Sales Closing ↔ Owner Dashboard', () => {
     const result = cashReconciliationSnapshot({
       openingCash: 25,
       currentCashSales: 300,
-      paymentEntries: [{ amount: 120, payment_method: 'card' }, { amount: 80, payment_method: 'credit' }],
+      revenueEntries: [{ amount: 120, payment_method: 'card' }, { amount: 80, payment_method: 'credit' }],
       ledgerMovements: [{ direction: 'out', amount: 280 }],
       actualCash: 45,
     });
