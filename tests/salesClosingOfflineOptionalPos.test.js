@@ -41,6 +41,8 @@ describe('Sales Closing: POS optional, manual/offline available', () => {
     expect(src).toContain("disabled={!automaticTotalsEnabled || Boolean(initial?.id)}");
     expect(src).toContain('data-testid="offline-sales-audit"');
     expect(src).toContain('data-testid="closing-blockers"');
+    expect(src).toContain("typeof raw === 'string' ? JSON.parse(raw) : raw");
+    expect(src).toContain("id: entry.id || newStableRowId");
     expect(src).toContain('id="quick-closing-cashSales"');
     expect(src).toContain('id={`quick-closing-network-${entry.id}`}');
     expect(src).toContain("passed: posEntries.every(e => e.amount === '' || e.amount == null");
