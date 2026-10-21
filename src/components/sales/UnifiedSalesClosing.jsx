@@ -1137,7 +1137,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (openingVerificationBusy || role !== 'owner') return;
     const raw = openingVerificationAmount.trim();
     const amount = Number(raw);
-    if (!/^\\d+(?:\\.\\d{1,2})?$/.test(raw) || !Number.isFinite(amount) || amount < 0) {
+    if (!/^\d+(?:\.\d{1,2})?$/.test(raw) || !Number.isFinite(amount) || amount < 0) {
       setOpeningVerificationError('Enter the physically counted opening cash (0 or a positive amount, max two decimals).');
       return;
     }
