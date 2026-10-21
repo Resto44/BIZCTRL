@@ -50,6 +50,14 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('Exceptional Cash Adjustment');
   });
 
+  it('rejects legacy Closing Cash as a synthetic Actual Count and revalidates when opening arrives', async () => {
+    const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
+    expect(workspace).toContain("initial?.actual_cash == null ? '' : String(initial.actual_cash)");
+    expect(workspace).not.toContain('Number(initial.closing_cash) - Number(initial.owner_cash_injection || 0)');
+    expect(workspace).toContain('hasValidActualCount');
+    expect(workspace).toContain('cashContextReady, openingReviewRequired, ledgerOverdrawn');
+  });
+
   it('blocks unverified shift openings until the owner records an immutable physical count', async () => {
     const [workspace, panel, migration] = await Promise.all([
       source('../src/components/sales/UnifiedSalesClosing.jsx'),
@@ -144,7 +152,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const requiresCashReconciliation = closingConfig?.validation_rules?.require_cash_reconciliation !== false;');
     expect(workspace).toContain('const automaticClosingEnabled = Boolean(automaticTotalsEnabled');
     expect(workspace).toContain('const useAutomaticSales = Boolean(automaticTotalsEnabled');
-    expect(workspace).toContain('!requiresCashReconciliation || actualCount !== null');
+    expect(workspace).toContain('passed: actualCount !== null,');
     expect(workspace).toContain('Variance will be recorded separately');
     expect(workspace).toContain('(requiresCashReconciliation || attentionCount > 0)');
     expect(workspace).toContain('requiresCashReconciliation && <div');
@@ -188,7 +196,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
     expect(workspace).toContain('Fixed and variable expenses are supplied only by the canonical server cash');
     expect(workspace).not.toContain(".from('expenses')");
-    expect(workspace).toContain("nextErrors.actualCash = 'Actual Cash is required.'");
+    expect(workspace).toContain("nextErrors.actualCash = 'Enter the physically counted Actual Cash (0 or positive, up to two decimal places).'");
     expect(workspace).toContain('focusField(firstError)');
     expect(workspace).toContain('Closing already completed for this branch and shift.');
     expect(sales).toContain("import { closingSaveErrorMessage, recordClosingOwnerPayment, saveClosingSession } from '@/lib/closing/ClosingRepository';");
