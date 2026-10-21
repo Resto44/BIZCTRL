@@ -175,15 +175,15 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
         {openingVerified && !ledgerUnavailable && !ledgerLoading && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-2 text-xs text-blue-900" data-testid="opening-cash-provenance">
             <span className="font-bold">Opening Cash source</span>
-            <span>{openingStatus === 'initial_zero' ? 'No earlier verified closing · initial SAR 0 baseline' : openingSource === 'same_cashier_count' ? 'Previous shift · matched cashier' : 'Previous shift · branch physical count'}{openingShiftDate ? ` · ${openingShiftDate}` : ''}</span>
+            <span>{openingStatus === 'manual_verified_opening' ? 'Owner-certified physical opening count' : openingSource === 'same_cashier_count' ? 'Previous shift · matched cashier count' : openingSource === 'single_branch_shift_count' ? 'Previous shift · one counted branch drawer' : 'Opening source requires review'}{openingShiftDate ? ` · ${openingShiftDate}` : ''}</span>
           </div>
         )}
         <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)] gap-3">
           <div id="quick-closing-reconciliation" className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-            <label htmlFor="quick-closing-actualCash" className="block text-xs font-black text-slate-700 sm:text-sm">Actual Cash <span className="text-red-500">*</span></label>
+            <label htmlFor="closing-detail-actual-cash" className="block text-xs font-black text-slate-700 sm:text-sm">Actual Cash <span className="text-red-500">*</span></label>
             <p className="mt-1 hidden text-xs text-slate-500 sm:block">Enter the physical cash count</p>
             <ClosingNumericInput
-              id="quick-closing-actualCash"
+              id="closing-detail-actual-cash"
               value={actualCashValue}
               onChange={onActualCashChange}
               prefix={currency}
