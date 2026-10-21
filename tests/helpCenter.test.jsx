@@ -55,6 +55,52 @@ describe('Help Center guide integrity', () => {
     expect(searchHelpArticles({ role: 'employee', category: 'money' }).map(a => a.id)).toContain('wallet-notifications');
     expect(searchHelpArticles({ role: 'employee', category: 'money' }).map(a => a.id)).not.toContain('wallet-owner-history-alerts');
   });
+  it('documents all eight Sales Closing tabs, four Product Master steps and restaurant POS item fields', () => {
+    const closingIds = ['closing-field-builder-reference', 'closing-source-reference', 'closing-payment-reference', 'closing-configuration-reference'];
+    const productIds = ['product-identity-reference', 'product-pricing-reference', 'product-inventory-reference', 'product-advanced-reference', 'restaurant-menu-product-fields', 'product-management-tabs'];
+    const guides = helpArticles.filter(article => [...closingIds, ...productIds].includes(article.id));
+    expect(guides).toHaveLength(10);
+    expect(guides.flatMap(article => article.fields || []).length).toBeGreaterThanOrEqual(125);
+    for (const article of guides) {
+      expect(article.route).toMatch(/^\/(sales-closing-customization|product-management)$/);
+      for (const field of article.fields || []) {
+        expect(['required','optional','conditional','system']).toContain(field.status);
+        expect(field.key.length).toBeGreaterThan(1);
+        for (const lang of ['en','ar','fa']) {
+          expect(field.content[lang].label.length).toBeGreaterThan(1);
+          expect(field.content[lang].description.length).toBeGreaterThan(10);
+        }
+      }
+    }
+    const source = helpArticles.find(article => article.id === 'closing-source-reference');
+    expect(source.fields.map(field => field.key)).toEqual(expect.arrayContaining([
+      'name_en','is_global','branch_ids','included_in_revenue',
+      'included_in_cash_register','included_in_profit_calc','requires_wallet',
+    ]));
+    const menu = helpArticles.find(article => article.id === 'restaurant-menu-product-fields');
+    expect(menu.fields.map(field => field.key)).toEqual(expect.arrayContaining([
+      'name','price','tax_rate','station','stock_mode','inventory_id','recipe_quantity','confirm_untracked',
+    ]));
+    expect(helpArticles.find(article => article.id === 'product-identity-reference').fields.find(field => field.key === 'name').status).toBe('required');
+    expect(helpArticles.find(article => article.id === 'product-identity-reference').fields.find(field => field.key === 'barcode').status).toBe('conditional');
+  });
+
+  it('covers installation on iPhone, Android and desktop with separate troubleshooting', () => {
+    for (const id of ['pwa-install-ios','pwa-install-android','pwa-install-desktop','pwa-install-push-fixes','new-user-essentials']) {
+      const guide = helpArticles.find(article => article.id === id);
+      expect(guide, id).toBeDefined();
+      expect(guide.category).toMatch(/^(start|trouble)$/);
+      for (const lang of ['en','ar','fa']) expect(guide.content[lang].steps).toHaveLength(3);
+    }
+  });
+
+  it('indexes individual field keys and translated field names', () => {
+    expect(searchHelpArticles({ query: 'included_in_cash_register' }).map(article => article.id)).toContain('closing-source-reference');
+    expect(searchHelpArticles({ query: 'موجودی آغاز' }).map(article => article.id)).toContain('product-inventory-reference');
+    expect(searchHelpArticles({ query: 'تخصيص إقفال' }).map(article => article.id)).toContain('closing-field-builder-reference');
+    expect(searchHelpArticles({ query: 'Add to Home Screen' }).map(article => article.id)).toContain('pwa-install-ios');
+    expect(searchHelpArticles({ role: 'employee' }).map(article => article.id)).not.toContain('closing-field-builder-reference');
+  });
   it('combines role and topic filters without implying permissions', () => {
     const found = searchHelpArticles({ role: 'supplier', category: 'portals' });
     expect(found.map(a => a.id)).toEqual(['supplier-portal']);
@@ -77,6 +123,19 @@ describe('Help Center interactions', () => {
     expect(tree.root.findAllByType('article')).toHaveLength(helpArticles.length);
     act(() => tree.root.findByProps({ id: 'help-search' }).props.onChange({ target: { value: 'reconciliation' } }));
     expect(tree.root.findAllByType('article').length).toBeLessThan(helpArticles.length);
+  });
+  it('opens a deep-linked field guide and shows required-status labels in Persian', () => {
+    locale.lang = 'fa';
+    mount('/help?guide=product-identity-reference');
+    expect(tree.root.findAllByProps({ 'data-help-field': 'name' })).toHaveLength(1);
+    expect(tree.root.findAllByProps({ 'data-help-field': 'barcode' })).toHaveLength(1);
+    const article = tree.root.findAllByType('article')[0];
+    expect(article.props.id).toBe('guide-product-identity-reference');
+    const fields = tree.root.findAllByProps({ 'data-help-field': 'name' });
+    expect(JSON.stringify(fields[0].toJSON?.() || fields[0].props)).toContain('name');
+    const toggle = tree.root.findAllByType('button').find(button => button.props['aria-controls'] === 'help-body-product-identity-reference');
+    act(() => toggle.props.onClick());
+    expect(tree.root.findAllByProps({ 'data-help-field': 'name' })).toHaveLength(0);
   });
   it('changes role filter and safely handles unknown URL parameters', () => {
     locale.lang = 'ar'; mount('/help?role=unknown&topic=unknown&guide=missing');
