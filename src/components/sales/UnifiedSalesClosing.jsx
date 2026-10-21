@@ -1209,7 +1209,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   }, [cashLedgerContext.opening_cash, initial?.id]);
 
   const opening = openingReviewRequired ? null : Number(cashLedgerContext.opening_cash ?? openingCash) || 0;
-  const actualCount = actualCashCount !== '' ? Number(actualCashCount) : null;
+  // Blank / incomplete numeric input is not a physical count. 0 is valid only
+  // when the operator actually typed zero; never coerce an empty count to zero.
+  const hasValidActualCount = /^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$/.test(String(actualCashCount));
+  const actualCount = hasValidActualCount && Number.isFinite(Number(actualCashCount))
+    ? Number(actualCashCount) : null;
   const ownerContrib = 0;
   const approvedPurchasesTotal = approvedPurchasesForDate.reduce((sum, purchase) => sum + (Number(purchase.total_amount) || 0), 0);
   // The server context is canonical for both daily fixed allocation and dated
@@ -1272,7 +1276,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       key: 'erpData',
       label: 'ERP Sales and Cash Ledger Available',
       passed: !automaticClosingUnavailable && !cashLedgerUnavailable && cashContextReady && !openingReviewRequired && !ledgerOverdrawn,
-      message: openingReviewRequired ? 'Opening Cash needs reconciliation' : automaticClosingUnavailable || cashLedgerUnavailable || !cashContextReady ? 'Retry required' : (useAutomaticSales ? 'Ledger-scoped sales loaded' : 'No posted sales'),
+      message: openingReviewRequired ? 'Opening Cash needs reconciliation' : ledgerOverdrawn ? 'Correct overdrawn cash movement ledger' : automaticClosingUnavailable || cashLedgerUnavailable || !cashContextReady ? 'Retry required' : 'Verified cash ledger available',
     },
     {
       key: 'cashier',
@@ -1328,8 +1332,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     {
       key: 'cashBalance',
       label: 'Actual Cash Count Recorded',
-      passed: !requiresCashReconciliation || actualCount !== null,
-      message: !requiresCashReconciliation ? 'Optional by configuration' : actualCount === null ? 'Actual cash count required' : remainingDifference === 0 ? 'Balanced' : 'Variance will be recorded separately',
+      passed: actualCount !== null,
+      message: actualCount === null ? 'A verified physical cash count is required by the server' : remainingDifference === 0 ? 'Balanced' : 'Variance will be recorded separately',
     },
     {
       key: 'requiredFields',
@@ -1337,7 +1341,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       passed: !!form.date && !!form.branch && customClosingFields.every((field) => !field.is_required || hasCustomClosingFieldValue(field)),
       message: form.date || 'Date required',
     },
-  ], [form, automaticClosingUnavailable, cashLedgerUnavailable, useAutomaticSales, cashierDisplayName, approvedPurchasesForDate, posEntries, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
+  ], [form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, approvedPurchasesForDate, posEntries, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   const networkCounterTotal = baseNetworkTotal;
@@ -1387,7 +1391,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (openingReviewRequired) nextErrors.reconciliation = openingReviewReason;
     if (cashLedgerUnavailable || !cashContextReady) nextErrors.reconciliation = 'Load and verify the ERP cash ledger before saving.';
     if (ledgerOverdrawn) nextErrors.reconciliation = 'Cash ledger is overdrawn. Reconcile dated cash movements and funding before finalizing.';
-    if (!savingDraft && requiresCashReconciliation && actualCount === null) nextErrors.actualCash = 'Actual Cash is required.';
+    if (!savingDraft && actualCount === null) nextErrors.actualCash = 'Enter the physically counted Actual Cash (0 or positive, up to two decimal places).';
     if (invalidCredit) nextErrors.credit = 'Select an active branch customer and enter a valid non-negative credit sale amount.';
     if (!savingDraft && pendingPaymentEntry) nextErrors.credit = 'Record or clear the customer debt payment before saving the Sales Closing.';
     if (!savingDraft && limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer_name_snapshot || 'the selected customer'}. Reduce the credit sale to the live available credit.`;
