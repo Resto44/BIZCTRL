@@ -114,7 +114,10 @@ export const cashReconciliationSnapshot = ({
   const otherSales = payments.other;
   const revenueToday = cashSales + cardSales + bankTransferSales + onlineSales + walletSales + creditSales + otherSales;
   const opening = money(openingCash);
-  const expectedCash = money(opening + ledger.cashIn + cashSales - ledger.cashOut);
+  // Do not clamp a physically impossible negative drawer expectation to zero.
+  // The mismatch must be corrected in the scoped movement ledger, not shown as
+  // a normal cash overage. Finalization is blocked independently by the RPC.
+  const expectedCash = Math.round((opening + ledger.cashIn + cashSales - ledger.cashOut) * 100) / 100;
   const actual = actualCash === '' || actualCash === null || actualCash === undefined ? null : money(actualCash);
   const difference = actual === null ? null : Math.round((actual - expectedCash) * 100) / 100;
   const shortage = difference !== null && difference < 0 ? Math.abs(difference) : 0;
@@ -144,7 +147,8 @@ export const cashReconciliationSnapshot = ({
     ownerSettlementRequired: settlement.ownerPaymentRequired,
     cashFundingRequired,
     operatingResult,
-    varianceStatus: difference === null ? 'pending' : difference === 0 ? 'balanced' : difference < 0 ? 'shortage' : 'overage',
+    varianceStatus: expectedCash < 0 ? 'ledger_overdrawn' : difference === null ? 'pending' : difference === 0 ? 'balanced' : difference < 0 ? 'shortage' : 'overage',
+    ledgerOverdrawn: expectedCash < 0,
     ...settlement,
   };
 };
