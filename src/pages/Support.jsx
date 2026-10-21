@@ -4,6 +4,7 @@ import HelpCenter, { HELP_COPY } from '@/components/help/HelpCenter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { useRole, ROLE_HOME } from '@/lib/RoleContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -175,6 +176,8 @@ function TicketDetail({ ticket, onClose }) {
 
 export default function Support() {
   const { user } = useAuth();
+  const { role } = useRole();
+  const dashboardPath = ROLE_HOME[role] || (user?.role ? ROLE_HOME[user.role] : null);
   const { lang: language, dir } = useLanguage();
   const [params, setParams] = useSearchParams();
   const showTickets = params.get("tab") === "tickets";
@@ -219,7 +222,7 @@ export default function Support() {
       <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label={helpCopy.title}>
         {[['guides', helpCopy.title], ['tickets', lbl.my_tickets]].map(([tab, label]) => <Button key={tab} variant={(showTickets ? 'tickets' : 'guides') === tab ? 'default' : 'outline'} aria-pressed={(showTickets ? 'tickets' : 'guides') === tab} onClick={() => setParams(current => { const next = new URLSearchParams(current); next.set('tab', tab); return next; }, { replace: true })}>{label}</Button>)}
       </div>
-      {!showTickets ? <HelpCenter /> : isError ? <div role="alert" className="rounded-xl border p-4"><p>{language === 'fa' ? 'تیکت‌ها دریافت نشد.' : language === 'ar' ? 'تعذر تحميل التذاكر.' : 'Could not load support tickets.'}</p><Button className="mt-3" onClick={() => refetch()}>{language === 'fa' ? 'تلاش دوباره' : language === 'ar' ? 'إعادة المحاولة' : 'Retry'}</Button></div> : isLoading ? (
+      {!showTickets ? <HelpCenter dashboardPath={dashboardPath} /> : isError ? <div role="alert" className="rounded-xl border p-4"><p>{language === 'fa' ? 'تیکت‌ها دریافت نشد.' : language === 'ar' ? 'تعذر تحميل التذاكر.' : 'Could not load support tickets.'}</p><Button className="mt-3" onClick={() => refetch()}>{language === 'fa' ? 'تلاش دوباره' : language === 'ar' ? 'إعادة المحاولة' : 'Retry'}</Button></div> : isLoading ? (
         <p className="text-center text-sm text-muted-foreground py-8">{lbl.loading}</p>
       ) : tickets.length === 0 ? (
         <div className="text-center py-16">
