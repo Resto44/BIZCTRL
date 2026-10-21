@@ -1211,7 +1211,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const opening = openingReviewRequired ? null : Number(cashLedgerContext.opening_cash ?? openingCash) || 0;
   // Blank / incomplete numeric input is not a physical count. 0 is valid only
   // when the operator actually typed zero; never coerce an empty count to zero.
-  const hasValidActualCount = /^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$/.test(String(actualCashCount));
+  const hasValidActualCount = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(String(actualCashCount));
   const actualCount = hasValidActualCount && Number.isFinite(Number(actualCashCount))
     ? Number(actualCashCount) : null;
   const ownerContrib = 0;
