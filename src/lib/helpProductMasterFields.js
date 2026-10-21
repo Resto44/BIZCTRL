@@ -79,7 +79,6 @@ discount_allowed|optional|Discount allowed|السماح بالخصم|اجازه 
 branch_price_override|optional|Branch price override|تعديل سعر الفرع|قیمت متفاوت شعبه|Allow authorized branch-specific pricing.|يسمح بسعر خاص للفروع المصرح لها.|اجازه قیمت خاص شعبه.
 price_change_requires_approval|optional|Owner price approval|موافقة المالك للسعر|تأیید اونر برای قیمت|Request owner approval for price changes.|مراجعة المالك لتغييرات السعر.|تغییر قیمت نیازمند تأیید اونر.`),
   }),
-,
   fieldGuide({
     id: 'product-inventory-reference', category: 'stock', roles: ['owner','manager'], route: '/product-management',
     source: 'src/components/products/ProductMasterForm.jsx',
