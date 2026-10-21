@@ -50,6 +50,25 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('Exceptional Cash Adjustment');
   });
 
+  it('blocks unverified shift openings until the owner records an immutable physical count', async () => {
+    const [workspace, panel, migration] = await Promise.all([
+      source('../src/components/sales/UnifiedSalesClosing.jsx'),
+      source('../src/components/sales/CashReconciliationPanel.jsx'),
+      source('../supabase/migrations/20261021170000_sales_closing_audited_opening_verification.sql'),
+    ]);
+    expect(workspace).toContain('const cashContextReady = Boolean(cashLedgerContextData && cashLedgerContext.opening_verified === true)');
+    expect(workspace).toContain('data-testid="opening-cash-needs-review"');
+    expect(workspace).toContain('data-testid="owner-verify-opening-cash"');
+    expect(workspace).toContain("supabase.rpc('erp_verify_sales_closing_opening_count'");
+    expect(workspace).toContain('p_request_id: requestId');
+    expect(workspace).toContain('!cashContextReady || !allValid');
+    expect(panel).toContain('data-testid="opening-cash-provenance"');
+    expect(panel).toContain('data-testid="closing-cash-preview"');
+    expect(migration).toContain('CREATE TRIGGER opening_verifications_immutable');
+    expect(migration).toContain("public.erp_can_write_scope_text(p_restaurant_id::text, p_branch_id::text)");
+    expect(migration).not.toContain('UPDATE public.daily_sales');
+  });
+
   it('calculates total sales, cash reconciliation, purchases, expenses and operating result automatically', async () => {
     const [workspace, reconciliationPanel] = await Promise.all([
       source('../src/components/sales/UnifiedSalesClosing.jsx'),
@@ -58,7 +77,7 @@ describe('Unified Sales Closing workflow contract', () => {
 
     expect(workspace).toContain('cashSales + networkTotal + creditTotal + otherPaymentTotal');
     expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
-    expect(workspace).toContain('const cashDifference = reconciliation.difference;');
+    expect(workspace).toContain('const cashDifference = !cashContextReady ? null : reconciliation.difference;');
     expect(workspace).toContain('const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;');
     expect(workspace).toContain('const operatingResult = totalSales - totalDailyExpenses;');
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
@@ -93,7 +112,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('salesSourceTodayTotal(customSourceSummaries)');
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
     expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
-    expect(workspace).toContain('const expectedCash = reconciliation.expectedCash;');
+    expect(workspace).toContain('const expectedCash = !cashContextReady ? null : reconciliation.expectedCash;');
   });
 
   it('invalidates every branch-scoped source cache after an Owner source mutation rather than merging it into another branch', async () => {
@@ -189,7 +208,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('automaticClosingUnavailable');
     expect(workspace).toContain('Retry ERP data');
     expect(workspace).toContain('cashLedgerLoading || autoSourceLoading');
-    expect(workspace).toContain('cashLedgerUnavailable || !allValid');
+    expect(workspace).toContain('cashLedgerUnavailable || !cashContextReady || !allValid');
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
   });
 
