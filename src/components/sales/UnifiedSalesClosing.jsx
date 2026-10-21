@@ -5,21 +5,20 @@ import { creditEntrySourceId, customerCreditSnapshots } from '@/lib/customerCred
  * Architecture: exception-first, role-aware ERP closing workflow.
  * Design: Material 3 / Enterprise ERP, responsive, mobile-first.
  *
- * Finalized Accounting Rules (PRESERVED — DO NOT MODIFY):
- *  1. Sales Total = Cash Sales + POS Sales + Customer Credit.
- *  2. Never change Sales Total because of cash shortage, overage or owner payments.
- *  3. Expected Cash = Opening Cash + Cash Sales.
- *  4. Cash Difference = Actual Cash - Expected Cash.
- *  5. If Difference < 0 → Cash Shortage.
- *  6. If Difference > 0 → Cash Overage.
- *  7. Owner payment = Owner Capital Contribution, never Sales.
- *  8. Operating Result = Total Sales - Approved Purchases.
- *  9. Opening Cash = Previous Shift Closing Cash (automatic).
- * 10. Closing Cash = Actual Cash + Owner Capital Contribution.
- * 11. Next shift Opening Cash = Previous Closing Cash.
- * 12. Remaining Difference = Closing Cash - Expected Cash.
- *     Shift cannot close until Remaining Difference = 0 or Manager Approval.
- * 13. Sales, Cash Reconciliation, Purchases and Operating Result are independent.
+ * ERP posting contract:
+ *  1. Sales = current-period cash + network/card + credit + other sales once.
+ *  2. Opening Cash is a verified prior count or audited Owner opening.
+ *  3. Expected Cash = Opening + Cash Sales + posted Cash In - Cash Out.
+ *  4. Actual Cash is physically counted; Closing Cash is that count.
+ *  5. Variance = Actual - Expected, recorded separately from revenue.
+ *  6. Owner funding, wallet transfers and customer debt collections are not
+ *     newly earned sales. Network receipts are not physical drawer cash.
+ *  7. Operating Result here is Sales - approved purchases - recorded expenses,
+ *     a purchase-basis management estimate, NOT audited inventory COGS profit.
+ *  8. Unreconciled opening cash and overdrawn ledgers cannot finalize.
+ *  9. Manual/offline cash entries need a traceable receipt and reason; their
+ *     existence does not prove there are no sales in POS.
+ * 10. Historic source snapshots are explanatory; do not add again.
  */
 import React, { useState, useMemo, useEffect, useLayoutEffect, useCallback, useDeferredValue, useRef, memo } from 'react';
 import { flushSync } from 'react-dom';
@@ -1392,6 +1391,12 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (cashLedgerUnavailable || !cashContextReady) nextErrors.reconciliation = 'Load and verify the ERP cash ledger before saving.';
     if (ledgerOverdrawn) nextErrors.reconciliation = 'Cash ledger is overdrawn. Reconcile dated cash movements and funding before finalizing.';
     if (!savingDraft && actualCount === null) nextErrors.actualCash = 'Enter the physically counted Actual Cash (0 or positive, up to two decimal places).';
+    // Exceptional manual cash is posted as sale revenue. Require an auditable
+    // receipt/reference and explanation so an owner can reconcile a later POS
+    // sync and identify duplicated offline sales.
+    if (!savingDraft && !useAutomaticSales && manualCashSales > 0 && String(form.sales_notes || '').trim().length < 10) {
+      nextErrors.sales_notes = 'Explain the offline sale and provide its receipt/reference (at least 10 characters). Do not enter Owner cash funding or debt collections here.';
+    }
     if (invalidCredit) nextErrors.credit = 'Select an active branch customer and enter a valid non-negative credit sale amount.';
     if (!savingDraft && pendingPaymentEntry) nextErrors.credit = 'Record or clear the customer debt payment before saving the Sales Closing.';
     if (!savingDraft && limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer_name_snapshot || 'the selected customer'}. Reduce the credit sale to the live available credit.`;
@@ -1770,7 +1775,16 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4"><div className="rounded-xl bg-emerald-50 p-3"><Banknote className="h-4 w-4 text-emerald-600" /><p className="mt-2 text-[10px] text-slate-500">Cash</p><Money currency={currency} value={cashSales} className="text-sm font-black" /></div><div className="rounded-xl bg-blue-50 p-3"><Network className="h-4 w-4 text-blue-600" /><p className="mt-2 text-[10px] text-slate-500">Network</p><Money currency={currency} value={networkTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-violet-50 p-3"><CreditCard className="h-4 w-4 text-violet-600" /><p className="mt-2 text-[10px] text-slate-500">Credit</p><Money currency={currency} value={creditTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-amber-50 p-3"><Bike className="h-4 w-4 text-amber-600" /><p className="mt-2 text-[10px] text-slate-500">Delivery apps</p><Money currency={currency} value={onlineTotal} className="text-sm font-black" /></div></div>
               <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3 sm:grid-cols-4"><div className="rounded-xl bg-blue-50 p-3"><Building2 className="h-4 w-4 text-blue-600" /><p className="mt-2 text-[10px] text-slate-500">Counter network</p><Money currency={currency} value={networkCounterTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-cyan-50 p-3"><Bike className="h-4 w-4 text-cyan-600" /><p className="mt-2 text-[10px] text-slate-500">Driver network</p><Money currency={currency} value={networkDriversTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-slate-50 p-3"><MoreHorizontal className="h-4 w-4 text-slate-600" /><p className="mt-2 text-[10px] text-slate-500">Other network</p><Money currency={currency} value={otherNetworkTotal} className="text-sm font-black" /></div><div className="rounded-xl border border-blue-200 bg-blue-50 p-3"><Coins className="h-4 w-4 text-blue-700" /><p className="mt-2 text-[10px] text-blue-600">Network total</p><Money currency={currency} value={networkTotal} className="text-sm font-black text-blue-700" /></div></div>
               {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div className="space-y-2 border-t border-slate-100 p-3"><p className="text-xs font-black uppercase tracking-wide text-slate-700">Manual sales sources</p>{customSourceSummaries.map(({ source, sourceLabel, today, previous, driverEntries }) => source.allows_driver_entries === true ? <DriverSalesSourceCard key={source.id} source={source} sourceLabel={sourceLabel} entries={driverEntries} drivers={driverSourceDrivers} branchLabel={form.branch} previous={previous} currency={currency} onAdd={() => addDriverSourceEntry(source)} onChange={(clientRowId, patch) => updateDriverSourceEntry(source.id, clientRowId, patch)} onRemove={(clientRowId) => removeDriverSourceEntry(source.id, clientRowId)} isHistoryLoading={sourceHistoryLoading || driverSourceDriversLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} /> : <CompactSalesSourceRow key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} historyLoading={sourceHistoryLoading} historyUnavailable={sourceHistoryUnavailable} />)}</div>}
-              {!useAutomaticSales && <div className="border-t border-amber-200 bg-amber-50 p-3"><p className="text-xs font-bold text-amber-900">No posted ERP cash sales were found. Record sales at POS first.</p><div className="mt-3"><NumInput id="quick-closing-cashSales" label="Exceptional Cash Adjustment" value={cashSalesInput} onChange={updateCashSales} prefix={currency} helpText="Use only for an offline sale that cannot be posted before closing" /></div></div>}
+              {!useAutomaticSales && <div data-testid="offline-sales-audit" className="border-t border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-bold leading-5 text-amber-900">{lang === 'fa' ? 'تطبیق اتومات POS برای این شیفت فعال نیست؛ این پیام به معنی نبود فروش ثبت‌شده نیست.' : lang === 'ar' ? 'المطابقة التلقائية مع POS غير مفعلة لهذه الوردية؛ لا يعني ذلك عدم وجود مبيعات مسجلة.' : 'Automatic POS reconciliation is unavailable for this shift; this does NOT mean no POS sales exist.'}</p>
+                <p className="mt-1 text-[11px] leading-5 text-amber-900">{lang === 'fa' ? 'فقط فروش نقدی آفلاین واقعی و ثبت‌نشده را وارد کنید؛ تأمین پول Owner، دریافت قرض مشتری و فروش تکراری POS را اینجا وارد نکنید.' : lang === 'ar' ? 'أدخل فقط البيع النقدي غير المسجل خارج POS، وليس تمويل المالك أو تحصيل دين العميل أو بيعاً مكرراً.' : 'Enter only genuine unposted offline cash sales, never Owner funding, old customer debt collections or duplicate POS sales.'}</p>
+                <div className="mt-3"><NumInput id="quick-closing-cashSales" label={lang === 'fa' ? 'فروش نقدی آفلاین (غیرثبت‌شده)' : lang === 'ar' ? 'بيع نقدي خارج POS (غير مرحّل)' : 'Unposted offline cash sales'} value={cashSalesInput} onChange={updateCashSales} prefix={currency} helpText={lang === 'fa' ? 'فروش ثبت‌شده در POS را دوباره محاسبه نکنید.' : lang === 'ar' ? 'لا تضف مبيعات POS المسجلة مرة أخرى.' : 'Never add a sale already posted in POS.'} /></div>
+                {manualCashSales > 0 && <div className="mt-3">
+                  <Label htmlFor="offline-sales-reference" className="text-xs font-bold">{lang === 'fa' ? 'دلیل فروش آفلاین و شماره رسید *' : lang === 'ar' ? 'سبب البيع ورقم الإيصال *' : 'Offline sale reason and receipt/reference *'}</Label>
+                  <Textarea id="offline-sales-reference" className="mt-1 min-h-20 bg-white" value={form.sales_notes || ''} onChange={e => set('sales_notes',e.target.value)} placeholder="Example: POS offline, receipt #123, cashier shift" disabled={isSubmitting} />
+                  {inlineErrors.sales_notes && <p role="alert" className="mt-1 text-xs font-bold text-red-700">{inlineErrors.sales_notes}</p>}
+                </div>}
+              </div>}
             </section>
 
             {creditSource && <section className="space-y-3" data-testid="customer-credit-closing-section" data-i18n-skip="true">{custLoading ? <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">Loading Debt Management customers…</div> : <><div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{customerCreditSales.map((entry, index) => <div key={entry.id} className="min-w-0 space-y-2"><label className="block text-sm font-semibold">{lang === 'fa' ? 'منبع فروش قرضه' : lang === 'ar' ? 'مصدر البيع الآجل' : 'Customer credit sales source'}<select aria-label="Customer credit sales source" className="mt-1 min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3" value={creditEntrySourceId(entry, creditSources)} onChange={event => updateCustomerCreditSale(entry.id, 'source_id', event.target.value)} disabled={isSubmitting}>{creditSources.map(source => <option key={source.id} value={source.id}>{lang === 'ar' ? source.name_ar || source.name_en : lang === 'fa' ? source.name_fa || source.name_ar || source.name_en : source.name_en}</option>)}</select></label><CustomerCreditSalesSource entry={entry} idx={index} onRemove={removeCustomerCreditSale} onUpdate={updateCustomerCreditSale} customers={customers} currency={currency} customerSearch={customerSearch} onCustomerSearch={setCustomerSearch} onSelectCustomer={refetchCustomers} onReviewCreditSale={() => { const target = document.getElementById('sales-closing-actions'); target?.scrollIntoView({ behavior: 'smooth', block: 'center' }); target?.focus({ preventScroll: true }); }} onRecordPayment={recordCustomerCreditPayment} isRecordingPayment={isRecordingCustomerDebtPayment} paymentMethods={configuredPaymentMethods} disabled={isSubmitting} /></div>)}</div>{customerCreditSales.length > 0 && customerCreditSales.every((entry) => entry.customer_id) && <div className="flex justify-end"><Button type="button" size="sm" variant="outline" className="min-h-10 rounded-xl bg-white" onClick={addCustomerCreditSale} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />Add Another Customer</Button></div>}</>}{inlineErrors.credit && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}</section>}
