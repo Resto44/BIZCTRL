@@ -512,11 +512,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
   // ── Cash Reconciliation inputs ────────────────────────────────────────────
   const [openingCash, setOpeningCash] = useState(initial?.opening_cash ?? '');
-  const [actualCashCount, setActualCashCount] = useState(() => {
-    if (initial?.actual_cash != null) return String(initial.actual_cash);
-    if (initial?.closing_cash == null) return '';
-    return String(Number(initial.closing_cash) - Number(initial.owner_cash_injection || 0));
-  });
+  // Legacy Closing Cash is a derived field, not evidence that physical cash
+  // was ever counted. Never turn a historical calculated amount into Actual.
+  const [actualCashCount, setActualCashCount] = useState(
+    () => initial?.actual_cash == null ? '' : String(initial.actual_cash),
+  );
   const [cashNotes, setCashNotes] = useState(initial?.cash_notes || '');
   // Keep raw numeric editing values in their own stable state. React batches
   // the related calculations normally; synchronously replacing a keyed parent
