@@ -47,7 +47,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain(".eq('branch_id', selectedBranchId)");
     expect(workspace).toContain(".eq('date', form.date)");
     expect(workspace).toContain('Record sales at POS first.');
-    expect(workspace).toContain('Exceptional Cash Adjustment');
+    expect(workspace).toContain('data-testid="offline-sales-audit"');
+    expect(workspace).toContain('nextErrors.sales_notes =');
   });
 
   it('rejects legacy Closing Cash as a synthetic Actual Count and revalidates when opening arrives', async () => {
