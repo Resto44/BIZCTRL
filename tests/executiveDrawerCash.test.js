@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { enteredDrawerCash, summarizeDrawerCash } from '../src/lib/executiveDrawerCash.js';
+import { enteredDrawerCash, summarizeDrawerCash, normalizeDrawerCashAsOf } from '../src/lib/executiveDrawerCash.js';
 
 const source = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 const finalized = (rest = {}) => ({
@@ -34,7 +34,7 @@ describe('Executive drawer cash — physical closing balance only', () => {
     expect(enteredDrawerCash(finalized({ actual_cash: 0, closing_cash: 100, restaurant_cash: 400 }))).toBe(0);
     expect(enteredDrawerCash(finalized({ actual_cash: null, closing_cash: null, restaurant_cash: 400 }))).toBeNull();
     expect(enteredDrawerCash(finalized({ actual_cash: '', closing_cash: 150, owner_cash_injection: 100 }))).toBeNull();
-    expect(enteredDrawerCash(finalized({ actual_cash: null, closing_cash: 30, owner_cash_injection: 0 }))).toBe(30);
+    expect(enteredDrawerCash(finalized({ actual_cash: null, closing_cash: 30, owner_cash_injection: 0 }))).toBeNull();
   });
 
   it('counts only the latest shift of a branch, ordered by business date then finalization', () => {
@@ -58,6 +58,30 @@ describe('Executive drawer cash — physical closing balance only', () => {
     expect(result).toMatchObject({ amount: null, branches: 2, missingBranches: 1, complete: false });
   });
 
+  it('trusts only the last unique verified physical drawer count per scoped branch', () => {
+    const verified = {
+      amount: 175, branches: 2, missingBranches: 0, complete: true,
+      basis: 'last_verified_physical_count_not_live_bank_balance',
+      asOfDate: '2026-10-21',
+      details: [
+        { branchId: 'b1', status: 'verified', date: '2026-10-21', cash: 125 },
+        { branchId: 'b2', status: 'verified', date: '2026-10-20', cash: 50 },
+      ],
+    };
+    expect(normalizeDrawerCashAsOf(verified)).toMatchObject({
+      amount: 175, branches: 2, missingBranches: 0, complete: true, asOfDate: '2026-10-21',
+    });
+    expect(normalizeDrawerCashAsOf(verified, { loading: true }).amount).toBeNull();
+    expect(normalizeDrawerCashAsOf(verified, { error: true }).amount).toBeNull();
+    expect(normalizeDrawerCashAsOf({ ...verified, amount: 999, complete: false, missingBranches: 1,
+      details: [{ status: 'verified', cash: 125 }, { status: 'ambiguous_drawer', cash: null }],
+    })).toMatchObject({ amount: null, branches: 2, missingBranches: 1, complete: false });
+    expect(normalizeDrawerCashAsOf({ ...verified, amount: 999, details: [
+      { status: 'verified', cash: 125 }, { status: 'missing_actual', cash: null },
+    ] }).amount).toBeNull();
+    expect(normalizeDrawerCashAsOf(null).amount).toBeNull();
+  });
+
   it('renders cash in drawer as a balance, not a contribution to sales composition', async () => {
     const [owner, report, executive] = await Promise.all([
       source('../src/pages/OwnerDashboard.jsx'),
@@ -65,7 +89,8 @@ describe('Executive drawer cash — physical closing balance only', () => {
       source('../src/components/dashboard/ExecutiveSnapshotV2.jsx'),
     ]);
     expect(report).toContain('<ExecutiveSnapshotV2 model={model} copy={copy} />');
-    expect(owner).toContain('summarizeDrawerCash(periodSales)');
+    expect(owner).toContain('normalizeDrawerCashAsOf(drawerCashQuery.data');
+    expect(owner).toContain("supabase.rpc('erp_owner_drawer_cash_asof'");
     expect(executive).toContain('data-testid="snapshot-drawer-cash"');
     expect(executive).toContain('methods.map(method=>');
     expect(executive).toContain('presentation.reconciled');
