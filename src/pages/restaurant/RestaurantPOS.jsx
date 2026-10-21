@@ -14,6 +14,7 @@ import { ChefHat, Monitor, Plus, Printer, RefreshCw, Search, Settings2, Shopping
 import { useTenant } from '@/lib/TenantContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useRole } from '@/lib/RoleContext';
+import { useWorkspaceTabActive } from '@/lib/WorkspaceTabVisibilityContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { supabase } from '@/api/supabaseClient';
 import { useRetailCashier } from '@/hooks/useRetailCashier';
@@ -39,13 +40,16 @@ export function useRestaurantWorkspace(tenant,branch,date,active=true) {
 
 export function Setup({tenant,branch,c,close,refresh,initial=null,menuOnly=false}) {
  const {lang}=useLanguage();const labels=restaurantProductCopy(lang);const serving=servingCopy(lang);
+ const workspaceTabActive=useWorkspaceTabActive();
  const [error,setError]=useState('');const [busy,setBusy]=useState(false);
  const [form,setForm]=useState(()=>({id:crypto.randomUUID(),product_id:'',name:'',name_ar:'',name_fa:'',image_url:'',price:'',tax_rate:'0',category_id:'',category:'Food',station:'Kitchen',stock_mode:'recipe',active:true,option_group:'',option_key:'',...initial,confirm_untracked:false}));
  const [recipe,setRecipe]=useState(()=>initial?.recipe?.length?initial.recipe:[{inventory_id:'',quantity:''}]);
  const data=useQuery({queryKey:['restaurant-pos-setup',tenant,branch],queryFn:()=>restaurantRpc('pos_catalog',{p_restaurant_id:tenant,p_branch_id:branch,p_search:''}),enabled:Boolean(tenant&&branch)});
  const set=(key,value)=>setForm(s=>({...s,[key]:value}));
  const submit=async(command,payload)=>{setBusy(true);setError('');try{await restaurantRpc('pos_setup',{p_restaurant_id:tenant,p_branch_id:branch,p_command:command,p_payload:payload});await refresh();if(command==='menu')close();}catch(e){setError(e.message);}finally{setBusy(false);}};
- return <Dialog open onOpenChange={v=>{if(!v&&!busy)close();}}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{menuOnly?labels.setup:c.setup}</DialogTitle><DialogDescription>{labels.recipeHint}</DialogDescription></DialogHeader>
+ // Cached Owner tabs keep the Setup component's draft state. This Radix
+ // portal must be invisible and non-modal when a different tab is active.
+ return <Dialog open={workspaceTabActive} onOpenChange={v=>{if(!v&&!busy&&workspaceTabActive)close();}}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{menuOnly?labels.setup:c.setup}</DialogTitle><DialogDescription>{labels.recipeHint}</DialogDescription></DialogHeader>
 
   <form className="grid gap-4 border-t pt-4" onSubmit={e=>{e.preventDefault();try{void submit('menu',{...form,price:Number(form.price),tax_rate:Number(form.tax_rate),recipe:parseRecipeRows(recipe)});}catch(e){setError(e.message);}}}>
    <div className="grid gap-3 sm:grid-cols-2">{[['name',c.name],['name_ar',c.arabic],['name_fa',labels.persian],['price',c.price],['tax_rate',c.taxRate],['station',c.station]].map(([k,label])=><Field key={k} label={label}><input className={input} required={!['name_ar','name_fa'].includes(k)} type={['price','tax_rate'].includes(k)?'number':'text'} step="0.01" min={k==='price'?'0.01':'0'} max={k==='tax_rate'?'100':undefined} value={form[k]??''} onChange={e=>set(k,e.target.value)}/></Field>)}</div>
