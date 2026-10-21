@@ -328,6 +328,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // amounts. Current-period sales remain the explicit Today inputs until an
   // ERP feed with branch + date + shift + cashier scope is available.
   const automaticTotalsEnabled = false;
+  // Manual closing never depends on POS connectivity. Automatic posting is
+  // selectable only when a branch/date/shift/cashier-verified POS feed exists.
+  // Legacy payment tables do not provide that scope and must not be used.
+  const [salesEntryMode, setSalesEntryMode] = useState('manual');
   const requiresCashReconciliation = closingConfig?.validation_rules?.require_cash_reconciliation !== false;
   const salesSourceCopy = useMemo(() => ({
     title: t('salesClosing.sources.title'),
@@ -455,6 +459,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     setRuntimeError(null);
     setInlineErrors({});
     setRequestedClosingState('draft');
+    setSalesEntryMode('manual');
     setCashSalesInput('');
     setOpeningCash('');
     setActualCashCount('');
@@ -784,6 +789,14 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   }, [cashiers, form.cashier_employee_id, form.cashier_id]);
   const defaultCashier = firstRecord(cashiers);
   const cashierDisplayName = form.cashier_name || selectedCashier?.full_name || defaultCashier?.full_name || user?.full_name || user?.email || '';
+  // A displayed name is NOT sufficient: every Closing ledger query and final
+  // write must use one consistent UUID, including the authenticated operator
+  // when an Employee cashier has not been configured.
+  const uuidLike = (value) => typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  const effectiveCashierId = [
+    form.cashier_id, form.cashier_employee_id, defaultCashier?.id, user?.id,
+  ].find(uuidLike) || null;
 
   // Keep the outer New Closing action on the same stable business key as this
   // single canonical workspace. The callback is observational only: it neither
@@ -794,10 +807,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       branch: form.branch,
       branch_id: selectedBranchId,
       shift: form.shift,
-      cashier_id: form.cashier_id || form.cashier_employee_id || defaultCashier?.id || user?.id || null,
+      cashier_id: effectiveCashierId,
       cashier_name: cashierDisplayName,
     });
-  }, [cashierDisplayName, defaultCashier?.id, form.branch, form.cashier_employee_id, form.cashier_id, form.date, form.shift, onSessionContextChange, selectedBranchId, user?.id]);
+  }, [cashierDisplayName, effectiveCashierId, form.branch, form.date, form.shift, onSessionContextChange, selectedBranchId]);
 
   // Keep the cashier name and ID synchronized. This also repairs a stale cashier
   // identifier and auto-selects the sole cashier available to an Owner.
@@ -974,7 +987,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Every read is scoped by the active restaurant, branch and business date. The
   // closing form uses these ERP records as its primary source; manual values are
   // exceptional adjustments only, never a required re-entry step.
-  const automaticClosingEnabled = Boolean(automaticTotalsEnabled && activeRestaurant?.id && form.date && form.branch && !initial?.id);
+  const automaticClosingEnabled = Boolean(salesEntryMode === 'automatic' && automaticTotalsEnabled
+    && activeRestaurant?.id && form.date && form.branch && !initial?.id);
   const {
     data: automaticClosingData,
     isLoading: automaticClosingLoading,
@@ -1094,17 +1108,18 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     });
   }, [automaticClosing, automaticClosingScope]);
   const snapshotMatchesScope = automaticClosingSnapshot.scope === automaticClosingScope;
-  const useAutomaticSales = Boolean(automaticTotalsEnabled && !initial?.id && snapshotMatchesScope && automaticClosingSnapshot.hasData);
-  const autoSourceLoading = automaticTotalsEnabled && automaticClosingLoading && !useAutomaticSales;
-  const automaticClosingUnavailable = automaticTotalsEnabled && automaticClosingIsError && !useAutomaticSales;
+  const useAutomaticSales = Boolean(salesEntryMode === 'automatic' && automaticTotalsEnabled
+    && !initial?.id && snapshotMatchesScope && automaticClosingSnapshot.hasData);
+  const autoSourceLoading = automaticClosingEnabled && automaticClosingLoading && !useAutomaticSales;
+  const automaticClosingUnavailable = automaticClosingEnabled && automaticClosingIsError && !useAutomaticSales;
 
   // The canonical server context is the only source of opening cash and posted
   // physical-cash movements. It is scoped by restaurant, branch, date, shift and
   // cashier, so unrelated shifts or prior days cannot change this Closing.
   const currentClosingId = savedClosing?.id || initial?.id || null;
   const { data: cashLedgerContextData, isLoading: cashLedgerLoading, isError: cashLedgerUnavailable, refetch: refetchCashLedger } = useQuery({
-    queryKey: ['sales-closing-cash-ledger-context', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift, form.cashier_id || form.cashier_employee_id, currentClosingId],
-    enabled: Boolean(activeRestaurant?.id && selectedBranchId && form.date && form.shift && (form.cashier_id || form.cashier_employee_id || defaultCashier?.id)),
+    queryKey: ['sales-closing-cash-ledger-context', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift, effectiveCashierId, currentClosingId],
+    enabled: Boolean(activeRestaurant?.id && selectedBranchId && form.date && form.shift && effectiveCashierId),
     staleTime: 15000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('erp_sales_closing_cash_context', {
@@ -1113,7 +1128,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         p_branch: form.branch,
         p_date: form.date,
         p_shift: form.shift,
-        p_cashier_id: form.cashier_id || form.cashier_employee_id || defaultCashier?.id || null,
+        p_cashier_id: effectiveCashierId,
         p_closing_id: currentClosingId,
       });
       if (error) throw error;
@@ -1144,7 +1159,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       setOpeningVerificationError('Provide a clear reason with at least 10 characters for the audit log.');
       return;
     }
-    const cashierId = form.cashier_id || form.cashier_employee_id || defaultCashier?.id || null;
+    const cashierId = effectiveCashierId;
     if (!activeRestaurant?.id || !selectedBranchId || !form.branch || !form.date || !form.shift || !cashierId) {
       setOpeningVerificationError('Select a valid business, branch, shift and cashier before verifying opening cash.');
       return;
@@ -1234,15 +1249,22 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       (movement) => !isCurrentClosingOwnerSettlementMovement(movement),
     ),
     currentCashSales: baseCashSales,
-    revenueEntries: customSourceSummaries.flatMap(({ source, today, driverEntries }) => source.allows_driver_entries === true
-      ? driverEntries.flatMap((entry) => {
-        const amounts = driverSourceEntryAmounts(entry);
-        return [
-          ...(amounts.cash > 0 ? [{ amount: amounts.cash, payment_method: 'cash' }] : []),
-          ...(amounts.network > 0 ? [{ amount: amounts.network, payment_method: 'card' }] : []),
-        ];
-      })
-      : [{ amount: today, payment_method: source.default_payment_method }]),
+    revenueEntries: [
+      // POS/network and credit are sales but never physical drawer cash.
+      // Include them exactly once in reconciliation's revenue overview.
+      { amount: baseNetworkTotal, payment_method: 'card' },
+      { amount: baseCreditTotal, payment_method: 'credit' },
+      ...(useAutomaticSales ? [{ amount: automaticClosingSnapshot.other, payment_method: 'other' }] : []),
+      ...customSourceSummaries.flatMap(({ source, today, driverEntries }) => source.allows_driver_entries === true
+        ? driverEntries.flatMap((entry) => {
+          const amounts = driverSourceEntryAmounts(entry);
+          return [
+            ...(amounts.cash > 0 ? [{ amount: amounts.cash, payment_method: 'cash' }] : []),
+            ...(amounts.network > 0 ? [{ amount: amounts.network, payment_method: 'card' }] : []),
+          ];
+        })
+        : [{ amount: today, payment_method: source.default_payment_method }]),
+    ],
     actualCash: actualCount,
     branchWalletAvailable,
   });
@@ -1280,8 +1302,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     {
       key: 'cashier',
       label: 'Cashier Selected',
-      passed: !!cashierDisplayName,
-      message: cashierDisplayName || 'Required',
+      passed: Boolean(effectiveCashierId && cashierDisplayName),
+      message: effectiveCashierId ? (cashierDisplayName || 'Required') : 'Assign an operator/cashier UUID',
     },
     {
       key: 'branch',
@@ -1340,7 +1362,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       passed: !!form.date && !!form.branch && customClosingFields.every((field) => !field.is_required || hasCustomClosingFieldValue(field)),
       message: form.date || 'Date required',
     },
-  ], [form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, approvedPurchasesForDate, posEntries, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
+  ], [form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   const networkCounterTotal = baseNetworkTotal;
@@ -1386,17 +1408,14 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (!form.date) nextErrors.date = 'Date is required.';
     if (!form.branch) nextErrors.branch = 'Branch is required.';
     if (!form.shift) nextErrors.shift = 'Shift is required.';
-    if (!cashierDisplayName) nextErrors.cashier = 'Cashier is required.';
+    if (!cashierDisplayName || !effectiveCashierId) nextErrors.cashier = 'Select a valid operator/cashier before saving.';
     if (openingReviewRequired) nextErrors.reconciliation = openingReviewReason;
     if (cashLedgerUnavailable || !cashContextReady) nextErrors.reconciliation = 'Load and verify the ERP cash ledger before saving.';
     if (ledgerOverdrawn) nextErrors.reconciliation = 'Cash ledger is overdrawn. Reconcile dated cash movements and funding before finalizing.';
     if (!savingDraft && actualCount === null) nextErrors.actualCash = 'Enter the physically counted Actual Cash (0 or positive, up to two decimal places).';
-    // Exceptional manual cash is posted as sale revenue. Require an auditable
-    // receipt/reference and explanation so an owner can reconcile a later POS
-    // sync and identify duplicated offline sales.
-    if (!savingDraft && !useAutomaticSales && manualCashSales > 0 && String(form.sales_notes || '').trim().length < 10) {
-      nextErrors.sales_notes = 'Explain the offline sale and provide its receipt/reference (at least 10 characters). Do not enter Owner cash funding or debt collections here.';
-    }
+    // Manual daily totals are a supported mode, not an exceptional adjustment.
+    // Optional references belong to the audit note; an unwritten note cannot
+    // block an otherwise reconciled Closing that has no POS connection.
     if (invalidCredit) nextErrors.credit = 'Select an active branch customer and enter a valid non-negative credit sale amount.';
     if (!savingDraft && pendingPaymentEntry) nextErrors.credit = 'Record or clear the customer debt payment before saving the Sales Closing.';
     if (!savingDraft && limitExceededEntry) nextErrors.credit = `Credit limit exceeded for ${limitExceededEntry.customer_name_snapshot || 'the selected customer'}. Reduce the credit sale to the live available credit.`;
@@ -1424,7 +1443,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       branch.branch_key === form.branch,
     );
     const branchId = selectedBranch?.id || selectedBranchId || null;
-    const cashierId = form.cashier_id || form.cashier_employee_id || defaultCashier?.id || user?.id || null;
+    const cashierId = effectiveCashierId;
     const customerId = form.customer_id || customerCreditSales.find((entry) => entry.customer_id)?.customer_id || null;
     const posDeviceId = form.pos_device_id || posEntries.find((entry) => entry.device_id)?.device_id || null;
     const createdBy = user?.email || ownerFilter?.created_by || '';
@@ -1445,9 +1464,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       return;
     }
 
-    if (isManager && (custLoading || posLoading)) {
-      console.log('[UnifiedSalesClosing] FAILED: Data still loading');
-      toast.error('Required data is still loading, please wait...');
+    // A network/POS terminal is optional for a manual Closing. Its device
+    // inventory must not block a branch's cash or credit-free shift close.
+    if (isManager && manualCreditTotal > 0 && custLoading) {
+      toast.error('Customer credit accounts are still loading.');
       return;
     }
 
@@ -1710,6 +1730,37 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
           </section>
 
+
+          <section data-testid="closing-sales-entry-mode" className="rounded-2xl border border-blue-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="flex items-center justify-between gap-2">
+              <div><h2 className="text-sm font-black text-slate-950">{lang === 'fa' ? 'روش ثبت فروش روزانه' : lang === 'ar' ? 'طريقة تسجيل المبيعات اليومية' : 'Daily sales entry mode'}</h2>
+                <p className="mt-1 text-[11px] text-slate-500">{lang === 'fa' ? 'اتصال POS اختیاری است؛ بدون دستگاه هم کلوزینگ ثبت می‌شود.' : lang === 'ar' ? 'ربط POS اختياري؛ يمكن إقفال المبيعات دون جهاز.' : 'POS connection is optional. Manual closing works without a POS device.'}</p></div>
+              <Badge variant="outline">{lang === 'fa' ? 'اختیاری' : lang === 'ar' ? 'اختياري' : 'Optional POS'}</Badge>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Sales entry mode">
+              <button type="button" aria-pressed={salesEntryMode === 'manual'} data-testid="sales-entry-manual" onClick={() => setSalesEntryMode('manual')} className={`min-h-12 rounded-xl border px-3 py-2 text-xs font-bold ${salesEntryMode === 'manual' ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>{lang === 'fa' ? 'دستی / آفلاین' : lang === 'ar' ? 'يدوي / دون POS' : 'Manual / Offline'}</button>
+              <button type="button" aria-pressed={salesEntryMode === 'automatic'} data-testid="sales-entry-automatic" disabled={!automaticTotalsEnabled || Boolean(initial?.id)} onClick={() => setSalesEntryMode('automatic')} className="min-h-12 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500 disabled:cursor-not-allowed disabled:opacity-70">{lang === 'fa' ? 'POS اتومات (فعلاً غیرفعال)' : lang === 'ar' ? 'POS تلقائي (غير متاح حالياً)' : 'Automatic POS (not connected)'}</button>
+            </div>
+            <p className="mt-2 text-[11px] leading-5 text-slate-600">{lang === 'fa' ? 'منبع اتوماتیکِ تأییدشده برای شیفت و صندوق هنوز وصل نیست. ارقام را دستی ثبت کنید؛ داده‌های قبلی POS را دوباره اضافه نکنید.' : lang === 'ar' ? 'مصدر POS تلقائي معتمد لهذه الوردية والصندوق غير متصل. أدخل الإجماليات يدوياً دون تكرار المبيعات المسجلة.' : 'No verified shift/cashier POS feed is connected. Enter totals manually, and do not duplicate already posted closing sales.'}</p>
+            {!useAutomaticSales && <div data-testid="offline-sales-audit" className="mt-3 space-y-3">
+              <div><Label htmlFor="quick-closing-cashSales" className="mb-1 block text-xs font-bold">{lang === 'fa' ? 'فروش نقدی امروز' : lang === 'ar' ? 'المبيعات النقدية اليوم' : 'Cash sales today'}</Label>
+                <ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} inputClassName="h-12 bg-white font-bold" /></div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-black text-slate-800">{lang === 'fa' ? 'فروش شبکه / کارت (اختیاری)' : lang === 'ar' ? 'مبيعات الشبكة / البطاقة (اختياري)' : 'Network / Card sales (optional)'}</p>
+                <p className="mt-1 text-[11px] text-slate-500">{lang === 'fa' ? 'اگر دستگاه POS ندارید، این مبلغ را صفر بگذارید.' : lang === 'ar' ? 'إن لم يكن لديك جهاز POS، اترك المبلغ صفراً.' : 'If no POS device was used, leave this at zero.'}</p>
+                {posEntries.map((entry, index) => <div key={entry.id} className="mt-2 flex min-w-0 items-center gap-2">
+                  <span className="min-w-0 flex-1"><ClosingNumericInput id={`quick-closing-network-${entry.id}`} value={entry.amount ?? ''} onChange={value => updatePos(entry.id, 'amount', value)} prefix={currency} inputClassName="h-11 bg-white font-bold" /></span>
+                  {index > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => removePos(entry.id)} disabled={isSubmitting} aria-label="Remove POS total"><Trash2 className="h-4 w-4" /></Button>}
+                </div>)}
+                <Button type="button" variant="outline" size="sm" onClick={addPos} disabled={isSubmitting} className="mt-2 min-h-10 bg-white"><PlusCircle className="mr-1.5 h-4 w-4" />{lang === 'fa' ? 'شبکه دیگر' : lang === 'ar' ? 'إضافة جهاز آخر' : 'Add another total'}</Button>
+              </div>
+              {manualCashSales > 0 && <div>
+                <Label htmlFor="offline-sales-reference" className="mb-1 block text-xs font-bold">{lang === 'fa' ? 'توضیحات یا شماره رسید (اختیاری)' : lang === 'ar' ? 'ملاحظات أو رقم الإيصال (اختياري)' : 'Reference / note (optional)'}</Label>
+                <Textarea id="offline-sales-reference" className="min-h-14 bg-white" value={form.sales_notes || ''} onChange={e => set('sales_notes', e.target.value)} placeholder={lang === 'fa' ? 'مثلاً شماره رسید یا نام صندوق‌دار' : lang === 'ar' ? 'مثال: رقم الإيصال أو أمين الصندوق' : 'E.g. receipt number or cashier shift'} disabled={isSubmitting} />
+              </div>}
+            </div>}
+          </section>
+
           {ledgerOverdrawn && <div role="alert" data-testid="cash-ledger-overdrawn" className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-900"><p className="font-black">Cash ledger overdrawn · reconciliation required</p><p className="mt-1 text-xs leading-6">Expected Cash is {currency} {reconciliation.expectedCash.toLocaleString()} after Cash In and Cash Out. A physical drawer cannot be negative. Verify missing funding and cash movements in Cash Register before closing. This is not an ordinary overage.</p><Button type="button" size="sm" variant="outline" onClick={() => refetchCashLedger()} className="mt-2 min-h-10"><RefreshCw className="mr-1.5 h-4 w-4" />Recheck cash ledger</Button></div>}
           {openingReviewRequired && <div role="alert" data-testid="opening-cash-needs-review" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-black">Opening Cash needs reconciliation</p>
@@ -1754,9 +1805,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           </section>}
 
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm" data-testid="quick-closing-auto-summary">
-            <div className="border-b border-slate-100 px-4 py-3"><h2 className="text-sm font-black text-slate-950">Verified automatically</h2></div>
+            <div className="border-b border-slate-100 px-4 py-3"><h2 className="text-sm font-black text-slate-950">{lang === 'fa' ? 'خلاصه ارقام کلوزینگ' : lang === 'ar' ? 'ملخص أرقام الإقفال' : 'Closing totals · Manual & ERP'}</h2></div>
             <div className="divide-y divide-slate-100">
-              <button type="button" className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50" onClick={() => setShowFullDetails(true)}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><Store className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-slate-900">Sales sources</span><span className="block text-[11px] text-slate-500">Cash, network, credit and configured sources</span></span><Money currency={currency} value={totalSales} className="text-sm font-black text-slate-950" />{autoSourceLoading ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : <CheckCircle2 className="h-5 w-5 text-emerald-500" />}</button>
+              <button type="button" className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50" onClick={() => setShowFullDetails(true)}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><Store className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-slate-900">Sales sources</span><span className="block text-[11px] text-slate-500">Cash, network, credit and configured sources</span></span><Money currency={currency} value={totalSales} className="text-sm font-black text-slate-950" />{autoSourceLoading ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : <ChevronRight className="h-5 w-5 text-slate-400" />}</button>
               <button type="button" className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50" onClick={() => setShowFullDetails(true)}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Network className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-slate-900">Network total</span><span className="block truncate text-[11px] text-slate-500">Counter {currency} {networkCounterTotal.toLocaleString()} · Drivers {currency} {networkDriversTotal.toLocaleString()} · Other {currency} {otherNetworkTotal.toLocaleString()}</span></span><Money currency={currency} value={networkTotal} className="text-sm font-black text-slate-950" /><CheckCircle2 className="h-5 w-5 text-emerald-500" /></button>
               <div className="flex min-h-16 items-center gap-3 px-4 py-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600"><WalletCards className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-slate-900">Expenses &amp; purchases</span><span className="block text-[11px] text-slate-500">Synced from ERP</span></span><Money currency={currency} value={totalDailyExpenses} className="text-sm font-black text-slate-950" />{purchasesLoading || cashLedgerLoading ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : <CheckCircle2 className="h-5 w-5 text-emerald-500" />}</div>
               <button type="button" className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50" onClick={() => setShowFullDetails(true)}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600"><ClipboardCheck className="h-5 w-5" /></span><span className="min-w-0 flex-1 text-sm font-bold text-slate-900">Closing fields</span><span className={`text-sm font-black ${completedClosingFields === customClosingFields.length ? 'text-emerald-600' : 'text-amber-700'}`}>{completedClosingFields}/{customClosingFields.length}</span>{completedClosingFields === customClosingFields.length ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <AlertCircle className="h-5 w-5 text-amber-500" />}</button>
@@ -1775,19 +1826,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4"><div className="rounded-xl bg-emerald-50 p-3"><Banknote className="h-4 w-4 text-emerald-600" /><p className="mt-2 text-[10px] text-slate-500">Cash</p><Money currency={currency} value={cashSales} className="text-sm font-black" /></div><div className="rounded-xl bg-blue-50 p-3"><Network className="h-4 w-4 text-blue-600" /><p className="mt-2 text-[10px] text-slate-500">Network</p><Money currency={currency} value={networkTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-violet-50 p-3"><CreditCard className="h-4 w-4 text-violet-600" /><p className="mt-2 text-[10px] text-slate-500">Credit</p><Money currency={currency} value={creditTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-amber-50 p-3"><Bike className="h-4 w-4 text-amber-600" /><p className="mt-2 text-[10px] text-slate-500">Delivery apps</p><Money currency={currency} value={onlineTotal} className="text-sm font-black" /></div></div>
               <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3 sm:grid-cols-4"><div className="rounded-xl bg-blue-50 p-3"><Building2 className="h-4 w-4 text-blue-600" /><p className="mt-2 text-[10px] text-slate-500">Counter network</p><Money currency={currency} value={networkCounterTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-cyan-50 p-3"><Bike className="h-4 w-4 text-cyan-600" /><p className="mt-2 text-[10px] text-slate-500">Driver network</p><Money currency={currency} value={networkDriversTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-slate-50 p-3"><MoreHorizontal className="h-4 w-4 text-slate-600" /><p className="mt-2 text-[10px] text-slate-500">Other network</p><Money currency={currency} value={otherNetworkTotal} className="text-sm font-black" /></div><div className="rounded-xl border border-blue-200 bg-blue-50 p-3"><Coins className="h-4 w-4 text-blue-700" /><p className="mt-2 text-[10px] text-blue-600">Network total</p><Money currency={currency} value={networkTotal} className="text-sm font-black text-blue-700" /></div></div>
               {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div className="space-y-2 border-t border-slate-100 p-3"><p className="text-xs font-black uppercase tracking-wide text-slate-700">Manual sales sources</p>{customSourceSummaries.map(({ source, sourceLabel, today, previous, driverEntries }) => source.allows_driver_entries === true ? <DriverSalesSourceCard key={source.id} source={source} sourceLabel={sourceLabel} entries={driverEntries} drivers={driverSourceDrivers} branchLabel={form.branch} previous={previous} currency={currency} onAdd={() => addDriverSourceEntry(source)} onChange={(clientRowId, patch) => updateDriverSourceEntry(source.id, clientRowId, patch)} onRemove={(clientRowId) => removeDriverSourceEntry(source.id, clientRowId)} isHistoryLoading={sourceHistoryLoading || driverSourceDriversLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} /> : <CompactSalesSourceRow key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} historyLoading={sourceHistoryLoading} historyUnavailable={sourceHistoryUnavailable} />)}</div>}
-              {!useAutomaticSales && <div data-testid="offline-sales-audit" className="border-t border-amber-200 bg-amber-50 p-3">
-                <p className="text-xs font-bold leading-5 text-amber-900">{lang === 'fa' ? 'تطبیق اتومات POS برای این شیفت فعال نیست؛ این پیام به معنی نبود فروش ثبت‌شده نیست.' : lang === 'ar' ? 'المطابقة التلقائية مع POS غير مفعلة لهذه الوردية؛ لا يعني ذلك عدم وجود مبيعات مسجلة.' : 'Automatic POS reconciliation is unavailable for this shift; this does NOT mean no POS sales exist.'}</p>
-                <p className="mt-1 text-[11px] leading-5 text-amber-900">{lang === 'fa' ? 'فقط فروش نقدی آفلاین واقعی و ثبت‌نشده را وارد کنید؛ تأمین پول Owner، دریافت قرض مشتری و فروش تکراری POS را اینجا وارد نکنید.' : lang === 'ar' ? 'أدخل فقط البيع النقدي غير المسجل خارج POS، وليس تمويل المالك أو تحصيل دين العميل أو بيعاً مكرراً.' : 'Enter only genuine unposted offline cash sales, never Owner funding, old customer debt collections or duplicate POS sales.'}</p>
-                <div className="mt-3"><NumInput id="quick-closing-cashSales" label={lang === 'fa' ? 'فروش نقدی آفلاین (غیرثبت‌شده)' : lang === 'ar' ? 'بيع نقدي خارج POS (غير مرحّل)' : 'Unposted offline cash sales'} value={cashSalesInput} onChange={updateCashSales} prefix={currency} helpText={lang === 'fa' ? 'فروش ثبت‌شده در POS را دوباره محاسبه نکنید.' : lang === 'ar' ? 'لا تضف مبيعات POS المسجلة مرة أخرى.' : 'Never add a sale already posted in POS.'} /></div>
-                {manualCashSales > 0 && <div className="mt-3">
-                  <Label htmlFor="offline-sales-reference" className="text-xs font-bold">{lang === 'fa' ? 'دلیل فروش آفلاین و شماره رسید *' : lang === 'ar' ? 'سبب البيع ورقم الإيصال *' : 'Offline sale reason and receipt/reference *'}</Label>
-                  <Textarea id="offline-sales-reference" className="mt-1 min-h-20 bg-white" value={form.sales_notes || ''} onChange={e => set('sales_notes',e.target.value)} placeholder="Example: POS offline, receipt #123, cashier shift" disabled={isSubmitting} />
-                  {inlineErrors.sales_notes && <p role="alert" className="mt-1 text-xs font-bold text-red-700">{inlineErrors.sales_notes}</p>}
-                </div>}
-              </div>}
-            </section>
 
-            {creditSource && <section className="space-y-3" data-testid="customer-credit-closing-section" data-i18n-skip="true">{custLoading ? <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">Loading Debt Management customers…</div> : <><div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{customerCreditSales.map((entry, index) => <div key={entry.id} className="min-w-0 space-y-2"><label className="block text-sm font-semibold">{lang === 'fa' ? 'منبع فروش قرضه' : lang === 'ar' ? 'مصدر البيع الآجل' : 'Customer credit sales source'}<select aria-label="Customer credit sales source" className="mt-1 min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3" value={creditEntrySourceId(entry, creditSources)} onChange={event => updateCustomerCreditSale(entry.id, 'source_id', event.target.value)} disabled={isSubmitting}>{creditSources.map(source => <option key={source.id} value={source.id}>{lang === 'ar' ? source.name_ar || source.name_en : lang === 'fa' ? source.name_fa || source.name_ar || source.name_en : source.name_en}</option>)}</select></label><CustomerCreditSalesSource entry={entry} idx={index} onRemove={removeCustomerCreditSale} onUpdate={updateCustomerCreditSale} customers={customers} currency={currency} customerSearch={customerSearch} onCustomerSearch={setCustomerSearch} onSelectCustomer={refetchCustomers} onReviewCreditSale={() => { const target = document.getElementById('sales-closing-actions'); target?.scrollIntoView({ behavior: 'smooth', block: 'center' }); target?.focus({ preventScroll: true }); }} onRecordPayment={recordCustomerCreditPayment} isRecordingPayment={isRecordingCustomerDebtPayment} paymentMethods={configuredPaymentMethods} disabled={isSubmitting} /></div>)}</div>{customerCreditSales.length > 0 && customerCreditSales.every((entry) => entry.customer_id) && <div className="flex justify-end"><Button type="button" size="sm" variant="outline" className="min-h-10 rounded-xl bg-white" onClick={addCustomerCreditSale} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />Add Another Customer</Button></div>}</>}{inlineErrors.credit && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}</section>}
+            </section>{creditSource && <section className="space-y-3" data-testid="customer-credit-closing-section" data-i18n-skip="true">{custLoading ? <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">Loading Debt Management customers…</div> : <><div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{customerCreditSales.map((entry, index) => <div key={entry.id} className="min-w-0 space-y-2"><label className="block text-sm font-semibold">{lang === 'fa' ? 'منبع فروش قرضه' : lang === 'ar' ? 'مصدر البيع الآجل' : 'Customer credit sales source'}<select aria-label="Customer credit sales source" className="mt-1 min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3" value={creditEntrySourceId(entry, creditSources)} onChange={event => updateCustomerCreditSale(entry.id, 'source_id', event.target.value)} disabled={isSubmitting}>{creditSources.map(source => <option key={source.id} value={source.id}>{lang === 'ar' ? source.name_ar || source.name_en : lang === 'fa' ? source.name_fa || source.name_ar || source.name_en : source.name_en}</option>)}</select></label><CustomerCreditSalesSource entry={entry} idx={index} onRemove={removeCustomerCreditSale} onUpdate={updateCustomerCreditSale} customers={customers} currency={currency} customerSearch={customerSearch} onCustomerSearch={setCustomerSearch} onSelectCustomer={refetchCustomers} onReviewCreditSale={() => { const target = document.getElementById('sales-closing-actions'); target?.scrollIntoView({ behavior: 'smooth', block: 'center' }); target?.focus({ preventScroll: true }); }} onRecordPayment={recordCustomerCreditPayment} isRecordingPayment={isRecordingCustomerDebtPayment} paymentMethods={configuredPaymentMethods} disabled={isSubmitting} /></div>)}</div>{customerCreditSales.length > 0 && customerCreditSales.every((entry) => entry.customer_id) && <div className="flex justify-end"><Button type="button" size="sm" variant="outline" className="min-h-10 rounded-xl bg-white" onClick={addCustomerCreditSale} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />Add Another Customer</Button></div>}</>}{inlineErrors.credit && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}</section>}
 
             {customClosingFields.length > 0 && <section id="closing-control-fields" className="rounded-2xl border border-slate-200 bg-background p-3 shadow-sm sm:p-4"><div className="mb-3"><h2 className="text-sm font-black text-slate-950">Closing fields</h2><p className="mt-0.5 text-[11px] text-slate-500">Only values for this closing are stored here.</p></div><div className="space-y-2">{customClosingFields.map((field) => <ClosingFieldControlRow key={field.id} field={field} label={closingFieldNameForLanguage(field)} value={customClosingFieldValues[field.id] ?? ''} error={inlineErrors[`custom_${field.id}`]} onChange={(value) => updateCustomClosingField(field.id, value)} />)}</div></section>}
 
