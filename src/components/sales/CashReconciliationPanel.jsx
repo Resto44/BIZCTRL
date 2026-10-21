@@ -55,7 +55,7 @@ function VarianceRing({ difference, status }) {
 
   return (
     <div
-      className="relative flex aspect-square w-24 max-w-full items-center justify-center rounded-full p-2 sm:w-28"
+      className="relative flex aspect-square w-20 max-w-full items-center justify-center rounded-full p-2 sm:w-24"
       style={{ background: `conic-gradient(${tone.ring} 0 28%, ${tone.track} 28% 100%)` }}
       role="status"
       aria-label={difference === null ? 'Variance pending' : `Cash variance ${difference}`}
@@ -87,6 +87,7 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
   openingShiftDate = null,
   openingShift = null,
   openingReviewRequired = false,
+  ledgerOverdrawn = false,
   actualCashValue = '',
   actualCash = null,
   difference = null,
@@ -115,7 +116,7 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
   const [noteOpen, setNoteOpen] = useState(Boolean(cashNotes));
   const status = !openingVerified || ledgerLoading || ledgerUnavailable || difference === null ? 'pending' : difference === 0 ? 'balanced' : difference < 0 ? 'shortage' : 'overage';
   const statusCopy = status === 'pending'
-    ? 'Awaiting Count'
+    ? (ledgerOverdrawn ? 'Ledger error' : !openingVerified ? 'Opening unverified' : 'Awaiting Count')
     : status === 'balanced'
       ? 'Balanced'
       : status === 'shortage'
@@ -149,8 +150,8 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
 
         {!openingVerified || ledgerUnavailable ? (
           <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-            <p className="font-black">{openingReviewRequired ? 'Opening Cash needs reconciliation' : 'ERP cash ledger is unavailable.'}</p>
-            <p className="mt-1 text-xs">{openingReviewRequired ? 'Previous shift has no verified counted balance or multiple possible drawers. Check the prior closing before finalizing.' : 'The cash count cannot be approved until the scoped ledger has loaded.'}</p>
+            <p className="font-black">{ledgerOverdrawn ? 'Cash Ledger overdrawn' : openingReviewRequired ? 'Opening Cash needs reconciliation' : 'ERP cash ledger is unavailable.'}</p>
+            <p className="mt-1 text-xs">{ledgerOverdrawn ? 'Cash Out exceeds available cash. Review the posted funding and payments before closing; this is not an ordinary cash overage.' : openingReviewRequired ? 'Previous shift has no verified counted balance or multiple possible drawers. Check the prior closing before finalizing.' : 'The cash count cannot be approved until the scoped ledger has loaded.'}</p>
             {openingShiftDate && <p className="mt-1 text-xs">Previous: {openingShiftDate} · {openingShift || 'Unknown shift'}</p>}
             <Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-200 bg-white" onClick={onRetryLedger}>
               <RefreshCw className="mr-1.5 h-4 w-4" />Retry ledger load
@@ -192,7 +193,7 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
               error={actualCashError}
               placeholder="0.00"
               className="mt-3"
-              inputClassName="h-20 rounded-2xl border-slate-300 bg-white pl-16 text-3xl font-black shadow-none focus-visible:ring-blue-500 sm:h-24 sm:text-4xl"
+              inputClassName="h-16 rounded-2xl border-slate-300 bg-white pl-16 text-2xl font-black shadow-none focus-visible:ring-blue-500 sm:h-20 sm:text-3xl"
             />
           </div>
           <div className="flex min-w-0 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 sm:p-4">
