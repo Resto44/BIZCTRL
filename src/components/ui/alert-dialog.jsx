@@ -2,9 +2,20 @@ import * as React from "react"
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog"
 
 import { cn } from "@/lib/utils"
+import { useWorkspaceTabActive } from "@/lib/WorkspaceTabVisibilityContext"
 import { buttonVariants } from "@/components/ui/button"
 
-const AlertDialog = AlertDialogPrimitive.Root
+// Dialog portals live in document.body, outside cached Owner tab panels. An
+// inactive tab must not retain a global overlay, focus trap or scroll lock.
+// Keep the caller's open state unchanged so it is restored on tab reactivation.
+function AlertDialog({ open, onOpenChange, ...props }) {
+  const active = useWorkspaceTabActive();
+  return <AlertDialogPrimitive.Root
+    {...props}
+    open={active ? open : false}
+    onOpenChange={active ? onOpenChange : undefined}
+  />;
+}
 
 const AlertDialogTrigger = AlertDialogPrimitive.Trigger
 
