@@ -325,7 +325,9 @@ class MobileMenuErrorBoundary extends React.Component {
 function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGroups, onNavigate, onToggle }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [openSection, setOpenSection] = useState(null);
-  const { translateLiteral, t } = useLanguage();
+  const { lang, translateLiteral, t } = useLanguage();
+  const salesSourcesLabel = lang === 'ar' ? 'مصادر المبيعات' : lang === 'fa' ? 'منابع فروش' : 'Sales Sources';
+  const addProductLabel = lang === 'ar' ? 'إضافة منتج' : lang === 'fa' ? 'افزودن محصول' : 'Add Product';
   const dashboardPath = roleDashboardPath(role);
 
   const accessibleItems = useMemo(
@@ -566,13 +568,13 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
               {can.viewSales && (
                 <Link to="/sales-sources" onClick={onNavigate} data-testid="mobile-quick-sales-sources" className="flex min-h-12 min-w-0 touch-manipulation items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-2 py-2 text-center text-xs font-black leading-tight text-white shadow-md shadow-violet-600/20 transition active:scale-[0.98] sm:text-sm">
                   <Banknote className="h-5 w-5 shrink-0" />
-                  <span className="min-w-0 break-words">{translateLiteral('Sales Sources')}</span>
+                  <span className="min-w-0 break-words">{salesSourcesLabel}</span>
                 </Link>
               )}
               {can.viewInventory && (
                 <Link to="/product-management?create=1" onClick={onNavigate} data-testid="mobile-quick-add-product" className="flex min-h-12 min-w-0 touch-manipulation items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-2 py-2 text-center text-xs font-black leading-tight text-white shadow-md shadow-sky-600/20 transition active:scale-[0.98] sm:text-sm">
                   <Package className="h-5 w-5 shrink-0" />
-                  <span className="min-w-0 break-words">{translateLiteral('Add Product')}</span>
+                  <span className="min-w-0 break-words">{addProductLabel}</span>
                 </Link>
               )}
             </div>
