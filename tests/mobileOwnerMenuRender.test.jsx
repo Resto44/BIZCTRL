@@ -111,8 +111,8 @@ describe('mobile owner ERP menu render', () => {
     const links = renderer.root.findAllByType('a');
     expect(links.some((link) => link.props.href === '/sales')).toBe(true);
     expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
-    expect(links.some((link) => link.props.href === '/sales-sources')).toBe(true);
-    expect(links.some((link) => link.props.href === '/product-management?create=1')).toBe(true);
+    expect(links.some((link) => link.props.href === '/sales-sources?create=1')).toBe(true);
+    expect(links.some((link) => link.props.href === '/product-management')).toBe(true);
     expect(renderer.root.findAllByProps({ 'data-testid': 'mobile-quick-sales-sources' })).toHaveLength(1);
     expect(renderer.root.findAllByProps({ 'data-testid': 'mobile-quick-add-product' })).toHaveLength(1);
     expect(renderer.root.findAllByProps({ 'aria-label': 'Search modules and actions' })).toHaveLength(1);
@@ -134,8 +134,8 @@ describe('mobile owner ERP menu render', () => {
         );
       });
       const links = renderer.root.findAllByType('a');
-      expect(links.some((link) => link.props.href === '/sales-sources')).toBe(false);
-      expect(links.some((link) => link.props.href === '/product-management?create=1')).toBe(false);
+      expect(links.some((link) => link.props.href === '/sales-sources?create=1')).toBe(false);
+      expect(links.some((link) => link.props.href === '/product-management')).toBe(false);
       expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
     } finally {
       if (renderer) await act(async () => renderer.unmount());
@@ -166,8 +166,8 @@ describe('mobile owner ERP menu render', () => {
     const links = renderer.root.findAllByType('a');
     expect(links.some((link) => link.props.href === '/sales')).toBe(true);
     expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
-    expect(links.some((link) => link.props.href === '/sales-sources')).toBe(true);
-    expect(links.some((link) => link.props.href === '/product-management?create=1')).toBe(true);
+    expect(links.some((link) => link.props.href === '/sales-sources?create=1')).toBe(true);
+    expect(links.some((link) => link.props.href === '/product-management')).toBe(true);
     expect(consoleError).toHaveBeenCalledWith(
       '[mobile-erp-menu] render failed; showing safe navigation',
       expect.any(Error),
