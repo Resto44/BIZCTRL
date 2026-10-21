@@ -1,6 +1,7 @@
 import { SALES_CLOSING_FIELD_GUIDES } from './helpSalesClosingFields';
 import { PRODUCT_MASTER_FIELD_GUIDES } from './helpProductMasterFields';
 import { ERP_INSTALL_GUIDES } from './helpInstallGuides';
+import { RESTAURANT_PRODUCT_FIELD_GUIDES } from './helpRestaurantProductFields';
 
 // Reviewed against the linked application source; update guides when workflows change.
 export const HELP_REVIEWED_AT = "2026-10-21";
@@ -1525,6 +1526,7 @@ export const helpArticles = [
   ...SALES_CLOSING_FIELD_GUIDES,
   ...PRODUCT_MASTER_FIELD_GUIDES,
   ...ERP_INSTALL_GUIDES,
+  ...RESTAURANT_PRODUCT_FIELD_GUIDES,
 ];
 
 export function normalizeHelpSearch(value) {
