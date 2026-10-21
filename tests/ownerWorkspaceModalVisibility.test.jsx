@@ -3,16 +3,17 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const primitiveParts = async () => {
+const { primitiveParts } = vi.hoisted(() => ({ primitiveParts: async () => {
   const { default: React } = await import('react');
   const Part = React.forwardRef(({ children, ...props }, ref) =>
     React.createElement('div', { ...props, ref }, children));
   Part.displayName = 'MockRadixPart';
-  const Root = ({ open, onOpenChange, children }) => (
-    <div data-modal-root="true" data-open={String(open)} data-can-change={String(Boolean(onOpenChange))}>
-      {children}
-    </div>
-  );
+  const Root = ({ open, onOpenChange, children }) =>
+    React.createElement('div', {
+      'data-modal-root': 'true',
+      'data-open': String(open),
+      'data-can-change': String(Boolean(onOpenChange)),
+    }, children);
   return {
     Root,
     Trigger: Part,
@@ -25,7 +26,7 @@ const primitiveParts = async () => {
     Action: Part,
     Cancel: Part,
   };
-};
+} }));
 vi.mock('@radix-ui/react-dialog', primitiveParts);
 vi.mock('@radix-ui/react-alert-dialog', primitiveParts);
 
