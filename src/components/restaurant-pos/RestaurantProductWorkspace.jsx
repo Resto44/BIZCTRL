@@ -4,7 +4,7 @@ import {customizationCopy} from '@/lib/restaurantCustomization';
 import RestaurantSalesCategories from './RestaurantSalesCategories';
 import RestaurantMenuGroupEditor from './RestaurantMenuGroupEditor';
 import {servingCopy,touchCopy} from '@/lib/restaurantServingOptions';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChefHat, Package, Plus, Pencil, RefreshCw } from 'lucide-react';
@@ -33,6 +33,17 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
  const selectionScope=tenant+':'+branch;const selectedIds=selected.filter(s=>s.scope===selectionScope).map(s=>s.id);
  const toggle=id=>setSelected(rows=>selectedIds.includes(id)?rows.filter(r=>r.id!==id):[...rows,{id,scope:selectionScope}]);
  const [editing,setEditing]=useState(null);
+ // Owner mobile quick entry opens the existing POS menu-product editor.
+ // Remove the one-shot URL flag so closing does not reopen the form.
+ useEffect(()=>{
+  if(params.get('create')!=='1'||!manage||!branch||raw)return;
+  setEditing({});
+  setParams(current=>{
+   const next=new URLSearchParams(current);
+   next.delete('create');
+   return next;
+  },{replace:true});
+ },[params,manage,branch,raw,setParams]);
  const [categoryOpen,setCategoryOpen]=useState(false);
  const [importOpen,setImportOpen]=useState(false);
  const [groupEditing,setGroupEditing]=useState(null);const touch=touchCopy(lang);
