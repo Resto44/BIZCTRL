@@ -1,3 +1,7 @@
+import { SALES_CLOSING_FIELD_GUIDES } from './helpSalesClosingFields';
+import { PRODUCT_MASTER_FIELD_GUIDES } from './helpProductMasterFields';
+import { ERP_INSTALL_GUIDES } from './helpInstallGuides';
+
 // Reviewed against the linked application source; update guides when workflows change.
 export const HELP_REVIEWED_AT = "2026-10-21";
 export const helpArticles = [
@@ -1517,16 +1521,31 @@ export const helpArticles = [
         "note": "AI تمام صفحات و جدول‌های SaaS را مستقیم نمی‌بیند و نمی‌تواند خودسرانه کد یا باگ سرور را اصلاح کند. فقط ابزارهای داده مجاز پاسخ عددی می‌دهند؛ موجودی ثبت‌شده ممکن است با موجودی زنده فرق کند و نتایج بزرگ ممکن است کامل نباشند. رمز، کلید API و اطلاعات حساس مشتری را در گفتگو نفرستید."
       }
     }
-  }
+  },
+  ...SALES_CLOSING_FIELD_GUIDES,
+  ...PRODUCT_MASTER_FIELD_GUIDES,
+  ...ERP_INSTALL_GUIDES,
 ];
 
 export function normalizeHelpSearch(value) {
   return String(value || "").normalize("NFKC").toLowerCase().replace(/[يى]/g, "ی").replace(/ك/g, "ک").replace(/[\u064B-\u065F\u0670\u0640\u200c]/g, "").replace(/\s+/g, " ").trim();
 }
 
+// Pre-index multilingual field names, validation statuses and instructions so
+// beginners can search for a single form label without opening every guide.
+const helpSearchIndex = new Map(helpArticles.map(article => [article.id, normalizeHelpSearch([
+  article.id,
+  ...(article.keywords || []),
+  ...Object.values(article.content).flatMap(copy => [copy.title, ...copy.steps, copy.note]),
+  ...(article.fields || []).flatMap(field => [
+    field.key, field.status,
+    ...Object.values(field.content || {}).flatMap(copy => [copy.label, copy.description, copy.example]),
+  ]),
+].join(' '))]));
+
 export function searchHelpArticles({ query = "", category = "all", role = "all" } = {}) {
   const words = normalizeHelpSearch(query).split(" ").filter(Boolean);
   return helpArticles.filter(article => (category === "all" || article.category === category)
     && (role === "all" || article.roles.includes(role))
-    && words.every(word => normalizeHelpSearch([article.id, ...Object.values(article.content).flatMap(copy => [copy.title, ...copy.steps, copy.note])].join(" ")).includes(word)));
+    && words.every(word => helpSearchIndex.get(article.id).includes(word)));
 }
