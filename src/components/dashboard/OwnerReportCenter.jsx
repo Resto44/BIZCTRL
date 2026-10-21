@@ -218,7 +218,7 @@ function ExecutiveReport({ model, copy }) {
 }
 
 function FinancialReport({ model, copy }) {
-  const { formatMoney, periodMetrics, previousPeriodMetrics, periodSalesChange, periodLabel, expenseGroups, revenueTrend, receivables, payables, cashRegister } = model;
+  const { formatMoney, periodMetrics, previousPeriodMetrics, periodSalesChange, periodLabel, expenseGroups, revenueTrend, receivables, payables, cashRegister, accountingProvisional, pendingExpenseCount } = model;
   const revenueBreakdown = [
     { label: text(copy, 'cash', 'Cash'), value: periodMetrics.totalCash, color: 'bg-emerald-500' },
     { label: text(copy, 'network', 'Network'), value: periodMetrics.totalNetwork, color: 'bg-blue-500' },
@@ -226,7 +226,8 @@ function FinancialReport({ model, copy }) {
     { label: text(copy, 'otherSources', 'Other sources'), value: periodMetrics.totalAdditionalSources, color: 'bg-amber-500' },
   ];
   const maxExpense = Math.max(...expenseGroups.map((row) => row.amount), 1);
-  const operatingCash = periodMetrics.totalCash + periodMetrics.totalNetwork - periodMetrics.totalPurchaseCost - periodMetrics.totalExpenses;
+  // Network revenue is not available bank cash. Real liquidity requires a
+  // settled bank/Treasury ledger; never infer it from sales minus purchases.
   return (
     <div data-testid="report-finance" className="w-full min-w-0 max-w-full overflow-x-hidden space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -263,10 +264,12 @@ function FinancialReport({ model, copy }) {
           <SectionTitle icon={Landmark} title={text(copy, 'cashAndObligations', 'Cash & obligations')} subtitle={text(copy, 'cashAndObligationsHint', 'Liquidity, receivables and supplier exposure')} tone="green" />
           <div className="mt-4 grid grid-cols-2 gap-2">
             <MetricCard label={text(copy, 'register', 'Cash register')} value={cashRegister == null ? '—' : formatMoney(cashRegister)} icon={Banknote} tone="violet" />
-            <MetricCard label={text(copy, 'operatingCash', 'Operating cash')} value={formatMoney(operatingCash)} icon={CreditCard} tone={operatingCash >= 0 ? 'green' : 'rose'} />
+            <MetricCard label={text(copy, 'operatingCash', 'Network sales (not bank cash)')} value={formatMoney(periodMetrics.totalNetwork)} icon={CreditCard} tone="blue" />
             <MetricCard label={text(copy, 'receivables', 'Receivables')} value={formatMoney(receivables)} icon={Landmark} tone="blue" />
             <MetricCard label={text(copy, 'payables', 'Payables')} value={formatMoney(payables)} icon={ReceiptText} tone="amber" />
           </div>
+          <p data-testid="owner-accounting-liquidity-basis" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/25 dark:text-amber-200">{text(copy, 'liquidityNote', 'Drawer is the last physical count; card sales are not available bank funds. The operating result is based on purchases, not inventory COGS.')}</p>
+          {accountingProvisional && <p role="status" data-testid="owner-pending-expense-estimate" className="mt-2 rounded-xl border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-800">{text(copy, 'accountingProvisionalLabel', 'Management estimate · pending expenses')} ({pendingExpenseCount})</p>}
           <div className="mt-3 rounded-2xl border border-border bg-muted/30 p-3 text-xs">
             <div className="flex justify-between"><span className="text-muted-foreground">{text(copy, 'previousPeriodSales', 'Previous period sales')}</span><strong>{formatMoney(previousPeriodMetrics.totalSales)}</strong></div>
             <div className="mt-2 flex justify-between"><span className="text-muted-foreground">{text(copy, 'previousPeriodProfit', 'Previous period profit')}</span><strong>{formatMoney(previousPeriodMetrics.netProfit)}</strong></div>
