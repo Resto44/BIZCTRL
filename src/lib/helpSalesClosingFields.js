@@ -82,4 +82,49 @@ export const SALES_CLOSING_FIELD_GUIDES = [
       guideField("save_configuration", "required", ["Save Configuration","حفظ الإعدادات","ذخیره تنظیمات"], ["Persists calculation layout and validation switches; Reload does not save.","يحفظ الإعدادات؛ إعادة التحميل لا تحفظ التغييرات.","تنظیمات را ذخیره می‌کند؛ Reload جای Save نیست."]),
     ],
   })
+
+  fieldGuide({
+    id: 'closing-physical-cash-reconciliation',
+    category: 'sales', roles: ['owner','manager'],
+    route: '/sales',
+    source: 'src/components/sales/CashReconciliationPanel.jsx',
+    title: [
+      'Sales Closing: Opening, Actual, Closing and variance',
+      'إقفال المبيعات: النقد الافتتاحي والفعلي والختامي والفروقات',
+      'بستن فروش: Opening، Actual، Closing و اختلاف صندوق'
+    ],
+    steps: [
+      [
+        'Select the correct branch, date, shift and cashier. Opening Cash comes from a verified prior physical count; an unknown value is not zero.',
+        'Review cash sales, cash in and cash out. Count actual cash physically; expected = opening + cash sales + in - out. Network, credit and wallet transfers are not physical cash.',
+        'Compare Actual vs Expected. Closing Cash is the counted physical amount. If the opening is missing or ambiguous, ask the Owner to verify a documented start-of-shift count with a reason. An overdrawn cash ledger requires correction before Finalize.'
+      ],
+      [
+        'اختر الفرع والتاريخ والوردية والكاشير الصحيحين. النقد الافتتاحي يأتي من عد فعلي موثق للسابق؛ المبلغ غير المعروف ليس صفراً.',
+        'راجع النقد المباع والوارد والصادر وعدّ النقد الفعلي. المتوقع = الافتتاحي + المبيعات النقدية + الوارد - الصادر. الشبكة والآجل والمحفظة ليست نقداً فعلياً.',
+        'قارن الفعلي بالمتوقع؛ الختامي هو النقد المعدود. عند غياب الافتتاحي أو تعدد الصناديق، يجب على المالك توثيق العد في بداية الوردية وسبب التصحيح. الرصيد المتوقع السالب يتطلب مطابقة قبل الإقفال.'
+      ],
+      [
+        'شعبه، تاریخ، شیفت و صندوق‌دار را درست انتخاب کنید. Opening فقط از شمارش واقعی معتبر شیفت قبل می‌آید؛ نامعلوم مساوی صفر نیست.',
+        'Cash Sales، Cash In و Cash Out را بررسی و مبلغ صندوق را بشمارید. Expected = Opening + Cash Sales + In − Out؛ شبکه، قرض و انتقال والت پول نقد نیستند.',
+        'Actual را با Expected تطبیق کنید؛ Closing همان مبلغ واقعی شمرده‌شده است. اگر Opening نامعلوم یا چندصندوقی است، Owner با سند معتبر آغاز شیفت و دلیل آن را تأیید کند. Expected منفی قبل از Finalize باید اصلاح شود.'
+      ]
+    ],
+    note: [
+      'Owner verification is an immutable audited starting count, never permission to invent SAR 0 or replace current Actual Cash. Legacy counts remain intact. Shortage/overage does not alter sales or profit.',
+      'تأكيد المالك سجل افتتاحي غير قابل للتعديل ولا يسمح بتخمين صفر أو استبدال النقد الفعلي. تبقى السجلات القديمة كما هي؛ العجز والزيادة لا يغيران البيع أو الربح.',
+      'تأیید Owner یک سند افتتاحیه غیرقابل‌ویرایش است، نه اجازه درج صفر ساختگی یا جایگزینی Actual. تاریخچه قدیمی دست‌نخورده می‌ماند؛ کسری و اضافه مبلغ فروش را تغییر نمی‌دهد.'
+    ],
+    fields: [
+      guideField('opening_cash','conditional',['Opening Cash','النقد الافتتاحي','موجودی آغاز'],['Verified physical count carried from the preceding relevant shift, or owner-certified count at shift start.','النقد المعدود بالوردية السابقة أو الموثق من المالك عند بداية الوردية.','مبلغ واقعی شمارش‌شده قبلی یا تأییدشده توسط Owner در آغاز شیفت.']),
+      guideField('cash_sales','optional',['Cash Sales','المبيعات النقدية','فروش نقدی'],['Actual cash sales only; card and credit are excluded.','المبيعات النقدية فقط دون الشبكة والآجل.','فقط فروش نقدی؛ نه شبکه و قرض.']),
+      guideField('cash_in','optional',['Cash In','النقد الوارد','ورودی نقد'],['Posted cash funding and collections for the correct drawer; not automatic sales revenue.','حركات النقد الواردة المثبتة، وليست إيراد بيع تلقائياً.','پول ورودی ثبت‌شده، نه درآمد فروش اتومات.']),
+      guideField('cash_out','optional',['Cash Out','النقد الصادر','خروجی نقد'],['Posted payments/handovers physically removed from drawer.','المدفوعات والتسليمات الخارجة فعلياً من الصندوق.','پرداخت یا تحویل واقعی خارج‌شده از صندوق.']),
+      guideField('expected_cash','system',['Expected Cash','النقد المتوقع','نقد مورد انتظار'],['Opening + cash sales + posted cash in - posted cash out; negative is an error to investigate.','الافتتاحي + النقد المباع + الوارد - الصادر؛ السالب يحتاج مراجعة.','Opening + Cash Sales + Cash In − Cash Out؛ مقدار منفی نیاز به بررسی دارد.']),
+      guideField('actual_cash','required',['Actual Cash','النقد الفعلي','نقد واقعی'],['Physically counted cash at closing. A real zero is different from no count.','النقد المعدود عند الإقفال؛ الصفر المعدود يختلف عن عدم العد.','پول نقد شمرده‌شده هنگام بستن؛ صفر واقعی با شمارش‌نشدن فرق دارد.']),
+      guideField('cash_variance','system',['Variance','فرق النقد','اختلاف صندوق'],['Actual minus Expected; positive overage, negative shortage; not another sale.','الفعلي ناقص المتوقع؛ موجب زيادة وسالب عجز، وليس بيعاً جديداً.','Actual − Expected؛ مثبت اضافه و منفی کسری، نه فروش جدید.']),
+      guideField('closing_cash','system',['Closing Cash','النقد الختامي','موجودی پایان'],['Verified physical drawer count for shift end, distinct from wallet settlement.','عد النقد الفعلي في ختام الوردية بعيداً عن تسوية المحفظة.','مبلغ واقعی صندوق در پایان شیفت، جدا از تسویه والت.']),
+      guideField('opening_owner_verification','conditional',['Owner opening verification','توثيق الافتتاح من المالك','تأیید افتتاحیه اونر'],['If no reliable prior count exists, require recorded shift-start amount, reason and owner permission.','عند غياب العد السابق يلزم مبلغ بداية الوردية والسبب وموافقة المالك.','اگر شمارش قبلی معتبر نیست، سند مبلغ آغاز شیفت، دلیل و تأیید Owner لازم است.'])
+    ]
+  }),
 ];
