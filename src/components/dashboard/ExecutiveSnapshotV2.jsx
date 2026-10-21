@@ -76,7 +76,7 @@ export default function ExecutiveSnapshotV2({model,copy}) {
   const navigate=useNavigate();
   const {
     periodMetrics={},previousPeriodMetrics={},revenueTrend=[],periodKey='today',
-    periodLabel,formatMoney,hasQueryError,drawerCash,receivables,payables,scopedAlerts=[],
+    periodLabel,formatMoney,hasQueryError,accountingProvisional,drawerCash,receivables,payables,scopedAlerts=[],
   }=model;
   const presentation=useMemo(()=>buildExecutiveSnapshotPresentation({
     periodMetrics,previousPeriodMetrics,revenueTrend,periodKey,
@@ -94,8 +94,8 @@ export default function ExecutiveSnapshotV2({model,copy}) {
     <section data-testid="executive-snapshot" className="min-w-0 rounded-[1.55rem] border border-border/80 bg-card p-3.5 shadow-sm sm:p-5">
       <SectionHeader icon={BarChart3} title={t(copy,'executiveSnapshot','Executive snapshot')}
         subtitle={`${t(copy,'performanceOverview','Key performance overview')} · ${periodLabel}`}>
-        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${hasQueryError?'border-amber-200 bg-amber-50 text-amber-700':'border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'}`}>
-          {hasQueryError?t(copy,'syncRequired','Sync required'):t(copy,'verifiedERP','VERIFIED ERP')}
+        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${hasQueryError || accountingProvisional?'border-amber-200 bg-amber-50 text-amber-700':'border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'}`}>
+          {hasQueryError?t(copy,'syncRequired','Sync required'):accountingProvisional?t(copy,'accountingProvisionalLabel','Management estimate · pending expenses'):t(copy,'verifiedERP','VERIFIED ERP')}
         </span>
       </SectionHeader>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5 sm:gap-3">
@@ -149,7 +149,7 @@ export default function ExecutiveSnapshotV2({model,copy}) {
         <div data-testid="snapshot-drawer-cash" className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
           <p className="flex items-center gap-2 text-xs font-black text-emerald-800 dark:text-emerald-300"><Banknote className="h-4 w-4"/>{t(copy,'drawerCash','Cash in drawer')}</p>
           <p className="mt-3 text-[clamp(1.45rem,4vw,2rem)] font-black text-emerald-950 dark:text-emerald-100" dir="ltr">{drawerCash?.complete?formatMoney(drawerCash.amount):'—'}</p>
-          <p className="mt-2 text-[11px] leading-4 text-emerald-700 dark:text-emerald-300">{drawerCash?.complete?t(copy,'drawerCashHint','Recorded physical cash remaining'):drawerCash?.missingBranches?t(copy,'partialDrawerCash','Some branch cash counts are missing'):t(copy,'drawerCashMissing','Not recorded')}</p>
+          <p className="mt-2 text-[11px] leading-4 text-emerald-700 dark:text-emerald-300">{drawerCash?.complete?t(copy,'drawerCashHint','Last verified physical count · not a live bank balance'):drawerCash?.error?t(copy,'syncRequired','Sync required'):drawerCash?.missingBranches?t(copy,'partialDrawerCash','Some branch cash counts are missing'):t(copy,'drawerCashMissing','Not recorded')}</p>
         </div>
         <div className="min-w-0 rounded-2xl border border-border/80 p-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
