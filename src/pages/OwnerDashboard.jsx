@@ -224,26 +224,36 @@ function OwnerDashboardContent() {
     legacyColumn = 'branch', dateColumn, dateFrom, dateTo, filters = {}, orderColumn = 'date', ascending = false, limit = 1000,
   } = {}) => {
     if (!activeRestaurant?.id) return [];
-    const createQuery = () => {
-      let query = supabase.from(table).select('*').eq('restaurant_id', activeRestaurant.id);
-      if (dateColumn && dateFrom) query = query.gte(dateColumn, dateFrom);
-      if (dateColumn && dateTo) query = query.lte(dateColumn, dateTo);
-      Object.entries(filters).forEach(([column, value]) => { query = query.eq(column, value); });
-      if (orderColumn) query = query.order(orderColumn, { ascending });
-      return query.limit(limit);
+    // Supabase/PostgREST typically caps responses at 1,000 rows even if the
+    // caller requests 10,000. Quiet truncation makes Owner ERP KPIs false.
+    // Fetch ordered pages, and treat an exhausted safety ceiling as a data
+    // error rather than displaying a partial total as VERIFIED.
+    const pageSize = 1000;
+    const fetchPages = async (applyBranch = (query) => query) => {
+      const all = [];
+      for (let offset = 0; offset < limit; offset += pageSize) {
+        let query = supabase.from(table).select('*').eq('restaurant_id', activeRestaurant.id);
+        if (dateColumn && dateFrom) query = query.gte(dateColumn, dateFrom);
+        if (dateColumn && dateTo) query = query.lte(dateColumn, dateTo);
+        Object.entries(filters).forEach(([column, value]) => { query = query.eq(column, value); });
+        if (orderColumn) query = query.order(orderColumn, { ascending });
+        if (orderColumn !== 'id') query = query.order('id', { ascending: true });
+        const batchSize = Math.min(pageSize, limit - offset);
+        const { data, error } = await applyBranch(query).range(offset, offset + batchSize - 1);
+        if (error) throw error;
+        const page = data || [];
+        all.push(...page);
+        if (page.length < batchSize) return all;
+      }
+      throw new Error(`ERP_REPORT_ROW_LIMIT_REACHED: ${table} exceeds ${limit} scoped rows. Narrow the period or use paged server aggregates.`);
     };
-    if (isAllBranches) {
-      const { data, error } = await createQuery();
-      if (error) throw error;
-      return data || [];
-    }
+    if (isAllBranches) return fetchPages();
     if (!selectedBranchId || !selectedBranchKey) return [];
     const [canonical, legacy] = await Promise.all([
-      createQuery().eq('branch_id', selectedBranchId),
-      createQuery().is('branch_id', null).eq(legacyColumn, selectedBranchKey),
+      fetchPages((query) => query.eq('branch_id', selectedBranchId)),
+      fetchPages((query) => query.is('branch_id', null).eq(legacyColumn, selectedBranchKey)),
     ]);
-    if (canonical.error || legacy.error) throw canonical.error || legacy.error;
-    return uniqueRecords([...(canonical.data || []), ...(legacy.data || [])]);
+    return uniqueRecords([...canonical, ...legacy]);
   }, [activeRestaurant?.id, isAllBranches, selectedBranchId, selectedBranchKey]);
 
   const fetchInventoryTransactions = useCallback(async () => {
