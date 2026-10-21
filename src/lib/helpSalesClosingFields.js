@@ -81,7 +81,7 @@ export const SALES_CLOSING_FIELD_GUIDES = [
       guideField("live_preview", "system", ["Live Preview","المعاينة المباشرة","پیش‌نمایش"], ["Shows a sample without saving a real closing.","عرض تجريبي دون حفظ إقفال فعلي.","نمایش نمونه، بدون ذخیره معامله."]),
       guideField("save_configuration", "required", ["Save Configuration","حفظ الإعدادات","ذخیره تنظیمات"], ["Persists calculation layout and validation switches; Reload does not save.","يحفظ الإعدادات؛ إعادة التحميل لا تحفظ التغييرات.","تنظیمات را ذخیره می‌کند؛ Reload جای Save نیست."]),
     ],
-  })
+  }),
 
   fieldGuide({
     id: 'closing-physical-cash-reconciliation',
