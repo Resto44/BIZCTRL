@@ -79,4 +79,78 @@ discount_allowed|optional|Discount allowed|السماح بالخصم|اجازه 
 branch_price_override|optional|Branch price override|تعديل سعر الفرع|قیمت متفاوت شعبه|Allow authorized branch-specific pricing.|يسمح بسعر خاص للفروع المصرح لها.|اجازه قیمت خاص شعبه.
 price_change_requires_approval|optional|Owner price approval|موافقة المالك للسعر|تأیید اونر برای قیمت|Request owner approval for price changes.|مراجعة المالك لتغييرات السعر.|تغییر قیمت نیازمند تأیید اونر.`),
   }),
+,
+  fieldGuide({
+    id: 'product-inventory-reference', category: 'stock', roles: ['owner','manager'], route: '/product-management',
+    source: 'src/components/products/ProductMasterForm.jsx',
+    title: ['Product Management: inventory and units — every field', 'إدارة المنتجات: جميع حقول المخزون والوحدات', 'Product Management: تمام فیلدهای انبار و واحدها'],
+    steps: [
+      ['Under Inventory Policy choose which physical goods need tracking and whether negative stock, batches, expiry or serial numbers apply.',
+       'Add unit conversions with a positive factor and target unit, then record opening, reorder and Par stock values separately by branch.',
+       'Set preferred supplier, delivery lead time, minimum order and purchase suggestions, then verify every unit and branch quantity.'],
+      ['ضمن سياسة المخزون حدد تتبع المخزون السالب والدفعات وتواريخ الانتهاء والأرقام التسلسلية وفق نوع المنتج.',
+       'أضف تحويل الوحدات بمعامل موجب ووحدة الهدف، ثم حدد مخزون البداية وحد الطلب ومستوى الهدف لكل فرع.',
+       'راجع المورد المفضل ومدة التوريد والحد الأدنى للشراء والاقتراحات وتأكد من صحة وحدة وكمية كل فرع.'],
+      ['در Inventory Policy ردیابی کالا، منفی‌شدن، Batch، انقضا و شماره سریال را تعیین کنید.',
+       'واحدهای تبدیل با ضریب مثبت را درج و برای هر شعبه Opening Stock، Reorder و Par level را جدا وارد کنید.',
+       'سپلایر مورد نظر، روزهای تحویل، حداقل سفارش و پیشنهاد خرید را تنظیم و واحد و موجودی هر شعبه را کنترل کنید.'],
+    ],
+    note: ['Opening stock is a starting position, not a purchase. Never add cartons, kilograms or portions without a conversion. Stock quantities must be non-negative.',
+      'مخزون البداية ليس فاتورة شراء، ولا تجمع الكرتون والكيلو والحصة بلا تحويل صالح. كميات المخزون غير سالبة.',
+      'Opening Stock موجودی آغاز است نه خرید. کارتن، کیلو و پرس بدون تبدیل معتبر قابل جمع نیستند؛ موجودی نباید منفی باشد.'],
+    fields: fields(`
+track_inventory|optional|Track inventory|تتبع المخزون|ردیابی انبار|Enabled for physical stock; services may not track.|فعّل للمواد الفعلية لا لكل الخدمات.|برای جنس فیزیکی فعال؛ خدمات معمولاً انبار ندارند.
+allow_negative_stock|optional|Allow negative stock|السماح بالمخزون السالب|موجودی منفی|Risk of selling more than stock; normally disable.|قد يسمح ببيع أكثر من المتاح؛ يفضّل تعطيله.|خطر فروش بیش از موجودی؛ بهتر خاموش.
+batch_tracking|optional|Batch tracking|تتبع الدفعات|ردیابی Batch|Track lot numbers for sensitive stock.|تعقب أرقام دفعات الأصناف.|شماره Batch اجناس را دنبال می‌کند.
+expiry_tracking|optional|Expiry tracking|تتبع الصلاحية|ردیابی انقضا|Track expiry for perishables.|للمواد ذات تاريخ صلاحية.|برای جنس دارای تاریخ انقضا.
+serial_tracking|optional|Serial tracking|الأرقام التسلسلية|شماره سریال|Identify individual serialized goods.|تعقب أرقام الوحدات المنفردة.|ردیابی هر محصول دارای Serial.
+from_unit|conditional|Source unit|الوحدة الأصلية|واحد مبدأ|Required for a conversion row.|مطلوبة عند إضافة تحويل.|در صورت افزودن تبدیل لازم.
+factor|conditional|Conversion factor|معامل التحويل|ضریب تبدیل|Must be positive e.g. 12 pieces per carton.|يجب أن يكون موجباً مثل ١٢ قطعة للكرتون.|باید مثبت باشد؛ مثلاً ۱۲ عدد در کارتن.
+to_unit|conditional|Target unit|الوحدة الهدف|واحد مقصد|Required target for any conversion.|مطلوبة لكل تحويل.|برای هر تبدیل لازم است.
+conversion_barcode|optional|Conversion barcode|باركود التحويل|بارکد تبدیل|Optional pack barcode.|باركود اختياري للعبوة.|بارکد بسته اختیاری.
+opening_stock|optional|Opening stock per branch|مخزون البداية للفرع|موجودی آغاز شعبه|Starting balance, not a purchase entry.|رصيد افتتاحي وليس مشتريات.|موجودی اولیه، نه ثبت خرید.
+reorder_point|optional|Reorder point|حد إعادة الطلب|حد سفارش مجدد|Alert when stock reaches the threshold.|التنبيه عند بلوغ حد الطلب.|هشدار هنگام رسیدن به حد.
+par_level|optional|Par level|مستوى المخزون المستهدف|موجودی هدف|Target quantity for replenishment planning.|مقدار المخزون المستهدف للتزويد.|مقدار مطلوب برای تأمین.
+preferred_supplier|optional|Preferred supplier|المورد المفضل|سپلایر ترجیحی|Select a linked supplier.|اختر مورداً مسجلاً.|سپلایر ثبت‌شده را انتخاب کنید.
+lead_time_days|optional|Lead time (days)|مدة التوريد بالأيام|روزهای تأمین|Estimated days between order and receipt.|مدة وصول المواد بعد الطلب.|تعداد روز تا رسیدن سفارش.
+minimum_order_qty|optional|Minimum order quantity|حد أدنى للطلب|حداقل مقدار سفارش|Minimum suggested purchase amount.|أقل كمية شراء مقترحة.|کمترین مقدار سفارش.
+automatic_purchase_suggestion|optional|Automatic purchase suggestion|اقتراح شراء تلقائي|پیشنهاد خرید اتومات|Suggestion only, not an approved purchase invoice.|اقتراح وليس فاتورة شراء معتمدة.|فقط پیشنهاد است، نه فاکتور پرداخت‌شده.`),
+  }),
+  fieldGuide({
+    id: 'product-advanced-reference', category: 'stock', roles: ['owner','manager'], route: '/product-management',
+    source: 'src/components/products/ProductMasterForm.jsx',
+    title: ['Product Management: advanced rules, accounting and access', 'إدارة المنتجات: القواعد والحسابات والصلاحيات', 'Product Management: تنظیمات پیشرفته، حسابداری و صلاحیت'],
+    steps: [
+      ['Complete organization-required Custom Fields, then choose Sellable, Purchasable, Returnable and any manager approval requirement.',
+       'Check POS visibility, purchase limit and mapping to Sales, Inventory, COGS and Stock Variance accounts.',
+       'Select permitted owner, manager and employee product access, then use Create/Update Product and verify the server record in the catalog.'],
+      ['أكمل الحقول المخصصة المطلوبة وحدد قابلية البيع والشراء والإرجاع وحاجة موافقة المدير.',
+       'راجع ظهور المنتج في POS وسقف الشراء وربط حسابات المبيعات والمخزون وتكلفة البضاعة وفروق الجرد.',
+       'اختر وصول المالك والمدير والموظف ثم أنشئ أو حدّث المنتج وتحقق من السجل في الكتالوج.'],
+      ['Custom Fields الزامی را کامل کنید و Sellable، Purchasable، Returnable و تأیید مدیر را مشخص کنید.',
+       'نمایش POS، سقف خرید و اتصال حساب‌های Sales، Inventory، COGS و Stock Variance را بررسی کنید.',
+       'دسترسی Owner، Manager و Employee را تعیین و Create/Update را بزنید؛ ثبت سروری را در کاتالوگ بررسی کنید.'],
+    ],
+    note: ['Product access settings never override central ERP role permissions or RLS. Save Draft saves only a local device draft; it does not post a product.',
+      'صلاحيات المنتج لا تتجاوز الأدوار المركزية أو RLS. حفظ المسودة محلي على الجهاز وليس إنشاء منتج في الخادم.',
+      'تنظیم دسترسی محصول از RBAC و RLS مرکزی عبور نمی‌کند. Save Draft فقط پیش‌نویس روی دستگاه است، نه ثبت محصول در سرور.'],
+    fields: fields(`
+custom_attributes|conditional|Custom attributes|الحقول المخصصة|فیلدهای سفارشی|Required only when defined in Workspace.|مطلوبة حسب إعدادات المؤسسة.|بسته به Workspace ممکن است الزامی شوند.
+sellable|optional|Sellable|قابل للبيع|قابل فروش|Allow product in sales when authorized.|للسماح ببيع المنتج.|اجازه استفاده در فروش.
+purchasable|optional|Purchasable|قابل للشراء|قابل خرید|Allow purchase workflows for this item.|للسماح بشراء المنتج.|اجازه ثبت در خرید.
+returnable|optional|Returnable|قابل للإرجاع|قابل برگشت|Enable returns under business policy.|يسمح بالإرجاع وفق السياسة.|اجازه برگشت کالا.
+requires_manager_approval|optional|Manager approval required|موافقة المدير مطلوبة|تأیید مدیر الزامی|Adds approval requirement to restricted actions.|تتطلب الإجراءات الحساسة موافقة.|عملیات حساس تأیید لازم دارد.
+pos_visibility|optional|POS visibility|الظهور في POS|نمایش در POS|All, selected or hidden for cashier menus.|الكل أو المحدد أو مخفي.|همه، منتخب یا پنهان.
+purchase_limit|optional|Purchase limit per order|حد شراء للطلب|سقف خرید هر سفارش|Sets purchase limit where applicable.|أقصى شراء لكل طلب.|حد خرید هر سفارش.
+sales_account|optional|Sales account|حساب المبيعات|حساب فروش|Ledger mapping for earned product sales.|ربط حساب المبيعات.|اتصال فروش به دفترکل.
+inventory_account|optional|Inventory account|حساب المخزون|حساب موجودی|Ledger stock-asset mapping.|حساب أصول المخزون.|اتصال دارایی انبار.
+cogs_account|optional|COGS account|حساب تكلفة المبيعات|حساب بهای تمام‌شده|Cost of Goods Sold mapping.|تكلفة البضاعة المباعة.|حساب بهای کالای فروخته‌شده.
+stock_variance_account|optional|Stock variance account|حساب فرق الجرد|حساب اختلاف انبار|Mapping for approved count adjustments.|فروقات الجرد المعتمدة.|حساب اختلافات انبار.
+owner_access|system|Owner access|صلاحيات المالك|دسترسی اونر|Edit or View, subject to central role.|تعديل أو عرض تحت صلاحيات الدور.|Edit یا View تحت مجوز مرکزی.
+manager_access|system|Manager access|صلاحيات المدير|دسترسی مدیر|Edit, Stock-only or View within RLS.|تعديل أو مخزون فقط أو عرض حسب RLS.|Edit، Stock یا View مطابق RLS.
+employee_access|system|Employee access|صلاحيات الموظف|دسترسی کارمند|Stock-only, View or None; central role is authoritative.|مخزون أو عرض أو لا وصول.|Stock، View یا None؛ رول مرکزی معتبر است.
+save_draft|optional|Save draft|حفظ المسودة|ذخیره پیش‌نویس|Local draft only; not a saved ERP product.|مسودة محلية وليست منتجاً محفوظاً.|پیش‌نویس محلی، نه محصول ذخیره‌شده.
+create_product|required|Create or Update Product|إنشاء أو تحديث المنتج|ثبت یا ویرایش محصول|Final validation and server save; verify new catalog row.|الحفظ النهائي للخادم بعد التحقق.|ذخیره نهایی در سرور؛ رکورد را بررسی کنید.`),
+  }),
+
 ];
