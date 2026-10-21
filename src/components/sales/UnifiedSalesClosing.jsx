@@ -1297,7 +1297,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       key: 'erpData',
       label: 'ERP Sales and Cash Ledger Available',
       passed: !automaticClosingUnavailable && !cashLedgerUnavailable && cashContextReady && !openingReviewRequired && !ledgerOverdrawn,
-      message: openingReviewRequired ? 'Opening Cash needs reconciliation' : ledgerOverdrawn ? 'Correct overdrawn cash movement ledger' : automaticClosingUnavailable || cashLedgerUnavailable || !cashContextReady ? 'Retry required' : 'Verified cash ledger available',
+      message: !effectiveCashierId ? 'Select a valid cashier/operator to load the cash ledger' : openingReviewRequired ? openingReviewReason : ledgerOverdrawn ? 'Correct overdrawn cash movement ledger' : automaticClosingUnavailable || cashLedgerUnavailable ? 'Cash ledger could not be loaded; recheck branch and shift' : !cashContextReady ? 'Cash ledger is loading or opening count is not verified' : 'Verified cash ledger available',
     },
     {
       key: 'cashier',
@@ -1326,7 +1326,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     {
       key: 'pos',
       label: 'POS Totals Valid',
-      passed: posEntries.every(e => !e.device_id || Number(e.amount) >= 0),
+      // A POS device ID is optional in Manual / Offline mode. The manually
+      // entered network amount still must be finite and non-negative.
+      passed: posEntries.every(e => e.amount === '' || e.amount == null
+        || (Number.isFinite(Number(e.amount)) && Number(e.amount) >= 0)),
       message: `${currency}\u00A0${networkTotal.toLocaleString()}`,
     },
     {
@@ -1427,7 +1430,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (Object.keys(nextErrors).length) {
       setInlineErrors(nextErrors);
       const firstError = Object.keys(nextErrors)[0];
-      if (!['actualCash', 'reconciliation'].includes(firstError)) setShowFullDetails(true);
+      if (!['actualCash', 'reconciliation', 'sales_notes'].includes(firstError)) setShowFullDetails(true);
       focusField(firstError);
       return;
     }
@@ -1730,6 +1733,13 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
           </section>
 
+          {attentionCount > 0 && <div data-testid="closing-blockers" role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+            <p className="text-xs font-black text-amber-900">{lang === 'fa' ? 'برای تکمیل کلوزینگ این موارد را اصلاح کنید:' : lang === 'ar' ? 'أكمل البنود التالية لإتمام الإقفال:' : 'To finalize the shift, resolve these items:'}</p>
+            <div className="mt-2 space-y-2">{failedValidations.map(validation => <button type="button" key={validation.key} className="flex min-h-10 w-full items-start gap-2 rounded-lg border border-amber-100 bg-white px-3 py-2 text-left text-xs text-amber-900" onClick={() => {
+              if (['cashier', 'branch', 'shift', 'requiredFields', 'pos', 'credit', 'creditLimit'].includes(validation.key)) setShowFullDetails(true);
+              requestAnimationFrame(() => document.getElementById(validation.key === 'cashBalance' ? 'quick-closing-actualCash' : validation.key === 'erpData' ? 'opening-cash-needs-review' : 'closing-full-details')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+            }}><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span className="min-w-0"><strong className="block">{validation.label}</strong><span className="mt-0.5 block">{validation.message}</span></span></button>)}</div>
+          </div>}
 
           <section data-testid="closing-sales-entry-mode" className="rounded-2xl border border-blue-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex items-center justify-between gap-2">
@@ -1762,7 +1772,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           </section>
 
           {ledgerOverdrawn && <div role="alert" data-testid="cash-ledger-overdrawn" className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-900"><p className="font-black">Cash ledger overdrawn · reconciliation required</p><p className="mt-1 text-xs leading-6">Expected Cash is {currency} {reconciliation.expectedCash.toLocaleString()} after Cash In and Cash Out. A physical drawer cannot be negative. Verify missing funding and cash movements in Cash Register before closing. This is not an ordinary overage.</p><Button type="button" size="sm" variant="outline" onClick={() => refetchCashLedger()} className="mt-2 min-h-10"><RefreshCw className="mr-1.5 h-4 w-4" />Recheck cash ledger</Button></div>}
-          {openingReviewRequired && <div role="alert" data-testid="opening-cash-needs-review" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          {openingReviewRequired && <div id="opening-cash-needs-review" role="alert" data-testid="opening-cash-needs-review" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-black">Opening Cash needs reconciliation</p>
             <p className="mt-1 text-xs leading-6">{openingReviewReason}</p>
             <p className="mt-1 text-xs">Previous shift: {cashLedgerContext.opening_shift || 'Initial'} · {cashLedgerContext.opening_shift_date || '—'} · Records: {cashLedgerContext.opening_prior_count ?? '—'}</p>
