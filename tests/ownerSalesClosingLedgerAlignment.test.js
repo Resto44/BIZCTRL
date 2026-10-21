@@ -87,7 +87,11 @@ describe('ERP contract: Sales Closing ↔ Owner Dashboard', () => {
     expect(executive).toContain('accountingProvisional?');
     expect(closingPage).not.toContain('No posted ERP cash sales were found.');
     expect(closingPage).toContain('data-testid="offline-sales-audit"');
-    expect(closingPage).toContain('nextErrors.sales_notes =');
+    expect(closingPage).not.toContain('nextErrors.sales_notes =');
+    expect(closingPage).toContain('data-testid="sales-entry-manual"');
+    expect(closingPage).toContain('data-testid="sales-entry-automatic"');
+    expect(closingPage).toContain('data-testid="closing-blockers"');
+    expect(closingPage).toContain('effectiveCashierId');
     expect(migration).toContain('erp_can_access_scope_text');
     expect(migration).not.toContain('UPDATE public.daily_sales');
     expect(migration).not.toContain('closing_cash AS actual_cash');
