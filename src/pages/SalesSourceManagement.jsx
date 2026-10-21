@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -29,7 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { downloadCSV, downloadPDF } from '@/lib/exportUtils';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const asArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const COLORS = ['#2563eb', '#16a34a', '#ea580c', '#7c3aed', '#db2777', '#0891b2', '#65a30d', '#dc2626'];
@@ -55,6 +55,7 @@ function HistoryTable({ rows, lang, t, currency }) {
 export default function SalesSourceManagement() {
   const { t, lang, currency } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const { branches } = useTenant();
   const { selectedBranchId, isAllBranches, setSelectedBranchId } = useBranchScope();
   const { canCustomize, paymentMethods, saveSalesSource, deleteSalesSource, isSavingSalesSource, isDeletingSalesSource } = useSalesClosingCustomization();
@@ -85,6 +86,23 @@ export default function SalesSourceManagement() {
     refetch,
   } = useSalesSourceManagement({ filters: managementFilters, page });
   const canManage = canCustomize;
+  // Open the existing Add Sales Source dialog from the Owner mobile Quick Entry.
+  // This is a one-shot navigation flag; removing it prevents reopening after Close.
+  // The existing canCustomize permission still guards creation and the server write.
+  useEffect(() => {
+    const search = new URLSearchParams(location.search);
+    if (search.get('create') !== '1') return;
+    setTab('sources');
+    if (canManage) {
+      setSourceEditor({ mode: 'create', source: newSalesClosingSource((sources.length + 1) * 10) });
+    }
+    search.delete('create');
+    navigate({
+      pathname: location.pathname,
+      search: search.toString() ? `?${search.toString()}` : '',
+      hash: location.hash,
+    }, { replace: true });
+  }, [canManage, location.hash, location.pathname, location.search, navigate, sources.length]);
 
   const filteredSources = useMemo(() => {
     const q = query.trim().toLowerCase();
