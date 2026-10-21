@@ -100,12 +100,25 @@ describe('CashReconciliationPanel', () => {
     />);
     const text = textOf(tree.root);
     expect(text).toContain('Opening Cash needs reconciliation');
-    expect(text).toContain('Awaiting Count');
+    expect(text).toContain('Opening unverified');
     expect(text).not.toContain('SAR 14 Overage');
     const approve = tree.root.findAllByType('button').find(node => textOf(node).includes('Approve Cash Count'));
     expect(approve.props.disabled).toBe(true);
     expect(tree.root.findByProps({ id: 'closing-detail-actual-cash' }).props.disabled).toBe(true);
     expect(textOf(tree.root.findByProps({ 'data-testid': 'closing-cash-preview' }))).toContain('—');
+  });
+
+  it('shows the ledger error separately from an unverified previous shift', () => {
+    const tree = TestRenderer.create(<CashReconciliationPanel {...baseProps}
+      ledgerOverdrawn openingVerified={false} openingReviewRequired={false}
+      expectedCash={-60} closingCash={null} difference={null}
+    />);
+    const message = textOf(tree.root);
+    expect(message).toContain('Cash Ledger overdrawn');
+    expect(message).toContain('Ledger error');
+    expect(message).not.toContain('Opening Cash needs reconciliation');
+    const approve = tree.root.findAllByType('button').find((node) => textOf(node).includes('Approve Cash Count'));
+    expect(approve.props.disabled).toBe(true);
   });
 
   it('keeps the reconciliation note optional and approves the current count explicitly', () => {
