@@ -58,6 +58,25 @@ export default function HelpCenter() {
           <p className="text-xs text-muted-foreground">{article.roles.map(item => c.roles[item]).join(' · ')}</p>
           <h4 className="font-semibold">{c.steps}</h4>
           <ol className="list-decimal space-y-3 ps-6 text-sm leading-7">{copy.steps.map((step, index) => <li key={index} className="ps-1">{step}</li>)}</ol>
+          {open && article.fields?.length > 0 && (
+            <section aria-label={c.reference} className="space-y-3">
+              <h4 className="font-semibold">{c.reference} ({article.fields.length})</h4>
+              <div className="grid gap-2 md:grid-cols-2">
+                {article.fields.map(field => {
+                  const detail = field.content[language] || field.content.en;
+                  return <div key={field.key} data-help-field={field.key} className="min-w-0 space-y-2 rounded-xl border bg-muted/20 p-3">
+                    <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5">
+                      <h5 className="min-w-0 break-words text-sm font-bold">{detail.label}</h5>
+                      <span className="rounded-md border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground">{c[field.status] || c.conditional}</span>
+                    </div>
+                    <p className="break-words text-xs leading-6 text-muted-foreground">{detail.description}</p>
+                    {detail.example && <p className="break-words text-xs"><b>{c.example}: </b><span dir="auto">{detail.example}</span></p>}
+                    <code dir="ltr" className="block w-fit max-w-full break-all rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">{field.key}</code>
+                  </div>;
+                })}
+              </div>
+            </section>
+          )}
           <aside className="rounded-lg border border-amber-300/50 bg-amber-500/10 p-4 text-sm leading-7"><h4 className="font-semibold">{c.note}</h4><p>{copy.note}</p></aside>
           <div className="flex flex-wrap gap-3"><Link to={article.route} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">{c.open}<ExternalLink className="h-4 w-4" aria-hidden="true" /></Link><Link to={`/help?guide=${article.id}`} className="inline-flex min-h-11 items-center px-2 text-sm text-primary underline">{c.link}</Link></div>
         </div>
