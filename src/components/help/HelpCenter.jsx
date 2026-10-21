@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { BookOpen, Search, ExternalLink, ChevronDown } from 'lucide-react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, BookOpen, Search, ExternalLink, ChevronDown, LayoutDashboard } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
-import { HELP_REVIEWED_AT, searchHelpArticles } from '@/lib/helpArticles';
+import { HELP_REVIEWED_AT, helpArticles, searchHelpArticles } from '@/lib/helpArticles';
 
 export const HELP_COPY = {
   en: { title: 'Help Center', intro: 'Learn how to use BizCTRL, one task at a time.', search: 'Search guides, e.g. supplier payment', category: 'Topic', role: 'Guide for', all: 'All', results: 'guides', reference: 'Field details', required: 'Required', optional: 'Optional', conditional: 'Depends on settings', system: 'System / protected', example: 'Example', steps: 'Steps', note: 'Before you continue', open: 'Open this section', link: 'Link to this guide', empty: 'No matching guides. Try fewer words or another topic.', reset: 'Clear filters', scope: 'Guides explain available workflows. Your role, assigned branch, business type and plan determine which actions you can use. Opening a guide does not change your access.', reviewed: 'Reviewed', contact: 'Cannot sign in? Contact us', support: 'My support tickets', home: 'Go to sign in', topics: { start: 'Getting started', sales: 'Sales & POS', stock: 'Products & stock', buy: 'Purchases & suppliers', money: 'Finance & treasury', people: 'People & approvals', reports: 'Reports & alerts', portals: 'Portal guides', trouble: 'Troubleshooting' }, roles: { owner: 'Business owner', manager: 'Branch manager', employee: 'Employee', supplier: 'Supplier', platform: 'Platform owner' } },
@@ -10,8 +10,9 @@ export const HELP_COPY = {
   fa: { title: 'مرکز راهنما', intro: 'استفاده از BizCTRL را قدم‌به‌قدم یاد بگیرید.', search: 'جست‌وجوی راهنما؛ مثلاً پرداخت سپلایر', category: 'موضوع', role: 'راهنما برای', all: 'همه', results: 'راهنما', reference: 'توضیح تمام فیلدها', required: 'الزامی', optional: 'اختیاری', conditional: 'بسته به تنظیمات', system: 'سیستمی', example: 'مثال', steps: 'مراحل کار', note: 'پیش از ادامه', open: 'باز کردن این بخش', link: 'لینک این راهنما', empty: 'راهنمای مطابق پیدا نشد. کلمات کمتر یا موضوع دیگر را امتحان کنید.', reset: 'پاک کردن فیلترها', scope: 'راهنما جریان‌های کاری موجود را توضیح می‌دهد. نقش، شعبه تعیین‌شده، نوع کسب‌وکار و پلان شما عملیات مجاز را مشخص می‌کند. خواندن راهنما صلاحیت شما را تغییر نمی‌دهد.', reviewed: 'بازبینی', contact: 'وارد شده نمی‌توانید؟ تماس بگیرید', support: 'تیکت‌های پشتیبانی', home: 'رفتن به صفحه ورود', topics: { start: 'شروع کار', sales: 'فروش و POS', stock: 'محصولات و انبار', buy: 'خرید و سپلایر', money: 'مالی و خزانه', people: 'کارکنان و تأییدها', reports: 'گزارش و هشدار', portals: 'راهنمای پورتل‌ها', trouble: 'رفع مشکل' }, roles: { owner: 'اونر کسب‌وکار', manager: 'مدیر شعبه', employee: 'کارمند', supplier: 'سپلایر', platform: 'اونر پلتفورم' } },
 };
 
-export default function HelpCenter() {
+export default function HelpCenter({ dashboardPath = null }) {
   const { lang } = useLanguage();
+  const location = useLocation();
   const language = HELP_COPY[lang] ? lang : 'en';
   const c = HELP_COPY[language];
   const [params, setParams] = useSearchParams();
@@ -20,7 +21,10 @@ export default function HelpCenter() {
   const role = Object.hasOwn(c.roles, params.get('role')) ? params.get('role') : 'all';
   const selected = params.get('guide');
   const articles = useMemo(() => searchHelpArticles({ query, category, role }), [query, category, role]);
-  const displayedArticles = useMemo(() => selected ? [...articles].sort((a, b) => Number(b.id === selected) - Number(a.id === selected)) : articles, [articles, selected]);
+  // The selected guide becomes the only open detail view. Keeping it inside the
+  // current /support route preserves Owner workspace tabs and the bottom nav.
+  const selectedArticle = useMemo(() => selected ? helpArticles.find(article => article.id === selected) : null, [selected]);
+  const displayedArticles = selectedArticle ? [selectedArticle] : articles;
   const change = (key, value) => setParams(current => {
     const next = new URLSearchParams(current);
     if (value) next.set(key, value); else next.delete(key);
@@ -31,6 +35,21 @@ export default function HelpCenter() {
     ['q', 'topic', 'role'].forEach(key => next.delete(key));
     return next;
   }, { replace: true });
+  // Quick Start must not navigate to public /help: that route is outside the
+  // authenticated ERP shell and would remove Owner tabs / Dashboard controls.
+  const openQuickGuide = (id) => setParams(current => {
+    const next = new URLSearchParams(current);
+    ['q', 'topic', 'role'].forEach(key => next.delete(key));
+    if (location.pathname === '/support') next.set('tab', 'guides');
+    next.set('guide', id);
+    return next;
+  }, { replace: false });
+  const closeGuide = () => change('guide', '');
+  const linkToGuide = (id) => {
+    const next = new URLSearchParams(params);
+    next.set('guide', id);
+    return { pathname: location.pathname, search: `?${next.toString()}` };
+  };
 
   return <section dir={language === 'en' ? 'ltr' : 'rtl'} className="min-w-0 space-y-5" aria-label={c.title}>
     <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 sm:p-7">
@@ -39,6 +58,12 @@ export default function HelpCenter() {
       <p className="mt-2 text-sm leading-6 text-muted-foreground">{c.intro}</p>
       <p className="mt-3 text-xs leading-6 text-muted-foreground">{c.scope}</p>
     </div>
+    <nav aria-label={c.title} className="flex flex-wrap items-center gap-2">
+      {selectedArticle && <button type="button" onClick={closeGuide} data-testid="help-back-to-guides" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/30 bg-card px-3 py-2 text-sm font-semibold text-primary"><ArrowLeft className="h-4 w-4 rtl:rotate-180" />{language === 'fa' ? 'برگشت به راهنماها' : language === 'ar' ? 'العودة للأدلة' : 'Back to guides'}</button>}
+      {dashboardPath && <Link to={dashboardPath} data-testid="help-go-dashboard" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm font-semibold"><LayoutDashboard className="h-4 w-4" />{language === 'fa' ? 'داشبورد' : language === 'ar' ? 'لوحة التحكم' : 'Dashboard'}</Link>}
+      {!dashboardPath && location.pathname === '/help' && <Link to="/support?tab=guides" className="inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold">{language === 'fa' ? 'بازگشت به ERP Support' : language === 'ar' ? 'العودة لدعم ERP' : 'Back to ERP Support'}</Link>}
+    </nav>
+    {!selectedArticle && <>
     <nav aria-label="Quick start guides" className="flex flex-wrap gap-2">
       {[
         ['new-user-essentials', language === 'ar' ? 'البدء للمستخدم الجديد' : language === 'fa' ? 'شروع کاربر جدید' : 'New user'],
@@ -46,7 +71,7 @@ export default function HelpCenter() {
         ['product-identity-reference', language === 'ar' ? 'إدارة المنتجات' : language === 'fa' ? 'مدیریت محصولات' : 'Product Management'],
         ['pwa-install-ios', language === 'ar' ? 'تثبيت آيفون' : language === 'fa' ? 'نصب آیفون' : 'iPhone / Safari'],
         ['pwa-install-android', language === 'ar' ? 'تثبيت أندرويد' : language === 'fa' ? 'نصب اندروید' : 'Android / Chrome'],
-      ].map(([id, label]) => <Link key={id} to={`/help?guide=${id}`} className="inline-flex min-h-11 items-center rounded-xl border border-primary/25 bg-card px-3 py-2 text-xs font-semibold text-primary">{label}</Link>)}
+      ].map(([id, label]) => <button type="button" key={id} data-help-quick-guide={id} onClick={() => openQuickGuide(id)} className="inline-flex min-h-11 items-center rounded-xl border border-primary/25 bg-card px-3 py-2 text-xs font-semibold text-primary">{label}</button>)}
     </nav>
     <div className="space-y-3">
       <label className="block text-sm font-semibold" htmlFor="help-search">{c.search}</label>
@@ -57,7 +82,8 @@ export default function HelpCenter() {
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm"><p role="status">{articles.length} {c.results}</p><button type="button" onClick={clear} className="min-h-11 px-2 text-primary underline">{c.reset}</button></div>
     </div>
-    {!articles.length && <p className="rounded-xl border p-6 text-sm">{c.empty}</p>}
+    </>}
+    {!selectedArticle && !articles.length && <p className="rounded-xl border p-6 text-sm">{c.empty}</p>}
     <div className="space-y-3">{displayedArticles.map(article => {
       const copy = article.content[language];
       const open = selected === article.id;
@@ -87,7 +113,7 @@ export default function HelpCenter() {
             </section>
           )}
           <aside className="rounded-lg border border-amber-300/50 bg-amber-500/10 p-4 text-sm leading-7"><h4 className="font-semibold">{c.note}</h4><p>{copy.note}</p></aside>
-          <div className="flex flex-wrap gap-3"><Link to={article.route} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">{c.open}<ExternalLink className="h-4 w-4" aria-hidden="true" /></Link><Link to={`/help?guide=${article.id}`} className="inline-flex min-h-11 items-center px-2 text-sm text-primary underline">{c.link}</Link></div>
+          <div className="flex flex-wrap gap-3">{article.route === '/help' ? <button type="button" onClick={closeGuide} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">{language === 'fa' ? 'برگشت به راهنماها' : language === 'ar' ? 'العودة للأدلة' : 'Back to guides'}</button> : <Link to={article.route} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">{c.open}<ExternalLink className="h-4 w-4" aria-hidden="true" /></Link>}<Link to={linkToGuide(article.id)} className="inline-flex min-h-11 items-center px-2 text-sm text-primary underline">{c.link}</Link></div>
         </div>
       </article>;
     })}</div>
