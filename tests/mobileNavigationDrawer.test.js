@@ -54,6 +54,12 @@ describe('mobile navigation drawer contract', () => {
     expect(sidebar).toContain('QUICK ENTRY');
     expect(sidebar).toContain('to="/sales"');
     expect(sidebar).toContain('to="/purchases?create=1"');
+    expect(sidebar).toContain('data-testid="mobile-quick-sales-sources"');
+    expect(sidebar).toContain('to="/sales-sources"');
+    expect(sidebar).toContain('data-testid="mobile-quick-add-product"');
+    expect(sidebar).toContain('to="/product-management?create=1"');
+    expect(sidebar).toContain('salesSourcesLabel');
+    expect(sidebar).toContain('addProductLabel');
     expect(purchases).toContain("searchParams.get('create') !== '1'");
     expect(purchases).toContain('setShowForm(true)');
     expect(purchases).toContain("nextParams.delete('create')");
@@ -82,6 +88,24 @@ describe('mobile navigation drawer contract', () => {
     expect(app).toContain('FeatureRouteGuard feature="network_management"');
     expect(role).toContain('if (role === ROLES.OWNER)');
     expect(role).toContain('[key]: true');
+  });
+
+
+  it('opens the real product-create UI from Quick Entry for restaurant and general ERP products', async () => {
+    const [products, restaurant, app] = await Promise.all([
+      source('../src/pages/ProductManagement.jsx'),
+      source('../src/components/restaurant-pos/RestaurantProductWorkspace.jsx'),
+      source('../src/App.jsx'),
+    ]);
+    expect(app).toContain('<Route path="/product-management" element={<RoleGuard permission="viewInventory">');
+    expect(app).toContain('<Route path="/sales-sources" element={<RoleGuard permission="viewSales">');
+    expect(products).toContain("params.get('create') !== '1'");
+    expect(products).toContain('setShowCreate(true)');
+    expect(products).toContain("params.delete('create')");
+    expect(restaurant).toContain("params.get('create')!=='1'");
+    expect(restaurant).toContain('setEditing({})');
+    expect(restaurant).toContain("next.delete('create')");
+    expect(restaurant).toContain('menuOnly');
   });
 
   it('imports every icon used by the expanded mobile module registry', async () => {
