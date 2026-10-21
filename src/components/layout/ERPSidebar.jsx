@@ -287,9 +287,9 @@ function MobileMenuFallback({ can, role, onNavigate, onToggle }) {
             <Plus className="h-5 w-5" /> Add Purchase
           </Link>
         )}
-        {can?.viewSales && (
-          <Link to="/sales-sources?create=1" onClick={onNavigate} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-600 px-2 text-sm font-black text-white">
-            <Banknote className="h-5 w-5" /> Sales Sources
+        {can?.manageSettings && (
+          <Link to="/sales-closing-customization" onClick={onNavigate} className="flex min-h-16 items-center justify-center gap-2 rounded-xl bg-violet-600 px-2 text-sm font-black text-white">
+            <SlidersHorizontal className="h-5 w-5" /> Sales Closing Customization
           </Link>
         )}
         {can?.viewInventory && (
@@ -326,7 +326,7 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
   const [searchQuery, setSearchQuery] = useState('');
   const [openSection, setOpenSection] = useState(null);
   const { lang, translateLiteral, t } = useLanguage();
-  const salesSourcesLabel = lang === 'ar' ? 'مصادر المبيعات' : lang === 'fa' ? 'منابع فروش' : 'Sales Sources';
+  const salesClosingCustomizationLabel = lang === 'ar' ? 'تخصيص إقفال المبيعات' : lang === 'fa' ? 'تنظیمات بستن فروش' : 'Sales Closing Customization';
   const addProductLabel = lang === 'ar' ? 'إضافة منتج' : lang === 'fa' ? 'افزودن محصول' : 'Add Product';
   const dashboardPath = roleDashboardPath(role);
 
@@ -541,7 +541,7 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
       </nav>
 
       <div className="shrink-0 border-t border-slate-200 bg-white px-3 pt-3 dark:border-slate-800 dark:bg-slate-950 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        {(can.viewSales || can.viewPurchases || can.viewInventory) && (
+        {(can.viewSales || can.viewPurchases || can.viewInventory || can.manageSettings) && (
           <section aria-labelledby="quick-entry-title">
             <h3 id="quick-entry-title" className="mb-2 text-[10px] font-black tracking-[0.14em] text-slate-500">{translateLiteral('QUICK ENTRY')}</h3>
             <div className="grid grid-cols-2 gap-2">
@@ -565,10 +565,10 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
                   {t('add_purchase') || translateLiteral('Add Purchase')}
                 </Link>
               )}
-              {can.viewSales && (
-                <Link to="/sales-sources?create=1" onClick={onNavigate} data-testid="mobile-quick-sales-sources" className="flex min-h-12 min-w-0 touch-manipulation items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-2 py-2 text-center text-xs font-black leading-tight text-white shadow-md shadow-violet-600/20 transition active:scale-[0.98] sm:text-sm">
-                  <Banknote className="h-5 w-5 shrink-0" />
-                  <span className="min-w-0 break-words">{salesSourcesLabel}</span>
+              {can.manageSettings && (
+                <Link to="/sales-closing-customization" onClick={onNavigate} data-testid="mobile-quick-sales-closing-customization" className="flex min-h-16 min-w-0 touch-manipulation items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-2 py-2 text-center text-xs font-black leading-tight text-white shadow-md shadow-violet-600/20 transition active:scale-[0.98] sm:text-sm">
+                  <SlidersHorizontal className="h-5 w-5 shrink-0" />
+                  <span className="min-w-0 break-words">{salesClosingCustomizationLabel}</span>
                 </Link>
               )}
               {can.viewInventory && (
