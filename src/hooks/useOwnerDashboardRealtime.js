@@ -5,7 +5,7 @@ import { supabase } from '@/api/supabaseClient';
 
 // These prefixes match the current OwnerDashboard queries, not legacy cards.
 export const OWNER_DASHBOARD_TABLE_QUERIES = {
-  daily_sales: ['sales_report_period', 'sales_report_previous_period'],
+  daily_sales: ['sales_report_period', 'sales_report_previous_period', 'owner_drawer_cash_asof'],
   supplier_invoices: ['supplier_invoices'],
   expenses: ['expenses_report_period', 'expenses_report_previous_period', 'expenses_report_fixed_pool', 'expenses_report_previous_fixed_pool'],
   expense_categories: ['expense_categories_dash'],
@@ -15,7 +15,7 @@ export const OWNER_DASHBOARD_TABLE_QUERIES = {
   product_price_history: ['product_price_history'],
   debt_records: ['debts_customer_dash'],
   wallet_transactions: ['wallet_transactions_dash'],
-  branches: ['branches'],
+  branches: ['branches', 'owner_drawer_cash_asof'],
 };
 const TABLE_QUERY_MAP = OWNER_DASHBOARD_TABLE_QUERIES;
 const DASHBOARD_KEYS = new Set(Object.values(TABLE_QUERY_MAP).flat());
