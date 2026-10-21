@@ -20,6 +20,7 @@ export default function HelpCenter() {
   const role = Object.hasOwn(c.roles, params.get('role')) ? params.get('role') : 'all';
   const selected = params.get('guide');
   const articles = useMemo(() => searchHelpArticles({ query, category, role }), [query, category, role]);
+  const displayedArticles = useMemo(() => selected ? [...articles].sort((a, b) => Number(b.id === selected) - Number(a.id === selected)) : articles, [articles, selected]);
   const change = (key, value) => setParams(current => {
     const next = new URLSearchParams(current);
     if (value) next.set(key, value); else next.delete(key);
@@ -48,7 +49,7 @@ export default function HelpCenter() {
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm"><p role="status">{articles.length} {c.results}</p><button type="button" onClick={clear} className="min-h-11 px-2 text-primary underline">{c.reset}</button></div>
     </div>
     {!articles.length && <p className="rounded-xl border p-6 text-sm">{c.empty}</p>}
-    <div className="space-y-3">{articles.map(article => {
+    <div className="space-y-3">{displayedArticles.map(article => {
       const copy = article.content[language];
       const open = selected === article.id;
       return <article key={article.id} className="min-w-0 overflow-hidden rounded-xl border bg-card" id={`guide-${article.id}`}>
