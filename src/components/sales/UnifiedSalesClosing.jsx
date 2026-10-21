@@ -1243,6 +1243,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     actualCash: actualCount,
     branchWalletAvailable,
   });
+  const ledgerOverdrawn = cashContextReady && reconciliation.ledgerOverdrawn;
   const branchWalletApplied = Math.max(0, Number(activeOwnerSettlement?.wallet_payment_amount ?? reconciliation.branchWalletApplied) || 0);
   const ownerSettlementRequired = Math.max(0, Number(activeOwnerSettlement?.owner_settlement_required ?? reconciliation.ownerPaymentRequired) || 0);
   const ownerSettlementPaymentTarget = Math.max(ownerSettlementRequired, reconciliation.ownerPaymentRequired);
@@ -1256,11 +1257,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     ? 'Resolved'
     : (activeOwnerSettlement?.status || 'PENDING');
   const expectedCash = !cashContextReady ? null : reconciliation.expectedCash;
-  const cashDifference = !cashContextReady ? null : reconciliation.difference;
+  const cashDifference = !cashContextReady || ledgerOverdrawn ? null : reconciliation.difference;
   const cashReconcStatus = cashDifference === null ? null : cashDifference === 0 ? 'Balanced' : cashDifference < 0 ? 'Shortage' : 'Overage';
   // Closing Cash for this shift equals the counted physical drawer cash.
   // Wallet settlement and network receipts are never silently added to it.
-  const closingCash = actualCount !== null && cashContextReady ? actualCount : null;
+  const closingCash = actualCount !== null && cashContextReady && !ledgerOverdrawn ? actualCount : null;
   const remainingDifference = cashDifference;
   // Funding never changes this result; it is a settlement flow, not revenue.
   const operatingResult = totalSales - totalDailyExpenses;
@@ -1270,7 +1271,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     {
       key: 'erpData',
       label: 'ERP Sales and Cash Ledger Available',
-      passed: !automaticClosingUnavailable && !cashLedgerUnavailable && cashContextReady && !openingReviewRequired,
+      passed: !automaticClosingUnavailable && !cashLedgerUnavailable && cashContextReady && !openingReviewRequired && !ledgerOverdrawn,
       message: openingReviewRequired ? 'Opening Cash needs reconciliation' : automaticClosingUnavailable || cashLedgerUnavailable || !cashContextReady ? 'Retry required' : (useAutomaticSales ? 'Ledger-scoped sales loaded' : 'No posted sales'),
     },
     {
@@ -1385,6 +1386,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (!cashierDisplayName) nextErrors.cashier = 'Cashier is required.';
     if (openingReviewRequired) nextErrors.reconciliation = openingReviewReason;
     if (cashLedgerUnavailable || !cashContextReady) nextErrors.reconciliation = 'Load and verify the ERP cash ledger before saving.';
+    if (ledgerOverdrawn) nextErrors.reconciliation = 'Cash ledger is overdrawn. Reconcile dated cash movements and funding before finalizing.';
     if (!savingDraft && requiresCashReconciliation && actualCount === null) nextErrors.actualCash = 'Actual Cash is required.';
     if (invalidCredit) nextErrors.credit = 'Select an active branch customer and enter a valid non-negative credit sale amount.';
     if (!savingDraft && pendingPaymentEntry) nextErrors.credit = 'Record or clear the customer debt payment before saving the Sales Closing.';
@@ -1699,6 +1701,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
           </section>
 
+          {ledgerOverdrawn && <div role="alert" data-testid="cash-ledger-overdrawn" className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-900"><p className="font-black">Cash ledger overdrawn · reconciliation required</p><p className="mt-1 text-xs leading-6">Expected Cash is {currency} {reconciliation.expectedCash.toLocaleString()} after Cash In and Cash Out. A physical drawer cannot be negative. Verify missing funding and cash movements in Cash Register before closing. This is not an ordinary overage.</p><Button type="button" size="sm" variant="outline" onClick={() => refetchCashLedger()} className="mt-2 min-h-10"><RefreshCw className="mr-1.5 h-4 w-4" />Recheck cash ledger</Button></div>}
           {openingReviewRequired && <div role="alert" data-testid="opening-cash-needs-review" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-black">Opening Cash needs reconciliation</p>
             <p className="mt-1 text-xs leading-6">{openingReviewReason}</p>
@@ -1770,7 +1773,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
             {customClosingFields.length > 0 && <section id="closing-control-fields" className="rounded-2xl border border-slate-200 bg-background p-3 shadow-sm sm:p-4"><div className="mb-3"><h2 className="text-sm font-black text-slate-950">Closing fields</h2><p className="mt-0.5 text-[11px] text-slate-500">Only values for this closing are stored here.</p></div><div className="space-y-2">{customClosingFields.map((field) => <ClosingFieldControlRow key={field.id} field={field} label={closingFieldNameForLanguage(field)} value={customClosingFieldValues[field.id] ?? ''} error={inlineErrors[`custom_${field.id}`]} onChange={(value) => updateCustomClosingField(field.id, value)} />)}</div></section>}
 
-            {requiresCashReconciliation && <CashReconciliationPanel currency={currency} openingCash={opening} cashSales={reconciliation.cashSales} cashIn={reconciliation.cashIn} cashOut={reconciliation.cashOut} expectedCash={expectedCash} closingCash={closingCash} openingVerified={cashContextReady} openingStatus={cashLedgerContext.opening_status} openingSource={cashLedgerContext.opening_source} openingShiftDate={cashLedgerContext.opening_shift_date} openingShift={cashLedgerContext.opening_shift} actualCashValue={actualCashCount} actualCash={actualCount} difference={cashDifference} shortage={reconciliation.shortage} overage={reconciliation.overage} cashNotes={cashNotes} onActualCashChange={handleActualCashChange} onCashNotesChange={setCashNotes} managerApproved={managerApproved} onApprove={() => setManagerApproved(true)} actualCashError={inlineErrors.actualCash || inlineErrors.reconciliation} ledgerLoading={cashLedgerLoading} ledgerUnavailable={cashLedgerUnavailable} openingReviewRequired={openingReviewRequired} onRetryLedger={() => refetchCashLedger()} branchWalletApplied={branchWalletApplied} ownerSettlementRequired={ownerSettlementRequired} ownerSettlementRemaining={ownerSettlementRemaining} ownerSettlementResolved={ownerSettlementResolved} ownerSettlementStatusLabel={ownerSettlementStatusLabel} settlementStatus={reconciliation.settlementStatus} canRecordOwnerPayment={Boolean(currentClosingId && onRecordOwnerPayment)} onRecordOwnerPayment={recordOwnerPayment} isRecordingOwnerPayment={isRecordingOwnerPayment} disabled={isSubmitting || !cashContextReady} />}
+            {requiresCashReconciliation && <CashReconciliationPanel currency={currency} openingCash={opening} cashSales={reconciliation.cashSales} cashIn={reconciliation.cashIn} cashOut={reconciliation.cashOut} expectedCash={expectedCash} closingCash={closingCash} openingVerified={cashContextReady && !ledgerOverdrawn} openingStatus={cashLedgerContext.opening_status} openingSource={cashLedgerContext.opening_source} openingShiftDate={cashLedgerContext.opening_shift_date} openingShift={cashLedgerContext.opening_shift} actualCashValue={actualCashCount} actualCash={actualCount} difference={cashDifference} shortage={reconciliation.shortage} overage={reconciliation.overage} cashNotes={cashNotes} onActualCashChange={handleActualCashChange} onCashNotesChange={setCashNotes} managerApproved={managerApproved} onApprove={() => setManagerApproved(true)} actualCashError={inlineErrors.actualCash || inlineErrors.reconciliation} ledgerLoading={cashLedgerLoading} ledgerUnavailable={cashLedgerUnavailable} openingReviewRequired={openingReviewRequired || ledgerOverdrawn} onRetryLedger={() => refetchCashLedger()} branchWalletApplied={branchWalletApplied} ownerSettlementRequired={ownerSettlementRequired} ownerSettlementRemaining={ownerSettlementRemaining} ownerSettlementResolved={ownerSettlementResolved} ownerSettlementStatusLabel={ownerSettlementStatusLabel} settlementStatus={reconciliation.settlementStatus} canRecordOwnerPayment={Boolean(currentClosingId && onRecordOwnerPayment)} onRecordOwnerPayment={recordOwnerPayment} isRecordingOwnerPayment={isRecordingOwnerPayment} disabled={isSubmitting || !cashContextReady || ledgerOverdrawn} />}
           </div>}
 
           {inlineErrors.duplicate && <div role="alert" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" /><p className="text-xs font-bold">{inlineErrors.duplicate}</p></div>}
@@ -1780,8 +1783,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       <div id="sales-closing-actions" tabIndex={-1} className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
         <div className="mx-auto grid w-full max-w-4xl grid-cols-[minmax(7rem,0.75fr)_minmax(0,1.25fr)] gap-2 sm:grid-cols-[auto_auto_minmax(14rem,1fr)] sm:items-center">
           <div className="flex min-w-0 flex-col justify-center px-1"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Final total</span><Money currency={currency} value={operatingResult} signed className={`truncate text-lg font-black ${operatingResult >= 0 ? 'text-blue-700' : 'text-red-700'}`} /></div>
-          <Button type="submit" variant="outline" className="min-h-12 font-bold sm:order-first sm:w-32" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable || !cashContextReady}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button>
-          <Button type="submit" aria-label="Finalize Closing" className="col-span-2 min-h-12 bg-blue-600 font-black hover:bg-blue-700 sm:col-span-1" onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable || !cashContextReady || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : allValid ? <><ShieldCheck className="mr-1.5 h-4 w-4" />Finalize Closing</> : `Complete ${attentionCount} required ${attentionCount === 1 ? 'action' : 'actions'}`}</Button>
+          <Button type="submit" variant="outline" className="min-h-12 font-bold sm:order-first sm:w-32" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button>
+          <Button type="submit" aria-label="Finalize Closing" className="col-span-2 min-h-12 bg-blue-600 font-black hover:bg-blue-700 sm:col-span-1" onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : allValid ? <><ShieldCheck className="mr-1.5 h-4 w-4" />Finalize Closing</> : `Complete ${attentionCount} required ${attentionCount === 1 ? 'action' : 'actions'}`}</Button>
         </div>
       </div>
     </form>
