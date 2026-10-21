@@ -111,9 +111,9 @@ describe('mobile owner ERP menu render', () => {
     const links = renderer.root.findAllByType('a');
     expect(links.some((link) => link.props.href === '/sales')).toBe(true);
     expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
-    expect(links.some((link) => link.props.href === '/sales-sources?create=1')).toBe(true);
+    expect(links.some((link) => link.props.href === '/sales-closing-customization')).toBe(true);
     expect(links.some((link) => link.props.href === '/product-management')).toBe(true);
-    expect(renderer.root.findAllByProps({ 'data-testid': 'mobile-quick-sales-sources' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ 'data-testid': 'mobile-quick-sales-closing-customization' })).toHaveLength(1);
     expect(renderer.root.findAllByProps({ 'data-testid': 'mobile-quick-add-product' })).toHaveLength(1);
     expect(renderer.root.findAllByProps({ 'aria-label': 'Search modules and actions' })).toHaveLength(1);
     await act(async () => renderer.unmount());
@@ -122,7 +122,7 @@ describe('mobile owner ERP menu render', () => {
 
   it('does not expose restricted quick actions if ERP permissions are missing', async () => {
     const previousPermissions = fixture.can;
-    fixture.can = { ...previousPermissions, viewInventory: false, viewSales: false };
+    fixture.can = { ...previousPermissions, viewInventory: false, viewSales: false, manageSettings: false };
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     let renderer;
     try {
@@ -134,7 +134,7 @@ describe('mobile owner ERP menu render', () => {
         );
       });
       const links = renderer.root.findAllByType('a');
-      expect(links.some((link) => link.props.href === '/sales-sources?create=1')).toBe(false);
+      expect(links.some((link) => link.props.href === '/sales-closing-customization')).toBe(false);
       expect(links.some((link) => link.props.href === '/product-management')).toBe(false);
       expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
     } finally {
@@ -166,7 +166,7 @@ describe('mobile owner ERP menu render', () => {
     const links = renderer.root.findAllByType('a');
     expect(links.some((link) => link.props.href === '/sales')).toBe(true);
     expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
-    expect(links.some((link) => link.props.href === '/sales-sources?create=1')).toBe(true);
+    expect(links.some((link) => link.props.href === '/sales-closing-customization')).toBe(true);
     expect(links.some((link) => link.props.href === '/product-management')).toBe(true);
     expect(consoleError).toHaveBeenCalledWith(
       '[mobile-erp-menu] render failed; showing safe navigation',
