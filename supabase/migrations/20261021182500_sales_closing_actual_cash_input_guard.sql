@@ -6,7 +6,11 @@ DO $migration$
 DECLARE
   v_old text;
   v_new text;
-  v_needle text := E'  v_payload := public.erp_normalize_driver_source_payload(\\n    public.erp_prepare_driver_source_payload(p_payload)\\n  );';
+  v_needle text := $needle$
+  v_payload := public.erp_normalize_driver_source_payload(
+    public.erp_prepare_driver_source_payload(p_payload)
+  );
+$needle$;
   v_guard text := $guard$
   -- The cash count is an independently attested physical observation.
   -- Do not let the legacy core silently clamp negative input to zero.
