@@ -20,6 +20,7 @@ const formatted = (value) => Math.abs(numeric(value)).toLocaleString(undefined, 
 });
 
 function Money({ currency, value, signed = false, className = '' }) {
+  if (value === null || value === undefined || value === '') return <span className={className} aria-label="Not verified">—</span>;
   const amount = numeric(value);
   const sign = signed && amount !== 0 ? (amount > 0 ? '+' : '−') : '';
   return <span className={`whitespace-nowrap tabular-nums ${className}`} dir="ltr">{sign}{currency ? <>{currency}{'\u00A0'}</> : null}{formatted(amount)}</span>;
@@ -74,11 +75,18 @@ const STATUS_OPTIONS = [
 
 const CashReconciliationPanel = memo(function CashReconciliationPanel({
   currency = 'SAR',
-  openingCash = 0,
+  openingCash = null,
   cashSales = 0,
   cashIn = 0,
   cashOut = 0,
-  expectedCash = 0,
+  expectedCash = null,
+  closingCash = null,
+  openingVerified = true,
+  openingStatus = '',
+  openingSource = '',
+  openingShiftDate = null,
+  openingShift = null,
+  openingReviewRequired = false,
   actualCashValue = '',
   actualCash = null,
   difference = null,
@@ -105,7 +113,7 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
   disabled = false,
 }) {
   const [noteOpen, setNoteOpen] = useState(Boolean(cashNotes));
-  const status = difference === null ? 'pending' : difference === 0 ? 'balanced' : difference < 0 ? 'shortage' : 'overage';
+  const status = !openingVerified || ledgerLoading || ledgerUnavailable || difference === null ? 'pending' : difference === 0 ? 'balanced' : difference < 0 ? 'shortage' : 'overage';
   const statusCopy = status === 'pending'
     ? 'Awaiting Count'
     : status === 'balanced'
@@ -139,10 +147,11 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
           </span>
         </header>
 
-        {ledgerUnavailable ? (
+        {!openingVerified || ledgerUnavailable ? (
           <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-            <p className="font-black">ERP cash ledger is unavailable.</p>
-            <p className="mt-1 text-xs">The count cannot be approved until the scoped ledger is loaded.</p>
+            <p className="font-black">{openingReviewRequired ? 'Opening Cash needs reconciliation' : 'ERP cash ledger is unavailable.'}</p>
+            <p className="mt-1 text-xs">{openingReviewRequired ? 'Previous shift has no verified counted balance or multiple possible drawers. Check the prior closing before finalizing.' : 'The cash count cannot be approved until the scoped ledger has loaded.'}</p>
+            {openingShiftDate && <p className="mt-1 text-xs">Previous: {openingShiftDate} · {openingShift || 'Unknown shift'}</p>}
             <Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-200 bg-white" onClick={onRetryLedger}>
               <RefreshCw className="mr-1.5 h-4 w-4" />Retry ledger load
             </Button>
@@ -163,6 +172,12 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
           </div>
         )}
 
+        {openingVerified && !ledgerUnavailable && !ledgerLoading && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-2 text-xs text-blue-900" data-testid="opening-cash-provenance">
+            <span className="font-bold">Opening Cash source</span>
+            <span>{openingStatus === 'initial_zero' ? 'No earlier verified closing · initial SAR 0 baseline' : openingSource === 'same_cashier_count' ? 'Previous shift · matched cashier' : 'Previous shift · branch physical count'}{openingShiftDate ? ` · ${openingShiftDate}` : ''}</span>
+          </div>
+        )}
         <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)] gap-3">
           <div id="quick-closing-reconciliation" className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
             <label htmlFor="quick-closing-actualCash" className="block text-xs font-black text-slate-700 sm:text-sm">Actual Cash <span className="text-red-500">*</span></label>
@@ -173,7 +188,7 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
               onChange={onActualCashChange}
               prefix={currency}
               required
-              disabled={disabled || ledgerLoading || ledgerUnavailable}
+              disabled={disabled || ledgerLoading || ledgerUnavailable || !openingVerified}
               error={actualCashError}
               placeholder="0.00"
               className="mt-3"
@@ -182,10 +197,15 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
           </div>
           <div className="flex min-w-0 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 sm:p-4">
             <p className="mb-2 text-[10px] font-black uppercase tracking-wide text-slate-600 sm:text-xs">Variance</p>
-            {ledgerLoading ? <Loader2 className="h-8 w-8 animate-spin text-blue-600" aria-label="Loading cash ledger" /> : <VarianceRing difference={difference} status={status} />}
+            {ledgerLoading ? <Loader2 className="h-8 w-8 animate-spin text-blue-600" aria-label="Loading cash ledger" /> : <VarianceRing difference={openingVerified && !ledgerUnavailable ? difference : null} status={status} />}
           </div>
         </div>
 
+        <div data-testid="closing-cash-preview" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-3 sm:p-4">
+          <div><p className="text-xs font-black text-sky-950">Closing Cash · physical drawer balance</p>
+            <p className="mt-1 text-[11px] text-sky-800">Carried into a verified next shift · no network, wallet or credit sales</p></div>
+          <Money currency={currency} value={openingVerified ? closingCash : null} className="text-xl font-black text-sky-950" />
+        </div>
         <div className="grid grid-cols-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-1" role="status" aria-label={`Cash status: ${statusCopy}`}>
           {STATUS_OPTIONS.map(({ key, label, Icon }) => {
             const active = status === key;
@@ -230,7 +250,7 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
           type="button"
           className={`min-h-14 w-full rounded-2xl text-base font-black shadow-sm ${managerApproved ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}
           onClick={onApprove}
-          disabled={disabled || ledgerLoading || ledgerUnavailable || actualCash === null || managerApproved}
+          disabled={disabled || !openingVerified || ledgerLoading || ledgerUnavailable || actualCash === null || managerApproved}
           aria-pressed={managerApproved}
         >
           {managerApproved ? <CheckCircle2 className="mr-2 h-5 w-5" /> : <ShieldCheck className="mr-2 h-5 w-5" />}
