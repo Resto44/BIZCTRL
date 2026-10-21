@@ -65,6 +65,24 @@ describe('ERP cash reconciliation ledger', () => {
     expect(result.difference).toBe(0);
   });
 
+  it('preserves overdrawn expected cash and refuses to invent a positive overage', () => {
+    const result = cashReconciliationSnapshot({
+      openingCash: 0,
+      currentCashSales: 0,
+      ledgerMovements: [{ direction: 'out', amount: 100, movement_type: 'cash_expense' }],
+      actualCash: 14,
+    });
+    expect(result.expectedCash).toBe(-100);
+    expect(result.actualCash).toBe(14);
+    expect(result.ledgerOverdrawn).toBe(true);
+    expect(result.varianceStatus).toBe('ledger_overdrawn');
+    expect(result.difference).toBeNull();
+    expect(result.overage).toBe(0);
+    expect(result.shortage).toBe(0);
+    expect(result.cashFundingRequired).toBe(100);
+    expect(result.revenueToday).toBe(0);
+  });
+
   it('allocates a shortage to the Branch Wallet before owner funding', () => {
     expect(walletFirstSettlementAllocation({ requiredFunding: 166.67, branchWalletAvailable: 500 })).toMatchObject({
       branchWalletApplied: 166.67,
