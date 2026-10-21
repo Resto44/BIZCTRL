@@ -42,10 +42,10 @@ export default function HelpCenter() {
     <nav aria-label="Quick start guides" className="flex flex-wrap gap-2">
       {[
         ['new-user-essentials', language === 'ar' ? 'البدء للمستخدم الجديد' : language === 'fa' ? 'شروع کاربر جدید' : 'New user'],
-        ['closing-field-builder-reference', 'Sales Closing Customization'],
-        ['product-identity-reference', 'Product Management'],
-        ['pwa-install-ios', 'iPhone / Safari'],
-        ['pwa-install-android', 'Android / Chrome'],
+        ['closing-field-builder-reference', language === 'ar' ? 'تخصيص إقفال المبيعات' : language === 'fa' ? 'تنظیمات بستن فروش' : 'Sales Closing Customization'],
+        ['product-identity-reference', language === 'ar' ? 'إدارة المنتجات' : language === 'fa' ? 'مدیریت محصولات' : 'Product Management'],
+        ['pwa-install-ios', language === 'ar' ? 'تثبيت آيفون' : language === 'fa' ? 'نصب آیفون' : 'iPhone / Safari'],
+        ['pwa-install-android', language === 'ar' ? 'تثبيت أندرويد' : language === 'fa' ? 'نصب اندروید' : 'Android / Chrome'],
       ].map(([id, label]) => <Link key={id} to={`/help?guide=${id}`} className="inline-flex min-h-11 items-center rounded-xl border border-primary/25 bg-card px-3 py-2 text-xs font-semibold text-primary">{label}</Link>)}
     </nav>
     <div className="space-y-3">
