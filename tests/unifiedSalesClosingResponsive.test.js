@@ -16,7 +16,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('data-testid="closing-cash-action"');
     expect(workspace).toContain('data-testid="closing-full-details"');
     expect(workspace).toContain("data-testid=\"quick-closing-auto-summary\"");
-    expect(workspace).toContain('Verified automatically');
+    expect(workspace).toContain('Closing totals · Manual & ERP');
     expect(workspace).not.toContain('CLOSING_WORKFLOW_STEP_IDS');
     expect(workspace).not.toContain('closing-workflow-stepper');
     expect(workspace).toContain('id="sales-closing-workspace" className="min-w-0"');
@@ -48,7 +48,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain(".eq('date', form.date)");
     expect(workspace).toContain('Record sales at POS first.');
     expect(workspace).toContain('data-testid="offline-sales-audit"');
-    expect(workspace).toContain('nextErrors.sales_notes =');
+    expect(workspace).not.toContain('nextErrors.sales_notes =');
+    expect(workspace).toContain('Reference / note (optional)');
   });
 
   it('rejects legacy Closing Cash as a synthetic Actual Count and revalidates when opening arrives', async () => {
@@ -151,8 +152,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const automaticTotalsEnabled = false;');
     expect(workspace).toContain('do not carry the Closing\'s full shift/cashier');
     expect(workspace).toContain('const requiresCashReconciliation = closingConfig?.validation_rules?.require_cash_reconciliation !== false;');
-    expect(workspace).toContain('const automaticClosingEnabled = Boolean(automaticTotalsEnabled');
-    expect(workspace).toContain('const useAutomaticSales = Boolean(automaticTotalsEnabled');
+    expect(workspace).toContain("const automaticClosingEnabled = Boolean(salesEntryMode === 'automatic' && automaticTotalsEnabled");
+    expect(workspace).toContain("const useAutomaticSales = Boolean(salesEntryMode === 'automatic' && automaticTotalsEnabled");
     expect(workspace).toContain('passed: actualCount !== null,');
     expect(workspace).toContain('Variance will be recorded separately');
     expect(workspace).toContain('(requiresCashReconciliation || attentionCount > 0)');
@@ -369,7 +370,7 @@ describe('Sales source daily and historical balance contract', () => {
   it('implements exception-first closing with compact verified totals, network detail and closing fields', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
-    expect(workspace).toContain('Verified automatically');
+    expect(workspace).toContain('Closing totals · Manual & ERP');
     expect(workspace).toContain('readinessPercent');
     expect(workspace).toContain('View full details');
     expect(workspace).toContain('Network total');
