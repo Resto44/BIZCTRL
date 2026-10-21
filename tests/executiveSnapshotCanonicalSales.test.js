@@ -28,6 +28,35 @@ describe('Executive snapshot canonical finalized Sales Closing accounting', () =
     });
   });
 
+  it('cannot retroactively remove posted cash/card/credit after Sales Source settings change', () => {
+    const turnedOff = [
+      { system_key: 'cash', included_in_revenue: false },
+      { system_key: 'network', included_in_revenue: false },
+      { system_key: 'credit', included_in_revenue: false },
+    ];
+    const posted = { ...closing, closing_state: 'finalized' };
+    expect(calculateSalesRevenue(posted, turnedOff)).toMatchObject({
+      cash: 400, network: 440, credit: 45, total: 885,
+    });
+    // Before posting, configuration may still determine which source is
+    // eligible; finalized immutable snapshots must not change afterward.
+    expect(calculateSalesRevenue({ ...posted, closing_state: 'draft' }, turnedOff).total).toBe(0);
+  });
+
+  it('preserves explicitly approved zero-value invoices and describes purchase-basis estimates', () => {
+    const metrics = calculateERPAccounting({
+      sales: [{ ...closing, closing_state: 'finalized' }],
+      purchases: [{ total_amount: 0, qty: 2, used_price: 999 }],
+      periodExpenses: [{ amount: 10, status: 'pending' }],
+      rangeType: 'day', asOfDate: '2026-10-21',
+    });
+    expect(metrics.totalPurchaseCost).toBe(0);
+    expect(metrics.totalSales).toBe(885);
+    expect(metrics.netProfit).toBe(875);
+    expect(metrics.accountingBasis).toBe('sales_less_approved_purchases_and_recorded_expenses');
+    expect(metrics.requiresInventoryCogs).toBe(true);
+  });
+
   it('aligns ERP sales, operating result and margin with Sales History sample', () => {
     const metrics = calculateERPAccounting({
       sales: [closing],
