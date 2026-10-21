@@ -73,6 +73,41 @@ describe('CashReconciliationPanel', () => {
     expect(tree.root.findAllByProps({ role: 'status' }).length).toBeGreaterThan(1);
   });
 
+  it('separates counted Closing Cash from Expected and does not add network/wallet settlements', () => {
+    const tree = TestRenderer.create(<CashReconciliationPanel {...baseProps}
+      openingCash={0} cashSales={0} cashIn={0} cashOut={0}
+      expectedCash={0} actualCash={14} actualCashValue="14"
+      closingCash={14} difference={14} shortage={0} overage={14}
+      openingVerified openingStatus="manual_verified_opening" openingSource="owner_verified_drawer_count"
+    />);
+    const text = textOf(tree.root);
+    expect(text).toContain('SAR 14 Overage');
+    expect(text).toContain('Closing Cash · physical drawer balance');
+    expect(text).toContain('Owner-certified physical opening count');
+    const closing = tree.root.findByProps({ 'data-testid': 'closing-cash-preview' });
+    expect(textOf(closing)).toMatch(/SAR\s+14/);
+    expect(tree.root.findByProps({ 'data-testid': 'opening-cash-provenance' })).toBeTruthy();
+    expect(tree.root.findAllByProps({ id: 'closing-detail-actual-cash' })).toHaveLength(1);
+    expect(tree.root.findAllByProps({ id: 'quick-closing-actualCash' })).toHaveLength(0);
+  });
+
+  it('does not misrepresent missing historic cash count as SAR 0, overage or approved', () => {
+    const tree = TestRenderer.create(<CashReconciliationPanel {...baseProps}
+      openingCash={null} expectedCash={null} closingCash={null}
+      actualCash={14} difference={null} overage={0}
+      openingVerified={false} openingReviewRequired
+      openingStatus="previous_count_missing"
+    />);
+    const text = textOf(tree.root);
+    expect(text).toContain('Opening Cash needs reconciliation');
+    expect(text).toContain('Awaiting Count');
+    expect(text).not.toContain('SAR 14 Overage');
+    const approve = tree.root.findAllByType('button').find(node => textOf(node).includes('Approve Cash Count'));
+    expect(approve.props.disabled).toBe(true);
+    expect(tree.root.findByProps({ id: 'closing-detail-actual-cash' }).props.disabled).toBe(true);
+    expect(textOf(tree.root.findByProps({ 'data-testid': 'closing-cash-preview' }))).toContain('—');
+  });
+
   it('keeps the reconciliation note optional and approves the current count explicitly', () => {
     const onApprove = vi.fn();
     const onCashNotesChange = vi.fn();
