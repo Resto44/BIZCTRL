@@ -5,19 +5,8 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { useWorkspaceTabActive } from "@/lib/WorkspaceTabVisibilityContext"
 
-// Dialog portals live in document.body, outside cached Owner tab panels. An
-// inactive tab must not retain a global overlay, focus trap or scroll lock.
-// Keep the caller's open state unchanged so it is restored on tab reactivation.
-function Dialog({ open, onOpenChange, ...props }) {
-  const active = useWorkspaceTabActive();
-  return <DialogPrimitive.Root
-    {...props}
-    open={active ? open : false}
-    onOpenChange={active ? onOpenChange : undefined}
-  />;
-}
+const Dialog = DialogPrimitive.Root
 
 const DialogTrigger = DialogPrimitive.Trigger
 
