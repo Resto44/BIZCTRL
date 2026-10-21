@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useOutlet } from 'react-router-dom';
 import { ERP_NAV_GROUPS } from './ERPSidebar';
 import { useRole, ROLES } from '@/lib/RoleContext';
 import { cn } from '@/lib/utils';
+import { WorkspaceTabVisibilityProvider } from '@/lib/WorkspaceTabVisibilityContext';
 
 const DEFAULT_TAB_PATH = '/owner-command-center';
 const DEFAULT_TAB = { path: DEFAULT_TAB_PATH, label: 'Dashboard', permanent: true };
@@ -179,7 +180,9 @@ export default function OwnerWorkspaceTabs() {
             className="w-full min-w-0 max-w-full"
             data-owner-workspace-page={tab.path}
           >
-            {tab.element}
+            <WorkspaceTabVisibilityProvider active={tab.path === activePath}>
+              {tab.element}
+            </WorkspaceTabVisibilityProvider>
           </section>
         ))}
       </div>
