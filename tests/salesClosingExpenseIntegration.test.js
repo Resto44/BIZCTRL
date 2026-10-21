@@ -50,7 +50,7 @@ describe('Sales Closing expense integration', () => {
     const reconciliationCall = workspace.slice(workspace.indexOf('const reconciliation = cashReconciliationSnapshot({'), workspace.indexOf('const branchWalletApplied'));
     expect(reconciliationCall).not.toContain('purchases:');
     expect(reconciliationCall).not.toContain('expenses:');
-    expect(ledger).toContain('const expectedCash = money(opening + ledger.cashIn + cashSales - ledger.cashOut);');
+    expect(ledger).toContain('const expectedCash = Math.round((opening + ledger.cashIn + cashSales - ledger.cashOut) * 100) / 100;');
     expect(ledger).toContain('walletFirstSettlementAllocation({ requiredFunding: shortage, branchWalletAvailable })');
     expect(workspace).toContain('Funding never changes this result');
   });
