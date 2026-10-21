@@ -287,6 +287,16 @@ function MobileMenuFallback({ can, role, onNavigate, onToggle }) {
             <Plus className="h-5 w-5" /> Add Purchase
           </Link>
         )}
+        {can?.viewSales && (
+          <Link to="/sales-sources" onClick={onNavigate} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-600 px-2 text-sm font-black text-white">
+            <Banknote className="h-5 w-5" /> Sales Sources
+          </Link>
+        )}
+        {can?.viewInventory && (
+          <Link to="/product-management?create=1" onClick={onNavigate} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-sky-600 px-2 text-sm font-black text-white">
+            <Package className="h-5 w-5" /> Add Product
+          </Link>
+        )}
       </div>
     </aside>
   );
@@ -529,7 +539,7 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
       </nav>
 
       <div className="shrink-0 border-t border-slate-200 bg-white px-3 pt-3 dark:border-slate-800 dark:bg-slate-950 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        {(can.viewSales || can.viewPurchases) && (
+        {(can.viewSales || can.viewPurchases || can.viewInventory) && (
           <section aria-labelledby="quick-entry-title">
             <h3 id="quick-entry-title" className="mb-2 text-[10px] font-black tracking-[0.14em] text-slate-500">{translateLiteral('QUICK ENTRY')}</h3>
             <div className="grid grid-cols-2 gap-2">
@@ -551,6 +561,18 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
                 >
                   <Plus className="h-5 w-5" />
                   {t('add_purchase') || translateLiteral('Add Purchase')}
+                </Link>
+              )}
+              {can.viewSales && (
+                <Link to="/sales-sources" onClick={onNavigate} data-testid="mobile-quick-sales-sources" className="flex min-h-12 min-w-0 touch-manipulation items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-2 py-2 text-center text-xs font-black leading-tight text-white shadow-md shadow-violet-600/20 transition active:scale-[0.98] sm:text-sm">
+                  <Banknote className="h-5 w-5 shrink-0" />
+                  <span className="min-w-0 break-words">{translateLiteral('Sales Sources')}</span>
+                </Link>
+              )}
+              {can.viewInventory && (
+                <Link to="/product-management?create=1" onClick={onNavigate} data-testid="mobile-quick-add-product" className="flex min-h-12 min-w-0 touch-manipulation items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-2 py-2 text-center text-xs font-black leading-tight text-white shadow-md shadow-sky-600/20 transition active:scale-[0.98] sm:text-sm">
+                  <Package className="h-5 w-5 shrink-0" />
+                  <span className="min-w-0 break-words">{translateLiteral('Add Product')}</span>
                 </Link>
               )}
             </div>
