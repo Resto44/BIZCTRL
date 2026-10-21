@@ -68,6 +68,27 @@ describe('Owner workspace cached modal lifecycle', () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
+  it('does not reveal Dish & recipe after the Add Purchase invoice is closed on a different tab', () => {
+    function CachedProductAndPurchase({ currentTab, invoiceOpen }) {
+      return <>
+        <WorkspaceTabVisibilityProvider active={currentTab === 'product'}>
+          <Dialog open><span>Dish & recipe</span></Dialog>
+        </WorkspaceTabVisibilityProvider>
+        <WorkspaceTabVisibilityProvider active={currentTab === 'purchases'}>
+          <Dialog open={invoiceOpen}><span>Purchase Invoice</span></Dialog>
+        </WorkspaceTabVisibilityProvider>
+      </>;
+    }
+    const openStates = () => tree.root.findAllByProps({ 'data-modal-root': 'true' })
+      .map(root => root.props['data-open']);
+    act(() => { tree = create(<CachedProductAndPurchase currentTab="product" invoiceOpen={false} />); });
+    expect(openStates()).toEqual(['true', 'false']);
+    act(() => { tree.update(<CachedProductAndPurchase currentTab="purchases" invoiceOpen />); });
+    expect(openStates()).toEqual(['false', 'true']);
+    act(() => { tree.update(<CachedProductAndPurchase currentTab="purchases" invoiceOpen={false} />); });
+    expect(openStates()).toEqual(['false', 'false']);
+  });
+
   it('keeps dialogs outside Owner tabs working without any workspace provider', () => {
     act(() => { tree = create(<Dialog open><span>Standalone dialog</span></Dialog>); });
     const root = tree.root.findByProps({ 'data-modal-root': 'true' });
