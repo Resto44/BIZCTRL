@@ -59,7 +59,7 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
  const refresh=async()=>{await Promise.all([qc.invalidateQueries({queryKey:['restaurant-menu-catalog']}),qc.invalidateQueries({queryKey:['restaurant-pos']}),qc.invalidateQueries({queryKey:['restaurant-pos-setup']}),qc.invalidateQueries({queryKey:['products']})]);};
  return <main className="space-y-4 pb-24" dir={lang==='en'?'ltr':'rtl'}>
   <header className={panel}>
-   <h1 className="text-2xl font-black">{labels.title}</h1><p className="mt-2 text-sm leading-6 text-slate-500">{labels.hint}</p>
+   <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-black">{labels.title}</h1><Link to="/help?guide=restaurant-menu-product-fields" className="inline-flex min-h-11 items-center rounded-xl border border-blue-200 px-3 py-2 text-sm font-bold text-blue-700">{lang === 'ar' ? 'شرح حقول المنتجات' : lang === 'fa' ? 'راهنمای فیلدهای منو' : 'Menu fields help'}</Link></div><p className="mt-2 text-sm leading-6 text-slate-500">{labels.hint}</p>
    <nav className="mt-4 grid grid-cols-2 gap-2" aria-label={labels.title}>
     {[[false,labels.menu,ChefHat],[true,labels.raw,Package]].map(([isRaw,label,Icon])=><button type="button" key={label} className={raw===isRaw?primary:button} aria-pressed={raw===isRaw} onClick={()=>{setEditing(null);setGroupEditing(null);setCategoryOpen(false);setParams(prev=>{const next=new URLSearchParams(prev);next.set('product_view',isRaw?'raw':'menu');return next;});}}><Icon size={20}/>{label}</button>)}
    </nav>
