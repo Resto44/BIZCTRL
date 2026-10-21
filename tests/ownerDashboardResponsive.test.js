@@ -27,8 +27,8 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
     expect(owner).toContain('data-testid="owner-mega-dashboard"');
     expect(owner).toContain('data-testid="owner-report-center"');
     expect(owner).toContain('data-testid="owner-report-nav"');
-    expect(owner).toContain('mx-auto box-border w-full min-w-0 max-w-6xl overflow-x-hidden');
-    expect(owner).toContain('flex flex-col gap-4 sm:flex-row');
+    expect(owner).toContain('mx-auto -mt-2 box-border w-full min-w-0 max-w-6xl overflow-x-hidden');
+    expect(owner).toContain('flex flex-col gap-2.5 sm:gap-4 sm:flex-row');
     expect(owner).toContain('grid min-w-0 grid-cols-2 gap-1 sm:grid-cols-4');
     expect(owner).not.toContain('min-w-[38rem]');
     expect(reportCenter).toContain('w-full min-w-0 max-w-full overflow-hidden rounded-[1.45rem]');
@@ -38,6 +38,31 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
     expect(reportCenter).toContain('min-w-[34rem]');
     expect(appLayout).toContain('mx-auto w-full min-w-0 max-w-[1600px]');
     expect(erpLayout).toContain('flex-1 min-w-0 max-w-full overflow-y-auto');
+  });
+
+  it('uses a compact mobile Owner Report Center without hiding live state or report controls', async () => {
+    const owner = await source('../src/pages/OwnerDashboard.jsx');
+    const header = owner.slice(owner.indexOf('data-testid="owner-report-center"'), owner.indexOf('data-testid="owner-report-nav"'));
+    expect(owner).toContain('space-y-3 px-3 pb-8 pt-0 sm:mt-0 sm:space-y-5');
+    expect(header).toContain('p-3 shadow-');
+    expect(header).toContain('sm:p-6');
+    expect(header).toContain('flex flex-col gap-2.5 sm:gap-4');
+    expect(header).toContain('data-testid="owner-mobile-live"');
+    expect(header).toContain('sm:hidden');
+    expect(header).toContain('mt-3 hidden flex-wrap items-center');
+    expect(header).toContain('line-clamp-1');
+    expect(header).toContain('data-testid="owner-branch-selector"');
+    expect(header).toContain('data-testid="owner-period-selector"');
+    expect(header).toContain('data-testid="owner-pdf-report"');
+    expect(header).toContain('min-h-10 w-full items-center');
+    expect(owner).toContain('data-testid="owner-report-nav"');
+    expect(owner).toContain('<OwnerReportCenter activePage={activePage} model={model} copy={copy} />');
+    // Compact presentation must not change the source-of-truth for reports or
+    // remove accessible controls for people using VoiceOver on iPhone.
+    expect(header).toContain('aria-label={copy.choosePeriod}');
+    expect(header).toContain('aria-busy={pdfLoading}');
+    expect(header).toContain('onChange={(event) => setSelectedBranchId(event.target.value)}');
+    expect(header).toContain('onChange={(event) => changeReportPeriod(event.target.value)}');
   });
 
   it('keeps fixed-width data tables inside local horizontal scroll containers', async () => {
