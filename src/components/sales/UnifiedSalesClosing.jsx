@@ -21,7 +21,7 @@ import { creditEntrySourceId, customerCreditSnapshots } from '@/lib/customerCred
  *     Shift cannot close until Remaining Difference = 0 or Manager Approval.
  * 13. Sales, Cash Reconciliation, Purchases and Operating Result are independent.
  */
-import React, { useState, useMemo, useEffect, useLayoutEffect, useCallback, useDeferredValue, memo } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useCallback, useDeferredValue, useRef, memo } from 'react';
 import { flushSync } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -30,6 +30,7 @@ import { useTenant } from '@/lib/TenantContext';
 import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
+import { useRole } from '@/lib/RoleContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -314,6 +315,7 @@ const DriverSalesSourceCard = memo(function DriverSalesSourceCard({ source, sour
 export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing, onSessionContextChange, onRecordOwnerPayment, isOpeningNewClosing = false }) {
   const { currency, lang, t } = useLanguage();
   const { user } = useAuth();
+  const { role } = useRole();
   const { ownerFilter, branches: tenantBranches, managerBranch, activeRestaurant, isManager } = useTenant();
   const { selectedBranchId: activeBranchId, selectedBranchKey: activeBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const queryClient = useQueryClient();
@@ -366,6 +368,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const [runtimeError, setRuntimeError] = useState(null);
   const [savedClosing, setSavedClosing] = useState(null);
   const [isRecordingOwnerPayment, setIsRecordingOwnerPayment] = useState(false);
+  const [openingVerificationAmount, setOpeningVerificationAmount] = useState('');
+  const [openingVerificationReason, setOpeningVerificationReason] = useState('');
+  const [openingVerificationBusy, setOpeningVerificationBusy] = useState(false);
+  const [openingVerificationError, setOpeningVerificationError] = useState('');
+  const openingVerificationRequestId = useRef(null);
   const [requestedClosingState, setRequestedClosingState] = useState(
     initial?.closing_state === 'finalized' ? 'finalized' : 'draft',
   );
@@ -1118,10 +1125,64 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Never infer a zero opening from a missing previous count or from a
   // different cashier's drawer. The backend returns explicit provenance.
   const openingReviewRequired = cashLedgerContext.opening_verified === false;
-  const openingReviewReason = cashLedgerContext.opening_status === 'ambiguous_previous_shift'
-    ? 'The previous shift has multiple possible drawers. Review the branch and cashier cash count before closing.'
-    : 'The previous finalized shift has no verified Actual Cash count. Reconcile the prior closing first.';
+  const openingReviewReason = cashLedgerContext.opening_status === 'initial_opening_required'
+    ? 'No earlier finalized cash count exists. The owner must count and verify the opening drawer balance, even if it is zero.'
+    : cashLedgerContext.opening_status === 'ambiguous_previous_shift'
+      ? 'The previous shift has multiple possible drawers. The owner must confirm the actual opening drawer count before closing.'
+      : 'The previous finalized shift has no verified Actual Cash count. The owner must confirm the physical opening balance before closing.';
   const cashContextReady = Boolean(cashLedgerContextData && cashLedgerContext.opening_verified === true);
+  // A separate immutable owner approval resolves a missing historic/initial
+  // physical drawer baseline. It never modifies past sales or cash movements.
+  const verifyOpeningCash = async () => {
+    if (openingVerificationBusy || role !== 'owner') return;
+    const raw = openingVerificationAmount.trim();
+    const amount = Number(raw);
+    if (!/^\\d+(?:\\.\\d{1,2})?$/.test(raw) || !Number.isFinite(amount) || amount < 0) {
+      setOpeningVerificationError('Enter the physically counted opening cash (0 or a positive amount, max two decimals).');
+      return;
+    }
+    if (openingVerificationReason.trim().length < 10) {
+      setOpeningVerificationError('Provide a clear reason with at least 10 characters for the audit log.');
+      return;
+    }
+    const cashierId = form.cashier_id || form.cashier_employee_id || defaultCashier?.id || null;
+    if (!activeRestaurant?.id || !selectedBranchId || !form.branch || !form.date || !form.shift || !cashierId) {
+      setOpeningVerificationError('Select a valid business, branch, shift and cashier before verifying opening cash.');
+      return;
+    }
+    const requestId = openingVerificationRequestId.current
+      || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : null);
+    if (!requestId) {
+      setOpeningVerificationError('Your browser could not generate a secure audit request ID. Reload and retry.');
+      return;
+    }
+    openingVerificationRequestId.current = requestId;
+    setOpeningVerificationError('');
+    setOpeningVerificationBusy(true);
+    try {
+      const { error } = await supabase.rpc('erp_verify_sales_closing_opening_count', {
+        p_restaurant_id: activeRestaurant.id,
+        p_branch_id: selectedBranchId,
+        p_branch: form.branch,
+        p_date: form.date,
+        p_shift: form.shift,
+        p_cashier_id: cashierId,
+        p_counted_cash: amount,
+        p_reason: openingVerificationReason.trim(),
+        p_request_id: requestId,
+      });
+      if (error) throw error;
+      openingVerificationRequestId.current = null;
+      setOpeningVerificationAmount('');
+      setOpeningVerificationReason('');
+      await refetchCashLedger();
+      toast.success('Opening drawer count verified and recorded in the audit log.');
+    } catch (error) {
+      setOpeningVerificationError(error?.message || 'Could not verify opening cash. Check the prior closing or retry.');
+    } finally {
+      setOpeningVerificationBusy(false);
+    }
+  };
   const activeOwnerSettlement = currentClosingId && cashLedgerContext.owner_settlement?.closing_id === currentClosingId
     ? cashLedgerContext.owner_settlement
     : null;
@@ -1641,7 +1702,25 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           {openingReviewRequired && <div role="alert" data-testid="opening-cash-needs-review" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-black">Opening Cash needs reconciliation</p>
             <p className="mt-1 text-xs leading-6">{openingReviewReason}</p>
-            <p className="mt-1 text-xs">Previous shift: {cashLedgerContext.opening_shift || 'Unknown'} · {cashLedgerContext.opening_shift_date || '—'} · Records: {cashLedgerContext.opening_prior_count ?? '—'}</p>
+            <p className="mt-1 text-xs">Previous shift: {cashLedgerContext.opening_shift || 'Initial'} · {cashLedgerContext.opening_shift_date || '—'} · Records: {cashLedgerContext.opening_prior_count ?? '—'}</p>
+            {role === 'owner' ? (
+              <div data-testid="owner-verify-opening-cash" className="mt-3 space-y-3 rounded-xl border border-amber-200 bg-white p-3">
+                <p className="text-xs font-black">Owner verification · counted opening drawer, not today's sales</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="block text-xs font-bold" htmlFor="opening-verification-count">Opening Cash ({currency}) <span className="text-red-600">*</span>
+                    <Input id="opening-verification-count" inputMode="decimal" value={openingVerificationAmount} onChange={event => setOpeningVerificationAmount(event.target.value)} placeholder="0.00" className="mt-1 min-h-11" disabled={openingVerificationBusy} />
+                  </label>
+                  <label className="block text-xs font-bold" htmlFor="opening-verification-reason">Reason / counted by <span className="text-red-600">*</span>
+                    <Input id="opening-verification-reason" value={openingVerificationReason} onChange={event => setOpeningVerificationReason(event.target.value)} placeholder="Physical starting drawer count verified by owner" className="mt-1 min-h-11" disabled={openingVerificationBusy} />
+                  </label>
+                </div>
+                <p className="text-[11px]">This creates an immutable owner-approved opening record. It does not overwrite earlier closings or add sales revenue.</p>
+                {openingVerificationError && <p role="alert" className="text-xs font-bold text-red-700">{openingVerificationError}</p>}
+                <Button type="button" size="sm" data-testid="verify-opening-cash-button" disabled={openingVerificationBusy || !openingVerificationAmount.trim() || openingVerificationReason.trim().length < 10} onClick={verifyOpeningCash}>
+                  {openingVerificationBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-1.5 h-4 w-4" />}Verify Opening Cash
+                </Button>
+              </div>
+            ) : <p className="mt-2 text-xs font-bold">Ask the business Owner to verify the drawer opening before the shift can be finalized.</p>}
             <Button type="button" size="sm" variant="outline" className="mt-2 min-h-10" onClick={() => refetchCashLedger()}><RefreshCw className="mr-1.5 h-4 w-4" />Recheck ledger</Button>
           </div>}
           {automaticClosingUnavailable && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"><p className="font-black">ERP sales data needs attention</p><p className="mt-1 text-xs">Check the branch and date, then retry before finalizing.</p><Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-300 bg-white" onClick={() => refetchAutomaticClosing()}><RefreshCw className="mr-1.5 h-4 w-4" />Retry ERP data</Button></div>}
