@@ -55,9 +55,9 @@ describe('mobile navigation drawer contract', () => {
     expect(sidebar).toContain('to="/sales"');
     expect(sidebar).toContain('to="/purchases?create=1"');
     expect(sidebar).toContain('data-testid="mobile-quick-sales-sources"');
-    expect(sidebar).toContain('to="/sales-sources"');
+    expect(sidebar).toContain('to="/sales-sources?create=1"');
     expect(sidebar).toContain('data-testid="mobile-quick-add-product"');
-    expect(sidebar).toContain('to="/product-management?create=1"');
+    expect(sidebar).toContain('to="/product-management"');
     expect(sidebar).toContain('salesSourcesLabel');
     expect(sidebar).toContain('addProductLabel');
     expect(purchases).toContain("searchParams.get('create') !== '1'");
@@ -91,21 +91,23 @@ describe('mobile navigation drawer contract', () => {
   });
 
 
-  it('opens the real product-create UI from Quick Entry for restaurant and general ERP products', async () => {
-    const [products, restaurant, app] = await Promise.all([
-      source('../src/pages/ProductManagement.jsx'),
-      source('../src/components/restaurant-pos/RestaurantProductWorkspace.jsx'),
+  it('routes Product Management to the page, but opens Add Sales Source directly', async () => {
+    const [sidebar, sources, app] = await Promise.all([
+      source('../src/components/layout/ERPSidebar.jsx'),
+      source('../src/pages/SalesSourceManagement.jsx'),
       source('../src/App.jsx'),
     ]);
+    expect(sidebar).toContain('to="/product-management"');
+    expect(sidebar).not.toContain('to="/product-management?create=1"');
+    expect(sidebar).toContain('to="/sales-sources?create=1"');
     expect(app).toContain('<Route path="/product-management" element={<RoleGuard permission="viewInventory">');
     expect(app).toContain('<Route path="/sales-sources" element={<RoleGuard permission="viewSales">');
-    expect(products).toContain("params.get('create') !== '1'");
-    expect(products).toContain('setShowCreate(true)');
-    expect(products).toContain("params.delete('create')");
-    expect(restaurant).toContain("params.get('create')!=='1'");
-    expect(restaurant).toContain('setEditing({})');
-    expect(restaurant).toContain("next.delete('create')");
-    expect(restaurant).toContain('menuOnly');
+    expect(sources).toContain("search.get('create') !== '1'");
+    expect(sources).toContain("setTab('sources')");
+    expect(sources).toContain("if (canManage)");
+    expect(sources).toContain("setSourceEditor({ mode: 'create'");
+    expect(sources).toContain("search.delete('create')");
+    expect(sources).toContain("{ replace: true }");
   });
 
   it('imports every icon used by the expanded mobile module registry', async () => {
