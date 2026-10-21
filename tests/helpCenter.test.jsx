@@ -1,15 +1,21 @@
 import React from 'react';
 import { act, create } from 'react-test-renderer';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { helpArticles, searchHelpArticles, normalizeHelpSearch } from '../src/lib/helpArticles';
 const locale = vi.hoisted(() => ({ lang: 'en' }));
 vi.mock('@/lib/LanguageContext', () => ({ useLanguage: () => locale }));
 import HelpCenter from '../src/components/help/HelpCenter';
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="help-location" data-path={location.pathname} data-search={location.search} />;
+}
 let tree;
 afterEach(() => { if (tree) act(() => tree.unmount()); tree = null; locale.lang = 'en'; });
-const mount = (path = '/help') => act(() => { tree = create(<MemoryRouter initialEntries={[path]}><HelpCenter /></MemoryRouter>); });
+const mount = (path = '/help', dashboardPath = null) => act(() => {
+  tree = create(<MemoryRouter initialEntries={[path]}><HelpCenter dashboardPath={dashboardPath} /><LocationProbe /></MemoryRouter>);
+});
 
 describe('Help Center guide integrity', () => {
   it('provides complete three-language steps, notes, real source files and registered routes', () => {
@@ -136,6 +142,47 @@ describe('Help Center interactions', () => {
     const toggle = tree.root.findAllByType('button').find(button => button.props['aria-controls'] === 'help-body-product-identity-reference');
     act(() => toggle.props.onClick());
     expect(tree.root.findAllByProps({ 'data-help-field': 'name' })).toHaveLength(0);
+  });
+  it('opens Quick Start inside authenticated Support rather than escaping to public /help', () => {
+    locale.lang = 'fa';
+    mount('/support?tab=guides', '/owner-command-center');
+    const shortcut = tree.root.findByProps({ 'data-help-quick-guide': 'product-identity-reference' });
+    act(() => shortcut.props.onClick());
+    const location = tree.root.findByProps({ 'data-testid': 'help-location' });
+    expect(location.props['data-path']).toBe('/support');
+    expect(location.props['data-search']).toContain('tab=guides');
+    expect(location.props['data-search']).toContain('guide=product-identity-reference');
+    expect(tree.root.findAllByType('article')).toHaveLength(1);
+    expect(tree.root.findByProps({ id: 'guide-product-identity-reference' })).toBeTruthy();
+    const dashboard = tree.root.findByProps({ 'data-testid': 'help-go-dashboard' });
+    expect(dashboard.props.to).toBe('/owner-command-center');
+    act(() => tree.root.findByProps({ 'data-testid': 'help-back-to-guides' }).props.onClick());
+    const returned = tree.root.findByProps({ 'data-testid': 'help-location' });
+    expect(returned.props['data-path']).toBe('/support');
+    expect(returned.props['data-search']).not.toContain('guide=');
+    expect(tree.root.findAllByType('article')).toHaveLength(helpArticles.length);
+  });
+
+  it('keeps sales-closing, iPhone and Android quick guides inside the current workspace URL', () => {
+    mount('/support?tab=guides');
+    for (const id of ['closing-field-builder-reference', 'pwa-install-ios', 'pwa-install-android']) {
+      act(() => tree.root.findByProps({ 'data-help-quick-guide': id }).props.onClick());
+      expect(tree.root.findByProps({ 'data-testid': 'help-location' }).props['data-path']).toBe('/support');
+      expect(tree.root.findByProps({ 'data-testid': 'help-location' }).props['data-search']).toContain(`guide=${id}`);
+      expect(tree.root.findAllByType('article')).toHaveLength(1);
+      act(() => tree.root.findByProps({ 'data-testid': 'help-back-to-guides' }).props.onClick());
+    }
+  });
+
+  it('offers an ERP return path from standalone public Help and avoids internal /help loops', () => {
+    mount('/help?guide=pwa-install-ios');
+    expect(tree.root.findAllByType('article')).toHaveLength(1);
+    const supportReturn = tree.root.findAllByType('a').find(item => item.props.to === '/support?tab=guides');
+    expect(supportReturn).toBeTruthy();
+    expect(tree.root.findAllByType('a').some(item => item.props.to === '/help')).toBe(false);
+    act(() => tree.root.findByProps({ 'data-testid': 'help-back-to-guides' }).props.onClick());
+    expect(tree.root.findByProps({ 'data-testid': 'help-location' }).props['data-path']).toBe('/help');
+    expect(tree.root.findAllByType('article')).toHaveLength(helpArticles.length);
   });
   it('changes role filter and safely handles unknown URL parameters', () => {
     locale.lang = 'ar'; mount('/help?role=unknown&topic=unknown&guide=missing');
