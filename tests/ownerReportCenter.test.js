@@ -69,7 +69,7 @@ describe('Owner ERP Report Center', () => {
       expect(dashboard).toContain(sourceName);
     }
     expect(dashboard).toContain('calculateERPAccounting({');
-    expect(dashboard).toContain('buildInventoryConsumption(inventoryTransactions, products, inventory)');
+    expect(dashboard).toContain('buildInventoryConsumption(inventoryTransactions, products, inventory, normalizedBranches)');
     expect(dashboard).not.toMatch(/mockData|placeholderData|demoValue/);
   });
 
