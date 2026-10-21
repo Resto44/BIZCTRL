@@ -74,6 +74,16 @@ function GeneralProductManagement() {
 
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [showCreate, setShowCreate] = useState(false);
+  // The mobile "Add Product" quick entry opens the real master-product form,
+  // rather than merely navigating to the catalog overview.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('create') !== '1' || !restaurantId) return;
+    setEditing(null);
+    setShowCreate(true);
+    params.delete('create');
+    navigate({ pathname: location.pathname, search: params.toString() ? `?${params}` : '' }, { replace: true });
+  }, [location.pathname, location.search, navigate, restaurantId]);
   const [barcodeRequest, setBarcodeRequest] = useState(null);
   useEffect(() => { setBarcodeRequest(null); }, [restaurantId, location.key]);
   const [editing, setEditing] = useState(null);
