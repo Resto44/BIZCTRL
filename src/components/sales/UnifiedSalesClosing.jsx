@@ -1885,7 +1885,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         </div>
       </div>
 
-      <div id="sales-closing-actions" tabIndex={-1} data-testid="closing-sticky-actions" className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-[0_-6px_24px_rgba(15,23,42,0.09)] backdrop-blur sm:bottom-0 sm:px-5">
+      <div id="sales-closing-actions" tabIndex={-1} data-testid="closing-sticky-actions" className="relative mt-4 mb-[calc(5.25rem+env(safe-area-inset-bottom))] border-t border-slate-200 bg-white px-3 py-4 sm:mb-0 sm:px-5">
+        {/* The Owner portal scrolls inside a nested workspace with its own fixed
+            bottom nav. position:sticky here visually parks this action bar in
+            the middle of the iPhone viewport and obscures Cash Reconciliation.
+            Keep actions in normal document flow, after every Closing field. */}
         <div className="mx-auto max-w-4xl">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-[11px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش همین شیفت' : lang === 'ar' ? 'مجموع مبيعات الوردية' : 'Shift sales total'}</span>
