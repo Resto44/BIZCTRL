@@ -27,6 +27,19 @@ Debt collection and owner funding are cash movements, not new revenue. Credit sa
 
 The browser test covered the new overview in isolation, not an authenticated complete closing on a physical phone. An authorized end-to-end cashier/manager test is still needed for full workflow assurance. The dormant automatic POS feed is intentionally still disabled: it lacks full shift/cashier scope and uses limited record queries. Do not enable it until that is redesigned. Existing security advisor findings were observed before the change; this migration introduces no tables or new exposed functions.
 
-## Release status
+## Initial release hold
 
 Frontend production release is held: the repository-wide workflow failed. A detached baseline at 677a553 reproduced the unrelated failures in branch scope, Help Center, mobile owner menu, realtime refresh, portal reads, product form routing and subscription tests. Related Closing expense-contract assertions were updated for minor-unit sums; the existing cash-panel test now counts actual input nodes rather than both the React component and its input. No checks were disabled or bypassed. The server correction is applied; the UI remains on the PR preview until the repository release gate is resolved.
+
+
+## Release follow-up
+
+The user authorized completion of the release. The seven previously failing test files were repaired without disabling checks or changing unrelated production behavior:
+
+- Branch scope assertions follow the existing paginated legacy-branch query.
+- Help checks inspect actual field labels and anchor hrefs; mobile menu checks count DOM anchors once.
+- Realtime recovery observes the existing 60-second safety sweep; subscription checks preserve the existing visibility-only refresh.
+- Product form tests provide their Router context.
+- Portal tests provide browser measurement APIs and separately verify core financial read failure, secondary inventory failure, and recovery through Retry widgets.
+
+All 1,377 tests now pass locally, including the added secondary-widget recovery case. The PDF fixture generator, translation audit scripts, and production build completed successfully. Runtime translation audits still report existing candidate literals for review; passing the script is not a claim that every runtime string is translated. The authenticated cashier workflow limitation above remains.

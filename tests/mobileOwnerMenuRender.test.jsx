@@ -113,8 +113,8 @@ describe('mobile owner ERP menu render', () => {
     expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
     expect(links.some((link) => link.props.href === '/sales-closing-customization')).toBe(true);
     expect(links.some((link) => link.props.href === '/product-management')).toBe(true);
-    expect(renderer.root.findAllByProps({ 'data-testid': 'mobile-quick-sales-closing-customization' })).toHaveLength(1);
-    expect(renderer.root.findAllByProps({ 'data-testid': 'mobile-quick-add-product' })).toHaveLength(1);
+    expect(renderer.root.findAllByType('a').filter(node => node.props['data-testid'] === 'mobile-quick-sales-closing-customization')).toHaveLength(1);
+    expect(renderer.root.findAllByType('a').filter(node => node.props['data-testid'] === 'mobile-quick-add-product')).toHaveLength(1);
     expect(renderer.root.findAllByProps({ 'aria-label': 'Search modules and actions' })).toHaveLength(1);
     await act(async () => renderer.unmount());
     queryClient.clear();

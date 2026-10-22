@@ -138,7 +138,8 @@ describe('Help Center interactions', () => {
     const article = tree.root.findAllByType('article')[0];
     expect(article.props.id).toBe('guide-product-identity-reference');
     const fields = tree.root.findAllByProps({ 'data-help-field': 'name' });
-    expect(JSON.stringify(fields[0].toJSON?.() || fields[0].props)).toContain('name');
+    expect(fields[0].findAllByType('code').map(node => node.children.join(''))).toContain('name');
+    expect(fields[0].findAllByType('span').some(node => node.children.includes('الزامی'))).toBe(true);
     const toggle = tree.root.findAllByType('button').find(button => button.props['aria-controls'] === 'help-body-product-identity-reference');
     act(() => toggle.props.onClick());
     expect(tree.root.findAllByProps({ 'data-help-field': 'name' })).toHaveLength(0);
@@ -177,9 +178,9 @@ describe('Help Center interactions', () => {
   it('offers an ERP return path from standalone public Help and avoids internal /help loops', () => {
     mount('/help?guide=pwa-install-ios');
     expect(tree.root.findAllByType('article')).toHaveLength(1);
-    const supportReturn = tree.root.findAllByType('a').find(item => item.props.to === '/support?tab=guides');
+    const supportReturn = tree.root.findAllByType('a').find(item => item.props.href === '/support?tab=guides');
     expect(supportReturn).toBeTruthy();
-    expect(tree.root.findAllByType('a').some(item => item.props.to === '/help')).toBe(false);
+    expect(tree.root.findAllByType('a').some(item => item.props.href === '/help')).toBe(false);
     act(() => tree.root.findByProps({ 'data-testid': 'help-back-to-guides' }).props.onClick());
     expect(tree.root.findByProps({ 'data-testid': 'help-location' }).props['data-path']).toBe('/help');
     expect(tree.root.findAllByType('article')).toHaveLength(helpArticles.length);
