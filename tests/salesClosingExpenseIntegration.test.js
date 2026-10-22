@@ -40,7 +40,7 @@ describe('Sales Closing expense integration', () => {
   it('keeps purchases separate but includes purchases plus both operating-expense components in Total Daily Expenses and Operating Result', () => {
     expect(workspace).toContain('const operatingExpensesTotal = fixedExpensesToday + variableExpensesToday;');
     expect(workspace).toContain('const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;');
-    expect(workspace).toContain('const operatingResult = totalSales - totalDailyExpenses;');
+    expect(workspace).toContain('const operatingResult = sumClosingMoney(totalSales, -totalDailyExpenses);');
     expect(workspace).toContain('expenses_total: operatingExpensesTotal');
     expect(workspace).toContain('Expenses &amp; purchases');
     expect(workspace).toContain('value={totalDailyExpenses}');
@@ -50,7 +50,7 @@ describe('Sales Closing expense integration', () => {
     const reconciliationCall = workspace.slice(workspace.indexOf('const reconciliation = cashReconciliationSnapshot({'), workspace.indexOf('const branchWalletApplied'));
     expect(reconciliationCall).not.toContain('purchases:');
     expect(reconciliationCall).not.toContain('expenses:');
-    expect(ledger).toContain('const expectedCash = Math.round((opening + ledger.cashIn + cashSales - ledger.cashOut) * 100) / 100;');
+    expect(ledger).toContain('const expectedCash = sumClosingMoney(opening, ledger.cashIn, cashSales, -ledger.cashOut);');
     expect(ledger).toContain('walletFirstSettlementAllocation({ requiredFunding: shortage, branchWalletAvailable })');
     expect(workspace).toContain('Funding never changes this result');
   });

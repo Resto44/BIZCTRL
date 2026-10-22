@@ -945,7 +945,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Manager (restaurant_id + branch). When isManager, scope by restaurant_id and branch.
   const purchasesEnabled = !!activeRestaurant?.id && !!form.date && !!selectedBranchId && !!form.branch;
 
-  const { data: approvedPurchasesForDateData, isLoading: purchasesLoading } = useQuery({
+  const { data: approvedPurchasesForDateData, isLoading: purchasesLoading, isError: purchasesUnavailable } = useQuery({
     queryKey: ['approved_purchases_for_date', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift],
     queryFn: async () => {
       if (!activeRestaurant?.id || !form.date || !selectedBranchId || !form.branch) return [];
@@ -1850,6 +1850,20 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               <button type="button" data-testid="closing-reconciliation-details" className="flex min-h-10 w-full items-center justify-between text-left text-xs font-bold text-blue-700" onClick={() => setShowFullDetails(true)}>{lang === 'fa' ? 'دفتر صندوق، کسری و اضافه، تسویه' : lang === 'ar' ? 'دفتر النقد، العجز والزيادة والتسوية' : 'Cash ledger, variance notes & settlements'}<ChevronRight className="h-4 w-4" /></button>
             </div>
           </section>
+
+          <details className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5" data-testid="closing-operating-statement" data-i18n-skip="true">
+            <summary className="min-h-11 cursor-pointer text-sm font-bold text-slate-900">{lang === 'fa' ? 'خریدها و مصارف' : lang === 'ar' ? 'المشتريات والمصروفات' : <>Expenses &amp; purchases</>}</summary>
+            {cashContextReady && !purchasesLoading && !purchasesUnavailable ? <dl className="mt-2 space-y-3 text-sm">
+              {[
+                [lang === 'fa' ? 'خریدهای تأییدشده' : lang === 'ar' ? 'المشتريات المعتمدة' : 'Approved purchases', approvedPurchasesTotal],
+                [lang === 'fa' ? 'سهم روزانه مصارف ثابت' : lang === 'ar' ? 'نصيب اليوم من المصروفات الثابتة' : 'Daily fixed expense allocation', fixedExpensesToday],
+                [lang === 'fa' ? 'مصارف متغیر امروز' : lang === 'ar' ? 'المصروفات المتغيرة اليوم' : 'Today variable expenses', variableExpensesToday],
+              ].map(([label, value]) => <div key={label} className="flex flex-wrap justify-between gap-2"><dt className="text-slate-600">{label}</dt><dd><Money currency={currency} value={value} className="font-semibold" /></dd></div>)}
+              <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-3"><dt className="font-bold">{lang === 'fa' ? 'مجموع هزینه روز' : lang === 'ar' ? 'إجمالي تكلفة اليوم' : 'Total daily expenses'}</dt><dd><Money currency={currency} value={totalDailyExpenses} className="font-bold" /></dd></div>
+              <div className="flex flex-wrap justify-between gap-2"><dt className="font-bold">{lang === 'fa' ? 'نتیجه عملیاتی تخمینی' : lang === 'ar' ? 'النتيجة التشغيلية التقديرية' : 'Estimated operating result'}</dt><dd><Money currency={currency} value={operatingResult} signed className="font-bold" /></dd></div>
+            </dl> : <p role="status" className="mt-2 text-sm text-amber-800">{lang === 'fa' ? 'نتیجه تا بارگذاری خریدها و دفتر نقد قابل تأیید نیست.' : lang === 'ar' ? 'لا يمكن تأكيد النتيجة قبل تحميل المشتريات ودفتر النقد.' : 'The result is unavailable until purchases and the cash ledger are loaded.'}</p>}
+            <p className="mt-3 text-xs leading-5 text-slate-500">{lang === 'fa' ? 'بر مبنای خرید و مصارف ثبت‌شده؛ سود حسابداری نهایی نیست. نقد صندوق فقط با حرکات ثبت‌شده نقدی تغییر می‌کند.' : lang === 'ar' ? 'على أساس المشتريات والمصروفات المسجلة؛ ليست الربح المحاسبي النهائي. لا يتغير نقد الصندوق إلا بحركات نقدية مسجلة.' : 'Purchase-basis management estimate, not final accounting profit. Drawer cash changes only through posted cash movements.'}</p>
+          </details>
 
           <section data-testid="quick-closing-auto-summary" className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5">
             <button type="button" className="flex min-h-12 w-full items-center justify-between gap-3 text-left" onClick={() => setShowFullDetails(true)} aria-label="Open advanced closing records" data-testid="closing-open-advanced-secondary">

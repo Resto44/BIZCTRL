@@ -87,7 +87,7 @@ describe('CashReconciliationPanel', () => {
     const closing = tree.root.findByProps({ 'data-testid': 'closing-cash-preview' });
     expect(textOf(closing)).toMatch(/SAR\s+14/);
     expect(tree.root.findByProps({ 'data-testid': 'opening-cash-provenance' })).toBeTruthy();
-    expect(tree.root.findAllByProps({ id: 'closing-detail-actual-cash' })).toHaveLength(1);
+    expect(tree.root.findAll(node => node.type === 'input' && node.props.id === 'closing-detail-actual-cash')).toHaveLength(1);
     expect(tree.root.findAllByProps({ id: 'quick-closing-actualCash' })).toHaveLength(0);
   });
 
