@@ -30,6 +30,9 @@ import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useRole } from '@/lib/RoleContext';
+import { useWorkspaceTabActive } from '@/lib/WorkspaceTabVisibilityContext';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -358,6 +361,12 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   }, [lang]);
   const branches = asRecordArray(tenantBranches);
   const [showFullDetails, setShowFullDetails] = useState(false);
+  const [showBlockers, setShowBlockers] = useState(false);
+  const [showNetworkDetail, setShowNetworkDetail] = useState(false);
+  const [showOpeningVerification, setShowOpeningVerification] = useState(false);
+  const [showFinalizeReview, setShowFinalizeReview] = useState(false);
+  const formRef = useRef(null);
+  const workspaceTabActive = useWorkspaceTabActive();
   const assignedManagerBranch = useMemo(() => {
     if (!isManager) return null;
     return branches.find((branch) =>
@@ -1689,11 +1698,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Save returns immediately to Daily Sales via onSubmit callback.
 
   return (
-    <form onSubmit={handleSubmit} className="min-w-0">
+    <form id="erp-sales-closing-form" ref={formRef} onSubmit={handleSubmit} className="min-w-0">
       {/* Embedded in the ERP page scroller: a second momentum scroller with
           percentage height can clip expanded content on iOS after keyboard use. */}
       <div id="sales-closing-workspace" className="min-w-0">
-        <div className="mx-auto w-full max-w-4xl space-y-3 p-3 sm:space-y-4 sm:p-4">
+        <div className="mx-auto w-full max-w-4xl space-y-3 px-2 py-2 sm:space-y-4 sm:p-4">
           {runtimeError && (
             <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-red-950">
               <p className="text-sm font-bold">Save failed</p>
@@ -1718,32 +1727,34 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
           )}
 
-          <header className="flex items-start justify-between gap-3 px-1 py-1">
+          <header className="flex items-center justify-between gap-2 px-1 py-1" data-testid="closing-compact-header">
             <div className="min-w-0">
-              <h1 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">Close Today</h1>
-              <p className="mt-1 truncate text-xs font-medium text-slate-500 sm:text-sm">{form.branch || 'Select branch'} · {form.shift || 'Select shift'} · {form.date}</p>
+              <h1 className="text-lg font-black tracking-tight text-slate-950 sm:text-2xl">{lang === 'fa' ? 'بستن فروش روزانه' : lang === 'ar' ? 'إقفال المبيعات' : 'Sales Closing'}</h1>
+              <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500 sm:text-xs" title={`${form.branch} · ${form.shift} · ${form.date}`}>{form.branch || 'Branch'} · {form.shift || 'Shift'} · {form.date}</p>
             </div>
-            <Button type="button" size="icon" variant="ghost" className="h-10 w-10 shrink-0 rounded-xl" onClick={onCancel} disabled={isSubmitting} aria-label="Close Sales Closing"><X className="h-5 w-5" /></Button>
+            <div className="flex shrink-0 items-center gap-1">
+              <Button type="button" variant="outline" size="sm" className="min-h-10 gap-1 rounded-xl px-2 text-xs sm:px-3" onClick={() => setShowFullDetails(true)} aria-label="Advanced Closing Details" data-testid="closing-open-advanced"><ClipboardCheck className="h-4 w-4" />{lang === 'fa' ? 'جزئیات' : lang === 'ar' ? 'التفاصيل' : 'Details'}</Button>
+              <Button type="button" size="icon" variant="ghost" className="h-10 w-10 shrink-0 rounded-xl" onClick={onCancel} disabled={isSubmitting} aria-label="Close Sales Closing"><X className="h-5 w-5" /></Button>
+            </div>
           </header>
 
-          <section className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${allValid ? 'border-emerald-200 bg-emerald-50/70' : 'border-slate-200 bg-background'}`} data-testid="closing-readiness-summary">
-            <div className="flex items-center gap-3">
-              <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${allValid ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-600'}`}><ShieldCheck className="h-6 w-6" /></span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-3"><h2 className={`text-base font-black ${allValid ? 'text-emerald-800' : 'text-slate-950'}`}>{allValid ? 'Ready to finalize' : 'Almost ready'}</h2><span className="shrink-0 text-xs font-bold text-slate-500">{readinessPercent}%</span></div>
-                <p className="mt-0.5 text-xs text-slate-500">{attentionCount === 0 ? 'Every required check is complete.' : `${attentionCount} ${attentionCount === 1 ? 'action' : 'actions'} remaining`}</p>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-emerald-500 transition-[width]" style={{ width: `${readinessPercent}%` }} /></div>
-              </div>
+          <section data-testid="closing-readiness-summary" className={`flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 ${allValid ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50/75'}`}>
+            <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${allValid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}><ShieldCheck className="h-4 w-4" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black text-slate-900">{allValid ? (lang === 'fa' ? 'آمادهٔ نهایی‌سازی' : lang === 'ar' ? 'جاهز للإقفال' : 'Ready to finalize') : (lang === 'fa' ? `${attentionCount} مورد نیاز به اصلاح` : lang === 'ar' ? `${attentionCount} بنود تحتاج معالجة` : `${attentionCount} required action${attentionCount === 1 ? '' : 's'}`)}</p>
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-200"><div className={`h-full rounded-full ${allValid ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{width: `${readinessPercent}%`}} /></div>
             </div>
+            <span className="shrink-0 text-xs font-bold tabular-nums text-slate-500">{readinessPercent}%</span>
+            {!allValid && <button type="button" className="min-h-9 rounded-lg px-1.5 text-xs font-bold text-amber-800 underline" data-testid="closing-toggle-blockers" aria-expanded={showBlockers} onClick={() => setShowBlockers(x => !x)}>{lang === 'fa' ? 'بررسی' : lang === 'ar' ? 'مراجعة' : 'Review'}</button>}
           </section>
-
-          {attentionCount > 0 && <div data-testid="closing-blockers" role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
-            <p className="text-xs font-black text-amber-900">{lang === 'fa' ? 'برای تکمیل کلوزینگ این موارد را اصلاح کنید:' : lang === 'ar' ? 'أكمل البنود التالية لإتمام الإقفال:' : 'To finalize the shift, resolve these items:'}</p>
-            <div className="mt-2 space-y-2">{failedValidations.map(validation => <button type="button" key={validation.key} className="flex min-h-10 w-full items-start gap-2 rounded-lg border border-amber-100 bg-white px-3 py-2 text-left text-xs text-amber-900" onClick={() => {
-              if (['cashier', 'branch', 'shift', 'requiredFields', 'pos', 'credit', 'creditLimit'].includes(validation.key)) setShowFullDetails(true);
-              requestAnimationFrame(() => document.getElementById(validation.key === 'cashBalance' ? 'quick-closing-actualCash' : validation.key === 'erpData' ? 'opening-cash-needs-review' : 'closing-full-details')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-            }}><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span className="min-w-0"><strong className="block">{validation.label}</strong><span className="mt-0.5 block">{validation.message}</span></span></button>)}</div>
-          </div>}
+          {attentionCount > 0 && showBlockers && <section data-testid="closing-blockers" role="status" className="space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 p-2.5">
+            {failedValidations.map(validation => <button type="button" key={validation.key} className="flex min-h-10 w-full items-start gap-2 rounded-lg bg-white px-2.5 py-2 text-left text-xs text-amber-900" onClick={() => {
+              if (validation.key === 'erpData' && openingReviewRequired) setShowOpeningVerification(true);
+              else if (validation.key !== 'cashBalance') setShowFullDetails(true);
+              const anchor = validation.key === 'cashBalance' ? 'quick-closing-actualCash' : validation.key === 'erpData' && openingReviewRequired ? 'opening-cash-needs-review' : null;
+              if (anchor) requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({behavior: 'smooth', block: 'center'}));
+            }}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span className="min-w-0"><strong className="block">{validation.label}</strong><span className="block text-[11px]">{validation.message}</span></span></button>)}
+          </section>}
 
           <section data-testid="closing-sales-entry-mode" className="rounded-2xl border border-blue-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex items-center justify-between gap-2">
