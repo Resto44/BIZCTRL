@@ -99,7 +99,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('data-testid="owner-verify-opening-cash"');
     expect(workspace).toContain("supabase.rpc('erp_verify_sales_closing_opening_count'");
     expect(workspace).toContain('p_request_id: requestId');
-    expect(workspace).toContain('!cashContextReady || ledgerOverdrawn || !allValid');
+    expect(workspace).toContain('!allValid || !cashContextReady || cashDifference === null || ledgerOverdrawn');
     expect(panel).toContain('data-testid="opening-cash-provenance"');
     expect(panel).toContain('data-testid="closing-cash-preview"');
     expect(migration).toContain('CREATE TRIGGER opening_verifications_immutable');
@@ -398,9 +398,9 @@ describe('Sales source daily and historical balance contract', () => {
   it('implements exception-first closing with compact verified totals, network detail and closing fields', async () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
-    expect(workspace).toContain('Closing totals · Manual & ERP');
+    expect(workspace).toContain('Advanced ERP details');
     expect(workspace).toContain('readinessPercent');
-    expect(workspace).toContain('View full details');
+    expect(workspace).toContain('data-testid="closing-open-advanced"');
     expect(workspace).toContain('Network total');
     expect(workspace).toContain('const networkCounterTotal = baseNetworkTotal;');
     expect(workspace).toContain('const networkDriversTotal = driverSourcePaymentTotals.card;');
