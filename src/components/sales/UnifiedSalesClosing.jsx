@@ -1855,7 +1855,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           </section>
 
           <Sheet open={Boolean(workspaceTabActive && showFullDetails)} onOpenChange={isOpen => {if (workspaceTabActive) setShowFullDetails(isOpen);}}>
-            <SheetContent side="bottom" className="z-[60] h-[min(90dvh,900px)] max-h-[90dvh] w-full overflow-y-auto overscroll-contain rounded-t-2xl border-slate-200 bg-slate-50 px-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-5 sm:mx-auto sm:max-w-4xl sm:px-5" data-testid="closing-advanced-sheet">
+            <SheetContent side="bottom" className="z-50 h-[min(90dvh,900px)] max-h-[90dvh] w-full overflow-y-auto overscroll-contain rounded-t-2xl border-slate-200 bg-slate-50 px-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-5 sm:mx-auto sm:max-w-4xl sm:px-5" data-testid="closing-advanced-sheet">
               <SheetHeader className="mb-4 pr-8 text-left">
                 <SheetTitle className="text-base font-black text-slate-950">{lang === 'fa' ? 'جزئیات پیشرفتهٔ کلوزینگ' : lang === 'ar' ? 'تفاصيل إقفال المبيعات' : 'Advanced closing details'}</SheetTitle>
                 <SheetDescription className="text-xs">{lang === 'fa' ? 'معلومات شعبه، مشتری، منابع فروش و دفتر کامل صندوق؛ تغییرات ذخیره نشده باقی می‌مانند.' : lang === 'ar' ? 'الفرع والعملاء ومصادر البيع ودفتر النقد، دون فقدان التعديلات.' : 'Business scope, customer credit, sales sources and full cash audit. Your edits remain in the form.'}</SheetDescription>
