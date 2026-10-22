@@ -56,6 +56,9 @@ const BUSINESS_MESSAGES = {
   SALES_CLOSING_CREDIT_LIMIT_EXCEEDED: 'Credit limit exceeded. Correct the Today Credit amount or perform an authorized manager override.',
   SALES_CLOSING_CREDIT_OVERRIDE_DENIED: 'Only an authorized manager or owner can approve a credit-limit override.',
   SALES_CLOSING_VERSION_IMMUTABLE: 'The finalized Closing snapshot could not be created safely. Reload the Closing and try again.',
+  CLOSING_NETWORK_ACCOUNT_INVALID: 'Choose an active Network Management account for each card amount in this branch.',
+  CLOSING_NETWORK_AMOUNT_INVALID: 'Card amounts must be non-negative with at most two decimals.',
+  CLOSING_NETWORK_ENTRIES_INVALID: 'Reload and review the network rows before saving.',
   CLOSING_ALREADY_EXISTS: 'An active draft Closing already exists for this branch, date, shift, and cashier.',
 };
 
