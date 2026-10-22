@@ -134,8 +134,8 @@ describe('Sales Closing numeric input focus stability', () => {
     ]);
     const workspace = await readFile(resolve(process.cwd(), 'src/components/sales/UnifiedSalesClosing.jsx'), 'utf8');
 
-    expect(workspace).toContain('{(requiresCashReconciliation || attentionCount > 0) && <section');
-    expect(workspace).toContain('{requiresCashReconciliation && <div');
+    expect(workspace).toContain('data-testid="closing-cash-action"');
+    expect(workspace).toContain('id="quick-closing-actualCash"');
     expect(workspace).not.toContain('requiresCashReconciliation && actualCount === null && <div');
   });
 });
