@@ -40,6 +40,11 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('data-testid="closing-open-advanced"');
     expect(workspace).toContain('data-testid="closing-advanced-sheet"');
     expect(workspace).toContain('data-testid="closing-sticky-actions"');
+    expect(workspace).toContain('className="relative mt-4 mb-[calc(5.25rem+env(safe-area-inset-bottom))] border-t border-slate-200 bg-white');
+    expect(workspace).not.toContain('className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))]');
+    expect(workspace).not.toContain('sm:bottom-0 sm:px-5');
+    expect(workspace.indexOf('id="sales-closing-actions"')).toBeGreaterThan(workspace.indexOf('data-testid="closing-cash-action"'));
+    expect(workspace.indexOf('id="sales-closing-actions"')).toBeGreaterThan(workspace.indexOf('data-testid="closing-advanced-sheet"'));
     expect(workspace).toContain('data-testid="closing-review-finalize"');
     expect(workspace).toContain('data-testid="closing-finalize-review"');
     expect(workspace).toContain('data-testid="closing-confirm-finalize"');
