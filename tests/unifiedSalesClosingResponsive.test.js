@@ -11,20 +11,48 @@ describe('Unified Sales Closing workflow contract', () => {
       source('../src/components/sales/CashReconciliationPanel.jsx'),
     ]);
 
-    expect(workspace).toContain('Close Today');
+    expect(workspace).toContain('data-testid="closing-compact-header"');
     expect(workspace).toContain('data-testid="closing-readiness-summary"');
     expect(workspace).toContain('data-testid="closing-cash-action"');
     expect(workspace).toContain('data-testid="closing-full-details"');
     expect(workspace).toContain("data-testid=\"quick-closing-auto-summary\"");
-    expect(workspace).toContain('Closing totals · Manual & ERP');
+    expect(workspace).toContain('Advanced ERP details');
     expect(workspace).not.toContain('CLOSING_WORKFLOW_STEP_IDS');
     expect(workspace).not.toContain('closing-workflow-stepper');
     expect(workspace).toContain('id="sales-closing-workspace" className="min-w-0"');
     expect(workspace).toContain('<CashReconciliationPanel');
     expect(reconciliationPanel).toContain('grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)]');
     expect(workspace).not.toContain('pb-[calc(env(safe-area-inset-bottom)+7rem)]');
-    expect(workspace).toContain('env(safe-area-inset-bottom)+0.75rem');
-    expect(workspace).not.toContain('100vw');
+    expect(workspace).toContain('env(safe-area-inset-bottom)+1.5rem');
+    expect(workspace).toContain('w-[calc(100vw-1.5rem)]');
+  });
+
+  it('uses a compact card workspace, accessible mobile sheet and explicit final posting review', async () => {
+    const [workspace, sheet] = await Promise.all([
+      source('../src/components/sales/UnifiedSalesClosing.jsx'),
+      source('../src/components/ui/sheet.jsx'),
+    ]);
+    expect(workspace).toContain('data-testid="closing-compact-header"');
+    expect(workspace).toContain('data-testid="closing-readiness-summary"');
+    expect(workspace).toContain('data-testid="closing-blockers"');
+    expect(workspace).toContain('data-testid="closing-sales-entry-mode"');
+    expect(workspace).toContain('data-testid="closing-cash-action"');
+    expect(workspace).toContain('data-testid="closing-open-advanced"');
+    expect(workspace).toContain('data-testid="closing-advanced-sheet"');
+    expect(workspace).toContain('data-testid="closing-sticky-actions"');
+    expect(workspace).toContain('data-testid="closing-review-finalize"');
+    expect(workspace).toContain('data-testid="closing-finalize-review"');
+    expect(workspace).toContain('data-testid="closing-confirm-finalize"');
+    expect(workspace).toContain("ref={formRef} onSubmit={handleSubmit}");
+    expect(workspace).toContain('formRef.current?.requestSubmit()');
+    expect(workspace).toContain('disabled={isSubmitting || !allValid || !cashContextReady || cashDifference === null || ledgerOverdrawn}');
+    expect(workspace).toContain('SheetContent side="bottom"');
+    expect(workspace).toContain('Boolean(workspaceTabActive && showFullDetails)');
+    expect(workspace).toContain('Boolean(workspaceTabActive && showFinalizeReview)');
+    expect(sheet).toContain('SheetPrimitive.Portal');
+    expect(workspace).not.toContain('{showFullDetails && <div');
+    expect(workspace).not.toContain('Expected Cash = Opening Cash + Cash Sales.');
+    expect(workspace).not.toContain('Cash Out = Credit Sales.');
   });
 
   it('starts every session in the same quick-close surface and does not mask the authenticated operator behind a pending employee query', async () => {
@@ -32,7 +60,7 @@ describe('Unified Sales Closing workflow contract', () => {
 
     expect(workspace).toContain('const [showFullDetails, setShowFullDetails] = useState(false);');
     expect(workspace).not.toContain('Quick Closing');
-    expect(workspace).not.toContain('Advanced Closing');
+    expect(workspace).toContain('Advanced Closing Details');
     expect(workspace).toContain("cashierDisplayName || (empLoading ? 'Loading…' : empError ? 'Unable to load cashier' : 'No cashier')");
   });
 
@@ -46,10 +74,10 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain(".eq('restaurant_id', activeRestaurant.id)");
     expect(workspace).toContain(".eq('branch_id', selectedBranchId)");
     expect(workspace).toContain(".eq('date', form.date)");
-    expect(workspace).toContain('Record sales at POS first.');
+    expect(workspace).toContain('POS optional · Do not duplicate posted sales');
     expect(workspace).toContain('data-testid="offline-sales-audit"');
     expect(workspace).not.toContain('nextErrors.sales_notes =');
-    expect(workspace).toContain('Reference / note (optional)');
+    expect(workspace).toContain('Sale note / reference (optional)');
   });
 
   it('rejects legacy Closing Cash as a synthetic Actual Count and revalidates when opening arrives', async () => {
@@ -156,8 +184,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain("const useAutomaticSales = Boolean(salesEntryMode === 'automatic' && automaticTotalsEnabled");
     expect(workspace).toContain('passed: actualCount !== null,');
     expect(workspace).toContain('Variance will be recorded separately');
-    expect(workspace).toContain('(requiresCashReconciliation || attentionCount > 0)');
-    expect(workspace).toContain('requiresCashReconciliation && <div');
+    expect(workspace).toContain('data-testid="closing-reconciliation-details"');
+    expect(workspace).toContain('id="quick-closing-actualCash"');
     expect(workspace).not.toContain('requiresCashReconciliation && actualCount === null && <div');
     expect(workspace).not.toContain('summaryVisibilityClass');
     expect(workspace).toContain('data-testid="closing-readiness-summary"');
@@ -185,7 +213,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain("import ClosingNumericInput from '@/components/sales/ClosingNumericInput';");
     expect(workspace).toContain('tabular-nums');
     expect(workspace).toContain('whitespace-nowrap');
-    expect(workspace).toContain('className="border-t border-border bg-background/95');
+    expect(workspace).toContain('data-testid="closing-sticky-actions"');
     expect(workspace).toContain('Save Draft');
     expect(workspace).toContain('Finalize Closing');
   });
@@ -217,8 +245,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('if (queryError) throw queryError;');
     expect(workspace).toContain('automaticClosingUnavailable');
     expect(workspace).toContain('Retry ERP data');
-    expect(workspace).toContain('cashLedgerLoading || autoSourceLoading');
-    expect(workspace).toContain('cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn || !allValid');
+    expect(workspace).toContain('cashLedgerLoading || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn');
+    expect(workspace).toContain('!allValid || !cashContextReady || cashDifference === null || ledgerOverdrawn');
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
   });
 
@@ -253,7 +281,7 @@ describe('Unified Sales Closing workflow contract', () => {
     ]);
 
     expect(workspace).toContain('const [showFullDetails, setShowFullDetails] = useState(false);');
-    expect(workspace).toContain('aria-expanded={showFullDetails}');
+    expect(workspace).toContain('open={Boolean(workspaceTabActive && showFullDetails)}');
     expect(workspace).not.toContain('goToNextWorkflowStep');
     expect(workspace).toContain('onSessionContextChange?.({');
     expect(workspace).toContain('isOpeningNewClosing = false');
