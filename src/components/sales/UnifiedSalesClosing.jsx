@@ -1738,7 +1738,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
           </header>
 
-          <section data-testid="closing-readiness-summary" className={`flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 ${allValid ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50/75'}`}>
+          <section id="closing-readiness-anchor" data-testid="closing-readiness-summary" className={`flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 ${allValid ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50/75'}`}>
             <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${allValid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}><ShieldCheck className="h-4 w-4" /></span>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-black text-slate-900">{allValid ? (lang === 'fa' ? 'آمادهٔ نهایی‌سازی' : lang === 'ar' ? 'جاهز للإقفال' : 'Ready to finalize') : (lang === 'fa' ? `${attentionCount} مورد نیاز به اصلاح` : lang === 'ar' ? `${attentionCount} بنود تحتاج معالجة` : `${attentionCount} required action${attentionCount === 1 ? '' : 's'}`)}</p>
@@ -1885,13 +1885,58 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         </div>
       </div>
 
-      <div id="sales-closing-actions" tabIndex={-1} className="border-t border-border bg-background/95 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
-        <div className="mx-auto grid w-full max-w-4xl grid-cols-[minmax(7rem,0.75fr)_minmax(0,1.25fr)] gap-2 sm:grid-cols-[auto_auto_minmax(14rem,1fr)] sm:items-center">
-          <div className="flex min-w-0 flex-col justify-center px-1"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Final total</span><Money currency={currency} value={operatingResult} signed className={`truncate text-lg font-black ${operatingResult >= 0 ? 'text-blue-700' : 'text-red-700'}`} /></div>
-          <Button type="submit" variant="outline" className="min-h-12 font-bold sm:order-first sm:w-32" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn}><Save className="mr-1.5 h-4 w-4" />Save Draft</Button>
-          <Button type="submit" aria-label="Finalize Closing" className="col-span-2 min-h-12 bg-blue-600 font-black hover:bg-blue-700 sm:col-span-1" onClick={() => flushSync(() => setRequestedClosingState('finalized'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || autoSourceLoading || automaticClosingUnavailable || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn || !allValid}>{isSubmitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</> : allValid ? <><ShieldCheck className="mr-1.5 h-4 w-4" />Finalize Closing</> : `Complete ${attentionCount} required ${attentionCount === 1 ? 'action' : 'actions'}`}</Button>
+      <div id="sales-closing-actions" tabIndex={-1} data-testid="closing-sticky-actions" className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-[0_-6px_24px_rgba(15,23,42,0.09)] backdrop-blur sm:bottom-0 sm:px-5">
+        <div className="mx-auto max-w-4xl">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش همین شیفت' : lang === 'ar' ? 'مجموع مبيعات الوردية' : 'Shift sales total'}</span>
+            <Money currency={currency} value={totalSales} className="text-lg font-black text-slate-900" />
+          </div>
+          <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2">
+            <Button type="submit" variant="outline" className="min-h-12 min-w-0 rounded-xl px-2 text-xs font-bold sm:text-sm" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn}><Save className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'ذخیره موقت' : lang === 'ar' ? 'حفظ المسودة' : 'Save Draft'}</Button>
+            <Button type="button" aria-label="Review & Finalize Closing" data-testid="closing-review-finalize" className="min-h-12 min-w-0 rounded-xl bg-blue-600 px-2 text-xs font-black hover:bg-blue-700 sm:text-sm" disabled={isSubmitting} onClick={() => {
+              if (!allValid || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn || purchasesLoading) {
+                setShowBlockers(true);
+                document.getElementById('closing-readiness-anchor')?.scrollIntoView({behavior:'smooth', block:'start'});
+                return;
+              }
+              setShowFinalizeReview(true);
+            }}>{isSubmitting ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" />{lang === 'fa' ? 'در حال ذخیره...' : lang === 'ar' ? 'جارٍ الحفظ...' : 'Saving…'}</> : <><ShieldCheck className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'بررسی و نهایی‌سازی' : lang === 'ar' ? 'مراجعة وإقفال' : 'Review & Finalize'}</>}</Button>
+          </div>
         </div>
       </div>
+
+      <Dialog open={Boolean(workspaceTabActive && showFinalizeReview)} onOpenChange={isOpen => {if (workspaceTabActive) setShowFinalizeReview(isOpen);}}>
+        <DialogContent className="max-h-[88dvh] w-[calc(100vw-1.5rem)] max-w-lg overflow-y-auto rounded-2xl p-4 sm:p-6" data-testid="closing-finalize-review">
+          <DialogHeader>
+            <DialogTitle className="text-left text-lg font-black">{lang === 'fa' ? 'تأیید نهایی کلوزینگ' : lang === 'ar' ? 'تأكيد إقفال المبيعات' : 'Confirm sales closing'}</DialogTitle>
+            <DialogDescription className="text-left text-xs">{form.branch} · {form.shift} · {form.date}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-xs">
+              <span className="text-slate-600">Cash Sales</span><Money currency={currency} value={cashSales} className="text-right font-black" />
+              <span className="text-slate-600">Network / Card</span><Money currency={currency} value={networkTotal} className="text-right font-black" />
+              <span className="text-slate-600">Customer Credit</span><Money currency={currency} value={creditTotal} className="text-right font-black" />
+              <span className="font-black text-slate-900">Sales total</span><Money currency={currency} value={totalSales} className="text-right text-sm font-black text-blue-700" />
+            </div>
+            <div className="grid grid-cols-2 gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs">
+              <span className="text-blue-900">Opening Cash</span><Money currency={currency} value={opening} className="text-right font-black" />
+              <span className="text-blue-900">Expected Cash</span><Money currency={currency} value={expectedCash} className="text-right font-black" />
+              <span className="text-blue-900">Actual Cash</span><Money currency={currency} value={actualCount} className="text-right font-black" />
+              <span className="font-black text-blue-900">Variance</span><Money currency={currency} value={cashDifference} signed className={`text-right text-sm font-black ${cashDifference === 0 ? 'text-emerald-700' : 'text-amber-700'}`} />
+            </div>
+            {cashDifference !== 0 && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">{lang === 'fa' ? 'کسری یا اضافه به‌صورت جدا ثبت می‌شود و مبلغ فروش را تغییر نمی‌دهد.' : lang === 'ar' ? 'يُسجل العجز أو الفائض بشكل منفصل دون تغيير قيمة المبيعات.' : 'Cash shortage or overage is recorded separately; it does not change sales revenue.'}</p>}
+            <p className="text-xs text-slate-600">{lang === 'fa' ? 'قبل از ثبت قطعی، ارقام نقدی و فروش را با اسناد همین شیفت تطبیق کنید.' : lang === 'ar' ? 'راجع أرقام الوردية والمستندات قبل الاعتماد النهائي.' : 'Verify this shift’s amounts against the cash count and sales evidence before posting.'}</p>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button type="button" variant="outline" className="min-h-12 rounded-xl" onClick={() => setShowFinalizeReview(false)}>{lang === 'fa' ? 'ویرایش' : lang === 'ar' ? 'تعديل' : 'Edit'}</Button>
+            <Button type="button" data-testid="closing-confirm-finalize" className="min-h-12 rounded-xl bg-blue-600 font-black hover:bg-blue-700" disabled={isSubmitting || !allValid || !cashContextReady || cashDifference === null || ledgerOverdrawn} onClick={() => {
+              setShowFinalizeReview(false);
+              flushSync(() => setRequestedClosingState('finalized'));
+              formRef.current?.requestSubmit();
+            }}><ShieldCheck className="mr-1 h-4 w-4" />{lang === 'fa' ? 'ثبت نهایی' : lang === 'ar' ? 'اعتماد الإقفال' : 'Confirm'}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
