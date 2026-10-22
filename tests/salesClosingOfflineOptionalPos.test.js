@@ -45,7 +45,7 @@ describe('Sales Closing: POS optional, manual/offline available', () => {
     expect(src).toContain("id: entry.id || newStableRowId");
     expect(src).toContain('id="quick-closing-cashSales"');
     expect(src).toContain('id={`quick-closing-network-${entry.id}`}');
-    expect(src).toContain("passed: posEntries.every(e => e.amount === '' || e.amount == null");
+    expect(src).toContain("passed: validClosingNetworkEntries(posEntries, posDevices)");
     expect(src).toContain('p_cashier_id: effectiveCashierId');
     expect(src).toContain("cashLedgerContext.opening_verified === true");
     expect(src).toContain("if (!savingDraft && actualCount === null) nextErrors.actualCash");

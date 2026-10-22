@@ -60,6 +60,8 @@ import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
 import CustomerCreditSalesSource from '@/components/sales/CustomerCreditSalesSource';
 import CashReconciliationPanel from '@/components/sales/CashReconciliationPanel';
 import ClosingControlOverview from '@/components/sales/ClosingControlOverview';
+import ClosingFundingPanel from '@/components/sales/ClosingFundingPanel';
+import { activeClosingNetworkAccounts, validClosingNetworkEntries } from '@/lib/closing/ClosingFunding';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { hasCanonicalCustomerScope, loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
 import { recordCustomerReceivablePayment, invalidateCustomerReceivableQueries, customerDebtPaymentErrorMessage } from '@/lib/debt/customerReceivableRepository';
@@ -858,31 +860,42 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // former direct daily_sales fallback had no cashier or shift identity and could
   // apply a late response from a previously selected branch.
 
-  // ── POS devices ───────────────────────────────────────────────────────────
-  const { data: posDevicesData, isLoading: posLoading } = useQuery({
-    queryKey: ['pos_devices_form', activeRestaurant?.id, ownerFilter?.created_by, form.branch, selectedBranchId],
+  // Account options come from Network Management in the active tenant/branch.
+  const { data: posDevicesData, isLoading: posLoading, isError: posUnavailable, refetch: reloadNetworks } = useQuery({
+    queryKey: ['pos_devices_form', activeRestaurant?.id, form.branch, selectedBranchId],
+    enabled: Boolean(activeRestaurant?.id && selectedBranchId),
     queryFn: async () => {
-      if (isManager && !activeRestaurant?.id) return [];
-      if (!isManager && !ownerFilter?.created_by) return [];
-      const all = asRecordArray(await base44.entities.NetworkAccount.filter(
-        isManager ? { restaurant_id: activeRestaurant.id } : { created_by: ownerFilter.created_by },
-        '-created_date',
-        200,
-      ));
-      return all.filter((account) =>
-        (account.status === 'active' || account.is_active) &&
-        (isManager
-          ? matchesBranch(account, form.branch, selectedBranchId)
-          : (!form.branch || account.branch === form.branch || account.branch_id === form.branch))
-      );
+      const all = [];
+      for (let offset = 0; offset < 10000; offset += 500) {
+        const { data, error } = await supabase.from('network_accounts')
+          .select('id,restaurant_id,branch_id,branch,branch_key,account_name,network_name,network_provider,status,is_active')
+          .eq('restaurant_id', activeRestaurant.id).order('id').range(offset, offset + 499);
+        if (error) throw error;
+        all.push(...data);
+        if (data.length < 500) return activeClosingNetworkAccounts(all, activeRestaurant.id, selectedBranchId, form.branch);
+      }
+      throw new Error('Network account list exceeds safe pagination limit');
     },
-    staleTime: 30000,
-    enabled: isManager ? !!activeRestaurant?.id && !!form.branch : !!ownerFilter?.created_by,
+    staleTime: 0,
   });
-  const posDevices = asRecordArray(posDevicesData);
+  const posDevices = useMemo(() => asRecordArray(posDevicesData), [posDevicesData]);
+  const chooseNetwork = (rowId, accountId) => {
+    const account = posDevices.find(item => item.id === accountId);
+    setPosEntries(rows => rows.map(row => row.id === rowId ? { ...row, device_id: accountId, network_account_id: accountId,
+      device_name: account?.account_name || account?.network_name || '', provider: account?.network_provider || '' } : row));
+  };
+  const networkSelector = (entry) => <label className="block min-w-0 space-y-1 text-xs font-semibold">
+    <span>{lang === 'fa' ? 'حساب شبکه' : lang === 'ar' ? 'حساب الشبكة' : 'Network account'}</span>
+    <select aria-label="Network account" className="min-h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm" value={entry.network_account_id || entry.device_id || ''}
+      disabled={isSubmitting || posLoading || posUnavailable} onChange={event => chooseNetwork(entry.id, event.target.value)}>
+      <option value="">{lang === 'fa' ? 'انتخاب از مدیریت شبکه' : lang === 'ar' ? 'اختر من إدارة الشبكات' : 'Choose from Network Management'}</option>
+      {(entry.network_account_id || entry.device_id) && !posDevices.some(a => a.id === (entry.network_account_id || entry.device_id)) && <option value={entry.network_account_id || entry.device_id} disabled>{entry.device_name || 'Unavailable account'}</option>}
+      {posDevices.map(account => <option key={account.id} value={account.id}>{account.account_name || account.network_name} {account.network_provider || ''}</option>)}
+    </select>
+  </label>;
 
   useEffect(() => {
-    if (initial?.id || !isManager || form.pos_device_id || !posDevices.length) return;
+    if (initial?.id || posDevices.length !== 1) return;
     const device = firstRecord(posDevices);
     if (!device?.id) return;
     setForm((previous) => ({ ...previous, pos_device_id: device.id }));
@@ -891,12 +904,13 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         ? {
             ...entry,
             device_id: device.id,
+            network_account_id: device.id,
             device_name: device.account_name || device.device_name || '',
-            provider: device.provider || device.account_type || '',
+            provider: device.network_provider || '',
           }
         : entry,
     ));
-  }, [form.pos_device_id, initial?.id, isManager, posDevices]);
+  }, [initial?.id, posDevices]);
 
   // ── Customers ─────────────────────────────────────────────────────────────
   const canonicalCustomerScope = {
@@ -1305,7 +1319,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       key: 'erpData',
       label: 'ERP Sales and Cash Ledger Available',
       passed: !automaticClosingUnavailable && !cashLedgerUnavailable && cashContextReady && !openingReviewRequired && !ledgerOverdrawn,
-      message: !effectiveCashierId ? 'Select a valid cashier/operator to load the cash ledger' : openingReviewRequired ? openingReviewReason : ledgerOverdrawn ? 'Correct overdrawn cash movement ledger' : automaticClosingUnavailable || cashLedgerUnavailable ? 'Cash ledger could not be loaded; recheck branch and shift' : !cashContextReady ? 'Cash ledger is loading or opening count is not verified' : 'Verified cash ledger available',
+      message: !effectiveCashierId ? 'Select a valid cashier/operator to load the cash ledger' : openingReviewRequired ? openingReviewReason : ledgerOverdrawn ? (lang === 'fa' ? 'تمویل از خزانه یا اونر را ثبت کنید' : lang === 'ar' ? 'سجّل تمويل الخزينة أو المالك' : 'Record treasury or owner funding') : automaticClosingUnavailable || cashLedgerUnavailable ? 'Cash ledger could not be loaded; recheck branch and shift' : !cashContextReady ? 'Cash ledger is loading or opening count is not verified' : 'Verified cash ledger available',
     },
     {
       key: 'cashier',
@@ -1334,11 +1348,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     {
       key: 'pos',
       label: 'POS Totals Valid',
-      // A POS device ID is optional in Manual / Offline mode. The manually
-      // entered network amount still must be finite and non-negative.
-      passed: posEntries.every(e => e.amount === '' || e.amount == null
-        || (Number.isFinite(Number(e.amount)) && Number(e.amount) >= 0)),
-      message: `${currency}\u00A0${networkTotal.toLocaleString()}`,
+      passed: validClosingNetworkEntries(posEntries, posDevices) && !(manualNetworkTotal > 0 && (posLoading || posUnavailable)),
+      message: validClosingNetworkEntries(posEntries, posDevices) ? `${currency} ${networkTotal.toLocaleString()}` : (lang === 'fa' ? 'برای هر مبلغ کارت یک حساب شبکه فعال انتخاب کنید.' : lang === 'ar' ? 'اختر حساب شبكة نشطاً لكل مبلغ بطاقة.' : 'Choose an active network account for each card amount.'),
     },
     {
       key: 'credit',
@@ -1373,7 +1384,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       passed: !!form.date && !!form.branch && customClosingFields.every((field) => !field.is_required || hasCustomClosingFieldValue(field)),
       message: form.date || 'Date required',
     },
-  ], [form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
+  ], [form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, posDevices, posLoading, posUnavailable, lang, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   const networkCounterTotal = baseNetworkTotal;
@@ -1417,6 +1428,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         const ids = driverEntries.map((entry) => String(entry.driver_id || '')).filter(Boolean);
         return new Set(ids).size !== ids.length;
       });
+    if (!validClosingNetworkEntries(posEntries, posDevices) || (manualNetworkTotal > 0 && (posLoading || posUnavailable))) nextErrors.pos = 'Choose an active branch network account for each card amount.';
     if (!form.date) nextErrors.date = 'Date is required.';
     if (!form.branch) nextErrors.branch = 'Branch is required.';
     if (!form.shift) nextErrors.shift = 'Shift is required.';
@@ -1457,7 +1469,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     const branchId = selectedBranch?.id || selectedBranchId || null;
     const cashierId = effectiveCashierId;
     const customerId = form.customer_id || customerCreditSales.find((entry) => entry.customer_id)?.customer_id || null;
-    const posDeviceId = form.pos_device_id || posEntries.find((entry) => entry.device_id)?.device_id || null;
+    const posDeviceId = posEntries.find((entry) => Number(entry.amount) > 0)?.device_id || null;
     const createdBy = user?.email || ownerFilter?.created_by || '';
     const tenantId = activeRestaurant?.id || user?.organization_id || user?.restaurant_id || '';
 
@@ -1754,7 +1766,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             {failedValidations.map(validation => <button type="button" key={validation.key} className="flex min-h-10 w-full items-start gap-2 rounded-lg bg-white px-2.5 py-2 text-left text-xs text-amber-900" onClick={() => {
               if (validation.key === 'erpData' && openingReviewRequired) setShowOpeningVerification(true);
               else if (validation.key !== 'cashBalance') setShowFullDetails(true);
-              const anchor = validation.key === 'cashBalance' ? 'quick-closing-actualCash' : validation.key === 'erpData' && openingReviewRequired ? 'opening-cash-needs-review' : null;
+              const anchor = validation.key === 'cashBalance' ? 'quick-closing-actualCash' : validation.key === 'erpData' && openingReviewRequired ? 'opening-cash-needs-review' : validation.key === 'erpData' && ledgerOverdrawn ? 'closing-funding' : null;
               if (anchor) requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({behavior: 'smooth', block: 'center'}));
             }}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span className="min-w-0"><strong className="block">{validation.label}</strong><span className="block text-[11px]">{validation.message}</span></span></button>)}
           </section>}
@@ -1773,13 +1785,17 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 </div>
               </div>
               <div data-testid="offline-sales-audit" className="grid min-w-0 grid-cols-1 gap-2.5 min-[360px]:grid-cols-2">
-                <div className="min-w-0"><Label htmlFor="quick-closing-cashSales" className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'نقدی' : lang === 'ar' ? 'نقدي' : 'Cash'}</Label><ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} disabled={useAutomaticSales || isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" /></div>
+                <div className="min-w-0"><Label htmlFor="quick-closing-cashSales" className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'فروش نقدی قبل از پرداخت‌ها' : lang === 'ar' ? 'مبيعات نقدية قبل المدفوعات' : 'Cash sales before payments'}</Label><ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} disabled={useAutomaticSales || isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" /></div>
                 <div className="min-w-0"><Label htmlFor={`quick-closing-network-${posEntries[0]?.id || 'empty'}`} className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : 'Network / Card'}</Label>
+                  {posEntries[0] && networkSelector(posEntries[0])}
                   {posEntries[0] && <ClosingNumericInput id={`quick-closing-network-${posEntries[0].id}`} value={posEntries[0].amount ?? ''} onChange={value => updatePos(posEntries[0].id, 'amount', value)} prefix={currency} disabled={isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" />}
                 </div>
               </div>
+              {posUnavailable && <p role="alert" className="text-sm text-red-700">{lang === 'fa' ? 'حساب‌های شبکه بارگذاری نشد.' : lang === 'ar' ? 'تعذر تحميل حسابات الشبكة.' : 'Network accounts could not load.'}<Button type="button" variant="outline" onClick={() => reloadNetworks()}>↻</Button></p>}
+              {inlineErrors.pos && <p role="alert" className="text-sm text-red-700">{inlineErrors.pos}</p>}
               {(posEntries.length > 1 || showNetworkDetail) && <div data-testid="closing-extra-network" className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
-                {posEntries.slice(1).map(entry => <div key={entry.id} className="flex items-center gap-2">
+                {posEntries.slice(1).map(entry => <div key={entry.id} className="grid min-w-0 grid-cols-[1fr_auto] items-end gap-2">
+                  <div className="col-span-2 min-w-0">{networkSelector(entry)}</div>
                   <span className="min-w-0 flex-1"><ClosingNumericInput id={`quick-closing-network-${entry.id}`} value={entry.amount ?? ''} onChange={value => updatePos(entry.id, 'amount', value)} prefix={currency} disabled={isSubmitting} inputClassName="h-11 bg-white" /></span>
                   <Button type="button" size="icon" variant="ghost" onClick={() => removePos(entry.id)} disabled={isSubmitting} aria-label="Remove network total"><Trash2 className="h-4 w-4" /></Button>
                 </div>)}
@@ -1797,7 +1813,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
           </section>
 
-          {ledgerOverdrawn && <div role="alert" data-testid="cash-ledger-overdrawn" className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-900"><p className="font-black">Cash ledger overdrawn · reconciliation required</p><p className="mt-1 text-xs leading-6">Expected Cash is {currency} {reconciliation.expectedCash.toLocaleString()} after Cash In and Cash Out. A physical drawer cannot be negative. Verify missing funding and cash movements in Cash Register before closing. This is not an ordinary overage.</p><Button type="button" size="sm" variant="outline" onClick={() => refetchCashLedger()} className="mt-2 min-h-10"><RefreshCw className="mr-1.5 h-4 w-4" />Recheck cash ledger</Button></div>}
+          {cashContextReady && <ClosingFundingPanel key={`${activeRestaurant?.id}:${selectedBranchId}:${form.date}:${form.shift}:${effectiveCashierId}`}
+            restaurantId={activeRestaurant?.id} branchId={selectedBranchId} branchKey={form.branch} date={form.date} shift={form.shift} cashierId={effectiveCashierId}
+            expectedCash={expectedCash} actualCash={actualCount} role={role} lang={lang} currency={currency} disabled={isSubmitting}
+            onPosted={async () => { setManagerApproved(false); await refetchCashLedger(); }} />}
+          {ledgerOverdrawn && <p role="alert" data-testid="cash-ledger-overdrawn" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{lang === 'fa' ? 'پرداخت نقدی بیشتر از موجودی ثبت‌شده است. تمویل واقعی را در بخش بالا ثبت و سپس صندوق را دوباره شمارش کنید.' : lang === 'ar' ? 'المدفوعات النقدية تتجاوز الرصيد المسجل. سجّل التمويل الفعلي أعلاه ثم أعد عد الصندوق.' : 'Cash payments exceed the recorded balance. Record actual funding above, then recount the drawer.'}</p>}
           {openingReviewRequired && showOpeningVerification && <div id="opening-cash-needs-review" role="alert" data-testid="opening-cash-needs-review" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-black">Opening Cash needs reconciliation</p>
             <p className="mt-1 text-xs leading-6">{openingReviewReason}</p>
