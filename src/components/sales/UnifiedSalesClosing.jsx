@@ -1758,7 +1758,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
           <section data-testid="closing-sales-entry-mode" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Daily sales">
             <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-3 sm:px-5">
-              <div><h2 className="text-sm font-black text-slate-950">{lang === 'fa' ? 'فروش امروز' : lang === 'ar' ? 'مبيعات اليوم' : 'Today's sales'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{lang === 'fa' ? 'فقط همین تاریخ و شیفت' : lang === 'ar' ? 'لهذا التاريخ والوردية فقط' : 'This date and shift only'}</p></div>
+              <div><h2 className="text-sm font-black text-slate-950">{lang === 'fa' ? 'فروش امروز' : lang === 'ar' ? 'مبيعات اليوم' : 'Today sales'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{lang === 'fa' ? 'فقط همین تاریخ و شیفت' : lang === 'ar' ? 'لهذا التاريخ والوردية فقط' : 'This date and shift only'}</p></div>
               <div className="text-right"><p className="text-[10px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش' : lang === 'ar' ? 'الإجمالي' : 'Total sales'}</p><Money currency={currency} value={totalSales} className="text-xl font-black text-blue-700" /></div>
             </div>
             <div className="space-y-3 p-3.5 sm:p-5">
