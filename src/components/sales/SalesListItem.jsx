@@ -20,20 +20,12 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
-import { dailySalesNetworkBreakdown, parseDailySalesSourceSnapshots } from '@/lib/dailySalesPresentation';
+import { dailySalesNetworkBreakdown, dailySalesProfitSummary, parseDailySalesSourceSnapshots } from '@/lib/dailySalesPresentation';
 
 const parseSalesSourceSnapshots = parseDailySalesSourceSnapshots;
 
 const numberValue = (value) => Number(value) || 0;
 const money = (currency, value) => `${currency} ${numberValue(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-const recordTotal = (sale) => numberValue(sale?.restaurant_cash ?? sale?.cash)
-  + numberValue(sale?.restaurant_network ?? sale?.network)
-  + numberValue(sale?.credit)
-  + Math.max(0, numberValue(sale?.custom_sources_total));
-const recordProfit = (sale) => Number.isFinite(Number(sale?.operating_result))
-  ? Number(sale.operating_result)
-  : recordTotal(sale) - numberValue(sale?.approved_purchases_total) - numberValue(sale?.expenses_total);
-
 const statePresentation = (state) => ({
   finalized: { label: 'Finalized', cls: 'bg-emerald-50 text-emerald-700' },
   draft: { label: 'Draft', cls: 'bg-slate-100 text-slate-700' },
@@ -65,7 +57,7 @@ export default function SalesListItem({
   selected = false,
   onToggleSelect = null,
 }) {
-  const { currency } = useLanguage();
+  const { currency, lang } = useLanguage();
   const { branches } = useTenant();
 
   // Prefer restaurant_ fields (new schema); fall back to legacy cash/network.
@@ -77,8 +69,24 @@ export default function SalesListItem({
   const total = rCash + rNet + credit + customSourcesTotal;
   const sourceSnapshots = useMemo(() => parseSalesSourceSnapshots(sale.sales_sources_json), [sale.sales_sources_json]);
   const network = useMemo(() => dailySalesNetworkBreakdown({ restaurant_network: rNet }, sourceSnapshots), [rNet, sourceSnapshots]);
-  const operatingResult = recordProfit(sale);
-  const margin = total > 0 ? (operatingResult / total) * 100 : 0;
+  const profit = dailySalesProfitSummary(sale);
+  const labels = lang === 'fa' ? {
+    sales: 'فروشات', costs: 'مصرف ثبت‌شده', gross: 'فایده ناخالص (تخمینی)', net: 'فایده خالص (تخمینی)',
+    purchases: 'خرید', expenses: 'مصارف عملیاتی', missing: 'اطلاعات هزینه کامل نیست',
+    zero: 'هیچ هزینه‌ای در این کلوزینگ ثبت نشده؛ فایده تأییدشده نیست.',
+    note: 'تخمین بر اساس مبالغ ذخیره‌شده: ناخالص = فروش − خرید؛ خالص = ناخالص − مصارف عملیاتی. خرید جایگزین بهای واقعی کالای فروخته‌شده نیست.',
+  } : lang === 'ar' ? {
+    sales: 'المبيعات', costs: 'التكاليف المسجلة', gross: 'الربح الإجمالي (تقديري)', net: 'صافي الربح (تقديري)',
+    purchases: 'المشتريات', expenses: 'المصاريف التشغيلية', missing: 'بيانات التكاليف غير مكتملة',
+    zero: 'لا توجد تكاليف مسجلة في هذا الإقفال؛ الربح غير مؤكد.',
+    note: 'تقدير من مبالغ الإقفال المحفوظة: الإجمالي = المبيعات − المشتريات؛ الصافي = الإجمالي − المصاريف التشغيلية. المشتريات ليست تكلفة البضاعة المباعة الفعلية.',
+  } : {
+    sales: 'Sales', costs: 'Recorded costs', gross: 'Gross profit (est.)', net: 'Net profit (est.)',
+    purchases: 'Purchases', expenses: 'Operating expenses', missing: 'Cost data incomplete',
+    zero: 'No costs recorded in this closing; profit is unverified.',
+    note: 'Saved closing estimate: gross = sales − purchases; net = gross − operating expenses. Purchases are not actual cost of goods sold.',
+  };
+  const costMoney = (value) => value === null ? '—' : money(currency, value);
   const branchLabel = branches.find((branch) => branch.key === sale.branch)?.label || sale.branch || '—';
   const managerName = sale.manager_name || sale.manager_email || sale.created_by || '—';
   const cashierName = sale.cashier_name || managerName;
@@ -129,11 +137,29 @@ export default function SalesListItem({
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-3 border-t border-border/70 pt-3">
-          <div><p className="text-[10px] text-muted-foreground">Sales</p><p className="text-base font-black tabular-nums text-primary sm:text-lg">{money(currency, total)}</p></div>
-          <div><p className="text-[10px] text-muted-foreground">Operating result</p><p className={`text-base font-black tabular-nums sm:text-lg ${operatingResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{operatingResult >= 0 ? '+' : '−'}{money(currency, Math.abs(operatingResult))}</p></div>
-          <div><p className="text-[10px] text-muted-foreground">Margin</p><p className={`text-base font-black tabular-nums sm:text-lg ${margin >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{margin.toFixed(1)}%</p></div>
-        </div>
+        <section className="mt-3 border-t border-border/70 pt-3" data-i18n-skip="true" dir={lang === 'fa' || lang === 'ar' ? 'rtl' : 'ltr'} aria-label={labels.costs}>
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            {[
+              { label: labels.sales, value: total, cls: 'text-primary' },
+              { label: labels.costs, value: profit.totalCosts, cls: 'text-foreground' },
+              { label: labels.gross, value: profit.grossProfit, signed: true },
+              { label: labels.net, value: profit.netProfit, signed: true },
+            ].map(({ label, value, cls, signed }) => (
+              <div key={label} className="min-w-0 rounded-xl bg-muted/40 p-2.5">
+                <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-xs">{label}</p>
+                <p dir="ltr" className={`mt-1 break-words text-start text-sm font-black tabular-nums sm:text-base ${cls || (value === null ? 'text-muted-foreground' : value < 0 ? 'text-red-700' : 'text-emerald-700')}`}>
+                  {value === null ? '—' : `${signed && value > 0 ? '+' : ''}${money(currency, value)}`}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground sm:text-xs">
+            <span>{labels.purchases}: <strong>{costMoney(profit.purchases)}</strong></span>
+            <span>{labels.expenses}: <strong>{costMoney(profit.operatingExpenses)}</strong></span>
+          </div>
+          {(profit.costsMissing || profit.noRecordedCosts) && <p className="mt-2 text-[10px] font-semibold text-amber-700 sm:text-xs" role="status">{profit.costsMissing ? labels.missing : labels.zero}</p>}
+          <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">{labels.note}</p>
+        </section>
 
         <div className="mt-3 flex h-4 overflow-hidden rounded-md bg-muted" aria-label="Payment mix">
           {percentages.cash > 0 && <span className="grid h-full place-items-center bg-blue-600 text-[8px] font-bold text-white" style={{ width: `${percentages.cash}%` }}>{percentages.cash >= 14 ? `${percentages.cash.toFixed(0)}%` : ''}</span>}
