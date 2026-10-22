@@ -97,3 +97,25 @@ export const filterDailySalesRecords = (sales, filters) => sales.filter((sale) =
   if (filters.maxTotal && total > Number(filters.maxTotal)) return false;
   return true;
 });
+
+// These are closing estimates based on saved purchases, not inventory COGS.
+// Missing cost snapshots must never be silently treated as zero expenses.
+export function dailySalesProfitSummary(sale) {
+  const amount = (value) => {
+    if (value == null || typeof value === 'boolean' || String(value).trim() === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.round(parsed * 100) : null;
+  };
+  const revenue = [sale?.restaurant_cash ?? sale?.cash, sale?.restaurant_network ?? sale?.network,
+    sale?.credit, sale?.custom_sources_total].reduce((sum, value) => sum + (amount(value) ?? 0), 0);
+  const purchases = amount(sale?.approved_purchases_total);
+  const expenses = amount(sale?.expenses_total);
+  const costs = purchases !== null && expenses !== null ? purchases + expenses : null;
+  const gross = purchases !== null ? revenue - purchases : null;
+  const net = costs !== null ? revenue - costs : null;
+  const money = (value) => value === null ? null : value / 100;
+  return { purchases: money(purchases), operatingExpenses: money(expenses), totalCosts: money(costs),
+    grossProfit: money(gross), netProfit: money(net),
+    costsMissing: purchases === null || expenses === null,
+    noRecordedCosts: costs === 0 };
+}
