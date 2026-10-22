@@ -1756,34 +1756,42 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             }}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span className="min-w-0"><strong className="block">{validation.label}</strong><span className="block text-[11px]">{validation.message}</span></span></button>)}
           </section>}
 
-          <section data-testid="closing-sales-entry-mode" className="rounded-2xl border border-blue-200 bg-white p-4 shadow-sm sm:p-5">
-            <div className="flex items-center justify-between gap-2">
-              <div><h2 className="text-sm font-black text-slate-950">{lang === 'fa' ? 'روش ثبت فروش روزانه' : lang === 'ar' ? 'طريقة تسجيل المبيعات اليومية' : 'Daily sales entry mode'}</h2>
-                <p className="mt-1 text-[11px] text-slate-500">{lang === 'fa' ? 'اتصال POS اختیاری است؛ بدون دستگاه هم کلوزینگ ثبت می‌شود.' : lang === 'ar' ? 'ربط POS اختياري؛ يمكن إقفال المبيعات دون جهاز.' : 'POS connection is optional. Manual closing works without a POS device.'}</p></div>
-              <Badge variant="outline">{lang === 'fa' ? 'اختیاری' : lang === 'ar' ? 'اختياري' : 'Optional POS'}</Badge>
+          <section data-testid="closing-sales-entry-mode" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Daily sales">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-3 sm:px-5">
+              <div><h2 className="text-sm font-black text-slate-950">{lang === 'fa' ? 'فروش امروز' : lang === 'ar' ? 'مبيعات اليوم' : 'Today's sales'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{lang === 'fa' ? 'فقط همین تاریخ و شیفت' : lang === 'ar' ? 'لهذا التاريخ والوردية فقط' : 'This date and shift only'}</p></div>
+              <div className="text-right"><p className="text-[10px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش' : lang === 'ar' ? 'الإجمالي' : 'Total sales'}</p><Money currency={currency} value={totalSales} className="text-xl font-black text-blue-700" /></div>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Sales entry mode">
-              <button type="button" aria-pressed={salesEntryMode === 'manual'} data-testid="sales-entry-manual" onClick={() => setSalesEntryMode('manual')} className={`min-h-12 rounded-xl border px-3 py-2 text-xs font-bold ${salesEntryMode === 'manual' ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>{lang === 'fa' ? 'دستی / آفلاین' : lang === 'ar' ? 'يدوي / دون POS' : 'Manual / Offline'}</button>
-              <button type="button" aria-pressed={salesEntryMode === 'automatic'} data-testid="sales-entry-automatic" disabled={!automaticTotalsEnabled || Boolean(initial?.id)} onClick={() => setSalesEntryMode('automatic')} className="min-h-12 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500 disabled:cursor-not-allowed disabled:opacity-70">{lang === 'fa' ? 'POS اتومات (فعلاً غیرفعال)' : lang === 'ar' ? 'POS تلقائي (غير متاح حالياً)' : 'Automatic POS (not connected)'}</button>
-            </div>
-            <p className="mt-2 text-[11px] leading-5 text-slate-600">{lang === 'fa' ? 'منبع اتوماتیکِ تأییدشده برای شیفت و صندوق هنوز وصل نیست. ارقام را دستی ثبت کنید؛ داده‌های قبلی POS را دوباره اضافه نکنید.' : lang === 'ar' ? 'مصدر POS تلقائي معتمد لهذه الوردية والصندوق غير متصل. أدخل الإجماليات يدوياً دون تكرار المبيعات المسجلة.' : 'No verified shift/cashier POS feed is connected. Enter totals manually, and do not duplicate already posted closing sales.'}</p>
-            {!useAutomaticSales && <div data-testid="offline-sales-audit" className="mt-3 space-y-3">
-              <div><Label htmlFor="quick-closing-cashSales" className="mb-1 block text-xs font-bold">{lang === 'fa' ? 'فروش نقدی امروز' : lang === 'ar' ? 'المبيعات النقدية اليوم' : 'Cash sales today'}</Label>
-                <ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} inputClassName="h-12 bg-white font-bold" /></div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-black text-slate-800">{lang === 'fa' ? 'فروش شبکه / کارت (اختیاری)' : lang === 'ar' ? 'مبيعات الشبكة / البطاقة (اختياري)' : 'Network / Card sales (optional)'}</p>
-                <p className="mt-1 text-[11px] text-slate-500">{lang === 'fa' ? 'اگر دستگاه POS ندارید، این مبلغ را صفر بگذارید.' : lang === 'ar' ? 'إن لم يكن لديك جهاز POS، اترك المبلغ صفراً.' : 'If no POS device was used, leave this at zero.'}</p>
-                {posEntries.map((entry, index) => <div key={entry.id} className="mt-2 flex min-w-0 items-center gap-2">
-                  <span className="min-w-0 flex-1"><ClosingNumericInput id={`quick-closing-network-${entry.id}`} value={entry.amount ?? ''} onChange={value => updatePos(entry.id, 'amount', value)} prefix={currency} inputClassName="h-11 bg-white font-bold" /></span>
-                  {index > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => removePos(entry.id)} disabled={isSubmitting} aria-label="Remove POS total"><Trash2 className="h-4 w-4" /></Button>}
-                </div>)}
-                <Button type="button" variant="outline" size="sm" onClick={addPos} disabled={isSubmitting} className="mt-2 min-h-10 bg-white"><PlusCircle className="mr-1.5 h-4 w-4" />{lang === 'fa' ? 'شبکه دیگر' : lang === 'ar' ? 'إضافة جهاز آخر' : 'Add another total'}</Button>
+            <div className="space-y-3 p-3.5 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-500">{lang === 'fa' ? 'روش ثبت' : lang === 'ar' ? 'طريقة الإدخال' : 'Entry mode'}</span>
+                <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1" role="group" aria-label="Sales entry mode">
+                  <button type="button" data-testid="sales-entry-manual" aria-pressed={salesEntryMode === 'manual'} className="min-h-9 rounded-md bg-white px-3 text-xs font-black text-blue-700 shadow-sm" onClick={() => setSalesEntryMode('manual')}>{lang === 'fa' ? 'دستی / آفلاین' : lang === 'ar' ? 'يدوي / أوفلاين' : 'Manual / Offline'}</button>
+                  <button type="button" data-testid="sales-entry-automatic" aria-pressed={salesEntryMode === 'automatic'} disabled={!automaticTotalsEnabled || Boolean(initial?.id)} className="min-h-9 rounded-md px-3 text-xs font-bold text-slate-500 disabled:opacity-60" onClick={() => setSalesEntryMode('automatic')}>{lang === 'fa' ? 'POS اتومات' : lang === 'ar' ? 'POS تلقائي' : 'Auto POS'}</button>
+                </div>
               </div>
-              {manualCashSales > 0 && <div>
-                <Label htmlFor="offline-sales-reference" className="mb-1 block text-xs font-bold">{lang === 'fa' ? 'توضیحات یا شماره رسید (اختیاری)' : lang === 'ar' ? 'ملاحظات أو رقم الإيصال (اختياري)' : 'Reference / note (optional)'}</Label>
-                <Textarea id="offline-sales-reference" className="min-h-14 bg-white" value={form.sales_notes || ''} onChange={e => set('sales_notes', e.target.value)} placeholder={lang === 'fa' ? 'مثلاً شماره رسید یا نام صندوق‌دار' : lang === 'ar' ? 'مثال: رقم الإيصال أو أمين الصندوق' : 'E.g. receipt number or cashier shift'} disabled={isSubmitting} />
+              <div data-testid="offline-sales-audit" className="grid min-w-0 grid-cols-2 gap-2.5">
+                <div className="min-w-0"><Label htmlFor="quick-closing-cashSales" className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'نقدی' : lang === 'ar' ? 'نقدي' : 'Cash'}</Label><ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} disabled={useAutomaticSales || isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" /></div>
+                <div className="min-w-0"><Label htmlFor={`quick-closing-network-${posEntries[0]?.id || 'empty'}`} className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : 'Network / Card'}</Label>
+                  {posEntries[0] && <ClosingNumericInput id={`quick-closing-network-${posEntries[0].id}`} value={posEntries[0].amount ?? ''} onChange={value => updatePos(posEntries[0].id, 'amount', value)} prefix={currency} disabled={isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" />}
+                </div>
+              </div>
+              {(posEntries.length > 1 || showNetworkDetail) && <div data-testid="closing-extra-network" className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                {posEntries.slice(1).map(entry => <div key={entry.id} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1"><ClosingNumericInput id={`quick-closing-network-${entry.id}`} value={entry.amount ?? ''} onChange={value => updatePos(entry.id, 'amount', value)} prefix={currency} disabled={isSubmitting} inputClassName="h-11 bg-white" /></span>
+                  <Button type="button" size="icon" variant="ghost" onClick={() => removePos(entry.id)} disabled={isSubmitting} aria-label="Remove network total"><Trash2 className="h-4 w-4" /></Button>
+                </div>)}
+                <Button type="button" variant="outline" size="sm" className="min-h-10 bg-white" onClick={addPos} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />{lang === 'fa' ? 'ترمینال دیگر' : lang === 'ar' ? 'إضافة جهاز' : 'Add network total'}</Button>
               </div>}
-            </div>}
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => {setShowFullDetails(true);}} className="flex min-h-12 min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label="Edit customer credit sales"><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'فروش قرضه' : lang === 'ar' ? 'البيع الآجل' : 'Credit sales'}</span><Money currency={currency} value={creditTotal} className="text-sm font-black text-violet-700" /></button>
+                <button type="button" onClick={() => setShowFullDetails(true)} className="flex min-h-12 min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label="Edit additional sales sources"><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'منابع دیگر' : lang === 'ar' ? 'مصادر أخرى' : 'Other sources'}</span><Money currency={currency} value={Math.max(0, totalSales - cashSales - networkTotal - creditTotal)} className="text-sm font-black text-slate-900" /></button>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <span className="text-[11px] text-slate-500">{lang === 'fa' ? 'POS اختیاری؛ فروش تکراری ثبت نکنید' : lang === 'ar' ? 'POS اختياري؛ تجنّب تكرار البيع' : 'POS optional · Do not duplicate posted sales'}</span>
+                <button type="button" className="min-h-9 text-[11px] font-bold text-blue-700 underline" onClick={() => setShowNetworkDetail(v => !v)} aria-expanded={showNetworkDetail} data-testid="closing-add-network-toggle">{showNetworkDetail ? (lang === 'fa' ? 'بستن' : lang === 'ar' ? 'إخفاء' : 'Hide') : (lang === 'fa' ? 'شبکه بیشتر' : lang === 'ar' ? 'شبكة إضافية' : 'More network')}</button>
+              </div>
+              {(manualCashSales > 0 || initial?.sales_notes) && <details className="rounded-lg border border-slate-100 p-2.5"><summary className="cursor-pointer text-[11px] font-bold text-slate-600">{lang === 'fa' ? 'یادداشت فروش (اختیاری)' : lang === 'ar' ? 'ملاحظات البيع (اختياري)' : 'Sale note / reference (optional)'}</summary><Textarea id="offline-sales-reference" value={form.sales_notes || ''} onChange={e => set('sales_notes', e.target.value)} className="mt-2 min-h-14 bg-white" disabled={isSubmitting} /></details>}
+            </div>
           </section>
 
           {ledgerOverdrawn && <div role="alert" data-testid="cash-ledger-overdrawn" className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-900"><p className="font-black">Cash ledger overdrawn · reconciliation required</p><p className="mt-1 text-xs leading-6">Expected Cash is {currency} {reconciliation.expectedCash.toLocaleString()} after Cash In and Cash Out. A physical drawer cannot be negative. Verify missing funding and cash movements in Cash Register before closing. This is not an ordinary overage.</p><Button type="button" size="sm" variant="outline" onClick={() => refetchCashLedger()} className="mt-2 min-h-10"><RefreshCw className="mr-1.5 h-4 w-4" />Recheck cash ledger</Button></div>}
