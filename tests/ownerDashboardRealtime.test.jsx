@@ -43,7 +43,7 @@ describe('owner dashboard manager record synchronization', () => {
     const count = readers.sales_report_period.mock.calls.length;
     await act(async () => mock.channels.at(-1).status('SUBSCRIBED'));
     expect(readers.sales_report_period.mock.calls.length).toBe(count + 1);
-    await act(async () => vi.advanceTimersByTimeAsync(15000));
+    await act(async () => vi.advanceTimersByTimeAsync(60000));
     expect(readers.sales_report_period.mock.calls.length).toBe(count + 2);
     expect(client.getQueryState(['sales_report_period','restaurant-b','branch']).isInvalidated).toBe(false);
   });
@@ -51,7 +51,7 @@ describe('owner dashboard manager record synchronization', () => {
     vi.useFakeTimers(); await mount(); const channel = mock.channels.at(-1);
     act(() => tree.unmount()); tree = null;
     const count = readers.sales_report_period.mock.calls.length;
-    await act(async () => { channel.handlers.daily_sales.callback({ eventType:'UPDATE', new:{} }); await vi.advanceTimersByTimeAsync(30000); });
+    await act(async () => { channel.handlers.daily_sales.callback({ eventType:'UPDATE', new:{} }); await vi.advanceTimersByTimeAsync(60000); });
     expect(readers.sales_report_period.mock.calls.length).toBe(count);
     expect(mock.removeChannel).toHaveBeenCalledWith(channel);
   });

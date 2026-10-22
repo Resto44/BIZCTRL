@@ -1,9 +1,28 @@
+import { driverSourceEntryAmounts } from '../salesSourceClosingLifecycle';
+
 const amount = (value) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : 0;
 };
 
 const money = (value) => Math.round(Math.max(0, amount(value)) * 100) / 100;
+
+// Sum posted amounts in minor units, including signed cash movements. Avoid
+// floating-point tails leaking into revenue, variance and settlement previews.
+export const sumClosingMoney = (...values) => values.reduce((sum, value) => sum + Math.round(amount(value) * 100), 0) / 100;
+
+/** Preserve each source's revenue policy when splitting driver tender rows. */
+export const closingSourceRevenueEntries = (summaries = []) => summaries.flatMap(({ source, today, driverEntries = [] }) => {
+  if (source.included_in_revenue === false) return [];
+  if (source.allows_driver_entries !== true) return [{ amount: today, payment_method: source.default_payment_method }];
+  return driverEntries.flatMap((entry) => {
+    const split = driverSourceEntryAmounts(entry);
+    return [
+      { amount: split.cash, payment_method: 'cash' },
+      { amount: split.network, payment_method: 'card' },
+    ];
+  });
+});
 
 export const PAYMENT_METHODS = Object.freeze({
   CASH: 'cash',
@@ -28,9 +47,10 @@ export const paymentMethodForCode = (value) => {
 };
 
 export const paymentBuckets = (entries = []) => entries.reduce((totals, entry) => {
+  if (entry?.included_in_revenue === false) return totals;
   const method = paymentMethodForCode(entry?.payment_method || entry?.payment_bucket || entry?.default_payment_method);
   const value = money(entry?.today_amount ?? entry?.amount);
-  totals[method] += value;
+  totals[method] = sumClosingMoney(totals[method], value);
   return totals;
 }, {
   [PAYMENT_METHODS.CASH]: 0,
@@ -45,8 +65,8 @@ export const paymentBuckets = (entries = []) => entries.reduce((totals, entry) =
 export const ledgerTotals = (movements = []) => movements.reduce((totals, movement) => {
   if (movement?.is_reversed) return totals;
   const value = money(movement?.amount);
-  if (String(movement?.direction || '').toLowerCase() === 'out') totals.cashOut += value;
-  else totals.cashIn += value;
+  if (String(movement?.direction || '').toLowerCase() === 'out') totals.cashOut = sumClosingMoney(totals.cashOut, value);
+  else totals.cashIn = sumClosingMoney(totals.cashIn, value);
   return totals;
 }, { cashIn: 0, cashOut: 0 });
 
@@ -105,20 +125,22 @@ export const cashReconciliationSnapshot = ({
   const ledger = ledgerTotals(ledgerMovements);
   const payments = paymentBuckets(revenueEntries);
   const explicitCredit = money(customerCredit);
-  const cashSales = money(currentCashSales) + payments.cash;
+  const cashSales = sumClosingMoney(money(currentCashSales), payments.cash);
   const cardSales = payments.card;
   const bankTransferSales = payments.bank_transfer;
   const onlineSales = payments.online;
   const walletSales = payments.wallet;
-  const creditSales = payments.credit + explicitCredit;
+  const creditSales = sumClosingMoney(payments.credit, explicitCredit);
   const otherSales = payments.other;
-  const revenueToday = cashSales + cardSales + bankTransferSales + onlineSales + walletSales + creditSales + otherSales;
+  const revenueToday = sumClosingMoney(cashSales, cardSales, bankTransferSales, onlineSales, walletSales, creditSales, otherSales);
   const opening = money(openingCash);
   // Do not clamp a physically impossible negative drawer expectation to zero.
   // The mismatch must be corrected in the scoped movement ledger, not shown as
   // a normal cash overage. Finalization is blocked independently by the RPC.
-  const expectedCash = Math.round((opening + ledger.cashIn + cashSales - ledger.cashOut) * 100) / 100;
-  const actual = actualCash === '' || actualCash === null || actualCash === undefined ? null : money(actualCash);
+  const expectedCash = sumClosingMoney(opening, ledger.cashIn, cashSales, -ledger.cashOut);
+  // Invalid or incomplete input must remain pending, never a fabricated zero.
+  const validActual = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(String(actualCash)) && Number.isFinite(Number(actualCash));
+  const actual = validActual ? money(actualCash) : null;
   const difference = actual === null || expectedCash < 0 ? null : Math.round((actual - expectedCash) * 100) / 100;
   const shortage = difference !== null && difference < 0 ? Math.abs(difference) : 0;
   const overage = difference !== null && difference > 0 ? difference : 0;
@@ -137,7 +159,7 @@ export const cashReconciliationSnapshot = ({
     walletSales,
     creditSales,
     otherSales,
-    nonCashSales: cardSales + bankTransferSales + onlineSales + walletSales,
+    nonCashSales: sumClosingMoney(cardSales, bankTransferSales, onlineSales, walletSales),
     revenueToday,
     expectedCash,
     actualCash: actual,

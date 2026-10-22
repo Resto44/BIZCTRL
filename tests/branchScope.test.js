@@ -43,7 +43,7 @@ describe('central branch UUID scope contract', () => {
     expect(dashboard).toContain("value={isAllBranches ? 'all' : selectedBranchId || 'all'}");
     expect(dashboard).toContain("queryKey: ['sales_report_period', activeRestaurant?.id, selectedBranchId, period.currentStart, period.currentEnd]");
     expect(dashboard).toContain("createQuery().eq('branch_id', selectedBranchId)");
-    expect(dashboard).toContain("createQuery().is('branch_id', null).eq(legacyColumn, selectedBranchKey)");
+    expect(dashboard).toContain("fetchPages((query) => query.is('branch_id', null).eq(legacyColumn, selectedBranchKey))");
   });
 
   it('keeps report analytics and linked operational routes on the same UUID scope', async () => {

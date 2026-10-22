@@ -71,7 +71,8 @@ describe('subscription UI and plan-change contract', () => {
     expect(billing).toContain('Loading subscription');
     expect(context).toContain('tenantReady, user?.id]);');
     expect(context).toContain('summaryRef.current?.found ? summaryRef.current : EMPTY_SUMMARY');
-    expect(context).toContain("window.addEventListener('focus', refreshWhenVisible)");
+    expect(context).toContain("document.addEventListener('visibilitychange', refreshWhenVisible)");
+    expect(context).not.toContain("window.addEventListener('focus', refreshWhenVisible)");
     expect(billing).toContain('paymentIntentInFlight.current');
   });
 

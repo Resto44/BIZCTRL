@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import TestRenderer, { act } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
@@ -81,7 +82,7 @@ describe('ProductMasterForm runtime render', () => {
     await act(async () => {
       renderer = TestRenderer.create(
         <QueryClientProvider client={queryClient}>
-          <ProductMasterForm onSubmit={vi.fn()} onCancel={vi.fn()} />
+          <MemoryRouter><ProductMasterForm onSubmit={vi.fn()} onCancel={vi.fn()} /></MemoryRouter>
         </QueryClientProvider>,
       );
       await Promise.resolve();
@@ -116,7 +117,7 @@ it('generates a retail draft barcode, keeps it in the form payload, and never ov
   const onSubmit = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   let renderer;
-  await act(async () => { renderer = TestRenderer.create(<QueryClientProvider client={client}><ProductMasterForm onSubmit={onSubmit} onCancel={vi.fn()} /></QueryClientProvider>); });
+  await act(async () => { renderer = TestRenderer.create(<QueryClientProvider client={client}><MemoryRouter><ProductMasterForm onSubmit={onSubmit} onCancel={vi.fn()} /></MemoryRouter></QueryClientProvider>); });
   const button = (label) => renderer.root.findAllByType('button').find((item) => nodeText(item).trim() === label);
   await act(async () => button('Generate barcode').props.onClick());
   expect(fixture.createBarcode).toHaveBeenCalledWith({ restaurantId: 'restaurant-1' });

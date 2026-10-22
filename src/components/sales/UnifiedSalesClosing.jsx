@@ -41,13 +41,13 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import {
-  Store, Trash2,
+  Trash2,
   CheckCircle2,
   AlertCircle,
   AlertTriangle,
   ChevronDown, ChevronUp,
   Loader2, RefreshCw, Save, X, PlusCircle,
-  WalletCards, ClipboardCheck,
+  ClipboardCheck,
   Banknote, CreditCard, Network, ShieldCheck,
   Building2, Bike, MoreHorizontal, Coins, FileText, ChevronRight,
 } from 'lucide-react';
@@ -59,10 +59,11 @@ import { buildSalesSourceClosingSnapshots, driverSourceEntryAmounts, driverSourc
 import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
 import CustomerCreditSalesSource from '@/components/sales/CustomerCreditSalesSource';
 import CashReconciliationPanel from '@/components/sales/CashReconciliationPanel';
+import ClosingControlOverview from '@/components/sales/ClosingControlOverview';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { hasCanonicalCustomerScope, loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
 import { recordCustomerReceivablePayment, invalidateCustomerReceivableQueries, customerDebtPaymentErrorMessage } from '@/lib/debt/customerReceivableRepository';
-import { cashReconciliationSnapshot, paymentMethodForCode } from '@/lib/closing/CashReconciliationLedger';
+import { cashReconciliationSnapshot, paymentMethodForCode, closingSourceRevenueEntries, sumClosingMoney } from '@/lib/closing/CashReconciliationLedger';
 import { salesSourceIconFor, salesSourceToneFor } from '@/lib/salesSourceAppearance';
 
 const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
@@ -149,13 +150,14 @@ export const NumInput = ClosingNumericInput;
 // MONEY — stable currency/number pairing for RTL and narrow screens
 // ─────────────────────────────────────────────────────────────────────────────
 function Money({ currency, value, className = '', signed = false }) {
-  const amount = Number(value) || 0;
+  if (value == null || value === '' || !Number.isFinite(Number(value))) return <span className={className}>—</span>;
+  const amount = Number(value);
   const sign = signed && amount > 0 ? '+' : amount < 0 ? '−' : '';
   return (
-    <span className={`inline-flex items-baseline gap-1 whitespace-nowrap tabular-nums ${className}`} dir="ltr">
+    <span className={`inline-flex max-w-full flex-wrap items-baseline gap-1 tabular-nums ${className}`} dir="ltr">
       {sign && <span>{sign}</span>}
       <span className="text-[0.78em] font-semibold tracking-wide opacity-75">{currency}</span>
-      <span>{Math.abs(amount).toLocaleString()}</span>
+      <span className="min-w-0 break-all">{Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
     </span>
   );
 }
@@ -366,6 +368,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const [showOpeningVerification, setShowOpeningVerification] = useState(false);
   const [showFinalizeReview, setShowFinalizeReview] = useState(false);
   const formRef = useRef(null);
+  const submissionInFlight = useRef(false);
   const workspaceTabActive = useWorkspaceTabActive();
   const assignedManagerBranch = useMemo(() => {
     if (!isManager) return null;
@@ -942,7 +945,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Manager (restaurant_id + branch). When isManager, scope by restaurant_id and branch.
   const purchasesEnabled = !!activeRestaurant?.id && !!form.date && !!selectedBranchId && !!form.branch;
 
-  const { data: approvedPurchasesForDateData, isLoading: purchasesLoading } = useQuery({
+  const { data: approvedPurchasesForDateData, isLoading: purchasesLoading, isError: purchasesUnavailable } = useQuery({
     queryKey: ['approved_purchases_for_date', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift],
     queryFn: async () => {
       if (!activeRestaurant?.id || !form.date || !selectedBranchId || !form.branch) return [];
@@ -1221,15 +1224,15 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const baseCashSales = useAutomaticSales ? automaticClosingSnapshot.cash : manualCashSales;
   const baseNetworkTotal = useAutomaticSales ? automaticClosingSnapshot.network : manualNetworkTotal;
   const baseCreditTotal = (useAutomaticSales ? automaticClosingSnapshot.credit : 0) + manualCreditTotal;
-  const cashSales = baseCashSales + customSourcePaymentTotals.cash;
-  const cardTotal = baseNetworkTotal + customSourcePaymentTotals.card;
+  const cashSales = sumClosingMoney(baseCashSales, customSourcePaymentTotals.cash);
+  const cardTotal = sumClosingMoney(baseNetworkTotal, customSourcePaymentTotals.card);
   const bankTransferTotal = customSourcePaymentTotals.bank_transfer;
   const onlineTotal = customSourcePaymentTotals.online;
   const walletTotal = customSourcePaymentTotals.wallet;
-  const creditTotal = baseCreditTotal + customSourcePaymentTotals.credit;
+  const creditTotal = sumClosingMoney(baseCreditTotal, customSourcePaymentTotals.credit);
   const otherPaymentTotal = (useAutomaticSales ? automaticClosingSnapshot.other : 0) + customSourcePaymentTotals.other;
-  const networkTotal = cardTotal + bankTransferTotal + onlineTotal + walletTotal;
-  const totalSales = cashSales + networkTotal + creditTotal + otherPaymentTotal;
+  const networkTotal = sumClosingMoney(cardTotal, bankTransferTotal, onlineTotal, walletTotal);
+  const totalSales = sumClosingMoney(cashSales, networkTotal, creditTotal, otherPaymentTotal);
 
   useEffect(() => {
     if (!initial?.id && cashLedgerContext.opening_cash !== undefined && cashLedgerContext.opening_cash !== null) setOpeningCash(String(cashLedgerContext.opening_cash));
@@ -1268,15 +1271,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       { amount: baseNetworkTotal, payment_method: 'card' },
       { amount: baseCreditTotal, payment_method: 'credit' },
       ...(useAutomaticSales ? [{ amount: automaticClosingSnapshot.other, payment_method: 'other' }] : []),
-      ...customSourceSummaries.flatMap(({ source, today, driverEntries }) => source.allows_driver_entries === true
-        ? driverEntries.flatMap((entry) => {
-          const amounts = driverSourceEntryAmounts(entry);
-          return [
-            ...(amounts.cash > 0 ? [{ amount: amounts.cash, payment_method: 'cash' }] : []),
-            ...(amounts.network > 0 ? [{ amount: amounts.network, payment_method: 'card' }] : []),
-          ];
-        })
-        : [{ amount: today, payment_method: source.default_payment_method }]),
+      ...closingSourceRevenueEntries(customSourceSummaries),
     ],
     actualCash: actualCount,
     branchWalletAvailable,
@@ -1302,7 +1297,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const closingCash = actualCount !== null && cashContextReady && !ledgerOverdrawn ? actualCount : null;
   const remainingDifference = cashDifference;
   // Funding never changes this result; it is a settlement flow, not revenue.
-  const operatingResult = totalSales - totalDailyExpenses;
+  const operatingResult = sumClosingMoney(totalSales, -totalDailyExpenses);
 
   // Validation checks
   const validations = useMemo(() => [
@@ -1397,6 +1392,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submissionInFlight.current) return;
     const savingDraft = requestedClosingState === 'draft';
 
     const invalidCredit = customerCreditSales.find((entry) => {
@@ -1498,6 +1494,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     // The DB should handle nulls or use its own defaults.
     console.log('[UnifiedSalesClosing] Proceeding with save...');
 
+    submissionInFlight.current = true;
     setIsSubmitting(true);
     try {
       if (customerCreditSales.some((entry) => (Number(entry.amount) || 0) > 0 && entry.customer_id)) {
@@ -1638,6 +1635,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       }
       toast.error(userMessage);
     } finally {
+      submissionInFlight.current = false;
       setIsSubmitting(false);
     }
   };
@@ -1738,6 +1736,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
           </header>
 
+          <ClosingControlOverview lang={lang} currency={currency} totalSales={totalSales} expectedCash={expectedCash} actualCash={actualCount} difference={cashDifference} ledgerOverdrawn={ledgerOverdrawn}
+            onSales={() => document.getElementById('quick-closing-cashSales')?.focus()}
+            onCash={() => document.getElementById('quick-closing-actualCash')?.focus()}
+            onReview={() => { document.getElementById('sales-closing-actions')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); document.getElementById('sales-closing-actions')?.focus({ preventScroll: true }); }} />
+
           <section id="closing-readiness-anchor" data-testid="closing-readiness-summary" className={`flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 ${allValid ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50/75'}`}>
             <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${allValid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}><ShieldCheck className="h-4 w-4" /></span>
             <div className="min-w-0 flex-1">
@@ -1769,7 +1772,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                   <button type="button" data-testid="sales-entry-automatic" aria-pressed={salesEntryMode === 'automatic'} disabled={!automaticTotalsEnabled || Boolean(initial?.id)} className="min-h-9 rounded-md px-3 text-xs font-bold text-slate-500 disabled:opacity-60" onClick={() => setSalesEntryMode('automatic')}>{lang === 'fa' ? 'POS اتومات' : lang === 'ar' ? 'POS تلقائي' : 'Auto POS'}</button>
                 </div>
               </div>
-              <div data-testid="offline-sales-audit" className="grid min-w-0 grid-cols-2 gap-2.5">
+              <div data-testid="offline-sales-audit" className="grid min-w-0 grid-cols-1 gap-2.5 min-[360px]:grid-cols-2">
                 <div className="min-w-0"><Label htmlFor="quick-closing-cashSales" className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'نقدی' : lang === 'ar' ? 'نقدي' : 'Cash'}</Label><ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} disabled={useAutomaticSales || isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" /></div>
                 <div className="min-w-0"><Label htmlFor={`quick-closing-network-${posEntries[0]?.id || 'empty'}`} className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : 'Network / Card'}</Label>
                   {posEntries[0] && <ClosingNumericInput id={`quick-closing-network-${posEntries[0].id}`} value={posEntries[0].amount ?? ''} onChange={value => updatePos(posEntries[0].id, 'amount', value)} prefix={currency} disabled={isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" />}
@@ -1783,8 +1786,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 <Button type="button" variant="outline" size="sm" className="min-h-10 bg-white" onClick={addPos} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />{lang === 'fa' ? 'ترمینال دیگر' : lang === 'ar' ? 'إضافة جهاز' : 'Add network total'}</Button>
               </div>}
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => {setShowFullDetails(true);}} className="flex min-h-12 min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label="Edit customer credit sales"><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'فروش قرضه' : lang === 'ar' ? 'البيع الآجل' : 'Credit sales'}</span><Money currency={currency} value={creditTotal} className="text-sm font-black text-violet-700" /></button>
-                <button type="button" onClick={() => setShowFullDetails(true)} className="flex min-h-12 min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label="Edit additional sales sources"><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'منابع دیگر' : lang === 'ar' ? 'مصادر أخرى' : 'Other sources'}</span><Money currency={currency} value={Math.max(0, totalSales - cashSales - networkTotal - creditTotal)} className="text-sm font-black text-slate-900" /></button>
+                <button type="button" onClick={() => {setShowFullDetails(true);}} className="flex min-h-12 min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label="Edit customer credit sales"><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'فروش قرضه' : lang === 'ar' ? 'البيع الآجل' : 'Credit sales'}</span><Money currency={currency} value={creditTotal} className="text-sm font-black text-violet-700" /></button>
+                <button type="button" onClick={() => setShowFullDetails(true)} className="flex min-h-12 min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label="Edit additional sales sources"><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'منابع دیگر' : lang === 'ar' ? 'مصادر أخرى' : 'Other sources'}</span><Money currency={currency} value={Math.max(0, totalSales - cashSales - networkTotal - creditTotal)} className="text-sm font-black text-slate-900" /></button>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <span className="text-[11px] text-slate-500">{lang === 'fa' ? 'POS اختیاری؛ فروش تکراری ثبت نکنید' : lang === 'ar' ? 'POS اختياري؛ تجنّب تكرار البيع' : 'POS optional · Do not duplicate posted sales'}</span>
@@ -1828,7 +1831,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               <span role="status" className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-black ${cashDifference === null ? 'bg-slate-100 text-slate-600' : cashDifference === 0 ? 'bg-emerald-50 text-emerald-700' : cashDifference < 0 ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{cashDifference === null ? (lang === 'fa' ? 'در انتظار' : lang === 'ar' ? 'قيد الانتظار' : 'Pending') : cashDifference === 0 ? (lang === 'fa' ? 'تطبیق' : lang === 'ar' ? 'متطابق' : 'Balanced') : cashDifference < 0 ? (lang === 'fa' ? 'کسری' : lang === 'ar' ? 'عجز' : 'Short') : (lang === 'fa' ? 'اضافه' : lang === 'ar' ? 'فائض' : 'Over')}</span>
             </div>
             <div className="space-y-3 p-3.5 sm:p-5">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl bg-slate-50 p-3 text-xs">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-2 min-[480px]:grid-cols-2 rounded-xl bg-slate-50 p-3 text-xs">
                 <div className="flex items-center justify-between gap-2"><span className="text-slate-500">{lang === 'fa' ? 'افتتاحیه' : lang === 'ar' ? 'الافتتاحي' : 'Opening'}</span><strong className="tabular-nums text-slate-900">{cashContextReady ? (opening ?? 0).toLocaleString() : '—'}</strong></div>
                 <div className="flex items-center justify-between gap-2"><span className="text-slate-500">{lang === 'fa' ? 'فروش نقدی' : lang === 'ar' ? 'بيع نقدي' : 'Cash Sales'}</span><strong className="tabular-nums text-slate-900">{reconciliation.cashSales.toLocaleString()}</strong></div>
                 <div className="flex items-center justify-between gap-2"><span className="text-slate-500">{lang === 'fa' ? 'ورود نقد' : lang === 'ar' ? 'نقد وارد' : 'Cash In'}</span><strong className="tabular-nums text-slate-900">{reconciliation.cashIn.toLocaleString()}</strong></div>
@@ -1838,15 +1841,29 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 <span className="text-xs font-bold text-blue-900">{lang === 'fa' ? 'موجودی مورد انتظار' : lang === 'ar' ? 'النقد المتوقع' : 'Expected Cash'}</span>
                 {expectedCash === null ? <span className="text-xs font-bold text-amber-700">{lang === 'fa' ? 'نامعلوم / نیاز به بررسی' : lang === 'ar' ? 'بحاجة للمراجعة' : 'Awaiting verified opening'}</span> : <Money currency={currency} value={expectedCash} className="text-lg font-black text-blue-800" />}
               </div>
-              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+              <div className="grid min-w-0 grid-cols-1 min-[480px]:grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
                 <div className="min-w-0"><Label htmlFor="quick-closing-actualCash" className="mb-1.5 block text-xs font-black text-slate-800">{lang === 'fa' ? 'پول واقعی صندوق *' : lang === 'ar' ? 'النقد الفعلي *' : 'Actual Cash *'}</Label><ClosingNumericInput id="quick-closing-actualCash" value={actualCashCount} onChange={handleActualCashChange} prefix={currency} inputClassName="h-14 min-w-0 border-blue-300 bg-white text-lg font-black" disabled={isSubmitting} /></div>
-                <div className="min-w-[5.5rem] rounded-xl bg-slate-50 px-2.5 py-2 text-right"><p className="text-[10px] font-bold text-slate-500">{lang === 'fa' ? 'اختلاف' : lang === 'ar' ? 'الفرق' : 'Variance'}</p>{cashDifference === null ? <span className="text-lg font-black text-slate-400">—</span> : <Money currency={currency} value={cashDifference} signed className={`text-lg font-black ${cashDifference === 0 ? 'text-emerald-700' : cashDifference < 0 ? 'text-red-700' : 'text-amber-700'}`} />}</div>
+                <div className="min-w-0 rounded-xl bg-slate-50 px-2.5 py-2 text-right"><p className="text-[10px] font-bold text-slate-500">{lang === 'fa' ? 'اختلاف' : lang === 'ar' ? 'الفرق' : 'Variance'}</p>{cashDifference === null ? <span className="text-lg font-black text-slate-400">—</span> : <Money currency={currency} value={cashDifference} signed className={`text-lg font-black ${cashDifference === 0 ? 'text-emerald-700' : cashDifference < 0 ? 'text-red-700' : 'text-amber-700'}`} />}</div>
               </div>
               {inlineErrors.actualCash && <p role="alert" className="text-xs font-bold text-red-700">{inlineErrors.actualCash}</p>}
               {openingReviewRequired && <button type="button" className="flex min-h-11 w-full items-center justify-between rounded-lg border border-amber-200 px-3 text-left text-xs font-bold text-amber-800" onClick={() => setShowOpeningVerification(v => !v)}>{lang === 'fa' ? 'تأیید Opening Cash لازم است' : lang === 'ar' ? 'يلزم توثيق النقد الافتتاحي' : 'Opening count requires review'}<ChevronRight className="h-4 w-4" /></button>}
               <button type="button" data-testid="closing-reconciliation-details" className="flex min-h-10 w-full items-center justify-between text-left text-xs font-bold text-blue-700" onClick={() => setShowFullDetails(true)}>{lang === 'fa' ? 'دفتر صندوق، کسری و اضافه، تسویه' : lang === 'ar' ? 'دفتر النقد، العجز والزيادة والتسوية' : 'Cash ledger, variance notes & settlements'}<ChevronRight className="h-4 w-4" /></button>
             </div>
           </section>
+
+          <details className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5" data-testid="closing-operating-statement" data-i18n-skip="true">
+            <summary className="min-h-11 cursor-pointer text-sm font-bold text-slate-900">{lang === 'fa' ? 'خریدها و مصارف' : lang === 'ar' ? 'المشتريات والمصروفات' : <>Expenses &amp; purchases</>}</summary>
+            {cashContextReady && !purchasesLoading && !purchasesUnavailable ? <dl className="mt-2 space-y-3 text-sm">
+              {[
+                [lang === 'fa' ? 'خریدهای تأییدشده' : lang === 'ar' ? 'المشتريات المعتمدة' : 'Approved purchases', approvedPurchasesTotal],
+                [lang === 'fa' ? 'سهم روزانه مصارف ثابت' : lang === 'ar' ? 'نصيب اليوم من المصروفات الثابتة' : 'Daily fixed expense allocation', fixedExpensesToday],
+                [lang === 'fa' ? 'مصارف متغیر امروز' : lang === 'ar' ? 'المصروفات المتغيرة اليوم' : 'Today variable expenses', variableExpensesToday],
+              ].map(([label, value]) => <div key={label} className="flex flex-wrap justify-between gap-2"><dt className="text-slate-600">{label}</dt><dd><Money currency={currency} value={value} className="font-semibold" /></dd></div>)}
+              <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-3"><dt className="font-bold">{lang === 'fa' ? 'مجموع هزینه روز' : lang === 'ar' ? 'إجمالي تكلفة اليوم' : 'Total daily expenses'}</dt><dd><Money currency={currency} value={totalDailyExpenses} className="font-bold" /></dd></div>
+              <div className="flex flex-wrap justify-between gap-2"><dt className="font-bold">{lang === 'fa' ? 'نتیجه عملیاتی تخمینی' : lang === 'ar' ? 'النتيجة التشغيلية التقديرية' : 'Estimated operating result'}</dt><dd><Money currency={currency} value={operatingResult} signed className="font-bold" /></dd></div>
+            </dl> : <p role="status" className="mt-2 text-sm text-amber-800">{lang === 'fa' ? 'نتیجه تا بارگذاری خریدها و دفتر نقد قابل تأیید نیست.' : lang === 'ar' ? 'لا يمكن تأكيد النتيجة قبل تحميل المشتريات ودفتر النقد.' : 'The result is unavailable until purchases and the cash ledger are loaded.'}</p>}
+            <p className="mt-3 text-xs leading-5 text-slate-500">{lang === 'fa' ? 'بر مبنای خرید و مصارف ثبت‌شده؛ سود حسابداری نهایی نیست. نقد صندوق فقط با حرکات ثبت‌شده نقدی تغییر می‌کند.' : lang === 'ar' ? 'على أساس المشتريات والمصروفات المسجلة؛ ليست الربح المحاسبي النهائي. لا يتغير نقد الصندوق إلا بحركات نقدية مسجلة.' : 'Purchase-basis management estimate, not final accounting profit. Drawer cash changes only through posted cash movements.'}</p>
+          </details>
 
           <section data-testid="quick-closing-auto-summary" className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5">
             <button type="button" className="flex min-h-12 w-full items-center justify-between gap-3 text-left" onClick={() => setShowFullDetails(true)} aria-label="Open advanced closing records" data-testid="closing-open-advanced-secondary">
@@ -1920,6 +1937,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               <span className="text-slate-600">{lang === 'fa' ? 'فروش نقدی' : lang === 'ar' ? 'المبيعات النقدية' : 'Cash Sales'}</span><Money currency={currency} value={cashSales} className="text-right font-black" />
               <span className="text-slate-600">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : 'Network / Card'}</span><Money currency={currency} value={networkTotal} className="text-right font-black" />
               <span className="text-slate-600">{lang === 'fa' ? 'فروش قرضه' : lang === 'ar' ? 'المبيعات الآجلة' : 'Customer Credit'}</span><Money currency={currency} value={creditTotal} className="text-right font-black" />
+              {otherPaymentTotal !== 0 && <><span className="text-slate-600">{lang === 'fa' ? 'سایر فروش‌ها' : lang === 'ar' ? 'مبيعات أخرى' : 'Other sales'}</span><Money currency={currency} value={otherPaymentTotal} className="text-right font-black" /></>}
               <span className="font-black text-slate-900">{lang === 'fa' ? 'مجموع فروش' : lang === 'ar' ? 'إجمالي المبيعات' : 'Sales total'}</span><Money currency={currency} value={totalSales} className="text-right text-sm font-black text-blue-700" />
             </div>
             <div className="grid grid-cols-2 gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs">

@@ -118,11 +118,11 @@ describe('Unified Sales Closing workflow contract', () => {
       source('../src/components/sales/CashReconciliationPanel.jsx'),
     ]);
 
-    expect(workspace).toContain('cashSales + networkTotal + creditTotal + otherPaymentTotal');
+    expect(workspace).toContain('sumClosingMoney(cashSales, networkTotal, creditTotal, otherPaymentTotal)');
     expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
     expect(workspace).toContain('const cashDifference = !cashContextReady || ledgerOverdrawn ? null : reconciliation.difference;');
     expect(workspace).toContain('const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;');
-    expect(workspace).toContain('const operatingResult = totalSales - totalDailyExpenses;');
+    expect(workspace).toContain('const operatingResult = sumClosingMoney(totalSales, -totalDailyExpenses);');
     expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
     expect(reconciliationPanel).toContain('Actual Cash');
     expect(reconciliationPanel).toContain('No settlement required');
@@ -144,12 +144,12 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(context).toContain('p_branch_id: selectedBranchId');
     expect(workspace).toContain('paymentBucketForCode(source.default_payment_method)');
     expect(workspace).toContain('const customSourcePaymentTotals = useMemo(() =>');
-    expect(workspace).toContain('const cashSales = baseCashSales + customSourcePaymentTotals.cash;');
-    expect(workspace).toContain('const cardTotal = baseNetworkTotal + customSourcePaymentTotals.card;');
+    expect(workspace).toContain('const cashSales = sumClosingMoney(baseCashSales, customSourcePaymentTotals.cash);');
+    expect(workspace).toContain('const cardTotal = sumClosingMoney(baseNetworkTotal, customSourcePaymentTotals.card);');
     expect(workspace).toContain('const bankTransferTotal = customSourcePaymentTotals.bank_transfer;');
     expect(workspace).toContain('const onlineTotal = customSourcePaymentTotals.online;');
     expect(workspace).toContain('const walletTotal = customSourcePaymentTotals.wallet;');
-    expect(workspace).toContain('const creditTotal = baseCreditTotal + customSourcePaymentTotals.credit;');
+    expect(workspace).toContain('const creditTotal = sumClosingMoney(baseCreditTotal, customSourcePaymentTotals.credit);');
     expect(workspace).toContain('buildSalesSourceClosingSnapshots(customSourceSummaries');
     expect(workspace).toContain("payment_bucket: snapshot.allows_driver_entries === true ? 'other' : paymentBucketForCode(snapshot.default_payment_method)");
     expect(workspace).toContain('salesSourceTodayTotal(customSourceSummaries)');
@@ -454,7 +454,7 @@ describe('Sales source daily and historical balance contract', () => {
     expect(workspace).toContain("salesSourceAmountForBucket(initial, 'cash')");
     expect(workspace).toContain('const baseCash = initial?.id');
     expect(workspace).toContain('Remove their saved daily snapshot before the live source');
-    expect(workspace).toContain('const cashSales = baseCashSales + customSourcePaymentTotals.cash;');
+    expect(workspace).toContain('const cashSales = sumClosingMoney(baseCashSales, customSourcePaymentTotals.cash);');
   });
 
   it('keeps each Today input mounted and focused while its raw amount string changes', async () => {
