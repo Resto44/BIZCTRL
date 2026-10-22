@@ -49,7 +49,7 @@ describe('Sales Closing: POS optional, manual/offline available', () => {
     expect(src).toContain('p_cashier_id: effectiveCashierId');
     expect(src).toContain("cashLedgerContext.opening_verified === true");
     expect(src).toContain("if (!savingDraft && actualCount === null) nextErrors.actualCash");
-    expect(src).toContain("cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn || !allValid");
+    expect(src).toContain("!allValid || !cashContextReady || cashDifference === null || ledgerOverdrawn");
     expect(src).not.toContain("nextErrors.sales_notes =");
     expect(src).not.toContain("if (isManager && (custLoading || posLoading))");
     expect(src).not.toContain("No posted ERP cash sales were found.");
