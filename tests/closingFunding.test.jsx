@@ -3,7 +3,7 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { closingFundingProposal, activeClosingNetworkAccounts, validClosingNetworkEntries } from '@/lib/closing/ClosingFunding';
+import { closingFundingProposal, activeClosingNetworkAccounts, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
 import { cashReconciliationSnapshot } from '@/lib/closing/CashReconciliationLedger';
 const mock=vi.hoisted(()=>({rpc:vi.fn()}));
 vi.mock('@/api/supabaseClient',()=>({supabase:{rpc:mock.rpc}}));
@@ -11,6 +11,14 @@ import ClosingFundingPanel from '@/components/sales/ClosingFundingPanel';
 let tree,client;
 afterEach(()=>{if(tree)act(()=>tree.unmount());tree=null;client?.clear();sessionStorage.clear();vi.clearAllMocks();});
 describe('closing funding and networks',()=>{
+ it('includes standalone owner receipts in a new closing and excludes only its linked settlement',()=>{
+  const standalone={direction:'in',amount:247,movement_type:'owner_injection',source_module:'OwnerCashInjection',source_document_id:null};
+  expect(isClosingSettlementMovement(standalone,null)).toBe(false);
+  expect(isClosingSettlementMovement(standalone,'closing')).toBe(false);
+  expect(isClosingSettlementMovement({...standalone,source_document_id:'closing'},'closing')).toBe(true);
+  const movements=[standalone].filter(m=>!isClosingSettlementMovement(m,null));
+  expect(cashReconciliationSnapshot({ledgerMovements:movements,actualCash:247})).toMatchObject({expectedCash:247,difference:0});
+ });
  it('shows both the minimum deficit and the funding matching an unchanged physical count',()=>{
   expect(closingFundingProposal(-152,95)).toEqual({minimum:152,toCount:247});
   expect(closingFundingProposal(null,null)).toEqual({minimum:0,toCount:null});

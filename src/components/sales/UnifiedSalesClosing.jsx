@@ -61,7 +61,7 @@ import CustomerCreditSalesSource from '@/components/sales/CustomerCreditSalesSou
 import CashReconciliationPanel from '@/components/sales/CashReconciliationPanel';
 import ClosingControlOverview from '@/components/sales/ClosingControlOverview';
 import ClosingFundingPanel from '@/components/sales/ClosingFundingPanel';
-import { activeClosingNetworkAccounts, validClosingNetworkEntries } from '@/lib/closing/ClosingFunding';
+import { activeClosingNetworkAccounts, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { hasCanonicalCustomerScope, loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
 import { recordCustomerReceivablePayment, invalidateCustomerReceivableQueries, customerDebtPaymentErrorMessage } from '@/lib/debt/customerReceivableRepository';
@@ -1268,15 +1268,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const operatingExpensesTotal = fixedExpensesToday + variableExpensesToday;
   const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;
   const branchWalletAvailable = Math.max(0, Number(cashLedgerContext.branch_wallet_available) || 0);
-  const isCurrentClosingOwnerSettlementMovement = (movement) => (
-    movement?.movement_type === 'owner_injection'
-    && movement?.source_module === 'OwnerCashInjection'
-    && movement?.source_document_id === currentClosingId
-  );
   const reconciliation = cashReconciliationSnapshot({
     openingCash: opening ?? 0,
     ledgerMovements: asRecordArray(cashLedgerContext.movements).filter(
-      (movement) => !isCurrentClosingOwnerSettlementMovement(movement),
+      (movement) => !isClosingSettlementMovement(movement, currentClosingId),
     ),
     currentCashSales: baseCashSales,
     revenueEntries: [

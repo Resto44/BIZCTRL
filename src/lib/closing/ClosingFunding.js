@@ -19,3 +19,11 @@ export function validClosingNetworkEntries(entries, accounts) {
     (/^\d+(?:\.\d{1,2})?$/.test(String(e.amount)) && Number.isFinite(Number(e.amount)) &&
       (Number(e.amount) === 0 || ids.has(e.network_account_id || e.device_id))));
 }
+
+// Standalone receipts have no closing document ID. A new unsaved closing also
+// has no ID; those two nulls must never classify a receipt as its settlement.
+export function isClosingSettlementMovement(movement, closingId) {
+  return Boolean(closingId) && movement?.movement_type === 'owner_injection'
+    && movement?.source_module === 'OwnerCashInjection'
+    && movement?.source_document_id === closingId;
+}
