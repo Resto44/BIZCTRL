@@ -44,17 +44,17 @@ const COPY = {
 
 export default function OwnerOrderSourcesAnalytics({
   sales = [], revenueSources = [], verifiedSales = 0,
-  formatMoney, lang = 'en', periodLabel = '', hasQueryError = false,
+  formatMoney, lang = 'en', periodLabel = '', hasQueryError = false, report: sharedReport = null,
 }) {
   const navigate = useNavigate();
   const copy = COPY[lang] || COPY.en;
   const report = useMemo(
-    () => buildOwnerOrderSourceAnalytics({ sales, revenueSources, verifiedSales, lang }),
-    [sales, revenueSources, verifiedSales, lang],
+    () => sharedReport || buildOwnerOrderSourceAnalytics({ sales, revenueSources, verifiedSales, lang }),
+    [sharedReport, sales, revenueSources, verifiedSales, lang],
   );
   const leading = report.sources[0];
   return (
-    <section data-testid="snapshot-order-sources-analytics" className="min-w-0 rounded-[1.55rem] border border-border/80 bg-card p-3.5 shadow-sm sm:p-5">
+    <section id="owner-order-sources-analytics" data-testid="snapshot-order-sources-analytics" className="min-w-0 rounded-[1.55rem] border border-border/80 bg-card p-3.5 shadow-sm sm:p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-600 text-white"><Layers3 className="h-5 w-5" /></div>
