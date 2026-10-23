@@ -179,14 +179,14 @@ function computeCash(scope, sources, completeness, issues, sales, saleDetails) {
 export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, completeness = {}, legacy = {} } = {}) {
   const scope = validateShadowScope(rawScope);
   const issues = [];
-  const missing = VALID_METRICS.length && ['daily_sales', 'supplier_invoices', 'inventory_transactions', 'expenses', 'payroll_runs', 'cash_movements', 'debt_records', 'wallet_transactions']
+  const missing = ['daily_sales', 'supplier_invoices', 'inventory_transactions', 'expenses', 'payroll_runs', 'cash_movements', 'debt_records', 'wallet_transactions']
     .filter(table => !sourceReady(completeness, table));
   for (const table of missing) issues.push({ code: 'SOURCE_NOT_ATTESTED_COMPLETE', table });
 
   const sales = distinctById(scopeRows(sources.daily_sales || [], scope, 'daily_sales', issues, { shiftScoped: true })
     .filter(row => state(row) === 'finalized' || (state(row) === 'locked' && row.legacy_lock_verified === true)), 'daily_sales', issues);
   const saleDetails = sales.map(row => closingCents(row, issues)).filter(Boolean);
-  const saleVerified = sourceReady(completeness, 'daily_sales') && !issueExists(issues, ['daily_sales']) && saleDetails.length === sales.length;
+  const saleVerified = sourceReady(completeness, 'daily_sales') && completeness.salesPostingCertified === true && completeness.refundsCertified === true && !issueExists(issues, ['daily_sales']) && saleDetails.length === sales.length;
   const saleTotal = sum(saleDetails.map(x => x.total));
 
   const purchases = distinctById(scopeRows(sources.supplier_invoices || [], scope, 'supplier_invoices', issues), 'supplier_invoices', issues);
@@ -220,6 +220,7 @@ export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, comple
   const payroll = distinctById(scopeRows(sources.payroll_runs || [], scope, 'payroll_runs', issues, { dated: false }), 'payroll_runs', issues)
     .filter(row => ['finalized', 'paid'].includes(status(row)) && (!row.month || (row.month >= scope.from.slice(0, 7) && row.month <= scope.to.slice(0, 7))));
   const payrollVals = payroll.map(row => {
+    if (!row.month) issues.push({ code: 'PAYROLL_MONTH_MISSING', table: 'payroll_runs', id: row.id });
     const base = integer(row.base_salary), bonuses = integer(row.bonuses ?? 0), deductions = integer(row.deductions ?? 0);
     if (base === null || bonuses === null || deductions === null) {
       issues.push({ code: 'PAYROLL_ACCRUAL_INCOMPLETE', table: 'payroll_runs', id: row.id });
@@ -232,15 +233,15 @@ export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, comple
     !issueExists(issues, ['payroll_runs']) && !scope.shift && scope.from.endsWith('-01') &&
     completeness.payrollPeriodCertified === true;
 
-  const salesM = metric(saleTotal, saleVerified, 'finalized_closing_payment_buckets', saleVerified ? null : 'SALES_SCOPE_INCOMPLETE');
-  const purchaseM = metric(sum(purchaseVals), purchaseVerified, 'approved_supplier_receipts', purchaseVerified ? null : 'PURCHASE_SCOPE_INCOMPLETE');
-  const cogsM = metric(valuedCOGS, cogsVerified, 'valued_recipe_consumption', cogsVerified ? null : 'VALUATION_NOT_CERTIFIED');
-  const expenseM = metric(sum(expenseVals.filter(v => v !== null)), expVerified, 'approved_posted_expenses', expVerified ? null : 'EXPENSE_ALLOCATION_NOT_CERTIFIED');
-  const payrollM = metric(sum(payrollVals.filter(v => v !== null)), payrollVerified, 'finalized_payroll_accrual', payrollVerified ? null : 'PAYROLL_PERIOD_NOT_CERTIFIED');
+  const salesM = metric(sourceReady(completeness, 'daily_sales') && saleDetails.length === sales.length ? saleTotal : null, saleVerified, 'finalized_closing_payment_buckets', saleVerified ? null : 'SALES_SCOPE_INCOMPLETE');
+  const purchaseM = metric(sourceReady(completeness, 'supplier_invoices') && !issueExists(issues, ['supplier_invoices']) ? sum(purchaseVals) : null, purchaseVerified, 'approved_supplier_receipts', purchaseVerified ? null : 'PURCHASE_SCOPE_INCOMPLETE');
+  const cogsM = metric(sourceReady(completeness, 'inventory_transactions') && consumed.length && cogsVals.every(v => v !== null) ? valuedCOGS : cogsVerified ? 0 : null, cogsVerified, 'valued_recipe_consumption', cogsVerified ? null : 'VALUATION_NOT_CERTIFIED');
+  const expenseM = metric(sourceReady(completeness, 'expenses') && expenseVals.every(v => v !== null) ? sum(expenseVals) : null, expVerified, 'approved_posted_expenses', expVerified ? null : 'EXPENSE_ALLOCATION_NOT_CERTIFIED');
+  const payrollM = metric(sourceReady(completeness, 'payroll_runs') && payrollVals.every(v => v !== null) ? sum(payrollVals) : null, payrollVerified, 'finalized_payroll_accrual', payrollVerified ? null : 'PAYROLL_PERIOD_NOT_CERTIFIED');
   const grossVerified = saleVerified && cogsVerified;
-  const gross = metric(saleTotal - valuedCOGS, grossVerified, 'sales_minus_recognized_cogs', grossVerified ? null : 'DEPENDENCY_NOT_VERIFIED');
+  const gross = metric(salesM.amount !== null && cogsM.amount !== null ? saleTotal - valuedCOGS : null, grossVerified, 'sales_minus_recognized_cogs', grossVerified ? null : 'DEPENDENCY_NOT_VERIFIED');
   const opVerified = grossVerified && expVerified && payrollVerified;
-  const operating = metric(saleTotal - valuedCOGS - sum(expenseVals.filter(v => v !== null)) - sum(payrollVals.filter(v => v !== null)), opVerified,
+  const operating = metric(gross.amount !== null && expenseM.amount !== null && payrollM.amount !== null ? saleTotal - valuedCOGS - sum(expenseVals) - sum(payrollVals) : null, opVerified,
     'gross_profit_minus_opex_minus_payroll', opVerified ? null : 'DEPENDENCY_NOT_VERIFIED');
   const cash = computeCash(scope, sources, completeness, issues, sales, saleDetails);
 
@@ -251,7 +252,7 @@ export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, comple
     const amounts = debtRows.filter(row => norm(row.type) === type).map(row => integer(row.remaining_amount ?? row.balance));
     if (amounts.some(value => value === null)) issues.push({ code: 'DEBT_BALANCE_MISSING', table: 'debt_records' });
     const valid = asOf && sourceReady(completeness, 'debt_records') && !issueExists(issues, ['debt_records']);
-    return metric(sum(amounts.filter(value => value !== null)), valid, 'receivable_payable_asof', valid ? null : 'ASOF_NOT_CERTIFIED');
+    return metric(sourceReady(completeness, 'debt_records') && amounts.every(v => v !== null) ? sum(amounts) : null, valid, 'receivable_payable_asof', valid ? null : 'ASOF_NOT_CERTIFIED');
   };
   const wallet = distinctById(scopeRows(sources.wallet_transactions || [], scope, 'wallet_transactions', issues), 'wallet_transactions', issues);
   // A transfer has two legs; this is only a diagnostic and must never enter sales.
