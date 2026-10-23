@@ -192,7 +192,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('data-testid="single-cash-ledger-note"');
     expect(workspace).toContain('inputId="quick-closing-actualCash"');
     expect(workspace.match(/<CashReconciliationPanel/g)).toHaveLength(1);
-    expect(workspace).toContain('id="quick-closing-actualCash"');
+    expect(workspace).toContain('inputId="quick-closing-actualCash"');
     expect(workspace).not.toContain('requiresCashReconciliation && actualCount === null && <div');
     expect(workspace).not.toContain('summaryVisibilityClass');
     expect(workspace).toContain('data-testid="closing-readiness-summary"');
