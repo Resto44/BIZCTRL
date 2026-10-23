@@ -211,9 +211,9 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
         </div>
 
         <div data-testid="closing-cash-preview" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-3 sm:p-4">
-          <div><p className="text-xs font-black text-sky-950">Closing Cash · physical drawer balance</p>
-            <p className="mt-1 text-[11px] text-sky-800">Carried into a verified next shift · no network, wallet or credit sales</p></div>
-          <Money currency={currency} value={closingCash} className="text-xl font-black text-sky-950" />
+          <div><p className="text-xs font-black text-sky-950">{closingCash === null ? 'Physically counted cash · pending reconciliation' : 'Closing Cash · physical drawer balance'}</p>
+            <p className="mt-1 text-[11px] text-sky-800">{closingCash === null ? 'Count is recorded for review; it will not be carried forward until the closing is finalized.' : 'Carried into a verified next shift · no network, wallet or credit sales'}</p></div>
+          <Money currency={currency} value={closingCash ?? actualCash} className="text-xl font-black text-sky-950" />
         </div>
         <div className="grid grid-cols-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-1" role="status" aria-label={`Cash status: ${statusCopy}`}>
           {STATUS_OPTIONS.map(({ key, label, Icon }) => {
