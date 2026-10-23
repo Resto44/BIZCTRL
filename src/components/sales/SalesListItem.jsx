@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
-  MoreVertical,
   Pencil,
   PieChart,
   ReceiptText,
@@ -20,7 +19,9 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
-import { dailySalesNetworkBreakdown, dailySalesProfitSummary, parseDailySalesSourceSnapshots } from '@/lib/dailySalesPresentation';
+import { dailySalesNetworkBreakdown, parseDailySalesSourceSnapshots } from '@/lib/dailySalesPresentation';
+
+import ClosingHistoryAnalytics from '@/components/sales/ClosingHistoryAnalytics';
 
 const parseSalesSourceSnapshots = parseDailySalesSourceSnapshots;
 
@@ -48,6 +49,7 @@ const NetworkDetailRow = memo(function NetworkDetailRow({ icon: Icon, label, des
 
 export default function SalesListItem({
   sale,
+  trend = null,
   record = sale,
   expanded = false,
   onToggleExpanded = null,
@@ -69,32 +71,16 @@ export default function SalesListItem({
   const total = rCash + rNet + credit + customSourcesTotal;
   const sourceSnapshots = useMemo(() => parseSalesSourceSnapshots(sale.sales_sources_json), [sale.sales_sources_json]);
   const network = useMemo(() => dailySalesNetworkBreakdown({ restaurant_network: rNet }, sourceSnapshots), [rNet, sourceSnapshots]);
-  const profit = dailySalesProfitSummary(sale);
-  const labels = lang === 'fa' ? {
-    sales: 'فروشات', costs: 'مصرف ثبت‌شده', gross: 'فایده ناخالص (تخمینی)', net: 'فایده خالص (تخمینی)',
-    purchases: 'خرید', expenses: 'مصارف عملیاتی', missing: 'اطلاعات هزینه کامل نیست',
-    zero: 'هیچ هزینه‌ای در این کلوزینگ ثبت نشده؛ فایده تأییدشده نیست.',
-    note: 'تخمین بر اساس مبالغ ذخیره‌شده: ناخالص = فروش − خرید؛ خالص = ناخالص − مصارف عملیاتی. خرید جایگزین بهای واقعی کالای فروخته‌شده نیست.',
-  } : lang === 'ar' ? {
-    sales: 'المبيعات', costs: 'التكاليف المسجلة', gross: 'الربح الإجمالي (تقديري)', net: 'صافي الربح (تقديري)',
-    purchases: 'المشتريات', expenses: 'المصاريف التشغيلية', missing: 'بيانات التكاليف غير مكتملة',
-    zero: 'لا توجد تكاليف مسجلة في هذا الإقفال؛ الربح غير مؤكد.',
-    note: 'تقدير من مبالغ الإقفال المحفوظة: الإجمالي = المبيعات − المشتريات؛ الصافي = الإجمالي − المصاريف التشغيلية. المشتريات ليست تكلفة البضاعة المباعة الفعلية.',
-  } : {
-    sales: 'Sales', costs: 'Recorded costs', gross: 'Gross profit (est.)', net: 'Net profit (est.)',
-    purchases: 'Purchases', expenses: 'Operating expenses', missing: 'Cost data incomplete',
-    zero: 'No costs recorded in this closing; profit is unverified.',
-    note: 'Saved closing estimate: gross = sales − purchases; net = gross − operating expenses. Purchases are not actual cost of goods sold.',
-  };
-  const costMoney = (value) => value === null ? '—' : money(currency, value);
   const branchLabel = branches.find((branch) => branch.key === sale.branch)?.label || sale.branch || '—';
   const managerName = sale.manager_name || sale.manager_email || sale.created_by || '—';
   const cashierName = sale.cashier_name || managerName;
   const closingState = sale.closing_state || record?.closing_state || 'finalized';
   const state = statePresentation(closingState);
-  const cashStatus = sale.cash_status || (numberValue(sale.cash_difference) === 0 ? 'Balanced' : numberValue(sale.cash_difference) < 0 ? 'Shortage' : 'Overage');
-  const expectedCash = numberValue(sale.expected_cash ?? rCash);
-  const actualCash = numberValue(sale.actual_cash ?? sale.closing_cash ?? rCash);
+  const savedMoney = value => value == null || String(value).trim() === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+  const expectedCash = savedMoney(sale.expected_cash);
+  const actualCash = savedMoney(sale.actual_cash);
+  const cashDifference = expectedCash === null || actualCash === null ? null : Math.round((actualCash - expectedCash) * 100) / 100;
+  const cashStatus = cashDifference === null ? 'Pending' : cashDifference === 0 ? 'Balanced' : cashDifference < 0 ? 'Shortage' : 'Overage';
   const date = sale.date ? new Date(`${sale.date}T12:00:00`) : null;
   const percentages = {
     cash: total > 0 ? (rCash / total) * 100 : 0,
@@ -104,7 +90,7 @@ export default function SalesListItem({
   };
 
   return (
-    <Card className={`w-full max-w-full overflow-hidden rounded-2xl border-border/80 bg-card shadow-sm transition-shadow hover:shadow-md ${selected ? 'ring-2 ring-primary/50' : ''}`} style={{ contentVisibility: 'auto', containIntrinsicSize: expanded ? '650px' : '260px' }}>
+    <Card className={`w-full max-w-full overflow-hidden rounded-2xl border-border/80 bg-card shadow-sm transition-shadow hover:shadow-md ${selected ? 'ring-2 ring-primary/50' : ''}`} style={{ contentVisibility: 'auto', containIntrinsicSize: expanded ? '850px' : '320px' }}>
       <div className="p-3 sm:p-4">
         <div className="flex items-start gap-3">
           {onToggleSelect && (
@@ -113,13 +99,9 @@ export default function SalesListItem({
             </button>
           )}
 
-          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-blue-100 bg-blue-50 text-center leading-none">
-            <span className="text-xl font-black text-blue-700">{date ? date.getDate() : '—'}</span>
-            <span className="text-[10px] font-bold uppercase text-slate-600">{date ? new Intl.DateTimeFormat('en', { month: 'short' }).format(date) : ''}</span>
-          </div>
-
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
+              <span className="shrink-0 text-xs font-bold tabular-nums text-blue-700">{date ? `${date.getDate()} ${new Intl.DateTimeFormat('en', { month: 'short' }).format(date)}` : '—'}</span>
               <h3 className="truncate text-sm font-black text-foreground sm:text-base" data-i18n-skip="true">{branchLabel}</h3>
               <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${state.cls}`}>{state.label}</span>
             </div>
@@ -132,35 +114,20 @@ export default function SalesListItem({
 
           <div className="flex shrink-0 items-center gap-0.5">
             <Button type="button" variant="outline" size="sm" className="hidden h-9 rounded-lg border-primary px-3 text-xs text-primary sm:inline-flex" aria-label="Edit Closing" onClick={() => onEdit?.(record)}>{closingState === 'draft' ? 'Continue' : 'Open Closing'}</Button>
-            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="Closing actions" onClick={onToggleExpanded}><MoreVertical className="h-4 w-4" /></Button>
-            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={expanded ? 'Collapse Closing details' : 'Expand Closing details'} onClick={onToggleExpanded}>{expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button>
+            <Button type="button" variant="ghost" size="icon" className="h-11 w-11" aria-expanded={expanded} aria-label={expanded ? 'Collapse Closing details' : 'Expand Closing details'} onClick={onToggleExpanded}>{expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button>
           </div>
         </div>
 
-        <section className="mt-3 border-t border-border/70 pt-3" data-i18n-skip="true" dir={lang === 'fa' || lang === 'ar' ? 'rtl' : 'ltr'} aria-label={labels.costs}>
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            {[
-              { label: labels.sales, value: total, cls: 'text-primary' },
-              { label: labels.costs, value: profit.totalCosts, cls: 'text-foreground' },
-              { label: labels.gross, value: profit.grossProfit, signed: true },
-              { label: labels.net, value: profit.netProfit, signed: true },
-            ].map(({ label, value, cls, signed }) => (
-              <div key={label} className="min-w-0 rounded-xl bg-muted/40 p-2.5">
-                <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-xs">{label}</p>
-                <p dir="ltr" className={`mt-1 break-words text-start text-sm font-black tabular-nums sm:text-base ${cls || (value === null ? 'text-muted-foreground' : value < 0 ? 'text-red-700' : 'text-emerald-700')}`}>
-                  {value === null ? '—' : `${signed && value > 0 ? '+' : ''}${money(currency, value)}`}
-                </p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground sm:text-xs">
-            <span>{labels.purchases}: <strong>{costMoney(profit.purchases)}</strong></span>
-            <span>{labels.expenses}: <strong>{costMoney(profit.operatingExpenses)}</strong></span>
-          </div>
-          {(profit.costsMissing || profit.noRecordedCosts) && <p className="mt-2 text-[10px] font-semibold text-amber-700 sm:text-xs" role="status">{profit.costsMissing ? labels.missing : labels.zero}</p>}
-          <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">{labels.note}</p>
-        </section>
+        <ClosingHistoryAnalytics sale={sale} trend={trend} currency={currency} lang={lang} expanded={expanded} />
 
+        <div className="mt-2 flex min-h-11 items-center justify-between gap-2 border-t border-border/70 pt-1 text-xs">
+          <span className={`flex min-w-0 flex-wrap items-center gap-1 font-semibold ${cashStatus === 'Balanced' ? 'text-emerald-700' : cashStatus === 'Shortage' ? 'text-red-700' : 'text-amber-700'}`}><CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />{cashStatus}{cashDifference !== null && cashDifference !== 0 && <bdi>{money(currency, Math.abs(cashDifference))}</bdi>}</span>
+          {onToggleExpanded && <button type="button" aria-expanded={expanded} onClick={onToggleExpanded} className="min-h-11 shrink-0 px-2 font-bold text-blue-700">{expanded ? (lang === 'fa' ? 'بستن تحلیل' : lang === 'ar' ? 'إخفاء التحليل' : 'Hide analysis') : (lang === 'fa' ? 'تحلیل بیشتر' : lang === 'ar' ? 'تحليل أكثر' : 'More analysis')}</button>}
+        </div>
+
+        {expanded && (
+          <div className="mt-2 space-y-3 border-t border-border/70 pt-2">
+            <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><span>Expected <strong>{expectedCash === null ? '—' : money(currency, expectedCash)}</strong></span><span>Actual <strong>{actualCash === null ? '—' : money(currency, actualCash)}</strong></span></div>
         <div className="mt-3 flex h-4 overflow-hidden rounded-md bg-muted" aria-label="Payment mix">
           {percentages.cash > 0 && <span className="grid h-full place-items-center bg-blue-600 text-[8px] font-bold text-white" style={{ width: `${percentages.cash}%` }}>{percentages.cash >= 14 ? `${percentages.cash.toFixed(0)}%` : ''}</span>}
           {percentages.network > 0 && <span className="grid h-full place-items-center bg-emerald-600 text-[8px] font-bold text-white" style={{ width: `${percentages.network}%` }}>{percentages.network >= 14 ? `${percentages.network.toFixed(0)}%` : ''}</span>}
@@ -175,14 +142,7 @@ export default function SalesListItem({
           {customSourcesTotal > 0 && <span><i className="mr-1.5 inline-block h-2 w-2 rounded-full bg-amber-500" />Other {money(currency, customSourcesTotal)} ({percentages.other.toFixed(0)}%)</span>}
         </div>
 
-        <div className="mt-3 grid grid-cols-3 items-center gap-2 border-t border-dashed border-border/70 pt-3 text-[10px] sm:text-xs">
-          <span className={`flex items-center gap-1.5 font-semibold ${cashStatus === 'Balanced' ? 'text-emerald-700' : cashStatus === 'Shortage' ? 'text-red-700' : 'text-amber-700'}`}><CheckCircle2 className="h-4 w-4" aria-hidden="true" />{cashStatus}</span>
-          <span className="text-center text-muted-foreground">Expected <strong className="ml-1 text-foreground">{money(currency, expectedCash)}</strong></span>
-          <span className="text-right text-muted-foreground">Actual <strong className="ml-1 text-foreground">{money(currency, actualCash)}</strong></span>
-        </div>
 
-        {expanded && (
-          <div className="mt-4 space-y-3 border-t border-border/70 pt-4">
             <section className="rounded-2xl border border-blue-100 bg-blue-50/50 p-3" aria-label="Network Sales Details">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>

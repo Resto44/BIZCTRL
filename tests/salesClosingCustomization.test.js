@@ -69,7 +69,7 @@ describe('Sales Closing Customization runtime contract', () => {
     expect(card).toContain('parseSalesSourceSnapshots');
     expect(card).toContain('Cashier:');
     expect(card).toContain('Shift:');
-    expect(card).toContain('Net profit (est.)');
+    expect(card).toContain('<ClosingHistoryAnalytics');
     expect(migration).toContain('ADD COLUMN IF NOT EXISTS expenses_total NUMERIC');
     expect(migration).toContain('ADD COLUMN IF NOT EXISTS operating_result NUMERIC');
   });
