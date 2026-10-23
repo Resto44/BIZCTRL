@@ -30,7 +30,7 @@ const complete = {
   payroll_runs: true, cash_movements: true, debt_records: true, wallet_transactions: true,
 };
 const run = (opts = {}) => reconcileCanonicalShadow({
-  scope, sources: { daily_sales: [closing()], supplier_invoices: [purchase()], ...opts.sources },
+  scope: opts.scope || scope, sources: { daily_sales: [closing()], supplier_invoices: [purchase()], ...opts.sources },
   completeness: { ...complete, ...opts.completeness }, legacy: opts.legacy || {},
 });
 
@@ -165,7 +165,7 @@ describe('Issue #183 read-only shadow source of truth', () => {
   });
 
   it('never turns customer collection, wallet transfer or owner handover into sales', () => {
-    const result = run({ sources: { wallet_transactions: [
+    const result = run({ scope: { ...scope, branchId: null }, sources: { wallet_transactions: [
       { id: 'leg-a', restaurant_id: 'tenant-1', branch_id: 'branch-a', date: '2026-10-23',
         transaction_type: 'owner_branch_funding_debit', reference_id: 'fund-1', amount: 50 },
       { id: 'leg-b', restaurant_id: 'tenant-1', branch_id: 'branch-a', date: '2026-10-23',
@@ -176,7 +176,7 @@ describe('Issue #183 read-only shadow source of truth', () => {
   });
 
   it('flags unmatched treasury transfer legs instead of balancing them silently', () => {
-    const result = run({ sources: { wallet_transactions: [{
+    const result = run({ scope: { ...scope, branchId: null }, sources: { wallet_transactions: [{
       id: 'leg-a', restaurant_id: 'tenant-1', branch_id: 'branch-a', date: '2026-10-23',
       transaction_type: 'owner_branch_funding_debit', reference_id: 'fund-1', amount: 50,
     }] }, completeness: { treasuryPairingCertified: true } });
@@ -188,7 +188,8 @@ describe('Issue #183 read-only shadow source of truth', () => {
     const result = run({ sources: { daily_sales: [
       closing({ id: 'legacy', closing_state: 'locked', legacy_lock_verified: false }),
     ] } });
-    expect(result.metrics.net_sales.amount).toBe(0);
+    expect(result.metrics.net_sales.amount).toBeNull();
+    expect(result.issues.map(x => x.code)).toContain('CLOSING_REVISION_UNRESOLVED');
     const verified = run({ sources: { daily_sales: [
       closing({ id: 'legacy', closing_state: 'locked', legacy_lock_verified: true }),
     ] } });
