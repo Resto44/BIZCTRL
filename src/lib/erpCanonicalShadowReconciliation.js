@@ -189,11 +189,11 @@ export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, comple
   const saleVerified = sourceReady(completeness, 'daily_sales') && completeness.salesPostingCertified === true && completeness.refundsCertified === true && !issueExists(issues, ['daily_sales']) && saleDetails.length === sales.length;
   const saleTotal = sum(saleDetails.map(x => x.total));
 
-  const purchases = distinctById(scopeRows(sources.supplier_invoices || [], scope, 'supplier_invoices', issues), 'supplier_invoices', issues);
+  const purchases = distinctById(scopeRows(sources.supplier_invoices || [], scope, 'supplier_invoices', issues, { shiftScoped: Boolean(scope.shift) }), 'supplier_invoices', issues);
   const purchaseVals = purchases.map(row => purchaseCents(row, issues)).filter(x => x !== null);
   const purchaseVerified = sourceReady(completeness, 'supplier_invoices') && !issueExists(issues, ['supplier_invoices']);
 
-  const inventory = distinctById(scopeRows(sources.inventory_transactions || [], scope, 'inventory_transactions', issues), 'inventory_transactions', issues);
+  const inventory = distinctById(scopeRows(sources.inventory_transactions || [], scope, 'inventory_transactions', issues, { shiftScoped: Boolean(scope.shift) }), 'inventory_transactions', issues);
   const consumed = inventory.filter(row => norm(row.transaction_type) === 'recipe_consumption' && !row.is_reversed);
   const cogsVals = consumed.map(row => {
     const qty = Number(row.quantity);
@@ -208,7 +208,7 @@ export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, comple
   const cogsVerified = sourceReady(completeness, 'inventory_transactions') &&
     completeness.cogsValuationCertified === true && !issueExists(issues, ['inventory_transactions']);
 
-  const expenses = distinctById(scopeRows(sources.expenses || [], scope, 'expenses', issues), 'expenses', issues);
+  const expenses = distinctById(scopeRows(sources.expenses || [], scope, 'expenses', issues, { shiftScoped: Boolean(scope.shift) }), 'expenses', issues);
   const expenseVals = expenses.filter(row => APPROVED.has(status(row))).map(row => {
     const value = integer(row.amount);
     if (value === null) issues.push({ code: 'EXPENSE_AMOUNT_MISSING', table: 'expenses', id: row.id });
@@ -306,7 +306,7 @@ export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, comple
  * Fail-closed release gate; this is advisory only and NEVER toggles a flag.
  * Independent approval + CI + complete branch evidence is required.
  */
-export function assessCanonicalRelease({ snapshot, testsPassed = false, authorizedBranches = [], reconciledBranches = [],
+export function assessCanonicalRelease({ snapshot, metricNames = [], approvedBasisDifferences = [], testsPassed = false, authorizedBranches = [], reconciledBranches = [],
   daysObserved = 0, financeApproved = false, technicalApproved = false, ownerApproved = false } = {}) {
   const blockers = [];
   if (!snapshot?.readOnly || snapshot.releaseFlagEnabled) blockers.push('UNSAFE_SNAPSHOT');
@@ -314,8 +314,12 @@ export function assessCanonicalRelease({ snapshot, testsPassed = false, authoriz
   if (daysObserved < 14) blockers.push('SHADOW_WINDOW_INCOMPLETE');
   if (!authorizedBranches.length || authorizedBranches.some(id => !reconciledBranches.includes(id))) blockers.push('BRANCH_RECONCILIATION_INCOMPLETE');
   if (snapshot?.issues?.length) blockers.push('UNRESOLVED_SOURCE_EXCEPTIONS');
-  if (!snapshot?.metrics || Object.values(snapshot.metrics).some(m => m.confidence !== 'VERIFIED')) blockers.push('UNVERIFIED_METRIC');
-  if (!snapshot?.comparisons || Object.values(snapshot.comparisons).some(m => !['MATCH'].includes(m.classification))) blockers.push('KPI_PARITY_NOT_APPROVED');
+  if (!metricNames.length || metricNames.some(name => !VALID_METRICS.includes(name))) blockers.push('METRIC_SCOPE_INVALID');
+  if (!snapshot?.metrics || metricNames.some(name => snapshot.metrics[name]?.confidence !== 'VERIFIED')) blockers.push('UNVERIFIED_METRIC');
+  if (!snapshot?.comparisons || metricNames.some(name => {
+    const result = snapshot.comparisons[name];
+    return result?.classification !== 'MATCH' && !(result?.classification === 'BASIS_REVIEW_REQUIRED' && approvedBasisDifferences.includes(name));
+  })) blockers.push('KPI_PARITY_NOT_APPROVED');
   if (!financeApproved || !technicalApproved || !ownerApproved) blockers.push('APPROVALS_MISSING');
   return { eligibleForManualCanaryReview: blockers.length === 0, blockers };
 }
