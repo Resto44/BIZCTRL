@@ -6,7 +6,7 @@ describe('unreconciled closing draft boundary', () => {
   it('allows draft capture without allowing negative-cash finalization', () => {
     expect(source).toContain('if (!savingDraft && ledgerOverdrawn) nextErrors.reconciliation');
     const buttons = [...source.matchAll(/<Button type="submit" data-closing-intent="draft"[^>]+>/g)].map(m=>m[0]);
-    expect(buttons).toHaveLength(2);
+    expect(buttons).toHaveLength(1);
     for (const button of buttons) expect(button).not.toContain('ledgerOverdrawn');
     expect(source).toContain('disabled={isSubmitting || !allValid || !cashContextReady || cashDifference === null || ledgerOverdrawn}');
   });
@@ -21,8 +21,11 @@ describe('unreconciled closing draft boundary', () => {
   it('protects previously posted records from draft downgrade and explains the unresolved cash source', () => {
     expect(migration).toContain('SALES_CLOSING_FINALIZED_DRAFT_DENIED');
     expect(migration).toContain('COALESCE(v_closing_version, 0) > 0');
-    expect(source).toContain('Unexplained difference from cash count');
-    expect(source).toContain('Record funding only when cash actually entered this drawer.');
+    expect(source).not.toContain('Unexplained difference from cash count');
+    expect(source).toContain('data-testid="closing-cash-action"');
+    expect(source).toContain('cashFundingRequired={reconciliation.cashFundingRequired}');
+    const panel = readFileSync('src/components/sales/CashReconciliationPanel.jsx','utf8');
+    expect(panel).toContain('Recorded cash balance gap · not count variance');
     expect(source).toContain('Draft saved. Final reconciliation is still pending.');
   });
 });

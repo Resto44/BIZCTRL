@@ -13,12 +13,18 @@ export default function ClosingFundingPanel({restaurantId, branchId, branchKey, 
  const tr=labels[lang]||labels.en;
  const qc=useQueryClient();
  const proposal=closingFundingProposal(expectedCash,actualCash);
+ // Owner/treasury may physically top up a counted shortage. Posting Cash In
+ // also increases Expected Cash: do NOT clear the original short variance.
+ // It needs a separate audited shortage settlement/correction.
+ const physicalShortage=Number.isFinite(Number(expectedCash)) && expectedCash !== null &&
+   actualCash !== null && Number.isFinite(Number(actualCash)) && Number(expectedCash)>=0
+   ? Math.max(0,Math.round((Number(expectedCash)-Number(actualCash))*100)/100) : 0;
  const storageKey=`closing-funding:${restaurantId}:${branchId}:${date}:${shift}:${cashierId}`;
  const [pending,setPending]=useState(()=>{try{return JSON.parse(sessionStorage.getItem(storageKey))||null;}catch{return null;}});
  const [source,setSource]=useState(pending?.p_source||'owner');
  const [sourceId,setSourceId]=useState(pending?.p_source_account_id||'');
  const [destinationId,setDestinationId]=useState(pending?.p_destination_account_id||'');
- const [amount,setAmount]=useState(pending ? String(pending.p_amount) : String(proposal.toCount || proposal.minimum || ''));
+ const [amount,setAmount]=useState(pending ? String(pending.p_amount) : String(proposal.toCount || proposal.minimum || physicalShortage || ''));
  const [note,setNote]=useState(pending?.p_note||'');
  const [received,setReceived]=useState(pending?.p_received||false);
  const [settled,setSettled]=useState(pending?.p_settled||false);
@@ -52,6 +58,10 @@ export default function ClosingFundingPanel({restaurantId, branchId, branchKey, 
  const field='min-h-12 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-2 text-base text-slate-900';
  return <section id="closing-funding" data-testid="closing-funding" dir={lang==='en'?'ltr':'rtl'} className="min-w-0 space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-4">
   <h3 className="font-black text-slate-950">{tr.title}</h3><p className="text-sm leading-6">{tr.explain}</p>
+  {physicalShortage > 0 && <div data-testid="funding-physical-shortage-note" className="rounded-xl border border-amber-200 bg-white p-3 text-xs leading-5 text-amber-900">
+    {lang==='fa'?'کمبود شمارش:':lang==='ar'?'عجز الجرد:':'Counted shortage:'} <strong dir="ltr">{physicalShortage.toFixed(2)} {currency}</strong>.
+    {' '}{lang==='fa'?'تمویل واقعاً دریافت‌شده به Cash In افزوده می‌شود؛ اختلاف پیشین خودکار صفر نمی‌شود و به رسیدگی حسابداری نیاز دارد.':lang==='ar'?'يضاف التمويل المستلم فعلياً إلى النقد الوارد؛ لا يمحى فرق الجرد السابق تلقائياً ويحتاج مراجعة محاسبية.':'Physically received funding posts as Cash In. It does not erase the original count variance; audit review remains required.'}
+  </div>}
   <dl className="grid gap-2 text-sm sm:grid-cols-2"><div><dt>{tr.minimum}</dt><dd className="break-all text-lg font-black">{proposal.minimum.toFixed(2)} {currency}</dd></div><div><dt>{tr.count}</dt><dd className="break-all text-lg font-black">{proposal.toCount===null?'—':proposal.toCount.toFixed(2)} {currency}</dd></div></dl>
   {role!=='owner'?<p>{tr.manager}</p>:<>
    {pending&&<p role="status">{tr.pending}</p>}

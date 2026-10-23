@@ -110,7 +110,8 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
   });
 
   it('keeps the mobile Actual Cash field as the shared DOM-stable numeric control', () => {
-    expect(reconciliationPanel).toContain('id="closing-detail-actual-cash"');
+    expect(reconciliationPanel).toContain("inputId = 'closing-detail-actual-cash'");
+    expect(reconciliationPanel).toContain('id={inputId}');
     expect(workspace).toContain('updateActualCashCount(value)');
     expect(reconciliationPanel).toContain('ClosingNumericInput');
     expect(workspace).toContain('cashSales={reconciliation.cashSales}');

@@ -43,8 +43,16 @@ describe('closing funding and networks',()=>{
   expect(validClosingNetworkEntries([{amount:'1.001',network_account_id:'a'}],accounts)).toBe(false);
   expect(validClosingNetworkEntries([{amount:0}],[])).toBe(true);
  });
- const mount=async(role='owner')=>{client=new QueryClient({defaultOptions:{queries:{retry:false}}});await act(async()=>{tree=create(<QueryClientProvider client={client}><ClosingFundingPanel restaurantId="r" branchId="b" branchKey="main" date="2026-10-23" shift="Morning" cashierId="c" expectedCash={-152} actualCash={95} role={role}/></QueryClientProvider>);});};
+ const mount=async(role='owner', expectedCash=-152, actualCash=95)=>{client=new QueryClient({defaultOptions:{queries:{retry:false}}});await act(async()=>{tree=create(<QueryClientProvider client={client}><ClosingFundingPanel restaurantId="r" branchId="b" branchKey="main" date="2026-10-23" shift="Morning" cashierId="c" expectedCash={expectedCash} actualCash={actualCash} role={role}/></QueryClientProvider>);});};
  const fill=()=>act(()=>{tree.root.findByType('textarea').props.onChange({target:{value:'Confirmed supplier cash funding'}});tree.root.findAllByType('input').find(x=>x.props.type==='checkbox').props.onChange({target:{checked:true}});});
+ it('offers Owner/Treasury funding for a real counted shortage without pretending variance disappears',async()=>{
+  await mount('owner',100,95);
+  const amount=tree.root.findAllByType('input').find(x=>x.props.inputMode==='decimal');
+  expect(amount.props.value).toBe('5');
+  const notice=tree.root.findByProps({ 'data-testid': 'funding-physical-shortage-note' });
+  expect(notice).toBeTruthy();
+  expect(mock.rpc).not.toHaveBeenCalled();
+ });
  it('never posts on render or before confirmation; double click posts only once',async()=>{
   let resolve;mock.rpc.mockReturnValue(new Promise(r=>resolve=r));await mount();expect(mock.rpc).not.toHaveBeenCalled();
   let button=tree.root.findAllByType('button').at(-1);expect(button.props.disabled).toBe(true);fill();button=tree.root.findAllByType('button').at(-1);

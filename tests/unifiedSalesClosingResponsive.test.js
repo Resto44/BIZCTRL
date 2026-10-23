@@ -189,8 +189,10 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain("const useAutomaticSales = Boolean(salesEntryMode === 'automatic' && automaticTotalsEnabled");
     expect(workspace).toContain('passed: actualCount !== null,');
     expect(workspace).toContain('Variance will be recorded separately');
-    expect(workspace).toContain('data-testid="closing-reconciliation-details"');
-    expect(workspace).toContain('id="quick-closing-actualCash"');
+    expect(workspace).toContain('data-testid="single-cash-ledger-note"');
+    expect(workspace).toContain('inputId="quick-closing-actualCash"');
+    expect(workspace.match(/<CashReconciliationPanel/g)).toHaveLength(1);
+    expect(workspace).toContain('inputId="quick-closing-actualCash"');
     expect(workspace).not.toContain('requiresCashReconciliation && actualCount === null && <div');
     expect(workspace).not.toContain('summaryVisibilityClass');
     expect(workspace).toContain('data-testid="closing-readiness-summary"');
