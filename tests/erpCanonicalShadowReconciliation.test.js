@@ -21,7 +21,7 @@ const closing = (overrides = {}) => ({
 });
 const purchase = (overrides = {}) => ({
   id: 'buy-1', restaurant_id: 'tenant-1', branch_id: 'branch-a',
-  date: '2026-10-23', approval_status: 'approved', status: 'partial',
+  date: '2026-10-23', shift: 'morning', approval_status: 'approved', status: 'partial',
   total_amount: 90, ...overrides,
 });
 const complete = {
@@ -107,7 +107,7 @@ describe('Issue #183 read-only shadow source of truth', () => {
   it('recognizes recipe consumption with explicit cost and source, not unrelated inventory receipts or transfers', () => {
     const inventory = (id, kind, more = {}) => ({
       id, restaurant_id: 'tenant-1', branch_id: 'branch-a', date: '2026-10-23',
-      transaction_type: kind, quantity: 4, unit_cost: 3, reference_id: 'order-1',
+      transaction_type: kind, shift: 'morning', quantity: 4, unit_cost: 3, reference_id: 'order-1',
       reference_type: 'sale', ...more,
     });
     const result = run({ sources: { inventory_transactions: [
@@ -122,7 +122,7 @@ describe('Issue #183 read-only shadow source of truth', () => {
   it('withholds Verified COGS when unit cost or valuation reference is absent', () => {
     const result = run({ sources: { inventory_transactions: [{
       id: 'missing-value', restaurant_id: 'tenant-1', branch_id: 'branch-a',
-      date: '2026-10-23', transaction_type: 'recipe_consumption', quantity: 1,
+      date: '2026-10-23', shift: 'morning', transaction_type: 'recipe_consumption', quantity: 1,
     }] }, completeness: { cogsValuationCertified: true } });
     expect(result.metrics.recognized_cogs.amount).toBeNull();
     expect(result.issues.map(x => x.code)).toContain('COGS_VALUATION_INCOMPLETE');
@@ -199,7 +199,7 @@ describe('Issue #183 read-only shadow source of truth', () => {
     const result = run({
       sources: { inventory_transactions: [{
         id: 'cogs-1', restaurant_id: 'tenant-1', branch_id: 'branch-a',
-        date: '2026-10-23', transaction_type: 'recipe_consumption',
+        date: '2026-10-23', shift: 'morning', transaction_type: 'recipe_consumption',
         quantity: 3, unit_cost: 5, reference_id: 'sale-1', reference_type: 'sale',
       }] },
       completeness: { cogsValuationCertified: true },
