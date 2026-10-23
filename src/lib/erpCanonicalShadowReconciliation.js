@@ -15,6 +15,20 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const APPROVED = new Set(['approved', 'auto_approved', 'posted', 'paid', 'settled', 'partial']);
 const NON_REVENUE = new Set(['owner_injection', 'owner_contribution', 'cash_handover', 'branch_transfer', 'treasury_transfer', 'debt_collection']);
 const VALID_METRICS = ['net_sales', 'approved_purchases', 'recognized_cogs', 'posted_expenses', 'payroll_expense', 'gross_profit', 'operating_result', 'drawer_expected', 'drawer_variance', 'receivables', 'payables', 'treasury_transfer_net'];
+const METRIC_DEPENDENCIES = Object.freeze({
+  net_sales: ['daily_sales'],
+  approved_purchases: ['supplier_invoices'],
+  recognized_cogs: ['inventory_transactions'],
+  posted_expenses: ['expenses'],
+  payroll_expense: ['payroll_runs'],
+  gross_profit: ['daily_sales', 'inventory_transactions'],
+  operating_result: ['daily_sales', 'inventory_transactions', 'expenses', 'payroll_runs'],
+  drawer_expected: ['daily_sales', 'cash_movements'],
+  drawer_variance: ['daily_sales', 'cash_movements'],
+  receivables: ['debt_records'],
+  payables: ['debt_records'],
+  treasury_transfer_net: ['wallet_transactions'],
+});
 
 const integer = value => {
   if (value === null || value === undefined || value === '') return null;
@@ -323,7 +337,8 @@ export function assessCanonicalRelease({ snapshot, metricNames = [], approvedBas
   if (!testsPassed) blockers.push('TESTS_NOT_PASSED');
   if (daysObserved < 14) blockers.push('SHADOW_WINDOW_INCOMPLETE');
   if (!authorizedBranches.length || authorizedBranches.some(id => !reconciledBranches.includes(id))) blockers.push('BRANCH_RECONCILIATION_INCOMPLETE');
-  if (snapshot?.issues?.length) blockers.push('UNRESOLVED_SOURCE_EXCEPTIONS');
+  const dependentTables = new Set(metricNames.flatMap(name => METRIC_DEPENDENCIES[name] || []));
+  if (snapshot?.issues?.some(issue => dependentTables.has(issue.table) || issue.code === 'TENANT_SCOPE_MISMATCH')) blockers.push('UNRESOLVED_SOURCE_EXCEPTIONS');
   if (!metricNames.length || metricNames.some(name => !VALID_METRICS.includes(name))) blockers.push('METRIC_SCOPE_INVALID');
   if (!snapshot?.metrics || metricNames.some(name => snapshot.metrics[name]?.confidence !== 'VERIFIED')) blockers.push('UNVERIFIED_METRIC');
   if (!snapshot?.comparisons || metricNames.some(name => {
