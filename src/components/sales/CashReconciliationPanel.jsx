@@ -76,6 +76,11 @@ const STATUS_OPTIONS = [
 const CashReconciliationPanel = memo(function CashReconciliationPanel({
   currency = 'SAR',
   openingCash = null,
+  inputId = 'closing-detail-actual-cash',
+  fundingContent = null,
+  cashFundingRequired = 0,
+  movements = [],
+  lang = 'en',
   cashSales = 0,
   cashIn = 0,
   cashOut = 0,
@@ -114,6 +119,8 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
   disabled = false,
 }) {
   const [noteOpen, setNoteOpen] = useState(Boolean(cashNotes));
+  const [ledgerExpanded, setLedgerExpanded] = useState(false);
+  const postedReceipts = movements.filter(m => m?.direction === 'in' && m?.is_reversed !== true);
   const status = !openingVerified || ledgerLoading || ledgerUnavailable || difference === null ? 'pending' : difference === 0 ? 'balanced' : difference < 0 ? 'shortage' : 'overage';
   const statusCopy = status === 'pending'
     ? (ledgerOverdrawn ? 'Ledger error' : !openingVerified ? 'Opening unverified' : 'Awaiting Count')
@@ -148,10 +155,11 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
           </span>
         </header>
 
-        {!openingVerified || ledgerUnavailable ? (
+        {!openingVerified || ledgerUnavailable || ledgerOverdrawn ? (
           <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-            <p className="font-black">{ledgerOverdrawn ? 'Cash Ledger overdrawn' : openingReviewRequired ? 'Opening Cash needs reconciliation' : 'ERP cash ledger is unavailable.'}</p>
+            <p className="font-black">{ledgerOverdrawn ? (lang === 'fa' ? 'گردش نقد صندوق نیاز به بررسی دارد' : lang === 'ar' ? 'حركة نقد الصندوق تحتاج مراجعة' : 'Cash Ledger overdrawn') : openingReviewRequired ? 'Opening Cash needs reconciliation' : 'ERP cash ledger is unavailable.'}</p>
             <p className="mt-1 text-xs">{ledgerOverdrawn ? 'Cash Out exceeds available cash. Review the posted funding and payments before closing; this is not an ordinary cash overage.' : openingReviewRequired ? 'Previous shift has no verified counted balance or multiple possible drawers. Check the prior closing before finalizing.' : 'The cash count cannot be approved until the scoped ledger has loaded.'}</p>
+            {ledgerOverdrawn && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3" data-testid="drawer-ledger-funding-gap"><span className="text-xs font-bold">{lang === 'fa' ? 'کمبود دفتر نقد (نه اختلاف شمارش)' : lang === 'ar' ? 'عجز الدفتر وليس فرق الجرد' : 'Recorded cash balance gap · not count variance'}</span><Money currency={currency} value={cashFundingRequired} className="font-black text-red-700" /></div>}
             {openingShiftDate && <p className="mt-1 text-xs">Previous: {openingShiftDate} · {openingShift || 'Unknown shift'}</p>}
             <Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-200 bg-white" onClick={onRetryLedger}>
               <RefreshCw className="mr-1.5 h-4 w-4" />Retry ledger load
@@ -181,15 +189,15 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
         )}
         <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)] gap-3">
           <div id="quick-closing-reconciliation" className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-            <label htmlFor="closing-detail-actual-cash" className="block text-xs font-black text-slate-700 sm:text-sm">Actual Cash <span className="text-red-500">*</span></label>
+            <label htmlFor={inputId} className="block text-xs font-black text-slate-700 sm:text-sm">Actual Cash <span className="text-red-500">*</span></label>
             <p className="mt-1 hidden text-xs text-slate-500 sm:block">Enter the physical cash count</p>
             <ClosingNumericInput
-              id="closing-detail-actual-cash"
+              id={inputId}
               value={actualCashValue}
               onChange={onActualCashChange}
               prefix={currency}
               required
-              disabled={disabled || ledgerLoading || ledgerUnavailable || !openingVerified}
+              disabled={disabled || ledgerLoading}
               error={actualCashError}
               placeholder="0.00"
               className="mt-3"
@@ -205,7 +213,7 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
         <div data-testid="closing-cash-preview" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-3 sm:p-4">
           <div><p className="text-xs font-black text-sky-950">Closing Cash · physical drawer balance</p>
             <p className="mt-1 text-[11px] text-sky-800">Carried into a verified next shift · no network, wallet or credit sales</p></div>
-          <Money currency={currency} value={openingVerified ? closingCash : null} className="text-xl font-black text-sky-950" />
+          <Money currency={currency} value={closingCash} className="text-xl font-black text-sky-950" />
         </div>
         <div className="grid grid-cols-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-1" role="status" aria-label={`Cash status: ${statusCopy}`}>
           {STATUS_OPTIONS.map(({ key, label, Icon }) => {
@@ -258,6 +266,8 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
           {managerApproved ? 'Cash Count Approved' : 'Approve Cash Count'}
         </Button>
 
+        {postedReceipts.length > 0 && <div data-testid="posted-cash-funding" className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-xs"><button type="button" className="min-h-10 w-full text-left font-bold text-sky-900" aria-expanded={ledgerExpanded} onClick={() => setLedgerExpanded(v => !v)}>{lang === 'fa' ? 'ورود نقد ثبت‌شده · سند و منبع' : lang === 'ar' ? 'النقد الوارد المثبت · المصدر والسند' : 'Posted cash receipts · sources and references'} ({postedReceipts.length})</button>{ledgerExpanded && <ul className="mt-2 space-y-2">{postedReceipts.map((row, index) => <li className="flex flex-wrap items-center justify-between gap-2 border-t border-sky-200 pt-2" key={row.id || index}><span className="min-w-0 break-words">{row.source_module || row.movement_type || 'Cash In'} · {row.source_document_id || row.source_record_id || 'Reference pending'}</span><Money currency={currency} value={row.amount} className="font-bold" /></li>)}</ul>}</div>}
+        {fundingContent && <div data-testid="drawer-funding-inside-reconciliation" className="rounded-2xl border border-slate-200 p-3"><details open={ledgerOverdrawn || undefined}><summary className="min-h-11 cursor-pointer text-sm font-bold text-blue-800">{lang === 'fa' ? 'ثبت نقد دریافتی از اونر یا خزانه' : lang === 'ar' ? 'تسجيل النقد المستلم من المالك أو الخزينة' : 'Record cash received from owner or treasury'}</summary><div className="mt-2">{fundingContent}</div></details></div>}
         {difference !== null && (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
             <div className="flex items-center gap-2">
