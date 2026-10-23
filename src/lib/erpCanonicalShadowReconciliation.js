@@ -304,7 +304,7 @@ export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, comple
     posted_expenses: expenseM, payroll_expense: payrollM, gross_profit: gross,
     operating_result: operating, drawer_expected: cash.expected, drawer_variance: cash.variance,
     receivables: balance('receivable'), payables: balance('payable'),
-    treasury_transfer_net: metric(0, treasuryVerified, 'balanced_internal_transfer_pair', treasuryVerified ? null : 'PAIRING_NOT_CERTIFIED'),
+    treasury_transfer_net: metric(treasuryVerified ? 0 : null, treasuryVerified, 'balanced_internal_transfer_pair', treasuryVerified ? null : 'PAIRING_NOT_CERTIFIED'),
   };
   const comparisons = Object.fromEntries(Object.entries(metrics).map(([name, canonical]) => {
     const legacyCents = integer(legacy[name]);
