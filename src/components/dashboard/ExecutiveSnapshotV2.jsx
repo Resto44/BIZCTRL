@@ -8,6 +8,7 @@ import {
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { buildExecutiveSnapshotPresentation, moneyChange } from '@/lib/executiveSnapshotPresentation';
 import OwnerOrderSourcesAnalytics from './OwnerOrderSourcesAnalytics';
+import { buildOwnerOrderSourceAnalytics } from '@/lib/ownerOrderSourceAnalytics';
 
 const t = (copy,key,fallback) => copy?.[key] || fallback;
 
@@ -83,6 +84,9 @@ export default function ExecutiveSnapshotV2({model,copy}) {
   const presentation=useMemo(()=>buildExecutiveSnapshotPresentation({
     periodMetrics,previousPeriodMetrics,revenueTrend,periodKey,
   }),[periodMetrics,previousPeriodMetrics,revenueTrend,periodKey]);
+  const sourceBreakdown=useMemo(()=>buildOwnerOrderSourceAnalytics({
+    sales:periodSales,revenueSources,verifiedSales:presentation.sales,lang,
+  }),[periodSales,revenueSources,presentation.sales,lang]);
   const prev=previousPeriodMetrics;
   const methods=presentation.methods;
   const gradient=methods.reduce((acc,method)=>{
@@ -169,7 +173,7 @@ export default function ExecutiveSnapshotV2({model,copy}) {
             </div>
             <div className="min-w-[9rem] flex-1 space-y-2">
               {methods.map(method=><div key={method.key} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 text-[10px] sm:text-xs">
-                <span className="flex min-w-0 items-center gap-1.5 font-semibold text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full" style={{backgroundColor:method.color}}/><span className="truncate">{method.key==='cash'?t(copy,'cashSales','Cash sales'):t(copy,method.key,method.key)}</span></span>
+                <span className="flex min-w-0 items-center gap-1.5 font-semibold text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full" style={{backgroundColor:method.color}}/><span className="truncate">{method.key==='cash'?t(copy,'cashSales','Cash sales'):method.key==='otherSources'?t(copy,'otherPaymentMethods','Other payment methods'):t(copy,method.key,method.key)}</span></span>
                 <strong className="tabular-nums text-foreground" dir="ltr">{Number(method.amount).toLocaleString(undefined,{maximumFractionDigits:0})}</strong>
                 <span className="w-12 text-end tabular-nums text-muted-foreground">{presentation.reconciled?method.percent.toFixed(1)+'%':'—'}</span>
               </div>)}
@@ -177,13 +181,24 @@ export default function ExecutiveSnapshotV2({model,copy}) {
           </div>
           {!presentation.reconciled && <p role="alert" className="mt-2 text-[11px] font-semibold text-rose-700">{t(copy,'mixMismatch','Payment mix differs from reported sales; review the closing records.')}</p>}
           <p className="mt-2 text-[10px] leading-4 text-muted-foreground">{t(copy,'cashDrawerWarning','Cash sales and cash left in drawer are different figures.')}</p>
+          {sourceBreakdown.sources.length>0&&!hasQueryError&&<div data-testid="snapshot-recorded-source-shortcut" className="mt-3 rounded-xl border border-violet-200 bg-violet-50/60 p-3 dark:border-violet-900 dark:bg-violet-950/30">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold text-violet-800 dark:text-violet-200">{t(copy,'recordedSalesSources','Recorded order / sales sources')} · <span className="tabular-nums">{sourceBreakdown.sources.length}</span></p>
+                <p className="mt-1 text-[10px] text-muted-foreground">{t(copy,'sourceBreakdownHint','Breakdown of sales already counted above, not extra revenue.')}</p>
+              </div>
+              <a href="#owner-order-sources-analytics" className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-background px-2.5 py-1 text-xs font-black text-violet-700 hover:bg-violet-100 focus-visible:outline-2 focus-visible:outline-violet-500 dark:border-violet-900 dark:text-violet-300" aria-label={t(copy,'viewRecordedSources','View recorded sales sources')}>
+                <span dir="ltr">{formatMoney(sourceBreakdown.allocatedTotal)}</span><ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
+              </a>
+            </div>
+          </div>}
         </div>
       </div>
     </section>
 
     <OwnerOrderSourcesAnalytics
       sales={periodSales} revenueSources={revenueSources} verifiedSales={presentation.sales}
-      formatMoney={formatMoney} lang={lang} periodLabel={periodLabel} hasQueryError={hasQueryError}
+      formatMoney={formatMoney} lang={lang} periodLabel={periodLabel} hasQueryError={hasQueryError} report={sourceBreakdown}
     />
 
     <section data-testid="snapshot-related-financials" className="min-w-0 rounded-[1.55rem] border border-border/80 bg-card p-3.5 shadow-sm sm:p-5">
