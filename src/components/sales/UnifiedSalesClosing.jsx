@@ -60,6 +60,7 @@ import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
 import CustomerCreditSalesSource from '@/components/sales/CustomerCreditSalesSource';
 import CashReconciliationPanel from '@/components/sales/CashReconciliationPanel';
 import ClosingControlOverview from '@/components/sales/ClosingControlOverview';
+import ClosingStepNavigation, { closingStepCopy, closingStepIssues } from '@/components/sales/ClosingStepNavigation';
 import ClosingFundingPanel from '@/components/sales/ClosingFundingPanel';
 import { activeClosingNetworkAccounts, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
@@ -365,6 +366,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   }, [lang]);
   const branches = asRecordArray(tenantBranches);
   const [showFullDetails, setShowFullDetails] = useState(false);
+  const [closingStep, setClosingStep] = useState(0);
+  const [showFunding, setShowFunding] = useState(false);
+  const finalConfirmation = useRef(false);
+  const stepCopy = closingStepCopy[lang] || closingStepCopy.en;
   const [showBlockers, setShowBlockers] = useState(false);
   const [showNetworkDetail, setShowNetworkDetail] = useState(false);
   const [showOpeningVerification, setShowOpeningVerification] = useState(false);
@@ -819,6 +824,14 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Keep the outer New Closing action on the same stable business key as this
   // single canonical workspace. The callback is observational only: it neither
   // persists a draft nor resets any form state while the operator is typing.
+  useEffect(() => {
+    setClosingStep(0);
+    setShowBlockers(false);
+    setShowFunding(false);
+    setShowFinalizeReview(false);
+    finalConfirmation.current = false;
+  }, [activeRestaurant?.id, selectedBranchId, form.date, form.shift, effectiveCashierId]);
+
   useEffect(() => {
     onSessionContextChange?.({
       date: form.date,
@@ -1391,15 +1404,41 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     [customClosingFields, hasCustomClosingFieldValue],
   );
   const failedValidations = useMemo(() => validations.filter((validation) => !validation.passed), [validations]);
-  const attentionCount = failedValidations.length;
-  const readinessPercent = validations.length
-    ? Math.round(((validations.length - attentionCount) / validations.length) * 100)
-    : 100;
+  const stepFailedValidations = closingStep === 2 ? failedValidations : closingStepIssues(closingStep, validations);
+  const attentionCount = stepFailedValidations.length;
+  const goToClosingStep = (next) => {
+    if (isSubmitting || submissionInFlight.current) return;
+    const target = Math.max(0, Math.min(2, next));
+    if (target > closingStep && closingStepIssues(closingStep, validations).length) {
+      setShowBlockers(true);
+      requestAnimationFrame(() => document.getElementById('closing-readiness-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      return;
+    }
+    setClosingStep(target);
+    setShowBlockers(false);
+    requestAnimationFrame(() => {
+      const heading = document.getElementById('closing-step-heading');
+      heading?.focus({ preventScroll: true });
+      heading?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submissionInFlight.current) return;
     const savingDraft = requestedClosingState === 'draft';
+    const explicitDraft = e.nativeEvent?.submitter?.dataset?.closingIntent === 'draft';
+    const confirmed = finalConfirmation.current;
+    finalConfirmation.current = false;
+    // Enter in a field can move forward, but can never finalize a closing.
+    if (!explicitDraft && !confirmed) {
+      goToClosingStep(Math.min(2, closingStep + 1));
+      return;
+    }
+    if (confirmed && (closingStep !== 2 || !allValid || !cashContextReady || ledgerOverdrawn)) {
+      setShowBlockers(true);
+      return;
+    }
 
     const invalidCredit = customerCreditSales.find((entry) => {
       const amount = Number(entry.amount);
@@ -1447,7 +1486,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       setInlineErrors(nextErrors);
       const firstError = Object.keys(nextErrors)[0];
       if (!['actualCash', 'reconciliation', 'sales_notes'].includes(firstError)) setShowFullDetails(true);
-      focusField(firstError);
+      if (['actualCash', 'reconciliation'].includes(firstError)) setClosingStep(1);
+      requestAnimationFrame(() => focusField(firstError));
       return;
     }
     setInlineErrors({});
@@ -1743,42 +1783,46 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
           </header>
 
-          <ClosingControlOverview lang={lang} currency={currency} totalSales={totalSales} expectedCash={expectedCash} actualCash={actualCount} difference={cashDifference} ledgerOverdrawn={ledgerOverdrawn}
-            onSales={() => document.getElementById('quick-closing-cashSales')?.focus()}
-            onCash={() => document.getElementById('quick-closing-actualCash')?.focus()}
-            onReview={() => { document.getElementById('sales-closing-actions')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); document.getElementById('sales-closing-actions')?.focus({ preventScroll: true }); }} />
+          <ClosingStepNavigation step={closingStep} onChange={goToClosingStep} disabled={isSubmitting} lang={lang} />
+          <h2 id="closing-step-heading" tabIndex={-1} className="px-1 text-xl font-black text-slate-950 outline-none" data-i18n-skip="true">{closingStep === 1 ? (lang === 'fa' ? 'چقدر پول در صندوق است؟' : lang === 'ar' ? 'كم النقد الموجود في الصندوق؟' : 'How much cash is in the drawer?') : stepCopy.steps[closingStep]}</h2>
+          {closingStep === 2 && <ClosingControlOverview lang={lang} currency={currency} totalSales={totalSales} expectedCash={expectedCash} actualCash={actualCount} difference={cashDifference} ledgerOverdrawn={ledgerOverdrawn} showNavigation={false} />}
 
+          <div hidden={closingStep !== 2 && (!showBlockers || attentionCount === 0)}>
           <section id="closing-readiness-anchor" data-testid="closing-readiness-summary" className={`flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 ${allValid ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50/75'}`}>
             <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${allValid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}><ShieldCheck className="h-4 w-4" /></span>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-black text-slate-900">{allValid ? (lang === 'fa' ? 'آمادهٔ نهایی‌سازی' : lang === 'ar' ? 'جاهز للإقفال' : 'Ready to finalize') : (lang === 'fa' ? `${attentionCount} مورد نیاز به اصلاح` : lang === 'ar' ? `${attentionCount} بنود تحتاج معالجة` : `${attentionCount} required action${attentionCount === 1 ? '' : 's'}`)}</p>
-              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-200"><div className={`h-full rounded-full ${allValid ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{width: `${readinessPercent}%`}} /></div>
+
             </div>
-            <span className="shrink-0 text-xs font-bold tabular-nums text-slate-500">{readinessPercent}%</span>
+
             {!allValid && <button type="button" className="min-h-9 rounded-lg px-1.5 text-xs font-bold text-amber-800 underline" data-testid="closing-toggle-blockers" aria-expanded={showBlockers} onClick={() => setShowBlockers(x => !x)}>{lang === 'fa' ? 'بررسی' : lang === 'ar' ? 'مراجعة' : 'Review'}</button>}
           </section>
           {attentionCount > 0 && showBlockers && <section data-testid="closing-blockers" role="status" className="space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 p-2.5">
-            {failedValidations.map(validation => <button type="button" key={validation.key} className="flex min-h-10 w-full items-start gap-2 rounded-lg bg-white px-2.5 py-2 text-left text-xs text-amber-900" onClick={() => {
+            {stepFailedValidations.map(validation => <button type="button" key={validation.key} className="flex min-h-10 w-full items-start gap-2 rounded-lg bg-white px-2.5 py-2 text-left text-xs text-amber-900" onClick={() => {
+              setClosingStep(['erpData', 'cashBalance'].includes(validation.key) ? 1 : 0);
               if (validation.key === 'erpData' && openingReviewRequired) setShowOpeningVerification(true);
-              else if (validation.key !== 'cashBalance') setShowFullDetails(true);
+              else if (validation.key !== 'cashBalance' && !(validation.key === 'erpData' && ledgerOverdrawn)) setShowFullDetails(true);
               const anchor = validation.key === 'cashBalance' ? 'quick-closing-actualCash' : validation.key === 'erpData' && openingReviewRequired ? 'opening-cash-needs-review' : validation.key === 'erpData' && ledgerOverdrawn ? 'closing-funding' : null;
               if (anchor) requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({behavior: 'smooth', block: 'center'}));
             }}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span className="min-w-0"><strong className="block">{validation.label}</strong><span className="block text-[11px]">{validation.message}</span></span></button>)}
           </section>}
 
+          </div>
+          <div hidden={closingStep !== 0} data-testid="closing-step-sales">
           <section data-testid="closing-sales-entry-mode" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Daily sales">
             <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-3 sm:px-5">
               <div><h2 className="text-sm font-black text-slate-950">{lang === 'fa' ? 'فروش امروز' : lang === 'ar' ? 'مبيعات اليوم' : 'Today sales'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{lang === 'fa' ? 'فقط همین تاریخ و شیفت' : lang === 'ar' ? 'لهذا التاريخ والوردية فقط' : 'This date and shift only'}</p></div>
               <div className="text-right"><p className="text-[10px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش' : lang === 'ar' ? 'الإجمالي' : 'Total sales'}</p><Money currency={currency} value={totalSales} className="text-xl font-black text-blue-700" /></div>
             </div>
             <div className="space-y-3 p-3.5 sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <details className="rounded-lg border border-slate-100 p-2"><summary className="min-h-10 cursor-pointer text-xs text-slate-500">{lang === 'fa' ? 'روش ثبت فروش' : lang === 'ar' ? 'طريقة إدخال المبيعات' : 'Sales entry options'}</summary><div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[11px] font-bold text-slate-500">{lang === 'fa' ? 'روش ثبت' : lang === 'ar' ? 'طريقة الإدخال' : 'Entry mode'}</span>
                 <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1" role="group" aria-label="Sales entry mode">
                   <button type="button" data-testid="sales-entry-manual" aria-pressed={salesEntryMode === 'manual'} className="min-h-9 rounded-md bg-white px-3 text-xs font-black text-blue-700 shadow-sm" onClick={() => setSalesEntryMode('manual')}>{lang === 'fa' ? 'دستی / آفلاین' : lang === 'ar' ? 'يدوي / أوفلاين' : 'Manual / Offline'}</button>
                   <button type="button" data-testid="sales-entry-automatic" aria-pressed={salesEntryMode === 'automatic'} disabled={!automaticTotalsEnabled || Boolean(initial?.id)} className="min-h-9 rounded-md px-3 text-xs font-bold text-slate-500 disabled:opacity-60" onClick={() => setSalesEntryMode('automatic')}>{lang === 'fa' ? 'POS اتومات' : lang === 'ar' ? 'POS تلقائي' : 'Auto POS'}</button>
                 </div>
               </div>
+              </details>
               <div data-testid="offline-sales-audit" className="grid min-w-0 grid-cols-1 gap-2.5 min-[360px]:grid-cols-2">
                 <div className="min-w-0"><Label htmlFor="quick-closing-cashSales" className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'فروش نقدی قبل از پرداخت‌ها' : lang === 'ar' ? 'مبيعات نقدية قبل المدفوعات' : 'Cash sales before payments'}</Label><ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} disabled={useAutomaticSales || isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" /></div>
                 <div className="min-w-0"><Label htmlFor={`quick-closing-network-${posEntries[0]?.id || 'empty'}`} className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : 'Network / Card'}</Label>
@@ -1808,11 +1852,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </div>
           </section>
 
-          {cashContextReady && <ClosingFundingPanel key={`${activeRestaurant?.id}:${selectedBranchId}:${form.date}:${form.shift}:${effectiveCashierId}`}
-            restaurantId={activeRestaurant?.id} branchId={selectedBranchId} branchKey={form.branch} date={form.date} shift={form.shift} cashierId={effectiveCashierId}
-            expectedCash={expectedCash} actualCash={actualCount} role={role} lang={lang} currency={currency} disabled={isSubmitting}
-            onPosted={async () => { setManagerApproved(false); await refetchCashLedger(); }} />}
-          {ledgerOverdrawn && <p role="alert" data-testid="cash-ledger-overdrawn" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{lang === 'fa' ? 'پرداخت نقدی بیشتر از موجودی ثبت‌شده است. تمویل واقعی را در بخش بالا ثبت و سپس صندوق را دوباره شمارش کنید.' : lang === 'ar' ? 'المدفوعات النقدية تتجاوز الرصيد المسجل. سجّل التمويل الفعلي أعلاه ثم أعد عد الصندوق.' : 'Cash payments exceed the recorded balance. Record actual funding above, then recount the drawer.'}</p>}
+          </div>
+          <div hidden={closingStep !== 1} data-testid="closing-step-cash" className="space-y-3">
+          {ledgerOverdrawn && <p role="alert" data-testid="cash-ledger-overdrawn" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{lang === 'fa' ? 'پرداخت نقدی بیشتر از موجودی ثبت‌شده است. تمویل واقعی را در بخش تمویل ثبت و سپس صندوق را دوباره شمارش کنید.' : lang === 'ar' ? 'المدفوعات النقدية تتجاوز الرصيد المسجل. سجّل التمويل الفعلي في قسم التمويل ثم أعد عد الصندوق.' : 'Cash payments exceed the recorded balance. Record actual funding in the funding section, then recount the drawer.'}</p>}
           {openingReviewRequired && showOpeningVerification && <div id="opening-cash-needs-review" role="alert" data-testid="opening-cash-needs-review" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-black">Opening Cash needs reconciliation</p>
             <p className="mt-1 text-xs leading-6">{openingReviewReason}</p>
@@ -1846,26 +1888,38 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               <span role="status" className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-black ${cashDifference === null ? 'bg-slate-100 text-slate-600' : cashDifference === 0 ? 'bg-emerald-50 text-emerald-700' : cashDifference < 0 ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{cashDifference === null ? (lang === 'fa' ? 'در انتظار' : lang === 'ar' ? 'قيد الانتظار' : 'Pending') : cashDifference === 0 ? (lang === 'fa' ? 'تطبیق' : lang === 'ar' ? 'متطابق' : 'Balanced') : cashDifference < 0 ? (lang === 'fa' ? 'کسری' : lang === 'ar' ? 'عجز' : 'Short') : (lang === 'fa' ? 'اضافه' : lang === 'ar' ? 'فائض' : 'Over')}</span>
             </div>
             <div className="space-y-3 p-3.5 sm:p-5">
+              <div className="grid min-w-0 grid-cols-1 min-[480px]:grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+                <div className="min-w-0"><Label htmlFor="quick-closing-actualCash" className="mb-1.5 block text-xs font-black text-slate-800">{lang === 'fa' ? 'پول واقعی صندوق *' : lang === 'ar' ? 'النقد الفعلي *' : 'Actual Cash *'}</Label><ClosingNumericInput id="quick-closing-actualCash" value={actualCashCount} onChange={handleActualCashChange} prefix={currency} inputClassName="h-14 min-w-0 border-blue-300 bg-white text-lg font-black" disabled={isSubmitting} /></div>
+                <div className="min-w-0 rounded-xl bg-slate-50 px-2.5 py-2 text-right"><p className="text-[10px] font-bold text-slate-500">{lang === 'fa' ? 'اختلاف' : lang === 'ar' ? 'الفرق' : 'Variance'}</p>{cashDifference === null ? <span className="text-lg font-black text-slate-400">—</span> : <Money currency={currency} value={cashDifference} signed className={`text-lg font-black ${cashDifference === 0 ? 'text-emerald-700' : cashDifference < 0 ? 'text-red-700' : 'text-amber-700'}`} />}</div>
+              </div>
+              <details className="rounded-xl border border-slate-100 p-3">
+              <summary className="min-h-11 cursor-pointer text-xs font-bold text-slate-600">{lang === 'fa' ? 'محاسبه موجودی صندوق' : lang === 'ar' ? 'حساب رصيد الصندوق' : 'How the drawer balance is calculated'}</summary>
               <div className="grid grid-cols-1 gap-x-4 gap-y-2 min-[480px]:grid-cols-2 rounded-xl bg-slate-50 p-3 text-xs">
                 <div className="flex items-center justify-between gap-2"><span className="text-slate-500">{lang === 'fa' ? 'افتتاحیه' : lang === 'ar' ? 'الافتتاحي' : 'Opening'}</span><strong className="tabular-nums text-slate-900">{cashContextReady ? (opening ?? 0).toLocaleString() : '—'}</strong></div>
                 <div className="flex items-center justify-between gap-2"><span className="text-slate-500">{lang === 'fa' ? 'فروش نقدی' : lang === 'ar' ? 'بيع نقدي' : 'Cash Sales'}</span><strong className="tabular-nums text-slate-900">{reconciliation.cashSales.toLocaleString()}</strong></div>
                 <div className="flex items-center justify-between gap-2"><span className="text-slate-500">{lang === 'fa' ? 'ورود نقد' : lang === 'ar' ? 'نقد وارد' : 'Cash In'}</span><strong className="tabular-nums text-slate-900">{reconciliation.cashIn.toLocaleString()}</strong></div>
                 <div className="flex items-center justify-between gap-2"><span className="text-slate-500">{lang === 'fa' ? 'خروج نقد' : lang === 'ar' ? 'نقد صادر' : 'Cash Out'}</span><strong className="tabular-nums text-slate-900">{reconciliation.cashOut.toLocaleString()}</strong></div>
               </div>
+              </details>
               <div className="flex items-center justify-between gap-3 rounded-xl bg-blue-50 px-3 py-2.5">
                 <span className="text-xs font-bold text-blue-900">{lang === 'fa' ? 'موجودی مورد انتظار' : lang === 'ar' ? 'النقد المتوقع' : 'Expected Cash'}</span>
                 {expectedCash === null ? <span className="text-xs font-bold text-amber-700">{lang === 'fa' ? 'نامعلوم / نیاز به بررسی' : lang === 'ar' ? 'بحاجة للمراجعة' : 'Awaiting verified opening'}</span> : <Money currency={currency} value={expectedCash} className="text-lg font-black text-blue-800" />}
               </div>
-              <div className="grid min-w-0 grid-cols-1 min-[480px]:grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-                <div className="min-w-0"><Label htmlFor="quick-closing-actualCash" className="mb-1.5 block text-xs font-black text-slate-800">{lang === 'fa' ? 'پول واقعی صندوق *' : lang === 'ar' ? 'النقد الفعلي *' : 'Actual Cash *'}</Label><ClosingNumericInput id="quick-closing-actualCash" value={actualCashCount} onChange={handleActualCashChange} prefix={currency} inputClassName="h-14 min-w-0 border-blue-300 bg-white text-lg font-black" disabled={isSubmitting} /></div>
-                <div className="min-w-0 rounded-xl bg-slate-50 px-2.5 py-2 text-right"><p className="text-[10px] font-bold text-slate-500">{lang === 'fa' ? 'اختلاف' : lang === 'ar' ? 'الفرق' : 'Variance'}</p>{cashDifference === null ? <span className="text-lg font-black text-slate-400">—</span> : <Money currency={currency} value={cashDifference} signed className={`text-lg font-black ${cashDifference === 0 ? 'text-emerald-700' : cashDifference < 0 ? 'text-red-700' : 'text-amber-700'}`} />}</div>
-              </div>
               {inlineErrors.actualCash && <p role="alert" className="text-xs font-bold text-red-700">{inlineErrors.actualCash}</p>}
-              {openingReviewRequired && <button type="button" className="flex min-h-11 w-full items-center justify-between rounded-lg border border-amber-200 px-3 text-left text-xs font-bold text-amber-800" onClick={() => setShowOpeningVerification(v => !v)}>{lang === 'fa' ? 'تأیید Opening Cash لازم است' : lang === 'ar' ? 'يلزم توثيق النقد الافتتاحي' : 'Opening count requires review'}<ChevronRight className="h-4 w-4" /></button>}
+              {openingReviewRequired && <button type="button" className="flex min-h-11 w-full items-center justify-between rounded-lg border border-amber-200 px-3 text-left text-xs font-bold text-amber-800" onClick={() => { setShowOpeningVerification(v => !v); requestAnimationFrame(() => document.getElementById('opening-cash-needs-review')?.scrollIntoView({ behavior: 'smooth', block: 'center' })); }}>{lang === 'fa' ? 'تأیید Opening Cash لازم است' : lang === 'ar' ? 'يلزم توثيق النقد الافتتاحي' : 'Opening count requires review'}<ChevronRight className="h-4 w-4" /></button>}
               <button type="button" data-testid="closing-reconciliation-details" className="flex min-h-10 w-full items-center justify-between text-left text-xs font-bold text-blue-700" onClick={() => setShowFullDetails(true)}>{lang === 'fa' ? 'دفتر صندوق، کسری و اضافه، تسویه' : lang === 'ar' ? 'دفتر النقد، العجز والزيادة والتسوية' : 'Cash ledger, variance notes & settlements'}<ChevronRight className="h-4 w-4" /></button>
             </div>
           </section>
 
+          <details open={ledgerOverdrawn || showFunding} onToggle={event => setShowFunding(event.currentTarget.open)} className="rounded-2xl border border-slate-200 bg-white p-3">
+            <summary className="min-h-11 cursor-pointer text-sm font-bold text-blue-700">{lang === 'fa' ? 'تمویل از خزانه یا اونر' : lang === 'ar' ? 'تمويل من الخزينة أو المالك' : 'Funding from treasury or owner'}</summary>
+          {cashContextReady && <ClosingFundingPanel key={`${activeRestaurant?.id}:${selectedBranchId}:${form.date}:${form.shift}:${effectiveCashierId}`}
+            restaurantId={activeRestaurant?.id} branchId={selectedBranchId} branchKey={form.branch} date={form.date} shift={form.shift} cashierId={effectiveCashierId}
+            expectedCash={expectedCash} actualCash={actualCount} role={role} lang={lang} currency={currency} disabled={isSubmitting}
+            onPosted={async () => { setManagerApproved(false); await refetchCashLedger(); }} />}
+          </details>
+          </div>
+          <div hidden={closingStep !== 2} data-testid="closing-step-review" className="space-y-3">
           <details className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5" data-testid="closing-operating-statement" data-i18n-skip="true">
             <summary className="min-h-11 cursor-pointer text-sm font-bold text-slate-900">{lang === 'fa' ? 'خریدها و مصارف' : lang === 'ar' ? 'المشتريات والمصروفات' : <>Expenses &amp; purchases</>}</summary>
             {cashContextReady && !purchasesLoading && !purchasesUnavailable ? <dl className="mt-2 space-y-3 text-sm">
@@ -1886,6 +1940,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             </button>
           </section>
 
+          </div>
           <Sheet open={Boolean(workspaceTabActive && showFullDetails)} onOpenChange={isOpen => {if (workspaceTabActive) setShowFullDetails(isOpen);}}>
             <SheetContent side="bottom" className="z-50 h-[min(90dvh,900px)] max-h-[90dvh] w-full overflow-y-auto overscroll-contain rounded-t-2xl border-slate-200 bg-slate-50 px-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-5 sm:mx-auto sm:max-w-4xl sm:px-5" data-testid="closing-advanced-sheet">
               <SheetHeader className="mb-4 pr-8 text-left">
@@ -1923,20 +1978,21 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             the middle of the iPhone viewport and obscures Cash Reconciliation.
             Keep actions in normal document flow, after every Closing field. */}
         <div className="mx-auto max-w-4xl">
+          {closingStep > 0 && <Button type="button" variant="ghost" className="mb-2 min-h-11" disabled={isSubmitting} onClick={() => goToClosingStep(closingStep - 1)}>{stepCopy.back}</Button>}
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-[11px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش همین شیفت' : lang === 'ar' ? 'مجموع مبيعات الوردية' : 'Shift sales total'}</span>
             <Money currency={currency} value={totalSales} className="text-lg font-black text-slate-900" />
           </div>
           <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2">
-            <Button type="submit" variant="outline" className="min-h-12 min-w-0 rounded-xl px-2 text-xs font-bold sm:text-sm" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn}><Save className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'ذخیره موقت' : lang === 'ar' ? 'حفظ المسودة' : 'Save Draft'}</Button>
-            <Button type="button" aria-label="Review & Finalize Closing" data-testid="closing-review-finalize" className="min-h-12 min-w-0 rounded-xl bg-blue-600 px-2 text-xs font-black hover:bg-blue-700 sm:text-sm" disabled={isSubmitting} onClick={() => {
+            <Button type="submit" data-closing-intent="draft" variant="outline" className="min-h-12 min-w-0 rounded-xl px-2 text-xs font-bold sm:text-sm" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn}><Save className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'ذخیره موقت' : lang === 'ar' ? 'حفظ المسودة' : 'Save Draft'}</Button>
+            {closingStep < 2 ? <Button type="button" data-testid="closing-next-step" className="min-h-12 min-w-0 whitespace-normal rounded-xl bg-blue-600 px-2 text-xs font-black hover:bg-blue-700 sm:text-sm" disabled={isSubmitting} onClick={() => goToClosingStep(closingStep + 1)}>{stepCopy.next[closingStep]}</Button> : <Button type="button" aria-label="Review & Finalize Closing" data-testid="closing-review-finalize" className="min-h-12 min-w-0 rounded-xl bg-blue-600 px-2 text-xs font-black hover:bg-blue-700 sm:text-sm" disabled={isSubmitting} onClick={() => {
               if (!allValid || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn || purchasesLoading) {
                 setShowBlockers(true);
                 document.getElementById('closing-readiness-anchor')?.scrollIntoView({behavior:'smooth', block:'start'});
                 return;
               }
               setShowFinalizeReview(true);
-            }}>{isSubmitting ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" />{lang === 'fa' ? 'در حال ذخیره...' : lang === 'ar' ? 'جارٍ الحفظ...' : 'Saving…'}</> : <><ShieldCheck className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'بررسی و نهایی‌سازی' : lang === 'ar' ? 'مراجعة وإقفال' : 'Review & Finalize'}</>}</Button>
+            }}>{isSubmitting ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" />{lang === 'fa' ? 'در حال ذخیره...' : lang === 'ar' ? 'جارٍ الحفظ...' : 'Saving…'}</> : <><ShieldCheck className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'بررسی و نهایی‌سازی' : lang === 'ar' ? 'مراجعة وإقفال' : 'Review & Finalize'}</>}</Button>}
           </div>
         </div>
       </div>
@@ -1969,7 +2025,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             <Button type="button" data-testid="closing-confirm-finalize" className="min-h-12 rounded-xl bg-blue-600 font-black hover:bg-blue-700" disabled={isSubmitting || !allValid || !cashContextReady || cashDifference === null || ledgerOverdrawn} onClick={() => {
               setShowFinalizeReview(false);
               flushSync(() => setRequestedClosingState('finalized'));
-              formRef.current?.requestSubmit();
+              finalConfirmation.current = true;
+              try { formRef.current?.requestSubmit(); } finally { finalConfirmation.current = false; }
             }}><ShieldCheck className="mr-1 h-4 w-4" />{lang === 'fa' ? 'ثبت نهایی' : lang === 'ar' ? 'اعتماد الإقفال' : 'Confirm'}</Button>
           </div>
         </DialogContent>

@@ -8,7 +8,7 @@ const COPY = {
 };
 
 /** Read-only overview; all amounts come from the existing canonical closing. */
-export default function ClosingControlOverview({ lang = 'en', currency, totalSales, expectedCash, actualCash, difference, ledgerOverdrawn, onSales, onCash, onReview }) {
+export default function ClosingControlOverview({ lang = 'en', currency, totalSales, expectedCash, actualCash, difference, ledgerOverdrawn, onSales, onCash, onReview, showNavigation = true }) {
   const text = COPY[lang] || COPY.en;
   const cards = [
     { key: 'sales', label: text.sales, value: totalSales, Icon: WalletCards, tone: 'text-slate-900', note: null },
@@ -27,9 +27,9 @@ export default function ClosingControlOverview({ lang = 'en', currency, totalSal
         {note && <p className={`mt-1 text-xs font-semibold ${tone}`}>{note}</p>}
       </div>)}
     </div>
-    <nav aria-label={text.title} className="grid grid-cols-1 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 min-[360px]:grid-cols-3">
+    {showNavigation && <nav aria-label={text.title} className="grid grid-cols-1 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 min-[360px]:grid-cols-3">
       {[{ label: text.salesStep, action: onSales }, { label: text.cashStep, action: onCash }, { label: text.reviewStep, action: onReview }].map(({ label, action }, index) => <button key={label} type="button" onClick={action} className="flex min-h-12 min-w-0 items-center gap-2 rounded-lg px-2 text-start text-xs font-bold text-slate-700 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"><span aria-hidden="true" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-blue-700">{index + 1}</span><span>{label}</span></button>)}
-    </nav>
+    </nav>}
     <p className="px-1 text-xs leading-5 text-slate-500">{text.help}</p>
   </section>;
 }
