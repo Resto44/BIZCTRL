@@ -38,6 +38,6 @@ describe('Guided closing workflow', () => {
     expect(source).toContain('finalConfirmation.current = false;');
     expect(source).toContain('try { formRef.current?.requestSubmit(); } finally { finalConfirmation.current = false; }');
     expect(source).toContain('data-closing-intent="draft"');
-    expect(source).toContain('open={ledgerOverdrawn || showFunding}');
+    expect(source).toContain('fundingContent={cashContextReady ? <ClosingFundingPanel');
   });
 });
