@@ -224,6 +224,59 @@ describe('Issue #183 read-only shadow source of truth', () => {
     expect(result.metrics.payroll_expense.amount).toBe(2050);
   });
 
+  it('marks valued but uncertified COGS and downstream gross profit Estimated rather than Verified', () => {
+    const result = run({
+      sources: { inventory_transactions: [{
+        id: 'cost-1', restaurant_id: 'tenant-1', branch_id: 'branch-a', date: '2026-10-23',
+        shift: 'morning', transaction_type: 'recipe_consumption',
+        quantity: 2, unit_cost: 6, reference_id: 'sale-1', reference_type: 'sale',
+      }] },
+    });
+    expect(result.metrics.recognized_cogs.confidence).toBe('ESTIMATED');
+    expect(result.metrics.recognized_cogs.estimatedAmount).toBe(12);
+    expect(result.metrics.gross_profit.confidence).toBe('ESTIMATED');
+    expect(result.metrics.gross_profit.estimatedAmount).toBe(163);
+  });
+
+  it('does not certify cash when closing posting provenance is missing', () => {
+    const result = run({
+      sources: { drawerCount: { openingCash: 0, actualCash: 100 } },
+      completeness: { salesPostingCertified: false },
+    });
+    expect(result.metrics.drawer_expected.amount).toBeNull();
+    expect(result.metrics.drawer_expected.confidence).toBe('ESTIMATED');
+    expect(result.metrics.net_sales.confidence).toBe('ESTIMATED');
+  });
+
+  it('rejects tenant_id mismatch when independently supplied tenant identity exists', () => {
+    const result = run({
+      scope: { ...scope, tenantId: 'tenant-1' },
+      sources: { daily_sales: [closing({ tenant_id: 'tenant-2' })] },
+    });
+    expect(result.metrics.net_sales.amount).toBeNull();
+    expect(result.issues.map(x => x.code)).toContain('TENANT_SCOPE_MISMATCH');
+  });
+
+  it('does not claim transfer pair certification from a single branch scope', () => {
+    const result = run({ sources: { wallet_transactions: [
+      { id: 'leg-a', restaurant_id: 'tenant-1', branch_id: 'branch-a', date: '2026-10-23',
+        transaction_type: 'owner_branch_funding_debit', reference_id: 'fund-1', amount: 50 },
+    ] }, completeness: { treasuryPairingCertified: true } });
+    expect(result.metrics.treasury_transfer_net.amount).toBeNull();
+    expect(result.metrics.treasury_transfer_net.confidence).toBe('UNAVAILABLE');
+  });
+
+  it('permits advisory canary review for a fully attested specific KPI without globally certifying unrelated KPIs', () => {
+    const snapshot = run({ legacy: { net_sales: 175 } });
+    const result = assessCanonicalRelease({
+      snapshot, metricNames: ['net_sales'], testsPassed: true,
+      authorizedBranches: ['branch-a'], reconciledBranches: ['branch-a'], daysObserved: 14,
+      financeApproved: true, technicalApproved: true, ownerApproved: true,
+    });
+    expect(result.eligibleForManualCanaryReview).toBe(true);
+    expect(snapshot.canPublishCanonicalKpis).toBe(false);
+  });
+
   it('requires independently audited CI, branch evidence, 14 days and approvals for canary', () => {
     const result = run();
     const gate = assessCanonicalRelease({
