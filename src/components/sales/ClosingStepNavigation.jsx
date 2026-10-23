@@ -10,7 +10,7 @@ export const closingStepCopy = {
 // validations and a separate explicit confirmation.
 export function closingStepIssues(step, validations) {
   const keys = step === 0
-    ? ['cashier', 'branch', 'shift', 'pos', 'credit', 'cash', 'creditLimit']
+    ? ['cashier', 'branch', 'shift', 'pos', 'credit', 'cashSources', 'cash', 'creditLimit']
     : step === 1 ? ['erpData', 'cashBalance'] : [];
   return validations.filter(item => keys.includes(item.key) && !item.passed);
 }
