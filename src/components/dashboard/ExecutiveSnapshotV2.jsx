@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { buildExecutiveSnapshotPresentation, moneyChange } from '@/lib/executiveSnapshotPresentation';
+import OwnerOrderSourcesAnalytics from './OwnerOrderSourcesAnalytics';
 
 const t = (copy,key,fallback) => copy?.[key] || fallback;
 
@@ -77,6 +78,7 @@ export default function ExecutiveSnapshotV2({model,copy}) {
   const {
     periodMetrics={},previousPeriodMetrics={},revenueTrend=[],periodKey='today',
     periodLabel,formatMoney,hasQueryError,accountingProvisional,drawerCash,receivables,payables,scopedAlerts=[],
+    periodSales=[],revenueSources=[],lang='en',
   }=model;
   const presentation=useMemo(()=>buildExecutiveSnapshotPresentation({
     periodMetrics,previousPeriodMetrics,revenueTrend,periodKey,
@@ -178,6 +180,11 @@ export default function ExecutiveSnapshotV2({model,copy}) {
         </div>
       </div>
     </section>
+
+    <OwnerOrderSourcesAnalytics
+      sales={periodSales} revenueSources={revenueSources} verifiedSales={presentation.sales}
+      formatMoney={formatMoney} lang={lang} periodLabel={periodLabel} hasQueryError={hasQueryError}
+    />
 
     <section data-testid="snapshot-related-financials" className="min-w-0 rounded-[1.55rem] border border-border/80 bg-card p-3.5 shadow-sm sm:p-5">
       <SectionHeader icon={Layers3} title={t(copy,'relatedFinancials','Related financials')}
