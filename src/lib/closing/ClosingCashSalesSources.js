@@ -21,7 +21,8 @@ export function closingCashSalesSources({ baseCashSales = 0, summaries = [] } = 
       ? driverSourcePaymentBreakdown(driverEntries).cash
       : paymentMethodForCode(source.default_payment_method) === 'cash' ? today : 0;
     const amount = sumClosingMoney(cash);
-    if (amount < 0) continue;
+    // A card, credit or wallet-only source is not a physical Cash Sales row.
+    if (amount <= 0) continue;
     rows.push({
       id: 'source:' + String(source.id),
       label: sourceLabel || source.name_en || source.name || 'Cash source',
