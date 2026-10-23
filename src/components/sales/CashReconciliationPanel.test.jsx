@@ -108,7 +108,7 @@ describe('CashReconciliationPanel', () => {
     // Count can be recorded for audit while opening provenance is unresolved;
     // approval/finalization still fails closed.
     expect(textOf(tree.root.findByProps({ 'data-testid': 'closing-cash-preview' }))).toContain('Physically counted cash · pending reconciliation');
-    expect(textOf(tree.root.findByProps({ 'data-testid': 'closing-cash-preview' }))).toMatch(/SAR\\s+14/);
+    expect(textOf(tree.root.findByProps({ 'data-testid': 'closing-cash-preview' }))).toMatch(/SAR\s+14/);
   });
 
   it('shows the ledger error separately from an unverified previous shift', () => {
