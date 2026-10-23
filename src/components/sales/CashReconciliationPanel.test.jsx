@@ -104,7 +104,9 @@ describe('CashReconciliationPanel', () => {
     expect(text).not.toContain('SAR 14 Overage');
     const approve = tree.root.findAllByType('button').find(node => textOf(node).includes('Approve Cash Count'));
     expect(approve.props.disabled).toBe(true);
-    expect(tree.root.findByProps({ id: 'closing-detail-actual-cash' }).props.disabled).toBe(true);
+    expect(tree.root.findByProps({ id: 'closing-detail-actual-cash' }).props.disabled).toBe(false);
+    // Count can be recorded for audit while opening provenance is unresolved;
+    // approval/finalization still fails closed.
     expect(textOf(tree.root.findByProps({ 'data-testid': 'closing-cash-preview' }))).toContain('—');
   });
 
