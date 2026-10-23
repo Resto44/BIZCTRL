@@ -1,3 +1,4 @@
+import { buildClosingTrendIndex } from '@/lib/closingHistoryAnalytics';
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -469,6 +470,7 @@ export default function Sales() {
   // saveClosingSession() below. Direct entity mutations are forbidden because
   // they bypass the canonical server lifecycle and audit transaction.
 
+  const closingTrends = useMemo(() => buildClosingTrendIndex(sales), [sales]);
   const filtered = useMemo(() => filterDailySalesRecords(sales, filters), [sales, filters]);
   const historyScopeRecords = useMemo(() => filtered.filter((sale) => {
     if (historyFilters.month !== 'all' && !String(sale.date || '').startsWith(historyFilters.month)) return false;
@@ -655,7 +657,7 @@ export default function Sales() {
         </div>
       )}
 
-      {linked?.event?.entity==='daily_sales' && linked.record && <SalesListItem key={`notification-${linked.event.id}`} sale={toDailySalesCardRecord(linked.record)} record={linked.record} expanded onToggleExpanded={null} onEdit={(sale)=>{if(isDriverSale(sale) && !canManageDriverSales) return;setNewClosingDefaults(null);setEditing(sale);setShowForm(false);}} onExport={()=>setShowExport(true)} onDelete={null} selected={false} onToggleSelect={null}/>}
+      {linked?.event?.entity==='daily_sales' && linked.record && <SalesListItem key={`notification-${linked.event.id}`} sale={toDailySalesCardRecord(linked.record)} trend={closingTrends.get(linked.record.id)} record={linked.record} expanded onToggleExpanded={null} onEdit={(sale)=>{if(isDriverSale(sale) && !canManageDriverSales) return;setNewClosingDefaults(null);setEditing(sale);setShowForm(false);}} onExport={()=>setShowExport(true)} onDelete={null} selected={false} onToggleSelect={null}/>}
 
       <div className="flex flex-col md:flex-row gap-4">
         {showFilters && (
@@ -692,6 +694,7 @@ export default function Sales() {
                 <SalesListItem
                   key={s.id}
                   sale={toDailySalesCardRecord(s)}
+                  trend={closingTrends.get(s.id)}
                   record={s}
                   expanded={expandedClosingId === s.id}
                   onToggleExpanded={() => setExpandedClosingId((current) => current === s.id ? null : s.id)}

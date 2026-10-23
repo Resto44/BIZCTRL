@@ -25,7 +25,8 @@ describe('Closing profit cards', () => {
   it.each(['en', 'fa', 'ar'])('renders all four metrics in %s without hiding them in expanded details', (lang) => {
     context.lang = lang;
     const html = renderToStaticMarkup(<SalesListItem sale={sale} />);
-    expect(html).toContain('SAR 350');
+    expect(html).toContain('SAR 200');
+    expect(html).toContain('SAR 150');
     expect(html).toContain('+SAR 450');
     expect(html).toContain('+SAR 300');
     expect(html).toContain('grid-cols-2');
@@ -34,6 +35,6 @@ describe('Closing profit cards', () => {
   it('shows missing-cost and zero-cost warnings instead of a certified margin', () => {
     context.lang = 'en';
     expect(renderToStaticMarkup(<SalesListItem sale={{ ...sale, expenses_total: null }} />)).toContain('Cost data incomplete');
-    expect(renderToStaticMarkup(<SalesListItem sale={{ ...sale, expenses_total: 0, approved_purchases_total: 0 }} />)).toContain('profit is unverified');
+    expect(renderToStaticMarkup(<SalesListItem sale={{ ...sale, expenses_total: 0, approved_purchases_total: 0 }} />)).toContain('profit unverified');
   });
 });
