@@ -123,7 +123,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const cashDifference = !cashContextReady || ledgerOverdrawn ? null : reconciliation.difference;');
     expect(workspace).toContain('const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;');
     expect(workspace).toContain('const operatingResult = sumClosingMoney(totalSales, -totalDailyExpenses);');
-    expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
+    expect(workspace).toContain("loadClosingCashContext(supabase,");
     expect(reconciliationPanel).toContain('Actual Cash');
     expect(reconciliationPanel).toContain('No settlement required');
   });
@@ -153,7 +153,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('buildSalesSourceClosingSnapshots(customSourceSummaries');
     expect(workspace).toContain("payment_bucket: snapshot.allows_driver_entries === true ? 'other' : paymentBucketForCode(snapshot.default_payment_method)");
     expect(workspace).toContain('salesSourceTodayTotal(customSourceSummaries)');
-    expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
+    expect(workspace).toContain("loadClosingCashContext(supabase,");
     expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
     expect(workspace).toContain('const expectedCash = !cashContextReady ? null : reconciliation.expectedCash;');
   });
@@ -228,7 +228,7 @@ describe('Unified Sales Closing workflow contract', () => {
     const sales = await source('../src/pages/Sales.jsx');
 
     expect(workspace).toContain("queryKey: ['approved_purchases_for_date'");
-    expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
+    expect(workspace).toContain("loadClosingCashContext(supabase,");
     expect(workspace).toContain('Fixed and variable expenses are supplied only by the canonical server cash');
     expect(workspace).not.toContain(".from('expenses')");
     expect(workspace).toContain("nextErrors.actualCash = 'Enter the physically counted Actual Cash (0 or positive, up to two decimal places).'");
@@ -252,7 +252,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('Retry ERP data');
     expect(workspace).toContain('cashLedgerLoading || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn');
     expect(workspace).toContain('!allValid || !cashContextReady || cashDifference === null || ledgerOverdrawn');
-    expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
+    expect(workspace).toContain("loadClosingCashContext(supabase,");
   });
 
   it('runs only non-accounting downstream side effects after the one committed finalized transition', async () => {

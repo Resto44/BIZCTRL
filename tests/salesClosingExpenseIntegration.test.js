@@ -10,7 +10,7 @@ const migration = read('src/supabase/20260826_fix_sales_closing_expense_context.
 
 describe('Sales Closing expense integration', () => {
   it('uses a canonical authenticated server context for branch-and-date scoped expenses instead of a browser fallback', () => {
-    expect(workspace).toContain("supabase.rpc('erp_sales_closing_cash_context'");
+    expect(workspace).toContain("loadClosingCashContext(supabase,");
     expect(workspace).not.toContain("from('expenses')");
     expect(workspace).not.toContain('expensesForDate');
     expect(workspace).toContain('variableExpensesToday = Math.max(0, Number(cashLedgerContext.variable_expenses_today) || 0)');

@@ -1,3 +1,4 @@
+import { loadClosingCashContext } from '@/lib/closing/ClosingCashContext';
 import { creditEntrySourceId, customerCreditSnapshots } from '@/lib/customerCreditSources';
 /**
  * UnifiedSalesClosing — Canonical ERP Sales Closing module
@@ -1164,8 +1165,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     queryKey: ['sales-closing-cash-ledger-context', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift, effectiveCashierId, currentClosingId],
     enabled: Boolean(activeRestaurant?.id && selectedBranchId && form.date && form.shift && effectiveCashierId),
     staleTime: 15000,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('erp_sales_closing_cash_context', {
+    queryFn: () => loadClosingCashContext(supabase, {
         p_restaurant_id: activeRestaurant.id,
         p_branch_id: selectedBranchId,
         p_branch: form.branch,
@@ -1173,12 +1173,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         p_shift: form.shift,
         p_cashier_id: effectiveCashierId,
         p_closing_id: currentClosingId,
-      });
-      if (error) throw error;
-      return data || {};
-    },
+    }),
   });
   const cashLedgerContext = cashLedgerContextData || {};
+  const ledgerClosingId = cashLedgerContext.resolved_closing_id || currentClosingId;
   // Never infer a zero opening from a missing previous count or from a
   // different cashier's drawer. The backend returns explicit provenance.
   const openingReviewRequired = cashLedgerContext.opening_verified === false;
@@ -1240,7 +1238,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       setOpeningVerificationBusy(false);
     }
   };
-  const activeOwnerSettlement = currentClosingId && cashLedgerContext.owner_settlement?.closing_id === currentClosingId
+  const activeOwnerSettlement = ledgerClosingId && cashLedgerContext.owner_settlement?.closing_id === ledgerClosingId
     ? cashLedgerContext.owner_settlement
     : null;
   const ownerSettlementPaymentApplied = Math.max(0, Number(activeOwnerSettlement?.owner_payment_amount) || 0);
@@ -1284,7 +1282,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const reconciliation = cashReconciliationSnapshot({
     openingCash: opening ?? 0,
     ledgerMovements: asRecordArray(cashLedgerContext.movements).filter(
-      (movement) => !isClosingSettlementMovement(movement, currentClosingId),
+      (movement) => !isClosingSettlementMovement(movement, ledgerClosingId),
     ),
     currentCashSales: baseCashSales,
     revenueEntries: [
@@ -1679,6 +1677,16 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       setRuntimeError({ ...details, userMessage });
       if (details?.code === 'CLOSING_ALREADY_EXISTS') {
         setInlineErrors({ duplicate: userMessage });
+      }
+      if (details?.code === 'SALES_CLOSING_CASH_LEDGER_OVERDRAWN') {
+        // Another save/payment may have changed the ledger since the preview.
+        // Keep all entered amounts and return to the actionable funding step.
+        setShowFinalizeReview(false);
+        setClosingStep(1);
+        setShowFunding(true);
+        setShowBlockers(true);
+        await refetchCashLedger();
+        requestAnimationFrame(() => document.getElementById('closing-funding')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
       }
       toast.error(userMessage);
     } finally {
