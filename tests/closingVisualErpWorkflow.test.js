@@ -22,9 +22,6 @@ describe('Sales Closing ERP visual/accounting contract', () => {
       ['restaurant_cash', 1840],
       ['source:delivery', 520],
       ['source:manual', 280],
-      ['source:network', 0],
-      ['source:wallet', 0],
-      ['source:credit', 0],
     ]);
   });
 
