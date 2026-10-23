@@ -115,9 +115,9 @@ describe('Sales Closing ERP cash reconciliation migration contract', () => {
     expect(reconciliationPanel).toContain('ClosingNumericInput');
     expect(workspace).toContain('cashSales={reconciliation.cashSales}');
     expect(workspace).toContain('value={cashSales}');
-    expect(workspace).toContain('cashLedgerContext.owner_settlement?.closing_id === currentClosingId');
+    expect(workspace).toContain('cashLedgerContext.owner_settlement?.closing_id === ledgerClosingId');
     expect(workspace).toContain('ownerSettlementPaymentApplied');
-    expect(workspace).toContain('isClosingSettlementMovement(movement, currentClosingId)');
+    expect(workspace).toContain('isClosingSettlementMovement(movement, ledgerClosingId)');
     expect(read('src/lib/closing/ClosingFunding.js')).toContain("movement?.source_module === 'OwnerCashInjection'");
     expect(workspace).toContain('ownerSettlementResolved');
     expect(workspace).toContain('ownerSettlementStatusLabel');
