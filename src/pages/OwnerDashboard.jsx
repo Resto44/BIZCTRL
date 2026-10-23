@@ -457,6 +457,7 @@ function OwnerDashboardContent() {
 
   const model = useMemo(() => ({
     formatMoney, periodMetrics, previousPeriodMetrics, periodSalesChange, periodLabel, periodKey: activePeriod,
+    periodSales, revenueSources, lang,
     branchRankings, scopedAlerts, inventoryOverview, receivables, payables, cashRegister, drawerCash,
     consumption, priceReport, supplierComparisons, branchPriceInconsistencies, priceHistory,
     expenseGroups, revenueTrend, periodPurchaseQuantity, periodPurchaseCost: periodMetrics.totalPurchaseCost,
@@ -464,7 +465,7 @@ function OwnerDashboardContent() {
     canOpenCopilot: role === 'owner' && subscriptionActive && hasFeature('ai_copilot') && Boolean(activeRestaurant?.id) && Boolean(user?.id),
     openCopilot: () => setCopilotOpen(true), copilotLabel,
     openQuickAddBranch: () => setQuickAddBranchOpen(true), loadingActiveAlerts, hasQueryError, accountingProvisional, pendingExpenseCount,
-  }), [branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, accountingProvisional, pendingExpenseCount, loadingActiveAlerts, payables, periodLabel, activePeriod, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel, subscriptionActive, hasFeature]);
+  }), [branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, accountingProvisional, pendingExpenseCount, loadingActiveAlerts, payables, periodLabel, activePeriod, periodSales, revenueSources, lang, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel, subscriptionActive, hasFeature]);
 
   if (loading) return <DashboardSkeleton />;
 
