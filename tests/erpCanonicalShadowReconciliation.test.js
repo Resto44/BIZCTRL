@@ -226,7 +226,7 @@ describe('Issue #183 read-only shadow source of truth', () => {
   it('requires independently audited CI, branch evidence, 14 days and approvals for canary', () => {
     const result = run();
     const gate = assessCanonicalRelease({
-      snapshot: result, testsPassed: true, authorizedBranches: ['branch-a'],
+      snapshot: result, metricNames: ['gross_profit'], testsPassed: true, authorizedBranches: ['branch-a'],
       reconciledBranches: ['branch-a'], daysObserved: 14,
       financeApproved: true, technicalApproved: true, ownerApproved: true,
     });
