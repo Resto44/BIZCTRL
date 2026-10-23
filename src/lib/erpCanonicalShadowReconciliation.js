@@ -54,7 +54,8 @@ function scopeRows(rows, scope, table, issues, { dated = true, shiftScoped = fal
   }
   const result = [];
   for (const row of rows) {
-    if (!row || String(row.restaurant_id) !== String(scope.restaurantId)) {
+    if (!row || String(row.restaurant_id) !== String(scope.restaurantId) ||
+        (scope.tenantId && row.tenant_id != null && String(row.tenant_id) !== String(scope.tenantId))) {
       issues.push({ code: 'TENANT_SCOPE_MISMATCH', table, id: row?.id ?? null });
       continue;
     }
@@ -184,7 +185,14 @@ export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, comple
   for (const table of missing) issues.push({ code: 'SOURCE_NOT_ATTESTED_COMPLETE', table });
 
   const sales = distinctById(scopeRows(sources.daily_sales || [], scope, 'daily_sales', issues, { shiftScoped: true, cashierScoped: true })
-    .filter(row => state(row) === 'finalized' || (state(row) === 'locked' && row.legacy_lock_verified === true)), 'daily_sales', issues);
+    .filter(row => {
+      if (['corrected', 'correction_requested'].includes(state(row)) ||
+          (state(row) === 'locked' && row.legacy_lock_verified !== true)) {
+        issues.push({ code: 'CLOSING_REVISION_UNRESOLVED', table: 'daily_sales', id: row.id });
+        return false;
+      }
+      return state(row) === 'finalized' || (state(row) === 'locked' && row.legacy_lock_verified === true);
+    }), 'daily_sales', issues);
   const saleDetails = sales.map(row => closingCents(row, issues)).filter(Boolean);
   const saleVerified = sourceReady(completeness, 'daily_sales') && completeness.salesPostingCertified === true && completeness.refundsCertified === true && !issueExists(issues, ['daily_sales']) && saleDetails.length === sales.length;
   const saleTotal = sum(saleDetails.map(x => x.total));
@@ -266,12 +274,14 @@ export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, comple
     legs.set(key, list);
   }
   for (const [key, list] of legs) {
+    // Single-branch ledgers cannot prove the opposite transfer leg was read.
+    if (scope.branchId) continue;
     if (!key || list.length !== 2 || new Set(list.map(x => norm(x.transaction_type))).size !== 2 ||
         integer(list[0].amount) !== integer(list[1].amount)) {
       issues.push({ code: 'TREASURY_TRANSFER_UNPAIRED', table: 'wallet_transactions', id: key || null });
     }
   }
-  const treasuryVerified = sourceReady(completeness, 'wallet_transactions') &&
+  const treasuryVerified = !scope.branchId && sourceReady(completeness, 'wallet_transactions') &&
     !issueExists(issues, ['wallet_transactions']) && completeness.treasuryPairingCertified === true;
 
   const metrics = {
