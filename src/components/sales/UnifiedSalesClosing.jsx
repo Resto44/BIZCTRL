@@ -60,6 +60,9 @@ import { buildSalesSourceClosingSnapshots, driverSourceEntryAmounts, driverSourc
 import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
 import CustomerCreditSalesSource from '@/components/sales/CustomerCreditSalesSource';
 import CashReconciliationPanel from '@/components/sales/CashReconciliationPanel';
+import ClosingCashSalesSources from '@/components/sales/ClosingCashSalesSources';
+import ClosingFinalReview from '@/components/sales/ClosingFinalReview';
+import { closingCashSalesSources } from '@/lib/closing/ClosingCashSalesSources';
 import ClosingControlOverview from '@/components/sales/ClosingControlOverview';
 import ClosingStepNavigation, { closingStepCopy, closingStepIssues } from '@/components/sales/ClosingStepNavigation';
 import ClosingFundingPanel from '@/components/sales/ClosingFundingPanel';
@@ -1256,6 +1259,13 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const otherPaymentTotal = (useAutomaticSales ? automaticClosingSnapshot.other : 0) + customSourcePaymentTotals.other;
   const networkTotal = sumClosingMoney(cardTotal, bankTransferTotal, onlineTotal, walletTotal);
   const totalSales = sumClosingMoney(cashSales, networkTotal, creditTotal, otherPaymentTotal);
+  // ERP source breakdown and the drawer's Cash Sales always use the SAME
+  // current-shift tender bucket; never add owner/treasury funding as sales.
+  const cashSalesBreakdown = useMemo(() => closingCashSalesSources({
+    baseCashSales, summaries: customSourceSummaries,
+  }), [baseCashSales, customSourceSummaries]);
+  const cashSalesSourcesMatched =
+    Math.abs(Math.round(cashSalesBreakdown.total * 100) - Math.round(cashSales * 100)) <= 1;
 
   useEffect(() => {
     if (!initial?.id && cashLedgerContext.opening_cash !== undefined && cashLedgerContext.opening_cash !== null) setOpeningCash(String(cashLedgerContext.opening_cash));
@@ -1365,6 +1375,12 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       message: `${currency}\u00A0${manualCreditTotal.toLocaleString()} credit sales`,
     },
     {
+      key: 'cashSources',
+      label: 'Cash Sales Sources Reconciled',
+      passed: cashSalesSourcesMatched,
+      message: cashSalesSourcesMatched ? 'Cash tender source totals match' : 'Recheck cash source classification before posting',
+    },
+    {
       key: 'cash',
       label: 'Cash Totals Valid',
       passed: cashSales >= 0,
@@ -1388,7 +1404,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       passed: !!form.date && !!form.branch && customClosingFields.every((field) => !field.is_required || hasCustomClosingFieldValue(field)),
       message: form.date || 'Date required',
     },
-  ], [form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, posDevices, posLoading, posUnavailable, lang, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
+  ], [form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, posDevices, posLoading, posUnavailable, lang, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, cashSalesSourcesMatched, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   const networkCounterTotal = baseNetworkTotal;
@@ -1887,8 +1903,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           </div>}
           {automaticClosingUnavailable && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"><p className="font-black">ERP sales data needs attention</p><p className="mt-1 text-xs">Check the branch and date, then retry before finalizing.</p><Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-300 bg-white" onClick={() => refetchAutomaticClosing()}><RefreshCw className="mr-1.5 h-4 w-4" />Retry ERP data</Button></div>}
 
+          <ClosingCashSalesSources breakdown={cashSalesBreakdown} closingCashSales={cashSales} currency={currency} lang={lang} />
           <div data-testid="closing-cash-action" className="min-w-0" aria-label="Cash reconciliation">
             <CashReconciliationPanel
+              compact
               inputId="quick-closing-actualCash"
               lang={lang}
               currency={currency}
@@ -1944,6 +1962,26 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           </div>
           </div>
           <div hidden={closingStep !== 2} data-testid="closing-step-review" className="space-y-3">
+            <ClosingFinalReview
+              lang={lang}
+              currency={currency}
+              cashSales={cashSales}
+              networkSales={networkTotal}
+              creditSales={creditTotal}
+              otherSales={otherPaymentTotal}
+              totalSales={totalSales}
+              openingCash={opening}
+              cashIn={reconciliation.cashIn}
+              cashOut={reconciliation.cashOut}
+              expectedCash={expectedCash}
+              actualCash={actualCount}
+              difference={cashDifference}
+              ledgerOverdrawn={ledgerOverdrawn}
+              cashContextReady={cashContextReady}
+              allValid={allValid}
+              onEditSales={() => goToClosingStep(0)}
+              onEditCash={() => goToClosingStep(1)}
+            />
           <details className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5" data-testid="closing-operating-statement" data-i18n-skip="true">
             <summary className="min-h-11 cursor-pointer text-sm font-bold text-slate-900">{lang === 'fa' ? 'خریدها و مصارف' : lang === 'ar' ? 'المشتريات والمصروفات' : <>Expenses &amp; purchases</>}</summary>
             {cashContextReady && !purchasesLoading && !purchasesUnavailable ? <dl className="mt-2 space-y-3 text-sm">
