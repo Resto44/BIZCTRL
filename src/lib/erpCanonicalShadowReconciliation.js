@@ -186,7 +186,8 @@ function computeCash(scope, sources, completeness, issues, sales, saleDetails) {
   }
   const cashSales = sum(saleDetails.map(value => value.cash));
   const expected = opening + cashSales + cashIn - cashOut;
-  const verified = !issueExists(issues, ['cash_movements', 'daily_sales']) && sourceReady(completeness, 'daily_sales');
+  const verified = !issueExists(issues, ['cash_movements', 'daily_sales']) && sourceReady(completeness, 'daily_sales') &&
+    completeness.salesPostingCertified === true && completeness.refundsCertified === true;
   return { expected: metric(expected, verified, 'posted_cash_movement_and_count', verified ? null : 'UNRECONCILED_CASH_SCOPE'),
     variance: metric(actual - expected, verified && expected >= 0, 'physical_minus_expected', expected < 0 ? 'NEGATIVE_EXPECTED_DRAWER' : null) };
 }
@@ -255,15 +256,15 @@ export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, comple
     !issueExists(issues, ['payroll_runs']) && !scope.shift && scope.from.endsWith('-01') &&
     completeness.payrollPeriodCertified === true;
 
-  const salesM = metric(sourceReady(completeness, 'daily_sales') && !issueExists(issues, ['daily_sales']) && saleDetails.length === sales.length ? saleTotal : null, saleVerified, 'finalized_closing_payment_buckets', saleVerified ? null : 'SALES_SCOPE_INCOMPLETE');
+  const salesM = metric(sourceReady(completeness, 'daily_sales') && !issueExists(issues, ['daily_sales']) && saleDetails.length === sales.length && (saleTotal !== 0 || saleVerified) ? saleTotal : null, saleVerified, 'finalized_closing_payment_buckets', saleVerified ? null : 'SALES_SCOPE_INCOMPLETE');
   const purchaseM = metric(sourceReady(completeness, 'supplier_invoices') && !issueExists(issues, ['supplier_invoices']) ? sum(purchaseVals) : null, purchaseVerified, 'approved_supplier_receipts', purchaseVerified ? null : 'PURCHASE_SCOPE_INCOMPLETE');
   const cogsM = metric(sourceReady(completeness, 'inventory_transactions') && consumed.length && cogsVals.every(v => v !== null) ? valuedCOGS : cogsVerified ? 0 : null, cogsVerified, 'valued_recipe_consumption', cogsVerified ? null : 'VALUATION_NOT_CERTIFIED');
   const expenseM = metric(sourceReady(completeness, 'expenses') && expenseVals.every(v => v !== null) ? sum(expenseVals) : null, expVerified, 'approved_posted_expenses', expVerified ? null : 'EXPENSE_ALLOCATION_NOT_CERTIFIED');
   const payrollM = metric(sourceReady(completeness, 'payroll_runs') && payrollVals.every(v => v !== null) ? sum(payrollVals) : null, payrollVerified, 'finalized_payroll_accrual', payrollVerified ? null : 'PAYROLL_PERIOD_NOT_CERTIFIED');
   const grossVerified = saleVerified && cogsVerified;
-  const gross = metric(salesM.amount !== null && cogsM.amount !== null ? saleTotal - valuedCOGS : null, grossVerified, 'sales_minus_recognized_cogs', grossVerified ? null : 'DEPENDENCY_NOT_VERIFIED');
+  const gross = metric((salesM.amount ?? salesM.estimatedAmount) !== null && (cogsM.amount ?? cogsM.estimatedAmount) !== null ? saleTotal - valuedCOGS : null, grossVerified, 'sales_minus_recognized_cogs', grossVerified ? null : 'DEPENDENCY_NOT_VERIFIED');
   const opVerified = grossVerified && expVerified && payrollVerified;
-  const operating = metric(gross.amount !== null && expenseM.amount !== null && payrollM.amount !== null ? saleTotal - valuedCOGS - sum(expenseVals) - sum(payrollVals) : null, opVerified,
+  const operating = metric((gross.amount ?? gross.estimatedAmount) !== null && (expenseM.amount ?? expenseM.estimatedAmount) !== null && (payrollM.amount ?? payrollM.estimatedAmount) !== null ? saleTotal - valuedCOGS - sum(expenseVals) - sum(payrollVals) : null, opVerified,
     'gross_profit_minus_opex_minus_payroll', opVerified ? null : 'DEPENDENCY_NOT_VERIFIED');
   const cash = computeCash(scope, sources, completeness, issues, sales, saleDetails);
 
