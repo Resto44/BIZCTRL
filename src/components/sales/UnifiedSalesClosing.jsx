@@ -1467,7 +1467,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (!cashierDisplayName || !effectiveCashierId) nextErrors.cashier = 'Select a valid operator/cashier before saving.';
     if (openingReviewRequired) nextErrors.reconciliation = openingReviewReason;
     if (cashLedgerUnavailable || !cashContextReady) nextErrors.reconciliation = 'Load and verify the ERP cash ledger before saving.';
-    if (ledgerOverdrawn) nextErrors.reconciliation = 'Cash ledger is overdrawn. Reconcile dated cash movements and funding before finalizing.';
+    if (!savingDraft && ledgerOverdrawn) nextErrors.reconciliation = 'Cash ledger is overdrawn. Reconcile dated cash movements and funding before finalizing.';
     if (!savingDraft && actualCount === null) nextErrors.actualCash = 'Enter the physically counted Actual Cash (0 or positive, up to two decimal places).';
     // Manual daily totals are a supported mode, not an exceptional adjustment.
     // Optional references belong to the audit note; an unwritten note cannot
@@ -1769,7 +1769,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             <div role="status" className={`rounded-xl border p-3 ${savedClosing._alreadyExists ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'}`}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-sm font-bold">{savedClosing._alreadyExists ? 'Closing already completed for this branch and shift.' : 'Daily closing saved successfully.'}</p>
+                  <p className="text-sm font-bold">{savedClosing._alreadyExists ? 'Closing already completed for this branch and shift.' : savedClosing.closing_state === 'draft' ? (lang === 'fa' ? 'پیش‌نویس ذخیره شد؛ هنوز نهایی نشده است.' : lang === 'ar' ? 'تم حفظ المسودة؛ لم يتم الإقفال بعد.' : 'Draft saved. Final reconciliation is still pending.') : 'Daily closing saved successfully.'}</p>
                   {savedClosing.id && <p className="mt-1 text-xs opacity-80">Closing ID: {savedClosing.id}</p>}
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex">
@@ -1862,7 +1862,17 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
           </div>
           <div hidden={closingStep !== 1} data-testid="closing-step-cash" className="space-y-3">
-          {ledgerOverdrawn && <p role="alert" data-testid="cash-ledger-overdrawn" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{lang === 'fa' ? 'پرداخت نقدی بیشتر از موجودی ثبت‌شده است. تمویل واقعی را در بخش تمویل ثبت و سپس صندوق را دوباره شمارش کنید.' : lang === 'ar' ? 'المدفوعات النقدية تتجاوز الرصيد المسجل. سجّل التمويل الفعلي في قسم التمويل ثم أعد عد الصندوق.' : 'Cash payments exceed the recorded balance. Record actual funding in the funding section, then recount the drawer.'}</p>}
+          {ledgerOverdrawn && <section role="alert" data-testid="cash-ledger-overdrawn" className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4" data-i18n-skip="true">
+            <h3 className="font-bold">{lang === 'fa' ? 'معلومات را ذخیره کنید؛ حساب صندوق نیاز به بررسی دارد' : lang === 'ar' ? 'احفظ البيانات؛ رصيد الصندوق يحتاج مراجعة' : 'Save your entries; the drawer needs review'}</h3>
+            <div className="flex flex-wrap justify-between gap-2 text-sm"><span>{lang === 'fa' ? 'کمبود موجودی ثبت‌شده' : lang === 'ar' ? 'نقص الرصيد المسجل' : 'Recorded balance shortfall'}</span><Money currency={currency} value={Math.abs(expectedCash)} className="font-bold text-red-700" /></div>
+            {actualCount !== null && <div className="flex flex-wrap justify-between gap-2 text-sm"><span>{lang === 'fa' ? 'اختلاف با نقد شمارش‌شده' : lang === 'ar' ? 'الفرق عن النقد المعدود' : 'Unexplained difference from cash count'}</span><Money currency={currency} value={actualCount - expectedCash} className="font-bold" /></div>}
+            <p className="text-xs leading-6">{lang === 'fa' ? 'اگر مصرف از خزانه یا جیب اونر پرداخت شده، منبع همان پرداخت را بررسی کنید. تمویل را فقط وقتی ثبت کنید که پول واقعاً وارد صندوق شده باشد.' : lang === 'ar' ? 'إذا دُفع المصروف من الخزينة أو المالك، راجع مصدر الدفعة. سجّل التمويل فقط إذا دخل النقد فعلياً إلى الصندوق.' : 'If treasury or the owner paid an expense directly, review that payment source. Record funding only when cash actually entered this drawer.'}</p>
+            <details className="rounded-lg bg-white p-3"><summary className="min-h-10 cursor-pointer text-sm font-bold">{lang === 'fa' ? 'بررسی پرداخت‌های نقدی' : lang === 'ar' ? 'مراجعة المدفوعات النقدية' : 'Review cash payments'}</summary><ul className="space-y-2 text-sm">{asRecordArray(cashLedgerContext.movements).filter(m => m.direction === 'out').map((m, i) => <li key={m.id || i} className="flex flex-wrap justify-between gap-2 border-t py-2"><span className="min-w-0 break-words">{m.description || m.movement_type || m.source_module}</span><Money currency={currency} value={m.amount} className="font-bold" /></li>)}</ul></details>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button type="submit" data-closing-intent="draft" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady} className="min-h-12 whitespace-normal">{lang === 'fa' ? 'ذخیره موقت و بررسی بعداً' : lang === 'ar' ? 'حفظ مسودة والمراجعة لاحقاً' : 'Save draft · review later'}</Button>
+              <Button type="button" variant="outline" className="min-h-12 whitespace-normal" onClick={() => {setShowFunding(true); requestAnimationFrame(() => document.getElementById('closing-funding')?.scrollIntoView({behavior:'smooth',block:'center'}));}}>{lang === 'fa' ? 'ثبت نقد دریافتی واقعی' : lang === 'ar' ? 'تسجيل النقد المستلم فعلياً' : 'Record cash actually received'}</Button>
+            </div>
+          </section>}
           {openingReviewRequired && showOpeningVerification && <div id="opening-cash-needs-review" role="alert" data-testid="opening-cash-needs-review" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-black">Opening Cash needs reconciliation</p>
             <p className="mt-1 text-xs leading-6">{openingReviewReason}</p>
@@ -1992,7 +2002,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             <Money currency={currency} value={totalSales} className="text-lg font-black text-slate-900" />
           </div>
           <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2">
-            <Button type="submit" data-closing-intent="draft" variant="outline" className="min-h-12 min-w-0 rounded-xl px-2 text-xs font-bold sm:text-sm" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn}><Save className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'ذخیره موقت' : lang === 'ar' ? 'حفظ المسودة' : 'Save Draft'}</Button>
+            <Button type="submit" data-closing-intent="draft" variant="outline" className="min-h-12 min-w-0 rounded-xl px-2 text-xs font-bold sm:text-sm" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady}><Save className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'ذخیره موقت' : lang === 'ar' ? 'حفظ المسودة' : 'Save Draft'}</Button>
             {closingStep < 2 ? <Button type="button" data-testid="closing-next-step" className="min-h-12 min-w-0 whitespace-normal rounded-xl bg-blue-600 px-2 text-xs font-black hover:bg-blue-700 sm:text-sm" disabled={isSubmitting} onClick={() => goToClosingStep(closingStep + 1)}>{stepCopy.next[closingStep]}</Button> : <Button type="button" aria-label="Review & Finalize Closing" data-testid="closing-review-finalize" className="min-h-12 min-w-0 rounded-xl bg-blue-600 px-2 text-xs font-black hover:bg-blue-700 sm:text-sm" disabled={isSubmitting} onClick={() => {
               if (!allValid || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn || purchasesLoading) {
                 setShowBlockers(true);

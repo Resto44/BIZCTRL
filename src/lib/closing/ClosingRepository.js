@@ -59,6 +59,7 @@ const BUSINESS_MESSAGES = {
   CLOSING_NETWORK_ACCOUNT_INVALID: 'Choose an active Network Management account for each card amount in this branch.',
   CLOSING_NETWORK_AMOUNT_INVALID: 'Card amounts must be non-negative with at most two decimals.',
   CLOSING_NETWORK_ENTRIES_INVALID: 'Reload and review the network rows before saving.',
+  SALES_CLOSING_FINALIZED_DRAFT_DENIED: 'This shift is already finalized. Open its record from Closing History to review it; a finalized closing cannot be overwritten as a draft.',
   CLOSING_ALREADY_EXISTS: 'An active draft Closing already exists for this branch, date, shift, and cashier.',
 };
 
