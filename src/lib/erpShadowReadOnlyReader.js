@@ -78,9 +78,10 @@ export async function readCanonicalShadowEvidence({
       mapped.length ? readPages(table, config, 'legacy') : Promise.resolve([]),
     ]);
     sources[table] = [...new Map([...canonical, ...legacyRows].map(row => [String(row.id), row])).values()];
-    const evidenceSafe = ['daily_sales', 'supplier_invoices', 'expenses', 'cash_movements'].includes(table);
-    completeness[table] = evidenceSafe && scope.legacyCoverageCertified === true;
-    if (!completeness[table]) diagnostics.push({ table, reason: 'REQUIRES_LEGACY_OR_BUSINESS_DATE_CERTIFICATION' });
+    // Paginated SELECTs across eight tables are not an atomic snapshot.
+    // Evidence can be reviewed, but it is NEVER certified complete by this reader.
+    completeness[table] = false;
+    diagnostics.push({ table, reason: 'NON_ATOMIC_READ_REQUIRES_INDEPENDENT_SNAPSHOT_CERTIFICATION' });
   }
   return {
     sources, completeness, diagnostics, readOnly: true,
