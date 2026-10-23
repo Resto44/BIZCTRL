@@ -72,6 +72,14 @@ describe('ERP Executive Snapshot V2',()=>{
        expect(card).toContain(`testId="${id}"`);
     expect(card).toContain('periodMetrics.totalPurchaseCost');
     expect(card).toContain('presentation.methods');
+    expect(card).toContain("method.key==='otherSources'?t(copy,'otherPaymentMethods','Other payment methods')");
+    expect(card).toContain('snapshot-recorded-source-shortcut');
+    expect(card).toContain('href="#owner-order-sources-analytics"');
+    expect(card).toContain('sourceBreakdown.allocatedTotal');
+    expect(card).toContain('report={sourceBreakdown}');
+    expect(dashboard).toContain("paymentMix: 'Sales by payment method'");
+    expect(dashboard).toContain("otherPaymentMethods: 'Other payment methods'");
+
     expect(card).toContain("navigate('/reports')");
     expect(card).not.toContain('SAR 4,219');
     expect(card).not.toContain('Cash (Drawer)');
