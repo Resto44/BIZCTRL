@@ -47,7 +47,7 @@ export function validateShadowScope(scope) {
   return Object.freeze({ ...scope, authorizedBranchIds: [...scope.authorizedBranchIds] });
 }
 
-function scopeRows(rows, scope, table, issues, { dated = true, shiftScoped = false } = {}) {
+function scopeRows(rows, scope, table, issues, { dated = true, shiftScoped = false, cashierScoped = false } = {}) {
   if (!Array.isArray(rows)) {
     issues.push({ code: 'SOURCE_NOT_ARRAY', table });
     return [];
@@ -79,7 +79,7 @@ function scopeRows(rows, scope, table, issues, { dated = true, shiftScoped = fal
       if (!row.shift) issues.push({ code: 'SHIFT_IDENTITY_MISSING', table, id: row.id ?? null });
       continue;
     }
-    if (shiftScoped && scope.cashierId && String(row.cashier_id || '') !== String(scope.cashierId)) {
+    if (cashierScoped && scope.cashierId && String(row.cashier_id || '') !== String(scope.cashierId)) {
       if (!row.cashier_id) issues.push({ code: 'CASHIER_IDENTITY_MISSING', table, id: row.id ?? null });
       continue;
     }
@@ -149,7 +149,7 @@ function computeCash(scope, sources, completeness, issues, sales, saleDetails) {
   const opening = integer(count?.openingCash);
   const actual = integer(count?.actualCash);
   if (opening === null || actual === null || actual < 0) return base;
-  const scoped = distinctById(scopeRows(sources.cash_movements || [], scope, 'cash_movements', issues, { shiftScoped: true }), 'cash_movements', issues);
+  const scoped = distinctById(scopeRows(sources.cash_movements || [], scope, 'cash_movements', issues, { shiftScoped: true, cashierScoped: true }), 'cash_movements', issues);
   let cashIn = 0, cashOut = 0;
   const salesIds = new Set(sales.map(row => String(row.id)));
   for (const row of scoped) {
@@ -183,7 +183,7 @@ export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, comple
     .filter(table => !sourceReady(completeness, table));
   for (const table of missing) issues.push({ code: 'SOURCE_NOT_ATTESTED_COMPLETE', table });
 
-  const sales = distinctById(scopeRows(sources.daily_sales || [], scope, 'daily_sales', issues, { shiftScoped: true })
+  const sales = distinctById(scopeRows(sources.daily_sales || [], scope, 'daily_sales', issues, { shiftScoped: true, cashierScoped: true })
     .filter(row => state(row) === 'finalized' || (state(row) === 'locked' && row.legacy_lock_verified === true)), 'daily_sales', issues);
   const saleDetails = sales.map(row => closingCents(row, issues)).filter(Boolean);
   const saleVerified = sourceReady(completeness, 'daily_sales') && completeness.salesPostingCertified === true && completeness.refundsCertified === true && !issueExists(issues, ['daily_sales']) && saleDetails.length === sales.length;
@@ -233,7 +233,7 @@ export function reconcileCanonicalShadow({ scope: rawScope, sources = {}, comple
     !issueExists(issues, ['payroll_runs']) && !scope.shift && scope.from.endsWith('-01') &&
     completeness.payrollPeriodCertified === true;
 
-  const salesM = metric(sourceReady(completeness, 'daily_sales') && saleDetails.length === sales.length ? saleTotal : null, saleVerified, 'finalized_closing_payment_buckets', saleVerified ? null : 'SALES_SCOPE_INCOMPLETE');
+  const salesM = metric(sourceReady(completeness, 'daily_sales') && !issueExists(issues, ['daily_sales']) && saleDetails.length === sales.length ? saleTotal : null, saleVerified, 'finalized_closing_payment_buckets', saleVerified ? null : 'SALES_SCOPE_INCOMPLETE');
   const purchaseM = metric(sourceReady(completeness, 'supplier_invoices') && !issueExists(issues, ['supplier_invoices']) ? sum(purchaseVals) : null, purchaseVerified, 'approved_supplier_receipts', purchaseVerified ? null : 'PURCHASE_SCOPE_INCOMPLETE');
   const cogsM = metric(sourceReady(completeness, 'inventory_transactions') && consumed.length && cogsVals.every(v => v !== null) ? valuedCOGS : cogsVerified ? 0 : null, cogsVerified, 'valued_recipe_consumption', cogsVerified ? null : 'VALUATION_NOT_CERTIFIED');
   const expenseM = metric(sourceReady(completeness, 'expenses') && expenseVals.every(v => v !== null) ? sum(expenseVals) : null, expVerified, 'approved_posted_expenses', expVerified ? null : 'EXPENSE_ALLOCATION_NOT_CERTIFIED');
