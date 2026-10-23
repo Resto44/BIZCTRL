@@ -18,7 +18,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain("data-testid=\"quick-closing-auto-summary\"");
     expect(workspace).toContain('Advanced ERP details');
     expect(workspace).not.toContain('CLOSING_WORKFLOW_STEP_IDS');
-    expect(workspace).not.toContain('closing-workflow-stepper');
+    expect(workspace).toContain('<ClosingStepNavigation');
     expect(workspace).toContain('id="sales-closing-workspace" className="min-w-0"');
     expect(workspace).toContain('<CashReconciliationPanel');
     expect(reconciliationPanel).toContain('grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)]');
@@ -404,7 +404,8 @@ describe('Sales source daily and historical balance contract', () => {
     const workspace = await source('../src/components/sales/UnifiedSalesClosing.jsx');
 
     expect(workspace).toContain('Advanced ERP details');
-    expect(workspace).toContain('readinessPercent');
+    expect(workspace).toContain('closingStepIssues(closingStep, validations)');
+    expect(workspace).not.toContain('readinessPercent');
     expect(workspace).toContain('data-testid="closing-open-advanced"');
     expect(workspace).toContain('Network total');
     expect(workspace).toContain('const networkCounterTotal = baseNetworkTotal;');
