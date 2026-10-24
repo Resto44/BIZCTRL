@@ -1,3 +1,4 @@
+import closingInterfacePhrases from './closing/closingInterfacePhrases.js';
 import { translateInterfaceDate } from './interfaceDates.js';
 import translations from './i18n.js';
 import localizedPhrases from './localizedPhrases.js';
@@ -38,6 +39,13 @@ for (const [source, entry] of Object.entries(erpInterfacePhrases)) {
 for (const [source, value] of Object.entries(persianUiPhrases)) catalogs.fa.set(normalizeInterfacePhrase(source), value);
 
 for (const [source, value] of Object.entries(arabicUiPhrases)) catalogs.ar.set(normalizeInterfacePhrase(source), value);
+
+for (const [source, entry] of Object.entries(closingInterfacePhrases)) {
+  for (const lang of ['fa', 'ar']) {
+    const key = normalizeInterfacePhrase(source);
+    if (!catalogs[lang].has(key) || catalogs[lang].get(key) === source) catalogs[lang].set(key, entry[lang]);
+  }
+}
 
 const folded = Object.fromEntries(Object.entries(catalogs).map(([lang, catalog]) => [lang, new Map([...catalog].map(([k,v]) => [k.toLowerCase(),v]))]));
 

@@ -60,7 +60,7 @@ export default function ClosingFundingPanel({restaurantId, branchId, branchKey, 
   <h3 className="font-black text-slate-950">{tr.title}</h3><p className="text-sm leading-6">{tr.explain}</p>
   {physicalShortage > 0 && <div data-testid="funding-physical-shortage-note" className="rounded-xl border border-amber-200 bg-white p-3 text-xs leading-5 text-amber-900">
     {lang==='fa'?'کمبود شمارش:':lang==='ar'?'عجز الجرد:':'Counted shortage:'} <strong dir="ltr">{physicalShortage.toFixed(2)} {currency}</strong>.
-    {' '}{lang==='fa'?'تمویل واقعاً دریافت‌شده به Cash In افزوده می‌شود؛ اختلاف پیشین خودکار صفر نمی‌شود و به رسیدگی حسابداری نیاز دارد.':lang==='ar'?'يضاف التمويل المستلم فعلياً إلى النقد الوارد؛ لا يمحى فرق الجرد السابق تلقائياً ويحتاج مراجعة محاسبية.':'Physically received funding posts as Cash In. It does not erase the original count variance; audit review remains required.'}
+    {' '}{lang==='fa'?'تمویل واقعاً دریافت‌شده به ورودی نقد افزوده می‌شود؛ اختلاف پیشین خودکار صفر نمی‌شود و به رسیدگی حسابداری نیاز دارد.':lang==='ar'?'يضاف التمويل المستلم فعلياً إلى النقد الوارد؛ لا يمحى فرق الجرد السابق تلقائياً ويحتاج مراجعة محاسبية.':'Physically received funding posts as Cash In. It does not erase the original count variance; audit review remains required.'}
   </div>}
   <dl className="grid gap-2 text-sm sm:grid-cols-2"><div><dt>{tr.minimum}</dt><dd className="break-all text-lg font-black">{proposal.minimum.toFixed(2)} {currency}</dd></div><div><dt>{tr.count}</dt><dd className="break-all text-lg font-black">{proposal.toCount===null?'—':proposal.toCount.toFixed(2)} {currency}</dd></div></dl>
   {role!=='owner'?<p>{tr.manager}</p>:<>

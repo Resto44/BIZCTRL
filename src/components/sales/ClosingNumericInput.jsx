@@ -1,3 +1,4 @@
+import { useClosingTranslation } from '@/lib/closing/useClosingTranslation';
 import React, { forwardRef, useCallback, useId, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +31,7 @@ const ClosingNumericInput = forwardRef(function ClosingNumericInput({
   inputClassName = '',
   'data-testid': testId,
 }, ref) {
+  const closingTr = useClosingTranslation();
   const generatedId = useId();
   const inputId = id || `closing-number-${generatedId}`;
   const [editingError, setEditingError] = useState('');
@@ -38,7 +40,7 @@ const ClosingNumericInput = forwardRef(function ClosingNumericInput({
   const handleChange = useCallback((event) => {
     const next = event.target.value;
     if (!moneyInputIsValid(next, { allowNegative, max })) {
-      setEditingError(max != null ? `Maximum amount is ${max}.` : 'Enter a valid amount with up to two decimals.');
+      setEditingError(max != null ? 'Maximum amount is {max}.' : 'Enter a valid amount with up to two decimals.');
       return;
     }
     setEditingError('');
@@ -52,8 +54,8 @@ const ClosingNumericInput = forwardRef(function ClosingNumericInput({
 
   return (
     <div className={className}>
-      {label && <Label htmlFor={inputId} className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}{required && <span className="ml-1 text-destructive">*</span>}</Label>}
-      {helpText && <p className="mb-1 text-[10px] leading-tight text-muted-foreground">{helpText}</p>}
+      {label && <Label htmlFor={inputId} className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{closingTr(label)}{required && <span className="ml-1 text-destructive">*</span>}</Label>}
+      {helpText && <p className="mb-1 text-[10px] leading-tight text-muted-foreground">{closingTr(helpText)}</p>}
       <div className="relative">
         {prefix && <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 whitespace-nowrap text-xs font-semibold tracking-wide text-muted-foreground">{prefix}</span>}
         <Input
@@ -76,7 +78,7 @@ const ClosingNumericInput = forwardRef(function ClosingNumericInput({
           className={`h-10 text-left text-sm font-medium tabular-nums transition-colors ${prefix ? 'pl-14' : ''} ${readOnly ? 'cursor-default bg-muted/50 text-muted-foreground' : 'bg-background'} ${(error || editingError) ? 'border-destructive ring-1 ring-destructive/30' : ''} ${inputClassName}`}
         />
       </div>
-      {(error || editingError) && <p id={`${inputId}-help`} role="alert" className="mt-1 text-[10px] font-medium text-destructive">{error || editingError}</p>}
+      {(error || editingError) && <p id={`${inputId}-help`} role="alert" className="mt-1 text-[10px] font-medium text-destructive">{closingTr(error || editingError, { max })}</p>}
     </div>
   );
 });

@@ -1,3 +1,4 @@
+import { useClosingTranslation } from '@/lib/closing/useClosingTranslation';
 import React, { memo, useState } from 'react';
 import {
   ArrowRight, Banknote, CheckCircle2, ChevronRight, CircleMinus,
@@ -20,16 +21,18 @@ const formatted = (value) => Math.abs(numeric(value)).toLocaleString(undefined, 
 });
 
 function Money({ currency, value, signed = false, className = '' }) {
-  if (value === null || value === undefined || value === '') return <span className={className} aria-label="Not verified">—</span>;
+  const closingTr = useClosingTranslation();
+  if (value === null || value === undefined || value === '') return <span className={className} aria-label={closingTr("Not verified")}>—</span>;
   const amount = numeric(value);
   const sign = signed && amount !== 0 ? (amount > 0 ? '+' : '−') : '';
   return <span className={`whitespace-nowrap tabular-nums ${className}`} dir="ltr">{sign}{currency ? <>{currency}{'\u00A0'}</> : null}{formatted(amount)}</span>;
 }
 
 function EquationMetric({ label, value, currency, expected = false, className = '' }) {
+  const closingTr = useClosingTranslation();
   return (
     <div className={`min-w-0 rounded-xl bg-white px-2.5 py-3 text-center ${className}`}>
-      <p className="truncate text-[10px] font-bold text-slate-500 sm:text-xs">{label}</p>
+      <p className="truncate text-[10px] font-bold text-slate-500 sm:text-xs">{closingTr(label)}</p>
       <Money
         currency={expected ? currency : ''}
         value={value}
@@ -44,6 +47,7 @@ function EquationOperator({ children }) {
 }
 
 function VarianceRing({ difference, status }) {
+  const closingTr = useClosingTranslation();
   const tone = status === 'balanced'
     ? { ring: '#10b981', track: '#d1fae5', text: 'text-emerald-600' }
     : status === 'overage'
@@ -58,7 +62,7 @@ function VarianceRing({ difference, status }) {
       className="relative flex aspect-square w-20 max-w-full items-center justify-center rounded-full p-2 sm:w-24"
       style={{ background: `conic-gradient(${tone.ring} 0 28%, ${tone.track} 28% 100%)` }}
       role="status"
-      aria-label={difference === null ? 'Variance pending' : `Cash variance ${difference}`}
+      aria-label={difference === null ? closingTr('Variance pending') : `Cash variance ${difference}`}
     >
       <div className="flex h-full w-full items-center justify-center rounded-full bg-white">
         <span className={`text-2xl font-black tabular-nums sm:text-3xl ${tone.text}`} dir="ltr">{display}</span>
@@ -119,6 +123,7 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
   isRecordingOwnerPayment = false,
   disabled = false,
 }) {
+  const closingTr = useClosingTranslation(lang);
   const [noteOpen, setNoteOpen] = useState(Boolean(cashNotes));
   const [ledgerExpanded, setLedgerExpanded] = useState(false);
   const postedReceipts = movements.filter(m => m?.direction === 'in' && m?.is_reversed !== true);
@@ -128,8 +133,8 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
     : status === 'balanced'
       ? 'Balanced'
       : status === 'shortage'
-        ? `${currency} ${formatted(shortage)} Shortage`
-        : `${currency} ${formatted(overage)} Overage`;
+        ? `${currency} ${formatted(shortage)} ${closingTr("Shortage")}`
+        : `${currency} ${formatted(overage)} ${closingTr("Overage")}`;
   const StatusIcon = status === 'balanced' ? CheckCircle2 : status === 'overage' ? TrendingUp : status === 'shortage' ? TrendingDown : CircleSlash2;
   const statusTone = status === 'balanced'
     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
@@ -148,64 +153,63 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
       <div className={compact ? 'space-y-3 p-3.5 sm:p-5' : 'space-y-4 p-4 sm:space-y-5 sm:p-5 lg:p-6'}>
         <header className="flex min-w-0 flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 className={`font-black tracking-tight text-slate-950 ${compact ? 'text-base sm:text-lg' : 'truncate text-xl sm:text-2xl'}`}>{lang === 'fa' ? 'تطبیق نقد صندوق' : lang === 'ar' ? 'مطابقة نقد الصندوق' : 'Cash Reconciliation'}</h2>
-            <p className="mt-1 text-xs font-medium text-slate-500">{lang === 'fa' ? 'نقد فیزیکی · فقط یک دفتر صندوق' : lang === 'ar' ? 'النقد الفعلي · دفتر صندوق واحد' : 'Physical cash only · one ERP drawer ledger'}</p>
+            <h2 className={`font-black tracking-tight text-slate-950 ${compact ? 'text-base sm:text-lg' : 'truncate text-xl sm:text-2xl'}`}>{lang === 'fa' ? 'تطبیق نقد صندوق' : lang === 'ar' ? 'مطابقة نقد الصندوق' : closingTr('Cash Reconciliation')}</h2>
+            <p className="mt-1 text-xs font-medium text-slate-500">{lang === 'fa' ? 'نقد فیزیکی · فقط یک دفتر صندوق' : lang === 'ar' ? 'النقد الفعلي · دفتر صندوق واحد' : closingTr('Physical cash only · one ERP drawer ledger')}</p>
           </div>
           <span className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-black sm:text-sm ${statusTone}`}>
-            <StatusIcon className="h-4 w-4" />{statusCopy}
+            <StatusIcon className="h-4 w-4" />{closingTr(statusCopy)}
           </span>
         </header>
 
         {!openingVerified || ledgerUnavailable || ledgerOverdrawn ? (
           <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-            <p className="font-black">{ledgerOverdrawn ? (lang === 'fa' ? 'گردش نقد صندوق نیاز به بررسی دارد' : lang === 'ar' ? 'حركة نقد الصندوق تحتاج مراجعة' : 'Cash Ledger overdrawn') : openingReviewRequired ? 'Opening Cash needs reconciliation' : 'ERP cash ledger is unavailable.'}</p>
-            <p className="mt-1 text-xs">{ledgerOverdrawn ? 'Cash Out exceeds available cash. Review the posted funding and payments before closing; this is not an ordinary cash overage.' : openingReviewRequired ? 'Previous shift has no verified counted balance or multiple possible drawers. Check the prior closing before finalizing.' : 'The cash count cannot be approved until the scoped ledger has loaded.'}</p>
-            {ledgerOverdrawn && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3" data-testid="drawer-ledger-funding-gap"><span className="text-xs font-bold">{lang === 'fa' ? 'کمبود دفتر نقد (نه اختلاف شمارش)' : lang === 'ar' ? 'عجز الدفتر وليس فرق الجرد' : 'Recorded cash balance gap · not count variance'}</span><Money currency={currency} value={cashFundingRequired} className="font-black text-red-700" /></div>}
-            {openingShiftDate && <p className="mt-1 text-xs">Previous: {openingShiftDate} · {openingShift || 'Unknown shift'}</p>}
+            <p className="font-black">{ledgerOverdrawn ? (lang === 'fa' ? 'گردش نقد صندوق نیاز به بررسی دارد' : lang === 'ar' ? 'حركة نقد الصندوق تحتاج مراجعة' : closingTr('Cash Ledger overdrawn')) : openingReviewRequired ? closingTr('Opening Cash needs reconciliation') : closingTr('ERP cash ledger is unavailable.')}</p>
+            <p className="mt-1 text-xs">{ledgerOverdrawn ? closingTr('Cash Out exceeds available cash. Review the posted funding and payments before closing; this is not an ordinary cash overage.') : openingReviewRequired ? closingTr('Previous shift has no verified counted balance or multiple possible drawers. Check the prior closing before finalizing.') : closingTr('The cash count cannot be approved until the scoped ledger has loaded.')}</p>
+            {ledgerOverdrawn && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3" data-testid="drawer-ledger-funding-gap"><span className="text-xs font-bold">{lang === 'fa' ? 'کمبود دفتر نقد (نه اختلاف شمارش)' : lang === 'ar' ? 'عجز الدفتر وليس فرق الجرد' : closingTr('Recorded cash balance gap · not count variance')}</span><Money currency={currency} value={cashFundingRequired} className="font-black text-red-700" /></div>}
+            {openingShiftDate && <p className="mt-1 text-xs">{closingTr("Previous:")}{openingShiftDate} · {closingTr(openingShift || 'Unknown shift')}</p>}
             <Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-200 bg-white" onClick={onRetryLedger}>
-              <RefreshCw className="mr-1.5 h-4 w-4" />Retry ledger load
-            </Button>
+              <RefreshCw className="mr-1.5 h-4 w-4" />{closingTr("Retry ledger load")}</Button>
           </div>
         ) : (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 sm:p-3" aria-label="Expected cash equation">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 sm:p-3" aria-label={closingTr("Expected cash equation")}>
             {compact ? <dl data-testid="drawer-cash-equation" className="space-y-1">
               {[
                 ['Opening Cash', openingCash, ''],
                 ['Cash Sales', cashSales, '+'],
                 ['Posted Cash In', cashIn, '+'],
                 ['Posted Cash Out', cashOut, '−'],
-              ].map(([label, value, sign]) => <div key={label} className="flex items-center justify-between gap-3 border-b border-slate-200 py-1.5 text-xs">
-                <dt className="min-w-0 text-slate-700"><span className="me-2 font-black text-blue-700">{sign}</span>{label}</dt>
+              ].map(([label, value, sign]) => <div key={closingTr(label)} className="flex items-center justify-between gap-3 border-b border-slate-200 py-1.5 text-xs">
+                <dt className="min-w-0 text-slate-700"><span className="me-2 font-black text-blue-700">{sign}</span>{closingTr(label)}</dt>
                 <dd className="shrink-0 font-bold tabular-nums" dir="ltr"><Money value={value} currency={currency} /></dd>
               </div>)}
               <div className="flex items-center justify-between gap-3 pt-2 text-sm font-black text-blue-800">
-                <dt>Expected Cash</dt><dd dir="ltr"><Money currency={currency} value={expectedCash} /></dd>
+                <dt>{closingTr("Expected Cash")}</dt><dd dir="ltr"><Money currency={currency} value={expectedCash} /></dd>
               </div>
             </dl> : null}
             {!compact && <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1.2fr)] sm:gap-1">
-              <EquationMetric label="Opening" value={openingCash} />
+              <EquationMetric label={closingTr("Opening")} value={openingCash} />
               <EquationOperator>+</EquationOperator>
-              <EquationMetric label="Cash Sales" value={cashSales} />
+              <EquationMetric label={closingTr("Cash Sales")} value={cashSales} />
               <EquationOperator>+</EquationOperator>
-              <EquationMetric label="Cash In" value={cashIn} />
+              <EquationMetric label={closingTr("Cash In")} value={cashIn} />
               <EquationOperator>−</EquationOperator>
-              <EquationMetric label="Cash Out" value={cashOut} />
+              <EquationMetric label={closingTr("Cash Out")} value={cashOut} />
               <EquationOperator>=</EquationOperator>
-              <EquationMetric label="Expected" value={expectedCash} currency={currency} expected className="col-span-2 border border-emerald-100 sm:col-span-1" />
+              <EquationMetric label={closingTr("Expected")} value={expectedCash} currency={currency} expected className="col-span-2 border border-emerald-100 sm:col-span-1" />
             </div>}
           </div>
         )}
 
         {openingVerified && !ledgerUnavailable && !ledgerLoading && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-2 text-xs text-blue-900" data-testid="opening-cash-provenance">
-            <span className="font-bold">Opening Cash source</span>
-            <span>{openingStatus === 'manual_verified_opening' ? 'Owner-certified physical opening count' : openingSource === 'same_cashier_count' ? 'Previous shift · matched cashier count' : openingSource === 'single_branch_shift_count' ? 'Previous shift · one counted branch drawer' : 'Opening source requires review'}{openingShiftDate ? ` · ${openingShiftDate}` : ''}</span>
+            <span className="font-bold">{closingTr("Opening Cash source")}</span>
+            <span>{openingStatus === 'manual_verified_opening' ? closingTr('Owner-certified physical opening count') : openingSource === 'same_cashier_count' ? closingTr('Previous shift · matched cashier count') : openingSource === 'single_branch_shift_count' ? closingTr('Previous shift · one counted branch drawer') : closingTr('Opening source requires review')}{openingShiftDate ? ` · ${openingShiftDate}` : ''}</span>
           </div>
         )}
         <div className={compact ? 'grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)]' : 'grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)] gap-3'}>
           <div id="quick-closing-reconciliation" className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-            <label htmlFor={inputId} className="block text-xs font-black text-slate-700 sm:text-sm">Actual Cash <span className="text-red-500">*</span></label>
-            <p className="mt-1 hidden text-xs text-slate-500 sm:block">Enter the physical cash count</p>
+            <label htmlFor={inputId} className="block text-xs font-black text-slate-700 sm:text-sm">{closingTr("Actual Cash")}<span className="text-red-500">*</span></label>
+            <p className="mt-1 hidden text-xs text-slate-500 sm:block">{closingTr("Enter the physical cash count")}</p>
             <ClosingNumericInput
               id={inputId}
               value={actualCashValue}
@@ -213,24 +217,24 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
               prefix={currency}
               required
               disabled={disabled || ledgerLoading}
-              error={actualCashError}
-              placeholder="0.00"
+              error={closingTr(actualCashError)}
+              placeholder={closingTr("0.00")}
               className="mt-3"
               inputClassName="h-16 rounded-2xl border-slate-300 bg-white pl-16 text-2xl font-black shadow-none focus-visible:ring-blue-500 sm:h-20 sm:text-3xl"
             />
           </div>
           <div className={compact ? `flex min-w-0 items-center justify-between gap-3 rounded-xl border px-3 py-2 ${status === 'balanced' ? 'border-emerald-200 bg-emerald-50' : status === 'shortage' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'} sm:flex-col sm:justify-center` : 'flex min-w-0 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 sm:p-4'}>
-            <p className={compact ? 'text-xs font-black text-slate-600' : 'mb-2 text-[10px] font-black uppercase tracking-wide text-slate-600 sm:text-xs'}>{lang === 'fa' ? 'اختلاف صندوق' : lang === 'ar' ? 'فرق الصندوق' : 'Variance'}</p>
-            {ledgerLoading ? <Loader2 className="h-6 w-6 animate-spin text-blue-600" aria-label="Loading cash ledger" /> : compact ? <span data-testid="compact-cash-variance" className="text-base font-black tabular-nums" dir="ltr"><Money value={openingVerified && !ledgerUnavailable ? difference : null} currency={currency} signed /></span> : <VarianceRing difference={openingVerified && !ledgerUnavailable ? difference : null} status={status} />}
+            <p className={compact ? 'text-xs font-black text-slate-600' : 'mb-2 text-[10px] font-black uppercase tracking-wide text-slate-600 sm:text-xs'}>{lang === 'fa' ? 'اختلاف صندوق' : lang === 'ar' ? 'فرق الصندوق' : closingTr('Variance')}</p>
+            {ledgerLoading ? <Loader2 className="h-6 w-6 animate-spin text-blue-600" aria-label={closingTr("Loading cash ledger")} /> : compact ? <span data-testid="compact-cash-variance" className="text-base font-black tabular-nums" dir="ltr"><Money value={openingVerified && !ledgerUnavailable ? difference : null} currency={currency} signed /></span> : <VarianceRing difference={openingVerified && !ledgerUnavailable ? difference : null} status={status} />}
           </div>
         </div>
 
         <div data-testid="closing-cash-preview" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-3 sm:p-4">
-          <div><p className="text-xs font-black text-sky-950">{closingCash === null ? 'Physically counted cash · pending reconciliation' : 'Closing Cash · physical drawer balance'}</p>
-            <p className="mt-1 text-[11px] text-sky-800">{closingCash === null ? 'Count is recorded for review; it will not be carried forward until the closing is finalized.' : 'Carried into a verified next shift · no network, wallet or credit sales'}</p></div>
+          <div><p className="text-xs font-black text-sky-950">{closingCash === null ? closingTr('Physically counted cash · pending reconciliation') : closingTr('Closing Cash · physical drawer balance')}</p>
+            <p className="mt-1 text-[11px] text-sky-800">{closingCash === null ? closingTr('Count is recorded for review; it will not be carried forward until the closing is finalized.') : closingTr('Carried into a verified next shift · no network, wallet or credit sales')}</p></div>
           <Money currency={currency} value={closingCash ?? actualCash} className="text-xl font-black text-sky-950" />
         </div>
-        {!compact && <div className="grid grid-cols-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-1" role="status" aria-label={`Cash status: ${statusCopy}`}>
+        {!compact && <div className="grid grid-cols-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-1" role="status" aria-label={`Cash status: ${closingTr(statusCopy)}`}>
           {STATUS_OPTIONS.map(({ key, label, Icon }) => {
             const active = status === key;
             const activeTone = key === 'balanced'
@@ -238,7 +242,7 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
               : key === 'overage'
                 ? 'border-amber-200 bg-amber-50 text-amber-700'
                 : 'border-red-200 bg-red-50 text-red-700';
-            return <div key={key} aria-current={active ? 'true' : undefined} className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-bold sm:text-sm ${active ? activeTone : 'border-transparent text-slate-500'}`}><Icon className="h-4 w-4 shrink-0" />{label}</div>;
+            return <div key={key} aria-current={active ? 'true' : undefined} className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-bold sm:text-sm ${active ? activeTone : 'border-transparent text-slate-500'}`}><Icon className="h-4 w-4 shrink-0" />{closingTr(label)}</div>;
           })}
         </div>}
 
@@ -249,10 +253,10 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
             onClick={() => setNoteOpen((open) => !open)}
             aria-expanded={noteOpen}
             aria-controls="quick-closing-cashNotes-panel"
-            aria-label="Add optional reconciliation note"
+            aria-label={closingTr("Add optional reconciliation note")}
           >
             <MessageCircle className="h-5 w-5 shrink-0 text-slate-500" />
-            <span className="min-w-0 flex-1 truncate">{cashNotes || 'Add optional note'}</span>
+            <span className="min-w-0 flex-1 truncate">{cashNotes || closingTr('Add optional note')}</span>
             <ChevronRight className={`h-5 w-5 shrink-0 transition-transform ${noteOpen ? 'rotate-90' : ''}`} />
           </button>
           {noteOpen && (
@@ -261,11 +265,11 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
                 id="quick-closing-cashNotes"
                 value={cashNotes}
                 onChange={(event) => onCashNotesChange?.(event.target.value)}
-                placeholder="Optional reconciliation note"
+                placeholder={closingTr("Optional reconciliation note")}
                 className="min-h-20 resize-none rounded-xl text-sm"
                 disabled={disabled}
               />
-              <p className="mt-1.5 text-[10px] text-slate-500">Optional — a variance is recorded even when no note is added.</p>
+              <p className="mt-1.5 text-[10px] text-slate-500">{closingTr("Optional — a variance is recorded even when no note is added.")}</p>
             </div>
           )}
         </div>
@@ -278,51 +282,50 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
           aria-pressed={managerApproved}
         >
           {managerApproved ? <CheckCircle2 className="mr-2 h-5 w-5" /> : <ShieldCheck className="mr-2 h-5 w-5" />}
-          {managerApproved ? 'Cash Count Approved' : 'Approve Cash Count'}
+          {managerApproved ? closingTr('Cash Count Approved') : closingTr('Approve Cash Count')}
         </Button>
 
-        {postedReceipts.length > 0 && <div data-testid="posted-cash-funding" className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-xs"><button type="button" className="min-h-10 w-full text-left font-bold text-sky-900" aria-expanded={ledgerExpanded} onClick={() => setLedgerExpanded(v => !v)}>{lang === 'fa' ? 'ورود نقد ثبت‌شده · سند و منبع' : lang === 'ar' ? 'النقد الوارد المثبت · المصدر والسند' : 'Posted cash receipts · sources and references'} ({postedReceipts.length})</button>{ledgerExpanded && <ul className="mt-2 space-y-2">{postedReceipts.map((row, index) => <li className="flex flex-wrap items-center justify-between gap-2 border-t border-sky-200 pt-2" key={row.id || index}><span className="min-w-0 break-words">{row.source_module || row.movement_type || 'Cash In'} · {row.source_document_id || row.source_record_id || 'Reference pending'}</span><Money currency={currency} value={row.amount} className="font-bold" /></li>)}</ul>}</div>}
-        {fundingContent && <div data-testid="drawer-funding-inside-reconciliation" className="rounded-2xl border border-slate-200 p-3"><details open={ledgerOverdrawn || undefined}><summary className="min-h-11 cursor-pointer text-sm font-bold text-blue-800">{lang === 'fa' ? 'ثبت نقد دریافتی از اونر یا خزانه' : lang === 'ar' ? 'تسجيل النقد المستلم من المالك أو الخزينة' : 'Record cash received from owner or treasury'}</summary><div className="mt-2">{fundingContent}</div></details></div>}
+        {postedReceipts.length > 0 && <div data-testid="posted-cash-funding" className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-xs"><button type="button" className="min-h-10 w-full text-left font-bold text-sky-900" aria-expanded={ledgerExpanded} onClick={() => setLedgerExpanded(v => !v)}>{lang === 'fa' ? 'ورود نقد ثبت‌شده · سند و منبع' : lang === 'ar' ? 'النقد الوارد المثبت · المصدر والسند' : closingTr('Posted cash receipts · sources and references')} ({postedReceipts.length})</button>{ledgerExpanded && <ul className="mt-2 space-y-2">{postedReceipts.map((row, index) => <li className="flex flex-wrap items-center justify-between gap-2 border-t border-sky-200 pt-2" key={row.id || index}><span className="min-w-0 break-words">{row.source_module || row.movement_type || closingTr('Cash In')} · {row.source_document_id || row.source_record_id || closingTr('Reference pending')}</span><Money currency={currency} value={row.amount} className="font-bold" /></li>)}</ul>}</div>}
+        {fundingContent && <div data-testid="drawer-funding-inside-reconciliation" className="rounded-2xl border border-slate-200 p-3"><details open={ledgerOverdrawn || undefined}><summary className="min-h-11 cursor-pointer text-sm font-bold text-blue-800">{lang === 'fa' ? 'ثبت نقد دریافتی از اونر یا خزانه' : lang === 'ar' ? 'تسجيل النقد المستلم من المالك أو الخزينة' : closingTr('Record cash received from owner or treasury')}</summary><div className="mt-2">{fundingContent}</div></details></div>}
         {difference !== null && (!compact || difference !== 0) && (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-blue-600" />
-              <h3 className="font-black text-slate-950">Settlement Responsibility</h3>
+              <h3 className="font-black text-slate-950">{closingTr("Settlement Responsibility")}</h3>
             </div>
 
             {status === 'shortage' ? (
               <>
                 <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-4">
                   <div className="rounded-2xl border border-blue-200 bg-white p-3 text-center">
-                    <p className="text-xs font-bold text-blue-800">Branch Wallet</p>
+                    <p className="text-xs font-bold text-blue-800">{closingTr("Branch Wallet")}</p>
                     <Money currency={currency} value={branchWalletApplied} className="mt-1 block text-xl font-black text-blue-700" />
                   </div>
                   <ArrowRight className="h-5 w-5 text-blue-600" aria-hidden="true" />
                   <div className="rounded-2xl border border-red-200 bg-white p-3 text-center">
-                    <p className="text-xs font-bold text-red-800">Owner</p>
+                    <p className="text-xs font-bold text-red-800">{closingTr("Owner")}</p>
                     <Money currency={currency} value={ownerSettlementRemaining || ownerSettlementRequired} className="mt-1 block text-xl font-black text-red-700" />
                   </div>
                 </div>
                 <div className="mt-3 flex flex-col gap-2 rounded-xl bg-blue-50 px-3 py-2.5 text-xs text-blue-800 sm:flex-row sm:items-center sm:justify-between">
-                  <span>Separate settlement — no sales impact</span>
-                  <span className="font-bold">{ownerSettlementResolved ? 'Resolved' : (ownerSettlementStatusLabel || settlementStatus)}</span>
+                  <span>{closingTr("Separate settlement — no sales impact")}</span>
+                  <span className="font-bold">{ownerSettlementResolved ? closingTr('Resolved') : closingTr(ownerSettlementStatusLabel || settlementStatus)}</span>
                 </div>
                 {canRecordOwnerPayment && (
                   <Button type="button" size="sm" variant="outline" className="mt-3 min-h-11 w-full rounded-xl border-red-200 bg-white text-red-700 hover:bg-red-50" disabled={isRecordingOwnerPayment || ownerSettlementResolved || ownerSettlementRequired === 0} onClick={onRecordOwnerPayment}>
                     {isRecordingOwnerPayment ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Banknote className="mr-1.5 h-4 w-4" />}
-                    {ownerSettlementResolved ? 'Owner Payment Recorded' : 'Record Owner Payment'}
+                    {ownerSettlementResolved ? closingTr('Owner Payment Recorded') : closingTr('Record Owner Payment')}
                   </Button>
                 )}
               </>
             ) : status === 'overage' ? (
               <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
-                <div><p className="font-black">Cash Overage</p><p className="mt-1 text-xs">Recorded separately — no sales impact</p></div>
+                <div><p className="font-black">{closingTr("Cash Overage")}</p><p className="mt-1 text-xs">{closingTr("Recorded separately — no sales impact")}</p></div>
                 <Money currency={currency} value={overage} className="text-xl font-black text-amber-700" />
               </div>
             ) : (
               <div className="mt-4 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">
-                <CheckCircle2 className="h-5 w-5" />No settlement required
-              </div>
+                <CheckCircle2 className="h-5 w-5" />{closingTr("No settlement required")}</div>
             )}
           </div>
         )}
