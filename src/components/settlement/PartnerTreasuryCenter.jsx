@@ -6,7 +6,6 @@ import {useRole} from '@/lib/RoleContext';
 import {useLanguage} from '@/lib/LanguageContext';
 import {partnerError} from '@/lib/partnerTreasury';
 import {peopleText,newPersonPermissions} from '@/lib/peopleAccounts';
-import PeopleCustodySummary from './PeopleCustodySummary';
 import WalletERPOverview from './WalletERPOverview';
 import PeopleMemberships from './PeopleMemberships';
 import PersonPermissions from './PersonPermissions';

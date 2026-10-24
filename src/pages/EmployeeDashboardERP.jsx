@@ -1,3 +1,4 @@
+import { visibleEmployeeAnnouncement } from '@/lib/verifiedReportRead';
 import HelpLink from '@/components/help/HelpLink';
 import PortalDataState from '@/components/shared/PortalDataState';
 import EmployeeMobileAttendance from '@/components/attendance/EmployeeMobileAttendance';
@@ -7,13 +8,12 @@ import { useTenant } from '@/lib/TenantContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   User,
   LogOut, GitBranch, Bell, ClipboardList, Home
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 export default function EmployeeDashboardERP() {
@@ -64,18 +64,22 @@ export default function EmployeeDashboardERP() {
 
   // Announcements
   const { data: announcements = [], isError: announcementsError, refetch: retryAnnouncements, isLoading: announcementsLoading } = useQuery({
-    queryKey: ['emp-announcements', branchId],
+    queryKey: ['emp-announcements', user?.restaurant_id, branchId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
+        .eq('restaurant_id', user.restaurant_id)
         .eq('branch_id', branchId)
+        .eq('is_active', true)
+        .or('target_role.is.null,target_role.eq.all,target_role.eq.employee')
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
         .order('created_date', { ascending: false })
         .limit(5);
       if (error) throw error;
-      return data || [];
+      return (data || []).filter(row => visibleEmployeeAnnouncement(row));
     },
-    enabled: !!branchId,
+    enabled: !!branchId && !!user?.restaurant_id,
   });
 
   // Attendance RPC independently checks the approved membership and employee UUID.

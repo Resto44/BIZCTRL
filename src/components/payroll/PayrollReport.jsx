@@ -13,7 +13,6 @@ import BranchSelect from '@/components/shared/BranchSelect';
 import { formatCurrency } from '@/lib/helpers';
 import { buildPayrollRow, monthRange, currentMonth } from '@/lib/payrollEngine';
 import { Download, CheckCircle2, AlertTriangle, Users, TrendingDown, Gift } from 'lucide-react';
-import { format } from 'date-fns';
 
 const STATUS_COLORS = {
   draft: 'bg-secondary text-secondary-foreground',

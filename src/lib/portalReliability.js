@@ -13,18 +13,20 @@ export function portalTreasuryMovement(rows) {
   },{inflow:0,outflow:0,net:0});
 }
 export function supplierInvoiceTotals(rows) {
-  return rows.filter(row=>!['rejected','cancelled','canceled','void'].includes(String(row.status).toLowerCase())).reduce((result,row)=>{
+  return rows.filter(row=>!['rejected','cancelled','canceled','void','voided','deleted'].includes(String(row.status).toLowerCase())).reduce((result,row)=>{
     const total=Number(row.total_amount)||0;
     const paid=row.paid_amount==null?(row.status==='paid'?total:0):(Number(row.paid_amount)||0);
     result.invoiced+=total;result.paid+=paid;result.outstanding+=total-paid;return result;
   },{invoiced:0,paid:0,outstanding:0});
 }
 export async function readAllPortalRows(queryFactory,pageSize=500) {
+  if (!Number.isInteger(pageSize) || pageSize < 1) throw new Error('Invalid page size');
   const rows=[];
   for(let offset=0;;offset+=pageSize){
     const {data,error}=await queryFactory().range(offset,offset+pageSize-1);
     if(error)throw error;
-    const page=data||[];rows.push(...page);
+    if (!Array.isArray(data)) throw new Error('Invalid portal data response');
+    const page=data;rows.push(...page);
     if(page.length<pageSize)return rows;
   }
 }

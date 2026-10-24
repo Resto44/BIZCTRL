@@ -1,5 +1,5 @@
 import React from 'react';
-import {ArrowDownLeft,ArrowUpRight,BookOpen,CalendarDays,CheckCircle2,Clock3,Receipt,ShieldCheck} from 'lucide-react';
+import {ArrowDownLeft,ArrowUpRight,BookOpen,CalendarDays,CheckCircle2,Clock3,Receipt} from 'lucide-react';
 import {recentWalletActivity,walletPartiesForKind,walletAccountReference} from '@/lib/walletPersonalActivity';
 
 const copy={

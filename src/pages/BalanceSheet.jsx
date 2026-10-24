@@ -6,7 +6,9 @@
  */
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { readTenantReportRows } from '@/lib/verifiedReportRead';
+import { latestInventorySnapshots } from '@/lib/inventorySnapshotView';
+import PortalDataState from '@/components/shared/PortalDataState';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
@@ -68,66 +70,60 @@ function SectionCard({ title, icon: Icon, color, children, total, totalLabel, to
 
 export default function BalanceSheet() {
   const { currency } = useLanguage();
-  const { activeRestaurant } = useTenant();
-  const [branch, setBranch] = useState('all');
+  const { activeRestaurant, branches = [], isManager, managerBranch } = useTenant();
+  const [selectedBranch, setBranch] = useState('all');
+  const branch = isManager ? managerBranch : selectedBranch;
 
   const fmt = (n) => `${currency}${(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-  const enabled = !!activeRestaurant?.id;
+  const enabled = !!activeRestaurant?.id && (!isManager || !!managerBranch);
   const orgFilter = activeRestaurant?.id ? { restaurant_id: activeRestaurant.id } : null;
 
   // ── Data Queries ─────────────────────────────────────────────────────────────
-  const { data: inventory = [], isLoading: loadingInv } = useQuery({
+  const { data: inventory = [], isLoading: loadingInv, isError: errorInv, refetch: retryInv } = useQuery({
     queryKey: ['bs_inventory', orgFilter, branch],
-    queryFn: () => base44.entities.Inventory.filter(orgFilter || {}, 'product_name', 500),
+    queryFn: () => readTenantReportRows(supabase, 'inventory', activeRestaurant.id, 'product_name', true),
     staleTime: 60000, enabled,
   });
 
-  const { data: walletTransactions = [], isLoading: loadingWallet } = useQuery({
+  const { data: walletTransactions = [], isLoading: loadingWallet, isError: errorWallet, refetch: retryWallet } = useQuery({
     queryKey: ['bs_wallet', orgFilter, branch],
-    queryFn: () => base44.entities.WalletTransaction.filter(orgFilter || {}, '-transaction_date', 2000),
+    queryFn: () => readTenantReportRows(supabase, 'wallet_transactions', activeRestaurant.id, 'transaction_date', false),
     staleTime: 30000, enabled,
   });
 
-  const { data: debtRecords = [], isLoading: loadingDebts } = useQuery({
+  const { data: debtRecords = [], isLoading: loadingDebts, isError: errorDebts, refetch: retryDebts } = useQuery({
     queryKey: ['bs_debts', orgFilter, branch],
-    queryFn: () => base44.entities.DebtRecord.filter(orgFilter || {}, '-date', 1000),
+    queryFn: () => readTenantReportRows(supabase, 'debt_records', activeRestaurant.id, 'date', false),
     staleTime: 30000, enabled,
   });
 
-  const { data: supplierInvoices = [], isLoading: loadingInvoices } = useQuery({
+  const { data: supplierInvoices = [], isLoading: loadingInvoices, isError: errorInvoices, refetch: retryInvoices } = useQuery({
     queryKey: ['bs_supplier_invoices', activeRestaurant?.id, branch],
-    queryFn: async () => {
-      if (!activeRestaurant?.id) return [];
-      const { data, error } = await supabase
-        .from('supplier_invoices')
-        .select('*')
-        .eq('restaurant_id', activeRestaurant.id)
-        .order('date', { ascending: false })
-        .limit(2000);
-      if (error) return [];
-      return data || [];
-    },
+    queryFn: () => readTenantReportRows(supabase, 'supplier_invoices', activeRestaurant.id, 'date', false),
     staleTime: 30000, enabled,
   });
 
   // ── Calculations ─────────────────────────────────────────────────────────────
   const balanceSheet = useMemo(() => {
-    const branchFilter = (arr, field = 'branch') =>
-      branch === 'all' ? arr : arr.filter(r => r[field] === branch);
+    const selected = branches.find(b => [b.id, b.key, b.branch_key].includes(branch));
+    const branchFilter = arr => branch === 'all' ? arr : arr.filter(row => {
+      if (row.branch_id) return row.branch_id === (selected?.id || branch);
+      return [selected?.key, selected?.branch_key, branch].filter(Boolean).includes(row.branch || row.branch_key);
+    });
 
     // Cash (from wallet transactions)
-    const walletTxns = branchFilter(walletTransactions, 'branch');
+    const walletTxns = branchFilter(walletTransactions);
     const cashIn  = walletTxns.filter(t => t.direction === 'in').reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const cashOut = walletTxns.filter(t => t.direction === 'out').reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const cash = cashIn - cashOut;
 
     // Inventory value
-    const invItems = branchFilter(inventory, 'branch');
+    const invItems = latestInventorySnapshots(branchFilter(inventory), branches);
     const inventoryValue = invItems.reduce((s, item) =>
       s + ((item.quantity || 0) * (item.unit_cost || item.avg_cost || item.cost_price || 0)), 0);
 
     // Receivable (open customer debts)
-    const receivables = branchFilter(debtRecords, 'branch')
+    const receivables = branchFilter(debtRecords)
       .filter(d => d.type === 'receivable' && d.status !== 'paid' && d.status !== 'written_off');
     const totalReceivable = receivables.reduce((s, d) => s + (Number(d.remaining_amount) || 0), 0);
 
@@ -135,7 +131,7 @@ export default function BalanceSheet() {
     const totalAssets = cash + inventoryValue + totalReceivable;
 
     // Payable (outstanding supplier invoices)
-    const branchInvoices = branchFilter(supplierInvoices, 'branch');
+    const branchInvoices = branchFilter(supplierInvoices);
     const kpis = computeProcurementKPIs(branchInvoices, []);
     const totalPayable = kpis.outstandingPayables;
 
@@ -143,9 +139,14 @@ export default function BalanceSheet() {
     const equity = totalAssets - totalPayable;
 
     return { cash, inventoryValue, totalReceivable, totalAssets, totalPayable, equity };
-  }, [inventory, walletTransactions, debtRecords, supplierInvoices, branch]);
+  }, [inventory, walletTransactions, debtRecords, supplierInvoices, branch, branches]);
 
   const isLoading = loadingInv || loadingWallet || loadingDebts || loadingInvoices;
+
+  if (errorInv || errorWallet || errorDebts || errorInvoices) {
+    return <PortalDataState onRetry={() => { retryInv(); retryWallet(); retryDebts(); retryInvoices(); }} />;
+  }
+  if (!enabled) return <PortalDataState loading />;
 
   return (
     <div className="space-y-5 pb-20">

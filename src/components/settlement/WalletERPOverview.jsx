@@ -4,7 +4,7 @@ import {supabase} from '@/api/supabaseClient';
 import {readSponsorOwnerRows,sponsorOwnerSummary} from '@/lib/sponsorOwnerBilateral';
 import {ownerWalletSnapshot} from '@/lib/walletERPViewModel';
 import OwnerWalletPersonActivity from './OwnerWalletPersonActivity';
-import {WalletCards,Users,ArrowDownLeft,ArrowUpRight,Clock3,Plus,BookOpen,ArrowLeftRight,ShieldCheck,ChevronRight,UserRound,Landmark,Activity,Search,FileClock} from 'lucide-react';
+import {WalletCards,ArrowDownLeft,ArrowUpRight,Clock3,Plus,ChevronRight,UserRound,Search} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 
 /** Read-only owner landing. Never combine personal principal with custody (business property).

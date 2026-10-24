@@ -1,3 +1,5 @@
+import PortalDataState from '@/components/shared/PortalDataState';
+import { readTenantReportRows } from '@/lib/verifiedReportRead';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -18,7 +20,7 @@ import {
   WalletCards,
 } from 'lucide-react';
 
-import { base44, supabase } from '@/api/supabaseClient';
+import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { drawLocalizedPdfText, prepareLocalizedPdf, safePdfFilename } from '@/lib/pdfLocalization';
 import { drawERPReportBrand,loadERPReportIcon } from '@/lib/erpPdfBrand';
@@ -302,14 +304,13 @@ export default function ProfitLoss() {
   }, [branchKeys.join('|'), isManager, managerBranch]);
 
   const restaurantId = activeRestaurant?.id;
-  const { data: financialData = EMPTY_DATA, isFetching, dataUpdatedAt } = useQuery({
+  const { data: financialData = EMPTY_DATA, isFetching, isLoading, isError, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['financial-analysis', restaurantId],
     enabled: Boolean(restaurantId),
     staleTime: 30_000,
     refetchInterval: 60_000,
     queryFn: async () => {
       if (!restaurantId) return EMPTY_DATA;
-      const scope = { restaurant_id: restaurantId };
       const [
         sales,
         purchases,
@@ -321,15 +322,15 @@ export default function ProfitLoss() {
         customers,
         suppliers,
       ] = await Promise.all([
-        base44.entities.DailySales.filter(scope, '-date', 5000),
-        base44.entities.Purchase.filter(scope, '-date', 5000),
-        base44.entities.SupplierInvoice.filter(scope, '-date', 5000),
-        base44.entities.Expense.filter(scope, '-date', 5000),
-        base44.entities.ExpenseCategory.filter(scope, 'sort_order', 500),
-        base44.entities.Product.filter(scope, 'name', 5000),
-        base44.entities.Category.filter(scope, 'name_en', 1000),
-        base44.entities.Customer.filter(scope, 'name', 5000),
-        base44.entities.Supplier.filter(scope, 'name', 5000),
+        readTenantReportRows(supabase, 'daily_sales', restaurantId, 'date', false),
+        readTenantReportRows(supabase, 'purchases', restaurantId, 'date', false),
+        readTenantReportRows(supabase, 'supplier_invoices', restaurantId, 'date', false),
+        readTenantReportRows(supabase, 'expenses', restaurantId, 'date', false),
+        readTenantReportRows(supabase, 'expense_categories', restaurantId, 'sort_order', true),
+        readTenantReportRows(supabase, 'products', restaurantId, 'name', true),
+        readTenantReportRows(supabase, 'categories', restaurantId, 'name_en', true),
+        readTenantReportRows(supabase, 'customers', restaurantId, 'name', true),
+        readTenantReportRows(supabase, 'suppliers', restaurantId, 'name', true),
       ]);
       return {
         sales,
@@ -462,6 +463,9 @@ export default function ProfitLoss() {
         : scopeMode === 'all'
           ? 'All Branches'
           : 'Organization Total';
+
+  if (isError) return <PortalDataState onRetry={refetch} />;
+  if (!restaurantId || isLoading) return <PortalDataState loading />;
 
   return (
     <div>
