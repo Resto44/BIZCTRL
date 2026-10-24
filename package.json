@@ -12,7 +12,8 @@
     "typecheck": "tsc -p ./jsconfig.json",
     "test": "vitest run",
     "preview": "vite preview",
-    "icons:generate": "node scripts/generate-pwa-icons.mjs"
+    "icons:generate": "node scripts/generate-pwa-icons.mjs",
+    "typecheck:ui": "tsc -p tests/types/tsconfig.json"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.30",

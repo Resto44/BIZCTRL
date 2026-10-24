@@ -45,3 +45,27 @@ This is a source/database metadata and automated regression audit, not certifica
 - Reconcile existing duplicate supplier invoices before adding durable database uniqueness/idempotency constraints; no financial records were deleted.
 - Review recurring expense effective periods/calendar allocation, audit versioning and legacy raw-material expense migration with actual source documents. The earlier October rent correction is preserved.
 - Complete the large pre-existing typecheck backlog and the targeted advisor review; no blanket claim of ERP certification, security certification or zero remaining defects is made.
+
+
+## Follow-up release — remaining portal and debt corrections
+
+Baseline: PR #201 / 19bba682d9ffe8f1b4a093335f3487e94da8c7ae.
+
+### Resolved in this follow-up
+
+- The orphaned CustomerPortal page is retired. `/customer-portal` now passes the existing `viewDebts` permission guard and redirects to canonical Customer Management. The system's database membership model supports four roles (Owner, Manager, Employee, Supplier); this does not invent a new customer login role. Broken self-profile/address writes are no longer reachable. Customer/address records are untouched.
+- Debt Management reads all tenant-scoped debts/payments and history pages, rather than 200 records filtered by their creator. Staff queries require the canonical assigned branch. Failed sources show retry, missing assignment shows an explicit missing-profile state, and incomplete data cannot be used as zero balances.
+- Debt totals coerce numeric database strings to numbers; cancelled/voided/written-off debts are excluded from open balances. Customer collection totals no longer include supplier/liability payments. Due-today debts are not overdue. Aging boundaries are labelled 1–30 / 31–60 / 60+ days.
+- Top debtors are grouped by canonical party identity, not name. Unlinked legacy entries remain separate.
+- PaymentForm uses a synchronous submit guard, checks finite positive amounts and remaining balance, and isolates notification failures after the authoritative payment commits. A notification outage no longer reports a successful payment as a failed payment.
+- Supabase initialization now retains the real SDK interface. Invalid initialization uses a network-disabled SDK client returning explicit configuration errors; it cannot fake a successful empty read or silently contact production using fallback credentials.
+- Added native React/Radix prop/ref contracts to shared UI wrappers. Correct props remain supported and invalid variants, boolean props and incompatible refs are rejected by a dedicated compile-time contract test.
+- Removed 126 shadowed translation properties. Effective translation values were compared before/after and preserved exactly; only earlier overwritten definitions were removed.
+
+### Follow-up verification and limits
+
+- 256 suites / 1,498 tests passed; production build exited 0; repository lint passed.
+- UI type contract test passes, including expected rejection of invalid input. Run `npm run typecheck:ui`.
+- Full existing `npm run typecheck` still fails: diagnostics decreased from 8,478 to 2,086. No project-wide check disable, exclude expansion, `@ts-nocheck`, or blanket `any` was introduced. Remaining diagnostics include source typing, test-library JavaScript, mutation inference, context defaults and browser/Deno configuration mismatch. They are not all proven runtime defects, and none are claimed fixed merely because a build passes.
+- Live Supabase schema was read to verify debt table scope columns; no production financial rows, policies, roles, schema or balances were mutated by this follow-up.
+- Authenticated multi-role browser/RLS integration testing, full general-ledger reconciliation, historical duplicate-invoice reconciliation, fixed-expense effective periods and the remaining typecheck/advisor review are still open. Retiring the legacy customer path resolves its unsafe implementation; it does not deliver a new authenticated customer self-service product.

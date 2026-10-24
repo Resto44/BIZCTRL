@@ -99,7 +99,6 @@ const SponsorTreasury     = lazy(() => import('@/pages/SponsorTreasury'));
 const DebtManagement      = lazy(() => import('@/pages/DebtManagement'));
 const NetworkManagement   = lazy(() => import('@/pages/NetworkManagement'));
 
-const CustomerPortal      = lazy(() => import('@/pages/CustomerPortal'));
 const LoyaltyProgram      = lazy(() => import('@/pages/LoyaltyProgram'));
 
 const SettingsPage        = lazy(() => import('@/pages/SettingsPage'));
@@ -422,7 +421,7 @@ const SubscribedRoutes = () => {
         <Route path="/smart-alerts" element={<Navigate to="/alerts" replace />} />
         <Route path="/ai-copilot" element={<RoleGuard permission="viewDashboard"><FeatureRouteGuard feature="ai_copilot"><AIBusinessCopilot /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/bi-center" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="advanced_analytics"><BICenter /></FeatureRouteGuard></RoleGuard>} />
-        <Route path="/customer-portal" element={<CustomerPortal />} />
+        <Route path="/customer-portal" element={<RoleGuard permission="viewDebts"><Navigate to="/customer-management" replace /></RoleGuard>} />
         <Route path="/loyalty-program" element={<RoleGuard permission="viewDebts"><LoyaltyProgram /></RoleGuard>} />
 
         {/* ── Short aliases — redirect to new ERP dashboards ── */}

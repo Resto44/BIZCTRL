@@ -1,7 +1,6 @@
 /**
  * Supabase client + Base44-compatible entity/auth wrapper.
- * CRASH-PROOF: every initialization step is guarded.
- * The module ALWAYS exports valid objects even if Supabase is unavailable.
+ * Uses the SDK query interface; unavailable initialization fails closed.
  */
 
 
@@ -18,64 +17,27 @@ const PROD_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || PROD_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || PROD_SUPABASE_ANON_KEY;
 
-// ── Stub Supabase for when it's unavailable ────────────────────────────────
-const stubAuth = {
-  getUser: async () => ({ data: { user: null }, error: null }),
-  getSession: async () => ({ data: { session: null }, error: null }),
-  signInWithPassword: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
-  signUp: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
-  signOut: async () => ({ error: null }),
-  resetPasswordForEmail: async () => ({ error: { message: 'Supabase not configured' } }),
-  onAuthStateChange: (cb) => {
-    // Fire with no session so AuthContext resolves immediately
-    setTimeout(() => cb('INITIAL_SESSION', null), 0);
-    return { data: { subscription: { unsubscribe: () => {} } } };
-  },
-};
-
-const stubFrom = () => ({
-  select: () => stubFrom(),
-  insert: () => stubFrom(),
-  update: () => stubFrom(),
-  upsert: () => stubFrom(),
-  delete: () => stubFrom(),
-  eq: () => stubFrom(),
-  or: () => stubFrom(),
-  order: () => stubFrom(),
-  limit: () => stubFrom(),
-  single: async () => ({ data: null, error: null }),
-  then: (resolve) => resolve({ data: [], error: null }),
-});
-
-let supabase = {
-  auth: stubAuth,
-  from: () => stubFrom(),
-  rpc: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
-  channel: () => ({
-    on: function() { return this; },
-    subscribe: function() { return this; },
-  }),
-  removeChannel: () => {},
-};
-
-try {
-  if (SUPABASE_URL && SUPABASE_ANON_KEY) {
-    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+// Use the real SDK interface even when initialization fails. The old stub
+// returned successful empty reads and inferred zero-argument query methods.
+function initializeERPClient() {
+  try {
+    return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: true, autoRefreshToken: true },
     });
-    // Use Object.assign to maintain the same reference in case of circular imports
-    Object.assign(supabase, client);
-    // Ensure the prototype is also copied if necessary, or just replace the variable
-    // For safety with live bindings, replacing the variable is usually fine, 
-    // but Object.assign is safer for captured closures if they captured the object itself.
-    // However, the closures capture the 'supabase' variable, so re-assignment is fine.
-    supabase = client; 
-  } else {
-    console.warn('[supabaseClient] VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY not set — using stub client');
+  } catch (error) {
+    console.error('[supabaseClient] Supabase init failed:', error.message);
+    // A correctly shaped, network-disabled client keeps retry/error screens
+    // available without switching an invalid deployment to production data.
+    return createClient(PROD_SUPABASE_URL, PROD_SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: { fetch: async () => new Response(JSON.stringify({
+        code: 'ERP_CLIENT_INITIALIZATION_FAILED', message: 'ERP client configuration is unavailable',
+      }), { status: 400, headers: { 'Content-Type': 'application/json' } }) },
+    });
   }
-} catch (e) {
-  console.error('[supabaseClient] Supabase init failed:', e.message);
 }
+
+const supabase = initializeERPClient();
 
 export { supabase, SUPABASE_URL, SUPABASE_ANON_KEY };
 

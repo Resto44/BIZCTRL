@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { isPast, parseISO } from 'date-fns';
+import { buildDebtLedgerSummary } from '@/lib/debtLedgerSummary';
 import { useDebtI18n } from '@/lib/debtI18n';
 
 const COLORS = ['#22c55e', '#f59e0b', '#ef4444', '#6366f1'];
@@ -10,34 +10,7 @@ const COLORS = ['#22c55e', '#f59e0b', '#ef4444', '#6366f1'];
 export default function DebtDashboard({ debts }) {
   const d = useDebtI18n();
 
-  const stats = useMemo(() => {
-    const receivables = debts.filter(x => x.type === 'receivable');
-    const liabilities = debts.filter(x => x.type === 'liability');
-    const overdue = debts.filter(x => x.status !== 'paid' && x.due_date && isPast(parseISO(x.due_date)));
-    const totalReceivable = receivables.reduce((s, x) => s + (x.remaining_amount || 0), 0);
-    const totalLiability = liabilities.reduce((s, x) => s + (x.remaining_amount || 0), 0);
-    const totalOverdue = overdue.reduce((s, x) => s + (x.remaining_amount || 0), 0);
-    const totalCollected = debts.reduce((s, x) => s + (x.paid_amount || 0), 0);
-
-    const aging = { current: 0, '30d': 0, '60d': 0, '90d+': 0 };
-    const now = new Date();
-    receivables.filter(x => x.status !== 'paid').forEach(x => {
-      if (!x.due_date) { aging.current += x.remaining_amount || 0; return; }
-      const diff = Math.floor((now - parseISO(x.due_date)) / 86400000);
-      if (diff <= 0) aging.current += x.remaining_amount || 0;
-      else if (diff <= 30) aging['30d'] += x.remaining_amount || 0;
-      else if (diff <= 60) aging['60d'] += x.remaining_amount || 0;
-      else aging['90d+'] += x.remaining_amount || 0;
-    });
-
-    const debtorMap = {};
-    receivables.filter(x => x.status !== 'paid').forEach(x => {
-      debtorMap[x.party_name] = (debtorMap[x.party_name] || 0) + (x.remaining_amount || 0);
-    });
-    const topDebtors = Object.entries(debtorMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-    return { totalReceivable, totalLiability, totalOverdue, totalCollected, aging, topDebtors, overdue };
-  }, [debts]);
+  const stats = useMemo(() => buildDebtLedgerSummary(debts), [debts]);
 
   const agingData = [
     { name: d.aging_current, value: stats.aging.current },
@@ -123,8 +96,8 @@ export default function DebtDashboard({ debts }) {
             <CardTitle className="text-sm">{d.top_debtors}</CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-2">
-            {stats.topDebtors.map(([name, amt], i) => (
-              <div key={name} className="flex items-center gap-3">
+            {stats.topDebtors.map(({id, name, amount: amt}, i) => (
+              <div key={id} className="flex items-center gap-3">
                 <span className="text-xs font-bold text-muted-foreground w-4">{i + 1}</span>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium truncate">{name}</div>

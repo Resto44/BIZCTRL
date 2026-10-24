@@ -26,13 +26,16 @@ export default function PaymentForm({ debt, onSave, onCancel }) {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const paymentRequestId = useRef(null);
+  const submitting = useRef(false);
 
   const remaining = (debt.remaining_amount ?? debt.total_amount - (debt.paid_amount || 0));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const amt = parseFloat(amount) || 0;
-    if (amt <= 0) return;
+    if (submitting.current) return;
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0 || amt > Number(remaining)) return;
+    submitting.current = true;
     setSaving(true);
 
     try {
@@ -64,16 +67,21 @@ export default function PaymentForm({ debt, onSave, onCancel }) {
         console.warn('Customer payment receipt delivery failed after commit:', receiptError?.message || receiptError);
       }
 
-      await notif.creditCollection({
-        branch: updatedDebt.branch || debt.branch || 'General',
-        amount: amt,
-        action: 'create',
-      });
+      try {
+        await notif.creditCollection({
+          branch: updatedDebt.branch || debt.branch || 'General',
+          amount: amt,
+          action: 'create',
+        });
+      } catch (notificationError) {
+        console.warn('Payment saved; notification failed:', notificationError);
+      }
       onSave();
     } catch (err) {
       console.error('Payment error:', err);
       alert(customerDebtPaymentErrorMessage(err));
     } finally {
+      submitting.current = false;
       setSaving(false);
     }
   };
