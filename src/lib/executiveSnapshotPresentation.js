@@ -49,3 +49,31 @@ export function buildExecutiveSnapshotPresentation({
       ? periodMetrics.netMargin - previousPeriodMetrics.netMargin : null,
   };
 }
+
+// Align by elapsed calendar day/month, never by the index of recorded rows.
+// Missing records stay null, so a missing closing is not presented as zero sales.
+export function buildExecutiveComparisonTrend({revenueTrend=[],previousRevenueTrend=[],periodKey='today',period}={}) {
+  if (!period?.currentStart || !period?.previousStart) {
+    return buildExecutiveSnapshotPresentation({revenueTrend,periodKey}).trend.map((row,index)=>({...row,slot:index+1,previousSales:null}));
+  }
+  const monthly=periodKey==='year'||periodKey==='six-months';
+  const slot=(date,start)=>monthly
+    ? (Number(date.slice(0,4))-Number(start.slice(0,4)))*12+Number(date.slice(5,7))-Number(start.slice(5,7))
+    : Math.round((Date.parse(date+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000);
+  const count=slot(period.currentEnd,period.currentStart)+1;
+  if (!Number.isFinite(count)||count<1||count>366) return [];
+  const rows=Array.from({length:count},(_,index)=>({slot:index+1,sales:null,previousSales:null}));
+  for (const [records,start,end,key,dateKey] of [
+    [revenueTrend,period.currentStart,period.currentEnd,'sales','date'],
+    [previousRevenueTrend,period.previousStart,period.previousEnd,'previousSales','previousDate'],
+  ]) {
+    for (const item of records) {
+      if (!item?.date||item.date<start||item.date>end||valid(item.sales)==null) continue;
+      const index=slot(item.date,start);
+      if (!rows[index]) continue;
+      rows[index][key]=(rows[index][key]??0)+Number(item.sales);
+      rows[index][dateKey]=monthly?item.date.slice(0,7):item.date;
+    }
+  }
+  return rows;
+}

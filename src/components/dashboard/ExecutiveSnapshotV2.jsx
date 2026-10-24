@@ -5,20 +5,21 @@ import {
   Banknote, BarChart3, CreditCard, Landmark, Layers3, ReceiptText,
   ShieldAlert, ShoppingBasket, TrendingUp,
 } from 'lucide-react';
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
-import { buildExecutiveSnapshotPresentation, moneyChange } from '@/lib/executiveSnapshotPresentation';
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { buildExecutiveSnapshotPresentation, buildExecutiveComparisonTrend, moneyChange } from '@/lib/executiveSnapshotPresentation';
 import OwnerOrderSourcesAnalytics from './OwnerOrderSourcesAnalytics';
 import { buildOwnerOrderSourceAnalytics } from '@/lib/ownerOrderSourceAnalytics';
 
 const t = (copy,key,fallback) => copy?.[key] || fallback;
 
-function Change({ percent, points = false, suffix = '', light = false }) {
+function Change({ percent, points = false, suffix = '', light = false, lowerIsBetter = false }) {
   if (percent == null || !Number.isFinite(percent)) return null;
   const positive = percent >= 0;
   const amount = Math.abs(percent).toFixed(1);
+  const favorable = lowerIsBetter ? !positive : positive;
   return <span className={`inline-flex max-w-full items-center gap-0.5 rounded-full px-2 py-1 text-[10px] font-black tabular-nums ${light
     ? 'bg-white/15 text-white'
-    : positive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300'
+    : favorable ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300'
       : 'bg-rose-100 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300'}`}>
     {positive ? <ArrowUpRight className="h-3 w-3 shrink-0"/> : <ArrowDownRight className="h-3 w-3 shrink-0"/>}
     {positive ? '+' : '-'}{amount}{points?' pp':'%'}{suffix ? ` ${suffix}`:''}
@@ -33,8 +34,9 @@ function ComparisonMeter({ current, previous, color }) {
     <span className={`w-2.5 rounded-t ${color}`} style={{height:`${Math.max(2,100*a/max)}%`}}/>
   </div>;
 }
-function StatCard({ title, value, icon: Icon, tone, hint, change, previous, current, testId }) {
+function StatCard({ title, value, icon: Icon, tone, hint, change, previous, current, testId, lowerIsBetter = false, comparisonLabel }) {
   const tones = {
+    blue:'border-blue-200/70 bg-blue-50/60 dark:border-blue-900 dark:bg-blue-950/40 text-blue-700',
     green:'border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-900 dark:from-emerald-950/45 dark:to-slate-950 text-emerald-700',
     violet:'border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-900 dark:from-violet-950/40 dark:to-slate-950 text-violet-700',
     rose:'border-rose-200/70 bg-gradient-to-br from-rose-50 to-white dark:border-rose-900 dark:from-rose-950/40 dark:to-slate-950 text-rose-700',
@@ -43,9 +45,10 @@ function StatCard({ title, value, icon: Icon, tone, hint, change, previous, curr
   return <div data-testid={testId} className={`min-w-0 rounded-2xl border p-3.5 shadow-sm ${tones[tone]||tones.green}`}>
     <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
       <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-black sm:text-xs"><Icon className="h-4 w-4 shrink-0"/><span className="break-words">{title}</span></span>
-      <Change percent={change}/>
+      <Change percent={change} lowerIsBetter={lowerIsBetter}/>
     </div>
     <p className="mt-2 break-words text-[clamp(1.05rem,3.5vw,1.65rem)] font-black leading-tight tracking-tight tabular-nums text-slate-950 dark:text-white" dir="ltr">{value}</p>
+    {comparisonLabel && <p className="mt-1 text-[10px] text-muted-foreground">{comparisonLabel}</p>}
     <p className="mt-1 min-h-4 text-[10px] leading-4 text-muted-foreground">{hint}</p>
     <ComparisonMeter current={current} previous={previous} color={tone==='rose'?'bg-rose-400':tone==='violet'?'bg-violet-500':tone==='amber'?'bg-amber-400':'bg-emerald-500'}/>
   </div>;
@@ -79,7 +82,7 @@ export default function ExecutiveSnapshotV2({model,copy}) {
   const {
     periodMetrics={},previousPeriodMetrics={},revenueTrend=[],periodKey='today',
     periodLabel,formatMoney,hasQueryError,accountingProvisional,drawerCash,receivables,payables,scopedAlerts=[],
-    periodSales=[],revenueSources=[],lang='en',
+    periodSales=[],revenueSources=[],lang='en', previousRevenueTrend=[], reportPeriod, changeReportPeriod,
   }=model;
   const presentation=useMemo(()=>buildExecutiveSnapshotPresentation({
     periodMetrics,previousPeriodMetrics,revenueTrend,periodKey,
@@ -94,53 +97,73 @@ export default function ExecutiveSnapshotV2({model,copy}) {
     const next=Math.min(100,previous+method.percent);
     return {sum:next,colors:[...acc.colors,`${method.color} ${previous.toFixed(4)}% ${next.toFixed(4)}%`]};
   },{sum:0,colors:[]});
-  const canChart=presentation.trend.length>=2;
+  const comparisonTrend=useMemo(()=>buildExecutiveComparisonTrend({revenueTrend,previousRevenueTrend,periodKey,period:reportPeriod}),[revenueTrend,previousRevenueTrend,periodKey,reportPeriod]);
+  const canChart=comparisonTrend.some(row=>row.sales!=null||row.previousSales!=null);
+  const slotLabel=(periodKey==='year'||periodKey==='six-months')?(lang==='fa'?'ماه':lang==='ar'?'شهر':'Month'):(lang==='fa'?'روز':lang==='ar'?'يوم':'Day');
+  const compareLabel=t(copy,'vsPreviousPeriod','vs previous period');
+  const money=value=>hasQueryError?'—':formatMoney(value);
+
   const risksKnown=!hasQueryError;
   return <div data-testid="executive-snapshot-v2" className="space-y-3.5">
     <section data-testid="executive-snapshot" className="min-w-0 rounded-[1.55rem] border border-border/80 bg-card p-3.5 shadow-sm sm:p-5">
       <SectionHeader icon={BarChart3} title={t(copy,'executiveSnapshot','Executive snapshot')}
         subtitle={`${t(copy,'performanceOverview','Key performance overview')} · ${periodLabel}`}>
-        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${hasQueryError || accountingProvisional?'border-amber-200 bg-amber-50 text-amber-700':'border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'}`}>
-          {hasQueryError?t(copy,'syncRequired','Sync required'):accountingProvisional?t(copy,'accountingProvisionalLabel','Management estimate · pending expenses'):t(copy,'verifiedERP','VERIFIED ERP')}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {changeReportPeriod && <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900" aria-label={t(copy,'choosePeriod','Report period')}>
+            {[['today','today','Today'],['week','thisWeek','This week'],['month','thisMonth','This month']].map(([key,label,fallback])=><button type="button" key={key} aria-pressed={periodKey===key} onClick={()=>changeReportPeriod(key)} className={`min-h-9 rounded-lg px-2.5 text-[11px] font-bold ${periodKey===key?'bg-blue-600 text-white shadow-sm':'text-muted-foreground hover:bg-background'}`}>{t(copy,label,fallback)}</button>)}
+          </div>}
+          {(hasQueryError||accountingProvisional)&&<span role="status" className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">{hasQueryError?t(copy,'syncRequired','Sync required'):t(copy,'accountingProvisionalLabel','Management estimate · pending expenses')}</span>}
+        </div>
       </SectionHeader>
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5 sm:gap-3">
-        <div data-testid="snapshot-sales" className="relative col-span-2 flex min-h-[10rem] min-w-0 flex-col overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-blue-950 p-4 text-white sm:col-span-3 sm:min-h-[14rem] sm:p-5">
-          <div aria-hidden="true" className="pointer-events-none absolute -end-12 -top-16 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl"/>
-          <div className="relative flex flex-wrap items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-2 text-sm font-black text-blue-100"><BarChart3 className="h-4 w-4"/>{t(copy,'sales','Sales')}</span>
-            <Change light percent={presentation.salesChange}/>
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+        <div data-testid="snapshot-sales" className="min-w-0 rounded-2xl border border-blue-200/70 bg-blue-50/60 p-3.5 dark:border-blue-900 dark:bg-blue-950/40">
+          <span className="flex items-center gap-1.5 text-xs font-black text-blue-700 dark:text-blue-300"><BarChart3 className="h-4 w-4"/>{t(copy,'sales','Sales')}</span>
+          <p className="my-2 break-words text-[clamp(1.05rem,3.5vw,1.65rem)] font-black tracking-tight tabular-nums" dir="ltr">{money(presentation.sales)}</p>
+          {!hasQueryError&&<Change percent={presentation.salesChange}/>}
+          <p className="mt-1 text-[10px] text-muted-foreground">{compareLabel}</p>
+        </div>
+        <StatCard testId="snapshot-sales-less-purchases" title={t(copy,'grossProfit','Sales less purchases')} value={money(periodMetrics.grossProfit)} icon={BadgeDollarSign} tone="green"
+          change={hasQueryError?null:moneyChange(periodMetrics.grossProfit,prev.grossProfit)} comparisonLabel={compareLabel}/>
+        <StatCard testId="snapshot-expenses" title={t(copy,'operatingExpense','Recorded expenses')} value={money(periodMetrics.totalExpenses)} icon={ReceiptText} tone="rose" lowerIsBetter
+          change={hasQueryError?null:moneyChange(periodMetrics.totalExpenses,prev.totalExpenses)} comparisonLabel={compareLabel}/>
+        <StatCard testId="snapshot-profit" title={t(copy,'netProfit','Operating estimate')} value={money(periodMetrics.netProfit)} icon={TrendingUp} tone={periodMetrics.netProfit<0?'rose':'violet'}
+          change={hasQueryError?null:presentation.profitChange} comparisonLabel={compareLabel}/>
+      </div>
+      <p className="mt-2 text-[10px] leading-4 text-muted-foreground">{t(copy,'profitHint','Sales less purchases and expenses; not inventory-COGS profit')}</p>
+      <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
+        <div className="min-w-0 rounded-2xl border border-border/80 p-3">
+          <h4 className="text-xs font-black">{t(copy,'revenueTrend','Revenue trend')}</h4>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1"><span className="h-0.5 w-4 bg-blue-600"/>{periodLabel}</span>
+            <span className="flex items-center gap-1"><span className="w-4 border-t-2 border-dashed border-slate-400"/>{t(copy,'previousPeriodSales','Previous period sales')}</span>
           </div>
-          <p className="relative mt-3 break-words text-[clamp(1.6rem,5.8vw,2.55rem)] font-black tracking-tight tabular-nums" dir="ltr">{formatMoney(presentation.sales)}</p>
-          <p className="relative mt-1 text-[11px] text-blue-100">{t(copy,'verifiedSalesHint','Confirmed sales from all payment methods')}</p>
-          {canChart?<div data-testid="snapshot-sales-trend" className="relative mt-auto h-24 min-w-0 pt-2" dir="ltr">
+          {canChart&&!hasQueryError?<div data-testid="snapshot-sales-trend" className="mt-3 h-48 min-w-0 sm:h-56" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={presentation.trend} margin={{top:7,right:7,left:0,bottom:0}}>
-                <defs><linearGradient id="ownerExecutiveSalesGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#93c5fd" stopOpacity={0.45}/>
-                  <stop offset="95%" stopColor="#93c5fd" stopOpacity={0.04}/>
-                </linearGradient></defs>
-                <XAxis dataKey="date" tickFormatter={date=>date.slice(periodKey==='year'||periodKey==='six-months'?5:8)} axisLine={false} tickLine={false} tick={{fontSize:9,fill:'#bfdbfe'}} minTickGap={20}/>
-                <Tooltip formatter={value=>formatMoney(value)} labelFormatter={date=>date} contentStyle={{borderRadius:12,color:'#0f172a'}}/>
-                <Area type="monotone" dataKey="sales" stroke="#fff" strokeWidth={2.3} fill="url(#ownerExecutiveSalesGradient)" dot={presentation.trend.length<7?{r:2}:false} activeDot={{r:4}}/>
+              <AreaChart data={comparisonTrend} margin={{top:8,right:8,left:0,bottom:0}}>
+                <defs><linearGradient id="ownerExecutiveSalesGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2563eb" stopOpacity={0.2}/><stop offset="95%" stopColor="#2563eb" stopOpacity={0.01}/></linearGradient></defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#cbd5e1" opacity={0.45}/>
+                <XAxis dataKey="slot" tickFormatter={value=>`${slotLabel} ${value}`} tick={{fontSize:10}} axisLine={false} tickLine={false} minTickGap={20}/>
+                <YAxis width={42} tick={{fontSize:9}} axisLine={false} tickLine={false} tickFormatter={value=>new Intl.NumberFormat(lang,{notation:'compact',maximumFractionDigits:1}).format(value)}/>
+                <Tooltip formatter={(value,name)=>[formatMoney(value),name]} labelFormatter={(_,payload)=>{const row=payload?.[0]?.payload;return [row?.date,row?.previousDate].filter(Boolean).join(' / ');}} contentStyle={{borderRadius:12,color:'#0f172a',fontSize:11}}/>
+                <Area type="linear" dataKey="previousSales" name={t(copy,'previousPeriodSales','Previous period sales')} stroke="#94a3b8" strokeDasharray="5 4" strokeWidth={2} fill="transparent" dot={{r:2}} connectNulls={false}/>
+                <Area type="linear" dataKey="sales" name={t(copy,'sales','Sales')} stroke="#2563eb" strokeWidth={2.5} fill="url(#ownerExecutiveSalesGradient)" dot={{r:3}} connectNulls={false}/>
               </AreaChart>
             </ResponsiveContainer>
-          </div>:<p className="relative mt-auto pt-4 text-[10px] text-blue-200">{t(copy,'moreTrendData','Trend available after two recorded dates')}</p>}
+          </div>:<div className="grid h-48 place-items-center text-center text-xs text-muted-foreground">{hasQueryError?t(copy,'syncRequired','Sync required'):t(copy,'noPeriodData','No recorded data for this period.')}</div>}
+          <p className="mt-1 text-[10px] text-muted-foreground">{t(copy,'revenueTrendHint','Recorded revenue in the selected period')}</p>
         </div>
-        <div className="col-span-2 grid min-w-0 grid-cols-2 gap-2.5 sm:col-span-2 sm:grid-cols-1">
-          <StatCard testId="snapshot-profit" title={t(copy,'netProfit','Net profit')} value={formatMoney(periodMetrics.netProfit)} icon={BadgeDollarSign}
-            hint={t(copy,'profitHint','Profit after recorded costs')} tone={periodMetrics.netProfit<0?'rose':'green'}
-            change={presentation.profitChange} current={periodMetrics.netProfit} previous={prev.netProfit}/>
-          <div data-testid="snapshot-margin" className="min-w-0 rounded-2xl border border-violet-200/70 bg-gradient-to-br from-violet-50 to-white p-3.5 text-violet-700 dark:border-violet-900 dark:from-violet-950/40 dark:to-slate-950">
-            <div className="flex flex-wrap items-start justify-between gap-1.5">
-              <span className="flex items-center gap-1.5 text-[11px] font-black sm:text-xs"><TrendingUp className="h-4 w-4"/>{t(copy,'netMargin','Net margin')}</span>
-              <Change points percent={presentation.marginChangePoints}/>
-            </div>
-            <p className="mt-2 text-[clamp(1.25rem,4.6vw,1.85rem)] font-black tabular-nums text-foreground" dir="ltr">{Number.isFinite(Number(periodMetrics.netMargin))?Number(periodMetrics.netMargin).toFixed(1)+'%':'—'}</p>
-            <p className="mt-1 text-[10px] text-muted-foreground">{t(copy,'marginHint','Net profit as a share of sales')}</p>
-            <ComparisonMeter current={periodMetrics.netMargin} previous={(prev.totalSales||0)>0?prev.netMargin:null} color="bg-violet-500"/>
-          </div>
+        <div data-testid="snapshot-margin" className="min-w-0 rounded-2xl border border-violet-200/70 bg-violet-50/50 p-3.5 dark:border-violet-900 dark:bg-violet-950/30">
+          <h4 className="flex items-center gap-1.5 text-xs font-black text-violet-700 dark:text-violet-300"><TrendingUp className="h-4 w-4"/>{t(copy,'netMargin','Estimated margin')}</h4>
+          <p className="my-3 break-words text-3xl font-black tabular-nums" dir="ltr">{!hasQueryError&&presentation.sales>0&&Number.isFinite(Number(periodMetrics.netMargin))?Number(periodMetrics.netMargin).toFixed(1)+'%':'—'}</p>
+          {!hasQueryError&&presentation.sales>0&&<Change points percent={presentation.marginChangePoints}/>}
+          <p className="mt-1 text-[10px] text-muted-foreground">{compareLabel}</p>
+          <p className="mt-3 text-[10px] leading-4 text-muted-foreground">{t(copy,'marginHint','Estimated result as a share of sales')}</p>
         </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50/40 p-3 dark:border-blue-900 dark:bg-blue-950/30">
+        <span className="flex items-center gap-2 text-xs font-bold"><ShoppingBasket className="h-4 w-4 text-blue-600"/>{t(copy,'purchases','Purchases')}</span>
+        <strong className="text-base tabular-nums" dir="ltr">{money(periodMetrics.totalPurchaseCost)}</strong>
+        <span className="text-[10px] text-muted-foreground">{t(copy,'purchasesHint','Approved purchases in the selected period')}</span>
       </div>
     </section>
 

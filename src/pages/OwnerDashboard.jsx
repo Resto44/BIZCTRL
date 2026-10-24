@@ -413,6 +413,7 @@ function OwnerDashboardContent() {
   const supplierComparisons = useMemo(() => buildSupplierPriceComparisons(priceHistory), [priceHistory]);
   const branchPriceInconsistencies = useMemo(() => buildBranchPriceInconsistencies(priceHistory), [priceHistory]);
   const expenseGroups = useMemo(() => groupExpensesByCategory(periodExpenses, expenseCategories), [expenseCategories, periodExpenses]);
+  const previousRevenueTrend = useMemo(() => aggregateDailyRevenue(previousPeriodSales, (sale) => calculateSalesRevenue(sale, revenueSources).total), [previousPeriodSales, revenueSources]);
   const revenueTrend = useMemo(() => aggregateDailyRevenue(periodSales, (sale) => calculateSalesRevenue(sale, revenueSources).total), [periodSales, revenueSources]);
   const receivables = customerDebts.reduce((sum, debt) => sum + numeric(debt.remaining_amount ?? debt.balance ?? debt.total_amount), 0);
   const payables = supplierInvoices.filter(approvedPurchase).reduce((sum, invoice) => sum + Math.max(0, numeric(invoice.remaining_amount ?? invoice.balance ?? (numeric(invoice.total_amount) - numeric(invoice.paid_amount ?? invoice.amount_paid)))), 0);
@@ -460,12 +461,13 @@ function OwnerDashboardContent() {
     periodSales, revenueSources, lang,
     branchRankings, scopedAlerts, inventoryOverview, receivables, payables, cashRegister, drawerCash,
     consumption, priceReport, supplierComparisons, branchPriceInconsistencies, priceHistory,
+    previousRevenueTrend, reportPeriod: period, changeReportPeriod,
     expenseGroups, revenueTrend, periodPurchaseQuantity, periodPurchaseCost: periodMetrics.totalPurchaseCost,
     supplierCount, selectBranch: setSelectedBranchId, canAddBranch: role === 'owner',
     canOpenCopilot: role === 'owner' && subscriptionActive && hasFeature('ai_copilot') && Boolean(activeRestaurant?.id) && Boolean(user?.id),
     openCopilot: () => setCopilotOpen(true), copilotLabel,
     openQuickAddBranch: () => setQuickAddBranchOpen(true), loadingActiveAlerts, hasQueryError, accountingProvisional, pendingExpenseCount,
-  }), [branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, accountingProvisional, pendingExpenseCount, loadingActiveAlerts, payables, periodLabel, activePeriod, periodSales, revenueSources, lang, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel, subscriptionActive, hasFeature]);
+  }), [previousRevenueTrend, period, changeReportPeriod, branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, accountingProvisional, pendingExpenseCount, loadingActiveAlerts, payables, periodLabel, activePeriod, periodSales, revenueSources, lang, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel, subscriptionActive, hasFeature]);
 
   if (loading) return <DashboardSkeleton />;
 
