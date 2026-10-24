@@ -84,7 +84,7 @@ describe('ERP contract: Sales Closing ↔ Owner Dashboard', () => {
     expect(report).not.toContain('const operatingCash = periodMetrics.totalCash + periodMetrics.totalNetwork');
     expect(report).toContain('data-testid="owner-accounting-liquidity-basis"');
     expect(report).toContain('data-testid="owner-pending-expense-estimate"');
-    expect(executive).toContain('accountingProvisional?');
+    expect(executive).toContain('hasQueryError||accountingProvisional');
     expect(closingPage).not.toContain('No posted ERP cash sales were found.');
     expect(closingPage).toContain('data-testid="offline-sales-audit"');
     expect(closingPage).not.toContain('nextErrors.sales_notes =');
