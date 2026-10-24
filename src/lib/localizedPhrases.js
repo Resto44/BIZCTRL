@@ -164,10 +164,6 @@ export const localizedPhrases = {
     "fa": "حساب #",
     "ar": "الحساب #"
   },
-  "Account Name": {
-    "fa": "نام حساب",
-    "ar": "اسم الحساب"
-  },
   "Account Number": {
     "fa": "شماره حساب",
     "ar": "رقم الحساب"
@@ -1404,10 +1400,6 @@ export const localizedPhrases = {
     "fa": "مشکل خود را شرح دهید...",
     "ar": "اشرح مشكلتك..."
   },
-  "Description / Notes": {
-    "fa": "توضیحات / یادداشت‌ها",
-    "ar": "الوصف / ملاحظات"
-  },
   "Detailed Comparison": {
     "fa": "مقایسه دقیق",
     "ar": "مقارنة تفصيلية"
@@ -2375,10 +2367,6 @@ export const localizedPhrases = {
   "Network / Card": {
     "fa": "شبکه / کارت",
     "ar": "شبكة / بطاقة"
-  },
-  "Network / POS": {
-    "fa": "شبکه / POS",
-    "ar": "شبكة / POS"
   },
   "Network / POS Sales": {
     "fa": "فروش شبکه / POS",

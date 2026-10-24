@@ -23,6 +23,7 @@ const badgeVariants = cva(
   }
 )
 
+/** @param {React.ComponentPropsWithoutRef<'div'> & import('class-variance-authority').VariantProps<typeof badgeVariants>} props */
 function Badge({
   className,
   variant,

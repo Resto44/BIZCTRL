@@ -1,13 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { readDebtPortalRows } from '@/lib/debtPortalData';
+import PortalDataState from '@/components/shared/PortalDataState';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
-import { isPast, parseISO } from 'date-fns';
+import { isOpenDebtRecord, isOverdueDebtRecord } from '@/lib/debtLedgerSummary';
 import DebtCard from '@/components/debts/DebtCard';
 import DebtForm from '@/components/debts/DebtForm';
 import PaymentForm from '@/components/debts/PaymentForm';
@@ -36,7 +37,7 @@ function CustomerLedger({ debts, payments, currency }) {
       map[key].debts.push(debt);
       map[key].totalDebt += Number(debt.total_amount) || 0;
       map[key].totalPaid += Number(debt.paid_amount) || 0;
-      map[key].remaining += Number(debt.remaining_amount) || 0;
+      map[key].remaining += isOpenDebtRecord(debt) ? Number(debt.remaining_amount) || 0 : 0;
     });
     return Object.values(map);
   }, [debts]);
@@ -131,16 +132,13 @@ function DebtHistory({ debts, payments, currency }) {
 }
 
 // ── Invoice History Component ─────────────────────────────────────────────────
-function InvoiceHistory({ createdBy, currency }) {
-  const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['debt_invoices', createdBy],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('debt_invoices').select('*').eq('created_by', createdBy).order('created_date', { ascending: false }).limit(100);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!createdBy,
+function InvoiceHistory({ restaurantId, branchId, restricted, currency }) {
+  const { data: invoices = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['debt_invoices', restaurantId, branchId, restricted],
+    queryFn: () => readDebtPortalRows(supabase, 'debt_invoices', restaurantId, branchId, restricted),
+    enabled: !!restaurantId && (!restricted || !!branchId),
   });
+  if (isError) return <PortalDataState onRetry={refetch} />;
   if (isLoading) return <div className="flex justify-center py-8"><div className="w-6 h-6 border-4 border-slate-200 border-t-primary rounded-full animate-spin" /></div>;
   return (
     <div className="space-y-2">
@@ -171,16 +169,13 @@ function InvoiceHistory({ createdBy, currency }) {
 }
 
 // ── Receipt History Component ─────────────────────────────────────────────────
-function ReceiptHistory({ createdBy, currency }) {
-  const { data: receipts = [], isLoading } = useQuery({
-    queryKey: ['debt_receipts', createdBy],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('debt_receipts').select('*').eq('created_by', createdBy).order('created_date', { ascending: false }).limit(100);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!createdBy,
+function ReceiptHistory({ restaurantId, branchId, restricted, currency }) {
+  const { data: receipts = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['debt_receipts', restaurantId, branchId, restricted],
+    queryFn: () => readDebtPortalRows(supabase, 'debt_receipts', restaurantId, branchId, restricted),
+    enabled: !!restaurantId && (!restricted || !!branchId),
   });
+  if (isError) return <PortalDataState onRetry={refetch} />;
   if (isLoading) return <div className="flex justify-center py-8"><div className="w-6 h-6 border-4 border-slate-200 border-t-primary rounded-full animate-spin" /></div>;
   return (
     <div className="space-y-2">
@@ -209,16 +204,13 @@ function ReceiptHistory({ createdBy, currency }) {
 }
 
 // ── WhatsApp Queue Component ──────────────────────────────────────────────────
-function WhatsAppQueue({ createdBy }) {
-  const { data: queue = [], isLoading } = useQuery({
-    queryKey: ['whatsapp_queue', createdBy],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('whatsapp_outbound_queue').select('*').eq('created_by', createdBy).order('created_date', { ascending: false }).limit(50);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!createdBy,
+function WhatsAppQueue({ restaurantId, branchId, restricted }) {
+  const { data: queue = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['whatsapp_queue', restaurantId, branchId, restricted],
+    queryFn: () => readDebtPortalRows(supabase, 'whatsapp_outbound_queue', restaurantId, branchId, restricted),
+    enabled: !!restaurantId && (!restricted || !!branchId),
   });
+  if (isError) return <PortalDataState onRetry={refetch} />;
   if (isLoading) return <div className="flex justify-center py-8"><div className="w-6 h-6 border-4 border-slate-200 border-t-primary rounded-full animate-spin" /></div>;
   const pending = queue.filter(q => q.status === 'pending').length;
   const sent = queue.filter(q => q.status === 'sent').length;
@@ -268,44 +260,29 @@ export default function DebtManagement() {
   const [payingDebt, setPayingDebt] = useState(null);
   const [viewingDebt, setViewingDebt] = useState(null);
 
-  const { ownerFilter, activeRestaurantId } = tenant;
-  const createdBy = ownerFilter?.created_by;
+  const restaurantId = tenant.activeRestaurantId || tenant.activeRestaurant?.id;
+  const restricted = role !== 'owner';
+  const branchId = tenant.managerBranchObject?.id;
+  const scopeReady = !!restaurantId && (!restricted || !!branchId);
 
-  const { data: payments = [] } = useQuery({
-    queryKey: ['debt_payments', createdBy],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('debt_payments')
-        .select('*')
-        .eq('created_by', createdBy)
-        .order('date', { ascending: false })
-        .limit(200);
-      if (error) return [];
-      return data || [];
-    },
-    enabled: !!createdBy,
+  const { data: payments = [], isLoading: paymentsLoading, isError: paymentsError, refetch: retryPayments } = useQuery({
+    queryKey: ['debt_payments', restaurantId, branchId, restricted],
+    queryFn: () => readDebtPortalRows(supabase, 'debt_payments', restaurantId, branchId, restricted),
+    enabled: scopeReady,
   });
-
-  const { data: debts = [], isLoading } = useQuery({
-    queryKey: ['debts', ownerFilter],
-    queryFn: () => base44.entities.DebtRecord.filter(ownerFilter || {}, '-date', 200),
-    enabled: !!ownerFilter?.created_by,
+  const { data: debts = [], isLoading, isError: debtsError, refetch: retryDebts } = useQuery({
+    queryKey: ['debts', restaurantId, branchId, restricted],
+    queryFn: () => readDebtPortalRows(supabase, 'debt_records', restaurantId, branchId, restricted),
+    enabled: scopeReady,
   });
-
-  const userBranch = tenant?.currentBranch;
-  const filteredByRole = useMemo(() => {
-    if (role === 'manager' && userBranch) {
-      return debts.filter(d => !d.branch || d.branch === userBranch);
-    }
-    return debts;
-  }, [debts, role, userBranch]);
+  const filteredByRole = debts;
 
   const filtered = useMemo(() => {
     return filteredByRole.filter(debt => {
       if (typeFilter !== 'all' && debt.type !== typeFilter) return false;
       if (partyFilter !== 'all' && debt.party_type !== partyFilter) return false;
-      if (statusFilter === 'open' && !['open', 'partial'].includes(debt.status)) return false;
-      if (statusFilter === 'overdue' && !(debt.status !== 'paid' && debt.due_date && isPast(parseISO(debt.due_date)))) return false;
+      if (statusFilter === 'open' && !isOpenDebtRecord(debt)) return false;
+      if (statusFilter === 'overdue' && !isOverdueDebtRecord(debt)) return false;
       if (statusFilter === 'paid' && debt.status !== 'paid') return false;
       if (search && !debt.party_name?.toLowerCase().includes(search.toLowerCase()) &&
           !debt.description?.toLowerCase().includes(search.toLowerCase())) return false;
@@ -314,15 +291,15 @@ export default function DebtManagement() {
   }, [filteredByRole, typeFilter, partyFilter, statusFilter, search]);
 
   const receivableTotal = useMemo(() =>
-    filteredByRole.filter(d => d.type === 'receivable' && d.status !== 'paid')
-      .reduce((s, d) => s + (d.remaining_amount || 0), 0), [filteredByRole]);
+    filteredByRole.filter(d => d.type === 'receivable' && isOpenDebtRecord(d))
+      .reduce((s, d) => s + (Number(d.remaining_amount) || 0), 0), [filteredByRole]);
 
   const liabilityTotal = useMemo(() =>
-    filteredByRole.filter(d => d.type === 'liability' && d.status !== 'paid')
-      .reduce((s, d) => s + (d.remaining_amount || 0), 0), [filteredByRole]);
+    filteredByRole.filter(d => d.type === 'liability' && isOpenDebtRecord(d))
+      .reduce((s, d) => s + (Number(d.remaining_amount) || 0), 0), [filteredByRole]);
 
   const overdueCount = useMemo(() =>
-    filteredByRole.filter(d => d.status !== 'paid' && d.due_date && isPast(parseISO(d.due_date))).length,
+    filteredByRole.filter(d => isOverdueDebtRecord(d)).length,
     [filteredByRole]);
 
   const handleSaved = () => {
@@ -352,7 +329,11 @@ export default function DebtManagement() {
     { value: 'driver', label: d.party_driver },
   ];
 
-  const remainingTotal = filtered.reduce((s, debt) => s + (debt.remaining_amount || 0), 0);
+  const remainingTotal = filtered.reduce((s, debt) => s + (Number(debt.remaining_amount) || 0), 0);
+
+  if (debtsError || paymentsError) return <PortalDataState onRetry={() => { retryDebts(); retryPayments(); }} />;
+  if (restaurantId && restricted && !branchId) return <PortalDataState missing />;
+  if (!scopeReady || isLoading || paymentsLoading) return <PortalDataState loading />;
 
   return (
     <div className="space-y-4 pb-8">
@@ -501,13 +482,13 @@ export default function DebtManagement() {
               <DebtHistory debts={filteredByRole} payments={payments} currency={currency} />
             </TabsContent>
             <TabsContent value="invoices" className="mt-3">
-              <InvoiceHistory createdBy={createdBy} currency={currency} />
+              <InvoiceHistory restaurantId={restaurantId} branchId={branchId} restricted={restricted} currency={currency} />
             </TabsContent>
             <TabsContent value="receipts" className="mt-3">
-              <ReceiptHistory createdBy={createdBy} currency={currency} />
+              <ReceiptHistory restaurantId={restaurantId} branchId={branchId} restricted={restricted} currency={currency} />
             </TabsContent>
             <TabsContent value="whatsapp" className="mt-3">
-              <WhatsAppQueue createdBy={createdBy} />
+              <WhatsAppQueue restaurantId={restaurantId} branchId={branchId} restricted={restricted} />
             </TabsContent>
           </Tabs>
         </TabsContent>
