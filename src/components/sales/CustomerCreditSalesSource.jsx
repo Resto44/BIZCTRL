@@ -5,6 +5,7 @@ import {
   TrendingDown, UserCheck, X,
 } from 'lucide-react';
 
+import { normalizeCreditAmount, validCreditAmount } from '@/lib/customerCreditSources';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -91,6 +92,7 @@ export default function CustomerCreditSalesSource({
   isRecordingPayment = false,
   paymentMethods = [],
   disabled = false,
+  creditPosted = false,
 }) {
   const searchInputRef = useRef(null);
   const [localSearch, setLocalSearch] = useState(customerSearch || '');
@@ -106,8 +108,11 @@ export default function CustomerCreditSalesSource({
     ? TRANSACTION_TYPES.DEBT_PAYMENT
     : TRANSACTION_TYPES.CREDIT_SALE;
   const isPayment = transactionType === TRANSACTION_TYPES.DEBT_PAYMENT;
-  const transactionAmount = amount(isPayment ? entry.payment_amount : entry.amount);
-  const saleExceedsLimit = !isPayment && transactionAmount > available;
+  const rawAmount = isPayment ? entry.payment_amount : entry.amount;
+  const invalidAmount = Boolean(rawAmount) && !validCreditAmount(rawAmount);
+  const transactionAmount = amount(rawAmount);
+  const projectedDebt = Math.round((outstanding + (isPayment ? -transactionAmount : transactionAmount)) * 100) / 100;
+  const saleExceedsLimit = !isPayment && !creditPosted && transactionAmount > available;
   const paymentExceedsDebt = isPayment && transactionAmount > outstanding;
 
   const activePaymentMethods = useMemo(() => {
@@ -188,13 +193,13 @@ export default function CustomerCreditSalesSource({
     if (nextType === transactionType) return;
     onUpdate(entry.id, {
       transaction_type: nextType,
-      amount: '',
+      amount: creditPosted ? entry.amount : '',
       payment_amount: '',
       ...(nextType === TRANSACTION_TYPES.DEBT_PAYMENT ? { payment_method: selectedPaymentMethod } : {}),
     });
   };
 
-  const updateAmount = (value) => onUpdate(entry.id, isPayment ? 'payment_amount' : 'amount', value);
+  const updateAmount = (value) => onUpdate(entry.id, isPayment ? 'payment_amount' : 'amount', normalizeCreditAmount(value));
 
   return (
     <article
@@ -207,7 +212,7 @@ export default function CustomerCreditSalesSource({
           <p className="mt-1 truncate text-xs font-medium text-slate-500 sm:text-sm">Sales Sources · Debt Management</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {idx > 0 && !disabled && (
+          {idx > 0 && !disabled && !creditPosted && (
             <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:bg-red-50 hover:text-red-600" onClick={() => onRemove(entry.id)} aria-label={`Remove customer credit transaction ${idx + 1}`}>
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -279,7 +284,7 @@ export default function CustomerCreditSalesSource({
                 <div className="truncate text-base font-black text-slate-950">{customerName || 'Selected customer'}</div>
                 <div className="mt-0.5 truncate text-sm text-slate-500" dir="ltr">{customerIdentifier || '—'}</div>
               </div>
-              {!disabled && <button type="button" className="rounded-full p-2 text-blue-600 hover:bg-blue-50" onClick={clearCustomer} aria-label="Change customer"><Pencil className="h-4 w-4" /></button>}
+              {!disabled && !creditPosted && <button type="button" className="rounded-full p-2 text-blue-600 hover:bg-blue-50" onClick={clearCustomer} aria-label="Change customer"><Pencil className="h-4 w-4" /></button>}
             </div>
 
             <div className="grid grid-cols-3 gap-2" aria-live="polite">
@@ -297,12 +302,21 @@ export default function CustomerCreditSalesSource({
               <Label className="mb-2 block text-xs font-bold text-slate-600 sm:text-sm">{isPayment ? 'Payment Amount' : 'Credit Sale Amount'}</Label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500" dir="ltr">{currency}</span>
-                <Input value={isPayment ? entry.payment_amount ?? '' : entry.amount ?? ''} onChange={(event) => updateAmount(event.target.value)} className="h-16 w-full rounded-2xl border-slate-400 pl-16 text-2xl font-medium tabular-nums shadow-none focus-visible:ring-blue-500" inputMode="decimal" type="text" placeholder="0.00" disabled={disabled || isRecordingPayment} aria-label={isPayment ? 'Debt payment amount' : 'Credit sale amount'} />
+                <Input value={isPayment ? entry.payment_amount ?? '' : entry.amount ?? ''} onChange={(event) => updateAmount(event.target.value)} className="h-16 w-full rounded-2xl border-slate-400 pl-16 text-2xl font-medium tabular-nums shadow-none focus-visible:ring-blue-500" inputMode="decimal" type="text" placeholder="0.00" disabled={disabled || isRecordingPayment || (!isPayment && creditPosted)} aria-invalid={invalidAmount} dir="ltr" aria-label={isPayment ? 'Debt payment amount' : 'Credit sale amount'} />
               </div>
               <div className="mt-3 flex items-start gap-2.5 rounded-2xl bg-blue-50 px-3.5 py-3 text-blue-900">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
                 <p className="text-[11px] leading-5 sm:text-xs">{isPayment ? 'This payment is recorded immediately in Debt Management. It never creates sales revenue.' : 'This amount is recorded as a receivable when the Sales Closing is finalized. It does not add cash.'}</p>
               </div>
+              {invalidAmount && <p role="alert" className="mt-2 text-xs text-red-700">Enter a positive amount with at most two decimal places.</p>}
+              {!invalidAmount && transactionAmount > 0 && !saleExceedsLimit && !paymentExceedsDebt && (isPayment || !creditPosted) && (
+                <div className="mt-3 rounded-xl border border-blue-100 p-3 text-xs" aria-live="polite" data-testid="credit-balance-preview">
+                  <p className="font-bold">{isPayment ? 'After recording payment (preview)' : 'After finalizing closing (preview)'}</p>
+                  <p className="mt-1">Debt: <bdi dir="ltr">{money(currency, projectedDebt)}</bdi></p>
+                  <p>Available: <bdi dir="ltr">{money(currency, Math.max(0, creditLimit - projectedDebt))}</bdi></p>
+                </div>
+              )}
+              {!isPayment && creditPosted && <p className="mt-2 text-xs text-slate-600">This finalized credit sale is already posted. It will not add debt again.</p>}
               {(saleExceedsLimit || paymentExceedsDebt) && (
                 <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700" role="alert"><AlertTriangle className="h-4 w-4 shrink-0" />{saleExceedsLimit ? 'Amount exceeds available credit.' : 'Payment cannot exceed outstanding debt.'}</div>
               )}
@@ -317,13 +331,13 @@ export default function CustomerCreditSalesSource({
                     <SelectContent>{activePaymentMethods.map((method) => <SelectItem key={method.code} value={method.code}>{method.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <Button type="button" className="h-14 w-full rounded-2xl bg-emerald-600 text-base font-black hover:bg-emerald-700" onClick={() => onRecordPayment?.({ ...entry, payment_method: selectedPaymentMethod })} disabled={disabled || isRecordingPayment || transactionAmount <= 0 || paymentExceedsDebt} aria-busy={isRecordingPayment}>
+                <Button type="button" className="h-14 w-full rounded-2xl bg-emerald-600 text-base font-black hover:bg-emerald-700" onClick={() => onRecordPayment?.({ ...entry, payment_method: selectedPaymentMethod })} disabled={disabled || isRecordingPayment || invalidAmount || transactionAmount <= 0 || paymentExceedsDebt} aria-busy={isRecordingPayment}>
                   {isRecordingPayment ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ArrowDownLeft className="mr-2 h-5 w-5" />}{isRecordingPayment ? 'Recording…' : 'Record Debt Payment'}
                 </Button>
               </div>
             ) : (
               <div className="space-y-2">
-                <Button type="button" className="min-h-14 w-full rounded-2xl bg-blue-600 text-sm font-black hover:bg-blue-700" disabled={disabled || isRecordingPayment || transactionAmount <= 0 || saleExceedsLimit || !onReviewCreditSale} onClick={() => onReviewCreditSale(entry)}>
+                <Button type="button" className="min-h-14 w-full rounded-2xl bg-blue-600 text-sm font-black hover:bg-blue-700" disabled={disabled || isRecordingPayment || invalidAmount || transactionAmount <= 0 || saleExceedsLimit || !onReviewCreditSale} onClick={() => onReviewCreditSale(entry)}>
                   <ClipboardCheck className="h-5 w-5" />Review & Save with Closing
                 </Button>
                 <p className="text-center text-xs text-slate-600" aria-live="polite">Credit Sale Saves with Sales Closing. Finalize Closing to record the debt.</p>

@@ -1,6 +1,6 @@
 import { closingExpenseContext } from '@/lib/dailySalesPresentation';
 import { loadClosingCashContext } from '@/lib/closing/ClosingCashContext';
-import { creditEntrySourceId, customerCreditSnapshots } from '@/lib/customerCreditSources';
+import { creditEntrySourceId, customerCreditSnapshots, validCreditAmount } from '@/lib/customerCreditSources';
 /**
  * UnifiedSalesClosing — Canonical ERP Sales Closing module
  *
@@ -70,7 +70,7 @@ import ClosingFundingPanel from '@/components/sales/ClosingFundingPanel';
 import { activeClosingNetworkAccounts, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { hasCanonicalCustomerScope, loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
-import { recordCustomerReceivablePayment, invalidateCustomerReceivableQueries, customerDebtPaymentErrorMessage } from '@/lib/debt/customerReceivableRepository';
+import { recordCustomerReceivablePayment, newReceivableRequestId, invalidateCustomerReceivableQueries, customerDebtPaymentErrorMessage } from '@/lib/debt/customerReceivableRepository';
 import { cashReconciliationSnapshot, paymentMethodForCode, closingSourceRevenueEntries, sumClosingMoney } from '@/lib/closing/CashReconciliationLedger';
 import { salesSourceIconFor, salesSourceToneFor } from '@/lib/salesSourceAppearance';
 
@@ -603,7 +603,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     return [];
   };
   const [customerCreditSales, setCustomerCreditSales] = useState(parseCustomerCreditSales);
+  const creditPosted = (savedClosing?.closing_state || initial?.closing_state) === 'finalized';
   const [isRecordingCustomerDebtPayment, setIsRecordingCustomerDebtPayment] = useState(false);
+  const debtPaymentInFlight = useRef(false);
+  const debtPaymentRequests = useRef(new Map());
 
   const addPos = () => setPosEntries(prev => [...prev, { id: Date.now(), device_id: '', device_name: '', amount: '', notes: '' }]);
   const removePos = (id) => setPosEntries(prev => prev.filter(e => e.id !== id));
@@ -951,6 +954,21 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     enabled: hasCanonicalCustomerScope(canonicalCustomerScope),
   });
   const allCustomers = asRecordArray(allCustomersData);
+  useEffect(() => {
+    if (!Array.isArray(allCustomersData)) return;
+    setCustomerCreditSales(previous => {
+      let changed = false;
+      const next = previous.map(row => {
+        const customer = allCustomersData.find(item => String(item.id) === String(row.customer_id));
+        if (!customer || (row.previous_outstanding_debt === customer.outstanding_balance
+          && row.credit_limit === customer.credit_limit && row.available_credit === customer.available_credit)) return row;
+        changed = true;
+        return { ...row, previous_outstanding_debt: customer.outstanding_balance,
+          credit_limit: customer.credit_limit, available_credit: customer.available_credit };
+      });
+      return changed ? next : previous;
+    });
+  }, [allCustomersData]);
 
   // The server-side RPC owns branch filtering and receivable aggregation. Never
   // reuse a restaurant-wide customer/debt cache after a branch switch.
@@ -1375,7 +1393,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       label: 'Customer Credit Sales Valid',
       passed: customerCreditSales.every((entry) => {
         const amount = Number(entry.amount);
-        return Number.isFinite(amount) && amount >= 0 && (amount === 0 || Boolean(entry.customer_id));
+        return (!entry.amount || validCreditAmount(entry.amount)) && Number.isFinite(amount) && amount >= 0 && (amount === 0 || Boolean(entry.customer_id));
       }),
       message: `${currency}\u00A0${manualCreditTotal.toLocaleString()} credit sales`,
     },
@@ -1394,7 +1412,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     {
       key: 'creditLimit',
       label: 'Credit Limits Not Exceeded',
-      passed: !customerCreditSales.some((entry) => (Number(entry.amount) || 0) > (Number(entry.available_credit) || 0)),
+      passed: creditPosted || !customerCreditSales.some((entry) => (Number(entry.amount) || 0) > (Number(entry.available_credit) || 0)),
       message: 'All credit sales are within the latest available credit shown.',
     },
     {
@@ -1409,7 +1427,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       passed: !!form.date && !!form.branch && customClosingFields.every((field) => !field.is_required || hasCustomClosingFieldValue(field)),
       message: form.date || 'Date required',
     },
-  ], [expenseContextReady, expenseContextMessage, form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, posDevices, posLoading, posUnavailable, lang, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, cashSalesSourcesMatched, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
+  ], [expenseContextReady, expenseContextMessage, form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, posDevices, posLoading, posUnavailable, lang, creditPosted, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, cashSalesSourcesMatched, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   const networkCounterTotal = baseNetworkTotal;
@@ -1459,9 +1477,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
     const invalidCredit = customerCreditSales.find((entry) => {
       const amount = Number(entry.amount);
-      return !Number.isFinite(amount) || amount < 0 || (amount > 0 && !entry.customer_id);
+      return (Boolean(entry.amount) && !validCreditAmount(entry.amount)) || !Number.isFinite(amount) || amount < 0 || (amount > 0 && !entry.customer_id);
     });
-    const limitExceededEntry = customerCreditSales.find((entry) => (Number(entry.amount) || 0) > (Number(entry.available_credit) || 0));
+    const limitExceededEntry = !creditPosted && customerCreditSales.find((entry) => (Number(entry.amount) || 0) > (Number(entry.available_credit) || 0));
     const pendingPaymentEntry = customerCreditSales.find((entry) => (Number(entry.payment_amount) || 0) > 0);
     const nextErrors = {};
     const invalidDriverSourceEntry = customSourceSummaries
@@ -1716,37 +1734,49 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   };
 
   const recordCustomerCreditPayment = useCallback(async (entry) => {
+    if (debtPaymentInFlight.current) return;
     const amount = Number(entry?.payment_amount);
-    if (!entry?.customer_id || !Number.isFinite(amount) || amount <= 0 || !activeRestaurant?.id || !selectedBranchId || !form.branch) {
+    if (!entry?.customer_id || !validCreditAmount(entry?.payment_amount) || !Number.isFinite(amount) || amount <= 0 || !activeRestaurant?.id || !selectedBranchId || !form.branch) {
       toast.error('Select an active branch customer and enter a valid debt payment amount.');
       return;
     }
-
+    const payload = {
+      restaurantId: activeRestaurant.id, branchId: selectedBranchId, branch: form.branch,
+      customerId: entry.customer_id, amount, date: form.date,
+      paymentMethod: entry.payment_method || 'cash', notes: entry.notes || '',
+    };
+    // Retain the reference after an ambiguous network failure. A retry must
+    // resolve the same server transaction, never collect the money twice.
+    const key = JSON.stringify(payload);
+    if (!debtPaymentRequests.current.has(key)) debtPaymentRequests.current.set(key, newReceivableRequestId());
+    debtPaymentInFlight.current = true;
     setIsRecordingCustomerDebtPayment(true);
     try {
-      const result = await recordCustomerReceivablePayment({
-        restaurantId: activeRestaurant.id,
-        branchId: selectedBranchId,
-        branch: form.branch,
-        customerId: entry.customer_id,
-        amount,
-        date: form.date,
-        paymentMethod: entry.payment_method || 'cash',
-        notes: entry.notes || '',
-      });
-      const position = result?.customer_position || {};
-      updateCustomerCreditSale(entry.id, {
-        payment_amount: '',
-        previous_outstanding_debt: Number(position.outstanding_balance) || 0,
-        credit_limit: Number(position.credit_limit) || entry.credit_limit || 0,
-        available_credit: Number(position.available_credit) || 0,
-      });
-      invalidateCustomerReceivableQueries(queryClient);
-      await Promise.all([refetchCustomers(), refetchCashLedger()]);
-      toast.success('Customer debt payment recorded in Debts & Receivables. Sales revenue was not changed.');
+      await recordCustomerReceivablePayment({ ...payload, requestId: debtPaymentRequests.current.get(key) });
     } catch (error) {
       toast.error(customerDebtPaymentErrorMessage(error));
+      debtPaymentInFlight.current = false;
+      setIsRecordingCustomerDebtPayment(false);
+      return;
+    }
+    debtPaymentRequests.current.delete(key);
+    updateCustomerCreditSale(entry.id, { payment_amount: '' });
+    toast.success('Customer debt payment recorded in Debts & Receivables. Sales revenue was not changed.');
+    try {
+      invalidateCustomerReceivableQueries(queryClient);
+      // Use the branch-scoped canonical position, not the restaurant-wide
+      // customer_position returned by the payment RPC.
+      const [customerResult, cashResult] = await Promise.all([refetchCustomers(), refetchCashLedger()]);
+      if (customerResult.isError || cashResult.isError) throw new Error('Refresh failed');
+      setCustomerCreditSales(previous => previous.map(row => {
+        const customer = customerResult.data?.find(item => String(item.id) === String(row.customer_id));
+        return customer ? { ...row, previous_outstanding_debt: customer.outstanding_balance,
+          credit_limit: customer.credit_limit, available_credit: customer.available_credit } : row;
+      }));
+    } catch {
+      toast.warning('Payment is saved. Balance refresh failed; refresh the page before recording another payment.');
     } finally {
+      debtPaymentInFlight.current = false;
       setIsRecordingCustomerDebtPayment(false);
     }
   }, [activeRestaurant?.id, form.branch, form.date, queryClient, refetchCashLedger, refetchCustomers, selectedBranchId, updateCustomerCreditSale]);
@@ -2028,7 +2058,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3 sm:grid-cols-4"><div className="rounded-xl bg-blue-50 p-3"><Building2 className="h-4 w-4 text-blue-600" /><p className="mt-2 text-[10px] text-slate-500">Counter network</p><Money currency={currency} value={networkCounterTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-cyan-50 p-3"><Bike className="h-4 w-4 text-cyan-600" /><p className="mt-2 text-[10px] text-slate-500">Driver network</p><Money currency={currency} value={networkDriversTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-slate-50 p-3"><MoreHorizontal className="h-4 w-4 text-slate-600" /><p className="mt-2 text-[10px] text-slate-500">Other network</p><Money currency={currency} value={otherNetworkTotal} className="text-sm font-black" /></div><div className="rounded-xl border border-blue-200 bg-blue-50 p-3"><Coins className="h-4 w-4 text-blue-700" /><p className="mt-2 text-[10px] text-blue-600">Network total</p><Money currency={currency} value={networkTotal} className="text-sm font-black text-blue-700" /></div></div>
               {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div className="space-y-2 border-t border-slate-100 p-3"><p className="text-xs font-black uppercase tracking-wide text-slate-700">Manual sales sources</p>{customSourceSummaries.map(({ source, sourceLabel, today, previous, driverEntries }) => source.allows_driver_entries === true ? <DriverSalesSourceCard key={source.id} source={source} sourceLabel={sourceLabel} entries={driverEntries} drivers={driverSourceDrivers} branchLabel={form.branch} previous={previous} currency={currency} onAdd={() => addDriverSourceEntry(source)} onChange={(clientRowId, patch) => updateDriverSourceEntry(source.id, clientRowId, patch)} onRemove={(clientRowId) => removeDriverSourceEntry(source.id, clientRowId)} isHistoryLoading={sourceHistoryLoading || driverSourceDriversLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} /> : <CompactSalesSourceRow key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} historyLoading={sourceHistoryLoading} historyUnavailable={sourceHistoryUnavailable} />)}</div>}
 
-            </section>{creditSource && <section className="space-y-3" data-testid="customer-credit-closing-section" data-i18n-skip="true">{custLoading ? <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">Loading Debt Management customers…</div> : <><div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{customerCreditSales.map((entry, index) => <div key={entry.id} className="min-w-0 space-y-2"><label className="block text-sm font-semibold">{lang === 'fa' ? 'منبع فروش قرضه' : lang === 'ar' ? 'مصدر البيع الآجل' : 'Customer credit sales source'}<select aria-label="Customer credit sales source" className="mt-1 min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3" value={creditEntrySourceId(entry, creditSources)} onChange={event => updateCustomerCreditSale(entry.id, 'source_id', event.target.value)} disabled={isSubmitting}>{creditSources.map(source => <option key={source.id} value={source.id}>{lang === 'ar' ? source.name_ar || source.name_en : lang === 'fa' ? source.name_fa || source.name_ar || source.name_en : source.name_en}</option>)}</select></label><CustomerCreditSalesSource entry={entry} idx={index} onRemove={removeCustomerCreditSale} onUpdate={updateCustomerCreditSale} customers={customers} currency={currency} customerSearch={customerSearch} onCustomerSearch={setCustomerSearch} onSelectCustomer={refetchCustomers} onReviewCreditSale={() => { const target = document.getElementById('sales-closing-actions'); target?.scrollIntoView({ behavior: 'smooth', block: 'center' }); target?.focus({ preventScroll: true }); }} onRecordPayment={recordCustomerCreditPayment} isRecordingPayment={isRecordingCustomerDebtPayment} paymentMethods={configuredPaymentMethods} disabled={isSubmitting} /></div>)}</div>{customerCreditSales.length > 0 && customerCreditSales.every((entry) => entry.customer_id) && <div className="flex justify-end"><Button type="button" size="sm" variant="outline" className="min-h-10 rounded-xl bg-white" onClick={addCustomerCreditSale} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />Add Another Customer</Button></div>}</>}{inlineErrors.credit && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}</section>}
+            </section>{creditSource && <section className="space-y-3" data-testid="customer-credit-closing-section" data-i18n-skip="true">{custLoading ? <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">Loading Debt Management customers…</div> : <><div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{customerCreditSales.map((entry, index) => <div key={entry.id} className="min-w-0 space-y-2"><label className="block text-sm font-semibold">{lang === 'fa' ? 'منبع فروش قرضه' : lang === 'ar' ? 'مصدر البيع الآجل' : 'Customer credit sales source'}<select aria-label="Customer credit sales source" className="mt-1 min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3" value={creditEntrySourceId(entry, creditSources)} onChange={event => updateCustomerCreditSale(entry.id, 'source_id', event.target.value)} disabled={isSubmitting}>{creditSources.map(source => <option key={source.id} value={source.id}>{lang === 'ar' ? source.name_ar || source.name_en : lang === 'fa' ? source.name_fa || source.name_ar || source.name_en : source.name_en}</option>)}</select></label><CustomerCreditSalesSource entry={entry} idx={index} onRemove={removeCustomerCreditSale} onUpdate={updateCustomerCreditSale} customers={customers} currency={currency} customerSearch={customerSearch} onCustomerSearch={setCustomerSearch} onSelectCustomer={refetchCustomers} onReviewCreditSale={() => { setShowFullDetails(false); goToClosingStep(Math.min(2, closingStep + 1)); }} creditPosted={creditPosted} onRecordPayment={recordCustomerCreditPayment} isRecordingPayment={isRecordingCustomerDebtPayment} paymentMethods={configuredPaymentMethods} disabled={isSubmitting} /></div>)}</div>{!creditPosted && customerCreditSales.length > 0 && customerCreditSales.every((entry) => entry.customer_id) && <div className="flex justify-end"><Button type="button" size="sm" variant="outline" className="min-h-10 rounded-xl bg-white" onClick={addCustomerCreditSale} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />Add Another Customer</Button></div>}</>}{inlineErrors.credit && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}</section>}
 
             {customClosingFields.length > 0 && <section id="closing-control-fields" className="rounded-2xl border border-slate-200 bg-background p-3 shadow-sm sm:p-4"><div className="mb-3"><h2 className="text-sm font-black text-slate-950">Closing fields</h2><p className="mt-0.5 text-[11px] text-slate-500">Only values for this closing are stored here.</p></div><div className="space-y-2">{customClosingFields.map((field) => <ClosingFieldControlRow key={field.id} field={field} label={closingFieldNameForLanguage(field)} value={customClosingFieldValues[field.id] ?? ''} error={inlineErrors[`custom_${field.id}`]} onChange={(value) => updateCustomClosingField(field.id, value)} />)}</div></section>}
 
