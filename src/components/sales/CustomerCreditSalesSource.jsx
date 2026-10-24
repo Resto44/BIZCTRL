@@ -42,15 +42,16 @@ const METRIC_TONES = {
   available: { card: 'border-emerald-100 bg-emerald-50/45', icon: 'bg-emerald-100 text-emerald-600', label: 'text-emerald-600', value: 'text-emerald-700' },
 };
 
-function Metric({ label, value, currency, tone, icon: Icon }) {
+function Metric({ label, value, currency, tone, icon: Icon, projected = false, pendingLabel = 'Preview' }) {
   const colors = METRIC_TONES[tone];
   return (
-    <div className={`min-w-0 rounded-2xl border p-2.5 sm:p-3 ${colors.card}`}>
+    <div data-testid={`customer-credit-metric-${tone}`} className={`min-w-0 rounded-2xl border p-2.5 sm:p-3 ${colors.card}`}>
       <div className="flex items-center justify-between gap-1.5">
         <span className={`truncate text-[10px] font-bold sm:text-xs ${colors.label}`}>{label}</span>
         <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${colors.icon}`}><Icon className="h-3.5 w-3.5" /></span>
       </div>
       <div className={`mt-2 truncate text-sm font-black tabular-nums sm:text-lg ${colors.value}`} dir="ltr">{money(currency, value)}</div>
+      {projected && <div data-testid={`customer-credit-metric-${tone}-preview`} className="mt-1 text-[9px] font-bold leading-4 text-amber-700 sm:text-[10px]">{pendingLabel}</div>}
     </div>
   );
 }
@@ -118,6 +119,15 @@ export default function CustomerCreditSalesSource({
   const projectedDebt = Math.round((outstanding + (isPayment ? -transactionAmount : transactionAmount)) * 100) / 100;
   const saleExceedsLimit = !isPayment && !creditPosted && transactionAmount > available;
   const paymentExceedsDebt = isPayment && transactionAmount > outstanding;
+  // The three circled cards preview the entered change immediately. A preview
+  // is never treated as a posted receivable or a posted repayment.
+  const hasValidProjection = hasSelectedCustomer && transactionAmount > 0 &&
+    !invalidAmount && !saleExceedsLimit && !paymentExceedsDebt &&
+    (isPayment || !creditPosted);
+  const displayedDebt = hasValidProjection ? Math.max(0, projectedDebt) : outstanding;
+  const displayedAvailable = hasValidProjection ? Math.max(0, Math.round((creditLimit - displayedDebt) * 100) / 100) : available;
+  const pendingLabel = lang === 'fa' ? 'پیش‌نمایش · ثبت‌نشده' :
+    lang === 'ar' ? 'معاينة · لم يُرحّل' : 'Preview · not posted';
 
   const activePaymentMethods = useMemo(() => {
     const configured = paymentMethods
@@ -292,9 +302,9 @@ export default function CustomerCreditSalesSource({
             </div>
 
             <div className="grid grid-cols-3 gap-2" aria-live="polite">
-              <Metric label={closingTr("Debt")} value={outstanding} currency={currency} tone="debt" icon={TrendingDown} />
+              <Metric label={closingTr("Debt")} value={displayedDebt} currency={currency} tone="debt" icon={TrendingDown} projected={hasValidProjection} pendingLabel={pendingLabel} />
               <Metric label={closingTr("Limit")} value={creditLimit} currency={currency} tone="limit" icon={CreditCard} />
-              <Metric label={closingTr("Available")} value={available} currency={currency} tone="available" icon={CircleCheck} />
+              <Metric label={closingTr("Available")} value={displayedAvailable} currency={currency} tone="available" icon={CircleCheck} projected={hasValidProjection} pendingLabel={pendingLabel} />
             </div>
 
             <div className="grid grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
