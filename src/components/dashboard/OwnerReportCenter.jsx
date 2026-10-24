@@ -177,7 +177,7 @@ function ExecutiveReport({ model, copy }) {
           <div data-testid="owner-credit-reconciliation-warning" role="status" className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
             <strong>{model.lang === 'fa' ? 'مغایرت نسیه و دفتر طلب‌ها' : model.lang === 'ar' ? 'فرق المبيعات الآجلة ودفتر الذمم' : 'Closing credit requires ledger reconciliation'}</strong>
             <p className="mt-1">{model.lang === 'fa' ? 'سندهای نسیه بعضی کلوزینگ‌های نهایی در دفتر مطالبات کامل نیست. تا تأیید اسناد، این اختلاف را بدهی قطعی حساب نکنید.' : model.lang === 'ar' ? 'بعض الإقفالات المعتمدة لا تطابق دفتر الذمم؛ لا تضف هذه الفروق إلى ديون العملاء دون تدقيق.' : 'Some finalized credit closings do not match linked receivable documents. Do not add these amounts to customer debt without an audit.'}</p>
-            <div className="mt-1 font-black" dir="ltr">{model.creditLedgerAudit.issues} · {formatMoney(model.creditLedgerAudit.unexplainedAmount, 2)}</div>
+            <div className="mt-1 font-black" dir="ltr">{model.creditLedgerAudit.issues} {model.lang === 'fa' ? 'مغایرت' : model.lang === 'ar' ? 'فروقات' : 'mismatches'} · {model.creditLedgerAudit.legacyWithoutDetails} {model.lang === 'fa' ? 'سند قدیمی بدون جزئیات' : model.lang === 'ar' ? 'سند قديم دون تفاصيل' : 'legacy without details'} · {formatMoney(model.creditLedgerAudit.unexplainedAmount, 2)} {model.lang === 'fa' ? 'نیازمند بررسی' : model.lang === 'ar' ? 'للمراجعة' : 'for review'}</div>
           </div>}
       </Panel>
 
