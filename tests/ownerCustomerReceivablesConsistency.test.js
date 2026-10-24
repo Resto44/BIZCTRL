@@ -43,7 +43,7 @@ describe('Owner posted customer credit ERP ledger',()=>{
     expect(realtime).toContain("customer_collections: ['debts_customer_dash']");
     expect(owner).toContain('summarizePostedCustomerReceivables(customerDebts');
     expect(owner).toContain("complete: !customerDebtsQuery.isError");
-    expect(reports).toContain('data-testid="owner-customer-credit-outstanding"');
+    expect(reports).toContain('testId="owner-customer-credit-outstanding"');
     expect(reports).toContain("receivables == null ? '—'");
     expect(reports).toContain("navigate('/debt-management')");
   });
