@@ -13,7 +13,7 @@ describe('Sales Closing expense integration', () => {
     expect(workspace).toContain("loadClosingCashContext(supabase,");
     expect(workspace).not.toContain("from('expenses')");
     expect(workspace).not.toContain('expensesForDate');
-    expect(workspace).toContain('variableExpensesToday = Math.max(0, Number(cashLedgerContext.variable_expenses_today) || 0)');
+    expect(workspace).toContain('variableExpensesToday = expenseContext.variable');
     expect(migration).toContain('erp_can_access_scope_text(p_restaurant_id::text, p_branch_id::text)');
     expect(migration).toContain('expense.branch_id = p_branch_id');
     expect(migration).toContain("expense.branch_id IS NULL AND expense.branch_key = v_branch_key");
@@ -38,9 +38,9 @@ describe('Sales Closing expense integration', () => {
   });
 
   it('keeps purchases separate but includes purchases plus both operating-expense components in Total Daily Expenses and Operating Result', () => {
-    expect(workspace).toContain('const operatingExpensesTotal = fixedExpensesToday + variableExpensesToday;');
-    expect(workspace).toContain('const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;');
-    expect(workspace).toContain('const operatingResult = sumClosingMoney(totalSales, -totalDailyExpenses);');
+    expect(workspace).toContain('const operatingExpensesTotal = expenseContext.total;');
+    expect(workspace).toContain('const totalDailyExpenses = expenseContextReady ? approvedPurchasesTotal + operatingExpensesTotal : null;');
+    expect(workspace).toContain('const operatingResult = expenseContextReady ? sumClosingMoney(totalSales, -totalDailyExpenses) : null;');
     expect(workspace).toContain('expenses_total: operatingExpensesTotal');
     expect(workspace).toContain('Expenses &amp; purchases');
     expect(workspace).toContain('value={totalDailyExpenses}');

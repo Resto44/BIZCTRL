@@ -121,8 +121,8 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('sumClosingMoney(cashSales, networkTotal, creditTotal, otherPaymentTotal)');
     expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
     expect(workspace).toContain('const cashDifference = !cashContextReady || ledgerOverdrawn ? null : reconciliation.difference;');
-    expect(workspace).toContain('const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;');
-    expect(workspace).toContain('const operatingResult = sumClosingMoney(totalSales, -totalDailyExpenses);');
+    expect(workspace).toContain('const totalDailyExpenses = expenseContextReady ? approvedPurchasesTotal + operatingExpensesTotal : null;');
+    expect(workspace).toContain('const operatingResult = expenseContextReady ? sumClosingMoney(totalSales, -totalDailyExpenses) : null;');
     expect(workspace).toContain("loadClosingCashContext(supabase,");
     expect(reconciliationPanel).toContain('Actual Cash');
     expect(reconciliationPanel).toContain('No settlement required');

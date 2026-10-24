@@ -126,3 +126,16 @@ export function dailySalesProfitSummary(sale) {
     costsMissing: purchases === null || expenses === null || expenseBreakdownMismatch,
     noRecordedCosts: costs === 0 };
 }
+
+// Strict RPC boundary: an unavailable amount is not a recorded zero.
+export function closingExpenseContext(context = {}) {
+  const read = value => {
+    if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') return null;
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? Math.round(number * 100) / 100 : null;
+  };
+  const fixed = read(context.fixed_expense_today);
+  const variable = read(context.variable_expenses_today);
+  const complete = fixed !== null && variable !== null;
+  return { fixed, variable, complete, total: complete ? (Math.round(fixed * 100) + Math.round(variable * 100)) / 100 : null };
+}
