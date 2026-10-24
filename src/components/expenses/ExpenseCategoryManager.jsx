@@ -1,3 +1,5 @@
+import { isReportFixedCategory, expenseAllocationFields, invalidateExpenseClosingContext } from '@/lib/expenseConfiguration';
+import { useBranchScope } from '@/lib/BranchScopeContext';
 import { toast } from 'sonner';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,15 +17,20 @@ import { Plus, Pencil, Trash2, Tag, FolderOpen, Lock, Zap } from 'lucide-react';
 
 const COLOR_OPTIONS = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16'];
 
-function CategoryForm({ initial, onSubmit, onCancel, lang }) {
+export function CategoryForm({ initial, onSubmit, onCancel, lang, branchId }) {
   const [form, setForm] = useState({
     name: initial?.name || '',
     color: initial?.color || '#6366f1',
-    is_fixed: initial?.is_fixed === true,
+    is_fixed: initial ? isReportFixedCategory(initial) : null,
+    monthly_amount: initial?.monthly_amount ?? 0,
+    allocation_days: initial?.allocation_days ?? 30,
     is_active: initial?.is_active !== false,
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const copy = (fa, ar, en) => lang === 'fa' ? fa : lang === 'ar' ? ar : en;
+  let valid = Boolean(form.name.trim());
+  try { expenseAllocationFields(form, branchId); } catch { valid = false; }
   return (
     <div className="space-y-3">
       <div>
@@ -56,13 +63,13 @@ function CategoryForm({ initial, onSubmit, onCancel, lang }) {
             type="button"
             onClick={() => set('is_fixed', false)}
             className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
-              !form.is_fixed
+              form.is_fixed === false
                 ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40'
                 : 'border-border bg-card hover:bg-muted/60'
             }`}
           >
-            <Zap className={`w-5 h-5 ${!form.is_fixed ? 'text-amber-600' : 'text-muted-foreground'}`} />
-            <span className={`text-xs font-bold ${!form.is_fixed ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>
+            <Zap className={`w-5 h-5 ${form.is_fixed === false ? 'text-amber-600' : 'text-muted-foreground'}`} />
+            <span className={`text-xs font-bold ${form.is_fixed === false ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>
               Daily Operating
             </span>
             <span className="text-[10px] text-muted-foreground text-center leading-tight">
@@ -72,11 +79,20 @@ function CategoryForm({ initial, onSubmit, onCancel, lang }) {
         </div>
         <p className="text-[10px] text-muted-foreground mt-1.5">
           {form.is_fixed
-            ? '⚡ Fixed expenses are entered once/month. Daily cost = Monthly ÷ Days in month.'
+            ? copy('سهم روزانه = مبلغ ماهانه ÷ روزهای تخصیص. نام دسته نوع حسابداری را تعیین نمی‌کند.', 'الحصة اليومية = المبلغ الشهري ÷ أيام التوزيع. اسم الفئة لا يحدد نوعها المحاسبي.', 'Daily allocation = monthly amount ÷ allocation days. The category name does not set its accounting type.')
             : '⚡ Daily expenses are counted in full on the day they are entered.'}
         </p>
       </div>
 
+      {form.is_fixed === null && <p role="alert" className="text-xs text-amber-700">{copy('نوع مصرف را صریحاً انتخاب کنید.', 'اختر نوع المصروف صراحةً.', 'Select an expense type explicitly.')}</p>}
+      {form.is_fixed === true && <div className="space-y-2 rounded-xl border p-3">
+        <Label>{copy('مبلغ ماهانهٔ همین شعبه', 'المبلغ الشهري لهذا الفرع', 'Monthly amount for this branch')}</Label>
+        <Input aria-label="Monthly allocation amount" type="number" min="0" step="0.01" disabled={!branchId} value={form.monthly_amount} onChange={e => set('monthly_amount', e.target.value)} />
+        <Label>{copy('تعداد روزهای تخصیص', 'عدد أيام التوزيع', 'Allocation days')}</Label>
+        <Input aria-label="Allocation days" type="number" min="1" max="366" step="1" value={form.allocation_days} onChange={e => set('allocation_days', e.target.value)} />
+        <p className="text-xs text-muted-foreground">{copy('هر هزینهٔ ثابت مثل کرایه یا معاش، دستهٔ جدا داشته باشد. مبلغ تنظیم‌شده جایگزین سند ماهانه می‌شود؛ دوباره جمع نمی‌شود. صفر یعنی استفاده از آخرین سند واجد شرایط همان ماه، تا تاریخ کلوزینگ.', 'أنشئ فئة منفصلة لكل تكلفة ثابتة كالإيجار والرواتب. المبلغ المحدد يحل محل مستند الشهر ولا يضاف إليه. الصفر يستخدم آخر مستند مؤهل للشهر حتى تاريخ الإقفال.', 'Use a separate category for each recurring cost, such as rent or salaries. Configuration replaces the monthly source; it is not added twice. Zero uses the latest eligible monthly record on or before closing.')}</p>
+        {!branchId && <p className="text-xs text-amber-700">{copy('برای مبلغ ماهانه، دسته باید مخصوص یک شعبه باشد.', 'يجب تخصيص الفئة لفرع لضبط المبلغ الشهري.', 'A configured monthly amount requires a branch-owned category.')}</p>}
+      </div>}
       <div>
         <Label>Color</Label>
         <div className="flex flex-wrap gap-1.5 mt-1">
@@ -92,7 +108,7 @@ function CategoryForm({ initial, onSubmit, onCancel, lang }) {
         <Label htmlFor="cat_active">Active</Label>
       </div>
       <div className="flex gap-2 pt-2">
-        <Button className="flex-1" onClick={() => { if (form.name.trim()) onSubmit(form); }} disabled={!form.name.trim()}>Save</Button>
+        <Button className="flex-1" onClick={() => { if (valid) onSubmit(form); }} disabled={!valid}>Save</Button>
         {onCancel && <Button variant="outline" onClick={onCancel}>Cancel</Button>}
       </div>
     </div>
@@ -117,6 +133,8 @@ export function useExpenseCategories() {
 export default function ExpenseCategoryManager({ onClose }) {
   const { lang } = useLanguage();
   const qc = useQueryClient();
+  const { selectedBranchId } = useBranchScope();
+  const newCategoryBranchId = selectedBranchId && selectedBranchId !== 'all' ? selectedBranchId : null;
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -129,8 +147,8 @@ export default function ExpenseCategoryManager({ onClose }) {
       const payload = { 
         name: d.name,
         color: d.color,
-        is_fixed: !!d.is_fixed,
-        expense_type: d.is_fixed ? 'fixed' : 'variable',
+        ...expenseAllocationFields(d, newCategoryBranchId),
+        branch_id: newCategoryBranchId,
         is_active: d.is_active,
         restaurant_id: activeRestaurantId,
         ...(isBranchScoped ? { branch_id: managerBranchObject?.id || managerBranch } : {}),
@@ -141,6 +159,7 @@ export default function ExpenseCategoryManager({ onClose }) {
     onSuccess: () => { 
       qc.invalidateQueries({ queryKey: ['expense_categories'] }); 
       qc.invalidateQueries({ queryKey: ['expense_categories_dash'] });
+      invalidateExpenseClosingContext(qc);
       setShowForm(false); 
     }
   });
@@ -149,8 +168,7 @@ export default function ExpenseCategoryManager({ onClose }) {
       return base44.entities.ExpenseCategory.update(id, {
         name: data.name,
         color: data.color,
-        is_fixed: !!data.is_fixed,
-        expense_type: data.is_fixed ? 'fixed' : 'variable',
+        ...expenseAllocationFields(data, categories.find(category => category.id === id)?.branch_id),
         is_active: data.is_active
       });
     },
@@ -158,6 +176,7 @@ export default function ExpenseCategoryManager({ onClose }) {
     onSuccess: () => { 
       qc.invalidateQueries({ queryKey: ['expense_categories'] }); 
       qc.invalidateQueries({ queryKey: ['expense_categories_dash'] });
+      invalidateExpenseClosingContext(qc);
       setEditing(null); 
     }
   });
@@ -167,13 +186,14 @@ export default function ExpenseCategoryManager({ onClose }) {
     onSuccess: () => { 
       qc.invalidateQueries({ queryKey: ['expense_categories'] }); 
       qc.invalidateQueries({ queryKey: ['expense_categories_dash'] });
+      invalidateExpenseClosingContext(qc);
       setDeleting(null); 
     }
   });
 
   // Split categories into fixed and variable for display
-  const fixedCategories = categories.filter(c => c.is_fixed === true);
-  const variableCategories = categories.filter(c => c.is_fixed !== true);
+  const fixedCategories = categories.filter(isReportFixedCategory);
+  const variableCategories = categories.filter(c => !isReportFixedCategory(c));
 
   return (
     <div className="space-y-3">
@@ -263,14 +283,14 @@ export default function ExpenseCategoryManager({ onClose }) {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Add Expense Category</DialogTitle></DialogHeader>
-          <CategoryForm lang={lang} onSubmit={d => createMut.mutate(d)} onCancel={() => setShowForm(false)} />
+          <CategoryForm lang={lang} branchId={newCategoryBranchId} onSubmit={d => createMut.mutate(d)} onCancel={() => setShowForm(false)} />
         </DialogContent>
       </Dialog>
 
       <Dialog open={!!editing} onOpenChange={open => { if (!open) setEditing(null); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Edit Category</DialogTitle></DialogHeader>
-          {editing && <CategoryForm lang={lang} initial={editing} onSubmit={d => updateMut.mutate({ id: editing.id, data: d })} onCancel={() => setEditing(null)} />}
+          {editing && <CategoryForm lang={lang} branchId={editing.branch_id} initial={editing} onSubmit={d => updateMut.mutate({ id: editing.id, data: d })} onCancel={() => setEditing(null)} />}
         </DialogContent>
       </Dialog>
 

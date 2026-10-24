@@ -1,3 +1,4 @@
+import { isReportFixedCategory, invalidateExpenseClosingContext } from '@/lib/expenseConfiguration';
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { deleteExpenseRecord } from '@/lib/expenseDeletion';
@@ -72,10 +73,10 @@ function ExpenseForm({ initial, onSubmit, onCancel, categories, isSaving = false
           <Select value={form.category_id} onValueChange={v => set('category_id', v)}>
             <SelectTrigger><SelectValue placeholder="Select category..." /></SelectTrigger>
             <SelectContent>
-              {activeCats.filter(c => c.is_fixed === true).length > 0 && (
+              {activeCats.filter(c => isReportFixedCategory(c)).length > 0 && (
                 <>
                   <div className="px-2 py-1 text-[10px] font-bold text-blue-600 uppercase tracking-wider">Fixed Monthly</div>
-                  {activeCats.filter(c => c.is_fixed === true).map(c => (
+                  {activeCats.filter(c => isReportFixedCategory(c)).map(c => (
                     <SelectItem key={c.id} value={c.id}>
                       <span className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color || '#888' }} />
@@ -86,10 +87,10 @@ function ExpenseForm({ initial, onSubmit, onCancel, categories, isSaving = false
                   ))}
                 </>
               )}
-              {activeCats.filter(c => c.is_fixed !== true).length > 0 && (
+              {activeCats.filter(c => !isReportFixedCategory(c)).length > 0 && (
                 <>
                   <div className="px-2 py-1 text-[10px] font-bold text-amber-600 uppercase tracking-wider">Daily Operating</div>
-                  {activeCats.filter(c => c.is_fixed !== true).map(c => (
+                  {activeCats.filter(c => !isReportFixedCategory(c)).map(c => (
                     <SelectItem key={c.id} value={c.id}>
                       <span className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color || '#888' }} />
@@ -212,6 +213,7 @@ export default function Expenses() {
     onError: error => toast.error(error?.message || 'Expense could not be saved'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses'] });
+      invalidateExpenseClosingContext(qc);
       qc.invalidateQueries({ queryKey: ['expenses_today'] });
       qc.invalidateQueries({ queryKey: ['expenses_yesterday'] });
       qc.invalidateQueries({ queryKey: ['expenses_week'] });
@@ -229,6 +231,7 @@ export default function Expenses() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses'] });
+      invalidateExpenseClosingContext(qc);
       qc.invalidateQueries({ queryKey: ['expenses_today'] });
       qc.invalidateQueries({ queryKey: ['expenses_yesterday'] });
       qc.invalidateQueries({ queryKey: ['expenses_week'] });
@@ -251,6 +254,7 @@ export default function Expenses() {
     onSuccess: () => {
       // Invalidate all expense-related query keys
       qc.invalidateQueries({ queryKey: ['expenses'] });
+      invalidateExpenseClosingContext(qc);
       qc.invalidateQueries({ queryKey: ['expenses_today'] });
       qc.invalidateQueries({ queryKey: ['expenses_yesterday'] });
       qc.invalidateQueries({ queryKey: ['expenses_week'] });
@@ -321,7 +325,7 @@ export default function Expenses() {
             : (
               <div className="space-y-2">
                 {filtered.map(e => {
-                  const cat = getCatById(e.category_id);
+                  const cat = getCatById(e.expense_category_id || e.category_id);
                   return (
                     <Card key={e.id} className="p-3">
                       <div className="flex items-center justify-between">
@@ -330,7 +334,8 @@ export default function Expenses() {
                           <div className="min-w-0">
                             <p className="text-sm font-semibold">{e.description || getCatDisplayName(e.category_id)}</p>
                             <p className="text-xs text-muted-foreground">{e.date} · {e.branch_key === 'all' ? t('all_branches') : (branches.find(b => b.key === e.branch_key)?.label || e.branch_key)}</p>
-                            <p className="text-xs text-muted-foreground italic">{getCatDisplayName(e.category_id)}</p>
+                            <p className="text-xs text-muted-foreground italic">{getCatDisplayName(e.expense_category_id || e.category_id)}</p>
+                            <p data-testid="expense-accounting-type" className="mt-1 text-xs font-semibold text-blue-700">{isReportFixedCategory(cat) ? (lang === 'fa' ? 'نوع حسابداری: ثابت ماهانه' : lang === 'ar' ? 'النوع المحاسبي: ثابت شهري' : 'Accounting type: fixed monthly') : (lang === 'fa' ? 'نوع حسابداری: متغیر؛ فقط در تاریخ ثبت‌شده' : lang === 'ar' ? 'النوع المحاسبي: متغير؛ في التاريخ المسجل فقط' : 'Accounting type: variable; recorded date only')}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
