@@ -26,6 +26,6 @@ describe('Closing expense classification',()=>{
  });
  it('warns on zero fixed allocation instead of implying rent and payroll are covered',()=>{
   const html=renderToStaticMarkup(<ClosingHistoryAnalytics sale={{...row,fixed_expenses_total:0,variable_expenses_total:0,expenses_total:0}}/>);
-  expect(html).toContain('Check monthly rent and salary setup');
+  expect(html).toContain('Saved fixed allocation is zero');
  });
 });

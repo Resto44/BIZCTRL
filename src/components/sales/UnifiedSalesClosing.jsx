@@ -1,3 +1,4 @@
+import { closingExpenseContext } from '@/lib/dailySalesPresentation';
 import { loadClosingCashContext } from '@/lib/closing/ClosingCashContext';
 import { creditEntrySourceId, customerCreditSnapshots } from '@/lib/customerCreditSources';
 /**
@@ -1282,10 +1283,13 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // The server context is canonical for both daily fixed allocation and dated
   // variable expenses. Accounting expenses stay separate from purchases, and
   // neither changes Expected Cash unless the ERP cash ledger contains Cash OUT.
-  const fixedExpensesToday = Math.max(0, Number(cashLedgerContext.fixed_expense_today) || 0);
-  const variableExpensesToday = Math.max(0, Number(cashLedgerContext.variable_expenses_today) || 0);
-  const operatingExpensesTotal = fixedExpensesToday + variableExpensesToday;
-  const totalDailyExpenses = approvedPurchasesTotal + operatingExpensesTotal;
+  const expenseContext = closingExpenseContext(cashLedgerContext);
+  const expenseContextReady = cashContextReady && expenseContext.complete;
+  const expenseContextMessage = lang === 'fa' ? 'اطلاعات مصارف ثابت یا متغیر ناقص است؛ دوباره بارگذاری کنید.' : lang === 'ar' ? 'بيانات المصروفات الثابتة أو المتغيرة غير مكتملة؛ أعد التحميل.' : 'Fixed or variable expense data is incomplete; reload before saving.';
+  const fixedExpensesToday = expenseContext.fixed;
+  const variableExpensesToday = expenseContext.variable;
+  const operatingExpensesTotal = expenseContext.total;
+  const totalDailyExpenses = expenseContextReady ? approvedPurchasesTotal + operatingExpensesTotal : null;
   const branchWalletAvailable = Math.max(0, Number(cashLedgerContext.branch_wallet_available) || 0);
   const reconciliation = cashReconciliationSnapshot({
     openingCash: opening ?? 0,
@@ -1325,10 +1329,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const closingCash = actualCount !== null && cashContextReady && !ledgerOverdrawn ? actualCount : null;
   const remainingDifference = cashDifference;
   // Funding never changes this result; it is a settlement flow, not revenue.
-  const operatingResult = sumClosingMoney(totalSales, -totalDailyExpenses);
+  const operatingResult = expenseContextReady ? sumClosingMoney(totalSales, -totalDailyExpenses) : null;
 
   // Validation checks
   const validations = useMemo(() => [
+    { key: 'expenseData', label: lang === 'fa' ? 'اطلاعات مصارف' : lang === 'ar' ? 'بيانات المصروفات' : 'Expense data', passed: expenseContextReady, message: expenseContextReady ? (lang === 'fa' ? 'مصارف دریافت شد' : lang === 'ar' ? 'تم تحميل المصروفات' : 'Expense data loaded') : expenseContextMessage },
     {
       key: 'erpData',
       label: 'ERP Sales and Cash Ledger Available',
@@ -1404,7 +1409,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       passed: !!form.date && !!form.branch && customClosingFields.every((field) => !field.is_required || hasCustomClosingFieldValue(field)),
       message: form.date || 'Date required',
     },
-  ], [form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, posDevices, posLoading, posUnavailable, lang, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, cashSalesSourcesMatched, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
+  ], [expenseContextReady, expenseContextMessage, form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, posDevices, posLoading, posUnavailable, lang, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, cashSalesSourcesMatched, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   const networkCounterTotal = baseNetworkTotal;
@@ -1479,6 +1484,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (!form.branch) nextErrors.branch = 'Branch is required.';
     if (!form.shift) nextErrors.shift = 'Shift is required.';
     if (!cashierDisplayName || !effectiveCashierId) nextErrors.cashier = 'Select a valid operator/cashier before saving.';
+    if (!expenseContextReady) nextErrors.expenses = expenseContextMessage;
     if (openingReviewRequired) nextErrors.reconciliation = openingReviewReason;
     if (cashLedgerUnavailable || !cashContextReady) nextErrors.reconciliation = 'Load and verify the ERP cash ledger before saving.';
     if (!savingDraft && ledgerOverdrawn) nextErrors.reconciliation = 'Cash ledger is overdrawn. Reconcile dated cash movements and funding before finalizing.';
@@ -1984,7 +1990,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             />
           <details open className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5" data-testid="closing-operating-statement" data-i18n-skip="true">
             <summary className="min-h-11 cursor-pointer text-sm font-bold text-slate-900">{lang === 'fa' ? 'خریدها و مصارف' : lang === 'ar' ? 'المشتريات والمصروفات' : <>Expenses &amp; purchases</>}</summary>
-            {cashContextReady && !purchasesLoading && !purchasesUnavailable ? <dl className="mt-2 space-y-3 text-sm">
+            {expenseContextReady && !purchasesLoading && !purchasesUnavailable ? <dl className="mt-2 space-y-3 text-sm">
               {[
                 [lang === 'fa' ? 'خریدهای تأییدشده' : lang === 'ar' ? 'المشتريات المعتمدة' : 'Approved purchases', approvedPurchasesTotal],
                 [lang === 'fa' ? 'سهم روزانه مصارف ثابت' : lang === 'ar' ? 'نصيب اليوم من المصروفات الثابتة' : 'Daily fixed expense allocation', fixedExpensesToday],
@@ -1993,6 +1999,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-3"><dt className="font-bold">{lang === 'fa' ? 'مجموع هزینه روز' : lang === 'ar' ? 'إجمالي تكلفة اليوم' : 'Total daily expenses'}</dt><dd><Money currency={currency} value={totalDailyExpenses} className="font-bold" /></dd></div>
               <div className="flex flex-wrap justify-between gap-2"><dt className="font-bold">{lang === 'fa' ? 'نتیجه عملیاتی تخمینی' : lang === 'ar' ? 'النتيجة التشغيلية التقديرية' : 'Estimated operating result'}</dt><dd><Money currency={currency} value={operatingResult} signed className="font-bold" /></dd></div>
             </dl> : <p role="status" className="mt-2 text-sm text-amber-800">{lang === 'fa' ? 'نتیجه تا بارگذاری خریدها و دفتر نقد قابل تأیید نیست.' : lang === 'ar' ? 'لا يمكن تأكيد النتيجة قبل تحميل المشتريات ودفتر النقد.' : 'The result is unavailable until purchases and the cash ledger are loaded.'}</p>}
+            {!expenseContextReady && <p role="alert" className="mt-2 text-xs text-amber-800">{expenseContextMessage}</p>}
             <p className="mt-3 text-xs leading-5 text-slate-500">{lang === 'fa' ? 'بر مبنای خرید و مصارف ثبت‌شده؛ سود حسابداری نهایی نیست. نقد صندوق فقط با حرکات ثبت‌شده نقدی تغییر می‌کند.' : lang === 'ar' ? 'على أساس المشتريات والمصروفات المسجلة؛ ليست الربح المحاسبي النهائي. لا يتغير نقد الصندوق إلا بحركات نقدية مسجلة.' : 'Purchase-basis management estimate, not final accounting profit. Drawer cash changes only through posted cash movements.'}</p>
           </details>
 
