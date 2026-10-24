@@ -56,17 +56,19 @@ export default function SupplierPortalERP() {
 
   // ── Purchase orders for this supplier ─────────────────────────────────────
   const { data: purchaseOrders = [], isLoading, refetch, isError: purchaseOrdersError } = useQuery({
-    queryKey: ['supplier-pos', supplierProfile?.id, user?.restaurant_id],
+    queryKey: ['supplier-pos', supplierProfile?.id, user?.restaurant_id, user?.branch_id],
     queryFn: async () => {
       if (!supplierProfile?.id) return [];
       return readAllPortalRows(() => supabase
         .from('purchase_orders')
         .select('*')
+        .eq('restaurant_id', user.restaurant_id)
+        .eq('branch_id', user.branch_id)
         .eq('supplier_id', supplierProfile.id)
         .order('created_date', { ascending: false })
         .order('id', { ascending: true }));
     },
-    enabled: !!supplierProfile?.id,
+    enabled: !!supplierProfile?.id && !!user?.restaurant_id && !!user?.branch_id,
     refetchInterval: 60000,
   });
 
@@ -94,6 +96,8 @@ export default function SupplierPortalERP() {
         .from('purchase_orders')
         .update({ status: 'shipped' })
         .eq('id', poId)
+        .eq('restaurant_id', user.restaurant_id)
+        .eq('branch_id', user.branch_id)
         .eq('supplier_id', supplierProfile.id)
         .eq('status', 'approved')
         .select('id');

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { disableDevicePush } from '@/lib/ownerPush';
+import { queryClientInstance } from '@/lib/query-client';
 
 const AuthContext = createContext();
 
@@ -23,6 +24,25 @@ export const AuthProvider = ({ children }) => {
   const [authChecked, setAuthChecked] = useState(false);
   const mounted = useRef(true);
   const authRequestVersion = useRef(0);
+  const verifiedIdentity = useRef(null);
+  const verifiedScope = useRef(null);
+
+  const clearPortalCache = () => {
+    queryClientInstance.clear();
+    verifiedIdentity.current = null;
+    verifiedScope.current = null;
+  };
+
+
+  const reconcilePortalScope = currentUser => {
+    if (!currentUser) { clearPortalCache(); return; }
+    const scope = JSON.stringify([currentUser.id, currentUser.restaurant_id,
+      currentUser.branch_id, currentUser.role, currentUser.linked_entity_id,
+      currentUser.permissions, currentUser.data_scope, currentUser.selected_branches]);
+    if (scope !== verifiedScope.current) queryClientInstance.clear();
+    verifiedScope.current = scope;
+    verifiedIdentity.current = currentUser.id;
+  };
 
   useEffect(() => {
     mounted.current = true;
@@ -38,6 +58,14 @@ export const AuthProvider = ({ children }) => {
       if (_event === 'INITIAL_SESSION') { return; }
       clearTimeout(authRefreshTimer);
       if (session) {
+        if (session.user?.id !== verifiedIdentity.current) {
+          // Hide the previous account immediately, before the deferred lookup.
+          authRequestVersion.current += 1;
+          clearPortalCache();
+          setUser(null);
+          setIsAuthenticated(false);
+          setIsLoadingAuth(true);
+        }
         // Supabase invokes listeners while holding its auth lock. Defer SDK
         // calls until the callback has returned; coalesce same-tick events.
         authRefreshTimer = setTimeout(() => {
@@ -45,6 +73,7 @@ export const AuthProvider = ({ children }) => {
         }, 0);
       } else {
         authRequestVersion.current += 1;
+        clearPortalCache();
         setUser(null);
         setIsAuthenticated(false);
         if (mounted.current) {
@@ -69,9 +98,11 @@ export const AuthProvider = ({ children }) => {
         if (!mounted.current || version !== authRequestVersion.current) return;
 
         if (currentUser) {
+          reconcilePortalScope(currentUser);
           setUser(currentUser);
           setIsAuthenticated(true);
         } else {
+          clearPortalCache();
           setUser(null);
           setIsAuthenticated(false);
           setAuthError({ type: 'auth_required', message: 'Authentication required' });
@@ -109,6 +140,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const currentUser = await withTimeout(base44.auth.me(), 8000);
       if (!mounted.current || version !== authRequestVersion.current) return;
+      reconcilePortalScope(currentUser);
       setUser(currentUser);
       setIsAuthenticated(Boolean(currentUser));
       setAuthError(currentUser ? null : { type: 'auth_required', message: 'Authentication required' });
@@ -130,6 +162,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     authRequestVersion.current += 1;
+    clearPortalCache();
     setUser(null);
     setIsAuthenticated(false);
     setIsLoadingAuth(false);
