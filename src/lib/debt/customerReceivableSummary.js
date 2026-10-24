@@ -27,3 +27,48 @@ export function summarizePostedCustomerReceivables(rows, { complete = true } = {
   }
   return { amount: Number((cents / 100).toFixed(2)), count, status: 'VERIFIED_POSTED_LEDGER' };
 }
+
+/**
+ * Detect whether finalized Closing credit is backed by linked receivable
+ * principal. This is a read-only exception report; it must NEVER create
+ * missing debt, infer a customer's identity or add unposted credit to AR.
+ */
+export function auditPostedClosingCredit(sales, debts, { complete = true } = {}) {
+  if (!complete || !Array.isArray(sales) || !Array.isArray(debts)) {
+    return { status: 'UNAVAILABLE', issues: 0, unexplainedAmount: null, legacyWithoutDetails: 0 };
+  }
+  const linked = new Map();
+  for (const debt of debts) {
+    if (debt.type !== 'receivable' || debt.party_type !== 'customer' || !debt.sales_closing_id) continue;
+    const key = String(debt.sales_closing_id);
+    const value = Number(debt.total_amount);
+    if (!Number.isFinite(value)) return { status: 'UNAVAILABLE', issues: 0, unexplainedAmount: null, legacyWithoutDetails: 0 };
+    linked.set(key, (linked.get(key) || 0) + Math.round(value * 100));
+  }
+  let issues = 0, deltaCents = 0, legacyWithoutDetails = 0;
+  const seen = new Set();
+  for (const sale of sales) {
+    if (String(sale.closing_state || '').toLowerCase() !== 'finalized' || !sale.id || seen.has(sale.id)) continue;
+    seen.add(sale.id);
+    const credit = Number(sale.credit || 0);
+    if (!Number.isFinite(credit) || credit <= 0) continue;
+    let entries = sale.credit_entries_json;
+    if (typeof entries === 'string') {
+      try { entries = JSON.parse(entries); } catch { entries = null; }
+    }
+    if (!Array.isArray(entries) || entries.length === 0) {
+      legacyWithoutDetails += 1;
+      continue; // cannot link a specific customer; never auto-backfill
+    }
+    const expected = Math.round(credit * 100);
+    const actual = linked.get(String(sale.id)) || 0;
+    if (Math.abs(actual - expected) > 1) {
+      issues += 1;
+      deltaCents += Math.max(0, expected - actual);
+    }
+  }
+  return {
+    status: issues || legacyWithoutDetails ? 'REVIEW_REQUIRED' : 'CHECKED_SCOPE',
+    issues, unexplainedAmount: Number((deltaCents / 100).toFixed(2)), legacyWithoutDetails,
+  };
+}
