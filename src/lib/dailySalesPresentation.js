@@ -15,6 +15,8 @@ export const toDailySalesCardRecord = (sale) => ({
   shift: sale.shift,
   approved_purchases_total: sale.approved_purchases_total,
   expenses_total: sale.expenses_total,
+  fixed_expenses_total: sale.fixed_expenses_total,
+  variable_expenses_total: sale.variable_expenses_total,
   operating_result: sale.operating_result,
   opening_cash: sale.opening_cash,
   expected_cash: sale.expected_cash,
@@ -110,12 +112,17 @@ export function dailySalesProfitSummary(sale) {
     sale?.credit, sale?.custom_sources_total].reduce((sum, value) => sum + (amount(value) ?? 0), 0);
   const purchases = amount(sale?.approved_purchases_total);
   const expenses = amount(sale?.expenses_total);
+  const fixed = amount(sale?.fixed_expenses_total);
+  const variable = amount(sale?.variable_expenses_total);
+  const expenseBreakdownComplete = fixed !== null && variable !== null && fixed >= 0 && variable >= 0;
+  const expenseBreakdownMismatch = expenseBreakdownComplete && expenses !== null && fixed + variable !== expenses;
   const costs = purchases !== null && expenses !== null ? purchases + expenses : null;
   const gross = purchases !== null ? revenue - purchases : null;
-  const net = costs !== null ? revenue - costs : null;
+  const net = costs !== null && !expenseBreakdownMismatch ? revenue - costs : null;
   const money = (value) => value === null ? null : value / 100;
-  return { purchases: money(purchases), operatingExpenses: money(expenses), totalCosts: money(costs),
+  return { fixedExpenses: money(fixed), variableExpenses: money(variable), expenseBreakdownComplete, expenseBreakdownMismatch,
+    purchases: money(purchases), operatingExpenses: money(expenses), totalCosts: money(costs),
     grossProfit: money(gross), netProfit: money(net),
-    costsMissing: purchases === null || expenses === null,
+    costsMissing: purchases === null || expenses === null || expenseBreakdownMismatch,
     noRecordedCosts: costs === 0 };
 }

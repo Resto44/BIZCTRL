@@ -129,6 +129,10 @@ export default function ExecutiveSnapshotV2({model,copy}) {
         <StatCard testId="snapshot-profit" title={t(copy,'netProfit','Operating estimate')} value={money(periodMetrics.netProfit)} icon={TrendingUp} tone={periodMetrics.netProfit<0?'rose':'violet'}
           change={hasQueryError?null:presentation.profitChange} comparisonLabel={compareLabel}/>
       </div>
+      <dl data-testid="executive-expense-breakdown" className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-border/70 bg-slate-50/50 p-3 dark:bg-slate-900/40">
+        {[[lang==='fa'?'سهم مصارف ثابت':lang==='ar'?'نصيب المصروفات الثابتة':'Allocated fixed costs',periodMetrics.fixedDeduction],
+          [lang==='fa'?'مصارف متغیر':lang==='ar'?'المصروفات المتغيرة':'Variable expenses',periodMetrics.totalVariableExpenses]].map(([label,value])=><div key={label} className="min-w-0"><dt className="text-[10px] text-muted-foreground">{label}</dt><dd className="mt-1 text-sm font-bold tabular-nums" dir="ltr">{value==null?'—':money(value)}</dd></div>)}
+      </dl>
       <p className="mt-2 text-[10px] leading-4 text-muted-foreground">{t(copy,'profitHint','Sales less purchases and expenses; not inventory-COGS profit')}</p>
       <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
         <div className="min-w-0 rounded-2xl border border-border/80 p-3">
