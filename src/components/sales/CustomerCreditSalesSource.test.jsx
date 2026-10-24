@@ -181,3 +181,54 @@ describe('CustomerCreditSalesSource', () => {
     expect(link.props.target).toBe('_blank');
   });
 });
+
+describe('credit balances and localized amounts', () => {
+  it.each(['۵۰٫۲۵', '٥٠٫٢٥', '50.25'])('normalizes %s before the closing receives it', value => {
+    const onUpdate = vi.fn();
+    const tree = renderSource({ onUpdate });
+    act(() => tree.root.findByProps({ 'aria-label': 'Credit sale amount' }).props.onChange({ target: { value } }));
+    expect(onUpdate).toHaveBeenCalledWith('1', 'amount', '50.25');
+    tree.unmount();
+  });
+
+  it.each(['1e2', '1,20', '-50', '50.001'])('blocks invalid monetary input %s', value => {
+    const tree = renderSource({ entry: { id: '1', customer_id: 'c1', amount: value }, onReviewCreditSale: vi.fn() });
+    expect(tree.root.findByProps({ 'aria-label': 'Credit sale amount' }).props['aria-invalid']).toBe(true);
+    const review = tree.root.findAllByType('button').find(node => textOf(node).includes('Review & Save with Closing'));
+    expect(review.props.disabled).toBe(true);
+    expect(tree.root.findAllByProps({ 'data-testid': 'credit-balance-preview' })).toHaveLength(0);
+    tree.unmount();
+  });
+
+  it('previews increased debt and reduced available credit without changing posted metrics', () => {
+    const tree = renderSource({ entry: { id: '1', customer_id: 'c1', amount: '50' } });
+    const preview = textOf(tree.root.findByProps({ 'data-testid': 'credit-balance-preview' }));
+    expect(preview).toContain('After finalizing closing (preview)');
+    expect(preview).toContain('SAR 160');
+    expect(preview).toContain('SAR 1,840');
+    expect(JSON.stringify(tree.toJSON())).toContain('SAR 110');
+    tree.unmount();
+  });
+
+  it('previews a full repayment and updates posted metrics when canonical data refreshes', () => {
+    const props = { entry: { id: '1', customer_id: 'c1', transaction_type: 'debt_payment', payment_amount: '110' }, customers: [customer] };
+    const tree = renderSource(props);
+    const preview = textOf(tree.root.findByProps({ 'data-testid': 'credit-balance-preview' }));
+    expect(preview).toContain('SAR 0');
+    expect(preview).toContain('SAR 2,000');
+    act(() => tree.update(React.createElement(CustomerCreditSalesSource, { ...props, entry: { ...props.entry, payment_amount: '' }, customers: [{ ...customer, outstanding_balance: 0, available_credit: 2000 }] })));
+    expect(tree.root.findAllByProps({ 'data-testid': 'credit-balance-preview' })).toHaveLength(0);
+    expect(JSON.stringify(tree.toJSON())).toContain('SAR 2,000');
+    tree.unmount();
+  });
+
+  it('never previews a finalized credit sale twice or deletes it when recording payment', () => {
+    const onUpdate = vi.fn();
+    const tree = renderSource({ creditPosted: true, onUpdate, entry: { id: '1', customer_id: 'c1', amount: '50' } });
+    expect(tree.root.findAllByProps({ 'data-testid': 'credit-balance-preview' })).toHaveLength(0);
+    expect(tree.root.findByProps({ 'aria-label': 'Credit sale amount' }).props.disabled).toBe(true);
+    act(() => tree.root.findAllByType('button').find(node => textOf(node) === ' Debt Payment').props.onClick());
+    expect(onUpdate).toHaveBeenCalledWith('1', expect.objectContaining({ transaction_type: 'debt_payment', amount: '50', payment_amount: '' }));
+    tree.unmount();
+  });
+});

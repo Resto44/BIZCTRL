@@ -27,3 +27,10 @@ export function customerCreditSnapshots(sources, entries) {
     };
   });
 }
+
+// Keep localized keyboard input compatible with all closing calculations.
+export const normalizeCreditAmount = value => String(value ?? '')
+  .replace(/[۰-۹]/g, digit => String(digit.charCodeAt(0) - 0x06f0))
+  .replace(/[٠-٩]/g, digit => String(digit.charCodeAt(0) - 0x0660))
+  .replace(/٫/g, '.').trim();
+export const validCreditAmount = value => /^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(String(value));
