@@ -14,6 +14,8 @@ export const OWNER_DASHBOARD_TABLE_QUERIES = {
   inventory_transactions: ['inventory_transactions_report', 'inventory_dash'],
   product_price_history: ['product_price_history'],
   debt_records: ['debts_customer_dash'],
+  debt_payments: ['debts_customer_dash'],
+  customer_collections: ['debts_customer_dash'],
   wallet_transactions: ['wallet_transactions_dash'],
   branches: ['branches', 'owner_drawer_cash_asof'],
 };
