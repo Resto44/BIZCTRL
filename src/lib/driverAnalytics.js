@@ -242,7 +242,7 @@ function addLegacyDriverSnapshots({ rows, drivers, sales, branchKey, branchId, d
   });
 }
 
-export function buildDriverSalesAnalytics({ drivers = [], sales = [], driverEntries, branchKey, branchId, dateFrom, dateTo } = {}) {
+export function buildDriverSalesAnalytics({ drivers = [], sales = [], driverEntries = undefined, branchKey = undefined, branchId = undefined, dateFrom = undefined, dateTo = undefined } = {}) {
   const { scopedDrivers, rows } = buildRows(drivers, branchKey, branchId);
 
   // Supplying canonical entries opts into the production data source, even when
@@ -256,7 +256,7 @@ export function buildDriverSalesAnalytics({ drivers = [], sales = [], driverEntr
   return summarizeRows(rows);
 }
 
-export function buildBranchDriverAnalytics({ drivers = [], sales = [], driverEntries, branches = [], dateFrom, dateTo } = {}) {
+export function buildBranchDriverAnalytics({ drivers = [], sales = [], driverEntries = undefined, branches = [], dateFrom = undefined, dateTo = undefined } = {}) {
   return records(branches).map((branch) => {
     const branchKey = branch.key || branch.branch_key || '';
     const branchId = branch.id || null;
@@ -273,12 +273,12 @@ export function buildBranchDriverAnalytics({ drivers = [], sales = [], driverEnt
 export function buildDriverTrendAnalytics({
   drivers = [],
   sales = [],
-  driverEntries,
+  driverEntries = undefined,
   branches = [],
-  branchKey,
-  branchId,
-  dateFrom,
-  dateTo,
+  branchKey = undefined,
+  branchId = undefined,
+  dateFrom = undefined,
+  dateTo = undefined,
 } = {}) {
   const analytics = buildDriverSalesAnalytics({
     drivers,

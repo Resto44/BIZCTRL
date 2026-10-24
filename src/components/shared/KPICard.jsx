@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { Card } from '@/components/ui/card';
 
-const KPICard = memo(function KPICard({ label, value, sublabel, icon: Icon, color = 'text-primary' }) {
+const KPICardView = function KPICard({ label, value, sublabel, icon: Icon, color = 'text-primary' }) {
   return (
     <Card className="p-4 flex items-start gap-3 bg-card border-border/50 shadow-sm">
       {Icon && (
@@ -16,6 +16,8 @@ const KPICard = memo(function KPICard({ label, value, sublabel, icon: Icon, colo
       </div>
     </Card>
   );
-});
+};
+
+const KPICard = memo(KPICardView);
 
 export default KPICard;

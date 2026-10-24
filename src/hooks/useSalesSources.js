@@ -24,6 +24,7 @@ const branchMatchesSource = (source, branchId, branchKey) => {
     || (source?.branch_id && branchKey && String(source.branch_id) === String(branchKey));
 };
 
+/** @param {{ branchId?: string, branchKey?: string, includeInactive?: boolean }} options */
 export function useSalesSources({ branchId, branchKey, includeInactive = false } = {}) {
   const { managerBranchObject } = useTenant();
   const { selectedBranchId, selectedBranchKey, isAllBranches } = useBranchScope();

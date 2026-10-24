@@ -13,7 +13,8 @@
     "test": "vitest run",
     "preview": "vite preview",
     "icons:generate": "node scripts/generate-pwa-icons.mjs",
-    "typecheck:ui": "tsc -p tests/types/tsconfig.json"
+    "typecheck:ui": "tsc -p tests/types/tsconfig.json",
+    "typecheck:runtime": "node scripts/check-runtime-identifiers.mjs"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.30",
@@ -87,6 +88,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
+    "@types/chai": "5.2.3",
     "@types/node": "^22.13.5",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",

@@ -446,8 +446,8 @@ export function previousFinancialDateRange(range) {
 }
 
 export function calculateFinancialReport({
-  range,
-  scope: rawScope,
+  range = undefined,
+  scope: rawScope = undefined,
   branches = [],
   sales = [],
   purchases = [],
@@ -674,8 +674,8 @@ export function calculateFinancialReport({
 
 export function buildFinancialTrend({
   trend = 'monthly',
-  range,
-  scope,
+  range = undefined,
+  scope = undefined,
   branches = [],
   data = {},
 } = {}) {
@@ -730,8 +730,8 @@ export function buildFinancialTrend({
 
 export function calculateBranchComparison({
   branches = [],
-  range,
-  previousRange,
+  range = undefined,
+  previousRange = undefined,
   data = {},
   accessibleBranchKeys = [],
 } = {}) {

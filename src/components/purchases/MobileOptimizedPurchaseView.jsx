@@ -39,7 +39,7 @@ const OVERDUE_BORDER = {
 };
 
 // ── Mobile Invoice Card ───────────────────────────────────────────────────────
-const MobileInvoiceCard = memo(function MobileInvoiceCard({
+const MobileInvoiceCardView = function MobileInvoiceCard({
   inv, currency, isOwner, onView, onEdit, onDelete, onApprove, dir, lang, branches
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -204,10 +204,12 @@ const MobileInvoiceCard = memo(function MobileInvoiceCard({
       )}
     </Card>
   );
-});
+};
+
+const MobileInvoiceCard = memo(MobileInvoiceCardView);
 
 // ── Sticky Action Bar ─────────────────────────────────────────────────────────
-export const StickyActionBar = memo(function StickyActionBar({
+const StickyActionBarView = function StickyActionBar({
   onAddInvoice, onViewDashboard, pendingCount = 0, overdueCount = 0, t
 }) {
   return (
@@ -261,10 +263,12 @@ export const StickyActionBar = memo(function StickyActionBar({
       </div>
     </div>
   );
-});
+};
+
+export const StickyActionBar = memo(StickyActionBarView);
 
 // ── Mobile Invoice List ───────────────────────────────────────────────────────
-const MobileInvoiceList = memo(function MobileInvoiceList({
+const MobileInvoiceListView = function MobileInvoiceList({
   invoices, currency, isOwner, onView, onEdit, onDelete, onApprove, dir, lang = 'en', branches = []
 }) {
   if (invoices.length === 0) {
@@ -296,6 +300,8 @@ const MobileInvoiceList = memo(function MobileInvoiceList({
       ))}
     </div>
   );
-});
+};
+
+const MobileInvoiceList = memo(MobileInvoiceListView);
 
 export default MobileInvoiceList;

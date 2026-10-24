@@ -34,7 +34,7 @@ const statePresentation = (state) => ({
   cancelled: { label: 'Cancelled', cls: 'bg-red-50 text-red-700' },
 }[state] || { label: 'Draft', cls: 'bg-slate-100 text-slate-700' });
 
-const NetworkDetailRow = memo(function NetworkDetailRow({ icon: Icon, label, description, value, currency }) {
+const NetworkDetailRowView = function NetworkDetailRow({ icon: Icon, label, description, value, currency }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-background px-3 py-2.5">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-700"><Icon className="h-4 w-4" aria-hidden="true" /></span>
@@ -45,7 +45,9 @@ const NetworkDetailRow = memo(function NetworkDetailRow({ icon: Icon, label, des
       <p className="shrink-0 text-sm font-black tabular-nums text-blue-700">{money(currency, value)}</p>
     </div>
   );
-});
+};
+
+const NetworkDetailRow = memo(NetworkDetailRowView);
 
 export default function SalesListItem({
   sale,

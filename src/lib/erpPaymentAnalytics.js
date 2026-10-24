@@ -48,7 +48,7 @@ const daysForTrend = (snapshot) => (snapshot?.breakdown||[]).map(day=>day.date);
 
 /** @returns canonical sales, non-additive source details, and time-series data */
 export function buildERPFinancialPaymentAnalytics({
- sales=[], range, snapshot, revenueSources=[], lang='en', selectedSource='all',
+ sales=[], range = undefined, snapshot = undefined, revenueSources=[], lang='en', selectedSource='all',
 }={}){
  if(!range?.from || !range?.to || !snapshot) throw new Error('Payment report requires a selected valid period');
  const periodSales=sales.filter(s=>finalized(s) && dateWithin(s,range.from,range.to));

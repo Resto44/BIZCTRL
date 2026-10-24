@@ -1,3 +1,4 @@
+import { closingSourceBreakdown } from '@/lib/closingSourceBreakdown';
 /**
  * FinancialKPIs — ERP Dashboard.
  *
@@ -289,6 +290,7 @@ export default function FinancialKPIs({ branch }) {
     let creditSalesToday = 0;
     let customSalesToday = 0;
     let totalSalesToday = 0;
+    const customSourcesMap = closingSourceBreakdown(daySales, allSalesSources);
 
     daySales.forEach(r => {
       const rev = calculateSalesRevenue(r, revenueSources);
@@ -380,7 +382,7 @@ export default function FinancialKPIs({ branch }) {
       customerReceivables, supplierPayables, inventoryValue,
       alerts,
     };
-  }, [todaySales, yesterdaySales, todayApprovedPurchases, customerDebts, allInvoices, inventory, branch, todayStr, lbl]);
+  }, [todaySales, yesterdaySales, todayApprovedPurchases, customerDebts, allInvoices, inventory, branch, todayStr, lbl, allSalesSources, revenueSources]);
 
   const fmt = (v) => `${currency}${Number(v || 0).toLocaleString()}`;
 

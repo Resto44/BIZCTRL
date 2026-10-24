@@ -99,7 +99,7 @@ export function invoicePaymentLabel(invoice,payments=[],language='en'){
  * No PDF screenshot, invented tax rate, synthetic approval or fake payment.
  */
 export function renderPurchaseInvoiceReference(doc,invoice,model,{
-  lang='en',business,brand,branch,payments=[],auditEvents=[],
+  lang='en',business = undefined,brand = undefined,branch = undefined,payments=[],auditEvents=[],
 }={}) {
   const language=LANGUAGE[lang]?lang:'en';
   const w=LANGUAGE[language],rtl=language!=='en';
@@ -110,11 +110,11 @@ export function renderPurchaseInvoiceReference(doc,invoice,model,{
   const paleBlue=[230,241,255],paleGreen=[231,248,241],palePurple=[242,237,255],paleAmber=[255,246,224];
   const toneAmber=[180,116,12],tonePurple=[110,70,200];
   const padding=4;
-  const print=(str,x,y,{size=9,color=ink,bold=false,align='left',maxWidth}={})=>
+  const print=(str,x,y,{size=9,color=ink,bold=false,align='left',maxWidth = undefined}={})=>
     drawLocalizedPdfText(doc,display(str),x,y,{
       rtl,bold,size,color,align,maxWidth,fit:Boolean(maxWidth),
     });
-  const number=(str,x,y,{size=10,color=ink,bold=true,align='right',maxWidth}={})=>
+  const number=(str,x,y,{size=10,color=ink,bold=true,align='right',maxWidth = undefined}={})=>
     drawLocalizedPdfText(doc,display(str),x,y,{
       rtl:false,bold,size,color,align,maxWidth,fit:Boolean(maxWidth),
     });

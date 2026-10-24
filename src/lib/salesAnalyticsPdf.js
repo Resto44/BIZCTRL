@@ -9,8 +9,8 @@ import {drawTwoPageERPReport} from './twoPageERPReport';
  * Summarizes all scoped data in sales and purchases/expenses pages.
  */
 export async function generateSalesAnalyticsPDF({
- snapshot,previousSnapshot=null,growth=null,range,branchLabel,businessName='BizCTRL',
- currency='SAR',lang='en',dir,operationsReport=null,fullAnalytics=null,download=true,
+ snapshot = undefined,previousSnapshot=null,growth=null,range = undefined,branchLabel = undefined,businessName='BizCTRL',
+ currency='SAR',lang='en',dir = undefined,operationsReport=null,fullAnalytics=null,download=true,
 }={}){
  if(!snapshot || !range?.from || !range?.to || !branchLabel)
    throw new Error('A verified report, period and selected branch are required');

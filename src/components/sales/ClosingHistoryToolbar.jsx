@@ -23,7 +23,7 @@ const operatingProfit = (sale) => Number.isFinite(Number(sale?.operating_result)
   : totalSales(sale) - numeric(sale?.approved_purchases_total) - numeric(sale?.expenses_total);
 const money = (currency, value) => `${currency} ${numeric(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
-const FilterSelect = memo(function FilterSelect({ icon: Icon, value, onChange, ariaLabel, children }) {
+const FilterSelectView = function FilterSelect({ icon: Icon, value, onChange, ariaLabel, children }) {
   return (
     <label className="relative flex min-w-[145px] flex-1 items-center rounded-xl border border-border/80 bg-background shadow-sm">
       <Icon className="pointer-events-none absolute left-3 h-4 w-4 text-foreground" aria-hidden="true" />
@@ -39,9 +39,11 @@ const FilterSelect = memo(function FilterSelect({ icon: Icon, value, onChange, a
       <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
     </label>
   );
-});
+};
 
-const PerformanceChart = memo(function PerformanceChart({ records, currency }) {
+const FilterSelect = memo(FilterSelectView);
+
+const PerformanceChartView = function PerformanceChart({ records, currency }) {
   const chart = useMemo(() => {
     const days = [...records].slice(0, 7).reverse();
     const values = days.flatMap((record) => [totalSales(record), operatingProfit(record)]);
@@ -83,9 +85,11 @@ const PerformanceChart = memo(function PerformanceChart({ records, currency }) {
       </svg>
     </div>
   );
-});
+};
 
-const StatusMetric = memo(function StatusMetric({ icon: Icon, value, label, tone }) {
+const PerformanceChart = memo(PerformanceChartView);
+
+const StatusMetricView = function StatusMetric({ icon: Icon, value, label, tone }) {
   return (
     <div className="flex min-w-0 items-center gap-3 px-3 py-4 sm:px-5">
       <Icon className={`h-8 w-8 shrink-0 ${tone}`} strokeWidth={1.8} aria-hidden="true" />
@@ -96,7 +100,9 @@ const StatusMetric = memo(function StatusMetric({ icon: Icon, value, label, tone
       </div>
     </div>
   );
-});
+};
+
+const StatusMetric = memo(StatusMetricView);
 
 export default function ClosingHistoryToolbar({
   records,

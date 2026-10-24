@@ -450,7 +450,7 @@ export default function Sales() {
 
       // Fetch the generated invoice from the DB
       const invoices = asRecordArray(await base44.entities.SalesInvoice.filter({ sale_id: saleId }));
-      const invoice = firstRecord(invoices);
+      const invoice = invoices[0] || null;
 
       if (!invoice) return;
 

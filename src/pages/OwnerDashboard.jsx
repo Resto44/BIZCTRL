@@ -221,7 +221,7 @@ function OwnerDashboardContent() {
   const formatMoney = useCallback((value, decimals = 0) => `${String(currency || 'SAR').trim()} ${numeric(value).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`, [currency]);
 
   const fetchBranchScopedRows = useCallback(async (table, {
-    legacyColumn = 'branch', dateColumn, dateFrom, dateTo, filters = {}, orderColumn = 'date', ascending = false, limit = 1000,
+    legacyColumn = 'branch', dateColumn = undefined, dateFrom = undefined, dateTo = undefined, filters = {}, orderColumn = 'date', ascending = false, limit = 1000,
   } = {}) => {
     if (!activeRestaurant?.id) return [];
     // Supabase/PostgREST typically caps responses at 1,000 rows even if the

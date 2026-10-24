@@ -11,7 +11,30 @@ import { moneyInputIsValid } from '@/lib/closing/ClosingCalculations';
  * while editing. Consumers own the raw string state, so calculation updates in
  * sibling components cannot replace the DOM node or dismiss mobile keyboards.
  */
-const ClosingNumericInput = forwardRef(function ClosingNumericInput({
+/**
+ * @typedef {Object} ClosingNumericInputProps
+ * @property {string} [id]
+ * @property {string} [label]
+ * @property {string | number} [value]
+ * @property {(value: string) => void} [onChange]
+ * @property {React.FocusEventHandler<HTMLInputElement>} [onBlur]
+ * @property {string} [prefix]
+ * @property {string} [helpText]
+ * @property {string | boolean} [error]
+ * @property {boolean} [required]
+ * @property {boolean} [readOnly]
+ * @property {boolean} [disabled]
+ * @property {number} [min]
+ * @property {number} [max]
+ * @property {boolean} [allowNegative]
+ * @property {string} [placeholder]
+ * @property {string} [className]
+ * @property {string} [inputClassName]
+ * @property {string} [data-testid]
+ */
+const ClosingNumericInput = forwardRef(
+/** @param {ClosingNumericInputProps} props @param {React.ForwardedRef<HTMLInputElement>} ref */
+function ClosingNumericInput({
   id,
   label,
   value = '',

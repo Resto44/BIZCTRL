@@ -144,7 +144,7 @@ export function calculateOperatingResult({ revenue = '', purchases = '', operati
   };
 }
 
-export function buildCleanClosingDraft({ date, branch, branchId = null, shift = 'Morning', cashierId = null, cashierName = '' } = {}) {
+export function buildCleanClosingDraft({ date = undefined, branch = undefined, branchId = null, shift = 'Morning', cashierId = null, cashierName = '' } = {}) {
   return {
     date: date || '',
     branch: branch || '',

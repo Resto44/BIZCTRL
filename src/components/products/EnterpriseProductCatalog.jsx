@@ -87,7 +87,7 @@ function CatalogError({ message, onRetry }) {
   );
 }
 
-const EnterpriseProductCatalog = memo(function EnterpriseProductCatalog({
+const EnterpriseProductCatalogView = function EnterpriseProductCatalog({
   restaurantId,
   branches,
   selectedLocation,
@@ -293,6 +293,8 @@ const EnterpriseProductCatalog = memo(function EnterpriseProductCatalog({
       {canImportProductSpreadsheet ? <ProductBulkImportDialog open={showImport} onOpenChange={setShowImport} restaurantId={restaurantId} selectedBranch={selectedBranch} onImported={refresh} isAllowed={canImportProductSpreadsheet} /> : null}
     </div>
   );
-});
+};
+
+const EnterpriseProductCatalog = memo(EnterpriseProductCatalogView);
 
 export default EnterpriseProductCatalog;

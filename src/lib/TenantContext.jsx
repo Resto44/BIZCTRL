@@ -9,9 +9,10 @@ const asRecordArray = (value) => Array.isArray(value) ? value.filter(Boolean) : 
 
 const TenantContext = createContext({
   restaurants: [], loadingRestaurants: false, activeRestaurant: null, activeRestaurantId: null,
-  setActiveRestaurant: () => {}, branches: [], allBranches: [], createRestaurant: async () => {},
-  updateRestaurant: async () => {}, updateRestaurantBranches: async () => {}, refetchRestaurants: () => {},
-  orgId: '', orgFilter: {}, restaurantFilter: null,
+  setActiveRestaurant: (_id) => {}, branches: [], allBranches: [], createRestaurant: async (_data) => {},
+  updateRestaurant: async (_id, _data) => {}, updateRestaurantBranches: async (_branches) => {}, refetchRestaurants: () => {},
+  orgId: '', orgFilter: {}, restaurantFilter: null, ownerFilter: null, restaurantLoadError: null,
+  isEmployee: false, isCustomer: false, isSponsor: false,
   managerBranch: null, managerBranchObject: null, isManager: false, isBranchScoped: false,
   portalIdentity: null, loadingPortalIdentity: false, portalIdentityError: null, refetchPortalIdentity: () => {},
 });
@@ -214,7 +215,7 @@ export function TenantProvider({ children }) {
       )
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => { void supabase.removeChannel(channel); };
   }, [activeRestaurant?.id, queryClient]);
 
   const createRestaurant = useCallback(async (data) => {

@@ -50,7 +50,7 @@ const purchaseValue = row => {
  * sales-source snapshot entries are added back to sales revenue. */
 export function buildSalesReportSnapshot({
   sales = [], purchases = [], expenses = [], expenseCategories = [],
-  revenueSources = [], from, to, groupBy = 'day',
+  revenueSources = [], from = undefined, to = undefined, groupBy = 'day',
 } = {}) {
   if(!/^\d{4}-\d{2}-\d{2}$/.test(from || '') || !/^\d{4}-\d{2}-\d{2}$/.test(to || '') || from>to)
     throw new Error('Valid report date range required');
