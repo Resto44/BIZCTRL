@@ -52,7 +52,7 @@ export function buildExecutiveSnapshotPresentation({
 
 // Align by elapsed calendar day/month, never by the index of recorded rows.
 // Missing records stay null, so a missing closing is not presented as zero sales.
-export function buildExecutiveComparisonTrend({revenueTrend=[],previousRevenueTrend=[],periodKey='today',period}={}) {
+export function buildExecutiveComparisonTrend({revenueTrend=[],previousRevenueTrend=[],periodKey='today',period = undefined}={}) {
   if (!period?.currentStart || !period?.previousStart) {
     return buildExecutiveSnapshotPresentation({revenueTrend,periodKey}).trend.map((row,index)=>({...row,slot:index+1,previousSales:null}));
   }

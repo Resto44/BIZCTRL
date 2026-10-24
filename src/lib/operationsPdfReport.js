@@ -19,7 +19,7 @@ const asDay = date => format(date,'yyyy-MM-dd');
  */
 export function buildOperationsPdfReport({
   branches=[],sales=[],purchases=[],expenses=[],expenseCategories=[],
-  inventory=[],inventoryTransactions=[],customerDebts=[],range,revenueSources=[],asOfDate,
+  inventory=[],inventoryTransactions=[],customerDebts=[],range = undefined,revenueSources=[],asOfDate = undefined,
 }={}){
  if(!range?.from || !range?.to || range.from>range.to)throw new Error('Invalid reporting period');
  const branchReports=(branches||[]).filter(b=>!!b?.id).map(branch=>{

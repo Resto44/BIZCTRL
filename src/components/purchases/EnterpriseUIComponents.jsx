@@ -44,7 +44,7 @@ const PIE_COLORS = [
 ];
 
 // ── Glassmorphism Executive KPI Card ─────────────────────────────────────────
-export const GlassKPICard = memo(function GlassKPICard({
+const GlassKPICardView = function GlassKPICard({
   icon: Icon,
   label,
   value,
@@ -126,10 +126,12 @@ export const GlassKPICard = memo(function GlassKPICard({
       </div>
     </div>
   );
-});
+};
+
+export const GlassKPICard = memo(GlassKPICardView);
 
 // ── Executive KPI Grid ────────────────────────────────────────────────────────
-export const ExecutiveKPIGrid = memo(function ExecutiveKPIGrid({ kpis, currency, t }) {
+const ExecutiveKPIGridView = function ExecutiveKPIGrid({ kpis, currency, t }) {
   const cards = useMemo(() => [
     {
       icon: ShoppingCart,
@@ -200,10 +202,12 @@ export const ExecutiveKPIGrid = memo(function ExecutiveKPIGrid({ kpis, currency,
       ))}
     </div>
   );
-});
+};
+
+export const ExecutiveKPIGrid = memo(ExecutiveKPIGridView);
 
 // ── Custom Recharts Tooltip ───────────────────────────────────────────────────
-const CustomTooltip = memo(function CustomTooltip({ active, payload, label, currency }) {
+const CustomTooltipView = function CustomTooltip({ active, payload, label, currency }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-background/95 backdrop-blur-sm border border-border rounded-xl shadow-xl p-3 text-xs min-w-[120px]">
@@ -221,10 +225,12 @@ const CustomTooltip = memo(function CustomTooltip({ active, payload, label, curr
       ))}
     </div>
   );
-});
+};
+
+const CustomTooltip = memo(CustomTooltipView);
 
 // ── Monthly Spend Area Chart ──────────────────────────────────────────────────
-export const MonthlySpendChart = memo(function MonthlySpendChart({ data, currency, t }) {
+const MonthlySpendChartView = function MonthlySpendChart({ data, currency, t }) {
   if (!data?.length) {
     return (
       <div className="flex items-center justify-center h-40 text-muted-foreground text-xs">
@@ -288,10 +294,12 @@ export const MonthlySpendChart = memo(function MonthlySpendChart({ data, currenc
       </AreaChart>
     </ResponsiveContainer>
   );
-});
+};
+
+export const MonthlySpendChart = memo(MonthlySpendChartView);
 
 // ── Supplier Spend Bar Chart ──────────────────────────────────────────────────
-export const SupplierSpendChart = memo(function SupplierSpendChart({ data, currency, t }) {
+const SupplierSpendChartView = function SupplierSpendChart({ data, currency, t }) {
   if (!data?.length) {
     return (
       <div className="flex items-center justify-center h-40 text-muted-foreground text-xs">
@@ -330,10 +338,12 @@ export const SupplierSpendChart = memo(function SupplierSpendChart({ data, curre
       </BarChart>
     </ResponsiveContainer>
   );
-});
+};
+
+export const SupplierSpendChart = memo(SupplierSpendChartView);
 
 // ── Payment Status Pie Chart ──────────────────────────────────────────────────
-export const PaymentStatusPie = memo(function PaymentStatusPie({ data, t: _t }) {
+const PaymentStatusPieView = function PaymentStatusPie({ data, t: _t }) {
   if (!data?.length) {
     return (
       <div className="flex items-center justify-center h-40 text-muted-foreground text-xs">
@@ -388,10 +398,12 @@ export const PaymentStatusPie = memo(function PaymentStatusPie({ data, t: _t }) 
       </div>
     </div>
   );
-});
+};
+
+export const PaymentStatusPie = memo(PaymentStatusPieView);
 
 // ── Enterprise Section Header ─────────────────────────────────────────────────
-export const SectionHeader = memo(function SectionHeader({ title, subtitle, action, icon: Icon }) {
+const SectionHeaderView = function SectionHeader({ title, subtitle, action, icon: Icon }) {
   return (
     <div className="flex items-start justify-between gap-3 mb-3">
       <div className="flex items-center gap-2.5 min-w-0">
@@ -408,10 +420,12 @@ export const SectionHeader = memo(function SectionHeader({ title, subtitle, acti
       {action && <div className="shrink-0">{action}</div>}
     </div>
   );
-});
+};
+
+export const SectionHeader = memo(SectionHeaderView);
 
 // ── Enterprise Alert Banner ───────────────────────────────────────────────────
-export const EnterpriseBanner = memo(function EnterpriseBanner({
+const EnterpriseBannerView = function EnterpriseBanner({
   type = 'warning', // 'warning' | 'danger' | 'info' | 'success'
   icon: Icon,
   title,
@@ -476,10 +490,12 @@ export const EnterpriseBanner = memo(function EnterpriseBanner({
       {action && <div className="mt-2.5">{action}</div>}
     </div>
   );
-});
+};
+
+export const EnterpriseBanner = memo(EnterpriseBannerView);
 
 // ── Skeleton Loader ───────────────────────────────────────────────────────────
-export const PurchaseSkeleton = memo(function PurchaseSkeleton() {
+const PurchaseSkeletonView = function PurchaseSkeleton() {
   return (
     <div className="space-y-4 animate-pulse">
       {/* KPI grid skeleton */}
@@ -496,4 +512,6 @@ export const PurchaseSkeleton = memo(function PurchaseSkeleton() {
       ))}
     </div>
   );
-});
+};
+
+export const PurchaseSkeleton = memo(PurchaseSkeletonView);

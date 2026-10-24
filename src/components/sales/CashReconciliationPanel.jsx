@@ -77,7 +77,7 @@ const STATUS_OPTIONS = [
   { key: 'shortage', label: 'Short', Icon: TrendingDown },
 ];
 
-const CashReconciliationPanel = memo(function CashReconciliationPanel({
+const CashReconciliationPanelView = function CashReconciliationPanel({
   currency = 'SAR',
   openingCash = null,
   inputId = 'closing-detail-actual-cash',
@@ -332,6 +332,8 @@ const CashReconciliationPanel = memo(function CashReconciliationPanel({
       </div>
     </section>
   );
-});
+};
+
+const CashReconciliationPanel = memo(CashReconciliationPanelView);
 
 export default CashReconciliationPanel;

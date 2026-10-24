@@ -5,7 +5,7 @@ import {fetchReportStockConsumption} from './reportStockConsumption';
  * NEVER silently treat an error or a truncated ledger as zero revenue.
  */
 export async function fetchScheduledERPReportData({
- db,restaurantId,allBranches=true,branchId=null,branchKey=null,range,maxRows=50000,
+ db = undefined,restaurantId = undefined,allBranches=true,branchId=null,branchKey=null,range = undefined,maxRows=50000,
 }={}){
  if(!db || !restaurantId || !range?.from || !range?.to)
    throw new Error('An active restaurant and report date range are required');

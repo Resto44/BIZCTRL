@@ -69,3 +69,14 @@ Baseline: PR #201 / 19bba682d9ffe8f1b4a093335f3487e94da8c7ae.
 - Full existing `npm run typecheck` still fails: diagnostics decreased from 8,478 to 2,086. No project-wide check disable, exclude expansion, `@ts-nocheck`, or blanket `any` was introduced. Remaining diagnostics include source typing, test-library JavaScript, mutation inference, context defaults and browser/Deno configuration mismatch. They are not all proven runtime defects, and none are claimed fixed merely because a build passes.
 - Live Supabase schema was read to verify debt table scope columns; no production financial rows, policies, roles, schema or balances were mutated by this follow-up.
 - Authenticated multi-role browser/RLS integration testing, full general-ledger reconciliation, historical duplicate-invoice reconciliation, fixed-expense effective periods and the remaining typecheck/advisor review are still open. Retiring the legacy customer path resolves its unsafe implementation; it does not deliver a new authenticated customer self-service product.
+
+## Runtime reference and JavaScript contract follow-up
+
+Baseline: PR #202 / 07943463cf8b8abdae85dba79851ccbc87c111b4.
+
+- Fixed seven unresolved runtime identifiers: dashboard API clients, financial source breakdown, inline cash-funding recovery, platform-owner MFA recovery state, sales invoice retrieval, and selected-tenant revenue rendering.
+- Source drilldown aggregates numeric custom-source snapshots, excludes system tenders and explicitly non-revenue entries, preserves posted snapshots against later source configuration changes, and never adds the breakdown back into canonical sales revenue. Regression cases cover absent lookup keys and malformed legacy JSON.
+- Corrected React memo inference by separating named view functions from their memo wrappers; added explicit optional defaults where the existing API already allowed an empty options object. Added monetary-input prop/ref documentation and the missing Chai type dependency. Runtime rendering and memoization remain intact.
+- Aligned tenant context defaults with provider keys and callback arguments; realtime cleanup no longer returns a Promise as a React effect destructor.
+- Validation: 257 suites / 1,502 tests pass; production build, lint and UI type-contract check pass. Added a separate unresolved-runtime-identifier check (`npm run typecheck:runtime`); this does not replace the full typecheck.
+- Full typecheck still fails with 1,327 diagnostics, down from 2,086. No checking was disabled and no exclusions expanded. Remaining typing, authenticated multi-role end-to-end tests, financial-history reconciliation and earlier audit limitations remain open. No production database records, schema, policies or financial balances were changed in this release.

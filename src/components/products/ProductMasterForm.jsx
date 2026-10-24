@@ -48,7 +48,7 @@ function readDraft(restaurantId) {
   }
 }
 
-function SectionCard({ icon: Icon, title, description, children, className }) {
+function SectionCard({ icon: Icon, title, description = undefined, children, className = undefined }) {
   return (
     <section className={cn('rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 dark:border-slate-800 dark:bg-slate-950', className)}>
       <div className="mb-4 flex items-start gap-3">
@@ -63,7 +63,7 @@ function SectionCard({ icon: Icon, title, description, children, className }) {
   );
 }
 
-function Field({ label, required, hint, children, className }) {
+function Field({ label, required = false, hint = undefined, children, className = undefined }) {
   return (
     <div className={className}>
       <Label className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300">{label}{required ? ' *' : ''}</Label>
@@ -73,7 +73,7 @@ function Field({ label, required, hint, children, className }) {
   );
 }
 
-function ToggleRow({ label, description, checked, onCheckedChange, disabled }) {
+function ToggleRow({ label, description = undefined, checked, onCheckedChange, disabled = false }) {
   return (
     <div className="flex min-h-12 items-center justify-between gap-4 border-b border-slate-100 py-2.5 last:border-0 dark:border-slate-800">
       <div className="min-w-0">

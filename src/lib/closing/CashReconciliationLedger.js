@@ -176,7 +176,7 @@ export const cashReconciliationSnapshot = ({
 };
 
 /** New daily Closing state intentionally never copies prior daily inputs. */
-export const dailyClosingDefaults = ({ date, branch, branchId, shift, cashierId, cashierName } = {}) => ({
+export const dailyClosingDefaults = ({ date = undefined, branch = undefined, branchId = undefined, shift = undefined, cashierId = undefined, cashierName = undefined } = {}) => ({
   date: date || '',
   branch: branch || '',
   branch_id: branchId || null,

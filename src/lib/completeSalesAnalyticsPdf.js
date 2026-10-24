@@ -3,8 +3,8 @@ import {drawERPReportBrand} from './erpPdfBrand';
 import {buildFullSalesAnalyticsReport} from './fullSalesAnalyticsReport';
 
 /** Fixed two-page executive coverage of every Sales Analytics section. */
-export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s,previousSnapshot:previous=null,growth=null,
- report:r=null,range,branchLabel,businessName,currency='SAR',lang='en',iconData,fullAnalytics=null}={}){
+export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,previousSnapshot:previous=null,growth=null,
+ report:r=null,range = undefined,branchLabel = undefined,businessName = undefined,currency='SAR',lang='en',iconData = undefined,fullAnalytics=null}={}){
  if(!s||!range?.from||!range?.to)throw new Error('Verified report data and dates required');
  const a=fullAnalytics||buildFullSalesAnalyticsReport({snapshot:s,previousSnapshot:previous,operationsReport:r,range,lang});
  // Map the detail grid into the space below the six executive cards. Keep

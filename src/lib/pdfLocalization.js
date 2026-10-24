@@ -46,9 +46,9 @@ export function drawLocalizedPdfText(doc, value, x, y, {
   rtl = false,
   bold = false,
   size = 9,
-  color,
-  align,
-  maxWidth,
+  color = undefined,
+  align = undefined,
+  maxWidth = undefined,
   fit = false,
 } = {}) {
   const text = String(value ?? '');

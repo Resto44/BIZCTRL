@@ -65,7 +65,7 @@ function DriverMobileCards({ rows, currency }) {
   );
 }
 
-const DriverTrendAnalytics = memo(function DriverTrendAnalytics({
+const DriverTrendAnalyticsView = function DriverTrendAnalytics({
   drivers = [],
   sales = [],
   driverEntries,
@@ -195,6 +195,8 @@ const DriverTrendAnalytics = memo(function DriverTrendAnalytics({
       </div>
     </section>
   );
-});
+};
+
+const DriverTrendAnalytics = memo(DriverTrendAnalyticsView);
 
 export default DriverTrendAnalytics;

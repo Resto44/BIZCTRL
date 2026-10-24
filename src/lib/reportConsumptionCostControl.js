@@ -2,7 +2,7 @@
  * Verified cost ratios and period consumption for the one-page Sales Analytics PDF.
  * Purchases are NOT food COGS; no "food cost %" without recipe/stock valuation.
  */
-export function buildPdfConsumptionCostControl({snapshot,previousSnapshot=null,operationsReport=null}={}){
+export function buildPdfConsumptionCostControl({snapshot = undefined,previousSnapshot=null,operationsReport=null}={}){
   if(!snapshot)throw new Error('A verified sales report snapshot is required');
   const pct=(amount,sales)=>{
     const revenue=Number(sales);

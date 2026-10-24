@@ -171,7 +171,7 @@ function Money({ currency, value, className = '', signed = false }) {
   );
 }
 
-const CompactSalesSourceRow = memo(function CompactSalesSourceRow({
+const CompactSalesSourceRowView = function CompactSalesSourceRow({
   source, sourceLabel, todayInput, today, previous, currency, onChange, historyLoading, historyUnavailable,
 }) {
   const closingTr = useClosingTranslation();
@@ -200,9 +200,11 @@ const CompactSalesSourceRow = memo(function CompactSalesSourceRow({
       <span className="sr-only">{closingTr("Today")}{today}{closingTr("; total")}{previous + today}</span>
     </div>
   );
-});
+};
 
-const ClosingFieldControlRow = memo(function ClosingFieldControlRow({ field, label, value, error, onChange }) {
+const CompactSalesSourceRow = memo(CompactSalesSourceRowView);
+
+const ClosingFieldControlRowView = function ClosingFieldControlRow({ field, label, value, error, onChange }) {
   const closingTr = useClosingTranslation();
   const inputId = `quick-closing-custom_${field.id}`;
   const visibilityClass = field.visible_mobile === false ? 'hidden sm:grid' : field.visible_desktop === false ? 'sm:hidden' : '';
@@ -226,9 +228,11 @@ const ClosingFieldControlRow = memo(function ClosingFieldControlRow({ field, lab
       <CheckCircle2 className={`hidden h-5 w-5 sm:block ${field.field_type === 'checkbox' ? (value ? 'text-emerald-500' : 'text-slate-300') : String(value ?? '').trim() ? 'text-emerald-500' : 'text-slate-300'}`} />
     </div>
   );
-});
+};
 
-const DriverSalesSourceCard = memo(function DriverSalesSourceCard({ source, sourceLabel, entries, drivers, branchLabel, previous, currency, onAdd, onChange, onRemove, isHistoryLoading, isHistoryUnavailable, copy }) {
+const ClosingFieldControlRow = memo(ClosingFieldControlRowView);
+
+const DriverSalesSourceCardView = function DriverSalesSourceCard({ source, sourceLabel, entries, drivers, branchLabel, previous, currency, onAdd, onChange, onRemove, isHistoryLoading, isHistoryUnavailable, copy }) {
   // This accordion deliberately excludes stored driver names from DOM translation.
   // Localize its own UI labels explicitly so the selected SaaS language is honored.
   const { translateLiteral } = useLanguage();
@@ -323,7 +327,9 @@ const DriverSalesSourceCard = memo(function DriverSalesSourceCard({ source, sour
       </div>
     </div>
   );
-});
+};
+
+const DriverSalesSourceCard = memo(DriverSalesSourceCardView);
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1725,7 +1731,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         // Keep all entered amounts and return to the actionable funding step.
         setShowFinalizeReview(false);
         setClosingStep(1);
-        setShowFunding(true);
         setShowBlockers(true);
         await refetchCashLedger();
         requestAnimationFrame(() => document.getElementById('closing-funding')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));

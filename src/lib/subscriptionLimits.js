@@ -21,7 +21,7 @@ export function isSubscriptionLimitReached(error) {
   return /SUBSCRIPTION_LIMIT_REACHED/i.test(value);
 }
 
-export function subscriptionLimitMessage({ resource, used, limit, planName } = {}) {
+export function subscriptionLimitMessage({ resource = undefined, used = undefined, limit = undefined, planName = undefined } = {}) {
   const key = limitKey(resource);
   const label = RESOURCE_LABELS[key] || (key || 'resources');
   const count = Number(used);

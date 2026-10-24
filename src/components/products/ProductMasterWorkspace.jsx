@@ -136,7 +136,7 @@ function EmptyPanel({ icon: Icon = Package, title, description, action }) {
   );
 }
 
-const OverviewPage = memo(function OverviewPage({ snapshot, money, onAdd, onImport, onBarcode, onNavigate, onChangePage, canImportProductSpreadsheet }) {
+const OverviewPageView = function OverviewPage({ snapshot, money, onAdd, onImport, onBarcode, onNavigate, onChangePage, canImportProductSpreadsheet }) {
   const tracked = Math.max(1, snapshot.trackedProducts || 0);
   const health = Math.round((snapshot.healthy / tracked) * 100);
   const lowPercent = Math.round((snapshot.lowStock / tracked) * 100);
@@ -262,9 +262,11 @@ const OverviewPage = memo(function OverviewPage({ snapshot, money, onAdd, onImpo
       </section>
     </div>
   );
-});
+};
 
-const InventoryPage = memo(function InventoryPage({ snapshot, transactions, branches, selectedLocation, money, onAdjust, onNavigate }) {
+const OverviewPage = memo(OverviewPageView);
+
+const InventoryPageView = function InventoryPage({ snapshot, transactions, branches, selectedLocation, money, onAdjust, onNavigate }) {
   const selectedBranch = branches.find((branch) => String(branch.id || branch.key) === String(selectedLocation));
   const selectedBranchValues = selectedBranch
     ? [selectedBranch.id, selectedBranch.key, selectedBranch.branch_key, selectedBranch.name, selectedBranch.label]
@@ -400,9 +402,11 @@ const InventoryPage = memo(function InventoryPage({ snapshot, transactions, bran
       </button>
     </div>
   );
-});
+};
 
-const PricingPage = memo(function PricingPage({ snapshot, suppliers, transactions, rules, setRules, saveRules, savingRules, money, onReview, onNavigate }) {
+const InventoryPage = memo(InventoryPageView);
+
+const PricingPageView = function PricingPage({ snapshot, suppliers, transactions, rules, setRules, saveRules, savingRules, money, onReview, onNavigate }) {
   const [subTab, setSubTab] = useState('rules');
   const supplierContracts = suppliers.filter((supplier) => supplier.contract_end_date || supplier.contract_expiry || supplier.expiry_date);
   const pricingRows = snapshot.productRows.filter((row) => row.price > 0).sort((a, b) => a.margin - b.margin);
@@ -490,7 +494,9 @@ const PricingPage = memo(function PricingPage({ snapshot, suppliers, transaction
       ) : null}
     </div>
   );
-});
+};
+
+const PricingPage = memo(PricingPageView);
 
 export default function ProductMasterWorkspace({
   restaurantId,

@@ -7,7 +7,7 @@ const approved=r=>['approved','auto_approved'].includes(r.approval_status)||(!r.
 const within=(d,range)=>d>=range.from&&d<=range.to;
 /** All inputs inherit authenticated tenant/branch scope. Never infer usage from buying. */
 export function buildFullSalesAnalyticsReport({sales=[],purchases=[],walletTransactions=null,
- snapshot,previousSnapshot=null,operationsReport=null,range,revenueSources=[],lang='en',historyAvailable=false}={}){
+ snapshot = undefined,previousSnapshot=null,operationsReport=null,range = undefined,revenueSources=[],lang='en',historyAvailable=false}={}){
  const confirmed=sales.filter(s=>['finalized','locked'].includes(s.closing_state));
  const daily=new Map(),weekdays=new Map();
  for(const sale of confirmed.filter(s=>within(s.date,range))){

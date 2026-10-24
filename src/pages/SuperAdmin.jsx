@@ -467,7 +467,7 @@ export default function SuperAdmin() {
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2.5">
                   <div className="text-[10px] text-muted-foreground">MRR</div>
-                  <div className="text-xs font-bold text-green-600">${selectedtenant.monthly_revenue || 0}/mo</div>
+                  <div className="text-xs font-bold text-green-600">${selectedTenant.monthly_revenue || 0}/mo</div>
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2.5">
                   <div className="text-[10px] text-muted-foreground">Restaurants</div>

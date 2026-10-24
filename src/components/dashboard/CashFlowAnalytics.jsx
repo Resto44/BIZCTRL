@@ -1,3 +1,4 @@
+import { base44 } from '@/api/base44Client';
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTenant } from '@/lib/TenantContext';

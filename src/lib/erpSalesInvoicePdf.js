@@ -89,7 +89,7 @@ export function renderERPSalesInvoicePDF(doc, invoice, { lang='en', currency='SA
   const fill=rgb=>doc.setFillColor(...rgb);
   const box=(x,y,w,h,rgb,r=2.5)=>{fill(rgb);doc.roundedRect(x,y,w,h,r,r,'F');};
   const line=(x1,y1,x2,y2)=>{doc.setDrawColor(...C.line);doc.setLineWidth(.25);doc.line(x1,y1,x2,y2);};
-  const write=(value,x,y,{size=10,bold=false,color=C.ink,align='left',maxWidth,fit=true}={})=>
+  const write=(value,x,y,{size=10,bold=false,color=C.ink,align='left',maxWidth = undefined,fit=true}={})=>
     drawLocalizedPdfText(doc,asText(value),x,y,{
       rtl:false,size,bold,color,align,maxWidth,fit:Boolean(maxWidth)&&fit,
     });

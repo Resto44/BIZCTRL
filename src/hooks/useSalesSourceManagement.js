@@ -43,7 +43,7 @@ export function sourceDisplayName(source, lang) {
  * from the existing SalesClosingCustomizationProvider. Transaction rows are
  * derived only from finalized daily_sales snapshots through the bounded RPC.
  */
-export function useSalesSourceManagement({ filters, page = 0 } = {}) {
+export function useSalesSourceManagement({ filters = undefined, page = 0 } = {}) {
   const { activeRestaurant } = useTenant();
   const {
     selectedBranchId,
