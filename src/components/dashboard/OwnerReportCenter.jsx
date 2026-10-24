@@ -164,6 +164,16 @@ function ExecutiveReport({ model, copy }) {
   return (
     <div data-testid="report-executive" className="w-full min-w-0 max-w-full overflow-x-hidden space-y-4">
       <ExecutiveSnapshotV2 model={model} copy={copy} />
+      <Panel testId="owner-customer-credit-outstanding">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SectionTitle icon={CreditCard} title={model.lang === 'fa' ? 'طلب مشتریان · نسیه' : model.lang === 'ar' ? 'ذمم العملاء · المبيعات الآجلة' : 'Customer Credit · Receivables'} subtitle={model.lang === 'fa' ? 'مانده ثبت‌شده در دفتر مطالبات، نه پیش‌نویس فروش' : model.lang === 'ar' ? 'الرصيد المرحّل من دفتر الذمم وليس مسودة البيع' : 'Posted debt ledger · pending Closing credit not included'} tone="blue" />
+          <button type="button" onClick={() => navigate('/debt-management')} className="min-h-10 rounded-xl border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700">{model.lang === 'fa' ? 'مدیریت طلب‌ها' : model.lang === 'ar' ? 'إدارة الذمم' : 'Debt Management'}</button>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <MetricCard label={text(copy, 'receivables', 'Receivables')} value={receivables == null ? '—' : formatMoney(receivables, 2)} icon={Landmark} tone="rose" detail={model.receivablesStatus === 'VERIFIED_POSTED_LEDGER' ? (model.lang === 'fa' ? 'بدهی باز تأییدشده' : model.lang === 'ar' ? 'الرصيد المستحق المرحّل' : 'Posted outstanding debt') : (model.lang === 'fa' ? 'نیاز به بررسی دفتر' : model.lang === 'ar' ? 'يحتاج مراجعة الدفتر' : 'Ledger requires review')} />
+          <MetricCard label={text(copy, 'credit', 'Credit') + ' · ' + (model.lang === 'fa' ? 'فروش بازه' : model.lang === 'ar' ? 'مبيعات الفترة' : 'Period Sales')} value={formatMoney(periodMetrics.totalCredit, 2)} icon={CreditCard} tone="blue" detail={model.lang === 'fa' ? 'فروش نسیه نهایی‌شده' : model.lang === 'ar' ? 'مبيعات آجلة معتمدة' : 'Finalized credit sales'} />
+        </div>
+      </Panel>
 
       <Panel>
         <SectionTitle icon={Building2} title={text(copy, 'branchCommand', 'Branch command board')} subtitle={text(copy, 'branchCommandHint', "Ranked by today's verified sales")} badge={`${branchRankings.length}`} />
@@ -265,7 +275,7 @@ function FinancialReport({ model, copy }) {
           <div className="mt-4 grid grid-cols-2 gap-2">
             <MetricCard label={text(copy, 'register', 'Cash register')} value={cashRegister == null ? '—' : formatMoney(cashRegister)} icon={Banknote} tone="violet" />
             <MetricCard label={text(copy, 'operatingCash', 'Network sales (not bank cash)')} value={formatMoney(periodMetrics.totalNetwork)} icon={CreditCard} tone="blue" />
-            <MetricCard label={text(copy, 'receivables', 'Receivables')} value={formatMoney(receivables)} icon={Landmark} tone="blue" />
+            <MetricCard label={text(copy, 'receivables', 'Receivables')} value={receivables == null ? '—' : formatMoney(receivables, 2)} icon={Landmark} tone="blue" />
             <MetricCard label={text(copy, 'payables', 'Payables')} value={formatMoney(payables)} icon={ReceiptText} tone="amber" />
           </div>
           <p data-testid="owner-accounting-liquidity-basis" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/25 dark:text-amber-200">{text(copy, 'liquidityNote', 'Drawer is the last physical count; card sales are not available bank funds. The operating result is based on purchases, not inventory COGS.')}</p>
