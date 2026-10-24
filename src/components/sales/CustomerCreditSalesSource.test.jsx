@@ -1,8 +1,12 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import CustomerCreditSalesSource from './CustomerCreditSalesSource';
+
+const language = vi.hoisted(() => ({ lang: 'en' }));
+vi.mock('@/lib/LanguageContext', () => ({ useLanguage: () => language }));
+beforeEach(() => { language.lang = 'en'; });
 
 vi.mock('@/components/ui/button', () => ({ Button: ({ children, ...props }) => React.createElement('button', props, children) }));
 vi.mock('@/components/ui/input', () => ({ Input: React.forwardRef((props, ref) => React.createElement('input', { ...props, ref })) }));
@@ -229,6 +233,42 @@ describe('credit balances and localized amounts', () => {
     expect(tree.root.findByProps({ 'aria-label': 'Credit sale amount' }).props.disabled).toBe(true);
     act(() => tree.root.findAllByType('button').find(node => textOf(node) === ' Debt Payment').props.onClick());
     expect(onUpdate).toHaveBeenCalledWith('1', expect.objectContaining({ transaction_type: 'debt_payment', amount: '50', payment_amount: '' }));
+    tree.unmount();
+  });
+});
+
+
+describe('live closing language selection', () => {
+  it('switches English → Persian → Arabic → English without changing entered money or customer identity', () => {
+    const props = { entry: { id: '1', customer_id: 'c1', amount: '50.25' }, customers: [customer], onUpdate: vi.fn(), onReviewCreditSale: vi.fn() };
+    const tree = renderSource(props);
+    for (const [lang, title, action] of [
+      ['fa', 'اعتبار مشتری', 'بررسی و ذخیره همراه بستن حساب'],
+      ['ar', 'ائتمان العميل', 'مراجعة وحفظ مع الإقفال'],
+      ['en', 'Customer Credit', 'Review & Save with Closing'],
+    ]) {
+      language.lang = lang;
+      act(() => tree.update(React.createElement(CustomerCreditSalesSource, props)));
+      const text = textOf(tree.root.findByType('article'));
+      expect(text).toContain(title);
+      expect(text).toContain(action);
+      expect(text).toContain(customer.name);
+      expect(text).toContain(customer.phone);
+      expect(tree.root.findAllByType('input').find(node => node.props.inputMode === 'decimal').props.value).toBe('50.25');
+      if (lang !== 'en') expect(text).not.toMatch(/Customer Credit|Credit Sale|Debt Payment|After finalizing|Available|Limit/);
+    }
+    expect(props.onUpdate).not.toHaveBeenCalled();
+    tree.unmount();
+  });
+
+  it('uses localized payment method names while preserving their submitted codes', () => {
+    language.lang = 'ar';
+    const onRecordPayment = vi.fn();
+    const tree = renderSource({ onRecordPayment, entry: { id: '1', customer_id: 'c1', transaction_type: 'debt_payment', payment_amount: '25', payment_method: 'cash' }, paymentMethods: [{ code: 'cash', name_en: 'Cash', name_ar: 'نقد الفرع', name_fa: 'نقد شعبه' }] });
+    expect(textOf(tree.root.findByType('article'))).toContain('نقد الفرع');
+    const button = tree.root.findAllByType('button').find(node => textOf(node).includes('تسجيل سداد الدين'));
+    act(() => button.props.onClick());
+    expect(onRecordPayment).toHaveBeenCalledWith(expect.objectContaining({ payment_method: 'cash', payment_amount: '25' }));
     tree.unmount();
   });
 });

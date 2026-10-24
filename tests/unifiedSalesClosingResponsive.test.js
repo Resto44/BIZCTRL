@@ -66,7 +66,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('const [showFullDetails, setShowFullDetails] = useState(false);');
     expect(workspace).not.toContain('Quick Closing');
     expect(workspace).toContain('Advanced Closing Details');
-    expect(workspace).toContain("cashierDisplayName || (empLoading ? 'Loading…' : empError ? 'Unable to load cashier' : 'No cashier')");
+    expect(workspace).toContain("cashierDisplayName || (empLoading ? closingTr('Loading…') : empError ? closingTr('Unable to load cashier') : closingTr('No cashier'))");
   });
 
   it('keeps legacy settlement rollups out of automatic sales while retaining supported query scope safeguards', async () => {

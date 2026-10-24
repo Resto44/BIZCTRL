@@ -1,3 +1,5 @@
+import { useLanguage } from '@/lib/LanguageContext';
+import { useClosingTranslation } from '@/lib/closing/useClosingTranslation';
 import React, { useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle, ArrowDownLeft, Check, CircleCheck, ClipboardCheck, CreditCard,
@@ -94,6 +96,8 @@ export default function CustomerCreditSalesSource({
   disabled = false,
   creditPosted = false,
 }) {
+  const closingTr = useClosingTranslation();
+  const { lang } = useLanguage();
   const searchInputRef = useRef(null);
   const [localSearch, setLocalSearch] = useState(customerSearch || '');
   const [searchOpen, setSearchOpen] = useState(Boolean(customerSearch.trim()));
@@ -118,10 +122,10 @@ export default function CustomerCreditSalesSource({
   const activePaymentMethods = useMemo(() => {
     const configured = paymentMethods
       .filter((method) => method?.is_active !== false)
-      .map((method) => ({ code: method.code || method.id, label: method.name_en || method.name || method.code || method.id }))
+      .map((method) => ({ code: method.code || method.id, label: method[`name_${lang}`] || closingTr(method.name_en || method.name || method.code || method.id) }))
       .filter((method) => method.code);
-    return configured.length ? configured : FALLBACK_PAYMENT_METHODS.map((method) => ({ code: method.code, label: method.name_en }));
-  }, [paymentMethods]);
+    return configured.length ? configured : FALLBACK_PAYMENT_METHODS.map((method) => ({ code: method.code, label: closingTr(method.name_en) }));
+  }, [paymentMethods, lang, closingTr]);
   const selectedPaymentMethod = activePaymentMethods.some((method) => method.code === entry.payment_method)
     ? entry.payment_method
     : activePaymentMethods[0]?.code || 'cash';
@@ -208,12 +212,12 @@ export default function CustomerCreditSalesSource({
     >
       <header className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate text-xl font-black tracking-tight text-slate-950 sm:text-2xl">Customer Credit</h2>
-          <p className="mt-1 truncate text-xs font-medium text-slate-500 sm:text-sm">Sales Sources · Debt Management</p>
+          <h2 className="truncate text-xl font-black tracking-tight text-slate-950 sm:text-2xl">{closingTr("Customer Credit")}</h2>
+          <p className="mt-1 truncate text-xs font-medium text-slate-500 sm:text-sm">{closingTr("Sales Sources · Debt Management")}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {idx > 0 && !disabled && !creditPosted && (
-            <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:bg-red-50 hover:text-red-600" onClick={() => onRemove(entry.id)} aria-label={`Remove customer credit transaction ${idx + 1}`}>
+            <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:bg-red-50 hover:text-red-600" onClick={() => onRemove(entry.id)} aria-label={`${closingTr("Remove customer credit transaction")} ${idx + 1}`}>
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
@@ -223,7 +227,7 @@ export default function CustomerCreditSalesSource({
 
       <div className="mt-6 space-y-5">
         <div className="relative" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false); }}>
-          <Label className="mb-2 block text-xs font-bold text-slate-600 sm:text-sm">Customer</Label>
+          <Label className="mb-2 block text-xs font-bold text-slate-600 sm:text-sm">{closingTr("Customer")}</Label>
           <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
             <Input
@@ -231,7 +235,7 @@ export default function CustomerCreditSalesSource({
               value={localSearch}
               onChange={(event) => updateSearch(event.target.value)}
               onFocus={() => setSearchOpen(true)}
-              placeholder="Search by name, phone, or customer ID"
+              placeholder={closingTr("Search by name, phone, or customer ID")}
               className="h-14 w-full rounded-2xl border-slate-300 pl-12 pr-11 text-base shadow-none focus-visible:ring-blue-500"
               autoComplete="off"
               inputMode="search"
@@ -242,7 +246,7 @@ export default function CustomerCreditSalesSource({
               aria-label={`Search customer for transaction ${idx + 1}`}
             />
             {localSearch && !disabled && (
-              <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={clearSearch} aria-label="Clear customer search"><X className="h-4 w-4" /></button>
+              <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={clearSearch} aria-label={closingTr("Clear customer search")}><X className="h-4 w-4" /></button>
             )}
           </div>
 
@@ -267,9 +271,9 @@ export default function CustomerCreditSalesSource({
                 </button>
               )) : (
                 <div className="px-3 py-5 text-center">
-                  <p className="text-sm font-bold text-slate-800">No customer found</p>
-                  <p className="mt-1 text-xs text-slate-500">Add or activate the customer in Debt Management.</p>
-                  <a href="/debt-management" target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:underline">Open Debt Management <ExternalLink className="h-3.5 w-3.5" /></a>
+                  <p className="text-sm font-bold text-slate-800">{closingTr("No customer found")}</p>
+                  <p className="mt-1 text-xs text-slate-500">{closingTr("Add or activate the customer in Debt Management.")}</p>
+                  <a href="/debt-management" target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:underline">{closingTr("Open Debt Management")}<ExternalLink className="h-3.5 w-3.5" /></a>
                 </div>
               )}
             </div>
@@ -281,74 +285,73 @@ export default function CustomerCreditSalesSource({
             <div className="flex min-h-20 min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-black text-blue-700">{initialsFor(customerName)}</span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-base font-black text-slate-950">{customerName || 'Selected customer'}</div>
+                <div className="truncate text-base font-black text-slate-950">{customerName || closingTr('Selected customer')}</div>
                 <div className="mt-0.5 truncate text-sm text-slate-500" dir="ltr">{customerIdentifier || '—'}</div>
               </div>
-              {!disabled && !creditPosted && <button type="button" className="rounded-full p-2 text-blue-600 hover:bg-blue-50" onClick={clearCustomer} aria-label="Change customer"><Pencil className="h-4 w-4" /></button>}
+              {!disabled && !creditPosted && <button type="button" className="rounded-full p-2 text-blue-600 hover:bg-blue-50" onClick={clearCustomer} aria-label={closingTr("Change customer")}><Pencil className="h-4 w-4" /></button>}
             </div>
 
             <div className="grid grid-cols-3 gap-2" aria-live="polite">
-              <Metric label="Debt" value={outstanding} currency={currency} tone="debt" icon={TrendingDown} />
-              <Metric label="Limit" value={creditLimit} currency={currency} tone="limit" icon={CreditCard} />
-              <Metric label="Available" value={available} currency={currency} tone="available" icon={CircleCheck} />
+              <Metric label={closingTr("Debt")} value={outstanding} currency={currency} tone="debt" icon={TrendingDown} />
+              <Metric label={closingTr("Limit")} value={creditLimit} currency={currency} tone="limit" icon={CreditCard} />
+              <Metric label={closingTr("Available")} value={available} currency={currency} tone="available" icon={CircleCheck} />
             </div>
 
             <div className="grid grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
-              <TransactionTypeButton active={!isPayment} disabled={disabled || isRecordingPayment} icon={ShoppingCart} label="Credit Sale" onClick={() => changeTransactionType(TRANSACTION_TYPES.CREDIT_SALE)} />
-              <TransactionTypeButton active={isPayment} disabled={disabled || isRecordingPayment || outstanding <= 0} icon={CreditCard} label="Debt Payment" tone="payment" onClick={() => changeTransactionType(TRANSACTION_TYPES.DEBT_PAYMENT)} />
+              <TransactionTypeButton active={!isPayment} disabled={disabled || isRecordingPayment} icon={ShoppingCart} label={closingTr("Credit Sale")} onClick={() => changeTransactionType(TRANSACTION_TYPES.CREDIT_SALE)} />
+              <TransactionTypeButton active={isPayment} disabled={disabled || isRecordingPayment || outstanding <= 0} icon={CreditCard} label={closingTr("Debt Payment")} tone="payment" onClick={() => changeTransactionType(TRANSACTION_TYPES.DEBT_PAYMENT)} />
             </div>
 
             <div>
-              <Label className="mb-2 block text-xs font-bold text-slate-600 sm:text-sm">{isPayment ? 'Payment Amount' : 'Credit Sale Amount'}</Label>
+              <Label className="mb-2 block text-xs font-bold text-slate-600 sm:text-sm">{isPayment ? closingTr('Payment Amount') : closingTr('Credit Sale Amount')}</Label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500" dir="ltr">{currency}</span>
-                <Input value={isPayment ? entry.payment_amount ?? '' : entry.amount ?? ''} onChange={(event) => updateAmount(event.target.value)} className="h-16 w-full rounded-2xl border-slate-400 pl-16 text-2xl font-medium tabular-nums shadow-none focus-visible:ring-blue-500" inputMode="decimal" type="text" placeholder="0.00" disabled={disabled || isRecordingPayment || (!isPayment && creditPosted)} aria-invalid={invalidAmount} dir="ltr" aria-label={isPayment ? 'Debt payment amount' : 'Credit sale amount'} />
+                <Input value={isPayment ? entry.payment_amount ?? '' : entry.amount ?? ''} onChange={(event) => updateAmount(event.target.value)} className="h-16 w-full rounded-2xl border-slate-400 pl-16 text-2xl font-medium tabular-nums shadow-none focus-visible:ring-blue-500" inputMode="decimal" type="text" placeholder={closingTr("0.00")} disabled={disabled || isRecordingPayment || (!isPayment && creditPosted)} aria-invalid={invalidAmount} dir="ltr" aria-label={isPayment ? closingTr('Debt payment amount') : closingTr('Credit sale amount')} />
               </div>
               <div className="mt-3 flex items-start gap-2.5 rounded-2xl bg-blue-50 px-3.5 py-3 text-blue-900">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-                <p className="text-[11px] leading-5 sm:text-xs">{isPayment ? 'This payment is recorded immediately in Debt Management. It never creates sales revenue.' : 'This amount is recorded as a receivable when the Sales Closing is finalized. It does not add cash.'}</p>
+                <p className="text-[11px] leading-5 sm:text-xs">{isPayment ? closingTr('This payment is recorded immediately in Debt Management. It never creates sales revenue.') : closingTr('This amount is recorded as a receivable when the Sales Closing is finalized. It does not add cash.')}</p>
               </div>
-              {invalidAmount && <p role="alert" className="mt-2 text-xs text-red-700">Enter a positive amount with at most two decimal places.</p>}
+              {invalidAmount && <p role="alert" className="mt-2 text-xs text-red-700">{closingTr("Enter a positive amount with at most two decimal places.")}</p>}
               {!invalidAmount && transactionAmount > 0 && !saleExceedsLimit && !paymentExceedsDebt && (isPayment || !creditPosted) && (
                 <div className="mt-3 rounded-xl border border-blue-100 p-3 text-xs" aria-live="polite" data-testid="credit-balance-preview">
-                  <p className="font-bold">{isPayment ? 'After recording payment (preview)' : 'After finalizing closing (preview)'}</p>
-                  <p className="mt-1">Debt: <bdi dir="ltr">{money(currency, projectedDebt)}</bdi></p>
-                  <p>Available: <bdi dir="ltr">{money(currency, Math.max(0, creditLimit - projectedDebt))}</bdi></p>
+                  <p className="font-bold">{isPayment ? closingTr('After recording payment (preview)') : closingTr('After finalizing closing (preview)')}</p>
+                  <p className="mt-1">{closingTr("Debt:")}<bdi dir="ltr">{money(currency, projectedDebt)}</bdi></p>
+                  <p>{closingTr("Available:")}<bdi dir="ltr">{money(currency, Math.max(0, creditLimit - projectedDebt))}</bdi></p>
                 </div>
               )}
-              {!isPayment && creditPosted && <p className="mt-2 text-xs text-slate-600">This finalized credit sale is already posted. It will not add debt again.</p>}
+              {!isPayment && creditPosted && <p className="mt-2 text-xs text-slate-600">{closingTr("This finalized credit sale is already posted. It will not add debt again.")}</p>}
               {(saleExceedsLimit || paymentExceedsDebt) && (
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700" role="alert"><AlertTriangle className="h-4 w-4 shrink-0" />{saleExceedsLimit ? 'Amount exceeds available credit.' : 'Payment cannot exceed outstanding debt.'}</div>
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700" role="alert"><AlertTriangle className="h-4 w-4 shrink-0" />{saleExceedsLimit ? closingTr('Amount exceeds available credit.') : closingTr('Payment cannot exceed outstanding debt.')}</div>
               )}
             </div>
 
             {isPayment ? (
               <div className="space-y-3">
                 <div>
-                  <Label className="mb-2 block text-xs font-bold text-slate-600 sm:text-sm">Payment Method</Label>
+                  <Label className="mb-2 block text-xs font-bold text-slate-600 sm:text-sm">{closingTr("Payment Method")}</Label>
                   <Select value={selectedPaymentMethod} onValueChange={(value) => onUpdate(entry.id, 'payment_method', value)} disabled={disabled || isRecordingPayment}>
                     <SelectTrigger className="h-12 w-full rounded-xl text-base"><SelectValue /></SelectTrigger>
                     <SelectContent>{activePaymentMethods.map((method) => <SelectItem key={method.code} value={method.code}>{method.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <Button type="button" className="h-14 w-full rounded-2xl bg-emerald-600 text-base font-black hover:bg-emerald-700" onClick={() => onRecordPayment?.({ ...entry, payment_method: selectedPaymentMethod })} disabled={disabled || isRecordingPayment || invalidAmount || transactionAmount <= 0 || paymentExceedsDebt} aria-busy={isRecordingPayment}>
-                  {isRecordingPayment ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ArrowDownLeft className="mr-2 h-5 w-5" />}{isRecordingPayment ? 'Recording…' : 'Record Debt Payment'}
+                  {isRecordingPayment ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ArrowDownLeft className="mr-2 h-5 w-5" />}{isRecordingPayment ? closingTr('Recording…') : closingTr('Record Debt Payment')}
                 </Button>
               </div>
             ) : (
               <div className="space-y-2">
                 <Button type="button" className="min-h-14 w-full rounded-2xl bg-blue-600 text-sm font-black hover:bg-blue-700" disabled={disabled || isRecordingPayment || invalidAmount || transactionAmount <= 0 || saleExceedsLimit || !onReviewCreditSale} onClick={() => onReviewCreditSale(entry)}>
-                  <ClipboardCheck className="h-5 w-5" />Review & Save with Closing
-                </Button>
-                <p className="text-center text-xs text-slate-600" aria-live="polite">Credit Sale Saves with Sales Closing. Finalize Closing to record the debt.</p>
+                  <ClipboardCheck className="h-5 w-5" />{closingTr("Review & Save with Closing")}</Button>
+                <p className="text-center text-xs text-slate-600" aria-live="polite">{closingTr("Credit Sale Saves with Sales Closing. Finalize Closing to record the debt.")}</p>
               </div>
             )}
           </>
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
             <UserCheck className="mx-auto h-6 w-6 text-slate-400" />
-            <p className="mt-2 text-sm font-bold text-slate-800">Select a Debt Management customer</p>
-            <p className="mt-1 text-xs text-slate-500">Debt, limit and available credit appear after selection.</p>
+            <p className="mt-2 text-sm font-bold text-slate-800">{closingTr("Select a Debt Management customer")}</p>
+            <p className="mt-1 text-xs text-slate-500">{closingTr("Debt, limit and available credit appear after selection.")}</p>
           </div>
         )}
       </div>

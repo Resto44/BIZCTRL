@@ -1,3 +1,4 @@
+import { useClosingTranslation } from '@/lib/closing/useClosingTranslation';
 import { closingExpenseContext } from '@/lib/dailySalesPresentation';
 import { loadClosingCashContext } from '@/lib/closing/ClosingCashContext';
 import { creditEntrySourceId, customerCreditSnapshots, validCreditAmount } from '@/lib/customerCreditSources';
@@ -173,6 +174,7 @@ function Money({ currency, value, className = '', signed = false }) {
 const CompactSalesSourceRow = memo(function CompactSalesSourceRow({
   source, sourceLabel, todayInput, today, previous, currency, onChange, historyLoading, historyUnavailable,
 }) {
+  const closingTr = useClosingTranslation();
   const SourceIcon = salesSourceIconFor(source.icon);
   const tone = salesSourceToneFor(source.color);
   return (
@@ -184,7 +186,7 @@ const CompactSalesSourceRow = memo(function CompactSalesSourceRow({
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-500">
             <span>{String(source.default_payment_method || 'cash').replaceAll('_', ' ')}</span>
             <span aria-hidden="true">•</span>
-            <span>{historyLoading ? 'Loading history…' : historyUnavailable ? 'History unavailable' : <>Previous <Money currency={currency} value={previous} className="font-semibold" /></>}</span>
+            <span>{historyLoading ? closingTr('Loading history…') : historyUnavailable ? closingTr('History unavailable') : <>{closingTr("Previous")}<Money currency={currency} value={previous} className="font-semibold" /></>}</span>
           </div>
         </div>
       </div>
@@ -195,12 +197,13 @@ const CompactSalesSourceRow = memo(function CompactSalesSourceRow({
         prefix={currency}
         inputClassName="h-11 border-blue-200 font-bold"
       />
-      <span className="sr-only">Today {today}; total {previous + today}</span>
+      <span className="sr-only">{closingTr("Today")}{today}{closingTr("; total")}{previous + today}</span>
     </div>
   );
 });
 
 const ClosingFieldControlRow = memo(function ClosingFieldControlRow({ field, label, value, error, onChange }) {
+  const closingTr = useClosingTranslation();
   const inputId = `quick-closing-custom_${field.id}`;
   const visibilityClass = field.visible_mobile === false ? 'hidden sm:grid' : field.visible_desktop === false ? 'sm:hidden' : '';
   const commonLabel = <span className="min-w-0 truncate text-sm font-bold text-slate-800">{label}{field.is_required && <span className="ml-1 text-destructive">*</span>}</span>;
@@ -210,7 +213,7 @@ const ClosingFieldControlRow = memo(function ClosingFieldControlRow({ field, lab
   } else if (field.field_type === 'dropdown') {
     control = <Select value={value} onValueChange={onChange}><SelectTrigger id={inputId} className="min-h-11 sm:max-w-64"><SelectValue placeholder={label} /></SelectTrigger><SelectContent>{field.options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>;
   } else if (field.field_type === 'checkbox') {
-    control = <label className="inline-flex min-h-11 items-center justify-end gap-2 text-sm font-semibold text-emerald-700"><input id={inputId} type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 accent-emerald-600" />{value ? 'Completed' : 'Pending'}</label>;
+    control = <label className="inline-flex min-h-11 items-center justify-end gap-2 text-sm font-semibold text-emerald-700"><input id={inputId} type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 accent-emerald-600" />{value ? closingTr('Completed') : closingTr('Pending')}</label>;
   } else if (field.field_type === 'currency' || field.field_type === 'number') {
     control = <ClosingNumericInput id={inputId} value={value} onChange={onChange} required={field.is_required} inputClassName="h-11 font-bold sm:max-w-56" />;
   } else {
@@ -219,7 +222,7 @@ const ClosingFieldControlRow = memo(function ClosingFieldControlRow({ field, lab
   return (
     <div id={`closing-control-field-${field.id}`} className={`grid min-w-0 gap-2 rounded-xl border border-slate-200 bg-background p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(11rem,0.75fr)_auto] sm:items-center ${visibilityClass}`}>
       <div className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><FileText className="h-4 w-4" /></span><div className="min-w-0">{commonLabel}{field.help_text && <p className="mt-0.5 truncate text-[10px] text-slate-500">{field.help_text}</p>}</div></div>
-      <div className="min-w-0">{control}{error && <p className="mt-1 text-[10px] font-medium text-destructive">{error}</p>}</div>
+      <div className="min-w-0">{control}{error && <p className="mt-1 text-[10px] font-medium text-destructive">{closingTr(error)}</p>}</div>
       <CheckCircle2 className={`hidden h-5 w-5 sm:block ${field.field_type === 'checkbox' ? (value ? 'text-emerald-500' : 'text-slate-300') : String(value ?? '').trim() ? 'text-emerald-500' : 'text-slate-300'}`} />
     </div>
   );
@@ -325,6 +328,7 @@ const DriverSalesSourceCard = memo(function DriverSalesSourceCard({ source, sour
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing, onSessionContextChange, onRecordOwnerPayment, isOpeningNewClosing = false }) {
+  const closingTr = useClosingTranslation();
   const { currency, lang, t } = useLanguage();
   const { user } = useAuth();
   const { role } = useRole();
@@ -468,7 +472,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const selectClosingBranch = useCallback((nextBranchKey) => {
     const nextBranch = branches.find((branch) => branch.key === nextBranchKey || branch.branch_key === nextBranchKey);
     if (!nextBranch?.id) {
-      toast.error('The selected branch is unavailable. Reload the authorized branch list and try again.');
+      toast.error(closingTr('The selected branch is unavailable. Reload the authorized branch list and try again.'));
       return;
     }
     // Clear the current component’s branch-dependent output synchronously. The
@@ -904,11 +908,11 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       device_name: account?.account_name || account?.network_name || '', provider: account?.network_provider || '' } : row));
   };
   const networkSelector = (entry) => <label className="block min-w-0 space-y-1 text-xs font-semibold">
-    <span>{lang === 'fa' ? 'حساب شبکه' : lang === 'ar' ? 'حساب الشبكة' : 'Network account'}</span>
-    <select aria-label="Network account" className="min-h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm" value={entry.network_account_id || entry.device_id || ''}
+    <span>{lang === 'fa' ? 'حساب شبکه' : lang === 'ar' ? 'حساب الشبكة' : closingTr('Network account')}</span>
+    <select aria-label={closingTr("Network account")} className="min-h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm" value={entry.network_account_id || entry.device_id || ''}
       disabled={isSubmitting || posLoading || posUnavailable} onChange={event => chooseNetwork(entry.id, event.target.value)}>
-      <option value="">{lang === 'fa' ? 'انتخاب از مدیریت شبکه' : lang === 'ar' ? 'اختر من إدارة الشبكات' : 'Choose from Network Management'}</option>
-      {(entry.network_account_id || entry.device_id) && !posDevices.some(a => a.id === (entry.network_account_id || entry.device_id)) && <option value={entry.network_account_id || entry.device_id} disabled>{entry.device_name || 'Unavailable account'}</option>}
+      <option value="">{lang === 'fa' ? 'انتخاب از مدیریت شبکه' : lang === 'ar' ? 'اختر من إدارة الشبكات' : closingTr('Choose from Network Management')}</option>
+      {(entry.network_account_id || entry.device_id) && !posDevices.some(a => a.id === (entry.network_account_id || entry.device_id)) && <option value={entry.network_account_id || entry.device_id} disabled>{entry.device_name || closingTr('Unavailable account')}</option>}
       {posDevices.map(account => <option key={account.id} value={account.id}>{account.account_name || account.network_name} {account.network_provider || ''}</option>)}
     </select>
   </label>;
@@ -1251,7 +1255,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       setOpeningVerificationAmount('');
       setOpeningVerificationReason('');
       await refetchCashLedger();
-      toast.success('Opening drawer count verified and recorded in the audit log.');
+      toast.success(closingTr('Opening drawer count verified and recorded in the audit log.'));
     } catch (error) {
       setOpeningVerificationError(error?.message || 'Could not verify opening cash. Check the prior closing or retry.');
     } finally {
@@ -1380,7 +1384,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       key: 'purchases',
       label: 'Purchases Recorded',
       passed: true,
-      message: approvedPurchasesForDate.length > 0 ? `${approvedPurchasesForDate.length} approved` : 'No approved purchases — optional',
+      message: approvedPurchasesForDate.length > 0 ? closingTr("{count} approved", { count: approvedPurchasesForDate.length }) : 'No approved purchases — optional',
     },
     {
       key: 'pos',
@@ -1395,7 +1399,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         const amount = Number(entry.amount);
         return (!entry.amount || validCreditAmount(entry.amount)) && Number.isFinite(amount) && amount >= 0 && (amount === 0 || Boolean(entry.customer_id));
       }),
-      message: `${currency}\u00A0${manualCreditTotal.toLocaleString()} credit sales`,
+      message: `${currency}\u00A0${manualCreditTotal.toLocaleString()} ${closingTr("Credit Sales")}`,
     },
     {
       key: 'cashSources',
@@ -1427,7 +1431,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       passed: !!form.date && !!form.branch && customClosingFields.every((field) => !field.is_required || hasCustomClosingFieldValue(field)),
       message: form.date || 'Date required',
     },
-  ], [expenseContextReady, expenseContextMessage, form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, posDevices, posLoading, posUnavailable, lang, creditPosted, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, cashSalesSourcesMatched, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
+  ], [expenseContextReady, expenseContextMessage, form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, posDevices, posLoading, posUnavailable, lang, closingTr, creditPosted, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, cashSalesSourcesMatched, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   const networkCounterTotal = baseNetworkTotal;
@@ -1529,7 +1533,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     setInlineErrors({});
     setRuntimeError(null);
     if (!approvedPurchasesForDate.length) {
-      toast.warning('No approved purchases found for this date. Proceeding without purchase data.');
+      toast.warning(closingTr('No approved purchases found for this date. Proceeding without purchase data.'));
     }
 
     const selectedBranch = branches.find((branch) =>
@@ -1555,21 +1559,21 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
     if (!activeRestaurant?.id || !branchId || !createdBy) {
       console.log('[UnifiedSalesClosing] FAILED: Missing core IDs');
-      toast.error('An active business, branch, and authenticated user are required to close sales.');
+      toast.error(closingTr('An active business, branch, and authenticated user are required to close sales.'));
       return;
     }
 
     // A network/POS terminal is optional for a manual Closing. Its device
     // inventory must not block a branch's cash or credit-free shift close.
     if (isManager && manualCreditTotal > 0 && custLoading) {
-      toast.error('Customer credit accounts are still loading.');
+      toast.error(closingTr('Customer credit accounts are still loading.'));
       return;
     }
 
     // Cashier is always required for all roles
     if (!cashierId) {
       console.log('[UnifiedSalesClosing] FAILED: No cashier ID');
-      toast.error('A cashier must be assigned to close sales.');
+      toast.error(closingTr('A cashier must be assigned to close sales.'));
       return;
     }
 
@@ -1726,7 +1730,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         await refetchCashLedger();
         requestAnimationFrame(() => document.getElementById('closing-funding')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
       }
-      toast.error(userMessage);
+      toast.error(closingTr(userMessage));
     } finally {
       submissionInFlight.current = false;
       setIsSubmitting(false);
@@ -1737,7 +1741,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (debtPaymentInFlight.current) return;
     const amount = Number(entry?.payment_amount);
     if (!entry?.customer_id || !validCreditAmount(entry?.payment_amount) || !Number.isFinite(amount) || amount <= 0 || !activeRestaurant?.id || !selectedBranchId || !form.branch) {
-      toast.error('Select an active branch customer and enter a valid debt payment amount.');
+      toast.error(closingTr('Select an active branch customer and enter a valid debt payment amount.'));
       return;
     }
     const payload = {
@@ -1754,14 +1758,14 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     try {
       await recordCustomerReceivablePayment({ ...payload, requestId: debtPaymentRequests.current.get(key) });
     } catch (error) {
-      toast.error(customerDebtPaymentErrorMessage(error));
+      toast.error(closingTr(customerDebtPaymentErrorMessage(error)));
       debtPaymentInFlight.current = false;
       setIsRecordingCustomerDebtPayment(false);
       return;
     }
     debtPaymentRequests.current.delete(key);
     updateCustomerCreditSale(entry.id, { payment_amount: '' });
-    toast.success('Customer debt payment recorded in Debts & Receivables. Sales revenue was not changed.');
+    toast.success(closingTr('Customer debt payment recorded in Debts & Receivables. Sales revenue was not changed.'));
     try {
       invalidateCustomerReceivableQueries(queryClient);
       // Use the branch-scoped canonical position, not the restaurant-wide
@@ -1779,7 +1783,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       debtPaymentInFlight.current = false;
       setIsRecordingCustomerDebtPayment(false);
     }
-  }, [activeRestaurant?.id, form.branch, form.date, queryClient, refetchCashLedger, refetchCustomers, selectedBranchId, updateCustomerCreditSale]);
+  }, [activeRestaurant?.id, form.branch, form.date, queryClient, refetchCashLedger, refetchCustomers, selectedBranchId, updateCustomerCreditSale, closingTr]);
 
   const recordOwnerPayment = async () => {
     const closingId = savedClosing?.id || initial?.id;
@@ -1788,9 +1792,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     try {
       await onRecordOwnerPayment(closingId);
       await refetchCashLedger();
-      toast.success('Owner payment was posted to the ERP cash ledger.');
+      toast.success(closingTr('Owner payment was posted to the ERP cash ledger.'));
     } catch (error) {
-      toast.error(error?.userMessage || error?.message || 'Unable to record the owner payment.');
+      toast.error(closingTr(error?.userMessage || error?.message || 'Unable to record the owner payment.'));
     } finally {
       setIsRecordingOwnerPayment(false);
     }
@@ -1808,10 +1812,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         <div className="mx-auto w-full max-w-4xl space-y-3 px-2 py-2 sm:space-y-4 sm:p-4">
           {runtimeError && (
             <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-red-950">
-              <p className="text-sm font-bold">Save failed</p>
-              <p className="mt-1 text-xs">{runtimeError.userMessage}</p>
+              <p className="text-sm font-bold">{closingTr("Save failed")}</p>
+              <p className="mt-1 text-xs">{closingTr(runtimeError.userMessage)}</p>
               {(import.meta.env.DEV || new URLSearchParams(window.location.search).has('closing_diagnostics')) && (
-                <p className="mt-2 text-[11px] font-medium" data-testid="closing-runtime-error-reference">Error: {runtimeError.code} · Request ID: {runtimeError.request_id || 'unavailable'}</p>
+                <p className="mt-2 text-[11px] font-medium" data-testid="closing-runtime-error-reference">{closingTr("Error:")}{runtimeError.code} {closingTr("· Request ID:")}{runtimeError.request_id || closingTr('unavailable')}</p>
               )}
             </div>
           )}
@@ -1819,12 +1823,12 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             <div role="status" className={`rounded-xl border p-3 ${savedClosing._alreadyExists ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'}`}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-sm font-bold">{savedClosing._alreadyExists ? 'Closing already completed for this branch and shift.' : savedClosing.closing_state === 'draft' ? (lang === 'fa' ? 'پیش‌نویس ذخیره شد؛ هنوز نهایی نشده است.' : lang === 'ar' ? 'تم حفظ المسودة؛ لم يتم الإقفال بعد.' : 'Draft saved. Final reconciliation is still pending.') : 'Daily closing saved successfully.'}</p>
-                  {savedClosing.id && <p className="mt-1 text-xs opacity-80">Closing ID: {savedClosing.id}</p>}
+                  <p className="text-sm font-bold">{savedClosing._alreadyExists ? closingTr('Closing already completed for this branch and shift.') : savedClosing.closing_state === 'draft' ? (lang === 'fa' ? 'پیش‌نویس ذخیره شد؛ هنوز نهایی نشده است.' : lang === 'ar' ? 'تم حفظ المسودة؛ لم يتم الإقفال بعد.' : closingTr('Draft saved. Final reconciliation is still pending.')) : closingTr('Daily closing saved successfully.')}</p>
+                  {savedClosing.id && <p className="mt-1 text-xs opacity-80">{closingTr("Closing ID:")}{savedClosing.id}</p>}
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex">
-                  <Button type="button" variant="outline" className="min-h-11" onClick={onCancel}>Open Closing</Button>
-                  <Button type="button" className="min-h-11 bg-emerald-600 hover:bg-emerald-700" onClick={() => onNewClosing?.()} disabled={isOpeningNewClosing} aria-busy={isOpeningNewClosing}>{isOpeningNewClosing ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Opening…</> : 'New Closing'}</Button>
+                  <Button type="button" variant="outline" className="min-h-11" onClick={onCancel}>{closingTr("Open Closing")}</Button>
+                  <Button type="button" className="min-h-11 bg-emerald-600 hover:bg-emerald-700" onClick={() => onNewClosing?.()} disabled={isOpeningNewClosing} aria-busy={isOpeningNewClosing}>{isOpeningNewClosing ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />{closingTr("Opening…")}</> : closingTr('New Closing')}</Button>
                 </div>
               </div>
             </div>
@@ -1832,28 +1836,28 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
           <header className="flex items-center justify-between gap-2 px-1 py-1" data-testid="closing-compact-header">
             <div className="min-w-0">
-              <h1 className="text-lg font-black tracking-tight text-slate-950 sm:text-2xl">{lang === 'fa' ? 'بستن فروش روزانه' : lang === 'ar' ? 'إقفال المبيعات' : 'Sales Closing'}</h1>
-              <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500 sm:text-xs" title={`${form.branch} · ${form.shift} · ${form.date}`}>{form.branch || 'Branch'} · {form.shift || 'Shift'} · {form.date}</p>
+              <h1 className="text-lg font-black tracking-tight text-slate-950 sm:text-2xl">{lang === 'fa' ? 'بستن فروش روزانه' : lang === 'ar' ? 'إقفال المبيعات' : closingTr('Sales Closing')}</h1>
+              <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500 sm:text-xs" title={`${form.branch} · ${closingTr(form.shift)} · ${form.date}`}>{form.branch || closingTr('Branch')} · {form.shift || closingTr('Shift')} · {form.date}</p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <Button type="button" variant="outline" size="sm" className="min-h-10 gap-1 rounded-xl px-2 text-xs sm:px-3" onClick={() => setShowFullDetails(true)} aria-label="Advanced Closing Details" data-testid="closing-open-advanced"><ClipboardCheck className="h-4 w-4" />{lang === 'fa' ? 'جزئیات' : lang === 'ar' ? 'التفاصيل' : 'Details'}</Button>
-              <Button type="button" size="icon" variant="ghost" className="h-10 w-10 shrink-0 rounded-xl" onClick={onCancel} disabled={isSubmitting} aria-label="Close Sales Closing"><X className="h-5 w-5" /></Button>
+              <Button type="button" variant="outline" size="sm" className="min-h-10 gap-1 rounded-xl px-2 text-xs sm:px-3" onClick={() => setShowFullDetails(true)} aria-label={closingTr("Advanced Closing Details")} data-testid="closing-open-advanced"><ClipboardCheck className="h-4 w-4" />{lang === 'fa' ? 'جزئیات' : lang === 'ar' ? 'التفاصيل' : closingTr('Details')}</Button>
+              <Button type="button" size="icon" variant="ghost" className="h-10 w-10 shrink-0 rounded-xl" onClick={onCancel} disabled={isSubmitting} aria-label={closingTr("Close Sales Closing")}><X className="h-5 w-5" /></Button>
             </div>
           </header>
 
           <ClosingStepNavigation step={closingStep} onChange={goToClosingStep} disabled={isSubmitting} lang={lang} />
-          <h2 id="closing-step-heading" tabIndex={-1} className="px-1 text-xl font-black text-slate-950 outline-none" data-i18n-skip="true">{closingStep === 1 ? (lang === 'fa' ? 'چقدر پول در صندوق است؟' : lang === 'ar' ? 'كم النقد الموجود في الصندوق؟' : 'How much cash is in the drawer?') : stepCopy.steps[closingStep]}</h2>
+          <h2 id="closing-step-heading" tabIndex={-1} className="px-1 text-xl font-black text-slate-950 outline-none" data-i18n-skip="true">{closingStep === 1 ? (lang === 'fa' ? 'چقدر پول در صندوق است؟' : lang === 'ar' ? 'كم النقد الموجود في الصندوق؟' : closingTr('How much cash is in the drawer?')) : stepCopy.steps[closingStep]}</h2>
           {closingStep === 2 && <ClosingControlOverview lang={lang} currency={currency} totalSales={totalSales} expectedCash={expectedCash} actualCash={actualCount} difference={cashDifference} ledgerOverdrawn={ledgerOverdrawn} showNavigation={false} />}
 
           <div hidden={closingStep !== 2 && (!showBlockers || attentionCount === 0)}>
           <section id="closing-readiness-anchor" data-testid="closing-readiness-summary" className={`flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 ${allValid ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50/75'}`}>
             <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${allValid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}><ShieldCheck className="h-4 w-4" /></span>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-black text-slate-900">{allValid ? (lang === 'fa' ? 'آمادهٔ نهایی‌سازی' : lang === 'ar' ? 'جاهز للإقفال' : 'Ready to finalize') : (lang === 'fa' ? `${attentionCount} مورد نیاز به اصلاح` : lang === 'ar' ? `${attentionCount} بنود تحتاج معالجة` : `${attentionCount} required action${attentionCount === 1 ? '' : 's'}`)}</p>
+              <p className="text-xs font-black text-slate-900">{allValid ? (lang === 'fa' ? 'آمادهٔ نهایی‌سازی' : lang === 'ar' ? 'جاهز للإقفال' : closingTr('Ready to finalize')) : (lang === 'fa' ? `${attentionCount} مورد نیاز به اصلاح` : lang === 'ar' ? `${attentionCount} بنود تحتاج معالجة` : `${attentionCount} required action${attentionCount === 1 ? '' : 's'}`)}</p>
 
             </div>
 
-            {!allValid && <button type="button" className="min-h-9 rounded-lg px-1.5 text-xs font-bold text-amber-800 underline" data-testid="closing-toggle-blockers" aria-expanded={showBlockers} onClick={() => setShowBlockers(x => !x)}>{lang === 'fa' ? 'بررسی' : lang === 'ar' ? 'مراجعة' : 'Review'}</button>}
+            {!allValid && <button type="button" className="min-h-9 rounded-lg px-1.5 text-xs font-bold text-amber-800 underline" data-testid="closing-toggle-blockers" aria-expanded={showBlockers} onClick={() => setShowBlockers(x => !x)}>{lang === 'fa' ? 'بررسی' : lang === 'ar' ? 'مراجعة' : closingTr('Review')}</button>}
           </section>
           {attentionCount > 0 && showBlockers && <section data-testid="closing-blockers" role="status" className="space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 p-2.5">
             {stepFailedValidations.map(validation => <button type="button" key={validation.key} className="flex min-h-10 w-full items-start gap-2 rounded-lg bg-white px-2.5 py-2 text-left text-xs text-amber-900" onClick={() => {
@@ -1862,85 +1866,84 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               else if (validation.key !== 'cashBalance' && !(validation.key === 'erpData' && ledgerOverdrawn)) setShowFullDetails(true);
               const anchor = validation.key === 'cashBalance' ? 'quick-closing-actualCash' : validation.key === 'erpData' && openingReviewRequired ? 'opening-cash-needs-review' : validation.key === 'erpData' && ledgerOverdrawn ? 'closing-funding' : null;
               if (anchor) requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({behavior: 'smooth', block: 'center'}));
-            }}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span className="min-w-0"><strong className="block">{validation.label}</strong><span className="block text-[11px]">{validation.message}</span></span></button>)}
+            }}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span className="min-w-0"><strong className="block">{closingTr(validation.label)}</strong><span className="block text-[11px]">{closingTr(validation.message)}</span></span></button>)}
           </section>}
 
           </div>
           <div hidden={closingStep !== 0} data-testid="closing-step-sales">
-          <section data-testid="closing-sales-entry-mode" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Daily sales">
+          <section data-testid="closing-sales-entry-mode" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label={closingTr("Daily sales")}>
             <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-3 sm:px-5">
-              <div><h2 className="text-sm font-black text-slate-950">{lang === 'fa' ? 'فروش امروز' : lang === 'ar' ? 'مبيعات اليوم' : 'Today sales'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{lang === 'fa' ? 'فقط همین تاریخ و شیفت' : lang === 'ar' ? 'لهذا التاريخ والوردية فقط' : 'This date and shift only'}</p></div>
-              <div className="text-right"><p className="text-[10px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش' : lang === 'ar' ? 'الإجمالي' : 'Total sales'}</p><Money currency={currency} value={totalSales} className="text-xl font-black text-blue-700" /></div>
+              <div><h2 className="text-sm font-black text-slate-950">{lang === 'fa' ? 'فروش امروز' : lang === 'ar' ? 'مبيعات اليوم' : closingTr('Today sales')}</h2><p className="mt-0.5 text-[11px] text-slate-500">{lang === 'fa' ? 'فقط همین تاریخ و شیفت' : lang === 'ar' ? 'لهذا التاريخ والوردية فقط' : closingTr('This date and shift only')}</p></div>
+              <div className="text-right"><p className="text-[10px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش' : lang === 'ar' ? 'الإجمالي' : closingTr('Total sales')}</p><Money currency={currency} value={totalSales} className="text-xl font-black text-blue-700" /></div>
             </div>
             <div className="space-y-3 p-3.5 sm:p-5">
-              <details className="rounded-lg border border-slate-100 p-2"><summary className="min-h-10 cursor-pointer text-xs text-slate-500">{lang === 'fa' ? 'روش ثبت فروش' : lang === 'ar' ? 'طريقة إدخال المبيعات' : 'Sales entry options'}</summary><div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-slate-500">{lang === 'fa' ? 'روش ثبت' : lang === 'ar' ? 'طريقة الإدخال' : 'Entry mode'}</span>
-                <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1" role="group" aria-label="Sales entry mode">
-                  <button type="button" data-testid="sales-entry-manual" aria-pressed={salesEntryMode === 'manual'} className="min-h-9 rounded-md bg-white px-3 text-xs font-black text-blue-700 shadow-sm" onClick={() => setSalesEntryMode('manual')}>{lang === 'fa' ? 'دستی / آفلاین' : lang === 'ar' ? 'يدوي / أوفلاين' : 'Manual / Offline'}</button>
-                  <button type="button" data-testid="sales-entry-automatic" aria-pressed={salesEntryMode === 'automatic'} disabled={!automaticTotalsEnabled || Boolean(initial?.id)} className="min-h-9 rounded-md px-3 text-xs font-bold text-slate-500 disabled:opacity-60" onClick={() => setSalesEntryMode('automatic')}>{lang === 'fa' ? 'POS اتومات' : lang === 'ar' ? 'POS تلقائي' : 'Auto POS'}</button>
+              <details className="rounded-lg border border-slate-100 p-2"><summary className="min-h-10 cursor-pointer text-xs text-slate-500">{lang === 'fa' ? 'روش ثبت فروش' : lang === 'ar' ? 'طريقة إدخال المبيعات' : closingTr('Sales entry options')}</summary><div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-500">{lang === 'fa' ? 'روش ثبت' : lang === 'ar' ? 'طريقة الإدخال' : closingTr('Entry mode')}</span>
+                <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1" role="group" aria-label={closingTr("Sales entry mode")}>
+                  <button type="button" data-testid="sales-entry-manual" aria-pressed={salesEntryMode === 'manual'} className="min-h-9 rounded-md bg-white px-3 text-xs font-black text-blue-700 shadow-sm" onClick={() => setSalesEntryMode('manual')}>{lang === 'fa' ? 'دستی / آفلاین' : lang === 'ar' ? 'يدوي / أوفلاين' : closingTr('Manual / Offline')}</button>
+                  <button type="button" data-testid="sales-entry-automatic" aria-pressed={salesEntryMode === 'automatic'} disabled={!automaticTotalsEnabled || Boolean(initial?.id)} className="min-h-9 rounded-md px-3 text-xs font-bold text-slate-500 disabled:opacity-60" onClick={() => setSalesEntryMode('automatic')}>{lang === 'fa' ? 'POS اتومات' : lang === 'ar' ? 'POS تلقائي' : closingTr('Auto POS')}</button>
                 </div>
               </div>
               </details>
               <div data-testid="offline-sales-audit" className="grid min-w-0 grid-cols-1 gap-2.5 min-[360px]:grid-cols-2">
-                <div className="min-w-0"><Label htmlFor="quick-closing-cashSales" className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'فروش نقدی قبل از پرداخت‌ها' : lang === 'ar' ? 'مبيعات نقدية قبل المدفوعات' : 'Cash sales before payments'}</Label><ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} disabled={useAutomaticSales || isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" /></div>
-                <div className="min-w-0"><Label htmlFor={`quick-closing-network-${posEntries[0]?.id || 'empty'}`} className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : 'Network / Card'}</Label>
+                <div className="min-w-0"><Label htmlFor="quick-closing-cashSales" className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'فروش نقدی قبل از پرداخت‌ها' : lang === 'ar' ? 'مبيعات نقدية قبل المدفوعات' : closingTr('Cash sales before payments')}</Label><ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} disabled={useAutomaticSales || isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" /></div>
+                <div className="min-w-0"><Label htmlFor={`quick-closing-network-${posEntries[0]?.id || 'empty'}`} className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : closingTr('Network / Card')}</Label>
                   {posEntries[0] && networkSelector(posEntries[0])}
                   {posEntries[0] && <ClosingNumericInput id={`quick-closing-network-${posEntries[0].id}`} value={posEntries[0].amount ?? ''} onChange={value => updatePos(posEntries[0].id, 'amount', value)} prefix={currency} disabled={isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" />}
                 </div>
               </div>
-              {posUnavailable && <p role="alert" className="text-sm text-red-700">{lang === 'fa' ? 'حساب‌های شبکه بارگذاری نشد.' : lang === 'ar' ? 'تعذر تحميل حسابات الشبكة.' : 'Network accounts could not load.'}<Button type="button" variant="outline" onClick={() => reloadNetworks()}>↻</Button></p>}
-              {inlineErrors.pos && <p role="alert" className="text-sm text-red-700">{inlineErrors.pos}</p>}
+              {posUnavailable && <p role="alert" className="text-sm text-red-700">{lang === 'fa' ? 'حساب‌های شبکه بارگذاری نشد.' : lang === 'ar' ? 'تعذر تحميل حسابات الشبكة.' : closingTr('Network accounts could not load.')}<Button type="button" variant="outline" onClick={() => reloadNetworks()}>↻</Button></p>}
+              {inlineErrors.pos && <p role="alert" className="text-sm text-red-700">{closingTr(inlineErrors.pos)}</p>}
               {(posEntries.length > 1 || showNetworkDetail) && <div data-testid="closing-extra-network" className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
                 {posEntries.slice(1).map(entry => <div key={entry.id} className="grid min-w-0 grid-cols-[1fr_auto] items-end gap-2">
                   <div className="col-span-2 min-w-0">{networkSelector(entry)}</div>
                   <span className="min-w-0 flex-1"><ClosingNumericInput id={`quick-closing-network-${entry.id}`} value={entry.amount ?? ''} onChange={value => updatePos(entry.id, 'amount', value)} prefix={currency} disabled={isSubmitting} inputClassName="h-11 bg-white" /></span>
-                  <Button type="button" size="icon" variant="ghost" onClick={() => removePos(entry.id)} disabled={isSubmitting} aria-label="Remove network total"><Trash2 className="h-4 w-4" /></Button>
+                  <Button type="button" size="icon" variant="ghost" onClick={() => removePos(entry.id)} disabled={isSubmitting} aria-label={closingTr("Remove network total")}><Trash2 className="h-4 w-4" /></Button>
                 </div>)}
-                <Button type="button" variant="outline" size="sm" className="min-h-10 bg-white" onClick={addPos} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />{lang === 'fa' ? 'ترمینال دیگر' : lang === 'ar' ? 'إضافة جهاز' : 'Add network total'}</Button>
+                <Button type="button" variant="outline" size="sm" className="min-h-10 bg-white" onClick={addPos} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />{lang === 'fa' ? 'ترمینال دیگر' : lang === 'ar' ? 'إضافة جهاز' : closingTr('Add network total')}</Button>
               </div>}
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => {setShowFullDetails(true);}} className="flex min-h-12 min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label="Edit customer credit sales"><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'فروش قرضه' : lang === 'ar' ? 'البيع الآجل' : 'Credit sales'}</span><Money currency={currency} value={creditTotal} className="text-sm font-black text-violet-700" /></button>
-                <button type="button" onClick={() => setShowFullDetails(true)} className="flex min-h-12 min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label="Edit additional sales sources"><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'منابع دیگر' : lang === 'ar' ? 'مصادر أخرى' : 'Other sources'}</span><Money currency={currency} value={Math.max(0, totalSales - cashSales - networkTotal - creditTotal)} className="text-sm font-black text-slate-900" /></button>
+                <button type="button" onClick={() => {setShowFullDetails(true);}} className="flex min-h-12 min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label={closingTr("Edit customer credit sales")}><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'فروش قرضه' : lang === 'ar' ? 'البيع الآجل' : closingTr('Credit sales')}</span><Money currency={currency} value={creditTotal} className="text-sm font-black text-violet-700" /></button>
+                <button type="button" onClick={() => setShowFullDetails(true)} className="flex min-h-12 min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label={closingTr("Edit additional sales sources")}><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'منابع دیگر' : lang === 'ar' ? 'مصادر أخرى' : closingTr('Other sources')}</span><Money currency={currency} value={Math.max(0, totalSales - cashSales - networkTotal - creditTotal)} className="text-sm font-black text-slate-900" /></button>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <span className="text-[11px] text-slate-500">{lang === 'fa' ? 'POS اختیاری؛ فروش تکراری ثبت نکنید' : lang === 'ar' ? 'POS اختياري؛ تجنّب تكرار البيع' : 'POS optional · Do not duplicate posted sales'}</span>
-                <button type="button" className="min-h-9 text-[11px] font-bold text-blue-700 underline" onClick={() => setShowNetworkDetail(v => !v)} aria-expanded={showNetworkDetail} data-testid="closing-add-network-toggle">{showNetworkDetail ? (lang === 'fa' ? 'بستن' : lang === 'ar' ? 'إخفاء' : 'Hide') : (lang === 'fa' ? 'شبکه بیشتر' : lang === 'ar' ? 'شبكة إضافية' : 'More network')}</button>
+                <span className="text-[11px] text-slate-500">{lang === 'fa' ? 'POS اختیاری؛ فروش تکراری ثبت نکنید' : lang === 'ar' ? 'POS اختياري؛ تجنّب تكرار البيع' : closingTr('POS optional · Do not duplicate posted sales')}</span>
+                <button type="button" className="min-h-9 text-[11px] font-bold text-blue-700 underline" onClick={() => setShowNetworkDetail(v => !v)} aria-expanded={showNetworkDetail} data-testid="closing-add-network-toggle">{showNetworkDetail ? (lang === 'fa' ? 'بستن' : lang === 'ar' ? 'إخفاء' : closingTr('Hide')) : (lang === 'fa' ? 'شبکه بیشتر' : lang === 'ar' ? 'شبكة إضافية' : closingTr('More network'))}</button>
               </div>
-              {(manualCashSales > 0 || initial?.sales_notes) && <details className="rounded-lg border border-slate-100 p-2.5"><summary className="cursor-pointer text-[11px] font-bold text-slate-600">{lang === 'fa' ? 'یادداشت فروش (اختیاری)' : lang === 'ar' ? 'ملاحظات البيع (اختياري)' : 'Sale note / reference (optional)'}</summary><Textarea id="offline-sales-reference" value={form.sales_notes || ''} onChange={e => set('sales_notes', e.target.value)} className="mt-2 min-h-14 bg-white" disabled={isSubmitting} /></details>}
+              {(manualCashSales > 0 || initial?.sales_notes) && <details className="rounded-lg border border-slate-100 p-2.5"><summary className="cursor-pointer text-[11px] font-bold text-slate-600">{lang === 'fa' ? 'یادداشت فروش (اختیاری)' : lang === 'ar' ? 'ملاحظات البيع (اختياري)' : closingTr('Sale note / reference (optional)')}</summary><Textarea id="offline-sales-reference" value={form.sales_notes || ''} onChange={e => set('sales_notes', e.target.value)} className="mt-2 min-h-14 bg-white" disabled={isSubmitting} /></details>}
             </div>
           </section>
 
           </div>
           <div hidden={closingStep !== 1} data-testid="closing-step-cash" className="space-y-3">
           {openingReviewRequired && showOpeningVerification && <div id="opening-cash-needs-review" role="alert" data-testid="opening-cash-needs-review" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-            <p className="font-black">Opening Cash needs reconciliation</p>
+            <p className="font-black">{closingTr("Opening Cash needs reconciliation")}</p>
             <p className="mt-1 text-xs leading-6">{openingReviewReason}</p>
-            <p className="mt-1 text-xs">Previous shift: {cashLedgerContext.opening_shift || 'Initial'} · {cashLedgerContext.opening_shift_date || '—'} · Records: {cashLedgerContext.opening_prior_count ?? '—'}</p>
+            <p className="mt-1 text-xs">{closingTr("Previous shift:")}{cashLedgerContext.opening_shift || closingTr('Initial')} · {cashLedgerContext.opening_shift_date || '—'} {closingTr("· Records:")}{cashLedgerContext.opening_prior_count ?? '—'}</p>
             {role === 'owner' ? (
               <div data-testid="owner-verify-opening-cash" className="mt-3 space-y-3 rounded-xl border border-amber-200 bg-white p-3">
-                <p className="text-xs font-black">Owner verification · counted opening drawer, not today's sales</p>
+                <p className="text-xs font-black">{closingTr("Owner verification · counted opening drawer, not today's sales")}</p>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="block text-xs font-bold" htmlFor="opening-verification-count">Opening Cash ({currency}) <span className="text-red-600">*</span>
-                    <Input id="opening-verification-count" inputMode="decimal" value={openingVerificationAmount} onChange={event => setOpeningVerificationAmount(event.target.value)} placeholder="0.00" className="mt-1 min-h-11" disabled={openingVerificationBusy} />
+                  <label className="block text-xs font-bold" htmlFor="opening-verification-count">{closingTr("Opening Cash (")}{currency}) <span className="text-red-600">*</span>
+                    <Input id="opening-verification-count" inputMode="decimal" value={openingVerificationAmount} onChange={event => setOpeningVerificationAmount(event.target.value)} placeholder={closingTr("0.00")} className="mt-1 min-h-11" disabled={openingVerificationBusy} />
                   </label>
-                  <label className="block text-xs font-bold" htmlFor="opening-verification-reason">Reason / counted by <span className="text-red-600">*</span>
-                    <Input id="opening-verification-reason" value={openingVerificationReason} onChange={event => setOpeningVerificationReason(event.target.value)} placeholder="Physical starting drawer count verified by owner" className="mt-1 min-h-11" disabled={openingVerificationBusy} />
+                  <label className="block text-xs font-bold" htmlFor="opening-verification-reason">{closingTr("Reason / counted by")}<span className="text-red-600">*</span>
+                    <Input id="opening-verification-reason" value={openingVerificationReason} onChange={event => setOpeningVerificationReason(event.target.value)} placeholder={closingTr("Physical starting drawer count verified by owner")} className="mt-1 min-h-11" disabled={openingVerificationBusy} />
                   </label>
                 </div>
-                <p className="text-[11px] font-semibold leading-5 text-amber-900">Enter the cash verified at the START of this shift from a signed handover or reliable source record, not the cash currently in the drawer (Actual Cash). If the starting amount cannot be substantiated, do not approve it.</p>
-                <p className="text-[11px]">This creates an immutable owner-approved opening record. It does not overwrite earlier closings or add sales revenue.</p>
-                {openingVerificationError && <p role="alert" className="text-xs font-bold text-red-700">{openingVerificationError}</p>}
+                <p className="text-[11px] font-semibold leading-5 text-amber-900">{closingTr("Enter the cash verified at the START of this shift from a signed handover or reliable source record, not the cash currently in the drawer (Actual Cash). If the starting amount cannot be substantiated, do not approve it.")}</p>
+                <p className="text-[11px]">{closingTr("This creates an immutable owner-approved opening record. It does not overwrite earlier closings or add sales revenue.")}</p>
+                {openingVerificationError && <p role="alert" className="text-xs font-bold text-red-700">{closingTr(openingVerificationError)}</p>}
                 <Button type="button" size="sm" data-testid="verify-opening-cash-button" disabled={openingVerificationBusy || !openingVerificationAmount.trim() || openingVerificationReason.trim().length < 10} onClick={verifyOpeningCash}>
-                  {openingVerificationBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-1.5 h-4 w-4" />}Verify Opening Cash
-                </Button>
+                  {openingVerificationBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-1.5 h-4 w-4" />}{closingTr("Verify Opening Cash")}</Button>
               </div>
-            ) : <p className="mt-2 text-xs font-bold">Ask the business Owner to verify the drawer opening before the shift can be finalized.</p>}
-            <Button type="button" size="sm" variant="outline" className="mt-2 min-h-10" onClick={() => refetchCashLedger()}><RefreshCw className="mr-1.5 h-4 w-4" />Recheck ledger</Button>
+            ) : <p className="mt-2 text-xs font-bold">{closingTr("Ask the business Owner to verify the drawer opening before the shift can be finalized.")}</p>}
+            <Button type="button" size="sm" variant="outline" className="mt-2 min-h-10" onClick={() => refetchCashLedger()}><RefreshCw className="mr-1.5 h-4 w-4" />{closingTr("Recheck ledger")}</Button>
           </div>}
-          {automaticClosingUnavailable && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"><p className="font-black">ERP sales data needs attention</p><p className="mt-1 text-xs">Check the branch and date, then retry before finalizing.</p><Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-300 bg-white" onClick={() => refetchAutomaticClosing()}><RefreshCw className="mr-1.5 h-4 w-4" />Retry ERP data</Button></div>}
+          {automaticClosingUnavailable && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"><p className="font-black">{closingTr("ERP sales data needs attention")}</p><p className="mt-1 text-xs">{closingTr("Check the branch and date, then retry before finalizing.")}</p><Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-300 bg-white" onClick={() => refetchAutomaticClosing()}><RefreshCw className="mr-1.5 h-4 w-4" />{closingTr("Retry ERP data")}</Button></div>}
 
           <ClosingCashSalesSources breakdown={cashSalesBreakdown} closingCashSales={cashSales} currency={currency} lang={lang} />
-          <div data-testid="closing-cash-action" className="min-w-0" aria-label="Cash reconciliation">
+          <div data-testid="closing-cash-action" className="min-w-0" aria-label={closingTr("Cash reconciliation")}>
             <CashReconciliationPanel
               compact
               inputId="quick-closing-actualCash"
@@ -1986,14 +1989,14 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               isRecordingOwnerPayment={isRecordingOwnerPayment}
               disabled={isSubmitting}
               fundingContent={cashContextReady ? <ClosingFundingPanel
-                key={`${activeRestaurant?.id}:${selectedBranchId}:${form.date}:${form.shift}:${effectiveCashierId}`}
-                restaurantId={activeRestaurant?.id} branchId={selectedBranchId} branchKey={form.branch} date={form.date} shift={form.shift} cashierId={effectiveCashierId}
+                key={`${activeRestaurant?.id}:${selectedBranchId}:${form.date}:${closingTr(form.shift)}:${effectiveCashierId}`}
+                restaurantId={activeRestaurant?.id} branchId={selectedBranchId} branchKey={form.branch} date={form.date} shift={closingTr(form.shift)} cashierId={effectiveCashierId}
                 expectedCash={expectedCash} actualCash={actualCount} role={role} lang={lang} currency={currency} disabled={isSubmitting}
                 onPosted={async () => { setManagerApproved(false); await refetchCashLedger(); }}
               /> : null}
             />
             {openingReviewRequired && <button type="button" className="mt-3 min-h-11 w-full rounded-xl border border-amber-300 bg-amber-50 px-3 text-left text-sm font-bold text-amber-900" onClick={() => setShowOpeningVerification(true)}>
-              {lang === 'fa' ? 'تأیید نقد افتتاحیه' : lang === 'ar' ? 'توثيق النقد الافتتاحي' : 'Verify opening cash'}
+              {lang === 'fa' ? 'تأیید نقد افتتاحیه' : lang === 'ar' ? 'توثيق النقد الافتتاحي' : closingTr('Verify opening cash')}
             </button>}
           </div>
           </div>
@@ -2019,23 +2022,23 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               onEditCash={() => goToClosingStep(1)}
             />
           <details open className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5" data-testid="closing-operating-statement" data-i18n-skip="true">
-            <summary className="min-h-11 cursor-pointer text-sm font-bold text-slate-900">{lang === 'fa' ? 'خریدها و مصارف' : lang === 'ar' ? 'المشتريات والمصروفات' : <>Expenses &amp; purchases</>}</summary>
+            <summary className="min-h-11 cursor-pointer text-sm font-bold text-slate-900">{lang === 'fa' ? 'خریدها و مصارف' : lang === 'ar' ? 'المشتريات والمصروفات' : <>{closingTr("Expenses &amp; purchases")}</>}</summary>
             {expenseContextReady && !purchasesLoading && !purchasesUnavailable ? <dl className="mt-2 space-y-3 text-sm">
               {[
                 [lang === 'fa' ? 'خریدهای تأییدشده' : lang === 'ar' ? 'المشتريات المعتمدة' : 'Approved purchases', approvedPurchasesTotal],
                 [lang === 'fa' ? 'سهم روزانه مصارف ثابت' : lang === 'ar' ? 'نصيب اليوم من المصروفات الثابتة' : 'Daily fixed expense allocation', fixedExpensesToday],
                 [lang === 'fa' ? 'مصارف متغیر امروز' : lang === 'ar' ? 'المصروفات المتغيرة اليوم' : 'Today variable expenses', variableExpensesToday],
               ].map(([label, value]) => <div key={label} className="flex flex-wrap justify-between gap-2"><dt className="text-slate-600">{label}</dt><dd><Money currency={currency} value={value} className="font-semibold" /></dd></div>)}
-              <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-3"><dt className="font-bold">{lang === 'fa' ? 'مجموع هزینه روز' : lang === 'ar' ? 'إجمالي تكلفة اليوم' : 'Total daily expenses'}</dt><dd><Money currency={currency} value={totalDailyExpenses} className="font-bold" /></dd></div>
-              <div className="flex flex-wrap justify-between gap-2"><dt className="font-bold">{lang === 'fa' ? 'نتیجه عملیاتی تخمینی' : lang === 'ar' ? 'النتيجة التشغيلية التقديرية' : 'Estimated operating result'}</dt><dd><Money currency={currency} value={operatingResult} signed className="font-bold" /></dd></div>
-            </dl> : <p role="status" className="mt-2 text-sm text-amber-800">{lang === 'fa' ? 'نتیجه تا بارگذاری خریدها و دفتر نقد قابل تأیید نیست.' : lang === 'ar' ? 'لا يمكن تأكيد النتيجة قبل تحميل المشتريات ودفتر النقد.' : 'The result is unavailable until purchases and the cash ledger are loaded.'}</p>}
+              <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-3"><dt className="font-bold">{lang === 'fa' ? 'مجموع هزینه روز' : lang === 'ar' ? 'إجمالي تكلفة اليوم' : closingTr('Total daily expenses')}</dt><dd><Money currency={currency} value={totalDailyExpenses} className="font-bold" /></dd></div>
+              <div className="flex flex-wrap justify-between gap-2"><dt className="font-bold">{lang === 'fa' ? 'نتیجه عملیاتی تخمینی' : lang === 'ar' ? 'النتيجة التشغيلية التقديرية' : closingTr('Estimated operating result')}</dt><dd><Money currency={currency} value={operatingResult} signed className="font-bold" /></dd></div>
+            </dl> : <p role="status" className="mt-2 text-sm text-amber-800">{lang === 'fa' ? 'نتیجه تا بارگذاری خریدها و دفتر نقد قابل تأیید نیست.' : lang === 'ar' ? 'لا يمكن تأكيد النتيجة قبل تحميل المشتريات ودفتر النقد.' : closingTr('The result is unavailable until purchases and the cash ledger are loaded.')}</p>}
             {!expenseContextReady && <p role="alert" className="mt-2 text-xs text-amber-800">{expenseContextMessage}</p>}
-            <p className="mt-3 text-xs leading-5 text-slate-500">{lang === 'fa' ? 'بر مبنای خرید و مصارف ثبت‌شده؛ سود حسابداری نهایی نیست. نقد صندوق فقط با حرکات ثبت‌شده نقدی تغییر می‌کند.' : lang === 'ar' ? 'على أساس المشتريات والمصروفات المسجلة؛ ليست الربح المحاسبي النهائي. لا يتغير نقد الصندوق إلا بحركات نقدية مسجلة.' : 'Purchase-basis management estimate, not final accounting profit. Drawer cash changes only through posted cash movements.'}</p>
+            <p className="mt-3 text-xs leading-5 text-slate-500">{lang === 'fa' ? 'بر مبنای خرید و مصارف ثبت‌شده؛ سود حسابداری نهایی نیست. نقد صندوق فقط با حرکات ثبت‌شده نقدی تغییر می‌کند.' : lang === 'ar' ? 'على أساس المشتريات والمصروفات المسجلة؛ ليست الربح المحاسبي النهائي. لا يتغير نقد الصندوق إلا بحركات نقدية مسجلة.' : closingTr('Purchase-basis management estimate, not final accounting profit. Drawer cash changes only through posted cash movements.')}</p>
           </details>
 
           <section data-testid="quick-closing-auto-summary" className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5">
-            <button type="button" className="flex min-h-12 w-full items-center justify-between gap-3 text-left" onClick={() => setShowFullDetails(true)} aria-label="Open advanced closing records" data-testid="closing-open-advanced-secondary">
-              <span className="flex min-w-0 items-center gap-2"><ClipboardCheck className="h-5 w-5 shrink-0 text-blue-600" /><span className="min-w-0"><strong className="block text-xs text-slate-900">{lang === 'fa' ? 'جزئیات پیشرفته ERP' : lang === 'ar' ? 'تفاصيل ERP المتقدمة' : 'Advanced ERP details'}</strong><span className="block truncate text-[11px] text-slate-500">{lang === 'fa' ? 'مشتریان، منابع، شعبه، تطبیق کامل' : lang === 'ar' ? 'العملاء والمصادر والفرع والمطابقة' : 'Customers, sources, branch & full cash ledger'}</span></span></span><ChevronRight className="h-5 w-5 shrink-0 text-blue-600" />
+            <button type="button" className="flex min-h-12 w-full items-center justify-between gap-3 text-left" onClick={() => setShowFullDetails(true)} aria-label={closingTr("Open advanced closing records")} data-testid="closing-open-advanced-secondary">
+              <span className="flex min-w-0 items-center gap-2"><ClipboardCheck className="h-5 w-5 shrink-0 text-blue-600" /><span className="min-w-0"><strong className="block text-xs text-slate-900">{lang === 'fa' ? 'جزئیات پیشرفته ERP' : lang === 'ar' ? 'تفاصيل ERP المتقدمة' : closingTr('Advanced ERP details')}</strong><span className="block truncate text-[11px] text-slate-500">{lang === 'fa' ? 'مشتریان، منابع، شعبه، تطبیق کامل' : lang === 'ar' ? 'العملاء والمصادر والفرع والمطابقة' : closingTr('Customers, sources, branch & full cash ledger')}</span></span></span><ChevronRight className="h-5 w-5 shrink-0 text-blue-600" />
             </button>
           </section>
 
@@ -2043,33 +2046,33 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           <Sheet open={Boolean(workspaceTabActive && showFullDetails)} onOpenChange={isOpen => {if (workspaceTabActive) setShowFullDetails(isOpen);}}>
             <SheetContent side="bottom" className="z-50 h-[min(90dvh,900px)] max-h-[90dvh] w-full overflow-y-auto overscroll-contain rounded-t-2xl border-slate-200 bg-slate-50 px-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-5 sm:mx-auto sm:max-w-4xl sm:px-5" data-testid="closing-advanced-sheet">
               <SheetHeader className="mb-4 pr-8 text-left">
-                <SheetTitle className="text-base font-black text-slate-950">{lang === 'fa' ? 'جزئیات پیشرفتهٔ کلوزینگ' : lang === 'ar' ? 'تفاصيل إقفال المبيعات' : 'Advanced closing details'}</SheetTitle>
-                <SheetDescription className="text-xs">{lang === 'fa' ? 'معلومات شعبه، مشتری، منابع فروش و دفتر کامل صندوق؛ تغییرات ذخیره نشده باقی می‌مانند.' : lang === 'ar' ? 'الفرع والعملاء ومصادر البيع ودفتر النقد، دون فقدان التعديلات.' : 'Business scope, customer credit, sales sources and full cash audit. Your edits remain in the form.'}</SheetDescription>
+                <SheetTitle className="text-base font-black text-slate-950">{lang === 'fa' ? 'جزئیات پیشرفتهٔ کلوزینگ' : lang === 'ar' ? 'تفاصيل إقفال المبيعات' : closingTr('Advanced closing details')}</SheetTitle>
+                <SheetDescription className="text-xs">{lang === 'fa' ? 'معلومات شعبه، مشتری، منابع فروش و دفتر کامل صندوق؛ تغییرات ذخیره نشده باقی می‌مانند.' : lang === 'ar' ? 'الفرع والعملاء ومصادر البيع ودفتر النقد، دون فقدان التعديلات.' : closingTr('Business scope, customer credit, sales sources and full cash audit. Your edits remain in the form.')}</SheetDescription>
               </SheetHeader>
               <div className="space-y-3" data-testid="closing-full-details">
             <section className="rounded-2xl border border-slate-200 bg-background p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-black text-slate-950">Business context</h2><p className="mt-0.5 text-[11px] text-slate-500">Change only when this closing belongs to another shift.</p></div><Badge variant="outline">ERP scope</Badge></div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{configuredIdentityFields.map((field) => { const fieldKey = field.field_key; const label = closingFieldLabel(fieldKey, field.fallback); if (fieldKey === 'date') return <div key={fieldKey} className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><Input id="quick-closing-date" type="date" value={form.date} onChange={event => set('date', event.target.value)} className="min-h-11 text-sm" /></div>; if (fieldKey === 'branch') return <div key={fieldKey} id="quick-closing-branch" className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><BranchSelect value={form.branch} onChange={selectClosingBranch} /></div>; if (fieldKey === 'shift') return <div key={fieldKey} id="quick-closing-shift" className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><Select value={form.shift} onValueChange={value => set('shift', value)}><SelectTrigger className="min-h-11 text-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Morning">Morning</SelectItem><SelectItem value="Evening">Evening</SelectItem></SelectContent></Select></div>; return <div key={fieldKey} id="quick-closing-cashier" className={`min-w-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 ${closingFieldVisibilityClass(fieldKey)}`}><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">{label}</p><p className="mt-1 truncate text-sm font-bold text-emerald-900">{cashierDisplayName || (empLoading ? 'Loading…' : empError ? 'Unable to load cashier' : 'No cashier')}</p></div>; })}</div>
+              <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-black text-slate-950">{closingTr("Business context")}</h2><p className="mt-0.5 text-[11px] text-slate-500">{closingTr("Change only when this closing belongs to another shift.")}</p></div><Badge variant="outline">{closingTr("ERP scope")}</Badge></div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{configuredIdentityFields.map((field) => { const fieldKey = field.field_key; const label = closingFieldLabel(fieldKey, field.fallback); if (fieldKey === 'date') return <div key={fieldKey} className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><Input id="quick-closing-date" type="date" value={form.date} onChange={event => set('date', event.target.value)} className="min-h-11 text-sm" /></div>; if (fieldKey === 'branch') return <div key={fieldKey} id="quick-closing-branch" className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><BranchSelect value={form.branch} onChange={selectClosingBranch} /></div>; if (fieldKey === 'shift') return <div key={fieldKey} id="quick-closing-shift" className={closingFieldVisibilityClass(fieldKey)}><Label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</Label><Select value={closingTr(form.shift)} onValueChange={value => set('shift', value)}><SelectTrigger className="min-h-11 text-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Morning">{closingTr("Morning")}</SelectItem><SelectItem value="Evening">{closingTr("Evening")}</SelectItem></SelectContent></Select></div>; return <div key={fieldKey} id="quick-closing-cashier" className={`min-w-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 ${closingFieldVisibilityClass(fieldKey)}`}><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">{label}</p><p className="mt-1 truncate text-sm font-bold text-emerald-900">{cashierDisplayName || (empLoading ? closingTr('Loading…') : empError ? closingTr('Unable to load cashier') : closingTr('No cashier'))}</p></div>; })}</div>
             </section>
 
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-background shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><div><h2 className="text-sm font-black text-slate-950">Sales breakdown</h2><p className="mt-0.5 text-[11px] text-slate-500">Daily revenue only; historical amounts are not added.</p></div><Money currency={currency} value={totalSales} className="text-base font-black text-blue-700" /></div>
-              <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4"><div className="rounded-xl bg-emerald-50 p-3"><Banknote className="h-4 w-4 text-emerald-600" /><p className="mt-2 text-[10px] text-slate-500">Cash</p><Money currency={currency} value={cashSales} className="text-sm font-black" /></div><div className="rounded-xl bg-blue-50 p-3"><Network className="h-4 w-4 text-blue-600" /><p className="mt-2 text-[10px] text-slate-500">Network</p><Money currency={currency} value={networkTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-violet-50 p-3"><CreditCard className="h-4 w-4 text-violet-600" /><p className="mt-2 text-[10px] text-slate-500">Credit</p><Money currency={currency} value={creditTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-amber-50 p-3"><Bike className="h-4 w-4 text-amber-600" /><p className="mt-2 text-[10px] text-slate-500">Delivery apps</p><Money currency={currency} value={onlineTotal} className="text-sm font-black" /></div></div>
-              <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3 sm:grid-cols-4"><div className="rounded-xl bg-blue-50 p-3"><Building2 className="h-4 w-4 text-blue-600" /><p className="mt-2 text-[10px] text-slate-500">Counter network</p><Money currency={currency} value={networkCounterTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-cyan-50 p-3"><Bike className="h-4 w-4 text-cyan-600" /><p className="mt-2 text-[10px] text-slate-500">Driver network</p><Money currency={currency} value={networkDriversTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-slate-50 p-3"><MoreHorizontal className="h-4 w-4 text-slate-600" /><p className="mt-2 text-[10px] text-slate-500">Other network</p><Money currency={currency} value={otherNetworkTotal} className="text-sm font-black" /></div><div className="rounded-xl border border-blue-200 bg-blue-50 p-3"><Coins className="h-4 w-4 text-blue-700" /><p className="mt-2 text-[10px] text-blue-600">Network total</p><Money currency={currency} value={networkTotal} className="text-sm font-black text-blue-700" /></div></div>
-              {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div className="space-y-2 border-t border-slate-100 p-3"><p className="text-xs font-black uppercase tracking-wide text-slate-700">Manual sales sources</p>{customSourceSummaries.map(({ source, sourceLabel, today, previous, driverEntries }) => source.allows_driver_entries === true ? <DriverSalesSourceCard key={source.id} source={source} sourceLabel={sourceLabel} entries={driverEntries} drivers={driverSourceDrivers} branchLabel={form.branch} previous={previous} currency={currency} onAdd={() => addDriverSourceEntry(source)} onChange={(clientRowId, patch) => updateDriverSourceEntry(source.id, clientRowId, patch)} onRemove={(clientRowId) => removeDriverSourceEntry(source.id, clientRowId)} isHistoryLoading={sourceHistoryLoading || driverSourceDriversLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} /> : <CompactSalesSourceRow key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} historyLoading={sourceHistoryLoading} historyUnavailable={sourceHistoryUnavailable} />)}</div>}
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><div><h2 className="text-sm font-black text-slate-950">{closingTr("Sales breakdown")}</h2><p className="mt-0.5 text-[11px] text-slate-500">{closingTr("Daily revenue only; historical amounts are not added.")}</p></div><Money currency={currency} value={totalSales} className="text-base font-black text-blue-700" /></div>
+              <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4"><div className="rounded-xl bg-emerald-50 p-3"><Banknote className="h-4 w-4 text-emerald-600" /><p className="mt-2 text-[10px] text-slate-500">{closingTr("Cash")}</p><Money currency={currency} value={cashSales} className="text-sm font-black" /></div><div className="rounded-xl bg-blue-50 p-3"><Network className="h-4 w-4 text-blue-600" /><p className="mt-2 text-[10px] text-slate-500">{closingTr("Network")}</p><Money currency={currency} value={networkTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-violet-50 p-3"><CreditCard className="h-4 w-4 text-violet-600" /><p className="mt-2 text-[10px] text-slate-500">{closingTr("Credit")}</p><Money currency={currency} value={creditTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-amber-50 p-3"><Bike className="h-4 w-4 text-amber-600" /><p className="mt-2 text-[10px] text-slate-500">{closingTr("Delivery apps")}</p><Money currency={currency} value={onlineTotal} className="text-sm font-black" /></div></div>
+              <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3 sm:grid-cols-4"><div className="rounded-xl bg-blue-50 p-3"><Building2 className="h-4 w-4 text-blue-600" /><p className="mt-2 text-[10px] text-slate-500">{closingTr("Counter network")}</p><Money currency={currency} value={networkCounterTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-cyan-50 p-3"><Bike className="h-4 w-4 text-cyan-600" /><p className="mt-2 text-[10px] text-slate-500">{closingTr("Driver network")}</p><Money currency={currency} value={networkDriversTotal} className="text-sm font-black" /></div><div className="rounded-xl bg-slate-50 p-3"><MoreHorizontal className="h-4 w-4 text-slate-600" /><p className="mt-2 text-[10px] text-slate-500">{closingTr("Other network")}</p><Money currency={currency} value={otherNetworkTotal} className="text-sm font-black" /></div><div className="rounded-xl border border-blue-200 bg-blue-50 p-3"><Coins className="h-4 w-4 text-blue-700" /><p className="mt-2 text-[10px] text-blue-600">{closingTr("Network total")}</p><Money currency={currency} value={networkTotal} className="text-sm font-black text-blue-700" /></div></div>
+              {isConfiguredClosingFieldShown('sales_sources') && customSources.length > 0 && <div className="space-y-2 border-t border-slate-100 p-3"><p className="text-xs font-black uppercase tracking-wide text-slate-700">{closingTr("Manual sales sources")}</p>{customSourceSummaries.map(({ source, sourceLabel, today, previous, driverEntries }) => source.allows_driver_entries === true ? <DriverSalesSourceCard key={source.id} source={source} sourceLabel={sourceLabel} entries={driverEntries} drivers={driverSourceDrivers} branchLabel={form.branch} previous={previous} currency={currency} onAdd={() => addDriverSourceEntry(source)} onChange={(clientRowId, patch) => updateDriverSourceEntry(source.id, clientRowId, patch)} onRemove={(clientRowId) => removeDriverSourceEntry(source.id, clientRowId)} isHistoryLoading={sourceHistoryLoading || driverSourceDriversLoading} isHistoryUnavailable={sourceHistoryUnavailable} copy={salesSourceCopy} /> : <CompactSalesSourceRow key={source.id} source={source} sourceLabel={sourceLabel} todayInput={customSourceAmounts[source.id] ?? ''} today={today} previous={previous} currency={currency} onChange={(value) => setCustomAmount(source.id, value)} historyLoading={sourceHistoryLoading} historyUnavailable={sourceHistoryUnavailable} />)}</div>}
 
-            </section>{creditSource && <section className="space-y-3" data-testid="customer-credit-closing-section" data-i18n-skip="true">{custLoading ? <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">Loading Debt Management customers…</div> : <><div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{customerCreditSales.map((entry, index) => <div key={entry.id} className="min-w-0 space-y-2"><label className="block text-sm font-semibold">{lang === 'fa' ? 'منبع فروش قرضه' : lang === 'ar' ? 'مصدر البيع الآجل' : 'Customer credit sales source'}<select aria-label="Customer credit sales source" className="mt-1 min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3" value={creditEntrySourceId(entry, creditSources)} onChange={event => updateCustomerCreditSale(entry.id, 'source_id', event.target.value)} disabled={isSubmitting}>{creditSources.map(source => <option key={source.id} value={source.id}>{lang === 'ar' ? source.name_ar || source.name_en : lang === 'fa' ? source.name_fa || source.name_ar || source.name_en : source.name_en}</option>)}</select></label><CustomerCreditSalesSource entry={entry} idx={index} onRemove={removeCustomerCreditSale} onUpdate={updateCustomerCreditSale} customers={customers} currency={currency} customerSearch={customerSearch} onCustomerSearch={setCustomerSearch} onSelectCustomer={refetchCustomers} onReviewCreditSale={() => { setShowFullDetails(false); goToClosingStep(Math.min(2, closingStep + 1)); }} creditPosted={creditPosted} onRecordPayment={recordCustomerCreditPayment} isRecordingPayment={isRecordingCustomerDebtPayment} paymentMethods={configuredPaymentMethods} disabled={isSubmitting} /></div>)}</div>{!creditPosted && customerCreditSales.length > 0 && customerCreditSales.every((entry) => entry.customer_id) && <div className="flex justify-end"><Button type="button" size="sm" variant="outline" className="min-h-10 rounded-xl bg-white" onClick={addCustomerCreditSale} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />Add Another Customer</Button></div>}</>}{inlineErrors.credit && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{inlineErrors.credit}</p>}</section>}
+            </section>{creditSource && <section className="space-y-3" data-testid="customer-credit-closing-section" data-i18n-skip="true">{custLoading ? <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">{closingTr("Loading Debt Management customers…")}</div> : <><div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{customerCreditSales.map((entry, index) => <div key={entry.id} className="min-w-0 space-y-2"><label className="block text-sm font-semibold">{lang === 'fa' ? 'منبع فروش قرضه' : lang === 'ar' ? 'مصدر البيع الآجل' : closingTr('Customer credit sales source')}<select aria-label={closingTr("Customer credit sales source")} className="mt-1 min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3" value={creditEntrySourceId(entry, creditSources)} onChange={event => updateCustomerCreditSale(entry.id, 'source_id', event.target.value)} disabled={isSubmitting}>{creditSources.map(source => <option key={source.id} value={source.id}>{lang === 'ar' ? source.name_ar || source.name_en : lang === 'fa' ? source.name_fa || source.name_ar || source.name_en : source.name_en}</option>)}</select></label><CustomerCreditSalesSource entry={entry} idx={index} onRemove={removeCustomerCreditSale} onUpdate={updateCustomerCreditSale} customers={customers} currency={currency} customerSearch={customerSearch} onCustomerSearch={setCustomerSearch} onSelectCustomer={refetchCustomers} onReviewCreditSale={() => { setShowFullDetails(false); goToClosingStep(Math.min(2, closingStep + 1)); }} creditPosted={creditPosted} onRecordPayment={recordCustomerCreditPayment} isRecordingPayment={isRecordingCustomerDebtPayment} paymentMethods={configuredPaymentMethods} disabled={isSubmitting} /></div>)}</div>{!creditPosted && customerCreditSales.length > 0 && customerCreditSales.every((entry) => entry.customer_id) && <div className="flex justify-end"><Button type="button" size="sm" variant="outline" className="min-h-10 rounded-xl bg-white" onClick={addCustomerCreditSale} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />{closingTr("Add Another Customer")}</Button></div>}</>}{inlineErrors.credit && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-900">{closingTr(inlineErrors.credit)}</p>}</section>}
 
-            {customClosingFields.length > 0 && <section id="closing-control-fields" className="rounded-2xl border border-slate-200 bg-background p-3 shadow-sm sm:p-4"><div className="mb-3"><h2 className="text-sm font-black text-slate-950">Closing fields</h2><p className="mt-0.5 text-[11px] text-slate-500">Only values for this closing are stored here.</p></div><div className="space-y-2">{customClosingFields.map((field) => <ClosingFieldControlRow key={field.id} field={field} label={closingFieldNameForLanguage(field)} value={customClosingFieldValues[field.id] ?? ''} error={inlineErrors[`custom_${field.id}`]} onChange={(value) => updateCustomClosingField(field.id, value)} />)}</div></section>}
+            {customClosingFields.length > 0 && <section id="closing-control-fields" className="rounded-2xl border border-slate-200 bg-background p-3 shadow-sm sm:p-4"><div className="mb-3"><h2 className="text-sm font-black text-slate-950">{closingTr("Closing fields")}</h2><p className="mt-0.5 text-[11px] text-slate-500">{closingTr("Only values for this closing are stored here.")}</p></div><div className="space-y-2">{customClosingFields.map((field) => <ClosingFieldControlRow key={field.id} field={field} label={closingFieldNameForLanguage(field)} value={customClosingFieldValues[field.id] ?? ''} error={inlineErrors[`custom_${field.id}`]} onChange={(value) => updateCustomClosingField(field.id, value)} />)}</div></section>}
 
             <p className="rounded-xl bg-sky-50 p-3 text-xs text-sky-900" data-testid="single-cash-ledger-note">
-              {lang === 'fa' ? 'تطبیق نقد صندوق، تمویل و ثبت شمارش فقط در کارت صندوق مرحله نقد انجام می‌شود.' : lang === 'ar' ? 'تتم مطابقة النقد والتمويل والعد في بطاقة الصندوق الواحدة.' : 'Cash count, funding and reconciliation are managed in the single Cash Reconciliation card on the Cash step.'}
+              {lang === 'fa' ? 'تطبیق نقد صندوق، تمویل و ثبت شمارش فقط در کارت صندوق مرحله نقد انجام می‌شود.' : lang === 'ar' ? 'تتم مطابقة النقد والتمويل والعد في بطاقة الصندوق الواحدة.' : closingTr('Cash count, funding and reconciliation are managed in the single Cash Reconciliation card on the Cash step.')}
             </p>
               </div>
             </SheetContent>
           </Sheet>
 
-          {inlineErrors.duplicate && <div role="alert" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" /><p className="text-xs font-bold">{inlineErrors.duplicate}</p></div>}
+          {inlineErrors.duplicate && <div role="alert" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" /><p className="text-xs font-bold">{closingTr(inlineErrors.duplicate)}</p></div>}
         </div>
       </div>
 
@@ -2081,19 +2084,19 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         <div className="mx-auto max-w-4xl">
           {closingStep > 0 && <Button type="button" variant="ghost" className="mb-2 min-h-11" disabled={isSubmitting} onClick={() => goToClosingStep(closingStep - 1)}>{stepCopy.back}</Button>}
           <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش همین شیفت' : lang === 'ar' ? 'مجموع مبيعات الوردية' : 'Shift sales total'}</span>
+            <span className="text-[11px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش همین شیفت' : lang === 'ar' ? 'مجموع مبيعات الوردية' : closingTr('Shift sales total')}</span>
             <Money currency={currency} value={totalSales} className="text-lg font-black text-slate-900" />
           </div>
           <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2">
-            <Button type="submit" data-closing-intent="draft" variant="outline" className="min-h-12 min-w-0 rounded-xl px-2 text-xs font-bold sm:text-sm" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady}><Save className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'ذخیره موقت' : lang === 'ar' ? 'حفظ المسودة' : 'Save Draft'}</Button>
-            {closingStep < 2 ? <Button type="button" data-testid="closing-next-step" className="min-h-12 min-w-0 whitespace-normal rounded-xl bg-blue-600 px-2 text-xs font-black hover:bg-blue-700 sm:text-sm" disabled={isSubmitting} onClick={() => goToClosingStep(closingStep + 1)}>{stepCopy.next[closingStep]}</Button> : <Button type="button" aria-label="Review & Finalize Closing" data-testid="closing-review-finalize" className="min-h-12 min-w-0 rounded-xl bg-blue-600 px-2 text-xs font-black hover:bg-blue-700 sm:text-sm" disabled={isSubmitting} onClick={() => {
+            <Button type="submit" data-closing-intent="draft" variant="outline" className="min-h-12 min-w-0 rounded-xl px-2 text-xs font-bold sm:text-sm" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady}><Save className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'ذخیره موقت' : lang === 'ar' ? 'حفظ المسودة' : closingTr('Save Draft')}</Button>
+            {closingStep < 2 ? <Button type="button" data-testid="closing-next-step" className="min-h-12 min-w-0 whitespace-normal rounded-xl bg-blue-600 px-2 text-xs font-black hover:bg-blue-700 sm:text-sm" disabled={isSubmitting} onClick={() => goToClosingStep(closingStep + 1)}>{stepCopy.next[closingStep]}</Button> : <Button type="button" aria-label={closingTr("Review & Finalize Closing")} data-testid="closing-review-finalize" className="min-h-12 min-w-0 rounded-xl bg-blue-600 px-2 text-xs font-black hover:bg-blue-700 sm:text-sm" disabled={isSubmitting} onClick={() => {
               if (!allValid || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn || purchasesLoading) {
                 setShowBlockers(true);
                 document.getElementById('closing-readiness-anchor')?.scrollIntoView({behavior:'smooth', block:'start'});
                 return;
               }
               setShowFinalizeReview(true);
-            }}>{isSubmitting ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" />{lang === 'fa' ? 'در حال ذخیره...' : lang === 'ar' ? 'جارٍ الحفظ...' : 'Saving…'}</> : <><ShieldCheck className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'بررسی و نهایی‌سازی' : lang === 'ar' ? 'مراجعة وإقفال' : 'Review & Finalize'}</>}</Button>}
+            }}>{isSubmitting ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" />{lang === 'fa' ? 'در حال ذخیره...' : lang === 'ar' ? 'جارٍ الحفظ...' : closingTr('Saving…')}</> : <><ShieldCheck className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'بررسی و نهایی‌سازی' : lang === 'ar' ? 'مراجعة وإقفال' : closingTr('Review & Finalize')}</>}</Button>}
           </div>
         </div>
       </div>
@@ -2101,34 +2104,34 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       <Dialog open={Boolean(workspaceTabActive && showFinalizeReview)} onOpenChange={isOpen => {if (workspaceTabActive) setShowFinalizeReview(isOpen);}}>
         <DialogContent className="max-h-[88dvh] w-[calc(100vw-1.5rem)] max-w-lg overflow-y-auto rounded-2xl p-4 sm:p-6" data-testid="closing-finalize-review">
           <DialogHeader>
-            <DialogTitle className="text-left text-lg font-black">{lang === 'fa' ? 'تأیید نهایی کلوزینگ' : lang === 'ar' ? 'تأكيد إقفال المبيعات' : 'Confirm sales closing'}</DialogTitle>
-            <DialogDescription className="text-left text-xs">{form.branch} · {form.shift} · {form.date}</DialogDescription>
+            <DialogTitle className="text-left text-lg font-black">{lang === 'fa' ? 'تأیید نهایی کلوزینگ' : lang === 'ar' ? 'تأكيد إقفال المبيعات' : closingTr('Confirm sales closing')}</DialogTitle>
+            <DialogDescription className="text-left text-xs">{form.branch} · {closingTr(form.shift)} · {form.date}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-xs">
-              <span className="text-slate-600">{lang === 'fa' ? 'فروش نقدی' : lang === 'ar' ? 'المبيعات النقدية' : 'Cash Sales'}</span><Money currency={currency} value={cashSales} className="text-right font-black" />
-              <span className="text-slate-600">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : 'Network / Card'}</span><Money currency={currency} value={networkTotal} className="text-right font-black" />
-              <span className="text-slate-600">{lang === 'fa' ? 'فروش قرضه' : lang === 'ar' ? 'المبيعات الآجلة' : 'Customer Credit'}</span><Money currency={currency} value={creditTotal} className="text-right font-black" />
-              {otherPaymentTotal !== 0 && <><span className="text-slate-600">{lang === 'fa' ? 'سایر فروش‌ها' : lang === 'ar' ? 'مبيعات أخرى' : 'Other sales'}</span><Money currency={currency} value={otherPaymentTotal} className="text-right font-black" /></>}
-              <span className="font-black text-slate-900">{lang === 'fa' ? 'مجموع فروش' : lang === 'ar' ? 'إجمالي المبيعات' : 'Sales total'}</span><Money currency={currency} value={totalSales} className="text-right text-sm font-black text-blue-700" />
+              <span className="text-slate-600">{lang === 'fa' ? 'فروش نقدی' : lang === 'ar' ? 'المبيعات النقدية' : closingTr('Cash Sales')}</span><Money currency={currency} value={cashSales} className="text-right font-black" />
+              <span className="text-slate-600">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : closingTr('Network / Card')}</span><Money currency={currency} value={networkTotal} className="text-right font-black" />
+              <span className="text-slate-600">{lang === 'fa' ? 'فروش قرضه' : lang === 'ar' ? 'المبيعات الآجلة' : closingTr('Customer Credit')}</span><Money currency={currency} value={creditTotal} className="text-right font-black" />
+              {otherPaymentTotal !== 0 && <><span className="text-slate-600">{lang === 'fa' ? 'سایر فروش‌ها' : lang === 'ar' ? 'مبيعات أخرى' : closingTr('Other sales')}</span><Money currency={currency} value={otherPaymentTotal} className="text-right font-black" /></>}
+              <span className="font-black text-slate-900">{lang === 'fa' ? 'مجموع فروش' : lang === 'ar' ? 'إجمالي المبيعات' : closingTr('Sales total')}</span><Money currency={currency} value={totalSales} className="text-right text-sm font-black text-blue-700" />
             </div>
             <div className="grid grid-cols-2 gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs">
-              <span className="text-blue-900">{lang === 'fa' ? 'موجودی آغاز' : lang === 'ar' ? 'نقد افتتاحي' : 'Opening Cash'}</span><Money currency={currency} value={opening} className="text-right font-black" />
-              <span className="text-blue-900">{lang === 'fa' ? 'نقد مورد انتظار' : lang === 'ar' ? 'نقد متوقع' : 'Expected Cash'}</span><Money currency={currency} value={expectedCash} className="text-right font-black" />
-              <span className="text-blue-900">{lang === 'fa' ? 'نقد واقعی' : lang === 'ar' ? 'نقد فعلي' : 'Actual Cash'}</span><Money currency={currency} value={actualCount} className="text-right font-black" />
-              <span className="font-black text-blue-900">{lang === 'fa' ? 'اختلاف صندوق' : lang === 'ar' ? 'فرق الصندوق' : 'Variance'}</span><Money currency={currency} value={cashDifference} signed className={`text-right text-sm font-black ${cashDifference === 0 ? 'text-emerald-700' : 'text-amber-700'}`} />
+              <span className="text-blue-900">{lang === 'fa' ? 'موجودی آغاز' : lang === 'ar' ? 'نقد افتتاحي' : closingTr('Opening Cash')}</span><Money currency={currency} value={opening} className="text-right font-black" />
+              <span className="text-blue-900">{lang === 'fa' ? 'نقد مورد انتظار' : lang === 'ar' ? 'نقد متوقع' : closingTr('Expected Cash')}</span><Money currency={currency} value={expectedCash} className="text-right font-black" />
+              <span className="text-blue-900">{lang === 'fa' ? 'نقد واقعی' : lang === 'ar' ? 'نقد فعلي' : closingTr('Actual Cash')}</span><Money currency={currency} value={actualCount} className="text-right font-black" />
+              <span className="font-black text-blue-900">{lang === 'fa' ? 'اختلاف صندوق' : lang === 'ar' ? 'فرق الصندوق' : closingTr('Variance')}</span><Money currency={currency} value={cashDifference} signed className={`text-right text-sm font-black ${cashDifference === 0 ? 'text-emerald-700' : 'text-amber-700'}`} />
             </div>
-            {cashDifference !== 0 && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">{lang === 'fa' ? 'کسری یا اضافه به‌صورت جدا ثبت می‌شود و مبلغ فروش را تغییر نمی‌دهد.' : lang === 'ar' ? 'يُسجل العجز أو الفائض بشكل منفصل دون تغيير قيمة المبيعات.' : 'Cash shortage or overage is recorded separately; it does not change sales revenue.'}</p>}
-            <p className="text-xs text-slate-600">{lang === 'fa' ? 'قبل از ثبت قطعی، ارقام نقدی و فروش را با اسناد همین شیفت تطبیق کنید.' : lang === 'ar' ? 'راجع أرقام الوردية والمستندات قبل الاعتماد النهائي.' : 'Verify this shift’s amounts against the cash count and sales evidence before posting.'}</p>
+            {cashDifference !== 0 && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">{lang === 'fa' ? 'کسری یا اضافه به‌صورت جدا ثبت می‌شود و مبلغ فروش را تغییر نمی‌دهد.' : lang === 'ar' ? 'يُسجل العجز أو الفائض بشكل منفصل دون تغيير قيمة المبيعات.' : closingTr('Cash shortage or overage is recorded separately; it does not change sales revenue.')}</p>}
+            <p className="text-xs text-slate-600">{lang === 'fa' ? 'قبل از ثبت قطعی، ارقام نقدی و فروش را با اسناد همین شیفت تطبیق کنید.' : lang === 'ar' ? 'راجع أرقام الوردية والمستندات قبل الاعتماد النهائي.' : closingTr('Verify this shift’s amounts against the cash count and sales evidence before posting.')}</p>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button type="button" variant="outline" className="min-h-12 rounded-xl" onClick={() => setShowFinalizeReview(false)}>{lang === 'fa' ? 'ویرایش' : lang === 'ar' ? 'تعديل' : 'Edit'}</Button>
+            <Button type="button" variant="outline" className="min-h-12 rounded-xl" onClick={() => setShowFinalizeReview(false)}>{lang === 'fa' ? 'ویرایش' : lang === 'ar' ? 'تعديل' : closingTr('Edit')}</Button>
             <Button type="button" data-testid="closing-confirm-finalize" className="min-h-12 rounded-xl bg-blue-600 font-black hover:bg-blue-700" disabled={isSubmitting || !allValid || !cashContextReady || cashDifference === null || ledgerOverdrawn} onClick={() => {
               setShowFinalizeReview(false);
               flushSync(() => setRequestedClosingState('finalized'));
               finalConfirmation.current = true;
               try { formRef.current?.requestSubmit(); } finally { finalConfirmation.current = false; }
-            }}><ShieldCheck className="mr-1 h-4 w-4" />{lang === 'fa' ? 'ثبت نهایی' : lang === 'ar' ? 'اعتماد الإقفال' : 'Confirm'}</Button>
+            }}><ShieldCheck className="mr-1 h-4 w-4" />{lang === 'fa' ? 'ثبت نهایی' : lang === 'ar' ? 'اعتماد الإقفال' : closingTr('Confirm')}</Button>
           </div>
         </DialogContent>
       </Dialog>
