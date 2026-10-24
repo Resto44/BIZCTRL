@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { summarizePostedCustomerReceivables } from '../src/lib/debt/customerReceivableSummary';
+import { auditPostedClosingCredit, summarizePostedCustomerReceivables } from '../src/lib/debt/customerReceivableSummary';
 
 const debt = (id, remaining, overrides={}) => ({
   id, restaurant_id:'tenant-a', branch_id:'branch-a', type:'receivable',
@@ -35,6 +35,33 @@ describe('Owner posted customer credit ERP ledger',()=>{
     expect(summarizePostedCustomerReceivables([debt('a',50,{party_type:'owner'})]).status).toBe('INVALID_SCOPE');
     expect(summarizePostedCustomerReceivables([debt('a',50,{type:'payable'})]).amount).toBeNull();
   });
+  it('finds finalized credit entries with missing or changed linked receivable principal',()=>{
+    const sales = [
+      {id:'closing-1',closing_state:'finalized',credit:50,credit_entries_json:[{customer_id:'c1',amount:50}]},
+      {id:'closing-2',closing_state:'finalized',credit:80,credit_entries_json:[{customer_id:'c2',amount:80}]},
+      {id:'draft',closing_state:'draft',credit:100,credit_entries_json:[{amount:100}]},
+    ];
+    const debts = [
+      {...debt('d1',20),sales_closing_id:'closing-1',total_amount:50},
+      {...debt('d2',35),sales_closing_id:'closing-2',total_amount:35},
+    ];
+    expect(auditPostedClosingCredit(sales, debts)).toEqual({
+      status:'REVIEW_REQUIRED', issues:1, unexplainedAmount:45, legacyWithoutDetails:0,
+    });
+  });
+  it('flags unverifiable historical closings without inventing a customer receivable',()=>{
+    expect(auditPostedClosingCredit([
+      {id:'legacy',closing_state:'finalized',credit:30,credit_entries_json:[]},
+    ],[])).toMatchObject({status:'REVIEW_REQUIRED', issues:0, unexplainedAmount:0, legacyWithoutDetails:1});
+    expect(auditPostedClosingCredit([],[],{complete:false}).status).toBe('UNAVAILABLE');
+  });
+  it('does not mistake a draft credit sale for a posted customer debt',()=>{
+    const result = auditPostedClosingCredit([
+      {id:'d',closing_state:'draft',credit:50,credit_entries_json:[{amount:50}]},
+    ],[]);
+    expect(result.status).toBe('CHECKED_SCOPE');
+    expect(result.issues).toBe(0);
+  });
   it('realtime invalidates posted debt and payments, not draft Closing credit as posted debt',()=>{
     const realtime=readFileSync('src/hooks/useOwnerDashboardRealtime.js','utf8');
     const owner=readFileSync('src/pages/OwnerDashboard.jsx','utf8');
@@ -44,6 +71,7 @@ describe('Owner posted customer credit ERP ledger',()=>{
     expect(owner).toContain('summarizePostedCustomerReceivables(customerDebts');
     expect(owner).toContain("complete: !customerDebtsQuery.isError");
     expect(reports).toContain('testId="owner-customer-credit-outstanding"');
+    expect(reports).toContain('data-testid="owner-credit-reconciliation-warning"');
     expect(reports).toContain("receivables == null ? '—'");
     expect(reports).toContain("navigate('/debt-management')");
   });
