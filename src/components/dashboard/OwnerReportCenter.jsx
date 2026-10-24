@@ -173,6 +173,12 @@ function ExecutiveReport({ model, copy }) {
           <MetricCard label={text(copy, 'receivables', 'Receivables')} value={receivables == null ? '—' : formatMoney(receivables, 2)} icon={Landmark} tone="rose" detail={model.receivablesStatus === 'VERIFIED_POSTED_LEDGER' ? (model.lang === 'fa' ? 'بدهی باز تأییدشده' : model.lang === 'ar' ? 'الرصيد المستحق المرحّل' : 'Posted outstanding debt') : (model.lang === 'fa' ? 'نیاز به بررسی دفتر' : model.lang === 'ar' ? 'يحتاج مراجعة الدفتر' : 'Ledger requires review')} />
           <MetricCard label={text(copy, 'credit', 'Credit') + ' · ' + (model.lang === 'fa' ? 'فروش بازه' : model.lang === 'ar' ? 'مبيعات الفترة' : 'Period Sales')} value={formatMoney(periodMetrics.totalCredit, 2)} icon={CreditCard} tone="blue" detail={model.lang === 'fa' ? 'فروش نسیه نهایی‌شده' : model.lang === 'ar' ? 'مبيعات آجلة معتمدة' : 'Finalized credit sales'} />
         </div>
+        {model.creditLedgerAudit?.status === 'REVIEW_REQUIRED' &&
+          <div data-testid="owner-credit-reconciliation-warning" role="status" className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+            <strong>{model.lang === 'fa' ? 'مغایرت نسیه و دفتر طلب‌ها' : model.lang === 'ar' ? 'فرق المبيعات الآجلة ودفتر الذمم' : 'Closing credit requires ledger reconciliation'}</strong>
+            <p className="mt-1">{model.lang === 'fa' ? 'سندهای نسیه بعضی کلوزینگ‌های نهایی در دفتر مطالبات کامل نیست. تا تأیید اسناد، این اختلاف را بدهی قطعی حساب نکنید.' : model.lang === 'ar' ? 'بعض الإقفالات المعتمدة لا تطابق دفتر الذمم؛ لا تضف هذه الفروق إلى ديون العملاء دون تدقيق.' : 'Some finalized credit closings do not match linked receivable documents. Do not add these amounts to customer debt without an audit.'}</p>
+            <div className="mt-1 font-black" dir="ltr">{model.creditLedgerAudit.issues} · {formatMoney(model.creditLedgerAudit.unexplainedAmount, 2)}</div>
+          </div>}
       </Panel>
 
       <Panel>
