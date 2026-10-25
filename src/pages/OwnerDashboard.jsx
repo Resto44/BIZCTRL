@@ -1,3 +1,4 @@
+import { buildDebtLedgerSummary } from '@/lib/debtLedgerSummary';
 /**
  * OwnerDashboard — Four-page ERP Owner Report Center.
  * Financial values use the shared ERP accounting engine; consumption and rate
@@ -415,7 +416,7 @@ function OwnerDashboardContent() {
   const expenseGroups = useMemo(() => groupExpensesByCategory(periodExpenses, expenseCategories), [expenseCategories, periodExpenses]);
   const previousRevenueTrend = useMemo(() => aggregateDailyRevenue(previousPeriodSales, (sale) => calculateSalesRevenue(sale, revenueSources).total), [previousPeriodSales, revenueSources]);
   const revenueTrend = useMemo(() => aggregateDailyRevenue(periodSales, (sale) => calculateSalesRevenue(sale, revenueSources).total), [periodSales, revenueSources]);
-  const receivables = customerDebts.reduce((sum, debt) => sum + numeric(debt.remaining_amount ?? debt.balance ?? debt.total_amount), 0);
+  const receivables = buildDebtLedgerSummary(customerDebts).totalReceivable;
   const payables = supplierInvoices.filter(approvedPurchase).reduce((sum, invoice) => sum + Math.max(0, numeric(invoice.remaining_amount ?? invoice.balance ?? (numeric(invoice.total_amount) - numeric(invoice.paid_amount ?? invoice.amount_paid)))), 0);
   const drawerCash = useMemo(
     () => normalizeDrawerCashAsOf(drawerCashQuery.data, {

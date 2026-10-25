@@ -27,3 +27,14 @@ describe('Executive analytics interaction and truthful states',()=>{
   expect(card(tree,'snapshot-sales').findAllByType('p')[0].children.join('')).toBe('—');tree.unmount();
  });
 });
+
+it('separates period credit sales from remaining debt after repayments', () => {
+ const creditModel = {...model, periodMetrics:{...model.periodMetrics,totalCredit:60},receivables:10};
+ const tree=create(<ExecutiveSnapshotV2 model={creditModel}/>);
+ expect(card(tree,'snapshot-credit-sales').findAllByType('p')[0].children.join('')).toBe('SAR 60');
+ expect(card(tree,'snapshot-receivables').findAllByType('p')[0].children.join('')).toBe('SAR 10');
+ act(()=>tree.update(<ExecutiveSnapshotV2 model={{...creditModel,receivables:0}}/>));
+ expect(card(tree,'snapshot-credit-sales').findAllByType('p')[0].children.join('')).toBe('SAR 60');
+ expect(card(tree,'snapshot-receivables').findAllByType('p')[0].children.join('')).toBe('SAR 0');
+ tree.unmount();
+});

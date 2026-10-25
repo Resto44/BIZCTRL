@@ -268,6 +268,8 @@ export default {
     "fa": "مبلغ مثبت با حداکثر دو رقم اعشار وارد کنید.",
     "ar": "أدخل مبلغاً موجباً بمنزلتين عشريتين كحد أقصى."
   },
+  "This shift already has posted customer credit. Open Closing History; a new closing cannot replace an existing customer debt.": { "fa": "نسیهٔ این شیفت قبلاً ثبت شده است. سابقهٔ کلوزینگ را باز کنید؛ کلوزینگ جدید نمی‌تواند جای بدهی ثبت‌شده را بگیرد.", "ar": "ائتمان هذه الوردية مسجل مسبقاً. افتح سجل الإقفالات؛ لا يمكن لإقفال جديد استبدال دين مسجل." },
+  "Recorded balance": { "fa": "ماندهٔ ثبت‌شده", "ar": "الرصيد المسجل" },
   "After recording payment (preview)": {
     "fa": "پس از ثبت پرداخت (پیش‌نمایش)",
     "ar": "بعد تسجيل السداد (معاينة)"

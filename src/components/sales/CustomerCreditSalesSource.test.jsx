@@ -204,12 +204,17 @@ describe('credit balances and localized amounts', () => {
     tree.unmount();
   });
 
-  it('previews increased debt and reduced available credit without changing posted metrics', () => {
+  it('updates the marked cards as a preview while preserving the recorded balance', () => {
     const tree = renderSource({ entry: { id: '1', customer_id: 'c1', amount: '50' } });
     const preview = textOf(tree.root.findByProps({ 'data-testid': 'credit-balance-preview' }));
     expect(preview).toContain('After finalizing closing (preview)');
     expect(preview).toContain('SAR 160');
     expect(preview).toContain('SAR 1,840');
+    const cards = textOf(tree.root.findByProps({ 'data-testid': 'credit-balance-cards' }));
+    expect(cards).toContain('SAR 160');
+    expect(cards).toContain('SAR 1,840');
+    expect(cards).toContain('Recorded balance');
+    expect(cards).toContain('SAR 110');
     expect(JSON.stringify(tree.toJSON())).toContain('SAR 110');
     tree.unmount();
   });
@@ -220,6 +225,10 @@ describe('credit balances and localized amounts', () => {
     const preview = textOf(tree.root.findByProps({ 'data-testid': 'credit-balance-preview' }));
     expect(preview).toContain('SAR 0');
     expect(preview).toContain('SAR 2,000');
+    const cards = textOf(tree.root.findByProps({ 'data-testid': 'credit-balance-cards' }));
+    expect(cards).toContain('After recording payment (preview)');
+    expect(cards).toContain('SAR 0');
+    expect(cards).toContain('SAR 2,000');
     act(() => tree.update(React.createElement(CustomerCreditSalesSource, { ...props, entry: { ...props.entry, payment_amount: '' }, customers: [{ ...customer, outstanding_balance: 0, available_credit: 2000 }] })));
     expect(tree.root.findAllByProps({ 'data-testid': 'credit-balance-preview' })).toHaveLength(0);
     expect(JSON.stringify(tree.toJSON())).toContain('SAR 2,000');

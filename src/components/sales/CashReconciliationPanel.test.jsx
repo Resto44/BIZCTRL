@@ -164,3 +164,28 @@ describe('CashReconciliationPanel', () => {
     expect(textOf(tree.root)).toContain('Awaiting Count');
   });
 });
+
+describe('simple cash-count flow', () => {
+  it('collapses calculation details while keeping the count editable', () => {
+    const tree = TestRenderer.create(<CashReconciliationPanel {...baseProps} compact />);
+    const details = tree.root.findByProps({ 'data-testid': 'cash-calculation-details' });
+    expect(details.type).toBe('details');
+    expect(details.props.open).toBeUndefined();
+    expect(textOf(details.findByType('summary'))).toMatch(/SAR\s+300/);
+    expect(tree.root.findByProps({ 'aria-label': 'Actual Cash' }).props.disabled).toBe(false);
+    tree.unmount();
+  });
+  it('never approves an overdrawn ledger even after a cash count', () => {
+    const tree = TestRenderer.create(<CashReconciliationPanel {...baseProps} compact ledgerOverdrawn />);
+    const approve = tree.root.findAllByType('button').find(node => textOf(node).includes('Approve Cash Count'));
+    expect(approve.props.disabled).toBe(true);
+    tree.unmount();
+  });
+  it('does not display the original owner liability again after settlement', () => {
+    const tree = TestRenderer.create(<CashReconciliationPanel {...baseProps} ownerSettlementResolved ownerSettlementRemaining={0} />);
+    expect(textOf(tree.root)).toContain('Resolved');
+    const ownerLabel = tree.root.findAllByType('p').find(node => textOf(node) === 'Owner');
+    expect(textOf(ownerLabel.parent)).toMatch(/SAR\s+0/);
+    tree.unmount();
+  });
+});

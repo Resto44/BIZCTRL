@@ -127,7 +127,7 @@ const CashReconciliationPanelView = function CashReconciliationPanel({
   const [noteOpen, setNoteOpen] = useState(Boolean(cashNotes));
   const [ledgerExpanded, setLedgerExpanded] = useState(false);
   const postedReceipts = movements.filter(m => m?.direction === 'in' && m?.is_reversed !== true);
-  const status = !openingVerified || ledgerLoading || ledgerUnavailable || difference === null ? 'pending' : difference === 0 ? 'balanced' : difference < 0 ? 'shortage' : 'overage';
+  const status = !openingVerified || ledgerLoading || ledgerUnavailable || ledgerOverdrawn || difference === null ? 'pending' : difference === 0 ? 'balanced' : difference < 0 ? 'shortage' : 'overage';
   const statusCopy = status === 'pending'
     ? (ledgerOverdrawn ? 'Ledger error' : !openingVerified ? 'Opening unverified' : 'Awaiting Count')
     : status === 'balanced'
@@ -154,7 +154,7 @@ const CashReconciliationPanelView = function CashReconciliationPanel({
         <header className="flex min-w-0 flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <h2 className={`font-black tracking-tight text-slate-950 ${compact ? 'text-base sm:text-lg' : 'truncate text-xl sm:text-2xl'}`}>{lang === 'fa' ? 'تطبیق نقد صندوق' : lang === 'ar' ? 'مطابقة نقد الصندوق' : closingTr('Cash Reconciliation')}</h2>
-            <p className="mt-1 text-xs font-medium text-slate-500">{lang === 'fa' ? 'نقد فیزیکی · فقط یک دفتر صندوق' : lang === 'ar' ? 'النقد الفعلي · دفتر صندوق واحد' : closingTr('Physical cash only · one ERP drawer ledger')}</p>
+            <p className="mt-1 text-xs font-medium text-slate-500">{lang === 'fa' ? 'پول داخل صندوق را بشمارید و وارد کنید؛ حساب باقی‌مانده خودکار است.' : lang === 'ar' ? 'عدّ النقد في الصندوق وأدخله؛ الحسابات الأخرى تلقائية.' : 'Count the cash in the drawer and enter it; the rest is calculated automatically.'}</p>
           </div>
           <span className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-black sm:text-sm ${statusTone}`}>
             <StatusIcon className="h-4 w-4" />{closingTr(statusCopy)}
@@ -172,7 +172,7 @@ const CashReconciliationPanelView = function CashReconciliationPanel({
           </div>
         ) : (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 sm:p-3" aria-label={closingTr("Expected cash equation")}>
-            {compact ? <dl data-testid="drawer-cash-equation" className="space-y-1">
+            {compact ? <details data-testid="cash-calculation-details"><summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 text-sm font-black text-blue-800"><span>{closingTr('Expected Cash')}<span className="block text-[10px] font-medium">{lang === 'fa' ? 'جزئیات محاسبه' : lang === 'ar' ? 'تفاصيل الحساب' : 'Calculation details'}</span></span><Money currency={currency} value={expectedCash} /></summary><dl data-testid="drawer-cash-equation" className="space-y-1">
               {[
                 ['Opening Cash', openingCash, ''],
                 ['Cash Sales', cashSales, '+'],
@@ -185,7 +185,7 @@ const CashReconciliationPanelView = function CashReconciliationPanel({
               <div className="flex items-center justify-between gap-3 pt-2 text-sm font-black text-blue-800">
                 <dt>{closingTr("Expected Cash")}</dt><dd dir="ltr"><Money currency={currency} value={expectedCash} /></dd>
               </div>
-            </dl> : null}
+            </dl></details> : null}
             {!compact && <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1.2fr)] sm:gap-1">
               <EquationMetric label={closingTr("Opening")} value={openingCash} />
               <EquationOperator>+</EquationOperator>
@@ -209,7 +209,7 @@ const CashReconciliationPanelView = function CashReconciliationPanel({
         <div className={compact ? 'grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)]' : 'grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)] gap-3'}>
           <div id="quick-closing-reconciliation" className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
             <label htmlFor={inputId} className="block text-xs font-black text-slate-700 sm:text-sm">{closingTr("Actual Cash")}<span className="text-red-500">*</span></label>
-            <p className="mt-1 hidden text-xs text-slate-500 sm:block">{closingTr("Enter the physical cash count")}</p>
+            <p className="mt-1 text-xs text-slate-500">{closingTr("Enter the physical cash count")}</p>
             <ClosingNumericInput
               id={inputId}
               value={actualCashValue}
@@ -278,7 +278,7 @@ const CashReconciliationPanelView = function CashReconciliationPanel({
           type="button"
           className={`min-h-14 w-full rounded-2xl text-base font-black shadow-sm ${managerApproved ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}
           onClick={onApprove}
-          disabled={disabled || !openingVerified || ledgerLoading || ledgerUnavailable || actualCash === null || managerApproved}
+          disabled={disabled || !openingVerified || ledgerLoading || ledgerUnavailable || ledgerOverdrawn || actualCash === null || managerApproved}
           aria-pressed={managerApproved}
         >
           {managerApproved ? <CheckCircle2 className="mr-2 h-5 w-5" /> : <ShieldCheck className="mr-2 h-5 w-5" />}
@@ -304,7 +304,7 @@ const CashReconciliationPanelView = function CashReconciliationPanel({
                   <ArrowRight className="h-5 w-5 text-blue-600" aria-hidden="true" />
                   <div className="rounded-2xl border border-red-200 bg-white p-3 text-center">
                     <p className="text-xs font-bold text-red-800">{closingTr("Owner")}</p>
-                    <Money currency={currency} value={ownerSettlementRemaining || ownerSettlementRequired} className="mt-1 block text-xl font-black text-red-700" />
+                    <Money currency={currency} value={ownerSettlementResolved ? 0 : ownerSettlementRemaining ?? ownerSettlementRequired} className="mt-1 block text-xl font-black text-red-700" />
                   </div>
                 </div>
                 <div className="mt-3 flex flex-col gap-2 rounded-xl bg-blue-50 px-3 py-2.5 text-xs text-blue-800 sm:flex-row sm:items-center sm:justify-between">
