@@ -299,7 +299,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(sales).toContain('const openNewClosing = useCallback(async () => {');
     expect(sales).toContain('Resumed the daily Closing.');
     expect(sales).toContain('dailyClosingDefaults({');
-    expect(sales).toContain("existing?.closing_state === 'finalized'");
+    expect(sales).toContain('if (existing) {');
     expect(sales).toContain('No record is created until you save it.');
     expect(sales).toContain("key={editing?.id || `new-closing-${newClosingInstance}-${selectedBranchId || 'none'}-${selectedBranchKey || 'none'}`}");
     expect(sales).toContain('matchesSalesClosingSession(record, session)');
@@ -317,7 +317,10 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(sales).toContain('const findExistingClosingSession = useCallback(async (session) => {');
     expect(sales).toContain("if (existing && ['draft', 'ready'].includes(existing.closing_state || 'draft')) {");
     expect(sales).toContain('Draft already exists for this business day, branch, shift, and cashier. Resumed the daily Closing.');
-    expect(sales).toContain('const nextSession = existing?.closing_state === \'finalized\'');
+    expect(sales).not.toContain('addDays(');
+    expect(sales).not.toContain('nextSession');
+    expect(sales).toContain('date: session.date');
+    expect(sales).toContain('Opened the same record without changing its date.');
     expect(sales).toContain('setEditing(existing);');
     expect(sales).toContain("import { closingSaveErrorMessage, recordClosingOwnerPayment, saveClosingSession } from '@/lib/closing/ClosingRepository';");
     expect(sales).toContain('const saved = await saveClosingSession({ payload, closingId: editing?.id || null });');

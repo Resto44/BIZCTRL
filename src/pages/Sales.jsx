@@ -23,7 +23,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
-import { addDays, format } from 'date-fns';
+import { format } from 'date-fns';
 import CustomerCollections from '@/components/sales/CustomerCollections';
 import DailySummary from '@/components/sales/DailySummary';
 import CashRegister from '@/components/sales/CashRegister';
@@ -208,29 +208,25 @@ export default function Sales() {
         toast.info('Draft already exists for this business day, branch, shift, and cashier. Resumed the daily Closing.');
         return;
       }
-      // A finalized Closing remains editable from History. The New Closing action
-      // deliberately opens the next business day with no copied daily amounts.
-      const nextSession = existing?.closing_state === 'finalized'
-        ? { ...session, date: format(addDays(new Date(`${session.date}T12:00:00`), 1), 'yyyy-MM-dd') }
-        : session;
-      const nextExisting = nextSession.date === session.date ? null : await findExistingClosingSession(nextSession);
-      if (nextExisting && ['draft', 'ready'].includes(nextExisting.closing_state || 'draft')) {
+      // A business date is an explicit accounting choice. Never advance it
+      // just because the selected shift already has a finalized record.
+      if (existing) {
         setNewClosingDefaults(null);
-        setEditing(nextExisting);
+        setEditing(existing);
         setShowForm(true);
-        toast.info('Draft already exists for the next business day. Resumed the daily Closing.');
+        toast.info(lang === 'fa' ? 'این شیفت قبلاً ثبت شده؛ همان رکورد باز شد و تاریخ تغییر نکرد.' : lang === 'ar' ? 'هذه الوردية مسجلة مسبقاً؛ تم فتح السجل نفسه دون تغيير التاريخ.' : 'This shift already exists. Opened the same record without changing its date.');
         return;
       }
       // Opening is in-memory until Save Draft or Finalize. The helper deliberately
       // resets all daily sales, credit, payment, cash, expense, and reconciliation inputs.
       setEditing(null);
       setNewClosingDefaults(dailyClosingDefaults({
-        date: nextSession.date,
-        branch: nextSession.branch,
-        branchId: nextSession.branch_id || null,
-        shift: nextSession.shift,
-        cashierId: nextSession.cashier_id || null,
-        cashierName: nextSession.cashier_name || '',
+        date: session.date,
+        branch: session.branch,
+        branchId: session.branch_id || null,
+        shift: session.shift,
+        cashierId: session.cashier_id || null,
+        cashierName: session.cashier_name || '',
       }));
       setNewClosingInstance((value) => value + 1);
       setShowForm(true);
@@ -240,7 +236,7 @@ export default function Sales() {
     } finally {
       setIsOpeningNewClosing(false);
     }
-  }, [findExistingClosingSession, isOpeningNewClosing, sessionContext]);
+  }, [findExistingClosingSession, isOpeningNewClosing, sessionContext, lang]);
 
   // Only create wallet transactions for COUNTER (restaurant) sales.
   const autoWalletTx = async (saleData, saleId, prevSale = null) => {
