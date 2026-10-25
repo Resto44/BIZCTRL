@@ -58,11 +58,12 @@ const textOf = (node) => node.children.map((child) => (
 )).join(' ');
 
 describe('CashReconciliationPanel', () => {
-  it('keeps optional funding and diagnostic details collapsed even when the ledger is overdrawn', () => {
+  it('shows funding directly while keeping diagnostic details collapsed', () => {
     const tree = TestRenderer.create(<CashReconciliationPanel {...baseProps} compact
       ledgerOverdrawn openingVerified={false} expectedCash={-2052} difference={null}
       fundingContent={<div>Receipt form</div>} />);
-    expect(tree.root.findByProps({ 'data-testid': 'optional-cash-receipt' }).props.open).toBeUndefined();
+    expect(tree.root.findByProps({ 'data-testid': 'drawer-funding-inside-reconciliation' })).toBeTruthy();
+    expect(tree.root.findAllByProps({ 'data-testid': 'optional-cash-receipt' })).toHaveLength(0);
     expect(tree.root.findByProps({ 'data-testid': 'cash-review-details' }).props.open).toBeUndefined();
     expect(tree.root.findByProps({ 'aria-label': 'Actual Cash' }).props.disabled).not.toBe(true);
     expect(textOf(tree.root)).toContain('does not mean money was received');

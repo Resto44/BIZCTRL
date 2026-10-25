@@ -67,7 +67,7 @@ import ClosingFinalReview from '@/components/sales/ClosingFinalReview';
 import { closingCashSalesSources } from '@/lib/closing/ClosingCashSalesSources';
 import ClosingControlOverview from '@/components/sales/ClosingControlOverview';
 import ClosingStepNavigation, { closingStepCopy, closingStepIssues } from '@/components/sales/ClosingStepNavigation';
-import ClosingFundingPanel from '@/components/sales/ClosingFundingPanel';
+import ClosingFundingPanel from '@/components/sales/SimpleClosingFunding';
 import { activeClosingNetworkAccounts, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { hasCanonicalCustomerScope, loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
@@ -2001,7 +2001,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               fundingContent={cashContextReady ? <ClosingFundingPanel
                 key={`${activeRestaurant?.id}:${selectedBranchId}:${form.date}:${form.shift}:${effectiveCashierId}`}
                 restaurantId={activeRestaurant?.id} branchId={selectedBranchId} branchKey={form.branch} date={form.date} shift={form.shift} cashierId={effectiveCashierId}
-                initialSource="treasury" expectedCash={expectedCash} actualCash={actualCount} role={role} lang={lang} currency={currency} disabled={isSubmitting}
+                expectedCash={expectedCash} actualCash={actualCount} role={role} lang={lang} currency={currency} disabled={isSubmitting}
                 onPosted={async () => { setManagerApproved(false); await refetchCashLedger(); }}
               /> : null}
             />
