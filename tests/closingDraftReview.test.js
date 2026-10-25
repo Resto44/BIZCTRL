@@ -7,7 +7,9 @@ describe('unreconciled closing draft boundary', () => {
     expect(source).toContain('if (!savingDraft && ledgerOverdrawn) nextErrors.reconciliation');
     const buttons = [...source.matchAll(/<Button type="submit" data-closing-intent="draft"[^>]+>/g)].map(m=>m[0]);
     expect(buttons).toHaveLength(1);
-    for (const button of buttons) expect(button).not.toContain('ledgerOverdrawn');
+    const draftButton = source.slice(source.indexOf('<Button type="submit" data-closing-intent="draft"'), source.indexOf('<Save', source.indexOf('<Button type="submit" data-closing-intent="draft"')));
+    expect(draftButton.match(/disabled=\{([^}]+)\}/)[1]).not.toContain('ledgerOverdrawn');
+    expect(draftButton).toContain('!canSaveClosingDraft');
     expect(source).toContain('disabled={isSubmitting || !allValid || !cashContextReady || cashDifference === null || ledgerOverdrawn}');
   });
   it('only defers the specific overdrawn error for drafts, leaving permissions and finalization intact', () => {
