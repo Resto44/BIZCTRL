@@ -1336,6 +1336,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     actualCash: actualCount,
     branchWalletAvailable,
   });
+  const canSaveClosingDraft = !['finalized', 'locked', 'corrected'].includes(savedClosing?.closing_state || initial?.closing_state);
   const ledgerOverdrawn = cashContextReady && reconciliation.ledgerOverdrawn;
   const branchWalletApplied = Math.max(0, Number(activeOwnerSettlement?.wallet_payment_amount ?? reconciliation.branchWalletApplied) || 0);
   const ownerSettlementRequired = Math.max(0, Number(activeOwnerSettlement?.owner_settlement_required ?? reconciliation.ownerPaymentRequired) || 0);
@@ -1366,7 +1367,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       key: 'erpData',
       label: 'ERP Sales and Cash Ledger Available',
       passed: !automaticClosingUnavailable && !cashLedgerUnavailable && cashContextReady && !openingReviewRequired && !ledgerOverdrawn,
-      message: !effectiveCashierId ? 'Select a valid cashier/operator to load the cash ledger' : openingReviewRequired ? openingReviewReason : ledgerOverdrawn ? (lang === 'fa' ? 'تمویل از خزانه یا اونر را ثبت کنید' : lang === 'ar' ? 'سجّل تمويل الخزينة أو المالك' : 'Record treasury or owner funding') : automaticClosingUnavailable || cashLedgerUnavailable ? 'Cash ledger could not be loaded; recheck branch and shift' : !cashContextReady ? 'Cash ledger is loading or opening count is not verified' : 'Verified cash ledger available',
+      message: !effectiveCashierId ? 'Select a valid cashier/operator to load the cash ledger' : openingReviewRequired ? openingReviewReason : ledgerOverdrawn ? (lang === 'fa' ? 'گردش صندوق نیاز به بررسی دارد؛ می‌توانید ذخیره موقت کنید' : lang === 'ar' ? 'حركة الصندوق تحتاج مراجعة؛ يمكنك حفظ المسودة' : 'Cash movements need review; you can save a draft') : automaticClosingUnavailable || cashLedgerUnavailable ? 'Cash ledger could not be loaded; recheck branch and shift' : !cashContextReady ? 'Cash ledger is loading or opening count is not verified' : 'Verified cash ledger available',
     },
     {
       key: 'cashier',
@@ -1515,6 +1516,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     if (!expenseContextReady) nextErrors.expenses = expenseContextMessage;
     if (openingReviewRequired) nextErrors.reconciliation = openingReviewReason;
     if (cashLedgerUnavailable || !cashContextReady) nextErrors.reconciliation = 'Load and verify the ERP cash ledger before saving.';
+    if (savingDraft && !canSaveClosingDraft) nextErrors.reconciliation = lang === 'fa' ? 'کلوزینگ نهایی‌شده را نمی‌توان به پیش‌نویس تبدیل کرد.' : lang === 'ar' ? 'لا يمكن تحويل الإقفال النهائي إلى مسودة.' : 'A finalized closing cannot be saved as a draft.';
     if (!savingDraft && ledgerOverdrawn) nextErrors.reconciliation = 'Cash ledger is overdrawn. Reconcile dated cash movements and funding before finalizing.';
     if (!savingDraft && actualCount === null) nextErrors.actualCash = 'Enter the physically counted Actual Cash (0 or positive, up to two decimal places).';
     // Manual daily totals are a supported mode, not an exceptional adjustment.
@@ -2095,8 +2097,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             <span className="text-[11px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش همین شیفت' : lang === 'ar' ? 'مجموع مبيعات الوردية' : closingTr('Shift sales total')}</span>
             <Money currency={currency} value={totalSales} className="text-lg font-black text-slate-900" />
           </div>
+          {ledgerOverdrawn && canSaveClosingDraft && <p role="status" className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{lang === 'fa' ? 'فروش و شمارش نقد را با «ذخیره برای بررسی» نگه دارید. کلوزینگ تا رفع اختلاف پیش‌نویس می‌ماند؛ لازم نیست برای ادامه تمویل ثبت کنید.' : lang === 'ar' ? 'احفظ المبيعات والعد النقدي عبر «حفظ للمراجعة». يبقى الإقفال مسودة حتى معالجة الفرق؛ لا يلزم تسجيل تمويل للمتابعة.' : 'Save sales and the cash count with “Save for review”. The closing remains a draft until the difference is reviewed; recording funding is not required to save.'}</p>}
           <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2">
-            <Button type="submit" data-closing-intent="draft" variant="outline" className="min-h-12 min-w-0 rounded-xl px-2 text-xs font-bold sm:text-sm" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={isSubmitting || purchasesLoading || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady}><Save className="mr-1 h-4 w-4 shrink-0" />{lang === 'fa' ? 'ذخیره موقت' : lang === 'ar' ? 'حفظ المسودة' : closingTr('Save Draft')}</Button>
+            <Button type="submit" data-closing-intent="draft" variant={ledgerOverdrawn ? "default" : "outline"} className="min-h-12 min-w-0 rounded-xl px-2 text-xs font-bold sm:text-sm" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={!canSaveClosingDraft || isSubmitting || purchasesLoading || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady}><Save className="mr-1 h-4 w-4 shrink-0" />{ledgerOverdrawn ? (lang === 'fa' ? 'ذخیره برای بررسی' : lang === 'ar' ? 'حفظ للمراجعة' : 'Save for review') : (lang === 'fa' ? 'ذخیره موقت' : lang === 'ar' ? 'حفظ المسودة' : closingTr('Save Draft'))}</Button>
             {closingStep < 2 ? <Button type="button" data-testid="closing-next-step" className="min-h-12 min-w-0 whitespace-normal rounded-xl bg-blue-600 px-2 text-xs font-black hover:bg-blue-700 sm:text-sm" disabled={isSubmitting} onClick={() => goToClosingStep(closingStep + 1)}>{stepCopy.next[closingStep]}</Button> : <Button type="button" aria-label={closingTr("Review & Finalize Closing")} data-testid="closing-review-finalize" className="min-h-12 min-w-0 rounded-xl bg-blue-600 px-2 text-xs font-black hover:bg-blue-700 sm:text-sm" disabled={isSubmitting} onClick={() => {
               if (!allValid || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady || ledgerOverdrawn || purchasesLoading) {
                 setShowBlockers(true);

@@ -44,11 +44,11 @@ describe('closing funding and networks',()=>{
   expect(validClosingNetworkEntries([{amount:0}],[])).toBe(true);
  });
  const mount=async(role='owner', expectedCash=-152, actualCash=95)=>{client=new QueryClient({defaultOptions:{queries:{retry:false}}});await act(async()=>{tree=create(<QueryClientProvider client={client}><ClosingFundingPanel restaurantId="r" branchId="b" branchKey="main" date="2026-10-23" shift="Morning" cashierId="c" expectedCash={expectedCash} actualCash={actualCash} role={role}/></QueryClientProvider>);});};
- const fill=()=>act(()=>{tree.root.findByType('textarea').props.onChange({target:{value:'Confirmed supplier cash funding'}});tree.root.findAllByType('input').find(x=>x.props.type==='checkbox').props.onChange({target:{checked:true}});});
+ const fill=()=>act(()=>{tree.root.findAllByType('input').find(x=>x.props.inputMode==='decimal').props.onChange({target:{value:'247'}});tree.root.findByType('textarea').props.onChange({target:{value:'Confirmed supplier cash funding'}});tree.root.findAllByType('input').find(x=>x.props.type==='checkbox').props.onChange({target:{checked:true}});});
  it('offers Owner/Treasury funding for a real counted shortage without pretending variance disappears',async()=>{
   await mount('owner',100,95);
   const amount=tree.root.findAllByType('input').find(x=>x.props.inputMode==='decimal');
-  expect(amount.props.value).toBe('5');
+  expect(amount.props.value).toBe('');
   const notice=tree.root.findByProps({ 'data-testid': 'funding-physical-shortage-note' });
   expect(notice).toBeTruthy();
   expect(mock.rpc).not.toHaveBeenCalled();

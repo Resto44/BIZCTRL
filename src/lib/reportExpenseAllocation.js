@@ -21,7 +21,10 @@ export function allocateReportExpenses(expenses = [], categories = [], from, to)
     daily.get(date)[fixed ? 'fixed' : 'variable'] += value;
     groups.set(name, (groups.get(name) || 0) + value);
   };
-  for (let day = parseISO(from); day <= parseISO(to); day = addDays(day, 1)) {
+  // Iterate at noon so a timezone transition at midnight cannot skip a business date.
+  const start = parseISO(`${from}T12:00:00`);
+  const end = parseISO(`${to}T12:00:00`);
+  for (let day = start; day <= end; day = addDays(day, 1)) {
     const date = format(day, 'yyyy-MM-dd');
     daily.set(date, {date, fixed: 0, variable: 0});
     for (const category of fixedCategories) {

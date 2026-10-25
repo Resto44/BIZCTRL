@@ -24,7 +24,7 @@ export default function ClosingFundingPanel({restaurantId, branchId, branchKey, 
  const [source,setSource]=useState(pending?.p_source||'owner');
  const [sourceId,setSourceId]=useState(pending?.p_source_account_id||'');
  const [destinationId,setDestinationId]=useState(pending?.p_destination_account_id||'');
- const [amount,setAmount]=useState(pending ? String(pending.p_amount) : String(proposal.toCount || proposal.minimum || physicalShortage || ''));
+ const [amount,setAmount]=useState(pending ? String(pending.p_amount) : '');
  const [note,setNote]=useState(pending?.p_note||'');
  const [received,setReceived]=useState(pending?.p_received||false);
  const [settled,setSettled]=useState(pending?.p_settled||false);
@@ -62,7 +62,7 @@ export default function ClosingFundingPanel({restaurantId, branchId, branchKey, 
     {lang==='fa'?'کمبود شمارش:':lang==='ar'?'عجز الجرد:':'Counted shortage:'} <strong dir="ltr">{physicalShortage.toFixed(2)} {currency}</strong>.
     {' '}{lang==='fa'?'تمویل واقعاً دریافت‌شده به ورودی نقد افزوده می‌شود؛ اختلاف پیشین خودکار صفر نمی‌شود و به رسیدگی حسابداری نیاز دارد.':lang==='ar'?'يضاف التمويل المستلم فعلياً إلى النقد الوارد؛ لا يمحى فرق الجرد السابق تلقائياً ويحتاج مراجعة محاسبية.':'Physically received funding posts as Cash In. It does not erase the original count variance; audit review remains required.'}
   </div>}
-  <dl className="grid gap-2 text-sm sm:grid-cols-2"><div><dt>{tr.minimum}</dt><dd className="break-all text-lg font-black">{proposal.minimum.toFixed(2)} {currency}</dd></div><div><dt>{tr.count}</dt><dd className="break-all text-lg font-black">{proposal.toCount===null?'—':proposal.toCount.toFixed(2)} {currency}</dd></div></dl>
+  <details><summary className="cursor-pointer text-xs font-semibold">{lang==='fa'?'جزئیات اختلاف صندوق':lang==='ar'?'تفاصيل فرق الصندوق':'Cash difference details'}</summary><dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2"><div><dt>{tr.minimum}</dt><dd className="break-all text-lg font-black">{proposal.minimum.toFixed(2)} {currency}</dd></div><div><dt>{tr.count}</dt><dd className="break-all text-lg font-black">{proposal.toCount===null?'—':proposal.toCount.toFixed(2)} {currency}</dd></div></dl></details>
   {role!=='owner'?<p>{tr.manager}</p>:<>
    {pending&&<p role="status">{tr.pending}</p>}
    <fieldset disabled={busy||Boolean(pending)||disabled} className="min-w-0 space-y-3 disabled:opacity-60">
