@@ -2001,7 +2001,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               fundingContent={cashContextReady ? <ClosingFundingPanel
                 key={`${activeRestaurant?.id}:${selectedBranchId}:${form.date}:${form.shift}:${effectiveCashierId}`}
                 restaurantId={activeRestaurant?.id} branchId={selectedBranchId} branchKey={form.branch} date={form.date} shift={form.shift} cashierId={effectiveCashierId}
-                expectedCash={expectedCash} actualCash={actualCount} role={role} lang={lang} currency={currency} disabled={isSubmitting}
+                initialSource="treasury" expectedCash={expectedCash} actualCash={actualCount} role={role} lang={lang} currency={currency} disabled={isSubmitting}
                 onPosted={async () => { setManagerApproved(false); await refetchCashLedger(); }}
               /> : null}
             />
