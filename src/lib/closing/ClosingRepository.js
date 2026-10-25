@@ -54,6 +54,7 @@ const BUSINESS_MESSAGES = {
   SALES_CLOSING_CREDIT_CUSTOMER_REQUIRED: 'Select an active Customer Master customer for every Today Credit amount.',
   SALES_CLOSING_CREDIT_CUSTOMER_INVALID: 'One or more selected credit customers are no longer active or do not belong to this branch.',
   SALES_CLOSING_CREDIT_LIMIT_EXCEEDED: 'Credit limit exceeded. Correct the Today Credit amount or perform an authorized manager override.',
+  SALES_CLOSING_CREDIT_FINALIZED_IMMUTABLE: 'This shift already has posted customer credit. Open Closing History; a new closing cannot replace an existing customer debt.',
   SALES_CLOSING_CREDIT_OVERRIDE_DENIED: 'Only an authorized manager or owner can approve a credit-limit override.',
   SALES_CLOSING_VERSION_IMMUTABLE: 'The finalized Closing snapshot could not be created safely. Reload the Closing and try again.',
   CLOSING_NETWORK_ACCOUNT_INVALID: 'Choose an active Network Management account for each card amount in this branch.',

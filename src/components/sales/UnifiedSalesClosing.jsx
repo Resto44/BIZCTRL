@@ -1947,7 +1947,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           </div>}
           {automaticClosingUnavailable && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"><p className="font-black">{closingTr("ERP sales data needs attention")}</p><p className="mt-1 text-xs">{closingTr("Check the branch and date, then retry before finalizing.")}</p><Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-300 bg-white" onClick={() => refetchAutomaticClosing()}><RefreshCw className="mr-1.5 h-4 w-4" />{closingTr("Retry ERP data")}</Button></div>}
 
+          <details open={!cashSalesSourcesMatched || undefined} className="rounded-2xl border border-slate-200 bg-white p-3" data-testid="cash-source-details">
+            <summary className="min-h-11 cursor-pointer text-sm font-bold">{lang === 'fa' ? 'فروش نقدی همهٔ منابع · جزئیات' : lang === 'ar' ? 'نقد المبيعات من جميع المصادر · التفاصيل' : 'Cash sales from all sources · details'}</summary>
           <ClosingCashSalesSources breakdown={cashSalesBreakdown} closingCashSales={cashSales} currency={currency} lang={lang} />
+          </details>
           <div data-testid="closing-cash-action" className="min-w-0" aria-label={closingTr("Cash reconciliation")}>
             <CashReconciliationPanel
               compact
@@ -1994,8 +1997,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               isRecordingOwnerPayment={isRecordingOwnerPayment}
               disabled={isSubmitting}
               fundingContent={cashContextReady ? <ClosingFundingPanel
-                key={`${activeRestaurant?.id}:${selectedBranchId}:${form.date}:${closingTr(form.shift)}:${effectiveCashierId}`}
-                restaurantId={activeRestaurant?.id} branchId={selectedBranchId} branchKey={form.branch} date={form.date} shift={closingTr(form.shift)} cashierId={effectiveCashierId}
+                key={`${activeRestaurant?.id}:${selectedBranchId}:${form.date}:${form.shift}:${effectiveCashierId}`}
+                restaurantId={activeRestaurant?.id} branchId={selectedBranchId} branchKey={form.branch} date={form.date} shift={form.shift} cashierId={effectiveCashierId}
                 expectedCash={expectedCash} actualCash={actualCount} role={role} lang={lang} currency={currency} disabled={isSubmitting}
                 onPosted={async () => { setManagerApproved(false); await refetchCashLedger(); }}
               /> : null}

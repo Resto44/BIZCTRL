@@ -237,6 +237,9 @@ export default function ExecutiveSnapshotV2({model,copy}) {
           change={moneyChange(periodMetrics.totalPurchaseCost,prev.totalPurchaseCost)}
           current={periodMetrics.totalPurchaseCost} previous={prev.totalPurchaseCost}
           hint={t(copy,'purchasesHint','Approved purchases in the period')}/>
+        <StatCard testId="snapshot-credit-sales" title={lang==='fa'?'فروش نسیهٔ دوره':lang==='ar'?'المبيعات الآجلة للفترة':'Period credit sales'} icon={ReceiptText}
+          value={hasQueryError?'—':formatMoney(periodMetrics.totalCredit || 0)} tone="violet"
+          hint={lang==='fa'?'فروش نسیهٔ نهایی‌شده؛ پرداخت بدهی این رقم را کم نمی‌کند.':lang==='ar'?'مبيعات آجلة معتمدة؛ سداد الدين لا يخفض هذا الرقم.':'Finalized credit sales; debt repayments do not reduce this amount.'}/>
         <StatCard testId="snapshot-receivables" title={t(copy,'receivables','Receivables')} icon={ReceiptText}
           value={hasQueryError?'—':formatMoney(receivables)} tone="green"
           hint={t(copy,'receivablesHint','Current outstanding customer balance')}/>

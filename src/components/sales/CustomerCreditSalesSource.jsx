@@ -108,7 +108,7 @@ export default function CustomerCreditSalesSource({
   const customerIdentifier = selectedCustomer?.phone || selectedCustomer?.customer_code || entry.customer_phone || '';
   const outstanding = amount(selectedCustomer?.outstanding_balance ?? entry.previous_outstanding_debt);
   const creditLimit = amount(selectedCustomer?.credit_limit ?? entry.credit_limit);
-  const available = amount(selectedCustomer?.available_credit ?? entry.available_credit ?? Math.max(0, creditLimit - outstanding));
+  const available = Math.max(0, creditLimit - outstanding);
   const transactionType = entry.transaction_type === TRANSACTION_TYPES.DEBT_PAYMENT
     ? TRANSACTION_TYPES.DEBT_PAYMENT
     : TRANSACTION_TYPES.CREDIT_SALE;
@@ -128,6 +128,8 @@ export default function CustomerCreditSalesSource({
   const displayedAvailable = hasValidProjection ? Math.max(0, Math.round((creditLimit - displayedDebt) * 100) / 100) : available;
   const pendingLabel = lang === 'fa' ? 'پیش‌نمایش · ثبت‌نشده' :
     lang === 'ar' ? 'معاينة · لم يُرحّل' : 'Preview · not posted';
+
+  const showBalancePreview = hasValidProjection;
 
   const activePaymentMethods = useMemo(() => {
     const configured = paymentMethods
@@ -301,10 +303,16 @@ export default function CustomerCreditSalesSource({
               {!disabled && !creditPosted && <button type="button" className="rounded-full p-2 text-blue-600 hover:bg-blue-50" onClick={clearCustomer} aria-label={closingTr("Change customer")}><Pencil className="h-4 w-4" /></button>}
             </div>
 
-            <div className="grid grid-cols-3 gap-2" aria-live="polite">
+            <div aria-live="polite" data-testid="credit-balance-cards">
+              <p className="mb-2 text-xs font-semibold text-slate-600">{showBalancePreview
+                ? closingTr(isPayment ? 'After recording payment (preview)' : 'After finalizing closing (preview)')
+                : closingTr('Recorded balance')}</p>
+              <div className="grid grid-cols-3 gap-2">
               <Metric label={closingTr("Debt")} value={displayedDebt} currency={currency} tone="debt" icon={TrendingDown} projected={hasValidProjection} pendingLabel={pendingLabel} />
               <Metric label={closingTr("Limit")} value={creditLimit} currency={currency} tone="limit" icon={CreditCard} />
               <Metric label={closingTr("Available")} value={displayedAvailable} currency={currency} tone="available" icon={CircleCheck} projected={hasValidProjection} pendingLabel={pendingLabel} />
+              </div>
+              {showBalancePreview && <p className="mt-2 text-xs text-slate-500">{closingTr('Recorded balance')}: <bdi dir="ltr">{money(currency, outstanding)}</bdi></p>}
             </div>
 
             <div className="grid grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
