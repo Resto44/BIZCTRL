@@ -1,4 +1,3 @@
-import { buildDebtLedgerSummary } from '@/lib/debtLedgerSummary';
 /**
  * OwnerDashboard — Four-page ERP Owner Report Center.
  * Financial values use the shared ERP accounting engine; consumption and rate
@@ -24,6 +23,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useBranchScope } from '@/lib/BranchScopeContext';
 import { calculateERPAccounting, calculateSalesRevenue, tagExpensesWithCategories } from '@/lib/helpers';
 import { normalizeDrawerCashAsOf } from '@/lib/executiveDrawerCash';
+import { auditPostedClosingCredit, summarizePostedCustomerReceivables } from '@/lib/debt/customerReceivableSummary';
 import { useLanguage } from '@/lib/LanguageContext';
 import { completeOwnerReportCopy } from '@/lib/ownerReportTranslations';
 import {
@@ -416,7 +416,14 @@ function OwnerDashboardContent() {
   const expenseGroups = useMemo(() => groupExpensesByCategory(periodExpenses, expenseCategories), [expenseCategories, periodExpenses]);
   const previousRevenueTrend = useMemo(() => aggregateDailyRevenue(previousPeriodSales, (sale) => calculateSalesRevenue(sale, revenueSources).total), [previousPeriodSales, revenueSources]);
   const revenueTrend = useMemo(() => aggregateDailyRevenue(periodSales, (sale) => calculateSalesRevenue(sale, revenueSources).total), [periodSales, revenueSources]);
-  const receivables = buildDebtLedgerSummary(customerDebts).totalReceivable;
+  const customerCreditPosition = useMemo(() => summarizePostedCustomerReceivables(customerDebts, {
+    complete: !customerDebtsQuery.isError && (isAllBranches || Boolean(selectedBranchId && selectedBranchKey)),
+  }), [customerDebts, customerDebtsQuery.isError, isAllBranches, selectedBranchId, selectedBranchKey]);
+  const receivables = customerCreditPosition.amount;
+  const creditLedgerAudit = useMemo(() => auditPostedClosingCredit(periodSales, customerDebts, {
+    complete: !customerDebtsQuery.isError && !periodSalesQuery.isError &&
+      (isAllBranches || Boolean(selectedBranchId && selectedBranchKey)),
+  }), [periodSales, customerDebts, customerDebtsQuery.isError, periodSalesQuery.isError, isAllBranches, selectedBranchId, selectedBranchKey]);
   const payables = supplierInvoices.filter(approvedPurchase).reduce((sum, invoice) => sum + Math.max(0, numeric(invoice.remaining_amount ?? invoice.balance ?? (numeric(invoice.total_amount) - numeric(invoice.paid_amount ?? invoice.amount_paid)))), 0);
   const drawerCash = useMemo(
     () => normalizeDrawerCashAsOf(drawerCashQuery.data, {
@@ -460,7 +467,7 @@ function OwnerDashboardContent() {
   const model = useMemo(() => ({
     formatMoney, periodMetrics, previousPeriodMetrics, periodSalesChange, periodLabel, periodKey: activePeriod,
     periodSales, revenueSources, lang,
-    branchRankings, scopedAlerts, inventoryOverview, receivables, payables, cashRegister, drawerCash,
+    branchRankings, scopedAlerts, inventoryOverview, receivables, receivablesStatus: creditLedgerAudit.status === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : customerCreditPosition.status, receivablesCount: customerCreditPosition.count, creditLedgerAudit, payables, cashRegister, drawerCash,
     consumption, priceReport, supplierComparisons, branchPriceInconsistencies, priceHistory,
     previousRevenueTrend, reportPeriod: period, changeReportPeriod,
     expenseGroups, revenueTrend, periodPurchaseQuantity, periodPurchaseCost: periodMetrics.totalPurchaseCost,
@@ -468,7 +475,7 @@ function OwnerDashboardContent() {
     canOpenCopilot: role === 'owner' && subscriptionActive && hasFeature('ai_copilot') && Boolean(activeRestaurant?.id) && Boolean(user?.id),
     openCopilot: () => setCopilotOpen(true), copilotLabel,
     openQuickAddBranch: () => setQuickAddBranchOpen(true), loadingActiveAlerts, hasQueryError, accountingProvisional, pendingExpenseCount,
-  }), [previousRevenueTrend, period, changeReportPeriod, branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, accountingProvisional, pendingExpenseCount, loadingActiveAlerts, payables, periodLabel, activePeriod, periodSales, revenueSources, lang, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel, subscriptionActive, hasFeature]);
+  }), [previousRevenueTrend, period, changeReportPeriod, branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, accountingProvisional, pendingExpenseCount, loadingActiveAlerts, payables, periodLabel, activePeriod, periodSales, revenueSources, lang, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, customerCreditPosition.status, customerCreditPosition.count, creditLedgerAudit, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel, subscriptionActive, hasFeature]);
 
   if (loading) return <DashboardSkeleton />;
 

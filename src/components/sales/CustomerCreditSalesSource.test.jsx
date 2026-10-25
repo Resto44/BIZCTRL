@@ -216,6 +216,11 @@ describe('credit balances and localized amounts', () => {
     expect(cards).toContain('Recorded balance');
     expect(cards).toContain('SAR 110');
     expect(JSON.stringify(tree.toJSON())).toContain('SAR 110');
+    expect(textOf(tree.root.findByProps({ 'data-testid': 'customer-credit-metric-debt' }))).toContain('SAR 160');
+    expect(textOf(tree.root.findByProps({ 'data-testid': 'customer-credit-metric-available' }))).toContain('SAR 1,840');
+    expect(textOf(tree.root.findByProps({ 'data-testid': 'customer-credit-metric-limit' }))).toContain('SAR 2,000');
+    expect(tree.root.findAllByProps({ 'data-testid': 'customer-credit-metric-debt-preview' })).toHaveLength(1);
+    expect(JSON.stringify(tree.toJSON())).toContain('Preview · not posted');
     tree.unmount();
   });
 
@@ -229,6 +234,8 @@ describe('credit balances and localized amounts', () => {
     expect(cards).toContain('After recording payment (preview)');
     expect(cards).toContain('SAR 0');
     expect(cards).toContain('SAR 2,000');
+    expect(textOf(tree.root.findByProps({ 'data-testid': 'customer-credit-metric-debt' }))).toContain('SAR 0');
+    expect(textOf(tree.root.findByProps({ 'data-testid': 'customer-credit-metric-available' }))).toContain('SAR 2,000');
     act(() => tree.update(React.createElement(CustomerCreditSalesSource, { ...props, entry: { ...props.entry, payment_amount: '' }, customers: [{ ...customer, outstanding_balance: 0, available_credit: 2000 }] })));
     expect(tree.root.findAllByProps({ 'data-testid': 'credit-balance-preview' })).toHaveLength(0);
     expect(JSON.stringify(tree.toJSON())).toContain('SAR 2,000');
@@ -240,6 +247,7 @@ describe('credit balances and localized amounts', () => {
     const tree = renderSource({ creditPosted: true, onUpdate, entry: { id: '1', customer_id: 'c1', amount: '50' } });
     expect(tree.root.findAllByProps({ 'data-testid': 'credit-balance-preview' })).toHaveLength(0);
     expect(tree.root.findByProps({ 'aria-label': 'Credit sale amount' }).props.disabled).toBe(true);
+    expect(tree.root.findAllByProps({ 'data-testid': 'customer-credit-metric-debt-preview' })).toHaveLength(0);
     act(() => tree.root.findAllByType('button').find(node => textOf(node) === ' Debt Payment').props.onClick());
     expect(onUpdate).toHaveBeenCalledWith('1', expect.objectContaining({ transaction_type: 'debt_payment', amount: '50', payment_amount: '' }));
     tree.unmount();
