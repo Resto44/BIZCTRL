@@ -11,6 +11,7 @@ import { AlertCircle, AlertTriangle, BarChart3, Building2, CalendarDays, Chevron
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import OwnerReportCenter from '@/components/dashboard/OwnerReportCenter';
+import ShareBizCTRL from '@/components/dashboard/ShareBizCTRL';
 
 // Load the authenticated Copilot chat only when the owner opens it.
 const OwnerCopilotPanel = React.lazy(() => import('@/components/dashboard/OwnerCopilotPanel'));
@@ -501,6 +502,7 @@ function OwnerDashboardContent() {
           </button>
           {pdfError && <p role="alert" className="mt-2 text-sm font-semibold text-red-600 dark:text-red-400">{pdfCopy.error}</p>}
         </div>}
+        {role === 'owner' && <ShareBizCTRL lang={lang} />}
         {hasQueryError ? <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{copy.unable}</div> : null}
       </header>
 
