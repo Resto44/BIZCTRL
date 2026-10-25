@@ -93,3 +93,10 @@ Baseline: PR #202 / 07943463cf8b8abdae85dba79851ccbc87c111b4.
 - A separate October 25 credit of 45 is already posted, giving this customer's currently observed open balance 55. These are observed balances, not hardcoded UI values.
 - Broader historical check still identifies three mismatched closing principals (October 23: 25 vs 0; October 11: 75 vs 55; October 7: 0 vs 35). These require source-document reconciliation, especially where a receipt already exists; no historical payments were erased or invented. They are not claimed fixed.
 - Validation: full suite 259 files / 1,508 tests passed; added executive credit-vs-balance test also passed in a focused rerun. Lint and unresolved-runtime-identifier checks passed. Production build passed. Signed-in browser/mobile testing and the pre-existing full typecheck backlog remain open.
+
+## 2026-10-25 — Prevent silent next-day closing creation
+
+- Found the exact cause of the October 26 record: `openNewClosing` automatically added one day when the selected business-key closing was already finalized. This was an explicit application behavior, not a display timezone conversion.
+- Removed the implicit date advance. Existing drafts resume; existing posted records open as the same record; an unused session retains the explicitly selected date. Arabic/Persian/English messages explain that the date did not change.
+- Live evidence: the October 26 closing (95 SAR) was created October 25 at 12:26 UTC. An October 25 closing (1,141 SAR) already exists for the same branch, Morning shift and cashier. No existing financial record was redated, merged or deleted: whether the 95 is additional or already included in 1,141 requires the user's accounting clarification.
+- Regression contracts now prohibit next-day generation and require preservation of the selected business date.
