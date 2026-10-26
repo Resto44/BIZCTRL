@@ -106,6 +106,8 @@ export default function SalesListItem({
               <span className="shrink-0 text-xs font-bold tabular-nums text-blue-700">{date ? `${date.getDate()} ${new Intl.DateTimeFormat('en', { month: 'short' }).format(date)}` : '—'}</span>
               <h3 className="truncate text-sm font-black text-foreground sm:text-base" data-i18n-skip="true">{branchLabel}</h3>
               <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${state.cls}`}>{state.label}</span>
+              {sale.closing_session_no && <span className="text-xs font-semibold text-muted-foreground">{lang === 'fa' ? 'کلوزینگ' : lang === 'ar' ? 'إقفال' : 'Closing'} #{sale.closing_session_no}</span>}
+              {sale.finalized_at && <time className="text-xs tabular-nums text-muted-foreground" dateTime={sale.finalized_at}>{new Intl.DateTimeFormat(lang === 'fa' ? 'fa' : lang === 'ar' ? 'ar' : 'en', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh' }).format(new Date(sale.finalized_at))}</time>}
             </div>
             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:text-xs">
               <span className="flex min-w-0 items-center gap-1"><UserRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /><span className="shrink-0">Cashier:</span><span className="truncate font-semibold text-foreground">{cashierName}</span></span>

@@ -112,6 +112,7 @@ export default function Sales() {
     const baseQuery = () => supabase.from('daily_sales').select('*')
       .eq('restaurant_id', activeRestaurant.id)
       .order('date', { ascending: false })
+      .order('session_closed_at', { ascending: false, nullsFirst: false })
       .limit(2000);
     if (isAllBranches) {
       const { data, error } = await baseQuery();
@@ -180,6 +181,7 @@ export default function Sales() {
       .eq('restaurant_id', activeRestaurant.id)
       .eq('date', session.date)
       .eq('shift', session.shift)
+      .in('closing_state', ['draft', 'ready'])
       .limit(50);
     const [canonical, legacy] = await Promise.all([
       session.branch_id ? baseQuery().eq('branch_id', session.branch_id) : Promise.resolve({ data: [], error: null }),
@@ -208,15 +210,8 @@ export default function Sales() {
         toast.info('Draft already exists for this business day, branch, shift, and cashier. Resumed the daily Closing.');
         return;
       }
-      // A business date is an explicit accounting choice. Never advance it
-      // just because the selected shift already has a finalized record.
-      if (existing) {
-        setNewClosingDefaults(null);
-        setEditing(existing);
-        setShowForm(true);
-        toast.info(lang === 'fa' ? 'این شیفت قبلاً ثبت شده؛ همان رکورد باز شد و تاریخ تغییر نکرد.' : lang === 'ar' ? 'هذه الوردية مسجلة مسبقاً؛ تم فتح السجل نفسه دون تغيير التاريخ.' : 'This shift already exists. Opened the same record without changing its date.');
-        return;
-      }
+      // Finalized sessions stay in History. A new session retains today's date
+      // and records only the sales made since the previous closing.
       // Opening is in-memory until Save Draft or Finalize. The helper deliberately
       // resets all daily sales, credit, payment, cash, expense, and reconciliation inputs.
       setEditing(null);

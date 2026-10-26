@@ -4,14 +4,15 @@ import { cashReconciliationSnapshot } from '../src/lib/closing/CashReconciliatio
 
 const scope = { p_restaurant_id:'restaurant', p_branch_id:'branch', p_branch:'main', p_date:'2026-10-23', p_shift:'Morning', p_cashier_id:'cashier', p_closing_id:null };
 function clientFor(data = [], error = null) {
-  const query = { select:vi.fn().mockReturnThis(), eq:vi.fn().mockReturnThis(), then(resolve) { return Promise.resolve({data,error}).then(resolve); } };
+  const query = { select:vi.fn().mockReturnThis(), eq:vi.fn().mockReturnThis(), in:vi.fn().mockReturnThis(), then(resolve) { return Promise.resolve({data,error}).then(resolve); } };
   return { from:vi.fn(() => query), query, rpc:vi.fn(async (_, args) => ({data:{ opening_cash:65, movements: args.p_closing_id ? [] : [{amount:250,direction:'in'}] },error:null})) };
 }
 describe('closing cash context session identity', () => {
-  it('excludes the prior sale when a new form targets an existing normalized session', async () => {
+  it('resumes an unfinished draft in the normalized session', async () => {
     const client = clientFor([{id:'existing',shift:' morning '},{id:'evening',shift:'Evening'}]);
     const result = await loadClosingCashContext(client, scope);
     expect(result.resolved_closing_id).toBe('existing');
+    expect(client.query.in).toHaveBeenCalledWith('closing_state',['draft','ready']);
     expect(client.rpc).toHaveBeenCalledWith('erp_sales_closing_cash_context', {...scope,p_closing_id:'existing'});
     for (const [key,value] of [['restaurant_id','restaurant'],['branch_id','branch'],['date','2026-10-23'],['cashier_id','cashier']]) expect(client.query.eq).toHaveBeenCalledWith(key,value);
   });
