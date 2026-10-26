@@ -119,7 +119,7 @@ describe('Unified Sales Closing workflow contract', () => {
     ]);
 
     expect(workspace).toContain('sumClosingMoney(cashSales, networkTotal, creditTotal, otherPaymentTotal)');
-    expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
+    expect(workspace).toContain('const rawReconciliation = cashReconciliationSnapshot({');
     expect(workspace).toContain('const cashDifference = !cashContextReady || ledgerOverdrawn ? null : reconciliation.difference;');
     expect(workspace).toContain('const totalDailyExpenses = expenseContextReady ? approvedPurchasesTotal + operatingExpensesTotal : null;');
     expect(workspace).toContain('const operatingResult = expenseContextReady ? sumClosingMoney(totalSales, -totalDailyExpenses) : null;');
@@ -154,7 +154,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain("payment_bucket: snapshot.allows_driver_entries === true ? 'other' : paymentBucketForCode(snapshot.default_payment_method)");
     expect(workspace).toContain('salesSourceTodayTotal(customSourceSummaries)');
     expect(workspace).toContain("loadClosingCashContext(supabase,");
-    expect(workspace).toContain('const reconciliation = cashReconciliationSnapshot({');
+    expect(workspace).toContain('const rawReconciliation = cashReconciliationSnapshot({');
     expect(workspace).toContain('const expectedCash = !cashContextReady ? null : reconciliation.expectedCash;');
   });
 

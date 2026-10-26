@@ -67,7 +67,7 @@ import ClosingFinalReview from '@/components/sales/ClosingFinalReview';
 import { closingCashSalesSources } from '@/lib/closing/ClosingCashSalesSources';
 import ClosingControlOverview from '@/components/sales/ClosingControlOverview';
 import ClosingStepNavigation, { closingStepCopy, closingStepIssues } from '@/components/sales/ClosingStepNavigation';
-import ClosingFundingPanel from '@/components/sales/SimpleClosingFunding';
+import ClosingFundingPanel from '@/components/sales/ClosingWalletChoice';
 import { activeClosingNetworkAccounts, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { hasCanonicalCustomerScope, loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
@@ -333,7 +333,7 @@ const DriverSalesSourceCard = memo(DriverSalesSourceCardView);
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing, onSessionContextChange, onRecordOwnerPayment, isOpeningNewClosing = false }) {
+export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNewClosing, onSessionContextChange, onOpenExistingClosing, onRecordOwnerPayment, isOpeningNewClosing = false }) {
   const closingTr = useClosingTranslation();
   const { currency, lang, t } = useLanguage();
   const { user } = useAuth();
@@ -403,6 +403,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const [inlineErrors, setInlineErrors] = useState({});
   const [runtimeError, setRuntimeError] = useState(null);
   const [savedClosing, setSavedClosing] = useState(null);
+  const [fundingPlan, setFundingPlan] = useState(null);
   const [isRecordingOwnerPayment, setIsRecordingOwnerPayment] = useState(false);
   const [openingVerificationAmount, setOpeningVerificationAmount] = useState('');
   const [openingVerificationReason, setOpeningVerificationReason] = useState('');
@@ -1319,7 +1320,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const operatingExpensesTotal = expenseContext.total;
   const totalDailyExpenses = expenseContextReady ? approvedPurchasesTotal + operatingExpensesTotal : null;
   const branchWalletAvailable = Math.max(0, Number(cashLedgerContext.branch_wallet_available) || 0);
-  const reconciliation = cashReconciliationSnapshot({
+  const rawReconciliation = cashReconciliationSnapshot({
     openingCash: opening ?? 0,
     ledgerMovements: asRecordArray(cashLedgerContext.movements).filter(
       (movement) => !isClosingSettlementMovement(movement, ledgerClosingId),
@@ -1336,6 +1337,15 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     actualCash: actualCount,
     branchWalletAvailable,
   });
+  const fundingScope = JSON.stringify([activeRestaurant?.id, selectedBranchId, form.date, form.shift, effectiveCashierId, rawReconciliation.expectedCash, actualCount]);
+  const activeFundingPlan = role === 'owner' && fundingPlan?.scope === fundingScope ? fundingPlan.value : null;
+  // This is an explicitly labelled preview. Only the atomic RPC posts money.
+  const reconciliation = activeFundingPlan ? {
+    ...rawReconciliation, cashIn: sumClosingMoney(rawReconciliation.cashIn, activeFundingPlan.amount),
+    expectedCash: sumClosingMoney(rawReconciliation.expectedCash, activeFundingPlan.amount),
+    difference: 0, shortage: 0, overage: 0, cashFundingRequired: 0, ledgerOverdrawn: false,
+    branchWalletApplied: 0, ownerPaymentRequired: 0, varianceStatus: 'balanced',
+  } : rawReconciliation;
   const canSaveClosingDraft = !['finalized', 'locked', 'corrected'].includes(savedClosing?.closing_state || initial?.closing_state);
   const ledgerOverdrawn = cashContextReady && reconciliation.ledgerOverdrawn;
   const branchWalletApplied = Math.max(0, Number(activeOwnerSettlement?.wallet_payment_amount ?? reconciliation.branchWalletApplied) || 0);
@@ -1608,6 +1618,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         date: form.date, shift: form.shift, cashier_id: cashierId, cashier_name: cashierDisplayName,
       }));
       const payload = {
+        wallet_funding: requestedClosingState === 'finalized' ? activeFundingPlan : null,
         date: form.date,
         branch: selectedBranch?.key || selectedBranch?.branch_key || form.branch,
         shift: form.shift,
@@ -1715,9 +1726,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
       console.log('[UnifiedSalesClosing] Calling onSubmit(payload)...');
       const saved = await onSubmit(payload);
+      setFundingPlan(null);
       setSavedClosing(saved || { id: initial?.id || null, status: 'saved' });
       invalidateCustomerReceivableQueries(queryClient);
-      await Promise.all([refetchCustomers(), refetchCashLedger()]);
+      await Promise.all([refetchCustomers(), refetchCashLedger(), queryClient.invalidateQueries({queryKey: ['simple-closing-funding']})]);
       console.log('[UnifiedSalesClosing] onSubmit(payload) SUCCESS');
 
     } catch (err) {
@@ -1728,7 +1740,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       if (details?.code === 'CLOSING_ALREADY_EXISTS') {
         setInlineErrors({ duplicate: userMessage });
       }
-      if (details?.code === 'SALES_CLOSING_CASH_LEDGER_OVERDRAWN') {
+      if (details?.code === 'SALES_CLOSING_CASH_LEDGER_OVERDRAWN' || ['CLOSING_FUNDING_PREVIEW_CHANGED', 'CLOSING_FUNDING_INSUFFICIENT_BALANCE'].includes(details?.code)) {
+        setFundingPlan(null);
+        await queryClient.invalidateQueries({queryKey: ['simple-closing-funding']});
         // Another save/payment may have changed the ledger since the preview.
         // Keep all entered amounts and return to the actionable funding step.
         setShowFinalizeReview(false);
@@ -1777,7 +1791,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       invalidateCustomerReceivableQueries(queryClient);
       // Use the branch-scoped canonical position, not the restaurant-wide
       // customer_position returned by the payment RPC.
-      const [customerResult, cashResult] = await Promise.all([refetchCustomers(), refetchCashLedger()]);
+      const [customerResult, cashResult] = await Promise.all([refetchCustomers(), refetchCashLedger(), queryClient.invalidateQueries({queryKey: ['simple-closing-funding']})]);
       if (customerResult.isError || cashResult.isError) throw new Error('Refresh failed');
       setCustomerCreditSales(previous => previous.map(row => {
         const customer = customerResult.data?.find(item => String(item.id) === String(row.customer_id));
@@ -1807,6 +1821,13 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     }
   };
 
+  if (!initial?.id && !savedClosing?.id && cashLedgerContext.resolved_closing_record?.id) {
+    return <div className="space-y-3 rounded-2xl border border-blue-200 bg-blue-50 p-5" data-testid="existing-closing-session">
+      <p className="font-bold">{lang === 'fa' ? 'برای این تاریخ و شیفت کلوزینگ موجود است. همان رکورد را باز کنید تا فروش‌ها دوباره ثبت نشوند.' : lang === 'ar' ? 'يوجد إقفال لهذا التاريخ والوردية. افتح السجل نفسه لتجنب تكرار المبيعات.' : 'A closing already exists for this date and shift. Open it to keep the recorded sales.'}</p>
+      <Button type="button" onClick={() => onOpenExistingClosing?.(cashLedgerContext.resolved_closing_record)}>{lang === 'fa' ? 'باز کردن کلوزینگ موجود' : lang === 'ar' ? 'فتح الإقفال الحالي' : 'Open existing closing'}</Button>
+      <Button type="button" variant="outline" onClick={onCancel}>{lang === 'fa' ? 'برگشت' : lang === 'ar' ? 'رجوع' : 'Back'}</Button>
+    </div>;
+  }
   // ── RENDER ────────────────────────────────────────────────────────────────
   // Requirement: Remove blocking success state.
   // Save returns immediately to Daily Sales via onSubmit callback.
@@ -1965,6 +1986,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               cashOut={reconciliation.cashOut}
               expectedCash={expectedCash}
               closingCash={closingCash}
+              fundingPreview={Boolean(activeFundingPlan)}
               openingVerified={cashContextReady && !ledgerOverdrawn}
               openingStatus={cashLedgerContext.opening_status}
               openingSource={cashLedgerContext.opening_source}
@@ -2001,7 +2023,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               fundingContent={cashContextReady ? <ClosingFundingPanel
                 key={`${activeRestaurant?.id}:${selectedBranchId}:${form.date}:${form.shift}:${effectiveCashierId}`}
                 restaurantId={activeRestaurant?.id} branchId={selectedBranchId} branchKey={form.branch} date={form.date} shift={form.shift} cashierId={effectiveCashierId}
-                expectedCash={expectedCash} actualCash={actualCount} role={role} lang={lang} currency={currency} disabled={isSubmitting}
+                expectedCash={cashContextReady ? rawReconciliation.expectedCash : null} actualCash={actualCount} role={role} lang={lang} currency={currency} disabled={isSubmitting}
+                value={activeFundingPlan} onChange={value => setFundingPlan(value ? {scope: fundingScope, value} : null)}
                 onPosted={async () => { setManagerApproved(false); await refetchCashLedger(); }}
               /> : null}
             />
@@ -2119,6 +2142,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             <DialogDescription className="text-left text-xs">{form.branch} · {closingTr(form.shift)} · {form.date}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            {activeFundingPlan && <p className="rounded-xl bg-blue-50 p-3 text-sm font-bold" data-testid="funding-final-confirmation">{lang === 'fa' ? 'با ثبت نهایی تأیید می‌کنم این نقد از والت دریافت شده است؛ تمویل و کلوزینگ با هم ثبت شوند.' : lang === 'ar' ? 'أؤكد استلام النقد من المحفظة؛ يُسجل التمويل والإقفال معاً.' : 'I confirm this cash was received from the selected wallet. Post the wallet funding and closing together.'} <span dir="ltr">{activeFundingPlan.amount.toFixed(2)} {currency}</span> · {activeFundingPlan.source === 'restaurant' ? (lang === 'fa' ? 'والت ریستورنت' : lang === 'ar' ? 'محفظة المطعم' : 'Restaurant wallet') : (lang === 'fa' ? 'والت اونر' : lang === 'ar' ? 'محفظة المالك' : 'Owner wallet')}</p>}
             <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-xs">
               <span className="text-slate-600">{lang === 'fa' ? 'فروش نقدی' : lang === 'ar' ? 'المبيعات النقدية' : closingTr('Cash Sales')}</span><Money currency={currency} value={cashSales} className="text-right font-black" />
               <span className="text-slate-600">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : closingTr('Network / Card')}</span><Money currency={currency} value={networkTotal} className="text-right font-black" />

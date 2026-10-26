@@ -66,7 +66,7 @@ describe('CashReconciliationPanel', () => {
     expect(tree.root.findAllByProps({ 'data-testid': 'optional-cash-receipt' })).toHaveLength(0);
     expect(tree.root.findByProps({ 'data-testid': 'cash-review-details' }).props.open).toBeUndefined();
     expect(tree.root.findByProps({ 'aria-label': 'Actual Cash' }).props.disabled).not.toBe(true);
-    expect(textOf(tree.root)).toContain('does not mean money was received');
+    expect(textOf(tree.root)).toContain('choose a funding wallet, then confirm the closing');
   });
 
   it('renders the selected shortage design with a computed, non-interactive status', () => {
@@ -129,7 +129,7 @@ describe('CashReconciliationPanel', () => {
     />);
     const message = textOf(tree.root);
     expect(message).toContain('Cash Ledger overdrawn');
-    expect(message).toContain('Ledger error');
+    expect(message).toContain('Choose wallet');
     expect(message).not.toContain('Opening Cash needs reconciliation');
     const approve = tree.root.findAllByType('button').find((node) => textOf(node).includes('Approve Cash Count'));
     expect(approve.props.disabled).toBe(true);
