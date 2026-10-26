@@ -9,6 +9,7 @@ export async function loadClosingCashContext(client, scope) {
       .eq('restaurant_id', scope.p_restaurant_id)
       .eq('branch_id', scope.p_branch_id)
       .eq('date', scope.p_date)
+      .in('closing_state', ['draft', 'ready'])
       .eq('cashier_id', scope.p_cashier_id);
     if (error) throw error;
     const normalize = value => String(value || '').trim().toLowerCase();

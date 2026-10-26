@@ -34,6 +34,8 @@ export function normalizeClosingPayload(payload, requestId) {
 }
 
 const BUSINESS_MESSAGES = {
+  SALES_CLOSING_SESSION_CHANGED: 'Another closing was saved. Reload the drawer balance before confirming this session.',
+  SALES_CLOSING_HAS_LATER_SESSION: 'A later closing uses this drawer balance. Open a new session instead of changing the earlier count.',
   CLOSING_FUNDING_PENDING_RETRY: 'The previous confirmation is pending. Keep the original amounts and retry to avoid a duplicate transfer.',
   CLOSING_FUNDING_PREVIEW_CHANGED: 'The cash ledger changed. No wallet debit was saved. Reload the cash ledger and choose the wallet again.',
   CLOSING_FUNDING_INSUFFICIENT_BALANCE: 'The selected wallet has insufficient funds. Choose the other wallet or add funds.',

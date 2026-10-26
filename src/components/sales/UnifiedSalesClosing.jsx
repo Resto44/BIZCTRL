@@ -355,6 +355,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // selectable only when a branch/date/shift/cashier-verified POS feed exists.
   // Legacy payment tables do not provide that scope and must not be used.
   const [salesEntryMode, setSalesEntryMode] = useState('manual');
+  const [newClosingSessionId] = useState(() => crypto.randomUUID());
   const requiresCashReconciliation = closingConfig?.validation_rules?.require_cash_reconciliation !== false;
   const salesSourceCopy = useMemo(() => ({
     title: t('salesClosing.sources.title'),
@@ -1070,7 +1071,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     isError: automaticClosingIsError,
     refetch: refetchAutomaticClosing,
   } = useQuery({
-    queryKey: ['quick_closing_automatic_sources', activeRestaurant?.id, selectedBranchId, form.branch, form.date],
+    queryKey: ['quick_closing_automatic_sources', activeRestaurant?.id, selectedBranchId, form.branch, form.date, newClosingSessionId],
     enabled: automaticClosingEnabled,
     staleTime: 15000,
     queryFn: async () => {
@@ -1079,13 +1080,23 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       nextDay.setDate(nextDay.getDate() + 1);
       const endDate = format(nextDay, 'yyyy-MM-dd');
       const allowAllBranches = form.branch === 'all' && !isManager;
+      const { data: sessionOpening, error: sessionOpeningError } = await supabase.rpc('erp_sales_closing_opening_context', {
+        p_restaurant_id: activeRestaurant.id, p_branch_id: selectedBranchId, p_branch: form.branch,
+        p_date: form.date, p_shift: form.shift, p_cashier_id: effectiveCashierId, p_current_closing_id: null,
+      });
+      if (sessionOpeningError) throw sessionOpeningError;
+      const previousCutoff = sessionOpening?.opening_shift_date === form.date ? sessionOpening?.previous_finalized_at : null;
       const scoped = (table, columns, dateColumn, legacyBranchColumn = 'branch') => {
-        const base = () => supabase.from(table)
+        const base = () => {
+          let query = supabase.from(table)
           .select(columns)
           .eq('restaurant_id', activeRestaurant.id)
           .gte(dateColumn, `${form.date}T00:00:00`)
           .lt(dateColumn, `${endDate}T00:00:00`)
           .limit(200);
+          if (previousCutoff) query = query.gt(dateColumn, previousCutoff);
+          return query;
+        };
         if (allowAllBranches) return [base()];
         return [
           selectedBranchId ? base().eq('branch_id', selectedBranchId) : Promise.resolve({ data: [], error: null }),
@@ -1193,7 +1204,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // cashier, so unrelated shifts or prior days cannot change this Closing.
   const currentClosingId = savedClosing?.id || initial?.id || null;
   const { data: cashLedgerContextData, isLoading: cashLedgerLoading, isError: cashLedgerUnavailable, refetch: refetchCashLedger } = useQuery({
-    queryKey: ['sales-closing-cash-ledger-context', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift, effectiveCashierId, currentClosingId],
+    queryKey: ['sales-closing-cash-ledger-context', activeRestaurant?.id, selectedBranchId, form.branch, form.date, form.shift, effectiveCashierId, currentClosingId, newClosingSessionId],
     enabled: Boolean(activeRestaurant?.id && selectedBranchId && form.date && form.shift && effectiveCashierId),
     staleTime: 15000,
     queryFn: () => loadClosingCashContext(supabase, {
@@ -1308,7 +1319,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const actualCount = hasValidActualCount && Number.isFinite(Number(actualCashCount))
     ? Number(actualCashCount) : null;
   const ownerContrib = 0;
-  const approvedPurchasesTotal = approvedPurchasesForDate.reduce((sum, purchase) => sum + (Number(purchase.total_amount) || 0), 0);
+  const approvedPurchasesTotal = Number(cashLedgerContext.approved_purchases_total ?? approvedPurchasesForDate.reduce((sum, purchase) => sum + (Number(purchase.total_amount) || 0), 0));
   // The server context is canonical for both daily fixed allocation and dated
   // variable expenses. Accounting expenses stay separate from purchases, and
   // neither changes Expected Cash unless the ERP cash ledger contains Cash OUT.
@@ -1618,6 +1629,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         date: form.date, shift: form.shift, cashier_id: cashierId, cashier_name: cashierDisplayName,
       }));
       const payload = {
+        closing_session_id: initial?.closing_session_id || (initial?.id ? null : newClosingSessionId),
+        previous_closing_id: cashLedgerContext.previous_closing_id || null,
         wallet_funding: requestedClosingState === 'finalized' ? activeFundingPlan : null,
         date: form.date,
         branch: selectedBranch?.key || selectedBranch?.branch_key || form.branch,
@@ -1740,7 +1753,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       if (details?.code === 'CLOSING_ALREADY_EXISTS') {
         setInlineErrors({ duplicate: userMessage });
       }
-      if (details?.code === 'SALES_CLOSING_CASH_LEDGER_OVERDRAWN' || ['CLOSING_FUNDING_PREVIEW_CHANGED', 'CLOSING_FUNDING_INSUFFICIENT_BALANCE'].includes(details?.code)) {
+      if (details?.code === 'SALES_CLOSING_CASH_LEDGER_OVERDRAWN' || ['SALES_CLOSING_SESSION_CHANGED', 'CLOSING_FUNDING_PREVIEW_CHANGED', 'CLOSING_FUNDING_INSUFFICIENT_BALANCE'].includes(details?.code)) {
         setFundingPlan(null);
         await queryClient.invalidateQueries({queryKey: ['simple-closing-funding']});
         // Another save/payment may have changed the ledger since the preview.
@@ -1834,6 +1847,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
   return (
     <form id="erp-sales-closing-form" ref={formRef} onSubmit={handleSubmit} className="min-w-0">
+      {!initial?.id && <p className="mb-3 rounded-xl bg-blue-50 p-3 text-sm font-semibold text-blue-800" data-testid="incremental-closing-hint">{lang === 'fa' ? 'فقط فروش این نوبت را وارد کنید. داشبورد مجموع تمام کلوزینگ‌های امروز را نشان می‌دهد.' : lang === 'ar' ? 'أدخل مبيعات هذه الجلسة فقط. تعرض لوحة التحكم مجموع إقفالات اليوم.' : 'Enter sales for this session only. The dashboard adds all of today’s closings.'}</p>}
       {/* Embedded in the ERP page scroller: a second momentum scroller with
           percentage height can clip expanded content on iOS after keyboard use. */}
       <div id="sales-closing-workspace" className="min-w-0">
