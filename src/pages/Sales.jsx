@@ -635,6 +635,7 @@ export default function Sales() {
             initial={editing || newClosingDefaults || undefined}
             onSubmit={handleSave}
             onCancel={() => { setEditing(null); setNewClosingDefaults(null); setShowForm(false); }}
+            onOpenExistingClosing={record => { setNewClosingDefaults(null); setEditing(record); setShowForm(false); }}
             onNewClosing={openNewClosing}
             onSessionContextChange={updateClosingSessionContext}
             onRecordOwnerPayment={handleOwnerSettlementPayment}

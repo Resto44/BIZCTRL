@@ -83,6 +83,7 @@ const CashReconciliationPanelView = function CashReconciliationPanel({
   inputId = 'closing-detail-actual-cash',
   compact = false,
   fundingContent = null,
+  fundingPreview = false,
   cashFundingRequired = 0,
   movements = [],
   lang = 'en',
@@ -129,7 +130,7 @@ const CashReconciliationPanelView = function CashReconciliationPanel({
   const postedReceipts = movements.filter(m => m?.direction === 'in' && m?.is_reversed !== true);
   const status = !openingVerified || ledgerLoading || ledgerUnavailable || ledgerOverdrawn || difference === null ? 'pending' : difference === 0 ? 'balanced' : difference < 0 ? 'shortage' : 'overage';
   const statusCopy = status === 'pending'
-    ? (ledgerOverdrawn ? 'Ledger error' : !openingVerified ? 'Opening unverified' : 'Awaiting Count')
+    ? (ledgerOverdrawn ? (lang === 'fa' ? 'انتخاب والت' : lang === 'ar' ? 'اختر محفظة' : 'Choose wallet') : !openingVerified ? 'Opening unverified' : 'Awaiting Count')
     : status === 'balanced'
       ? 'Balanced'
       : status === 'shortage'
@@ -157,15 +158,39 @@ const CashReconciliationPanelView = function CashReconciliationPanel({
             <p className="mt-1 text-xs font-medium text-slate-500">{lang === 'fa' ? 'پول داخل صندوق را بشمارید و وارد کنید؛ حساب باقی‌مانده خودکار است.' : lang === 'ar' ? 'عدّ النقد في الصندوق وأدخله؛ الحسابات الأخرى تلقائية.' : 'Count the cash in the drawer and enter it; the rest is calculated automatically.'}</p>
           </div>
           <span className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-black sm:text-sm ${statusTone}`}>
-            <StatusIcon className="h-4 w-4" />{closingTr(statusCopy)}
+            <StatusIcon className="h-4 w-4" />{fundingPreview ? (lang === 'fa' ? 'پیش‌نمایش پس از تمویل' : lang === 'ar' ? 'معاينة بعد التمويل' : 'Preview after funding') : closingTr(statusCopy)}
           </span>
         </header>
 
+        <div className={compact ? 'grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)]' : 'grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)] gap-3'}>
+          <div id="quick-closing-reconciliation" className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+            <label htmlFor={inputId} className="block text-xs font-black text-slate-700 sm:text-sm">{closingTr("Actual Cash")}<span className="text-red-500">*</span></label>
+            <p className="mt-1 text-xs text-slate-500">{closingTr("Enter the physical cash count")}</p>
+            <ClosingNumericInput
+              id={inputId}
+              value={actualCashValue}
+              onChange={onActualCashChange}
+              prefix={currency}
+              required
+              disabled={disabled || ledgerLoading}
+              error={closingTr(actualCashError)}
+              placeholder={closingTr("0.00")}
+              className="mt-3"
+              inputClassName="h-16 rounded-2xl border-slate-300 bg-white pl-16 text-2xl font-black shadow-none focus-visible:ring-blue-500 sm:h-20 sm:text-3xl"
+            />
+          </div>
+          <div className={compact ? `flex min-w-0 items-center justify-between gap-3 rounded-xl border px-3 py-2 ${status === 'balanced' ? 'border-emerald-200 bg-emerald-50' : status === 'shortage' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'} sm:flex-col sm:justify-center` : 'flex min-w-0 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 sm:p-4'}>
+            <p className={compact ? 'text-xs font-black text-slate-600' : 'mb-2 text-[10px] font-black uppercase tracking-wide text-slate-600 sm:text-xs'}>{lang === 'fa' ? 'اختلاف صندوق' : lang === 'ar' ? 'فرق الصندوق' : closingTr('Variance')}</p>
+            {ledgerLoading ? <Loader2 className="h-6 w-6 animate-spin text-blue-600" aria-label={closingTr("Loading cash ledger")} /> : compact ? <span data-testid="compact-cash-variance" className="text-base font-black tabular-nums" dir="ltr"><Money value={openingVerified && !ledgerUnavailable ? difference : null} currency={currency} signed /></span> : <VarianceRing difference={openingVerified && !ledgerUnavailable ? difference : null} status={status} />}
+          </div>
+        </div>
+
+        {fundingContent && <div data-testid="drawer-funding-inside-reconciliation">{fundingContent}</div>}
         {!openingVerified || ledgerUnavailable || ledgerOverdrawn ? (
           <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-            {compact && <p className="font-semibold">{lang === 'fa' ? 'نقد صندوق را وارد کنید. گردش صندوق نیاز به بررسی دارد؛ این وضعیت به معنی دریافت پول از اونر نیست.' : lang === 'ar' ? 'أدخل النقد المعدود. حركة الصندوق تحتاج مراجعة؛ هذا لا يعني استلام نقد من المالك.' : 'Enter the counted cash. Cash movements need review; this does not mean money was received from the owner.'}</p>}
-            {ledgerOverdrawn && fundingContent && <Button type="button" data-testid="open-owner-wallet-funding" className="mt-3 min-h-12 w-full bg-blue-600 text-white" onClick={()=>{requestAnimationFrame(()=>document.getElementById('closing-funding')?.scrollIntoView({behavior:'smooth',block:'center'}));}}>{lang==='fa'?'انتخاب والت برای تمویل':lang==='ar'?'اختر محفظة التمويل':'Choose funding wallet'}</Button>}
-            <details open={!compact || undefined} data-testid="cash-review-details"><summary className="min-h-10 cursor-pointer py-2 text-xs font-bold">{lang === 'fa' ? 'مشاهده علت و جزئیات' : lang === 'ar' ? 'عرض السبب والتفاصيل' : 'View reason and details'}</summary>
+            {ledgerOverdrawn && <p className="font-semibold">{lang === 'fa' ? 'نقد واقعی را وارد کنید و والت تمویل را انتخاب کنید؛ سپس ثبت نهایی را بزنید.' : lang === 'ar' ? 'أدخل النقد الفعلي واختر محفظة التمويل ثم اعتمد الإقفال.' : 'Enter counted cash, choose a funding wallet, then confirm the closing.'}</p>}
+
+            <details data-testid="cash-review-details"><summary className="min-h-10 cursor-pointer py-2 text-xs font-bold">{lang === 'fa' ? 'مشاهده علت و جزئیات' : lang === 'ar' ? 'عرض السبب والتفاصيل' : 'View reason and details'}</summary>
             <p className="font-black">{ledgerOverdrawn ? (lang === 'fa' ? 'گردش نقد صندوق نیاز به بررسی دارد' : lang === 'ar' ? 'حركة نقد الصندوق تحتاج مراجعة' : closingTr('Cash Ledger overdrawn')) : openingReviewRequired ? closingTr('Opening Cash needs reconciliation') : closingTr('ERP cash ledger is unavailable.')}</p>
             <p className="mt-1 text-xs">{ledgerOverdrawn ? closingTr('Cash Out exceeds available cash. Review the posted funding and payments before closing; this is not an ordinary cash overage.') : openingReviewRequired ? closingTr('Previous shift has no verified counted balance or multiple possible drawers. Check the prior closing before finalizing.') : closingTr('The cash count cannot be approved until the scoped ledger has loaded.')}</p>
             {ledgerOverdrawn && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3" data-testid="drawer-ledger-funding-gap"><span className="text-xs font-bold">{lang === 'fa' ? 'کمبود دفتر نقد (نه اختلاف شمارش)' : lang === 'ar' ? 'عجز الدفتر وليس فرق الجرد' : closingTr('Recorded cash balance gap · not count variance')}</span><Money currency={currency} value={cashFundingRequired} className="font-black text-red-700" /></div>}
@@ -210,29 +235,6 @@ const CashReconciliationPanelView = function CashReconciliationPanel({
             <span>{openingStatus === 'manual_verified_opening' ? closingTr('Owner-certified physical opening count') : openingSource === 'same_cashier_count' ? closingTr('Previous shift · matched cashier count') : openingSource === 'single_branch_shift_count' ? closingTr('Previous shift · one counted branch drawer') : closingTr('Opening source requires review')}{openingShiftDate ? ` · ${openingShiftDate}` : ''}</span>
           </div>
         )}
-        <div className={compact ? 'grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)]' : 'grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)] gap-3'}>
-          <div id="quick-closing-reconciliation" className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-            <label htmlFor={inputId} className="block text-xs font-black text-slate-700 sm:text-sm">{closingTr("Actual Cash")}<span className="text-red-500">*</span></label>
-            <p className="mt-1 text-xs text-slate-500">{closingTr("Enter the physical cash count")}</p>
-            <ClosingNumericInput
-              id={inputId}
-              value={actualCashValue}
-              onChange={onActualCashChange}
-              prefix={currency}
-              required
-              disabled={disabled || ledgerLoading}
-              error={closingTr(actualCashError)}
-              placeholder={closingTr("0.00")}
-              className="mt-3"
-              inputClassName="h-16 rounded-2xl border-slate-300 bg-white pl-16 text-2xl font-black shadow-none focus-visible:ring-blue-500 sm:h-20 sm:text-3xl"
-            />
-          </div>
-          <div className={compact ? `flex min-w-0 items-center justify-between gap-3 rounded-xl border px-3 py-2 ${status === 'balanced' ? 'border-emerald-200 bg-emerald-50' : status === 'shortage' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'} sm:flex-col sm:justify-center` : 'flex min-w-0 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 sm:p-4'}>
-            <p className={compact ? 'text-xs font-black text-slate-600' : 'mb-2 text-[10px] font-black uppercase tracking-wide text-slate-600 sm:text-xs'}>{lang === 'fa' ? 'اختلاف صندوق' : lang === 'ar' ? 'فرق الصندوق' : closingTr('Variance')}</p>
-            {ledgerLoading ? <Loader2 className="h-6 w-6 animate-spin text-blue-600" aria-label={closingTr("Loading cash ledger")} /> : compact ? <span data-testid="compact-cash-variance" className="text-base font-black tabular-nums" dir="ltr"><Money value={openingVerified && !ledgerUnavailable ? difference : null} currency={currency} signed /></span> : <VarianceRing difference={openingVerified && !ledgerUnavailable ? difference : null} status={status} />}
-          </div>
-        </div>
-
         <div data-testid="closing-cash-preview" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-3 sm:p-4">
           <div><p className="text-xs font-black text-sky-950">{closingCash === null ? closingTr('Physically counted cash · pending reconciliation') : closingTr('Closing Cash · physical drawer balance')}</p>
             <p className="mt-1 text-[11px] text-sky-800">{closingCash === null ? closingTr('Count is recorded for review; it will not be carried forward until the closing is finalized.') : closingTr('Carried into a verified next shift · no network, wallet or credit sales')}</p></div>
@@ -290,7 +292,7 @@ const CashReconciliationPanelView = function CashReconciliationPanel({
         </Button>
 
         {postedReceipts.length > 0 && <div data-testid="posted-cash-funding" className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-xs"><button type="button" className="min-h-10 w-full text-left font-bold text-sky-900" aria-expanded={ledgerExpanded} onClick={() => setLedgerExpanded(v => !v)}>{lang === 'fa' ? 'ورود نقد ثبت‌شده · سند و منبع' : lang === 'ar' ? 'النقد الوارد المثبت · المصدر والسند' : closingTr('Posted cash receipts · sources and references')} ({postedReceipts.length})</button>{ledgerExpanded && <ul className="mt-2 space-y-2">{postedReceipts.map((row, index) => <li className="flex flex-wrap items-center justify-between gap-2 border-t border-sky-200 pt-2" key={row.id || index}><span className="min-w-0 break-words">{row.source_module || row.movement_type || closingTr('Cash In')} · {row.source_document_id || row.source_record_id || closingTr('Reference pending')}</span><Money currency={currency} value={row.amount} className="font-bold" /></li>)}</ul>}</div>}
-        {fundingContent && <div data-testid="drawer-funding-inside-reconciliation">{fundingContent}</div>}
+
         {difference !== null && (!compact || difference !== 0) && (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
             <div className="flex items-center gap-2">

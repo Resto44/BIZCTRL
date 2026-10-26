@@ -34,6 +34,12 @@ export function normalizeClosingPayload(payload, requestId) {
 }
 
 const BUSINESS_MESSAGES = {
+  CLOSING_FUNDING_PENDING_RETRY: 'The previous confirmation is pending. Keep the original amounts and retry to avoid a duplicate transfer.',
+  CLOSING_FUNDING_PREVIEW_CHANGED: 'The cash ledger changed. No wallet debit was saved. Reload the cash ledger and choose the wallet again.',
+  CLOSING_FUNDING_INSUFFICIENT_BALANCE: 'The selected wallet has insufficient funds. Choose the other wallet or add funds.',
+  CLOSING_FUNDING_CLOSED_PERIOD: 'A later shift is finalized. Open the current shift; this historical period cannot receive new funding.',
+  CLOSING_OPEN_EXISTING: 'Open the existing closing for this date and shift before confirming funding.',
+
   SALES_CLOSING_AUTH_REQUIRED: 'Your session has expired. Sign in again before saving the Closing.',
   SALES_CLOSING_SCOPE_REQUIRED: 'Select the business, branch, date, shift, and cashier before saving the Closing.',
   SALES_CLOSING_BRANCH_CONTEXT_INVALID: 'The active branch is unavailable. Reload the authorized branch context before saving the Closing.',
@@ -98,11 +104,32 @@ export function closingErrorDetails(error) {
  * permission checks, calculates final totals, writes source snapshots and audit
  * records, and treats the request ID as an idempotency key.
  */
+const pendingFundedClosings = new Map();
+function stableFundingPayload(payload) {
+  const { request_id, finalized_at, closing_audit, ...stable } = payload;
+  return JSON.stringify(stable);
+}
 export async function saveClosingSession({ payload, closingId = null, requestId = newRequestId() }) {
-  const normalizedPayload = normalizeClosingPayload(payload, requestId);
+  let normalizedPayload = normalizeClosingPayload(payload, requestId);
+  const pendingKey = `atomic-closing:${payload.restaurant_id}:${payload.branch_id}:${payload.date}:${payload.shift}:${payload.cashier_id}:${closingId || 'new'}`;
+  let pending = pendingFundedClosings.get(pendingKey);
+  try { pending ||= JSON.parse(sessionStorage.getItem(pendingKey)); } catch { /* Storage may be unavailable. */ }
+  if (pending) {
+    if (stableFundingPayload(pending.payload) !== stableFundingPayload(normalizedPayload)) {
+      throw createClosingSaveError({message:'CLOSING_FUNDING_PENDING_RETRY'},pending.requestId);
+    }
+    requestId = pending.requestId;
+    normalizedPayload = pending.payload;
+  }
+  const clearPending = () => { pendingFundedClosings.delete(pendingKey); try { sessionStorage.removeItem(pendingKey); } catch { /* Optional storage. */ } };
+  if (normalizedPayload.wallet_funding) {
+    const frozen = { payload: normalizedPayload, requestId };
+    pendingFundedClosings.set(pendingKey,frozen);
+    try { sessionStorage.setItem(pendingKey,JSON.stringify(frozen)); } catch { /* In-memory retry remains available. */ }
+  }
   try {
     const rpcName = normalizedPayload.closing_state === 'finalized'
-      ? 'erp_finalize_sales_closing'
+      ? (normalizedPayload.wallet_funding ? 'erp_finalize_sales_closing_with_funding' : 'erp_finalize_sales_closing')
       : 'erp_save_sales_closing_draft';
     const { data, error } = await supabase.rpc(rpcName, {
       p_payload: normalizedPayload,
@@ -111,6 +138,7 @@ export async function saveClosingSession({ payload, closingId = null, requestId 
     });
     if (error) throw error;
     if (!data?.closing) throw new Error('The closing server did not return a saved record.');
+    clearPending();
     return {
       ...data.closing,
       _idempotent: Boolean(data.idempotent),
@@ -118,6 +146,7 @@ export async function saveClosingSession({ payload, closingId = null, requestId 
       _requestId: requestId,
     };
   } catch (error) {
+    if (['P0001','42501','23514','22003','22P02'].includes(error.code)) clearPending();
     const structuredError = createClosingSaveError(error, requestId);
     console.error('[ClosingRepository] Sales Closing save failed', closingErrorDetails(structuredError));
     throw structuredError;
