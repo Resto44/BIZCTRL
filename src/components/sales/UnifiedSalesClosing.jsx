@@ -1729,7 +1729,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       setFundingPlan(null);
       setSavedClosing(saved || { id: initial?.id || null, status: 'saved' });
       invalidateCustomerReceivableQueries(queryClient);
-      await Promise.all([refetchCustomers(), refetchCashLedger()]);
+      await Promise.all([refetchCustomers(), refetchCashLedger(), queryClient.invalidateQueries({queryKey: ['simple-closing-funding']})]);
       console.log('[UnifiedSalesClosing] onSubmit(payload) SUCCESS');
 
     } catch (err) {
@@ -1740,7 +1740,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       if (details?.code === 'CLOSING_ALREADY_EXISTS') {
         setInlineErrors({ duplicate: userMessage });
       }
-      if (details?.code === 'SALES_CLOSING_CASH_LEDGER_OVERDRAWN') {
+      if (details?.code === 'SALES_CLOSING_CASH_LEDGER_OVERDRAWN' || ['CLOSING_FUNDING_PREVIEW_CHANGED', 'CLOSING_FUNDING_INSUFFICIENT_BALANCE'].includes(details?.code)) {
+        setFundingPlan(null);
+        await queryClient.invalidateQueries({queryKey: ['simple-closing-funding']});
         // Another save/payment may have changed the ledger since the preview.
         // Keep all entered amounts and return to the actionable funding step.
         setShowFinalizeReview(false);
@@ -1789,7 +1791,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       invalidateCustomerReceivableQueries(queryClient);
       // Use the branch-scoped canonical position, not the restaurant-wide
       // customer_position returned by the payment RPC.
-      const [customerResult, cashResult] = await Promise.all([refetchCustomers(), refetchCashLedger()]);
+      const [customerResult, cashResult] = await Promise.all([refetchCustomers(), refetchCashLedger(), queryClient.invalidateQueries({queryKey: ['simple-closing-funding']})]);
       if (customerResult.isError || cashResult.isError) throw new Error('Refresh failed');
       setCustomerCreditSales(previous => previous.map(row => {
         const customer = customerResult.data?.find(item => String(item.id) === String(row.customer_id));
