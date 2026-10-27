@@ -176,6 +176,7 @@ export function PublicLayout({ children }) {
             <p className="text-sm font-bold text-white">{tr('Company')}</p>
             <div className="mt-4 flex flex-col gap-3 text-sm text-slate-400">
               <Link to="/contact" className="hover:text-white">{tr('Contact')}</Link>
+              <a href="mailto:support@mybizctrl.site" dir="ltr" translate="no" className="w-fit max-w-full break-all text-cyan-300 underline underline-offset-4 hover:text-white">support@mybizctrl.site</a>
               <Link to="/terms" className="hover:text-white">{tr('Terms of Service')}</Link>
               <Link to="/privacy" className="hover:text-white">{tr('Privacy Policy')}</Link>
               <Link to="/refund" className="hover:text-white">{tr('Refund Policy')}</Link>
