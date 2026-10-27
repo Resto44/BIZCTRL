@@ -20,7 +20,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).not.toContain('CLOSING_WORKFLOW_STEP_IDS');
     expect(workspace).toContain('<ClosingStepNavigation');
     expect(workspace).toContain('id="sales-closing-workspace" className="min-w-0"');
-    expect(workspace).toContain('<CashReconciliationPanel');
+    expect(workspace).toContain('<SimpleClosingCash');
     expect(reconciliationPanel).toContain('grid grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.65fr)]');
     expect(workspace).not.toContain('pb-[calc(env(safe-area-inset-bottom)+7rem)]');
     expect(workspace).toContain('env(safe-area-inset-bottom)+1.5rem');
@@ -93,15 +93,16 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('cashContextReady, openingReviewRequired, ledgerOverdrawn');
   });
 
-  it('blocks unverified shift openings until the owner records an immutable physical count', async () => {
+  it('uses a simple starting count without inventing an opening or requiring an owner for a new branch', async () => {
     const [workspace, panel, migration] = await Promise.all([
       source('../src/components/sales/UnifiedSalesClosing.jsx'),
       source('../src/components/sales/CashReconciliationPanel.jsx'),
       source('../supabase/migrations/20261021170000_sales_closing_audited_opening_verification.sql'),
     ]);
     expect(workspace).toContain('const cashContextReady = Boolean(cashLedgerContextData && cashLedgerContext.opening_verified === true)');
-    expect(workspace).toContain('data-testid="opening-cash-needs-review"');
-    expect(workspace).toContain('data-testid="owner-verify-opening-cash"');
+    expect(workspace).toContain('openingRequired={openingReviewRequired}');
+    expect(workspace).toContain("role === 'manager' && cashLedgerContext.opening_status === 'initial_opening_required'");
+    expect(workspace).not.toContain('opening-verification-reason');
     expect(workspace).toContain("supabase.rpc('erp_verify_sales_closing_opening_count'");
     expect(workspace).toContain('p_request_id: requestId');
     expect(workspace).toContain('!allValid || !cashContextReady || cashDifference === null || ledgerOverdrawn');
@@ -191,7 +192,7 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('Variance will be recorded separately');
     expect(workspace).toContain('data-testid="single-cash-ledger-note"');
     expect(workspace).toContain('inputId="quick-closing-actualCash"');
-    expect(workspace.match(/<CashReconciliationPanel/g)).toHaveLength(1);
+    expect(workspace.match(/<SimpleClosingCash/g)).toHaveLength(1);
     expect(workspace).toContain('inputId="quick-closing-actualCash"');
     expect(workspace).not.toContain('requiresCashReconciliation && actualCount === null && <div');
     expect(workspace).not.toContain('summaryVisibilityClass');
