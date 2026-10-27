@@ -61,7 +61,7 @@ import { useSalesClosingCustomization } from '@/lib/SalesClosingCustomizationCon
 import { buildSalesSourceClosingSnapshots, driverSourceEntryAmounts, driverSourcePaymentBreakdown, driverSourceTodayTotal, salesSourceTodayTotal } from '@/lib/salesSourceClosingLifecycle';
 import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
 import CustomerCreditSalesSource from '@/components/sales/CustomerCreditSalesSource';
-import CashReconciliationPanel from '@/components/sales/CashReconciliationPanel';
+import SimpleClosingCash from '@/components/sales/SimpleClosingCash';
 import ClosingCashSalesSources from '@/components/sales/ClosingCashSalesSources';
 import ClosingFinalReview from '@/components/sales/ClosingFinalReview';
 import { closingCashSalesSources } from '@/lib/closing/ClosingCashSalesSources';
@@ -387,7 +387,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const stepCopy = closingStepCopy[lang] || closingStepCopy.en;
   const [showBlockers, setShowBlockers] = useState(false);
   const [showNetworkDetail, setShowNetworkDetail] = useState(false);
-  const [showOpeningVerification, setShowOpeningVerification] = useState(false);
   const [showFinalizeReview, setShowFinalizeReview] = useState(false);
   const formRef = useRef(null);
   const submissionInFlight = useRef(false);
@@ -407,7 +406,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const [fundingPlan, setFundingPlan] = useState(null);
   const [isRecordingOwnerPayment, setIsRecordingOwnerPayment] = useState(false);
   const [openingVerificationAmount, setOpeningVerificationAmount] = useState('');
-  const [openingVerificationReason, setOpeningVerificationReason] = useState('');
   const [openingVerificationBusy, setOpeningVerificationBusy] = useState(false);
   const [openingVerificationError, setOpeningVerificationError] = useState('');
   const openingVerificationRequestId = useRef(null);
@@ -1217,29 +1215,26 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         p_closing_id: currentClosingId,
     }),
   });
+  useEffect(() => {
+    setOpeningVerificationAmount('');
+    setOpeningVerificationError('');
+    openingVerificationRequestId.current = null;
+  }, [activeRestaurant?.id, selectedBranchId, form.date, form.shift, effectiveCashierId]);
   const cashLedgerContext = cashLedgerContextData || {};
   const ledgerClosingId = cashLedgerContext.resolved_closing_id || currentClosingId;
   // Never infer a zero opening from a missing previous count or from a
   // different cashier's drawer. The backend returns explicit provenance.
   const openingReviewRequired = cashLedgerContext.opening_verified === false;
-  const openingReviewReason = cashLedgerContext.opening_status === 'initial_opening_required'
-    ? 'No earlier finalized cash count exists. The owner must count and verify the opening drawer balance, even if it is zero.'
-    : cashLedgerContext.opening_status === 'ambiguous_previous_shift'
-      ? 'The previous shift has multiple possible drawers. The owner must confirm the actual opening drawer count before closing.'
-      : 'The previous finalized shift has no verified Actual Cash count. The owner must confirm the physical opening balance before closing.';
+  const openingReviewReason = lang === 'fa' ? 'مبلغ نقد اول شیفت را وارد کنید.' : lang === 'ar' ? 'أدخل النقد الموجود في بداية الوردية.' : 'Enter the cash held at the start of this shift.';
   const cashContextReady = Boolean(cashLedgerContextData && cashLedgerContext.opening_verified === true);
-  // A separate immutable owner approval resolves a missing historic/initial
-  // physical drawer baseline. It never modifies past sales or cash movements.
+  // The starting count is audited once. Assigned managers can initialize a
+  // new drawer; only owners can resolve an ambiguous historic baseline.
   const verifyOpeningCash = async () => {
-    if (openingVerificationBusy || role !== 'owner') return;
+    if (openingVerificationBusy || !['owner', 'manager'].includes(role)) return;
     const raw = openingVerificationAmount.trim();
     const amount = Number(raw);
     if (!/^\d+(?:\.\d{1,2})?$/.test(raw) || !Number.isFinite(amount) || amount < 0) {
       setOpeningVerificationError('Enter the physically counted opening cash (0 or a positive amount, max two decimals).');
-      return;
-    }
-    if (openingVerificationReason.trim().length < 10) {
-      setOpeningVerificationError('Provide a clear reason with at least 10 characters for the audit log.');
       return;
     }
     const cashierId = effectiveCashierId;
@@ -1265,13 +1260,12 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         p_shift: form.shift,
         p_cashier_id: cashierId,
         p_counted_cash: amount,
-        p_reason: openingVerificationReason.trim(),
+        p_reason: 'Starting cash entered during guided closing',
         p_request_id: requestId,
       });
       if (error) throw error;
       openingVerificationRequestId.current = null;
       setOpeningVerificationAmount('');
-      setOpeningVerificationReason('');
       await refetchCashLedger();
       toast.success(closingTr('Opening drawer count verified and recorded in the audit log.'));
     } catch (error) {
@@ -1904,8 +1898,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           {attentionCount > 0 && showBlockers && <section data-testid="closing-blockers" role="status" className="space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 p-2.5">
             {stepFailedValidations.map(validation => <button type="button" key={validation.key} className="flex min-h-10 w-full items-start gap-2 rounded-lg bg-white px-2.5 py-2 text-left text-xs text-amber-900" onClick={() => {
               setClosingStep(['erpData', 'cashBalance'].includes(validation.key) ? 1 : 0);
-              if (validation.key === 'erpData' && openingReviewRequired) setShowOpeningVerification(true);
-              else if (validation.key !== 'cashBalance' && !(validation.key === 'erpData' && ledgerOverdrawn)) setShowFullDetails(true);
+              if (validation.key !== 'cashBalance' && !(validation.key === 'erpData' && (ledgerOverdrawn || openingReviewRequired))) setShowFullDetails(true);
               const anchor = validation.key === 'cashBalance' ? 'quick-closing-actualCash' : validation.key === 'erpData' && openingReviewRequired ? 'opening-cash-needs-review' : validation.key === 'erpData' && ledgerOverdrawn ? 'closing-funding' : null;
               if (anchor) requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({behavior: 'smooth', block: 'center'}));
             }}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span className="min-w-0"><strong className="block">{closingTr(validation.label)}</strong><span className="block text-[11px]">{closingTr(validation.message)}</span></span></button>)}
@@ -1958,30 +1951,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
           </div>
           <div hidden={closingStep !== 1} data-testid="closing-step-cash" className="space-y-3">
-          {openingReviewRequired && showOpeningVerification && <div id="opening-cash-needs-review" role="alert" data-testid="opening-cash-needs-review" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-            <p className="font-black">{closingTr("Opening Cash needs reconciliation")}</p>
-            <p className="mt-1 text-xs leading-6">{openingReviewReason}</p>
-            <p className="mt-1 text-xs">{closingTr("Previous shift:")}{cashLedgerContext.opening_shift || closingTr('Initial')} · {cashLedgerContext.opening_shift_date || '—'} {closingTr("· Records:")}{cashLedgerContext.opening_prior_count ?? '—'}</p>
-            {role === 'owner' ? (
-              <div data-testid="owner-verify-opening-cash" className="mt-3 space-y-3 rounded-xl border border-amber-200 bg-white p-3">
-                <p className="text-xs font-black">{closingTr("Owner verification · counted opening drawer, not today's sales")}</p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="block text-xs font-bold" htmlFor="opening-verification-count">{closingTr("Opening Cash (")}{currency}) <span className="text-red-600">*</span>
-                    <Input id="opening-verification-count" inputMode="decimal" value={openingVerificationAmount} onChange={event => setOpeningVerificationAmount(event.target.value)} placeholder={closingTr("0.00")} className="mt-1 min-h-11" disabled={openingVerificationBusy} />
-                  </label>
-                  <label className="block text-xs font-bold" htmlFor="opening-verification-reason">{closingTr("Reason / counted by")}<span className="text-red-600">*</span>
-                    <Input id="opening-verification-reason" value={openingVerificationReason} onChange={event => setOpeningVerificationReason(event.target.value)} placeholder={closingTr("Physical starting drawer count verified by owner")} className="mt-1 min-h-11" disabled={openingVerificationBusy} />
-                  </label>
-                </div>
-                <p className="text-[11px] font-semibold leading-5 text-amber-900">{closingTr("Enter the cash verified at the START of this shift from a signed handover or reliable source record, not the cash currently in the drawer (Actual Cash). If the starting amount cannot be substantiated, do not approve it.")}</p>
-                <p className="text-[11px]">{closingTr("This creates an immutable owner-approved opening record. It does not overwrite earlier closings or add sales revenue.")}</p>
-                {openingVerificationError && <p role="alert" className="text-xs font-bold text-red-700">{closingTr(openingVerificationError)}</p>}
-                <Button type="button" size="sm" data-testid="verify-opening-cash-button" disabled={openingVerificationBusy || !openingVerificationAmount.trim() || openingVerificationReason.trim().length < 10} onClick={verifyOpeningCash}>
-                  {openingVerificationBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-1.5 h-4 w-4" />}{closingTr("Verify Opening Cash")}</Button>
-              </div>
-            ) : <p className="mt-2 text-xs font-bold">{closingTr("Ask the business Owner to verify the drawer opening before the shift can be finalized.")}</p>}
-            <Button type="button" size="sm" variant="outline" className="mt-2 min-h-10" onClick={() => refetchCashLedger()}><RefreshCw className="mr-1.5 h-4 w-4" />{closingTr("Recheck ledger")}</Button>
-          </div>}
           {automaticClosingUnavailable && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"><p className="font-black">{closingTr("ERP sales data needs attention")}</p><p className="mt-1 text-xs">{closingTr("Check the branch and date, then retry before finalizing.")}</p><Button type="button" size="sm" variant="outline" className="mt-3 min-h-10 border-red-300 bg-white" onClick={() => refetchAutomaticClosing()}><RefreshCw className="mr-1.5 h-4 w-4" />{closingTr("Retry ERP data")}</Button></div>}
 
           <details open={!cashSalesSourcesMatched || undefined} className="rounded-2xl border border-slate-200 bg-white p-3" data-testid="cash-source-details">
@@ -1989,8 +1958,15 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           <ClosingCashSalesSources breakdown={cashSalesBreakdown} closingCashSales={cashSales} currency={currency} lang={lang} />
           </details>
           <div data-testid="closing-cash-action" className="min-w-0" aria-label={closingTr("Cash reconciliation")}>
-            <CashReconciliationPanel
-              compact
+            <SimpleClosingCash
+              role={role}
+              openingRequired={openingReviewRequired}
+              openingValue={openingVerificationAmount}
+              onOpeningChange={value => { setOpeningVerificationAmount(value); openingVerificationRequestId.current = null; setOpeningVerificationError(''); }}
+              onSaveOpening={verifyOpeningCash}
+              openingBusy={openingVerificationBusy}
+              openingError={closingTr(openingVerificationError)}
+              canSetOpening={role === 'owner' || (role === 'manager' && cashLedgerContext.opening_status === 'initial_opening_required')}
               inputId="quick-closing-actualCash"
               lang={lang}
               currency={currency}
@@ -2042,9 +2018,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 onPosted={async () => { setManagerApproved(false); await refetchCashLedger(); }}
               /> : null}
             />
-            {openingReviewRequired && <button type="button" className="mt-3 min-h-11 w-full rounded-xl border border-amber-300 bg-amber-50 px-3 text-left text-sm font-bold text-amber-900" onClick={() => setShowOpeningVerification(true)}>
-              {lang === 'fa' ? 'تأیید نقد افتتاحیه' : lang === 'ar' ? 'توثيق النقد الافتتاحي' : closingTr('Verify opening cash')}
-            </button>}
+
           </div>
           </div>
           <div hidden={closingStep !== 2} data-testid="closing-step-review" className="space-y-3">
