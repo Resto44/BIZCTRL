@@ -2,6 +2,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
+import { subscribeCashierBroadcast } from '@/lib/cashierBroadcast';
 
 // These prefixes match the current OwnerDashboard queries, not legacy cards.
 export const OWNER_DASHBOARD_TABLE_QUERIES = {
@@ -20,7 +21,7 @@ export const OWNER_DASHBOARD_TABLE_QUERIES = {
   branches: ['branches', 'owner_drawer_cash_asof'],
 };
 const TABLE_QUERY_MAP = OWNER_DASHBOARD_TABLE_QUERIES;
-const DASHBOARD_KEYS = new Set(Object.values(TABLE_QUERY_MAP).flat());
+const DASHBOARD_KEYS = new Set([...Object.values(TABLE_QUERY_MAP).flat(), 'owner_restaurant_pos']);
 let channelSequence = 0;
 
 // ─── Human-readable event labels ─────────────────────────────────────────────
@@ -178,6 +179,14 @@ export function useOwnerDashboardRealtime(restaurantId, branches = []) {
       }
     });
 
+    // POS private-schema messages are invalidation hints, never trusted data.
+    let posTimer;
+    const stopPOS = subscribeCashierBroadcast(supabase, `restaurant-pos:${restaurantId}`, status => {
+      if (disposed || !['changed', 'SUBSCRIBED'].includes(status)) return;
+      clearTimeout(posTimer);
+      posTimer = setTimeout(refreshDashboard, 200);
+    });
+
     // Filtered DELETE events, interrupted sockets and mobile backgrounding can
     // miss events. Re-fetch active tenant queries without remounting the page.
     // Real-time events update immediately; use a low-frequency safety sweep for missed events.
@@ -186,6 +195,8 @@ export function useOwnerDashboardRealtime(restaurantId, branches = []) {
     window.addEventListener('online', refreshDashboard);
     return () => {
       disposed = true;
+      stopPOS();
+      clearTimeout(posTimer);
       clearInterval(timer);
       document.removeEventListener('visibilitychange', refreshDashboard);
       window.removeEventListener('online', refreshDashboard);

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const mock = vi.hoisted(() => ({ channels: [], removeChannel: vi.fn() }));
 vi.mock('@/api/supabaseClient', () => ({ supabase: {
   channel(name) {
-    const c = { name, handlers: {}, on(_, filter, callback) { this.handlers[filter.table] = { filter, callback }; return this; }, subscribe(callback) { this.status = callback; return this; } };
+    const c = { name, handlers: {}, on(_, filter, callback) { this.handlers[filter.table || 'broadcast'] = { filter, callback }; return this; }, subscribe(callback) { this.status = callback; return this; } };
     mock.channels.push(c); return c;
   }, removeChannel: mock.removeChannel,
 } }));
@@ -26,10 +26,10 @@ async function mount() {
   for (const prefix of ['sales_report_period', 'expenses_report_period', 'supplier_invoices']) readers[prefix] = vi.fn().mockResolvedValue([]);
   await act(async () => { tree = create(<QueryClientProvider client={client}><Probe tenant="restaurant-a" /></QueryClientProvider>); });
 }
-afterEach(() => { if (tree) act(() => tree.unmount()); client?.clear(); mock.channels.length = 0; vi.clearAllMocks(); vi.useRealTimers(); });
+afterEach(async () => { if (tree) act(() => tree.unmount()); tree=null; if(vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(150); else await new Promise(resolve=>setTimeout(resolve,150)); client?.clear(); mock.channels.length = 0; vi.clearAllMocks(); vi.useRealTimers(); });
 describe('owner dashboard manager record synchronization', () => {
   it('refetches current sales, expenses and invoices on remote events without manual refresh', async () => {
-    await mount(); const channel = mock.channels.at(-1);
+    await mount(); const channel = mock.channels.find(c => c.name.startsWith('owner-dashboard-rt-'));
     for (const [table, key] of [['daily_sales','sales_report_period'], ['expenses','expenses_report_period'], ['supplier_invoices','supplier_invoices']]) {
       expect(channel.handlers[table].filter.filter).toBe('restaurant_id=eq.restaurant-a');
       const count = readers[key].mock.calls.length;
@@ -41,14 +41,28 @@ describe('owner dashboard manager record synchronization', () => {
     vi.useFakeTimers(); await mount();
     client.setQueryData(['sales_report_period','restaurant-b','branch'], [{ id:'other' }]);
     const count = readers.sales_report_period.mock.calls.length;
-    await act(async () => mock.channels.at(-1).status('SUBSCRIBED'));
+    await act(async () => mock.channels.find(c => c.name.startsWith('owner-dashboard-rt-')).status('SUBSCRIBED'));
     expect(readers.sales_report_period.mock.calls.length).toBe(count + 1);
     await act(async () => vi.advanceTimersByTimeAsync(60000));
     expect(readers.sales_report_period.mock.calls.length).toBe(count + 2);
     expect(client.getQueryState(['sales_report_period','restaurant-b','branch']).isInvalidated).toBe(false);
   });
+  it('refreshes only this owner tenant after private POS activity and coalesces bursts', async () => {
+    vi.useFakeTimers(); await mount();
+    client.setQueryData(['owner_restaurant_pos','restaurant-a',null], {});
+    client.setQueryData(['owner_restaurant_pos','restaurant-b',null], {});
+    const count = readers.sales_report_period.mock.calls.length;
+    const channel = mock.channels.find(c => c.name === 'restaurant-pos:restaurant-a');
+    await act(async () => {
+      channel.handlers.broadcast.callback({}); channel.handlers.broadcast.callback({});
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    expect(readers.sales_report_period.mock.calls.length).toBe(count + 1);
+    expect(client.getQueryState(['owner_restaurant_pos','restaurant-a',null]).isInvalidated).toBe(true);
+    expect(client.getQueryState(['owner_restaurant_pos','restaurant-b',null]).isInvalidated).toBe(false);
+  });
   it('ignores events from disposed channels and removes timers on unmount', async () => {
-    vi.useFakeTimers(); await mount(); const channel = mock.channels.at(-1);
+    vi.useFakeTimers(); await mount(); const channel = mock.channels.find(c => c.name.startsWith('owner-dashboard-rt-'));
     act(() => tree.unmount()); tree = null;
     const count = readers.sales_report_period.mock.calls.length;
     await act(async () => { channel.handlers.daily_sales.callback({ eventType:'UPDATE', new:{} }); await vi.advanceTimersByTimeAsync(60000); });
