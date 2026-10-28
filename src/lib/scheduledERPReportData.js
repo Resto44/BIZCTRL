@@ -6,6 +6,7 @@ import {fetchReportStockConsumption} from './reportStockConsumption';
  */
 export async function fetchScheduledERPReportData({
  db = undefined,restaurantId = undefined,allBranches=true,branchId=null,branchKey=null,range = undefined,maxRows=50000,
+ stockConsumptionReader=fetchReportStockConsumption,
 }={}){
  if(!db || !restaurantId || !range?.from || !range?.to)
    throw new Error('An active restaurant and report date range are required');
@@ -40,7 +41,7 @@ export async function fetchScheduledERPReportData({
   read('supplier_invoices',{from:range.previousFrom,to:range.to}),
   read('expenses',{legacyColumn:'branch_key',from:firstMonthStart,to:range.to}),
   read('inventory',{dateColumn:null}),
-  fetchReportStockConsumption({db,restaurantId,branchId:allBranches?null:branchId,range}),
+  stockConsumptionReader({db,restaurantId,branchId:allBranches?null:branchId,range}),
   read('debt_records',{dateColumn:null}),
   (async()=>{
    const {data,error}=await db.from('expense_categories').select('*').eq('restaurant_id',restaurantId);
