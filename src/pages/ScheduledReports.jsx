@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText } from 'lucide-react';
+import AutomaticOwnerReport from '@/components/reports/AutomaticOwnerReport';
 
 const EMAIL_TEXT = {
  en: {saved:'Report settings saved. No email has been sent.',send:'Send now',accepted:'Email provider accepted the report. Check your inbox and spam.',invalid:'Enter a report name and up to five valid email addresses.',failed:'Could not complete the request. Please try again.',load:'Could not load saved reports.',setup:'Email delivery needs administrator setup. Automatic delivery is not enabled.',manual:'Automatic delivery is not enabled. Use Send now to email the selected report.',pending:'Checking email service…',paused:'Saved settings',statusFailed:'Email status could not be saved; the provider accepted the report.',scope:'Select an authorized restaurant and branch.',provider:'The email provider rejected the report. Ask the administrator to check the sender configuration.',rate:'Please wait one minute before sending again.'},
@@ -178,7 +179,8 @@ export default function ScheduledReports() {
         }
       />
 
-      <p role="status" className="mb-4 rounded-lg border p-3 text-sm">{checkingEmail?messages.pending:emailStatus?.configured?messages.manual:messages.setup}</p>
+      <AutomaticOwnerReport restaurantId={activeRestaurant?.id} lang={lang}/>
+      <p role="status" className="mb-4 rounded-lg border p-3 text-sm">{checkingEmail?messages.pending:emailStatus?.configured?(lang==='fa'?'گزارش‌های سفارشی زیر با «ارسال الآن» فرستاده می‌شوند.':lang==='ar'?'التقارير المخصصة أدناه ترسل عبر «إرسال الآن».':'Custom reports below use Send now.'):messages.setup}</p>
       {/* Live KPI snapshot */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
         {[

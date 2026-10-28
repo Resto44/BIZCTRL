@@ -196,6 +196,7 @@ export default function ERPRegister() {
         <div><Label htmlFor="owner-branch" className="text-slate-300">Initial branch name</Label><Input id="owner-branch" value={owner.branch} onChange={(event) => setOwner((current) => ({ ...current, branch: event.target.value }))} className="mt-1.5 h-11 border-white/10 bg-white/5 text-white" required /></div>
         <div><Label htmlFor="owner-password" className="text-slate-300">Create password</Label><div className="mt-1.5"><PasswordInput id="owner-password" value={owner.password} onChange={(event) => setOwner((current) => ({ ...current, password: event.target.value }))} /></div></div>
         <div><Label htmlFor="owner-confirm" className="text-slate-300">Confirm password</Label><div className="mt-1.5"><PasswordInput id="owner-confirm" value={owner.confirm} onChange={(event) => setOwner((current) => ({ ...current, confirm: event.target.value }))} /></div></div>
+        <p className="text-xs leading-relaxed text-slate-400">After email verification, your organization’s previous-day PDF report will be sent to this email daily at 08:00 Riyadh time. You can pause it in Scheduled Reports.</p>
         <Button type="submit" disabled={submitting} className="h-11 w-full bg-gradient-to-r from-violet-600 to-indigo-600 font-bold text-white">{submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />}Create owner account and organization</Button>
       </form>
     </Panel>

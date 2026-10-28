@@ -31,3 +31,4 @@ dist-ssr
 .env
 .vite
 .vercel
+supabase/functions/automatic-report-email/report-bundle.js
