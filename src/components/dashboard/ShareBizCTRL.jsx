@@ -3,7 +3,7 @@ import { Copy, MessageCircle, Share2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { SAAS_SHARE_COPY, SAAS_SHARE_IMAGE, SAAS_SHARE_URL, whatsappShareHref } from '@/lib/saasShare';
 
-export default function ShareBizCTRL({ lang = 'en' }) {
+export default function ShareBizCTRL({ lang = 'en', compact = false }) {
   const copy = SAAS_SHARE_COPY[lang] || SAAS_SHARE_COPY.en;
   const [message, setMessage] = useState(copy.message);
   const [status, setStatus] = useState('');
@@ -13,7 +13,7 @@ export default function ShareBizCTRL({ lang = 'en' }) {
     catch { setStatus(copy.failed); }
   }
   return <Dialog onOpenChange={(open) => { if (open) { setMessage(copy.message); setStatus(''); } }}>
-    <DialogTrigger asChild><button type="button" className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-background px-4 py-2 text-sm font-bold text-blue-700 dark:text-blue-300"><Share2 className="h-4 w-4" />{copy.title}</button></DialogTrigger>
+    <DialogTrigger asChild><button type="button" className={`${compact ? 'w-full px-2 text-xs' : 'mt-3 px-4 text-sm'} inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-background py-2 font-bold text-blue-700 dark:text-blue-300`}><Share2 className="h-4 w-4" />{copy.title}</button></DialogTrigger>
     <DialogContent dir={rtl ? 'rtl' : 'ltr'} className="max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-lg overflow-y-auto rounded-2xl p-5">
       <DialogHeader><DialogTitle>{copy.title}</DialogTitle><DialogDescription>{copy.hint}</DialogDescription></DialogHeader>
       <img src={SAAS_SHARE_IMAGE} width="1200" height="630" alt="BizCTRL — Business ERP" className="w-full rounded-xl" />

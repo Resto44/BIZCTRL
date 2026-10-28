@@ -35,7 +35,7 @@ export default function AppLayout() {
   return (
     <ERPLayout>
       <RouteEnforcer />
-      <div className="mx-auto w-full min-w-0 max-w-[1600px] px-4 py-4 lg:px-6">
+      <div className="mx-auto w-full min-w-0 max-w-[1600px] px-4 py-2 sm:py-4 lg:px-6">
         <SubscriptionStatusBanner />
         <NotificationRecordLink><OwnerWorkspaceTabs /></NotificationRecordLink>
       </div>
