@@ -40,7 +40,7 @@ function createTab(path) {
 function OwnerTabStrip({ tabs, activePath, onActivate, onClose }) {
   return (
     <nav
-      className="sticky top-0 z-30 -mx-4 mb-4 w-[calc(100%+2rem)] min-w-0 max-w-none border-b border-border bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/85 lg:-mx-6 lg:w-[calc(100%+3rem)] lg:px-6"
+      className={`${tabs.length === 1 ? 'hidden sm:block' : ''} sticky top-0 z-30 -mx-4 mb-2 sm:mb-4 w-[calc(100%+2rem)] min-w-0 max-w-none border-b border-border bg-background/95 px-4 py-1 sm:py-2 backdrop-blur supports-[backdrop-filter]:bg-background/85 lg:-mx-6 lg:w-[calc(100%+3rem)] lg:px-6`}
       aria-label="Open workspace pages"
     >
       <div className="flex min-w-0 max-w-full gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [scrollbar-width:thin]">

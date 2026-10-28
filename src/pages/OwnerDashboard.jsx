@@ -482,11 +482,11 @@ function OwnerDashboardContent() {
   if (loading) return <DashboardSkeleton />;
 
   return (
-    <div data-testid="owner-mega-dashboard" className="mx-auto -mt-2 box-border w-full min-w-0 max-w-6xl overflow-x-hidden space-y-3 px-3 pb-8 pt-0 sm:mt-0 sm:space-y-5 sm:px-5 sm:pt-1" dir={isRTL ? 'rtl' : 'ltr'}>
+    <div data-testid="owner-mega-dashboard" className="mx-auto -mt-2 box-border w-full min-w-0 max-w-6xl overflow-x-hidden space-y-3 px-0 pb-8 pt-0 sm:mt-0 sm:space-y-5 sm:px-5 sm:pt-1" dir={isRTL ? 'rtl' : 'ltr'}>
       <header data-testid="owner-report-center" className="overflow-hidden rounded-[1.4rem] border border-blue-100 bg-gradient-to-br from-white via-blue-50/45 to-indigo-50/70 p-3 shadow-[0_18px_50px_-30px_rgba(37,99,235,0.45)] dark:border-blue-900/60 dark:from-slate-950 dark:via-blue-950/35 dark:to-indigo-950/40 sm:rounded-[1.75rem] sm:p-6">
         <div className="flex flex-col gap-2.5 sm:gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <div className="flex items-start gap-2.5 sm:items-center sm:gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/25 sm:h-11 sm:w-11 sm:rounded-2xl"><ClipboardList className="h-4 w-4 sm:h-5 sm:w-5" /></span><div className="min-w-0 flex-1"><h1 className="break-words text-lg font-black leading-tight tracking-tight text-slate-950 dark:text-white sm:text-3xl">{copy.title}</h1><p title={copy.subtitle} className="mt-0.5 line-clamp-1 text-[11px] font-medium text-muted-foreground sm:mt-1 sm:line-clamp-none sm:text-sm">{copy.subtitle}</p></div><span data-testid="owner-mobile-live" className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-black sm:hidden ${isLive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300'}`}><Radio className="h-3 w-3" />{isLive ? copy.live : copy.syncing}</span></div>
+            <div className="flex items-start gap-2.5 sm:items-center sm:gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/25 sm:h-11 sm:w-11 sm:rounded-2xl"><ClipboardList className="h-4 w-4 sm:h-5 sm:w-5" /></span><div className="min-w-0 flex-1"><h1 className="break-words text-lg font-black leading-tight tracking-tight text-slate-950 dark:text-white sm:text-3xl">{copy.title}</h1><p title={copy.subtitle} className="hidden sm:block mt-0.5 line-clamp-1 text-[11px] font-medium text-muted-foreground sm:mt-1 sm:line-clamp-none sm:text-sm">{copy.subtitle}</p></div><span data-testid="owner-mobile-live" className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-black sm:hidden ${isLive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300'}`}><Radio className="h-3 w-3" />{isLive ? copy.live : copy.syncing}</span></div>
             <div className="mt-3 hidden flex-wrap items-center gap-2 text-xs font-bold sm:flex"><span className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-background/85 px-2.5 py-1.5 text-foreground shadow-sm"><Building2 className="h-3.5 w-3.5 text-blue-600" />{displayScope}</span><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 ${isLive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300'}`}><Radio className={`h-3.5 w-3.5 ${isLive ? 'animate-pulse' : ''}`} />{isLive ? copy.live : copy.syncing}</span></div>
           </div>
           <div className="flex w-full min-w-0 gap-2 sm:w-auto">
@@ -494,16 +494,18 @@ function OwnerDashboardContent() {
             <label className="relative w-32 min-w-0 shrink-0 sm:w-40"><span className="sr-only">{copy.choosePeriod}</span><CalendarDays className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-600" /><select data-testid="owner-period-selector" aria-label={copy.choosePeriod} value={activePeriod} onChange={(event) => changeReportPeriod(event.target.value)} className="h-10 w-full appearance-none truncate rounded-xl border border-border bg-background ps-9 pe-7 text-xs font-bold text-foreground shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 sm:h-11">{REPORT_PERIODS.map((option) => <option key={option.key} value={option.key}>{copy[option.labelKey] || option.fallback}</option>)}</select><ChevronRight className="pointer-events-none absolute end-2.5 top-1/2 h-4 w-4 -translate-y-1/2 rotate-90 text-muted-foreground" /></label>
           </div>
         </div>
-        {can.viewReports && <div className="mt-2 sm:mt-4">
+        <div className="mt-2 grid grid-cols-2 items-start gap-2 sm:flex sm:flex-wrap sm:mt-4">
+        {can.viewReports && <div className="min-w-0">
           <button type="button" data-testid="owner-pdf-report" onClick={handlePDF}
             disabled={pdfLoading || !activeRestaurant?.id} aria-busy={pdfLoading}
-            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60 sm:min-h-11 sm:w-auto sm:px-5 sm:py-3 sm:text-sm">
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60 sm:min-h-11 sm:w-auto sm:px-5 sm:py-3 sm:text-sm">
             {pdfLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileDown className="h-5 w-5" />}
             {pdfLoading ? pdfCopy.loading : pdfCopy.label}
           </button>
           {pdfError && <p role="alert" className="mt-2 text-sm font-semibold text-red-600 dark:text-red-400">{pdfCopy.error}</p>}
         </div>}
-        {role === 'owner' && <ShareBizCTRL lang={lang} />}
+        {role === 'owner' && <ShareBizCTRL lang={lang} compact />}
+        </div>
         {hasQueryError ? <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{copy.unable}</div> : null}
       </header>
 

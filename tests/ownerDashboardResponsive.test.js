@@ -43,7 +43,7 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
   it('uses a compact mobile Owner Report Center without hiding live state or report controls', async () => {
     const owner = await source('../src/pages/OwnerDashboard.jsx');
     const header = owner.slice(owner.indexOf('data-testid="owner-report-center"'), owner.indexOf('data-testid="owner-report-nav"'));
-    expect(owner).toContain('space-y-3 px-3 pb-8 pt-0 sm:mt-0 sm:space-y-5');
+    expect(owner).toContain('space-y-3 px-0 pb-8 pt-0 sm:mt-0 sm:space-y-5');
     expect(header).toContain('p-3 shadow-');
     expect(header).toContain('sm:p-6');
     expect(header).toContain('flex flex-col gap-2.5 sm:gap-4');
@@ -54,7 +54,7 @@ describe('Owner Dashboard mobile responsiveness contract', () => {
     expect(header).toContain('data-testid="owner-branch-selector"');
     expect(header).toContain('data-testid="owner-period-selector"');
     expect(header).toContain('data-testid="owner-pdf-report"');
-    expect(header).toContain('min-h-10 w-full items-center');
+    expect(header).toContain('min-h-11 w-full items-center');
     expect(owner).toContain('data-testid="owner-report-nav"');
     expect(owner).toContain('<OwnerReportCenter activePage={activePage} model={model} copy={copy} />');
     // Compact presentation must not change the source-of-truth for reports or

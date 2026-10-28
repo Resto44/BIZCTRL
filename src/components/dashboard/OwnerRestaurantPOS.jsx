@@ -23,8 +23,8 @@ export default function OwnerRestaurantPOS({restaurant,branchId,lang}){
    <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
     {[[c.paidSales,data?.paid_sales],[c.unpaidOrders,data?.unpaid_orders]].map(([label,value])=><div key={label} className="rounded-lg bg-muted p-2"><span>{label}</span><strong className="mt-1 block text-base" dir="ltr">{isLoading||value==null?'—':money(value,restaurant.currency||'SAR')}</strong></div>)}
    </div>}
-  <p className="mt-2 text-[11px] text-muted-foreground">{day} · {lang==='fa'?'فروش پرداخت‌شدهٔ امروز؛ سفارش باز جدا است.':lang==='ar'?'مبيعات اليوم المدفوعة؛ الطلبات المفتوحة منفصلة.':'Today’s paid sales; open orders shown separately.'}</p>
-  {!!data?.events?.length&&<details className="mt-2 text-xs"><summary className="cursor-pointer py-2 font-semibold">{latest}</summary>
+  <p className="mt-1 text-[11px] text-muted-foreground">{day}</p>
+  {!!data?.events?.length&&<details className="mt-1 text-xs"><summary className="cursor-pointer py-1 font-semibold">{latest}</summary>
    {data.events.slice(0,5).map((event,i)=><div key={`${event.occurred_at}:${i}`} className="flex flex-wrap justify-between gap-2 border-t py-2"><span>{event.code} · {event.action}</span><time>{new Date(event.occurred_at).toLocaleTimeString()}</time></div>)}
   </details>}
  </section>;
