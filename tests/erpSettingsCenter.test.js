@@ -50,6 +50,10 @@ describe('ERP Settings Center', () => {
     expect(issues).toContain('Every document type needs a prefix.');
   });
 
+  it.each([Infinity, NaN, -1, 101, '', null])('rejects invalid VAT rates: %s', (rate) => {
+    expect(financeControlIssues({ ...DEFAULT_ERP_SETTINGS.finance, vatEnabled: true, vatRegistrationNumber: 'TEST', defaultVatRate: rate })).toContain('Default VAT rate must be between 0 and 100.');
+  });
+
   it('counts only enabled standard automation rules', () => {
     expect(activeAutomationCount({
       first: { enabled: true },

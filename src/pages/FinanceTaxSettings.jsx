@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import useERPSettings from '@/hooks/useERPSettings';
+import POSTaxReadiness from '@/components/settings/POSTaxReadiness';
 import { financeControlIssues } from '@/lib/erpSettings';
 import { useLanguage } from '@/lib/LanguageContext';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,7 @@ export default function FinanceTaxSettings() {
 
       {isLoading ? <div className="mt-4"><SettingsSkeleton /></div> : (
         <div className="mt-5 space-y-6">
+          {(activeTab === 'General' || activeTab === 'Tax') && <POSTaxReadiness />}
           {(activeTab === 'General' || activeTab === 'Tax') && (
             <div className="grid gap-5 xl:grid-cols-2">
               <SettingsSection title="Base currency" description="Used by financial reports, invoices and dashboard totals.">
@@ -91,7 +93,7 @@ export default function FinanceTaxSettings() {
                 </SettingsCard>
               </SettingsSection>
 
-              <SettingsSection title="VAT & tax" description="Tax controls apply to new transactions after saving.">
+              <SettingsSection title="VAT & tax" description="ERP finance preferences. Restaurant POS uses the tax rate saved on each menu item.">
                 <SettingsCard className="divide-y divide-slate-100 dark:divide-slate-800">
                   <SettingRow icon={Percent} title="VAT enabled"><Switch checked={Boolean(finance.vatEnabled)} onCheckedChange={(value) => patchFinance({ vatEnabled: value })} /></SettingRow>
                   <SettingRow title="Default VAT rate"><div className="relative"><Input type="number" min="0" max="100" step="0.01" value={finance.defaultVatRate ?? 0} onChange={(event) => patchFinance({ defaultVatRate: Number(event.target.value) })} className="h-10 w-28 rounded-xl pr-8 text-right font-bold" aria-label="Default VAT rate" /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span></div></SettingRow>
