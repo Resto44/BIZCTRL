@@ -70,8 +70,8 @@ export function financeControlIssues(finance = {}) {
   if (finance.vatEnabled && !String(finance.vatRegistrationNumber || '').trim()) {
     issues.push('VAT registration number is required while VAT is enabled.');
   }
-  if (finance.vatEnabled && !(Number(finance.defaultVatRate) >= 0)) {
-    issues.push('Default VAT rate must be zero or greater.');
+  if (finance.vatEnabled && (!Number.isFinite(Number(finance.defaultVatRate)) || Number(finance.defaultVatRate) < 0 || Number(finance.defaultVatRate) > 100 || String(finance.defaultVatRate ?? '').trim() === '')) {
+    issues.push('Default VAT rate must be between 0 and 100.');
   }
   ['salesInvoicePrefix', 'purchaseInvoicePrefix', 'creditNotePrefix'].forEach((key) => {
     if (!String(finance[key] || '').trim()) issues.push('Every document type needs a prefix.');
