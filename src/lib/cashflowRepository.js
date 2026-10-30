@@ -1,8 +1,10 @@
 import { readAllPortalRows } from './portalReliability';
 const COLUMNS = {
   cash_movements: 'id,date,branch_id,branch,amount,direction,is_reversed,movement_type,source_record_id,posted_at,created_date',
-  daily_sales: 'id,date,branch_id,branch,cashier_id,cashier_name,restaurant_network,network,credit,actual_cash,closing_state,session_closed_at,updated_date,finalized_at,created_date',
+  daily_sales: 'id,date,branch_id,branch,shift,cashier_id,cashier_name,restaurant_network,network,credit,opening_cash,closing_cash,cash_difference,closing_session_no,actual_cash,closing_state,session_closed_at,updated_date,finalized_at,created_date',
   daily_cash_settlements: 'id,date,branch_id,branch,opening_cash,status',
+  cash_shortages: 'id,date,branch_id,branch,shift,cashier_id,closing_id,shortage_amount,status,owner_payment_amount,wallet_payment_amount,created_date',
+  sales_closing_opening_verifications: 'id,date,branch_id,branch,shift,cashier_id,counted_cash,verified_at',
 };
 export function resolveCashflowBranch({ role, user, branches, selectedBranch }) {
   if (role === 'owner' && selectedBranch === 'all') return null;
@@ -28,8 +30,11 @@ export async function readCashflow(client, { restaurantId, branch, to }) {
     ]);
     return [...new Map(results.flat().map(row=>[row.id,row])).values()];
   };
-  const [movements,sales,settlements]=await Promise.all([
-    read('cash_movements'),read('daily_sales',[['in','closing_state',['finalized','locked']]]),read('daily_cash_settlements'),
+  // These are immutable/posted source records, not new money movements.
+  // RLS and the same tenant/branch filters apply to all five sources.
+  const [movements,sales,settlements,shortages,openingVerifications]=await Promise.all([
+    read('cash_movements'),read('daily_sales',[['in','closing_state',['finalized','locked']]]),
+    read('daily_cash_settlements'),read('cash_shortages'),read('sales_closing_opening_verifications'),
   ]);
-  return {movements,sales,settlements};
+  return {movements,sales,settlements,shortages,openingVerifications};
 }

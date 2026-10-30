@@ -12,7 +12,70 @@ export function cashflowDateRange(type, now = new Date()) {
   if (type === 'year') { date.setUTCMonth(0); date.setUTCDate(1); }
   return { from: date.toISOString().slice(0, 10), to };
 }
-export function computeRunningCashflow({ movements = [], sales = [], settlements = [], branches = [], fromStr, toStr }) {
+// Cash Flow audit records are derived from persisted, RLS-scoped records.
+// They are snapshots/discrepancies, NOT receipts or payments. Never append
+// them to cash_movements and never change the running cash balance with them.
+export function buildCashflowAuditEvents({sales=[],shortages=[],openingVerifications=[],fromStr,toStr}) {
+  const inRange=row=>row?.date>=fromStr && row?.date<=toStr;
+  const money=value=>valid(value) && Number(value)>=0 ? Math.round(Number(value)*100)/100 : null;
+  const isDrawerClose=row=>['finalized','locked'].includes(row.closing_state) &&
+    ['morning','evening'].includes(String(row.shift||'').trim().toLowerCase());
+  const closings=unique(sales).filter(row=>inRange(row)&&isDrawerClose(row));
+  const events=[];
+  for (const row of closings) {
+    const common={date:row.date,branch_id:row.branch_id,branch:row.branch,shift:row.shift,
+      cashier_id:row.cashier_id,closing_id:row.id,session_no:row.closing_session_no,
+      recordedAt:stamp(row),source:'daily_sales'};
+    const opening=money(row.opening_cash);
+    if(opening!==null)events.push({...common,id:'opening:'+row.id,type:'opening_cash',amount:opening,status:'recorded'});
+    const counted=money(row.actual_cash);
+    const booked=money(row.closing_cash);
+    if(counted!==null)events.push({...common,id:'closing:'+row.id,type:'closing_cash',amount:counted,status:'verified'});
+    else if(booked!==null)events.push({...common,id:'closing:'+row.id,type:'closing_cash',amount:booked,status:'unverified'});
+  }
+  const sameScope=(a,b)=>a.date===b.date
+    && String(a.branch_id||a.branch||'')===String(b.branch_id||b.branch||'')
+    && String(a.shift||'').toLowerCase()===String(b.shift||'').toLowerCase()
+    && String(a.cashier_id||'')===String(b.cashier_id||'');
+  for(const row of unique(openingVerifications).filter(inRange)) {
+    // An opening is visible immediately after physical verification even
+    // before the first closing. Once closed, the closing snapshot owns it.
+    if(closings.some(closing=>sameScope(closing,row)))continue;
+    const amount=money(row.counted_cash);
+    if(amount===null)continue;
+    events.push({id:'verified-opening:'+row.id,type:'opening_cash',amount,date:row.date,
+      branch_id:row.branch_id,branch:row.branch,shift:row.shift,cashier_id:row.cashier_id,
+      recordedAt:row.verified_at||'',status:'verified',source:'sales_closing_opening_verifications'});
+  }
+  const linkedShortages=new Set();
+  for(const row of unique(shortages).filter(inRange)) {
+    const amount=money(row.shortage_amount);
+    if(amount===null||amount===0)continue;
+    if(row.closing_id)linkedShortages.add(String(row.closing_id));
+    events.push({id:'shortage:'+row.id,type:'cash_shortage',date:row.date,
+      branch_id:row.branch_id,branch:row.branch,shift:row.shift,cashier_id:row.cashier_id,
+      closing_id:row.closing_id,amount,status:row.status||'Pending',
+      ownerPayment:money(row.owner_payment_amount)||0,walletPayment:money(row.wallet_payment_amount)||0,
+      recordedAt:row.created_date||'',source:'cash_shortages'});
+  }
+  // Older finalized closings can have a negative cash difference but no
+  // linked shortage record. Show an unresolved discrepancy, never book cash out.
+  for(const row of closings){
+    const difference=valid(row.cash_difference)?Number(row.cash_difference):null;
+    if(difference===null||difference>=0||linkedShortages.has(String(row.id)))continue;
+    events.push({id:'shortage-unlinked:'+row.id,type:'cash_shortage',date:row.date,
+      branch_id:row.branch_id,branch:row.branch,shift:row.shift,cashier_id:row.cashier_id,
+      closing_id:row.id,amount:Math.round(Math.abs(difference)*100)/100,
+      status:'Needs review',recordedAt:stamp(row),source:'daily_sales'});
+  }
+  const priority={cash_shortage:0,closing_cash:1,opening_cash:2};
+  events.sort((a,b)=>b.date.localeCompare(a.date)
+    || String(b.recordedAt).localeCompare(String(a.recordedAt))
+    || (priority[a.type]-priority[b.type]) || String(a.id).localeCompare(String(b.id)));
+  return events;
+}
+
+export function computeRunningCashflow({ movements = [], sales = [], settlements = [], shortages = [], openingVerifications = [], branches = [], fromStr, toStr }) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fromStr || '') || !/^\d{4}-\d{2}-\d{2}$/.test(toStr || '') || fromStr > toStr) throw new Error('Invalid report period');
   const keys = new Map(branches.flatMap(b => [[b.id, b.id], [b.key || b.branch_key, b.id]]).filter(([key, id]) => key && id));
   const scope = row => keys.get(row.branch_id) || row.branch_id || keys.get(row.branch) || row.branch || 'unassigned';
@@ -64,11 +127,21 @@ export function computeRunningCashflow({ movements = [], sales = [], settlements
     running+=row.inflow-row.outflow;
     return {...row,inflow:row.inflow/100,outflow:row.outflow/100,network:row.network/100,credit:row.credit/100,openCash:open,closeCash:completeOpening?(opening+running)/100:null,net:(row.inflow-row.outflow)/100,runningNet:running/100};
   });
-  return {rows,categories:[...categories.values()].map(row=>({...row,inflow:row.inflow/100,outflow:row.outflow/100})),summary:{
+  const events=buildCashflowAuditEvents({sales,shortages,openingVerifications,fromStr,toStr});
+  const shortageEvents=events.filter(row=>row.type==='cash_shortage');
+  const latest=(type)=>events.find(row=>row.type===type)||null;
+  return {rows,events,categories:[...categories.values()].map(row=>({...row,inflow:row.inflow/100,outflow:row.outflow/100})),summary:{
     openingCash:completeOpening?opening/100:null, closingCash:completeOpening?(opening+running)/100:null,
     totalCashIn:rows.reduce((s,r)=>s+cents(r.inflow),0)/100,totalCashOut:rows.reduce((s,r)=>s+cents(r.outflow),0)/100,
     netCash:running/100, networkSales:rows.reduce((s,r)=>s+cents(r.network),0)/100,creditSales:rows.reduce((s,r)=>s+cents(r.credit),0)/100,
     latestCount:completeCount?latestCount/100:null,latestCountAt,movementCount:rows.reduce((s,r)=>s+r.count,0),
     closingCount:closings.filter(row=>row.date>=fromStr).length,
+    auditEventCount:events.length,
+    latestOpeningEvent:latest('opening_cash'),
+    latestClosingEvent:latest('closing_cash'),
+    shortageCount:shortageEvents.length,
+    shortageTotal:shortageEvents.reduce((sum,row)=>sum+cents(row.amount),0)/100,
+    shortagePending:shortageEvents.filter(row=>!['resolved','settled','paid','closed'].includes(String(row.status).toLowerCase()))
+      .reduce((sum,row)=>sum+Math.max(0,cents(row.amount)-cents(row.ownerPayment||0)-cents(row.walletPayment||0)),0)/100,
   }};
 }
