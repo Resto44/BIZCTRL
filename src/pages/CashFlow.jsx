@@ -72,6 +72,10 @@ export default function CashFlow() {
     </Button>
    </div>
    <div className="mt-3 grid grid-cols-2 gap-2">
+    {metric(m.opening_cash,report.summary.latestOpeningEvent?.amount??null,'text-slate-900',
+      report.summary.latestOpeningEvent?m[String(report.summary.latestOpeningEvent.status).toLowerCase()]||report.summary.latestOpeningEvent.status:m.unknown)}
+    {metric(m.closing_cash,report.summary.latestClosingEvent?.amount??null,'text-blue-600',
+      report.summary.latestClosingEvent?m[String(report.summary.latestClosingEvent.status).toLowerCase()]||report.summary.latestClosingEvent.status:m.unknown)}
     {metric(m.shortageTotal,report.summary.shortageTotal,'text-amber-700',m.separate)}
     {metric(m.shortagePending,report.summary.shortagePending,'text-red-600',m.separate)}
    </div>
