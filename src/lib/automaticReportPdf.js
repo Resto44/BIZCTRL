@@ -7,7 +7,7 @@ import {generateSalesAnalyticsPDF} from './salesAnalyticsPdf';
 // Exact immutable period metadata comes from the leased server job; never use the worker clock.
 // UTC noon avoids DST errors; month cadences always start at a first-of-month boundary.
 export function automaticReportDateRange(job) {
- const pattern=/^\\d{4}-\\d{2}-\\d{2}$/;
+ const pattern=/^\d{4}-\d{2}-\d{2}$/;
  const from=job?.period_start||job?.report_date;
  const to=job?.report_date;
  const cadence=job?.frequency||'daily';
