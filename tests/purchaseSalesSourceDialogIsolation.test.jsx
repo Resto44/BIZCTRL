@@ -42,7 +42,7 @@ describe('Owner workspace purchase must not reveal Sales Source popup from an in
   const onSave=vi.fn(),onClose=vi.fn();
   await act(async()=>root.render(<Workspace active="sources" onSave={onSave} onClose={onClose}/>));
   expect(document.body.textContent).toContain('salesClosing.dialog.addSource');
-  expect(document.body.textContent).toContain('Preserve my draft');
+  expect([...document.querySelectorAll('input')].some(input=>input.value==='Preserve my draft')).toBe(true);
   await act(async()=>root.render(<Workspace active="purchase" onSave={onSave} onClose={onClose}/>));
   expect(document.body.textContent).toContain('Purchase Invoice');
   expect(document.body.textContent).not.toContain('salesClosing.dialog.addSource');
