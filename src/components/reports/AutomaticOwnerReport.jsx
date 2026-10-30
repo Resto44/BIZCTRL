@@ -7,7 +7,7 @@ import {toast} from 'sonner';
 
 const labels={
  en:{
-  title:'Owner daily PDF control',detail:'Previous business day · 08:00 Asia/Riyadh',
+  title:'Owner automatic PDF reports',detail:'Completed periods · 08:00 Asia/Riyadh',frequencyTitle:'Select report schedules',frequencyHint:'Choose one or more. Each checked schedule sends its own completed-period PDF.',
   recipient:'Verified owner email',toggle:'Enable daily PDF',paused:'Paused',active:'Active',
   missing:'Automatic PDF is not enrolled for this organization. Existing organizations were not bulk-enrolled.',
   load:'Could not load daily PDF settings.',save:'Could not save report settings.',saved:'Report settings saved.',
@@ -21,7 +21,7 @@ const labels={
   attempts:'Attempts',provider:'Provider ID',unavailable:'Unavailable'
  },
  ar:{
-  title:'تحكم المالك في تقرير PDF اليومي',detail:'يوم العمل السابق · ٨ صباحاً بتوقيت الرياض',
+  title:'تقارير PDF التلقائية للمالك',detail:'بعد اكتمال الفترة · ٨ صباحاً بتوقيت الرياض',frequencyTitle:'اختر دورية التقارير',frequencyHint:'يمكن اختيار أكثر من دورية. كل دورية ترسل PDF مستقل بعد اكتمال الفترة.',
   recipient:'بريد المالك المؤكد',toggle:'تفعيل التقرير اليومي',paused:'متوقف',active:'مفعّل',
   missing:'هذه المؤسسة غير مسجلة في الإرسال التلقائي. لم تُفعّل المؤسسات القديمة تلقائياً.',
   load:'تعذر تحميل الإعدادات.',save:'تعذر حفظ الإعدادات.',saved:'تم حفظ الإعدادات.',
@@ -35,7 +35,7 @@ const labels={
   attempts:'محاولات',provider:'معرّف المزود',unavailable:'غير متاح'
  },
  fa:{
-  title:'کنترل گزارش PDF روزانه مالک',detail:'روز کاری گذشته · ساعت ۸ صبح ریاض',
+  title:'کنترل گزارش‌های خودکار PDF مالک',detail:'پس از پایان دوره · ساعت ۸ صبح ریاض',frequencyTitle:'زمان‌بندی گزارش‌های PDF',frequencyHint:'یک یا چند دوره انتخاب کنید. هر دوره بعد از پایان خودش PDF جدا ارسال می‌کند.',
   recipient:'ایمیل تأییدشده مالک',toggle:'فعال‌سازی گزارش روزانه',paused:'متوقف',active:'فعال',
   missing:'این سازمان در ارسال خودکار ثبت نشده است. سازمان‌های قدیمی به‌طور گروهی فعال نشده‌اند.',
   load:'تنظیمات گزارش بارگذاری نشد.',save:'تنظیمات گزارش ذخیره نشد.',saved:'تنظیمات گزارش ذخیره شد.',
@@ -49,6 +49,15 @@ const labels={
   attempts:'تلاش‌ها',provider:'شناسه سرویس',unavailable:'ناموجود'
  }
 };
+const periods=[
+ {id:'daily',title:{en:'Daily',ar:'يومي',fa:'روزانه'},hint:{en:'Previous day',ar:'اليوم السابق',fa:'روز گذشته'}},
+ {id:'weekly',title:{en:'Weekly',ar:'أسبوعي',fa:'هفتگی'},hint:{en:'Every Saturday',ar:'كل سبت',fa:'هر شنبه'}},
+ {id:'monthly',title:{en:'Monthly',ar:'شهري',fa:'ماهانه'},hint:{en:'First day of month',ar:'أول الشهر',fa:'اول هر ماه'}},
+ {id:'quarterly',title:{en:'Every 3 months',ar:'كل ٣ أشهر',fa:'هر ۳ ماه'},hint:{en:'Jan / Apr / Jul / Oct',ar:'يناير / أبريل / يوليو / أكتوبر',fa:'ژانویه / اپریل / جولای / اکتبر'}},
+ {id:'semiannual',title:{en:'Every 6 months',ar:'كل ٦ أشهر',fa:'هر ۶ ماه'},hint:{en:'January / July',ar:'يناير / يوليو',fa:'ژانویه / جولای'}},
+ {id:'nine_months',title:{en:'Every 9 months',ar:'كل ٩ أشهر',fa:'هر ۹ ماه'},hint:{en:'Non-overlapping 9-month blocks',ar:'فترات ٩ أشهر غير متداخلة',fa:'دوره‌های ۹ ماهه بدون هم‌پوشانی'}},
+ {id:'yearly',title:{en:'Yearly',ar:'سنوي',fa:'سالانه'},hint:{en:'Every January 1',ar:'كل ١ يناير',fa:'اول ژانویه هر سال'}}
+];
 const langs=[{value:'en',label:'English'},{value:'ar',label:'العربية'},{value:'fa',label:'فارسی'}];
 const formatDate=(value,lang)=>{
  if(!value)return '—';
@@ -67,7 +76,7 @@ export default function AutomaticOwnerReport({restaurantId,lang,branches=[],isOw
   queryKey,enabled:Boolean(restaurantId&&isOwner),retry:1,
   queryFn:async()=>{
    const {data:row,error}=await supabase.from('organization_report_email')
-    .select('restaurant_id,enabled,report_language,report_branch_id,last_accepted_at,last_report_date')
+    .select('restaurant_id,enabled,report_language,report_branch_id,report_frequencies,last_accepted_at,last_report_date')
     .eq('restaurant_id',restaurantId).maybeSingle();
    if(error)throw error;
    if(!row)return null;
@@ -128,6 +137,28 @@ export default function AutomaticOwnerReport({restaurantId,lang,branches=[],isOw
    <Switch aria-label={text.toggle} checked={Boolean(data.enabled)}
     disabled={update.isPending} onCheckedChange={enabled=>update.mutate({enabled})}/>
   </div>
+  <section className="space-y-2" aria-label={text.frequencyTitle}>
+   <h3 className="text-sm font-semibold">{text.frequencyTitle}</h3>
+   <p className="text-xs text-muted-foreground">{text.frequencyHint}</p>
+   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    {periods.map(period=>{
+     const checked=(data.report_frequencies||['daily']).includes(period.id);
+     return <div key={period.id} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border p-3">
+      <div className="min-w-0">
+       <p className="text-sm font-medium">{period.title[lang]||period.title.en}</p>
+       <p className="text-xs text-muted-foreground">{period.hint[lang]||period.hint.en}</p>
+      </div>
+      <Switch aria-label={period.title[lang]||period.title.en}
+       checked={Boolean(checked)} disabled={!data.enabled||update.isPending}
+       onCheckedChange={isOn=>{
+        const current=data.report_frequencies||['daily'];
+        const next=isOn?[...new Set([...current,period.id])]:current.filter(item=>item!==period.id);
+        update.mutate({report_frequencies:next});
+       }}/>
+     </div>;
+    })}
+   </div>
+  </section>
   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
    <label className="block min-w-0 text-xs font-medium">{text.language}
     <select className={inputClass+' mt-1'} aria-label={text.language} value={data.report_language||'en'}
@@ -159,8 +190,8 @@ export default function AutomaticOwnerReport({restaurantId,lang,branches=[],isOw
    {historyError?<p role="alert" className="mt-2 text-xs text-destructive">{text.historyError}</p>:
     !history.length?<p className="mt-2 text-xs text-muted-foreground">{text.noHistory}</p>:
     <ul className="mt-2 space-y-2">
-     {history.map(row=><li key={row.report_date} className="rounded-lg bg-muted/40 p-2 text-xs">
-      <div className="flex flex-wrap justify-between gap-1"><strong>{row.report_date}</strong>
+     {history.map(row=><li key={(row.frequency||'daily')+'-'+row.report_date} className="rounded-lg bg-muted/40 p-2 text-xs">
+      <div className="flex flex-wrap justify-between gap-1"><strong>{periods.find(p=>p.id===(row.frequency||'daily'))?.title[lang]||'Daily'} · {row.period_start||row.report_date} → {row.report_date}</strong>
        <span className={row.state==='failed'?'text-destructive':'text-muted-foreground'}>{status[row.state]||row.state}</span></div>
       <p className="mt-1 text-muted-foreground">{text.attempts}: {row.attempts}
        {row.last_error?' · '+row.last_error:''}</p>
