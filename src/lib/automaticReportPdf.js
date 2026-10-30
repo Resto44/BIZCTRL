@@ -1,13 +1,34 @@
 import {fetchScheduledERPReportData} from './scheduledERPReportData';
-import {salesReportDateRange,buildSalesReportSnapshot,salesReportGrowth} from './salesReportPeriod';
+import {buildSalesReportSnapshot,salesReportGrowth} from './salesReportPeriod';
 import {buildOperationsPdfReport} from './operationsPdfReport';
 import {buildFullSalesAnalyticsReport} from './fullSalesAnalyticsReport';
 import {generateSalesAnalyticsPDF} from './salesAnalyticsPdf';
 
+// Exact immutable period metadata comes from the leased server job; never use the worker clock.
+// UTC noon avoids DST errors; month cadences always start at a first-of-month boundary.
+export function automaticReportDateRange(job) {
+ const pattern=/^\\d{4}-\\d{2}-\\d{2}$/;
+ const from=job?.period_start||job?.report_date;
+ const to=job?.report_date;
+ const cadence=job?.frequency||'daily';
+ const months={monthly:1,quarterly:3,semiannual:6,nine_months:9,yearly:12};
+ if(!pattern.test(from||'')||!pattern.test(to||'')||from>to ||
+    !['daily','weekly',...Object.keys(months)].includes(cadence))
+  throw new Error('INVALID_REPORT_PERIOD');
+ const parse=value=>new Date(value+'T12:00:00Z');
+ const format=date=>date.toISOString().slice(0,10);
+ const priorEnd=parse(from);priorEnd.setUTCDate(priorEnd.getUTCDate()-1);
+ const priorStart=parse(from);
+ if(months[cadence])priorStart.setUTCMonth(priorStart.getUTCMonth()-months[cadence]);
+ else priorStart.setUTCDate(priorStart.getUTCDate()-(cadence==='weekly'?7:1));
+ return {type:cadence,from,to,previousFrom:format(priorStart),
+  previousTo:format(priorEnd)};
+}
+
 // The persisted job date, not the worker clock, controls every retry's period.
 // Server-sourced owner preferences are validated against the same tenant before reading financial rows.
 export async function buildAutomaticReportPdf({db,job,context}) {
- const range=salesReportDateRange('today',new Date(job.report_date+'T12:00:00'));
+ const range=automaticReportDateRange(job);
  const restaurantId=job.restaurant_id;
  if(context.restaurant_id!==restaurantId || !Array.isArray(context.inventoryTransactions))
   throw new Error('REPORT_SCOPE_DENIED');
