@@ -49,7 +49,7 @@ export default function CashFlow() {
   const rows=report.events.map(e=>[e.date,branches.find(b=>b.id===e.branch_id)?.label||e.branch||e.branch_id||'',
    e.shift||'',m[e.type]||e.type,e.amount.toFixed(2),m[String(e.status).toLowerCase().replaceAll(' ','_')]||e.status,
    e.closing_id||e.id,e.source]);
-  const blob=new Blob(['\\uFEFF'+[headers,...rows].map(r=>r.map(cell).join(',')).join('\\r\\n')],{type:'text/csv;charset=utf-8;'});
+  const blob=new Blob(['\uFEFF'+[headers,...rows].map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;
   a.download=`cash_register_audit_${range.from}_${range.to}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  };
