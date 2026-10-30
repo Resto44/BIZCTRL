@@ -90,7 +90,8 @@ begin
   select report_date,state,attempts,created_at,provider_id,last_error
   from public.report_email_deliveries
   where restaurant_id=p_restaurant_id
-  order by report_date desc limit least(greatest(coalesce(p_limit,7),1),30)
+   and report_date >= (now() at time zone 'Asia/Riyadh')::date - (least(greatest(coalesce(p_limit,7),1),30)-1)
+  order by report_date desc limit 30
  ) d;
  return result;
 end $$;
