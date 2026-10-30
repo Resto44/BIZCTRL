@@ -142,6 +142,6 @@ export function computeRunningCashflow({ movements = [], sales = [], settlements
     shortageCount:shortageEvents.length,
     shortageTotal:shortageEvents.reduce((sum,row)=>sum+cents(row.amount),0)/100,
     shortagePending:shortageEvents.filter(row=>!['resolved','settled','paid','closed'].includes(String(row.status).toLowerCase()))
-      .reduce((sum,row)=>sum+cents(row.amount),0)/100,
+      .reduce((sum,row)=>sum+Math.max(0,cents(row.amount)-cents(row.ownerPayment||0)-cents(row.walletPayment||0)),0)/100,
   }};
 }
