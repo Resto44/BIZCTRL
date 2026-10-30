@@ -1225,7 +1225,15 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // Never infer a zero opening from a missing previous count or from a
   // different cashier's drawer. The backend returns explicit provenance.
   const openingReviewRequired = cashLedgerContext.opening_verified === false;
-  const openingReviewReason = lang === 'fa' ? 'مبلغ نقد اول شیفت را وارد کنید.' : lang === 'ar' ? 'أدخل النقد الموجود في بداية الوردية.' : 'Enter the cash held at the start of this shift.';
+  const previousCashCountMissing = Boolean(openingReviewRequired &&
+    cashLedgerContext.previous_closing_id && cashLedgerContext.opening_source === 'previous_closing_session');
+  const openingReviewReason = previousCashCountMissing
+    ? (lang === 'fa' ? 'کلوزینگ قبلی نقد پایان صندوق را ثبت نکرده است. اول همان کلوزینگ را بررسی کنید.'
+      : lang === 'ar' ? 'الإقفال السابق لا يحتوي على النقد النهائي. راجع ذلك الإقفال أولاً.'
+      : 'The previous closing has no verified ending cash. Review that closing first.')
+    : (lang === 'fa' ? 'نقد شروع صندوق را فقط یک‌بار وارد کنید.'
+      : lang === 'ar' ? 'أدخل رصيد بداية الصندوق مرة واحدة فقط.'
+      : 'Enter the starting cash just once.');
   const cashContextReady = Boolean(cashLedgerContextData && cashLedgerContext.opening_verified === true);
   // The starting count is audited once. Assigned managers can initialize a
   // new drawer; only owners can resolve an ambiguous historic baseline.
@@ -1252,7 +1260,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     setOpeningVerificationError('');
     setOpeningVerificationBusy(true);
     try {
-      const { error } = await supabase.rpc('erp_verify_sales_closing_opening_count', {
+      const { data: openingResult, error } = await supabase.rpc('erp_verify_sales_closing_opening_count', {
         p_restaurant_id: activeRestaurant.id,
         p_branch_id: selectedBranchId,
         p_branch: form.branch,
@@ -1266,10 +1274,31 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       if (error) throw error;
       openingVerificationRequestId.current = null;
       setOpeningVerificationAmount('');
-      await refetchCashLedger();
-      toast.success(closingTr('Opening drawer count verified and recorded in the audit log.'));
+      const refreshed = await refetchCashLedger();
+      if (openingResult?.already_exists && !openingResult?.amount_matches) {
+        const stored = Number(openingResult.opening_cash);
+        const formatted = Number.isFinite(stored) ? `${stored.toLocaleString()} ${currency}` : currency;
+        toast.info(lang === 'fa'
+          ? `نقد شروع قبلاً ${formatted} ثبت شده؛ تغییر نکرد. نقد فعلی را در کادر بالایی وارد کنید.`
+          : lang === 'ar' ? `الرصيد الأولي المسجل هو ${formatted}؛ لم يتغير. أدخل النقد الحالي أعلاه.`
+          : `Starting cash is already ${formatted} and was not changed. Enter cash now above.`);
+      } else {
+        toast.success(lang === 'fa' ? 'مبلغ شروع صندوق ثبت شد.' : lang === 'ar' ? 'تم حفظ رصيد البداية.' : 'Starting cash saved.');
+      }
+      if (refreshed?.data?.opening_verified === false) setOpeningVerificationError(openingReviewReason);
     } catch (error) {
-      setOpeningVerificationError(error?.message || 'Could not verify opening cash. Check the prior closing or retry.');
+      const rawError = String(error?.message || '');
+      const alreadyExists = error?.code === '23505'
+        || rawError.includes('sales_closing_opening_verified_scope_unique')
+        || rawError.includes('OPENING_VERIFICATION_ALREADY_VERIFIED');
+      if (alreadyExists) await refetchCashLedger();
+      setOpeningVerificationError(alreadyExists
+        ? (lang === 'fa' ? 'نقد شروع قبلاً ثبت شده؛ صندوق تازه‌سازی شد. نقد موجود را در کادر بالا وارد کنید.'
+          : lang === 'ar' ? 'رصيد البداية مسجل؛ تم تحديث الصندوق. أدخل النقد الحالي أعلاه.'
+          : 'Starting cash was already recorded. The drawer was refreshed; enter current cash above.')
+        : (lang === 'fa' ? 'ثبت نقد شروع ممکن نشد. شعبه و کلوزینگ قبلی را بررسی و دوباره تلاش کنید.'
+          : lang === 'ar' ? 'تعذر حفظ رصيد البداية. راجع الفرع والإقفال السابق وحاول مجدداً.'
+          : 'Could not save starting cash. Check the branch and previous closing, then retry.'));
     } finally {
       setOpeningVerificationBusy(false);
     }
@@ -1961,6 +1990,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             <SimpleClosingCash
               role={role}
               openingRequired={openingReviewRequired}
+              openingBlockedByPrevious={previousCashCountMissing}
               openingValue={openingVerificationAmount}
               onOpeningChange={value => { setOpeningVerificationAmount(value); openingVerificationRequestId.current = null; setOpeningVerificationError(''); }}
               onSaveOpening={verifyOpeningCash}
