@@ -8,7 +8,6 @@ import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Trash2, Mail, Clock, Loader2, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,6 +26,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText } from 'lucide-react';
 import AutomaticOwnerReport from '@/components/reports/AutomaticOwnerReport';
+import { useAuth } from '@/lib/AuthContext';
 
 const EMAIL_TEXT = {
  en: {saved:'Report settings saved. No email has been sent.',send:'Send now',accepted:'Email provider accepted the report. Check your inbox and spam.',invalid:'Enter a report name and up to five valid email addresses.',failed:'Could not complete the request. Please try again.',load:'Could not load saved reports.',setup:'Email delivery needs administrator setup. Automatic delivery is not enabled.',manual:'Automatic delivery is not enabled. Use Send now to email the selected report.',pending:'Checking email service…',paused:'Saved settings',statusFailed:'Email status could not be saved; the provider accepted the report.',scope:'Select an authorized restaurant and branch.',provider:'The email provider rejected the report. Ask the administrator to check the sender configuration.',rate:'Please wait one minute before sending again.'},
@@ -38,6 +38,7 @@ const FREQ_LABELS = { daily: 'daily', weekly: 'weekly', monthly: 'monthly' };
 
 export default function ScheduledReports() {
   const { t, currency, lang, dir } = useLanguage();
+  const { user } = useAuth();
   const { branches,activeRestaurant } = useTenant();
   const { selectedBranchId,selectedBranchKey,selectedBranchLabel,isAllBranches } = useBranchScope();
   const { revenueSources } = useSalesSources();
@@ -107,12 +108,6 @@ export default function ScheduledReports() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['scheduled_reports'] }); setShowForm(false); setForm({name:'',email_to:'',frequency:'weekly'}); toast.success(messages.saved); },
   });
 
-  const toggleMutation = useMutation({
-    onError: showError,
-    mutationFn: ({ id, is_active }) => base44.entities.ScheduledReport.update(id, { is_active }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scheduled_reports'] }),
-  });
-
   const deleteMutation = useMutation({
     onError: showError,
     mutationFn: (id) => base44.entities.ScheduledReport.delete(id),
@@ -179,7 +174,7 @@ export default function ScheduledReports() {
         }
       />
 
-      <AutomaticOwnerReport restaurantId={activeRestaurant?.id} lang={lang}/>
+      <AutomaticOwnerReport restaurantId={activeRestaurant?.id} lang={lang} branches={branches} isOwner={String(user?.role||'').toLowerCase()==='owner'}/>
       <p role="status" className="mb-4 rounded-lg border p-3 text-sm">{checkingEmail?messages.pending:emailStatus?.configured?(lang==='fa'?'گزارش‌های سفارشی زیر با «ارسال الآن» فرستاده می‌شوند.':lang==='ar'?'التقارير المخصصة أدناه ترسل عبر «إرسال الآن».':'Custom reports below use Send now.'):messages.setup}</p>
       {/* Live KPI snapshot */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
@@ -257,7 +252,7 @@ export default function ScheduledReports() {
       ) : (
         <div className="space-y-3">
           {schedules.map(s => (
-            <Card key={s.id} className={`p-4 ${!s.is_active ? 'opacity-60' : ''}`}>
+            <Card key={s.id} className="p-4">
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -288,12 +283,7 @@ export default function ScheduledReports() {
                     onClick={handlePDF} disabled={pdfLoading || loadingERP || reportError || !reportData}>
                     <FileText className="w-3 h-3"/>{t('export')}
                   </Button>
-                  <Switch
-                    aria-label={messages.paused}
-                    disabled={toggleMutation.isPending || !emailStatus?.automatic}
-                    checked={!!s.is_active && !!emailStatus?.automatic}
-                    onCheckedChange={v => toggleMutation.mutate({ id: s.id, is_active: v })}
-                  />
+                  <Badge variant="outline" className="text-xs">{lang==='fa'?'فقط ارسال دستی':lang==='ar'?'إرسال يدوي فقط':'Manual send only'}</Badge>
                   <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(s.id)} className="text-destructive h-8 w-8">
                     <Trash2 className="w-4 h-4" />
                   </Button>
