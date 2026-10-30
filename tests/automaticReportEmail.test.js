@@ -55,6 +55,14 @@ describe('automatic daily report worker',()=>{
   expect(await response.text()).not.toContain('private error');expect(f.updates.at(-1).values.state).toBe('pending');
   expect(f.updates.every(u=>u.table!=='organization_report_email')).toBe(true);
  });
+ it('labels weekly PDF mail with the full covered range',async()=>{
+  const f=fixture({job:{frequency:'weekly',period_start:'2026-10-24',report_date:'2026-10-30'}});
+  await f.run();
+  const payload=JSON.parse(f.fetchImpl.mock.calls[0][1].body);
+  expect(payload.subject).toContain('weekly');
+  expect(payload.subject).toContain('2026-10-24 to 2026-10-30');
+  expect(payload.attachments[0].filename).toBe('BizCTRL-weekly-2026-10-24-2026-10-30.pdf');
+ });
  it('does not render or send when no job is due',async()=>{
   const f=fixture({empty:true});expect(await (await f.run()).json()).toEqual({ok:true,processed:0});expect(f.fetchImpl).not.toHaveBeenCalled();
  });
