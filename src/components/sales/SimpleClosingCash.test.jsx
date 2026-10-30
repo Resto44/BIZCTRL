@@ -22,6 +22,12 @@ describe('simple branch closing count',()=>{
   expect(view.root.findAllByType('input')).toHaveLength(1);
   expect(JSON.stringify(view.toJSON())).toContain('This difference is saved separately');
  });
+ it('prevents a second starting-cash entry when an earlier session has no verified ending count',()=>{
+  const view=render({lang:'fa',openingRequired:true,openingBlockedByPrevious:true,canSetOpening:true,openingValue:'150'});
+  expect(view.root.findAllByType('input')).toHaveLength(1);
+  expect(view.root.findAllByType('button').filter(button=>button.props.children==='ثبت مبلغ شروع')).toHaveLength(0);
+  expect(JSON.stringify(view.toJSON())).toContain('کلوزینگ قبلی');
+ });
  it('shows a scoped recovery message instead of a manager opening override for history',()=>{
   const view=render({openingRequired:true,canSetOpening:false});
   expect(view.root.findAllByType('input')).toHaveLength(1);
