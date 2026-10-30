@@ -29,9 +29,9 @@ export function createAutomaticReportHandler({db,env,buildPdf,fetchImpl=fetch}) 
     const scope=await context(true);
     const pdf=await buildPdf({db,job,context:scope});
     if(!pdf?.startsWith('JVBERi0')||pdf.length>6000000)throw new Error('INVALID_PDF');
-    payload={from,to:[scope.email],subject:`BizCTRL daily report — ${job.report_date}`,
-     text:`Your organization's report for ${job.report_date} (Asia/Riyadh) is attached. Manage daily reports in Scheduled Reports: https://mybizctrl.site/scheduled-reports`,
-     attachments:[{filename:`BizCTRL-${job.report_date}.pdf`,content:pdf}]};
+    payload={from,to:[scope.email],subject:`BizCTRL ${job.frequency||'daily'} report — ${job.period_start||job.report_date} to ${job.report_date}`,
+     text:`Your organization's ${job.frequency||'daily'} report for ${job.period_start||job.report_date} to ${job.report_date} (Asia/Riyadh) is attached. Manage reports: https://mybizctrl.site/scheduled-reports`,
+     attachments:[{filename:`BizCTRL-${job.frequency||'daily'}-${job.period_start||job.report_date}-${job.report_date}.pdf`,content:pdf}]};
     // Freeze the exact provider request before sending. Retrying a newly rendered
     // PDF could conflict with provider idempotency when records changed meanwhile.
     await save({payload});
@@ -47,9 +47,9 @@ export function createAutomaticReportHandler({db,env,buildPdf,fetchImpl=fetch}) 
    const {error}=await db.from('organization_report_email').update({last_accepted_at:new Date().toISOString(),last_report_date:job.report_date}).eq('restaurant_id',job.restaurant_id);
    return reply(200,{ok:true,processed:1,accepted:true,status_saved:!error});
   } catch(error){
-   const denied=error.message==='REPORT_DELIVERY_DENIED';
+   const denied=error.message==='REPORT_DELIVERY_DENIED'||error.message==='REPORT_FREQUENCY_REVOKED';
    // Never log provider bodies, recipient addresses, keys or financial payloads.
-   const code=['REPORT_DELIVERY_DENIED','EMAIL_PROVIDER_REJECTED','INVALID_PDF','DELIVERY_SAVE_FAILED'].includes(error.message)?error.message:'REPORT_BUILD_OR_NETWORK_FAILED';
+   const code=['REPORT_DELIVERY_DENIED','REPORT_FREQUENCY_REVOKED','EMAIL_PROVIDER_REJECTED','INVALID_PDF','DELIVERY_SAVE_FAILED'].includes(error.message)?error.message:'REPORT_BUILD_OR_NETWORK_FAILED';
    try {await save({state:denied?'cancelled':'pending',last_error:code,available_at:new Date(Date.now()+10*60*1000).toISOString(),...(denied?{payload:null}:{})});}catch{/* lease recovery retries with the same persisted payload/key */}
    return reply(503,{error:code});
   }
