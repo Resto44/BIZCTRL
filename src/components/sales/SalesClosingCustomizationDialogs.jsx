@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { CORE_SALES_CLOSING_FIELDS, SALES_CLOSING_FIELD_TYPES, newSalesClosingCustomField, normalizeSalesClosingField } from '@/lib/salesClosingCustomization';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useWorkspaceTabActive } from '@/lib/WorkspaceTabVisibilityContext';
 import { Check } from 'lucide-react';
 import { SALES_SOURCE_COLOR_OPTIONS, SALES_SOURCE_ICON_OPTIONS, salesSourceToneFor } from '@/lib/salesSourceAppearance';
 
@@ -110,6 +111,9 @@ export function SalesClosingFieldDialog({ editor, onClose, onSave, isSaving }) {
 
 export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMethods = [], branches = [] }) {
   const { lang, t, translateLiteral } = useLanguage();
+  // Owner workspace keeps inactive pages mounted; their Radix portals must not
+  // cover the active Purchase Invoice. Keep draft state, only mask the portal.
+  const workspaceTabActive = useWorkspaceTabActive();
   const local = (value) => typeof translateLiteral === 'function' ? translateLiteral(value) : value;
   const [draft, setDraft] = useState(editor?.source || newSalesClosingSource());
   const [error, setError] = useState('');
@@ -151,7 +155,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
   };
 
   return (
-    <Dialog open={Boolean(editor)} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={Boolean(editor) && workspaceTabActive} onOpenChange={(open) => !open && workspaceTabActive && onClose()}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl" data-i18n-skip="true">
         <DialogHeader>
           <DialogTitle>{editor.mode === 'create' ? t('salesClosing.dialog.addSource') : t('salesClosing.dialog.editSource')}</DialogTitle>
