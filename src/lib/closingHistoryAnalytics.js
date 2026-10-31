@@ -12,26 +12,61 @@ const scopeKey = row => {
     ? JSON.stringify([row.restaurant_id, branch, row.shift, operator]) : null;
 };
 
-// Compare like-for-like finalized operator shifts, never mixed branch totals.
-// Only available saved history is used. Repeated dates are ambiguous and omitted.
+// Compare finalized Closing *sessions*, not unique calendar dates. Multiple
+// audited sessions in the same shift/day are valid and must be included once.
+// Refuse to invent an order for truly ambiguous legacy same-day records.
 export function buildClosingTrendIndex(records) {
   const groups = new Map();
   for (const row of records) {
     const key = scopeKey(row);
-    if (!key || !row.id || !/^\d{4}-\d{2}-\d{2}$/.test(row.date || '') || (row.closing_state || 'finalized') !== 'finalized' || closingRevenue(row) === null) continue;
+    if (!key || !row.id || !/^\d{4}-\d{2}-\d{2}$/.test(row.date || '')
+      || (row.closing_state || 'finalized') !== 'finalized'
+      || closingRevenue(row) === null) continue;
     if (!groups.has(key)) groups.set(key, new Map());
-    const dates = groups.get(key);
-    const rows = dates.get(row.date) || new Map();
-    rows.set(row.id, row); dates.set(row.date, rows);
+    const rows = groups.get(key);
+    rows.set(row.id, row); // Never count a re-fetched row twice.
   }
   const index = new Map();
-  for (const dates of groups.values()) {
-    const unique = [...dates.entries()].filter(([, rows]) => rows.size === 1)
-      .sort(([a], [b]) => a.localeCompare(b)).map(([, rows]) => [...rows.values()][0]);
-    unique.forEach((row, i) => {
-      const points = unique.slice(Math.max(0, i - 6), i + 1).map(item => ({ date: item.date, value: closingRevenue(item) }));
-      const previous = points.at(-2) || null;
-      index.set(row.id, { points, previous, change: previous?.value > 0 ? ((closingRevenue(row) - previous.value) / previous.value) * 100 : null });
+  const sessionNo = row => {
+    const number = Number(row.closing_session_no);
+    return Number.isInteger(number) && number > 0 ? number : null;
+  };
+  const closeStamp = row => {
+    const value = row.finalized_at || row.session_closed_at;
+    return value && Number.isFinite(Date.parse(value)) ? Date.parse(value) : null;
+  };
+  for (const group of groups.values()) {
+    const byDate = new Map();
+    for (const row of group.values()) {
+      if (!byDate.has(row.date)) byDate.set(row.date, []);
+      byDate.get(row.date).push(row);
+    }
+    const chronological = [];
+    for (const date of [...byDate.keys()].sort()) {
+      const sameDay = byDate.get(date);
+      if (sameDay.length === 1) {
+        chronological.push(sameDay[0]);
+        continue;
+      }
+      const sessions = sameDay.map(sessionNo);
+      const stamps = sameDay.map(closeStamp);
+      if (sessions.every(n => n !== null) && new Set(sessions).size === sameDay.length) {
+        chronological.push(...sameDay.sort((a,b) => sessionNo(a)-sessionNo(b)));
+      } else if (stamps.every(n => n !== null) && new Set(stamps).size === sameDay.length) {
+        chronological.push(...sameDay.sort((a,b) => closeStamp(a)-closeStamp(b)));
+      }
+      // A legacy group with no trustworthy session order stays excluded.
+    }
+    chronological.forEach((row,i) => {
+      const points = chronological.slice(Math.max(0,i-6),i+1).map(item => ({
+        date:item.date,value:closingRevenue(item),
+        ...(sessionNo(item)!==null ? {session:sessionNo(item)} : {})
+      }));
+      const previous=points.at(-2)||null, current=closingRevenue(row);
+      index.set(row.id,{
+        points,previous,
+        change: previous?.value > 0 ? (current-previous.value)/previous.value*100 : null
+      });
     });
   }
   return index;
