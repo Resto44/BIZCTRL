@@ -79,8 +79,23 @@ export function normalizeDrawerCashAsOf(payload, { loading = false, error = fals
     && Number.isInteger(missing) && missing === 0 && cash !== null
     && details.length === count
     && details.every(row => row?.status === 'verified' && moneyOrNull(row.cash) !== null);
+  // If some branches are uncounted, never promote a partial branch cash
+  // figure to a consolidated balance. A single latest VERIFIED branch can
+  // still be displayed with its branch identity and as-of timestamp.
+  const verifiedDetails=details.filter(row => row?.status==='verified' && moneyOrNull(row.cash)!==null);
+  const eventTime=row => {
+    const stamp=Date.parse(row?.countedAt||'');
+    return Number.isFinite(stamp)?stamp:0;
+  };
+  const latestVerifiedDetail=[...verifiedDetails].sort((a,b) =>
+    String(b?.date||'').localeCompare(String(a?.date||'')) ||
+    eventTime(b)-eventTime(a) ||
+    Number(b?.sessionNo||0)-Number(a?.sessionNo||0)
+  )[0]||null;
   return {
     amount: complete ? cash : null,
+    latestVerifiedDetail,
+    verifiedBranches:verifiedDetails.length,
     branches: Number.isInteger(count) && count >= 0 ? count : 0,
     missingBranches: Number.isInteger(missing) && missing >= 0 ? missing : 0,
     complete,
