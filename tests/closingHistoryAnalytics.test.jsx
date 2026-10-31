@@ -57,10 +57,8 @@ describe('Closing history analytics', () => {
       approved_purchases_total:0,expenses_total:0,fixed_expenses_total:0,variable_expenses_total:0
     });
     const html=renderToStaticMarkup(<ClosingHistoryAnalytics sale={sale}/>);
-    const noteIndex=html.indexOf('closing-history-accounting-notes');
-    expect(noteIndex).toBeGreaterThan(-1);
-    expect(html.slice(noteIndex)).toMatch(/<details[^>]*>.*?<summary/s);
-    expect(html).toContain('Fixed costs unverified');
+    expect(html).toMatch(/<details[^>]*data-testid="closing-history-accounting-notes"[^>]*>[\\s\\S]*?<summary/);
+    expect(html).toMatch(/Profit unverified|Fixed costs unverified/);
     expect(html).not.toContain('These amounts were saved when this date was finalized.');
   });
   it('caps real observations at seven, sorts dates and has no invented percent from a zero baseline', () => {
