@@ -19,6 +19,50 @@ describe('Closing history analytics', () => {
     expect(buildClosingTrendIndex(records).has('a')).toBe(false);
     expect(buildClosingTrendIndex(records).has('unknown')).toBe(false);
   });
+  it('keeps all four independently finalized Oct 31 closings and three prior Oct 27 sessions in the trend',()=>{
+    const rows=[
+      ...[560,976,930].map((amount,i)=>row('prior-'+(i+1),'2026-10-27',amount,
+        {closing_session_no:i+1,finalized_at:`2026-10-27T0${i+8}:00:00Z`})),
+      ...[427,203,453,407].map((amount,i)=>row('current-'+(i+1),'2026-10-31',amount,
+        {closing_session_no:i+1,finalized_at:`2026-10-31T0${i+8}:00:00Z`}))
+    ];
+    const trend=buildClosingTrendIndex([...rows].reverse());
+    const newest=trend.get('current-4');
+    expect(newest.points).toHaveLength(7);
+    expect(newest.points.map(p=>[p.date,p.session])).toEqual([
+      ['2026-10-27',1],['2026-10-27',2],['2026-10-27',3],
+      ['2026-10-31',1],['2026-10-31',2],['2026-10-31',3],['2026-10-31',4]
+    ]);
+    expect(newest.previous).toMatchObject({date:'2026-10-31',session:3,value:453});
+    expect(newest.change).toBeCloseTo((407-453)/453*100);
+    expect(renderToStaticMarkup(<ClosingHistoryAnalytics sale={rows[6]} trend={newest}/>))
+      .toContain('(7/7)');
+  });
+  it('respects real close times when older same-day sessions have no sequence numbers',()=>{
+    const old=row('old','2026-10-30',100,{finalized_at:'2026-10-30T05:00:00Z'});
+    const next=row('next','2026-10-30',200,{finalized_at:'2026-10-30T11:00:00Z'});
+    const trend=buildClosingTrendIndex([next,old]);
+    expect(trend.get('next').points.map(p=>p.value)).toEqual([100,200]);
+  });
+  it('never mixes a different cashier or branch into a shared date trend',()=>{
+    const a=row('a','2026-10-31',100,{closing_session_no:1});
+    const b=row('b','2026-10-31',200,{closing_session_no:2});
+    const unrelated=row('x','2026-10-31',999,{closing_session_no:3,cashier_id:'other'});
+    const trend=buildClosingTrendIndex([a,b,unrelated]);
+    expect(trend.get('b').points.map(p=>p.value)).toEqual([100,200]);
+    expect(trend.get('x').points.map(p=>p.value)).toEqual([999]);
+  });
+  it('shows lengthy accounting guidance only under a collapsed disclosure',()=>{
+    const sale=row('cost-warning','2026-10-31',407,{
+      approved_purchases_total:0,expenses_total:0,fixed_expenses_total:0,variable_expenses_total:0
+    });
+    const html=renderToStaticMarkup(<ClosingHistoryAnalytics sale={sale}/>);
+    const noteIndex=html.indexOf('closing-history-accounting-notes');
+    expect(noteIndex).toBeGreaterThan(-1);
+    expect(html.slice(noteIndex)).toMatch(/<details[^>]*>.*?<summary/s);
+    expect(html).toContain('Fixed costs unverified');
+    expect(html).not.toContain('These amounts were saved when this date was finalized.');
+  });
   it('caps real observations at seven, sorts dates and has no invented percent from a zero baseline', () => {
     const records = Array.from({length:10},(_,i)=>row(String(i),`2026-10-${String(i+10).padStart(2,'0')}`,i*100));
     const result = buildClosingTrendIndex(records.reverse());
