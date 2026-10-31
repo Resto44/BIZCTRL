@@ -78,11 +78,37 @@ describe('Closing history analytics', () => {
     expect(closingFinancialAnalysis(row('a','2026-10-23',1000,{expenses_total:null}))).toMatchObject({netProfit:null,margin:null,allocation:null});
     expect(closingFinancialAnalysis(row('a','2026-10-23',1000,{expenses_total:0,approved_purchases_total:0}))).toMatchObject({margin:null,allocation:null,noRecordedCosts:true});
   });
-  it.each(['fa','ar','en'])('renders real trends and reveals the waterfall only when expanded (%s)', lang => {
-    const sale = row('a','2026-10-23',1000), trend = buildClosingTrendIndex([sale,row('b','2026-10-22',800)]).get('a');
+  it.each(['fa','ar','en'])('keeps the expanded financial chart compact and opt-in when costs are recorded (%s)', lang => {
+    const sale = row('a','2026-10-23',1000,{fixed_expenses_total:75,variable_expenses_total:75});
+    const trend = buildClosingTrendIndex([sale,row('b','2026-10-22',800)]).get('a');
     const closed = renderToStaticMarkup(<ClosingHistoryAnalytics sale={sale} trend={trend} lang={lang}/>);
-    expect(closed).toContain('+25.0%'); expect(closed).toContain('2026-10-22'); expect(closed).not.toContain('closing-profit-waterfall');
+    expect(closed).toContain('+25.0%');
+    expect(closed).toContain('2026-10-22');
+    expect(closed).not.toContain('closing-profit-waterfall');
     const open = renderToStaticMarkup(<ClosingHistoryAnalytics sale={sale} trend={trend} lang={lang} expanded/>);
-    expect(open).toContain('closing-profit-waterfall'); expect(open).not.toMatch(/NaN|Infinity/);
+    expect(open).toMatch(/<details[^>]*data-testid="closing-profit-waterfall"[^>]*>.*?<summary/s);
+    expect(open).toMatch(/<details[^>]*data-testid="closing-accounting-method"[^>]*>.*?<summary/s);
+    expect(open).toContain('closing-trend-values');
+    expect(open).not.toMatch(/NaN|Infinity/);
+  });
+  it.each(['fa','ar','en'])('does not present zero recorded costs as confirmed profit in mobile expanded view (%s)',lang=>{
+    const sale=row('zero-costs','2026-10-31',425,{
+      approved_purchases_total:0,expenses_total:0,fixed_expenses_total:0,variable_expenses_total:0
+    });
+    const html=renderToStaticMarkup(<ClosingHistoryAnalytics sale={sale} lang={lang} expanded/>);
+    expect(html).toContain('closing-expanded-analysis');
+    expect(html).toContain('closing-profit-unverified');
+    expect(html).toContain('closing-history-accounting-notes');
+    expect(html).not.toContain('closing-profit-waterfall');
+    expect(html).toMatch(/<details[^>]*data-testid="closing-accounting-method"[^>]*>.*?<summary/s);
+    expect(html).not.toMatch(/NaN|Infinity/);
+  });
+  it('keeps identical-date trend observations distinct by closing session number',()=>{
+    const sale=row('a','2026-10-31',425,{approved_purchases_total:0,expenses_total:0,fixed_expenses_total:0,variable_expenses_total:0});
+    const trend={points:[{date:'2026-10-31',session:1,value:407},{date:'2026-10-31',session:2,value:425}]};
+    const html=renderToStaticMarkup(<ClosingHistoryAnalytics sale={sale} trend={trend} expanded/>);
+    expect(html).toContain('closing-trend-values');
+    expect(html).toContain('Closing #1');
+    expect(html).toContain('Closing #2');
   });
 });
