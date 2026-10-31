@@ -57,7 +57,7 @@ describe('Closing history analytics', () => {
       approved_purchases_total:0,expenses_total:0,fixed_expenses_total:0,variable_expenses_total:0
     });
     const html=renderToStaticMarkup(<ClosingHistoryAnalytics sale={sale}/>);
-    expect(html).toMatch(/<details[^>]*data-testid="closing-history-accounting-notes"[^>]*>[\\s\\S]*?<summary/);
+    expect(html).toMatch(/<details[^>]*data-testid="closing-history-accounting-notes"[^>]*>.*?<summary/s);
     expect(html).toMatch(/Profit unverified|Fixed costs unverified/);
     expect(html).not.toContain('These amounts were saved when this date was finalized.');
   });
