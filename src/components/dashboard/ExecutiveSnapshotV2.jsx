@@ -181,8 +181,32 @@ export default function ExecutiveSnapshotV2({model,copy}) {
       <div className="grid gap-2.5 sm:grid-cols-[minmax(0,0.75fr)_minmax(0,1.65fr)]">
         <div data-testid="snapshot-drawer-cash" className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
           <p className="flex items-center gap-2 text-xs font-black text-emerald-800 dark:text-emerald-300"><Banknote className="h-4 w-4"/>{t(copy,'drawerCash','Cash in drawer')}</p>
-          <p className="mt-3 text-[clamp(1.45rem,4vw,2rem)] font-black text-emerald-950 dark:text-emerald-100" dir="ltr">{drawerCash?.complete?formatMoney(drawerCash.amount):'—'}</p>
-          <p className="mt-2 text-[11px] leading-4 text-emerald-700 dark:text-emerald-300">{drawerCash?.complete?t(copy,'drawerCashHint','Last verified physical count · not a live bank balance'):drawerCash?.error?t(copy,'syncRequired','Sync required'):drawerCash?.missingBranches?t(copy,'partialDrawerCash','Some branch cash counts are missing'):t(copy,'drawerCashMissing','Not recorded')}</p>
+          <p data-testid="snapshot-drawer-cash-value" className="mt-2 text-[clamp(1.45rem,4vw,2rem)] font-black text-emerald-950 dark:text-emerald-100" dir="ltr">
+            {drawerCash?.complete ? formatMoney(drawerCash.amount)
+              : drawerCash?.error || drawerCash?.loading ? '—'
+              : drawerCash?.latestVerifiedDetail ? formatMoney(drawerCash.latestVerifiedDetail.cash) : '—'}
+          </p>
+          {drawerCash?.complete ? <p className="mt-1 text-[11px] leading-4 text-emerald-700 dark:text-emerald-300">
+              {t(copy,'drawerCashHint','Last verified physical count · not a live bank balance')}
+            </p> : drawerCash?.error || drawerCash?.loading
+              ? <p className="mt-1 text-[11px] text-amber-700">{t(copy,'syncRequired','Sync required')}</p>
+              : drawerCash?.latestVerifiedDetail
+                ? <div data-testid="snapshot-drawer-partial" className="mt-1 space-y-1 text-[11px] leading-4 text-emerald-900">
+                    <p className="font-semibold">{lang==='fa'?'آخرین شمارش یک شعبه؛ نه مجموع شعبه‌ها':lang==='ar'?'آخر جرد لفرع واحد؛ ليس إجمالي الفروع':'Last verified branch count · NOT all-branch total'}</p>
+                    <p className="break-words">{drawerCash.latestVerifiedDetail.branchName||drawerCash.latestVerifiedDetail.branchKey||'—'} · {drawerCash.latestVerifiedDetail.date||'—'}</p>
+                    <p className="text-amber-800">{lang==='fa'?`${drawerCash.missingBranches} شعبه از ${drawerCash.branches} بدون شمارش معتبر؛ مجموع کل نامعلوم است.`:lang==='ar'?`${drawerCash.missingBranches} من ${drawerCash.branches} فروع بدون جرد مؤكد؛ الإجمالي غير معروف.`:`${drawerCash.missingBranches} of ${drawerCash.branches} branches unverified; all-branch total unavailable.`}</p>
+                  </div>
+                : <p className="mt-1 text-[11px] text-amber-800">{t(copy,'drawerCashMissing','Not recorded')}</p>}
+          {drawerCash?.details?.length>1 && <details data-testid="snapshot-drawer-branch-breakdown" className="mt-2 border-t border-emerald-200/80 pt-2">
+            <summary className="min-h-7 cursor-pointer text-[11px] font-bold text-emerald-800">{lang==='fa'?'شمارش صندوق هر شعبه':lang==='ar'?'جرد صندوق كل فرع':'Cash count by branch'} ({drawerCash.details.length})</summary>
+            <div className="mt-1 space-y-1">
+              {drawerCash.details.map((item,i)=><div key={item.branchId||i} className="flex min-w-0 items-center justify-between gap-2 text-[11px]">
+                <span className="min-w-0 truncate">{item.branchName||item.branchKey||'—'} <span className="text-muted-foreground">{item.date||''}</span></span>
+                <strong className="shrink-0 tabular-nums" dir="ltr">{item.status==='verified' && item.cash!=null ? formatMoney(item.cash):'—'}</strong>
+              </div>)}
+            </div>
+            <p className="mt-1 text-[10px] leading-4 text-amber-800">{lang==='fa'?'— یعنی شمارش معتبر موجود نیست؛ صفر حساب نمی‌شود.':lang==='ar'?'— يعني عدم توفر جرد مؤكد، وليس صفراً.':'— means no verified count, not zero cash.'}</p>
+          </details>}
         </div>
         <div className="min-w-0 rounded-2xl border border-border/80 p-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
