@@ -67,6 +67,51 @@ describe('ERP contract: Sales Closing ↔ Owner Dashboard', () => {
     expect(normalizeDrawerCashAsOf(ambiguous)).toMatchObject({ amount: null, complete: false });
   });
 
+  it('keeps the all-branches amount unknown but exposes the latest verified branch snapshot',()=>{
+    const payload={
+      basis:'last_verified_physical_count_not_live_bank_balance',
+      amount:null,branches:4,missingBranches:2,complete:false,
+      details:[
+        {branchKey:'branch_2',branchName:'Branch 2',status:'verified',cash:180,date:'2026-10-28',sessionNo:1,countedAt:'2026-10-28T07:00:00Z'},
+        {branchKey:'branch_3',status:'no_closing',cash:null,date:null},
+        {branchKey:'branch_4',status:'no_closing',cash:null,date:null},
+        {branchKey:'main-9a50614652',branchName:'Main',status:'verified',cash:150,date:'2026-10-31',sessionNo:6,countedAt:'2026-10-31T20:14:39Z'},
+      ]
+    };
+    const result=normalizeDrawerCashAsOf(payload);
+    expect(result).toMatchObject({
+      amount:null,complete:false,branches:4,missingBranches:2,verifiedBranches:2,
+      latestVerifiedDetail:{cash:150,branchName:'Main',date:'2026-10-31',sessionNo:6,status:'verified'}
+    });
+    expect(normalizeDrawerCashAsOf({...payload,error:'none'},{error:true})).toMatchObject({amount:null,complete:false,error:true});
+  });
+  it('does not mistake an uncounted last closing for verified money, or turn null into zero',()=>{
+    const payload={
+      basis:'last_verified_physical_count_not_live_bank_balance',
+      amount:null,branches:1,missingBranches:1,complete:false,
+      details:[{branchKey:'main',status:'uncounted',cash:null,date:'2026-10-31'}]
+    };
+    expect(normalizeDrawerCashAsOf(payload)).toMatchObject({amount:null,latestVerifiedDetail:null,verifiedBranches:0,complete:false});
+  });
+  it('uses only actual physical cash, never the expected or cash-sales amounts',()=>{
+    expect(enteredDrawerCash({actual_cash:150,closing_cash:2000,restaurant_cash:1200})).toBe(150);
+    expect(enteredDrawerCash({actual_cash:null,closing_cash:2000,restaurant_cash:1200})).toBeNull();
+  });
+  it('replaces the ambiguous multi-session database rule while rejecting POS and independent drawers',async()=>{
+    const [migration,component]=await Promise.all([
+      source('../supabase/migrations/20261031231000_owner_latest_physical_cash_session.sql'),
+      source('../src/components/dashboard/ExecutiveSnapshotV2.jsx'),
+    ]);
+    expect(migration).toContain("lower(btrim(coalesce(s.shift,''))) IN ('morning','evening')");
+    expect(migration).toContain('s.closing_session_no DESC NULLS LAST');
+    expect(migration).toContain("sc.cashier_count<>1");
+    expect(migration).toContain("actual_cash IS NULL");
+    expect(migration).toContain("last_verified_physical_count_not_live_bank_balance");
+    expect(migration).not.toContain('UPDATE public.daily_sales');
+    expect(component).toContain('snapshot-drawer-partial');
+    expect(component).toContain('snapshot-drawer-branch-breakdown');
+    expect(component).toContain('NOT all-branch total');
+  });
   it('uses the same posted ledger as the dashboard and never displays an invented bank cash position', async () => {
     const [owner, report, executive, closingPage, realtime, migration] = await Promise.all([
       source('../src/pages/OwnerDashboard.jsx'),
