@@ -172,7 +172,9 @@ describe('Paddle live integration contract', () => {
       readFile(billingPath, 'utf8'),
       readFile(new URL('../src/supabase/20260821_paddle_duplicate_subscription_guard.sql', import.meta.url), 'utf8'),
     ]);
-    expect(provider).toContain("summary.payment_provider === 'paddle' && summary.paddle_customer_id");
+    expect(provider).toContain("summary.payment_provider === 'paddle' && hasLinkedSubscription");
+    expect(provider).toContain("summary.paddle_subscription_id || ''");
+    expect(provider).toContain("summary.paddle_customer_id || ''");
     expect(provider).toContain("flow: 'manage_existing_subscription'");
     expect(provider).toContain('await this.openCustomerPortal()');
     expect(billing).toContain("intent?.flow === 'manage_existing_subscription' && intent?.url");
