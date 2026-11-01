@@ -28,7 +28,7 @@ end $q$;
 revoke all on function public.paddle_register_annual_price(text,text,text,integer) from public,anon,authenticated;
 grant execute on function public.paddle_register_annual_price(text,text,text,integer) to service_role;
 
-CREATE OR REPLACE FUNCTION public.paddle_create_checkout_context(p_plan_id text, p_billing_interval text)
+CREATE OR REPLACE FUNCTION public.paddle_create_checkout_context(p_plan_id text,p_billing_interval text)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -84,8 +84,7 @@ BEGIN
   LIMIT 1
   FOR UPDATE;
 
-  IF v_existing_payment.id IS NOT NULL AND v_existing_payment.plan_id = v_plan.id
- AND coalesce(v_existing_payment.metadata->>'billing_interval','month')=v_interval AND v_existing_payment.amount_cents=v_amount THEN
+  IF v_existing_payment.id IS NOT NULL AND v_existing_payment.plan_id = v_plan.id AND coalesce(v_existing_payment.metadata->>'billing_interval','month')=v_interval AND v_existing_payment.amount_cents=v_amount THEN
     RETURN jsonb_build_object(
       'payment_id', v_existing_payment.id,
       'plan_id', v_plan.id,
@@ -239,8 +238,8 @@ $function$
 END;
 $function$
 ;
-revoke all on function public.paddle_create_checkout_context(text,text) from public,anon;
-grant execute on function public.paddle_create_checkout_context(text,text) to authenticated;
+REVOKE ALL ON FUNCTION public.paddle_create_checkout_context(text,text) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.paddle_create_checkout_context(text,text) TO authenticated;
 CREATE OR REPLACE FUNCTION public.paddle_apply_webhook_event(p_event_id text, p_event_type text, p_occurred_at timestamp with time zone, p_data jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -393,8 +392,8 @@ BEGIN
 END;
 $function$
 ;
-revoke all on function public.paddle_apply_webhook_event(text,text,timestamptz,jsonb) from public,anon,authenticated;
-grant execute on function public.paddle_apply_webhook_event(text,text,timestamptz,jsonb) to service_role;
+REVOKE ALL ON FUNCTION public.paddle_apply_webhook_event(text,text,timestamptz,jsonb) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.paddle_apply_webhook_event(text,text,timestamptz,jsonb) TO service_role;
 CREATE OR REPLACE FUNCTION public.erp_subscription_snapshot(p_restaurant_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -489,7 +488,7 @@ BEGIN
     'next_billing_date', CASE WHEN v_status = 'ACTIVE' THEN v_subscription.current_period_end ELSE NULL END,
     'cancel_at_period_end', v_subscription.cancel_at_period_end,
     'billing_email', v_subscription.billing_email,
-    'payment_provider', v_subscription.payment_provider, 'billing_interval',coalesce(v_subscription.billing_interval,'month'),
+    'payment_provider', v_subscription.payment_provider,'billing_interval',coalesce(v_subscription.billing_interval,'month'),
     'paddle_customer_id', CASE WHEN v_can_manage_billing AND v_subscription.payment_provider = 'paddle' THEN v_subscription.paddle_customer_id ELSE NULL END,
     'pending_payment_id', v_pending_payment_id,
     'test_mode_enabled', public.erp_subscription_test_mode_enabled(),
