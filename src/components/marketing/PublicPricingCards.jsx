@@ -10,6 +10,7 @@ import {
   money,
   monthlyLabel,
   planCapacities,
+  planResourceCapacities,
   planFeatures,
   trialDays,
   trialDisclosure,
@@ -32,6 +33,7 @@ export default function PublicPricingCards({ plans, onStartFree, onContactSales,
         const discounted = hasDiscount(plan);
         const trial = trialDays(plan);
         const capacities = planCapacities(plan, lang);
+        const resourceCapacities = planResourceCapacities(plan, lang);
         const features = planFeatures(plan, lang);
         const isEnterprise = String(plan.id) === 'enterprise_100';
         const yearly = billingInterval==='year' && Number(plan.monthly_price_cents)>0;
@@ -48,6 +50,7 @@ export default function PublicPricingCards({ plans, onStartFree, onContactSales,
               <span className="pb-1 text-sm text-slate-400">{yearly?billingPeriodLabel('year',lang):monthlyLabel(plan,lang)}</span>
             </div>
             {yearly&&<p className="mt-2 text-xs font-bold text-emerald-300">{annualSavingLabel(plan,lang)}</p>}
+            <p className="mt-2 text-xs leading-5 text-slate-300">{resourceCapacities.join(' · ')}</p>
             {trial > 0 && billingInterval==='month' ? <div className="mt-5 rounded-2xl border border-cyan-400/25 bg-cyan-400/10 p-4"><p className="font-bold text-cyan-100">First month free</p><p className="mt-2 text-sm leading-6 text-cyan-50/80">{trialDisclosure(plan, lang)}</p></div> : <p className="mt-5 min-h-16 text-sm leading-6 text-slate-400">{isEnterprise ? 'Highest-tier plan for organizations that need all available ERP modules and expanded operating capacity.' : 'Launch Pricing is shown directly from the active BizCTRL plan catalog.'}</p>}
             <div className="mt-6 space-y-2 text-sm text-slate-300">
               {capacities.map((label, index) => <p key={label} className="flex items-center gap-2"><CapacityIcon index={index} />{label}</p>)}
