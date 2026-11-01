@@ -64,5 +64,6 @@ describe('Upgrade with 4 branches and a failed prior Paddle payment',()=>{
   expect(billing).toContain('const shortfall=planCapacityGaps(candidate,usage)');
   expect(billing).toContain('cannotCoverUsage ||');
   expect(billing).toContain('onClick={() => beginManualPayment(item.id)}');
+  expect(billing).toContain("status === 'TRIAL' ? billingInterval === 'month'");
  });
 });
