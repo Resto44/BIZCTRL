@@ -1,5 +1,5 @@
 import { translateInterface } from './translateInterface.js';
-export const PUBLIC_PLAN_FIELDS = 'id, display_name, monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label, trial_days, billing_period_months, billing_product_key, paddle_price_id, paddle_annual_price_id, max_branches, max_employees, max_users, feature_flags, sort_order';
+export const PUBLIC_PLAN_FIELDS = 'id, display_name, monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label, trial_days, billing_period_months, billing_product_key, paddle_price_id, paddle_annual_price_id, max_restaurants, max_branches, max_employees, max_users, max_storage_mb, max_pdf_exports, max_ocr_scans, feature_flags, sort_order';
 
 export const PLAN_FEATURE_LABELS = {
   sales: 'Sales management',
@@ -95,4 +95,24 @@ export function annualSavingLabel(plan,lang='en'){
  return lang==='fa'?`۳۰٪ تخفیف اضافی سالانه · صرفه‌جویی ${money(saving,lang)}`:
    lang==='ar'?`خصم سنوي إضافي ٣٠٪ · توفر ${money(saving,lang)}`:
    `Extra 30% annual discount · save ${money(saving,lang)}`;
+}
+
+/** Paid quotas are server catalog data, not frontend constants. */
+export function planResourceCapacities(plan,lang='en'){
+ const storage=Number(plan?.max_storage_mb);
+ const pdf=Number(plan?.max_pdf_exports);
+ const ocr=Number(plan?.max_ocr_scans);
+ const locale=lang==='ar'?'ar-SA':lang==='fa'?'fa-IR':'en-US';
+ const number=value=>new Intl.NumberFormat(locale,{maximumFractionDigits:0}).format(value);
+ const gb=Number.isFinite(storage)&&storage>0?number(storage/1024):null;
+ const texts={
+  en:{storage:'GB storage',pdf:'PDF exports',ocr:'OCR scans'},
+  fa:{storage:'گیگابایت ذخیره‌سازی',pdf:'خروجی PDF',ocr:'اسکن OCR'},
+  ar:{storage:'غيغابايت تخزين',pdf:'تصدير PDF',ocr:'مسح OCR'},
+ }[lang]||{storage:'GB storage',pdf:'PDF exports',ocr:'OCR scans'};
+ return [
+  gb?`${gb} ${texts.storage}`:null,
+  Number.isInteger(pdf)&&pdf>0?`${number(pdf)} ${texts.pdf}`:null,
+  Number.isInteger(ocr)&&ocr>0?`${number(ocr)} ${texts.ocr}`:null
+ ].filter(Boolean);
 }
