@@ -134,7 +134,7 @@ export default function LandingPage() {
       setCheckoutNotice('The selected plan is no longer available.');
       return;
     }
-    void beginPlanCheckout(selectedPlan);
+    void beginPlanCheckout(selectedPlan,searchParams.get('checkout_period')==='year'?'year':'month');
   }, [beginPlanCheckout, catalogPlans, isLoadingAuth, searchParams, setCheckoutNotice, setSearchParams]);
 
   return (
