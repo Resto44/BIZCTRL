@@ -28,7 +28,7 @@ end $q$;
 revoke all on function public.paddle_register_annual_price(text,text,text,integer) from public,anon,authenticated;
 grant execute on function public.paddle_register_annual_price(text,text,text,integer) to service_role;
 
-CREATE OR REPLACE FUNCTION public.paddle_create_checkout_context(p_plan_id text,p_billing_interval text)
+CREATE OR REPLACE FUNCTION public.paddle_create_checkout_context(p_plan_id text, p_billing_interval text)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -58,7 +58,7 @@ BEGIN
   IF v_plan.id IS NULL THEN RAISE EXCEPTION 'PADDLE_LIVE_PRICE_NOT_CONFIGURED'; END IF;
   v_price := CASE WHEN v_interval='year' THEN v_plan.paddle_annual_price_id ELSE v_plan.paddle_price_id END;
   v_amount := CASE WHEN v_interval='year' THEN round(v_plan.monthly_price_cents::numeric*12*0.70)::integer ELSE v_plan.monthly_price_cents END;
-  IF v_price IS NULL OR v_price !~ '^pri_[a-z0-9]{26}
+  IF v_price IS NULL OR v_price !~ '^pri_[a-z0-9]{26}$' THEN RAISE EXCEPTION 'PADDLE_ANNUAL_PRICE_NOT_CONFIGURED'; END IF;
 
   SELECT * INTO v_subscription
   FROM public.subscriptions
@@ -142,95 +142,6 @@ BEGIN
     'user_id', auth.uid(),
     'plan_id', v_plan.id,
     'paddle_price_id', v_price,'billing_interval',v_interval,'amount_cents',v_amount,
-    'billing_email', coalesce(v_subscription.billing_email, auth.jwt() ->> 'email'),
-    'transaction_id', NULL,
-    'reused', false
-  );
-END;
-$function$
- THEN RAISE EXCEPTION 'PADDLE_ANNUAL_PRICE_NOT_CONFIGURED'; END IF;
-
-  SELECT * INTO v_subscription
-  FROM public.subscriptions
-  WHERE restaurant_id = v_restaurant_id
-  FOR UPDATE;
-  IF v_subscription.id IS NULL THEN
-    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'SUBSCRIPTION_NOT_FOUND';
-  END IF;
-
-  IF v_subscription.payment_provider = 'paddle'
-     AND coalesce(v_subscription.paddle_customer_id, '') ~ '^ctm_[a-z0-9]{26}$'
-     AND coalesce(v_subscription.paddle_subscription_id, '') ~ '^sub_[a-z0-9]{26}$'
-     AND v_subscription.subscription_status IN ('TRIAL', 'ACTIVE', 'PAST_DUE', 'CANCELED') THEN
-    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'PADDLE_EXISTING_SUBSCRIPTION_MANAGE_REQUIRED';
-  END IF;
-
-  SELECT * INTO v_existing_payment
-  FROM public.subscription_payments
-  WHERE subscription_id = v_subscription.id
-    AND provider = 'paddle'
-    AND status = 'pending'
-  ORDER BY created_at DESC
-  LIMIT 1
-  FOR UPDATE;
-
-  IF v_existing_payment.id IS NOT NULL AND v_existing_payment.plan_id = v_plan.id THEN
-    RETURN jsonb_build_object(
-      'payment_id', v_existing_payment.id,
-      'plan_id', v_plan.id,
-      'paddle_price_id', v_price,
-      'transaction_id', v_existing_payment.paddle_transaction_id,
-      'reused', true
-    );
-  END IF;
-
-  IF v_existing_payment.id IS NOT NULL THEN
-    UPDATE public.subscription_payments
-    SET status = 'superseded', updated_at = now()
-    WHERE id = v_existing_payment.id;
-  END IF;
-
-  UPDATE public.subscriptions
-  SET plan = v_plan.id,
-      subscription_status = 'PENDING_PAYMENT',
-      payment_provider = 'paddle',
-      cancel_at_period_end = false,
-      canceled_at = NULL,
-      updated_at = now()
-  WHERE id = v_subscription.id;
-
-  INSERT INTO public.subscription_payments (
-    subscription_id, restaurant_id, plan_id, provider, status, amount_cents,
-    currency, is_test, display_label, metadata
-  ) VALUES (
-    v_subscription.id, v_restaurant_id, v_plan.id, 'paddle', 'pending',
-    v_plan.monthly_price_cents, 'USD', false, 'Paddle checkout pending',
-    jsonb_build_object(
-      'requested_by', auth.uid(),
-      'paddle_environment', 'production',
-      'paddle_price_id', v_price,
-      'original_price_cents', v_plan.original_price_cents,
-      'discount_percent', v_plan.discount_percent,
-      'trial_days', v_plan.trial_days,
-      'reactivation', v_subscription.subscription_status IN ('CANCELED', 'EXPIRED', 'PAST_DUE')
-    )
-  ) RETURNING * INTO v_payment;
-
-  INSERT INTO public.subscription_events (
-    subscription_id, restaurant_id, event_type, previous_status, next_status,
-    source, actor_user_id, details
-  ) VALUES (
-    v_subscription.id, v_restaurant_id, 'paddle_checkout_requested',
-    v_subscription.subscription_status, 'PENDING_PAYMENT', 'paddle_checkout', auth.uid(),
-    jsonb_build_object('payment_id', v_payment.id, 'plan_id', v_plan.id, 'paddle_price_id', v_price, 'environment', 'production')
-  );
-
-  RETURN jsonb_build_object(
-    'payment_id', v_payment.id,
-    'restaurant_id', v_restaurant_id,
-    'user_id', auth.uid(),
-    'plan_id', v_plan.id,
-    'paddle_price_id', v_price,
     'billing_email', coalesce(v_subscription.billing_email, auth.jwt() ->> 'email'),
     'transaction_id', NULL,
     'reused', false
