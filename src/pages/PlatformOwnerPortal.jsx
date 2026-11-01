@@ -275,7 +275,7 @@ function PlanEditor({ item, modules, t, pending, onClose, onSave }) {
     ['original','originalPriceCents','Original price']
    ].map(([draftKey,centsKey,label])=><div key={draftKey}>
      <Label>{label} ({form.currency})</Label>
-     <div className="relative mt-1">
+     <div className="relative mt-1" dir="ltr">
        <span aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">{form.currency==='USD'?'$':form.currency}</span>
        <Input type="text" inputMode="decimal" dir="ltr" className="ps-9 tabular-nums" aria-label={`${label} in ${form.currency}`}
          disabled={paddlePriceLinked && draftKey!=='original'} value={priceDrafts[draftKey]}
