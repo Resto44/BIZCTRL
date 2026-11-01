@@ -115,7 +115,13 @@ export class PaddlePaymentProvider extends PaymentProvider {
     // An already-linked Paddle customer/subscription must be managed in Paddle's
     // hosted portal. Creating a second checkout transaction here could create a
     // duplicate subscription for the same tenant.
-    if (summary.payment_provider === 'paddle' && summary.paddle_customer_id) {
+    // A customer ID may outlive a declined/failed checkout. Only a genuine
+    // linked Paddle subscription is manageable in the customer portal.
+    // The guarded server RPC still rejects duplicates for active subscriptions.
+    const hasLinkedSubscription =
+      /^sub_[a-z0-9]{26}$/i.test(String(summary.paddle_subscription_id || '')) &&
+      /^ctm_[a-z0-9]{26}$/i.test(String(summary.paddle_customer_id || ''));
+    if (summary.payment_provider === 'paddle' && hasLinkedSubscription) {
       return { flow: 'manage_existing_subscription', url: await this.openCustomerPortal() };
     }
 
