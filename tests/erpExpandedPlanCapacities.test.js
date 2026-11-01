@@ -12,10 +12,9 @@ const catalog=[
 describe('November 2026 tiered ERP plan quotas — canonical catalog',()=>{
  it('changes all seven catalog quotas with no subscription, Paddle or price updates',()=>{
    const sql=text('../supabase/migrations/20261101180000_expand_paid_erp_plan_capacities.sql');
+   const compact=sql.replace(/\\s+/g,'');
    for(const row of catalog){
-     const expected=`('${row.id}',${row.max_restaurants}`;
-     expect(sql).toContain(expected);
-     expect(sql).toContain(`, ${row.max_branches}, ${row.max_users},`);
+     expect(compact).toContain(`('${row.id}',${row.max_restaurants},${row.max_branches},${row.max_users},${row.max_employees},${row.max_storage_mb},${row.max_pdf_exports},${row.max_ocr_scans})`);
    }
    for(const field of ['max_restaurants','max_branches','max_users','max_employees','max_storage_mb','max_pdf_exports','max_ocr_scans'])
      expect(sql).toContain(`${field} = c.`);
