@@ -30,7 +30,7 @@ Deno.serve(async(req)=>{
  const result:{plan:string;status:string;price_id?:string;code?:string}[]=[];
  let status="failed";
  try{
-  if(Deno.env.get("PADDLE_ENVIRONMENT")!=="production")throw Error("LIVE_ENVIRONMENT_REQUIRED");
+  if((Deno.env.get("PADDLE_ENVIRONMENT")??"production")!=="production")throw Error("LIVE_ENVIRONMENT_REQUIRED");
   const key=Deno.env.get("PADDLE_API_KEY");
   if(!key)throw Error("PADDLE_API_KEY_NOT_CONFIGURED");
   const {data:plans,error:dbError}=await db.from("subscription_plans")
