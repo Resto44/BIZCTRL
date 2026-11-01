@@ -5,6 +5,8 @@ const APP_ORIGIN = Deno.env.get("APP_URL") ?? "https://mybizctrl.site";
 const PADDLE_ENVIRONMENT = Deno.env.get("PADDLE_ENVIRONMENT") ?? "production";
 const PADDLE_API_URL = "https://api.paddle.com";
 const TRANSACTION_ID_PATTERN = /^txn_[a-z\d]{26}$/i;
+const PRICE_ID = /^pri_[a-z\d]{26}$/i;
+const PRODUCT_ID = /^pro_[a-z\d]{26}$/i;
 const SAFE_PADDLE_ERROR_FIELD_PATTERN = /^[a-z\d._-]{1,100}$/i;
 
 function safePaddleErrorField(value: unknown) {
@@ -42,19 +44,69 @@ Deno.serve(async (req: Request) => {
     if (!paddleApiKey) return fail("PADDLE_LIVE_NOT_CONFIGURED", 503, headers);
     if (!supabaseUrl || !anonKey || !serviceRoleKey || !authorization) return fail("BILLING_SERVICE_NOT_CONFIGURED", 503, headers);
 
-    const body = await req.json().catch(() => null) as { planId?: unknown } | null;
+    const body = await req.json().catch(() => null) as { planId?: unknown; billingInterval?: unknown } | null;
     const planId = typeof body?.planId === "string" ? body.planId.trim() : "";
     if (!planId) return fail("PAID_PLAN_REQUIRED", 400, headers);
+    const interval = body?.billingInterval === 'year' ? 'year' : body?.billingInterval === 'month' || body?.billingInterval == null ? 'month' : null;
+    if (!interval) return fail('INVALID_BILLING_INTERVAL',400,headers);
 
     const caller = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
     const { data: userData, error: userError } = await caller.auth.getUser();
     if (userError || !userData.user) return fail("UNAUTHENTICATED", 401, headers);
 
-    // This guarded RPC owns tenant resolution, plan validation, the local pending
-    // payment record, and state transition. Client data never determines a price
-    // or organization reference.
-    const { data: context, error: contextError } = await caller.rpc("paddle_create_checkout_context", { p_plan_id: planId });
-    if (contextError || !context?.payment_id || !context?.paddle_price_id) {
+    const service = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+    // The annual quote is read-only, checks owner membership server-side, and
+    // returns trusted catalog pricing. No pending payment is created until a
+    // valid yearly Paddle catalog price has been confirmed.
+    if (interval === 'year') {
+      const { data: quote, error: quoteError } = await caller.rpc('paddle_annual_quote', { p_plan_id: planId });
+      if (quoteError || !quote || !PRICE_ID.test(quote.monthly_price_id) || !Number.isSafeInteger(quote.annual_cents) || quote.annual_cents <= 0)
+        return fail('PADDLE_ANNUAL_PRICE_NOT_CONFIGURED',400,headers);
+      const authHeaders={Authorization:`Bearer ${paddleApiKey}`,'Content-Type':'application/json'};
+      const monthlyResponse=await fetch(`${PADDLE_API_URL}/prices/${quote.monthly_price_id}`,{headers:authHeaders});
+      const monthlyData=await monthlyResponse.json().catch(()=>null);
+      const monthly=monthlyData?.data;
+      if(!monthlyResponse.ok || !PRODUCT_ID.test(monthly?.product_id||'') ||
+         monthly?.billing_cycle?.interval!=='month' || Number(monthly?.billing_cycle?.frequency)!==1 ||
+         monthly?.unit_price?.currency_code!=='USD' ||
+         Number(monthly?.unit_price?.amount)!==quote.monthly_cents)
+        return fail('PADDLE_MONTHLY_CATALOG_MISMATCH',409,headers);
+      let annualId=quote.annual_price_id;
+      if (annualId && !PRICE_ID.test(annualId))return fail('PADDLE_ANNUAL_PRICE_INVALID',409,headers);
+      if(!annualId){
+        const annualResponse=await fetch(`${PADDLE_API_URL}/prices`,{
+          method:'POST',headers:authHeaders,
+          body:JSON.stringify({
+            description:`BizCTRL ${quote.plan_id} annual 30 percent off current monthly`,
+            name:'Annual (30% off)',product_id:monthly.product_id,
+            unit_price:{amount:String(quote.annual_cents),currency_code:'USD'},
+            billing_cycle:{interval:'year',frequency:1},quantity:{minimum:1,maximum:1},
+            tax_mode:'account_setting'
+          })
+        });
+        const annualBody=await annualResponse.json().catch(()=>null);
+        if(!annualResponse.ok || !PRICE_ID.test(annualBody?.data?.id||''))
+          return fail('PADDLE_ANNUAL_CATALOG_CREATE_FAILED',502,headers);
+        const {data:registered,error:registerError}=await service.rpc('paddle_register_annual_price',{
+          p_plan_id:quote.plan_id,p_monthly_price_id:quote.monthly_price_id,
+          p_annual_price_id:annualBody.data.id,p_amount_cents:quote.annual_cents
+        });
+        if(registerError || !PRICE_ID.test(registered||''))return fail('PADDLE_ANNUAL_CATALOG_LINK_FAILED',500,headers);
+        annualId=registered;
+      }
+      const annualResponse=await fetch(`${PADDLE_API_URL}/prices/${annualId}`,{headers:authHeaders});
+      const annual=(await annualResponse.json().catch(()=>null))?.data;
+      if(!annualResponse.ok || annual?.product_id!==monthly.product_id ||
+          annual?.billing_cycle?.interval!=='year' || annual?.billing_cycle?.frequency!==1 ||
+          annual?.unit_price?.currency_code!=='USD' || Number(annual?.unit_price?.amount)!==quote.annual_cents)
+        return fail('PADDLE_ANNUAL_CATALOG_MISMATCH',409,headers);
+    }
+
+    // Guarded DB RPC binds the verified interval, price, pending payment and tenant.
+    const { data: context, error: contextError } = await caller.rpc("paddle_create_checkout_context", {
+      p_plan_id:planId,p_billing_interval:interval
+    });
+    if (contextError || !context?.payment_id || !PRICE_ID.test(context?.paddle_price_id||'') || context.billing_interval!==interval) {
       return fail(contextError?.message ?? "PADDLE_CHECKOUT_CONTEXT_FAILED", 400, headers);
     }
 
@@ -62,7 +114,6 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ transactionId: context.transaction_id, reused: true }), { status: 200, headers });
     }
 
-    const service = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
     const transactionResponse = await fetch(`${PADDLE_API_URL}/transactions`, {
       method: "POST",
       headers: {
@@ -78,6 +129,7 @@ Deno.serve(async (req: Request) => {
           bizctrl_user_id: userData.user.id,
           bizctrl_plan_id: context.plan_id,
           bizctrl_environment: "production",
+          bizctrl_billing_interval: interval,
         },
       }),
     });
