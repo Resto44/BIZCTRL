@@ -1,6 +1,6 @@
 // A plan upgrade must support the organization's existing resources.
 // Do not redirect a customer with 4 branches toward a 1- or 3-branch plan.
-const CAPACITIES=[['branches','max_branches'],['users','max_users'],['employees','max_employees']];
+const CAPACITIES=[['restaurants','max_restaurants'],['branches','max_branches'],['users','max_users'],['employees','max_employees']];
 export function planCapacityGaps(plan,usage={}) {
  if(!plan)return [{resource:'plan',used:0,limit:0}];
  return CAPACITIES.flatMap(([resource,field])=>{
