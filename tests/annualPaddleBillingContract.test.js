@@ -29,7 +29,7 @@ describe('Annual Paddle 30 percent additional discount, source of truth',()=>{
   expect(sql).toContain("coalesce(v_existing_payment.metadata->>'billing_interval','month')=v_interval");
   expect(sql).toContain('v_existing_payment.amount_cents=v_amount');
   expect(sql).toContain("v_price_id IS DISTINCT FROM v_plan.paddle_annual_price_id");
-  expect(sql).toContain("IF auth.role()<>'service_role'");
+  expect(sql).toMatch(/IF auth\.role\(\)\s*<>\s*'service_role'/);
   expect(sql).toContain("'billing_interval',coalesce(v_subscription.billing_interval,'month')");
   expect(sql).not.toContain('PADDLE_SANDBOX');
  });
