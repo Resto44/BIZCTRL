@@ -77,7 +77,11 @@ export class ManualIbanPaymentProvider extends PaymentProvider {
   }
 
   async createCheckout(planId, couponCode = null) {
-    return this.subscriptionApi.createManualPaymentIntent(planId, couponCode);
+    // Billing passes an interval as its second argument. Do not mistake the
+    // monthly interval for a discount coupon, and never invoice a yearly
+    // purchase through the monthly-only IBAN payment RPC.
+    if(couponCode === 'year') throw new Error('ANNUAL_MANUAL_IBAN_UNAVAILABLE');
+    return this.subscriptionApi.createManualPaymentIntent(planId,couponCode === 'month' ? null : couponCode);
   }
 
   async verifyPayment() {
