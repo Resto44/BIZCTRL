@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useSubscription } from '@/lib/SubscriptionContext';
 import { createPaymentProvider } from '@/lib/payment/PaymentProvider';
-import {annualPriceCents,billingPeriodLabel,annualSavingLabel} from '@/lib/pricingCatalog';
+import {annualPriceCents,billingPeriodLabel,annualSavingLabel,planResourceCapacities} from '@/lib/pricingCatalog';
 import {planCapacityGaps,recommendedCapacityPlan} from '@/lib/billingUpgradeCapacity';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -406,7 +406,7 @@ export default function Billing() {
               {billingInterval==='year'?<p className="text-xs leading-5"><span className="text-muted-foreground line-through">{money(Number(item.monthly_price_cents)*12)}</span> · <span className="font-semibold text-emerald-700">{annualSavingLabel(item,lang)}</span></p>:discount&&<p className="text-xs text-muted-foreground"><span className="line-through">{copy.original}: {money(item.original_price_cents)}</span> · <span className="font-semibold text-emerald-700">{copy.final}: {money(item.monthly_price_cents)}</span></p>}
               {Number(item.trial_days)>0&&billingInterval==='month'&&<p className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs leading-5 text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">First month free ({item.trial_days}-day trial). After the free month, your subscription renews at {money(item.monthly_price_cents)}{copy.priceMonth} unless cancelled.</p>}
             </CardHeader>
-              <CardContent className="space-y-4"><p className="text-xs text-muted-foreground">{capacitySummary(item, lang)}</p>
+              <CardContent className="space-y-4"><div className="space-y-1 text-xs text-muted-foreground"><p>{capacitySummary(item, lang)}</p><p>{planResourceCapacities(item,lang).join(' · ')}</p></div>
                 {cannotCoverUsage&&<p data-testid={`capacity-warning-${item.id}`} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">{lang==='fa'?'محدودیت این پلن کمتر از منابع فعلی سازمان است.':lang==='ar'?'حدود هذه الخطة أقل من موارد المؤسسة الحالية.':'This plan is too small for your current organization.'} {capacityGaps.map(g=>`${g.resource}: ${g.used}/${g.limit??'?'}`).join(' · ')}</p>}
                 <ul className="space-y-1.5 text-sm text-muted-foreground">{features.slice(0, 5).map((feature) => <li key={feature} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{feature}</li>)}</ul>{isCurrent && !selectedPending ? <Badge variant="secondary" className="w-full justify-center py-2">{copy.current}</Badge> : !canManageBilling ? <Button className="w-full" disabled>{copy.ownerOnly}</Button> : <Button className="w-full" disabled={Boolean(acting) || cannotCoverUsage || (selectedPending && !isPaddleProvider) || (billingInterval==='year' && !isPaddleProvider)} onClick={() => beginManualPayment(item.id)}><CreditCard className="me-2 h-4 w-4" />{selectedPending ? (isPaddleProvider ? copy.resumeCheckout : copy.pending) : paidAction}</Button>}</CardContent>
             </Card>;
