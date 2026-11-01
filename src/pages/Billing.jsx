@@ -290,6 +290,7 @@ export default function Billing() {
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-black tracking-tight">{planName}</h1>
                 <Badge className={`border-0 font-semibold ${STATUS_STYLE[status] || STATUS_STYLE.EXPIRED}`}>{displayStatus(status)}</Badge>
+                {summary.billing_interval==='year'&&<Badge variant="outline">{lang==='fa'?'اشتراک سالانه':lang==='ar'?'اشتراك سنوي':'Annual subscription'}</Badge>}
               </div>
               {status === 'PENDING_PAYMENT' && <p className="mt-2 max-w-2xl text-sm text-amber-800 dark:text-amber-200">{copy.pendingDetails}</p>}
             </div>
