@@ -47,6 +47,17 @@ describe('Upgrade with 4 branches and a failed prior Paddle payment',()=>{
   });
   expect(beginPaddleCheckout).not.toHaveBeenCalled();
  });
+ it('preserves active trial during pending checkout and failed Paddle attempt without subscription',()=>{
+  const source=read('../supabase/migrations/20261101171500_paddle_upgrade_preserve_existing_entitlements.sql');
+  const parts=source.split('CREATE OR REPLACE FUNCTION public.paddle_apply_webhook_event');
+  expect(parts).toHaveLength(2);
+  expect(parts[0]).toContain('CREATE OR REPLACE FUNCTION public.paddle_create_checkout_context');
+  expect(parts[0]).not.toContain('UPDATE public.subscriptions');
+  expect(parts[0]).toContain("'paddle_checkout_requested'");
+  expect(parts[1]).toContain("p_event_type IN ('transaction.payment_failed','transaction.past_due')");
+  expect(parts[1]).toContain("nullif(v_subscription.paddle_subscription_id,'') IS NULL");
+  expect(parts[1]).toContain('UPDATE public.subscription_payments');
+ });
  it('does not auto-pay when clicking upgrade recommendation; requires deliberate plan choice',()=>{
   const billing=read('../src/pages/Billing.jsx');
   expect(billing).toContain('target?.scrollIntoView');
