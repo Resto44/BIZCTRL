@@ -40,8 +40,11 @@ describe('Platform Owner annual Paddle billing ERP reconciliation',()=>{
   expect(cards).toContain('formatPlatformMoney(amount,lang,plan.currency)');
   expect(cards).toContain('ownerAnnualCatalogState(plan)');
   expect(page).toContain('<PlatformPlanPricing plan={plan} lang={lang}/>');
-  expect(page).toContain('disabled={paddlePriceLinked} value={form.yearlyPriceCents}');
-  expect(page).toContain('disabled={paddlePriceLinked} value={form.monthlyPriceCents}');
+  expect(page).toContain("disabled={paddlePriceLinked && draftKey!=='original'}");
+  expect(page).toContain('value={priceDrafts[draftKey]}');
+  expect(page).toContain('setDollarPrice(draftKey,centsKey,event.target.value)');
+  expect(page).toContain('Monthly price');
+  expect(page).toContain('Yearly price · extra 30% off');
   expect(page).toContain('<SubscriptionInterval item={item} lang={lang}/>');
   expect(page).toContain("item.paddle_annual_price_id");
   expect(page).toContain('limits: { max_restaurants:');
