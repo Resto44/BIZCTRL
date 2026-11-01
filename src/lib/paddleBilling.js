@@ -11,9 +11,9 @@ async function responseError(result, fallback) {
   return new Error(code || result?.error?.message || fallback);
 }
 
-export async function beginPaddleCheckout(planId, paddleCustomerId = null) {
+export async function beginPaddleCheckout(planId, paddleCustomerId = null, billingInterval = 'month') {
   const { data, error } = await supabase.functions.invoke('paddle-subscription-checkout', {
-    body: { planId },
+    body: { planId, billingInterval },
   });
   if (error || !data?.transactionId) throw await responseError({ data, error }, 'PADDLE_CHECKOUT_UNAVAILABLE');
 
