@@ -46,6 +46,15 @@ describe('Platform Owner annual Paddle billing ERP reconciliation',()=>{
   expect(page).toContain("item.paddle_annual_price_id");
   expect(page).toContain('limits: { max_restaurants:');
  });
+ it('guards Paddle prices at table level against stale legacy RPCs',()=>{
+  const migration=source('../supabase/migrations/20261101204500_erp_paddle_linked_price_guard.sql');
+  expect(migration).toContain('BEFORE UPDATE ON public.subscription_plans');
+  expect(migration).toContain('OLD.paddle_annual_price_id IS NOT NULL');
+  expect(migration).toContain('NEW.yearly_price_cents IS DISTINCT FROM OLD.yearly_price_cents');
+  expect(migration).toContain('NEW.monthly_price_cents IS DISTINCT FROM OLD.monthly_price_cents');
+  expect(migration).toContain("MESSAGE='PADDLE_LINKED_PLAN_PRICE_LOCKED'");
+  expect(migration).not.toMatch(/NEW\.max_branches|NEW\.max_users|NEW\.max_employees/);
+ });
  it('normalizes annual MRR to monthly equivalent without modifying cash or payment history',()=>{
   const migration=source('../supabase/migrations/20261101203500_platform_owner_annual_mrr_normalization.sql');
   expect(migration).toContain("subscription.billing_interval='year'");
