@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useSubscription } from '@/lib/SubscriptionContext';
 import { createPaymentProvider } from '@/lib/payment/PaymentProvider';
+import {annualPriceCents,billingPeriodLabel,annualSavingLabel} from '@/lib/pricingCatalog';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -118,6 +119,7 @@ export default function Billing() {
   const provider = useMemo(() => createPaymentProvider(subscription), [subscription]);
   const [acting, setActing] = useState('');
   const [notice, setNotice] = useState('');
+  const [billingInterval,setBillingInterval]=useState('month');
   const [manualPayment, setManualPayment] = useState(null);
   const [paymentReference, setPaymentReference] = useState('');
   const [paymentProof, setPaymentProof] = useState(null);
@@ -168,11 +170,12 @@ export default function Billing() {
 
   const beginManualPayment = async (planId) => {
     if (paymentIntentInFlight.current) return;
+    if(billingInterval==='year'&&!isPaddleProvider){setNotice(lang==='fa'?'اشتراک سالانه فعلاً فقط با Paddle قابل پرداخت است.':lang==='ar'?'الاشتراك السنوي متاح حالياً عبر Paddle فقط.':'Annual subscriptions currently require Paddle Checkout.');return;}
     paymentIntentInFlight.current = true;
     setActing(`plan-${planId}`);
     setNotice('');
     try {
-      const intent = await provider.createCheckout(planId);
+      const intent = await provider.createCheckout(planId,billingInterval);
       if (isPaddleProvider) {
         if (intent?.flow === 'manage_existing_subscription' && intent?.url) {
           window.location.assign(intent.url);
@@ -199,7 +202,7 @@ export default function Billing() {
     setNotice('');
     try {
       if (isPaddleProvider) {
-        const intent = await provider.createCheckout(plan);
+        const intent = await provider.createCheckout(plan,billingInterval);
         if (intent?.flow === 'manage_existing_subscription' && intent?.url) {
           window.location.assign(intent.url);
           return;
@@ -343,7 +346,14 @@ export default function Billing() {
       </section>
 
       <section id="available-plans">
-        <div className="mb-3 flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /><h2 className="text-lg font-bold">{copy.availablePlans}</h2></div>
+        <div className="mb-3 flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary"/><h2 className="text-lg font-bold">{copy.availablePlans}</h2></div>
+        <div role="group" aria-label="Subscription payment frequency" className="mb-4 flex flex-wrap gap-2 rounded-xl border bg-muted/40 p-2">
+          {['month','year'].map(interval=><button type="button" key={interval} aria-pressed={billingInterval===interval} onClick={()=>setBillingInterval(interval)}
+           className={`rounded-lg px-4 py-2 text-sm font-semibold ${billingInterval===interval?'bg-primary text-primary-foreground':'bg-background text-foreground'}`}>
+           {interval==='year'?(lang==='fa'?'سالانه · ۳۰٪ تخفیف اضافی':lang==='ar'?'سنوي · خصم إضافي ٣٠٪':'Annual · extra 30% off'):(lang==='fa'?'ماهانه':lang==='ar'?'شهري':'Monthly')}
+          </button>)}
+        </div>
+        {billingInterval==='year'&&!isPaddleProvider&&<p role="status" className="mb-3 text-xs text-amber-700">{lang==='fa'?'پرداخت سالانه فعلاً فقط از راه Paddle فعال می‌شود.':lang==='ar'?'الدفع السنوي متاح عبر Paddle فقط حالياً.':'Annual payment currently requires Paddle.'}</p>}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {safePlans.map((item) => {
             const isCurrent = item.id === plan && ['TRIAL', 'ACTIVE', 'PENDING_PAYMENT'].includes(status);
@@ -355,9 +365,13 @@ export default function Billing() {
             const isDowngrade = Number(item.monthly_price_cents) < Number(summary.pricing?.monthly_price_cents || 0);
             const paidAction = isDowngrade ? copy.downgrade : copy.upgrade;
             return <Card key={item.id} className={`relative overflow-hidden ${isCurrent ? 'ring-2 ring-primary shadow-md' : ''}`}>
-              {discount && <Badge className="absolute end-3 top-3 bg-rose-600 text-white">{item.discount_label || `-${item.discount_percent}%`}</Badge>}
-              <CardHeader className="pb-2"><CardTitle className="text-lg">{item.display_name}</CardTitle><div className="flex items-end gap-2"><span className="text-3xl font-black">{money(item.monthly_price_cents)}</span><span className="pb-1 text-xs text-muted-foreground">{copy.priceMonth}</span></div>{discount && <p className="text-xs text-muted-foreground"><span className="line-through">{copy.original}: {money(item.original_price_cents)}</span> · <span className="font-semibold text-emerald-700">{copy.final}: {money(item.monthly_price_cents)}</span></p>}{Number(item.trial_days) > 0 && <p className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs leading-5 text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">First month free ({item.trial_days}-day trial). After the free month, your subscription renews at {money(item.monthly_price_cents)}{copy.priceMonth} unless cancelled.</p>}</CardHeader>
-              <CardContent className="space-y-4"><p className="text-xs text-muted-foreground">{capacitySummary(item, lang)}</p><ul className="space-y-1.5 text-sm text-muted-foreground">{features.slice(0, 5).map((feature) => <li key={feature} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{feature}</li>)}</ul>{isCurrent && !selectedPending ? <Badge variant="secondary" className="w-full justify-center py-2">{copy.current}</Badge> : !canManageBilling ? <Button className="w-full" disabled>{copy.ownerOnly}</Button> : <Button className="w-full" disabled={Boolean(acting) || (selectedPending && !isPaddleProvider)} onClick={() => beginManualPayment(item.id)}><CreditCard className="me-2 h-4 w-4" />{selectedPending ? (isPaddleProvider ? copy.resumeCheckout : copy.pending) : paidAction}</Button>}</CardContent>
+              {discount && billingInterval==='month' && <Badge className="absolute end-3 top-3 bg-rose-600 text-white">{item.discount_label || `-${item.discount_percent}%`}</Badge>}
+              <CardHeader className="pb-2"><CardTitle className="text-lg">{item.display_name}</CardTitle>
+              <div className="flex flex-wrap items-end gap-2"><span className="text-3xl font-black">{money(billingInterval==='year'?annualPriceCents(item):item.monthly_price_cents)}</span><span className="pb-1 text-xs text-muted-foreground">{billingInterval==='year'?billingPeriodLabel('year',lang):copy.priceMonth}</span></div>
+              {billingInterval==='year'?<p className="text-xs leading-5"><span className="text-muted-foreground line-through">{money(Number(item.monthly_price_cents)*12)}</span> · <span className="font-semibold text-emerald-700">{annualSavingLabel(item,lang)}</span></p>:discount&&<p className="text-xs text-muted-foreground"><span className="line-through">{copy.original}: {money(item.original_price_cents)}</span> · <span className="font-semibold text-emerald-700">{copy.final}: {money(item.monthly_price_cents)}</span></p>}
+              {Number(item.trial_days)>0&&billingInterval==='month'&&<p className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs leading-5 text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">First month free ({item.trial_days}-day trial). After the free month, your subscription renews at {money(item.monthly_price_cents)}{copy.priceMonth} unless cancelled.</p>}
+            </CardHeader>
+              <CardContent className="space-y-4"><p className="text-xs text-muted-foreground">{capacitySummary(item, lang)}</p><ul className="space-y-1.5 text-sm text-muted-foreground">{features.slice(0, 5).map((feature) => <li key={feature} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{feature}</li>)}</ul>{isCurrent && !selectedPending ? <Badge variant="secondary" className="w-full justify-center py-2">{copy.current}</Badge> : !canManageBilling ? <Button className="w-full" disabled>{copy.ownerOnly}</Button> : <Button className="w-full" disabled={Boolean(acting) || (selectedPending && !isPaddleProvider) || (billingInterval==='year' && !isPaddleProvider)} onClick={() => beginManualPayment(item.id)}><CreditCard className="me-2 h-4 w-4" />{selectedPending ? (isPaddleProvider ? copy.resumeCheckout : copy.pending) : paidAction}</Button>}</CardContent>
             </Card>;
           })}
         </div>
