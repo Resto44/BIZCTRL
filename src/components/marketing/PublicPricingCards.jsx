@@ -47,7 +47,7 @@ export default function PublicPricingCards({ plans, onStartFree, onContactSales,
               <span className="text-4xl font-black text-white">{money(yearly?annualPriceCents(plan):plan.monthly_price_cents,lang)}</span>
               <span className="pb-1 text-sm text-slate-400">{yearly?billingPeriodLabel('year',lang):monthlyLabel(plan,lang)}</span>
             </div>
-            {billingInterval==='year'&&<p className="mt-2 text-xs font-bold text-emerald-300">{annualSavingLabel(plan,lang)}</p>}
+            {yearly&&<p className="mt-2 text-xs font-bold text-emerald-300">{annualSavingLabel(plan,lang)}</p>}
             {trial > 0 && billingInterval==='month' ? <div className="mt-5 rounded-2xl border border-cyan-400/25 bg-cyan-400/10 p-4"><p className="font-bold text-cyan-100">First month free</p><p className="mt-2 text-sm leading-6 text-cyan-50/80">{trialDisclosure(plan, lang)}</p></div> : <p className="mt-5 min-h-16 text-sm leading-6 text-slate-400">{isEnterprise ? 'Highest-tier plan for organizations that need all available ERP modules and expanded operating capacity.' : 'Launch Pricing is shown directly from the active BizCTRL plan catalog.'}</p>}
             <div className="mt-6 space-y-2 text-sm text-slate-300">
               {capacities.map((label, index) => <p key={label} className="flex items-center gap-2"><CapacityIcon index={index} />{label}</p>)}
