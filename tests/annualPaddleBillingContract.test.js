@@ -41,6 +41,14 @@ describe('Annual Paddle 30 percent additional discount, source of truth',()=>{
   const provider=text('../src/lib/payment/PaymentProvider.js');
   expect(provider).toContain("beginPaddleCheckout(planId, summary.paddle_customer_id,billingInterval)");
  });
+ it('keeps monthly IBAN coupon null and rejects unsupported yearly IBAN',()=>{
+  const provider=text('../src/lib/payment/PaymentProvider.js');
+  const billing=text('../src/pages/Billing.jsx');
+  expect(provider).toContain("if(couponCode === 'year') throw new Error('ANNUAL_MANUAL_IBAN_UNAVAILABLE')");
+  expect(provider).toContain("couponCode === 'month' ? null : couponCode");
+  expect(billing).toContain("if(billingInterval==='year'&&!isPaddleProvider)");
+  expect(billing).toContain('provider.createCheckout(planId,billingInterval)');
+ });
  it('exposes annual selection on public pricing, Billing and registration return flow',()=>{
   const landing=text('../src/components/marketing/PublicPricingCards.jsx');
   const billing=text('../src/pages/Billing.jsx');
