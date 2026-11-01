@@ -82,7 +82,8 @@ export function planCapacities(plan, lang = 'en') {
 
 export const ANNUAL_ADDITIONAL_DISCOUNT_PERCENT=30;
 export function annualPriceCents(plan) {
- const monthly=Number(plan?.monthly_price_cents);
+ if(plan?.monthly_price_cents===null || plan?.monthly_price_cents===undefined)return null;
+ const monthly=Number(plan.monthly_price_cents);
  return Number.isSafeInteger(monthly)&&monthly>=0?Math.round(monthly*12*(1-ANNUAL_ADDITIONAL_DISCOUNT_PERCENT/100)):null;
 }
 export function billingPeriodLabel(interval='month',lang='en'){
