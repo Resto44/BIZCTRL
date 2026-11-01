@@ -13,15 +13,15 @@ const read=(path)=>readFileSync(new URL(path,import.meta.url),'utf8');
 describe('Upgrade with 4 branches and a failed prior Paddle payment',()=>{
  beforeEach(()=>vi.clearAllMocks());
  const plans=[
-  {id:'starter_20',display_name:'Starter',monthly_price_cents:1000,max_branches:1,max_users:3,max_employees:5},
-  {id:'growth_40',display_name:'Growth',monthly_price_cents:2000,max_branches:3,max_users:10,max_employees:15},
-  {id:'enterprise_100',display_name:'Enterprise',monthly_price_cents:5000,max_branches:10,max_users:30,max_employees:50}
+  {id:'starter_20',display_name:'Starter',monthly_price_cents:1000,max_restaurants:2,max_branches:3,max_users:10,max_employees:20},
+  {id:'growth_40',display_name:'Growth',monthly_price_cents:2000,max_restaurants:5,max_branches:5,max_users:25,max_employees:50},
+  {id:'enterprise_100',display_name:'Enterprise',monthly_price_cents:5000,max_restaurants:15,max_branches:15,max_users:75,max_employees:150}
  ];
- it('recommends Enterprise rather than a plan with less capacity than used',()=>{
+ it('recommends Growth for 4 branches instead of under-capacity Starter',()=>{
   const usage={branches:4,users:2,employees:2};
-  expect(recommendedCapacityPlan(plans,usage).id).toBe('enterprise_100');
-  expect(planCapacityGaps(plans[0],usage)).toMatchObject([{resource:'branches',used:4,limit:1}]);
-  expect(planCapacityGaps(plans[1],usage)).toMatchObject([{resource:'branches',used:4,limit:3}]);
+  expect(recommendedCapacityPlan(plans,usage).id).toBe('growth_40');
+  expect(planCapacityGaps(plans[0],usage)).toMatchObject([{resource:'branches',used:4,limit:3}]);
+  expect(planCapacityGaps(plans[1],usage)).toEqual([]);
   expect(planCapacityGaps(plans[2],usage)).toEqual([]);
  });
  it('opens a new transaction after failed Paddle checkout if customer has NO subscription',async()=>{
