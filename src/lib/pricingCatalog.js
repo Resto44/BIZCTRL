@@ -1,5 +1,5 @@
 import { translateInterface } from './translateInterface.js';
-export const PUBLIC_PLAN_FIELDS = 'id, display_name, monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label, trial_days, billing_period_months, billing_product_key, paddle_price_id, max_branches, max_employees, max_users, feature_flags, sort_order';
+export const PUBLIC_PLAN_FIELDS = 'id, display_name, monthly_price_cents, original_price_cents, discount_percent, discount_active, discount_label, trial_days, billing_period_months, billing_product_key, paddle_price_id, paddle_annual_price_id, max_branches, max_employees, max_users, feature_flags, sort_order';
 
 export const PLAN_FEATURE_LABELS = {
   sales: 'Sales management',
@@ -78,4 +78,20 @@ export function planCapacities(plan, lang = 'en') {
     Number(plan?.max_branches) > 0 ? `${plan.max_branches} branches` : null,
     Number(plan?.max_employees) > 0 ? `${plan.max_employees} employees` : null,
   ].filter(Boolean).map(label => lang === 'en' ? label : label.replace(/users|branches|employees/g, word => ({fa:{users:'کاربر',branches:'شعبه',employees:'کارمند'},ar:{users:'مستخدمين',branches:'فروع',employees:'موظفين'}}[lang]?.[word] || word)));
+}
+
+export const ANNUAL_ADDITIONAL_DISCOUNT_PERCENT=30;
+export function annualPriceCents(plan) {
+ const monthly=Number(plan?.monthly_price_cents);
+ return Number.isSafeInteger(monthly)&&monthly>=0?Math.round(monthly*12*(1-ANNUAL_ADDITIONAL_DISCOUNT_PERCENT/100)):null;
+}
+export function billingPeriodLabel(interval='month',lang='en'){
+ if(interval==='year')return lang==='fa'?'/سال':lang==='ar'?'/سنة':'/year';
+ return lang==='fa'?'/ماه':lang==='ar'?'/شهر':'/month';
+}
+export function annualSavingLabel(plan,lang='en'){
+ const saving=Number(plan?.monthly_price_cents)*12-annualPriceCents(plan);
+ return lang==='fa'?`۳۰٪ تخفیف اضافی سالانه · صرفه‌جویی ${money(saving,lang)}`:
+   lang==='ar'?`خصم سنوي إضافي ٣٠٪ · توفر ${money(saving,lang)}`:
+   `Extra 30% annual discount · save ${money(saving,lang)}`;
 }
