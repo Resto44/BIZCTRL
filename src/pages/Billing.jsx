@@ -132,7 +132,12 @@ export default function Billing() {
   const selectedPlan = safePlans.find((item) => item.id === (manualPayment?.plan_id || plan)) || null;
   const capacityRecommendation = recommendedCapacityPlan(safePlans,usage);
   const isPaddleProvider = provider.id === 'paddle';
-  const isPaddleSubscription = summary.payment_provider === 'paddle';
+  const isPaddleSubscription = summary.payment_provider === 'paddle'
+    && /^sub_[a-z0-9]{26}$/i.test(String(summary.paddle_subscription_id||''))
+    && /^ctm_[a-z0-9]{26}$/i.test(String(summary.paddle_customer_id||''));
+  const latestPaddlePayment=payments.find(payment=>payment.provider==='paddle');
+  const latestPaymentDeclined=latestPaddlePayment?.status==='failed'
+    && ['PAST_DUE','TRIAL','ACTIVE'].includes(status);
 
   useEffect(() => {
     let mounted = true;
@@ -288,6 +293,12 @@ export default function Billing() {
       {notice && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
           {notice}
+        </div>
+      )}
+      {latestPaymentDeclined && (
+        <div role="status" data-testid="paddle-failed-upgrade-notice"
+          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          {lang==='fa'?'پرداخت قبلی Paddle رد شده است؛ پلن جدید فعال نشده. برای ۴ شعبه پلن Enterprise را انتخاب کن و با روش پرداخت معتبر دوباره تلاش کن.':lang==='ar'?'تم رفض دفعة Paddle السابقة ولم يتم تفعيل الخطة الجديدة. لأربعة فروع اختر Enterprise ثم أعد المحاولة بوسيلة دفع صالحة.':'The last Paddle payment was declined; no upgrade was activated. For four branches, choose Enterprise below and retry with a valid payment method.'}
         </div>
       )}
       {error && (
