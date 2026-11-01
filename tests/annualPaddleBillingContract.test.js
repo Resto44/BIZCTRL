@@ -45,7 +45,7 @@ describe('Annual Paddle 30 percent additional discount, source of truth',()=>{
   const landing=text('../src/components/marketing/PublicPricingCards.jsx');
   const billing=text('../src/pages/Billing.jsx');
   const registration=text('../src/lib/publicPlanCheckout.js');
-  expect(landing).toContain('onStartFree(plan,billingInterval)');
+  expect(landing).toContain("onStartFree(plan,yearly?'year':'month')");
   expect(landing).toContain('annualPriceCents(plan)');
   expect(billing).toContain("provider.createCheckout(planId,billingInterval)");
   expect(billing).toContain('annualPriceCents(item)');
