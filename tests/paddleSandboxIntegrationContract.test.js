@@ -133,7 +133,7 @@ describe('Paddle live integration contract', () => {
     expect(landing).toContain("usePublicPlanCheckout");
     expect(landing).toContain('beginPlanCheckout');
     expect(landing).toContain("searchParams.get('checkout_plan')");
-    expect(landing).toContain('void beginPlanCheckout(selectedPlan);');
+    expect(landing).toContain("void beginPlanCheckout(selectedPlan,searchParams.get('checkout_period')==='year'?'year':'month');");
     expect(landing).toContain('enterpriseContactMode');
     expect(landing).not.toContain('Paddle Sandbox');
   });

@@ -134,7 +134,7 @@ describe('subscription UI and plan-change contract', () => {
 
   it('keeps a canonical pending Paddle checkout resumable while preserving the Manual IBAN pending lock', async () => {
     const billing = await readFile(billingPath, 'utf8');
-    expect(billing).toContain("disabled={Boolean(acting) || (selectedPending && !isPaddleProvider)}");
+    expect(billing).toContain("disabled={Boolean(acting) || (selectedPending && !isPaddleProvider) || (billingInterval==='year' && !isPaddleProvider)}");
     expect(billing).toContain("selectedPending ? (isPaddleProvider ? copy.resumeCheckout : copy.pending) : paidAction");
     expect(billing).toContain("resumeCheckout: 'Resume checkout'");
     expect(billing).toContain("resumeCheckout: 'استئناف الدفع'");

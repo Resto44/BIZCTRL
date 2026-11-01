@@ -10,14 +10,14 @@ export function safeInternalReturnTo(value, fallback = '/') {
   return candidate;
 }
 
-export function publicCheckoutReturnTo(planId) {
+export function publicCheckoutReturnTo(planId,billingInterval='month') {
   const safePlanId = String(planId || '').trim();
-  return safePlanId ? `/?checkout_plan=${encodeURIComponent(safePlanId)}` : '/#pricing';
+  return safePlanId ? `/?checkout_plan=${encodeURIComponent(safePlanId)}&checkout_period=${billingInterval==='year'?'year':'month'}` : '/#pricing';
 }
 
-export function ownerRegistrationForPlan(planId) {
+export function ownerRegistrationForPlan(planId,billingInterval='month') {
   const safePlanId = String(planId || '').trim();
-  const returnTo = publicCheckoutReturnTo(safePlanId);
+  const returnTo = publicCheckoutReturnTo(safePlanId,billingInterval);
   return `/erp-register?owner=1&plan=${encodeURIComponent(safePlanId)}&returnTo=${encodeURIComponent(returnTo)}`;
 }
 
@@ -27,12 +27,12 @@ export function usePublicPlanCheckout() {
   const [checkoutNotice, setCheckoutNotice] = useState('');
   const [checkoutPlanId, setCheckoutPlanId] = useState('');
 
-  const beginPlanCheckout = useCallback(async (plan) => {
+  const beginPlanCheckout = useCallback(async (plan,billingInterval='month') => {
     const planId = String(plan?.id || '').trim();
     if (!planId) return;
 
     if (!user) {
-      navigate(ownerRegistrationForPlan(planId));
+      navigate(ownerRegistrationForPlan(planId,billingInterval));
       return;
     }
 
@@ -52,7 +52,7 @@ export function usePublicPlanCheckout() {
     setCheckoutPlanId(planId);
     setCheckoutNotice('');
     try {
-      await beginPaddleCheckout(planId);
+      await beginPaddleCheckout(planId,null,billingInterval);
       setCheckoutNotice('Paddle checkout has opened. BizCTRL access will update only after a verified Paddle webhook synchronizes your subscription.');
     } catch (error) {
       setCheckoutNotice(error?.message || 'Paddle checkout is not available yet.');

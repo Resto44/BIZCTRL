@@ -106,7 +106,7 @@ export class PaddlePaymentProvider extends PaymentProvider {
     this.isLiveGateway = true;
   }
 
-  async createCheckout(planId) {
+  async createCheckout(planId,billingInterval='month') {
     const summary = this.subscriptionApi.summary || {};
     // An already-linked Paddle customer/subscription must be managed in Paddle's
     // hosted portal. Creating a second checkout transaction here could create a
@@ -116,7 +116,7 @@ export class PaddlePaymentProvider extends PaymentProvider {
     }
 
     const { beginPaddleCheckout } = await import('@/lib/paddleBilling');
-    return beginPaddleCheckout(planId, summary.paddle_customer_id);
+    return beginPaddleCheckout(planId, summary.paddle_customer_id,billingInterval);
   }
 
   async verifyPayment() {

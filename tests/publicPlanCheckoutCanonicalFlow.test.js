@@ -28,13 +28,13 @@ describe('public plan checkout canonical flow', () => {
     expect(landing).toContain('id="pricing"');
     expect(landing).toContain('onStartFree={beginPlanCheckout}');
     expect(landing).toContain("searchParams.get('checkout_plan')");
-    expect(landing).toContain('void beginPlanCheckout(selectedPlan);');
+    expect(landing).toContain("void beginPlanCheckout(selectedPlan,searchParams.get('checkout_period')==='year'?'year':'month');");
     expect(layout).toContain("href: '/#pricing'");
     expect(layout).toContain('href="/#pricing"');
-    expect(checkout).toContain('return safePlanId ? `/?checkout_plan=${encodeURIComponent(safePlanId)}` : \'/#pricing\';');
-    expect(checkout).toContain('ownerRegistrationForPlan(planId)');
+    expect(checkout).toContain('checkout_period=');
+    expect(checkout).toContain('ownerRegistrationForPlan(planId,billingInterval)');
     expect(checkout).toContain('publicCheckoutReturnTo');
-    expect(checkout).toContain('beginPaddleCheckout(planId)');
+    expect(checkout).toContain('beginPaddleCheckout(planId,null,billingInterval)');
   });
 
   it('retains the selected plan across owner registration and sign-in using an internal-only return path', async () => {
