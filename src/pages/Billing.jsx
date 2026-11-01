@@ -3,6 +3,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { useSubscription } from '@/lib/SubscriptionContext';
 import { createPaymentProvider } from '@/lib/payment/PaymentProvider';
 import {annualPriceCents,billingPeriodLabel,annualSavingLabel} from '@/lib/pricingCatalog';
+import {planCapacityGaps,recommendedCapacityPlan} from '@/lib/billingUpgradeCapacity';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -129,6 +130,7 @@ export default function Billing() {
   const copy = COPY[lang] || COPY.en;
   const safePlans = Array.isArray(plans) ? plans : [];
   const selectedPlan = safePlans.find((item) => item.id === (manualPayment?.plan_id || plan)) || null;
+  const capacityRecommendation = recommendedCapacityPlan(safePlans,usage);
   const isPaddleProvider = provider.id === 'paddle';
   const isPaddleSubscription = summary.payment_provider === 'paddle';
 
@@ -170,6 +172,15 @@ export default function Billing() {
 
   const beginManualPayment = async (planId) => {
     if (paymentIntentInFlight.current) return;
+    const candidate=safePlans.find(item=>item.id===planId);
+    if(!candidate)return;
+    const shortfall=planCapacityGaps(candidate,usage);
+    if(shortfall.length){
+      const branch=shortfall.find(x=>x.resource==='branches');
+      const detail=branch?`${branch.used} / ${branch.limit}`:shortfall.map(x=>x.resource).join(', ');
+      setNotice(lang==='fa'?`این پلن ظرفیت منابع فعلی سازمان را ندارد (${detail}). پلن بالاتر را انتخاب کن.`:lang==='ar'?`هذه الخطة لا تستوعب موارد المؤسسة الحالية (${detail}). اختر خطة أعلى.`:`This plan cannot cover your current resources (${detail}). Choose a higher plan.`);
+      return;
+    }
     if(billingInterval==='year'&&!isPaddleProvider){setNotice(lang==='fa'?'اشتراک سالانه فعلاً فقط با Paddle قابل پرداخت است.':lang==='ar'?'الاشتراك السنوي متاح حالياً عبر Paddle فقط.':'Annual subscriptions currently require Paddle Checkout.');return;}
     paymentIntentInFlight.current = true;
     setActing(`plan-${planId}`);
@@ -345,7 +356,12 @@ export default function Billing() {
         {!isWithinCapacity && exceededLimits.length > 0 && (
           <div role="alert" className="mt-4 flex flex-col gap-3 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-950 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100 sm:flex-row sm:items-center sm:justify-between">
             <div><p className="font-semibold">Upgrade Plan required for additional resources.</p><p className="mt-1">Existing data is retained. Creation is blocked only for resources above the current plan limit.</p><ul className="mt-2 list-inside list-disc">{exceededLimits.map((item) => <li key={item.resource}>{item.resource}: {item.used} / {item.limit}</li>)}</ul></div>
-            <Button asChild className="shrink-0"><a href="#available-plans">Upgrade Plan</a></Button>
+            <Button type="button" className="shrink-0" disabled={!canManageBilling || !capacityRecommendation}
+              onClick={()=>{
+                const target=document.getElementById(`billing-plan-${capacityRecommendation?.id}`);
+                target?.scrollIntoView({behavior:'smooth',block:'center'});
+                target?.focus({preventScroll:true});
+              }}>{lang==='fa'?'نمایش پلن مناسب':lang==='ar'?'عرض الخطة المناسبة':capacityRecommendation?`View ${capacityRecommendation.display_name} plan`:'No eligible plan'}</Button>
           </div>
         )}
       </section>
@@ -364,19 +380,23 @@ export default function Billing() {
             const isCurrent = item.id === plan && ['TRIAL', 'ACTIVE', 'PENDING_PAYMENT'].includes(status);
             const discount = Boolean(item.discount_active) && Number(item.original_price_cents) > Number(item.monthly_price_cents);
             const selectedPending = status === 'PENDING_PAYMENT' && item.id === plan;
+            const capacityGaps = planCapacityGaps(item,usage);
+            const cannotCoverUsage = capacityGaps.length>0;
             const allModules = lang === 'ar' ? 'جميع وحدات ERP' : lang === 'fa' ? 'همه ماژول‌های ERP' : 'All ERP modules';
             const featureFlags = Array.isArray(item.feature_flags) ? item.feature_flags : [];
             const features = featureFlags.includes('all') ? [allModules] : featureFlags.map((feature) => FEATURE_LABELS[lang]?.[feature] || FEATURE_LABELS.en[feature] || String(feature).replaceAll('_', ' '));
             const isDowngrade = Number(item.monthly_price_cents) < Number(summary.pricing?.monthly_price_cents || 0);
             const paidAction = isDowngrade ? copy.downgrade : copy.upgrade;
-            return <Card key={item.id} className={`relative overflow-hidden ${isCurrent ? 'ring-2 ring-primary shadow-md' : ''}`}>
+            return <Card id={`billing-plan-${item.id}`} tabIndex={-1} key={item.id} className={`relative scroll-mt-28 overflow-hidden focus:ring-2 focus:ring-primary ${isCurrent ? 'ring-2 ring-primary shadow-md' : ''}`}>
               {discount && billingInterval==='month' && <Badge className="absolute end-3 top-3 bg-rose-600 text-white">{item.discount_label || `-${item.discount_percent}%`}</Badge>}
               <CardHeader className="pb-2"><CardTitle className="text-lg">{item.display_name}</CardTitle>
               <div className="flex flex-wrap items-end gap-2"><span className="text-3xl font-black">{money(billingInterval==='year'?annualPriceCents(item):item.monthly_price_cents)}</span><span className="pb-1 text-xs text-muted-foreground">{billingInterval==='year'?billingPeriodLabel('year',lang):copy.priceMonth}</span></div>
               {billingInterval==='year'?<p className="text-xs leading-5"><span className="text-muted-foreground line-through">{money(Number(item.monthly_price_cents)*12)}</span> · <span className="font-semibold text-emerald-700">{annualSavingLabel(item,lang)}</span></p>:discount&&<p className="text-xs text-muted-foreground"><span className="line-through">{copy.original}: {money(item.original_price_cents)}</span> · <span className="font-semibold text-emerald-700">{copy.final}: {money(item.monthly_price_cents)}</span></p>}
               {Number(item.trial_days)>0&&billingInterval==='month'&&<p className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs leading-5 text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">First month free ({item.trial_days}-day trial). After the free month, your subscription renews at {money(item.monthly_price_cents)}{copy.priceMonth} unless cancelled.</p>}
             </CardHeader>
-              <CardContent className="space-y-4"><p className="text-xs text-muted-foreground">{capacitySummary(item, lang)}</p><ul className="space-y-1.5 text-sm text-muted-foreground">{features.slice(0, 5).map((feature) => <li key={feature} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{feature}</li>)}</ul>{isCurrent && !selectedPending ? <Badge variant="secondary" className="w-full justify-center py-2">{copy.current}</Badge> : !canManageBilling ? <Button className="w-full" disabled>{copy.ownerOnly}</Button> : <Button className="w-full" disabled={Boolean(acting) || (selectedPending && !isPaddleProvider) || (billingInterval==='year' && !isPaddleProvider)} onClick={() => beginManualPayment(item.id)}><CreditCard className="me-2 h-4 w-4" />{selectedPending ? (isPaddleProvider ? copy.resumeCheckout : copy.pending) : paidAction}</Button>}</CardContent>
+              <CardContent className="space-y-4"><p className="text-xs text-muted-foreground">{capacitySummary(item, lang)}</p>
+                {cannotCoverUsage&&<p data-testid={`capacity-warning-${item.id}`} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">{lang==='fa'?'محدودیت این پلن کمتر از منابع فعلی سازمان است.':lang==='ar'?'حدود هذه الخطة أقل من موارد المؤسسة الحالية.':'This plan is too small for your current organization.'} {capacityGaps.map(g=>`${g.resource}: ${g.used}/${g.limit??'?'}`).join(' · ')}</p>}
+                <ul className="space-y-1.5 text-sm text-muted-foreground">{features.slice(0, 5).map((feature) => <li key={feature} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{feature}</li>)}</ul>{isCurrent && !selectedPending ? <Badge variant="secondary" className="w-full justify-center py-2">{copy.current}</Badge> : !canManageBilling ? <Button className="w-full" disabled>{copy.ownerOnly}</Button> : <Button className="w-full" disabled={Boolean(acting) || cannotCoverUsage || (selectedPending && !isPaddleProvider) || (billingInterval==='year' && !isPaddleProvider)} onClick={() => beginManualPayment(item.id)}><CreditCard className="me-2 h-4 w-4" />{selectedPending ? (isPaddleProvider ? copy.resumeCheckout : copy.pending) : paidAction}</Button>}</CardContent>
             </Card>;
           })}
         </div>
