@@ -19,6 +19,10 @@ at an additional 30% discount.
   promotional monthly price * 70%. Tax is determined at checkout.
 - Backfilled `yearly_price_cents` for exactly these three live plans,
   precondition checking Paddle annual IDs, currency, existing amounts.
+- A table-level BEFORE UPDATE guard also protects linked Paddle pricing
+  against legacy owner RPCs with stale pricing assumptions. In a
+  rollback-only SQL test, the price change was rejected while a quota
+  increase was allowed.
 - `platform_owner_upsert_plan` now refuses attempts to edit monthly,
   yearly, currency or billing interval for Paddle-linked plans. Pricing
   in the Plan Editor is read-only, while resources/modules can still be
