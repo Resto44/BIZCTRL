@@ -198,6 +198,10 @@ export default function Billing() {
   };
 
   const beginReactivation = async () => {
+    if(billingInterval==='year'&&!isPaddleProvider){
+      setNotice(lang==='fa'?'برای فعال‌سازی سالانه Paddle را انتخاب کنید؛ پرداخت IBAN فقط ماهانه است.':lang==='ar'?'التفعيل السنوي عبر Paddle فقط؛ تحويل IBAN شهري حالياً.':'Yearly reactivation requires Paddle. Manual IBAN is monthly only.');
+      return;
+    }
     setActing('reactivate');
     setNotice('');
     try {
