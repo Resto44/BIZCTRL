@@ -388,7 +388,8 @@ export default function Billing() {
         {billingInterval==='year'&&!isPaddleProvider&&<p role="status" className="mb-3 text-xs text-amber-700">{lang==='fa'?'پرداخت سالانه فعلاً فقط از راه Paddle فعال می‌شود.':lang==='ar'?'الدفع السنوي متاح عبر Paddle فقط حالياً.':'Annual payment currently requires Paddle.'}</p>}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {safePlans.map((item) => {
-            const isCurrent = item.id === plan && ['TRIAL', 'ACTIVE', 'PENDING_PAYMENT'].includes(status);
+            const isCurrent = item.id === plan && ['TRIAL', 'ACTIVE', 'PENDING_PAYMENT'].includes(status)
+              && (status === 'TRIAL' ? billingInterval === 'month' : billingInterval === (summary.billing_interval||'month'));
             const discount = Boolean(item.discount_active) && Number(item.original_price_cents) > Number(item.monthly_price_cents);
             const selectedPending = status === 'PENDING_PAYMENT' && item.id === plan;
             const capacityGaps = planCapacityGaps(item,usage);
