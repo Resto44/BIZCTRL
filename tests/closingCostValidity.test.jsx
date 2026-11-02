@@ -18,7 +18,9 @@ describe('Closing cost validity and RTL',()=>{
  it('labels a zero-fixed result provisional and keeps signs and percentages in LTR isolates',()=>{
   const html=renderToStaticMarkup(<ClosingHistoryAnalytics sale={row} lang="fa" trend={{change:-37.9}} expanded/>);
   expect(html).toContain('closing-result-provisional');expect(html).toContain('قبل از تأیید پوشش مصارف ثابت');
-  expect(html).toContain('unicode-bidi:isolate');expect(html).toContain('unicode-bidi:bidi-override');
+  expect(html).toContain('unicode-bidi:isolate');
+  // Numeric amounts use explicit LTR direction; forcing bidi-override would be redundant.
+  expect(html).toContain('dir="ltr"');
   expect(html).toContain('<bdi dir="ltr" class="font-bold">18.5%</bdi>');expect(html).not.toContain('>-0</text>');
   expect(html).toContain('fill="#b45309"');expect(html).not.toContain('#d97706');
  });
