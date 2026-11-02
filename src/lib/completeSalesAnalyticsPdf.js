@@ -1,7 +1,7 @@
 import {drawLocalizedPdfText} from './pdfLocalization';
 import {drawERPReportBrand} from './erpPdfBrand';
 import {buildFullSalesAnalyticsReport} from './fullSalesAnalyticsReport';
-import {buildPdfFinancialExecutiveSummary,compactPdfMoney,exactPdfMoney} from './pdfFinancialExecutiveSummary';
+import {buildPdfFinancialExecutiveSummary,buildPdfBranchAttributionGap,compactPdfMoney,exactPdfMoney} from './pdfFinancialExecutiveSummary';
 
 /** Fixed two-page executive coverage of every Sales Analytics section. */
 export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,previousSnapshot:previous=null,growth=null,
@@ -9,6 +9,7 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,p
  if(!s||!range?.from||!range?.to)throw new Error('Verified report data and dates required');
  const a=fullAnalytics||buildFullSalesAnalyticsReport({snapshot:s,previousSnapshot:previous,operationsReport:r,range,lang});
  const finance=buildPdfFinancialExecutiveSummary(s);
+ const branchGap=buildPdfBranchAttributionGap(finance,r?.branches);
  // Map the detail grid into the space below the six executive cards. Keep
  // branding outside this viewport and preserve real text/font sizes.
  let detailViewport=false;
@@ -86,12 +87,12 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,p
   const items=[
    [tr('Sales · all sources','فروشات تمام سورس‌ها','مبيعات كل المصادر'),finance.sales,C.blue],
    [tr('Approved purchases','هزینه خرید','تكلفة المشتريات'),finance.purchases,C.purple],
-   [tr('Monthly fixed share','مصارف ثابت ماهانه*','حصة الثابت الشهري*'),finance.fixed,C.purple],
+   [tr('Allocated fixed costs','سهم مصارف ثابت','حصة التكاليف الثابتة'),finance.fixed,C.purple],
    [tr('Variable expenses','مصارف متغیر','المصروفات المتغيرة'),finance.variable,C.orange],
    [tr('Fixed + variable','مجموع مصارف','إجمالي المصروفات'),finance.operatingExpenses,C.orange],
    [tr('Purchases + expenses','خرید + مصارف','المشتريات + المصروفات'),finance.totalCostIncludingPurchases,C.orange],
-   [tr('Gross estimate*','نتیجه ناخالص*','إجمالي تقديري*'),finance.grossPurchaseProxy,finance.grossPurchaseProxy<0?C.red:C.green],
-   [tr('Net estimate*','نتیجه خالص*','صافي تقديري*'),finance.netOperatingProxy,finance.netOperatingProxy<0?C.red:C.green],
+   [tr('Sales − purchases*','فروش − خرید*','المبيعات − المشتريات*'),finance.grossPurchaseProxy,finance.grossPurchaseProxy<0?C.red:C.green],
+   [tr('After recorded costs*','بعد از مصارف ثبت‌شده*','بعد المصاريف المسجلة*'),finance.netOperatingProxy,finance.netOperatingProxy<0?C.red:C.green],
   ];
   detailViewport=false;
   const width=46.75;
@@ -163,14 +164,14 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,p
  text(tr('Period flow difference; not a verified bank balance.','تفاوت جریان دوره؛ ماندهٔ تأییدشدهٔ بانک نیست.','فرق تدفقات الفترة؛ ليس رصيد بنك مؤكداً.'),111,208,88,6.3,C.muted);
  panel(tr('Branch performance & sales signals','عملکرد شعبه‌ها و شاخص‌های فروش','أداء الفروع ومؤشرات المبيعات'),7,217,196,55);
  const branches=[...(r?.branches||[])]; // Every selected branch; never collapse into “Other”.
- const metrics=[['sales',tr('Sales','فروشات','المبيعات'),C.blue],['purchases',tr('Purchases','خرید','المشتريات'),C.purple],['expenses',tr('Expenses (fixed + variable)','مجموع مصارف ثابت و متغیر','المصروفات الثابتة والمتغيرة'),C.orange],['netProfit',tr('Profit / loss*','سود / زیان*','الربح / الخسارة*'),C.green]];
+ const metrics=[['sales',tr('Sales','فروشات','المبيعات'),C.blue],['purchases',tr('Purchases','خرید','المشتريات'),C.purple],['expenses',tr('Expenses (fixed + variable)','مجموع مصارف ثابت و متغیر','المصروفات الثابتة والمتغيرة'),C.orange],['netProfit',tr('Operating estimate*','نتیجه تخمینی*','نتيجة تشغيلية تقديرية*'),C.green]];
  legend(metrics.map(([,name,color])=>({name,color})),12,228,188);
  const active=branches.filter(b=>b.closings>0||metrics.some(([key])=>(Number(b[key])||0)!==0));
  const bestValue=active.length?Math.max(...active.map(b=>Number(b.netProfit)||0)):null;
  const winners=active.filter(b=>Number(b.netProfit)===bestValue);
  const winnerLabel=active.length===0?tr('No branch activity in this period','در این دوره فعالیت شعبه ثبت نشده','لا نشاط للفروع خلال الفترة'):
-  active.length===1?tr('Only branch with recorded activity','تنها شعبه با فعالیت ثبت‌شده','الفرع الوحيد ذو نشاط مسجل'):
-  r?.branchProfitUnallocated?tr('Provisional leader (unallocated costs)','پیشتاز موقت (هزینهٔ تخصیص‌نیافته)','متصدر مؤقت (تكاليف غير موزعة)'):
+  active.length===1?tr('Only attributed branch active','تنها شعبه با فعالیت منتسب','الفرع الوحيد ذو نشاط منسوب'):
+  r?.branchProfitUnallocated?tr('Provisional: branch totals differ','موقت: جمع شعب تفاوت دارد','مؤقت: مجاميع الفروع مختلفة'):
   bestValue<0?tr('Lowest operating loss','کمترین زیان عملیاتی','أقل خسارة تشغيلية'):
   tr('Best branch by operating result','بهترین شعبه بر اساس نتیجه عملیاتی','أفضل فرع حسب النتيجة التشغيلية');
  text(winnerLabel,11,234,86,7.2,C.muted);
@@ -193,9 +194,13 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,p
    text(branch.name,x,266,group-1,7,C.ink,'center');
   });
  }
- text(tr('*Profit shown = sales − purchases − expenses; same selected period and currency.',
-  '*سود نمایش‌داده‌شده = فروش − خرید − هزینه؛ در دوره و واحد پول انتخاب‌شده.',
-  '*الربح المعروض = المبيعات − المشتريات − المصروفات؛ لنفس الفترة والعملة.'),11,271,188,6,C.muted);
+ const branchGapNote=branchGap?
+  tr('Branch gap: sales ','اختلاف شعب: فروش ','فرق الفروع: مبيعات ')+money(branchGap.sales)+
+  tr(' · purchases ',' · خرید ',' · مشتريات ')+money(branchGap.purchases)+
+  tr(' · result ',' · نتیجه ',' · نتيجة ')+money(branchGap.operatingProxy):null;
+ text(branchGapNote||tr('*Purchase-basis estimate, not actual inventory COGS or verified profit.',
+  '*تخمین بر مبنای خرید است، نه مصرف واقعی انبار یا فایده تأییدشده.',
+  '*تقدير بناءً على المشتريات، ليس تكلفة الاستهلاك أو ربحاً مؤكداً.'),11,271,188,6,C.muted);
  const performance=a.performance;
  const day=d=>d?d.date+' / '+money(d.value):'—';
  note(tr('Best day: ','بهترین روز: ','أفضل يوم: ')+day(performance.best)+' · '+tr('Lowest posted day: ','کمترین روز ثبت‌شده: ','أقل يوم مسجل: ')+day(performance.worst)+' · '+tr('Closings: ','بستن‌ها: ','الإقفالات: ')+num(s.finalizedClosings),275);
