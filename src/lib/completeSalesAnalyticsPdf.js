@@ -201,6 +201,8 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,p
  note(tr('Best day: ','بهترین روز: ','أفضل يوم: ')+day(performance.best)+' · '+tr('Lowest posted day: ','کمترین روز ثبت‌شده: ','أقل يوم مسجل: ')+day(performance.worst)+' · '+tr('Closings: ','بستن‌ها: ','الإقفالات: ')+num(s.finalizedClosings),275);
  note(tr('All amounts: ','تمام مبالغ: ','جميع المبالغ: ')+currency+tr(' · Sources are non-additive. Calendar comparison ends on the shown date.',' · منابع دوباره جمع نمی‌شوند. مقایسهٔ تقویمی تا تاریخ نمایش‌داده‌شده است.',' · المصادر لا تُجمع مجدداً. المقارنة التقويمية حتى التاريخ المعروض.'),278);
  detailViewport=false;
+ // Preserve visibility of the missing historical comparison, previously in Growth KPI.
+ if(growth==null)note(tr('No comparable prior sales','فروش قبلی قابل مقایسه نیست','لا مبيعات سابقة قابلة للمقارنة'),281);
  drawERPReportBrand(document,{lang,title:tr('Complete Sales Analytics','گزارش جامع فروشات','تحليل المبيعات الشامل'),business:businessName,branch:branchLabel,period:range.from+' / '+range.to,iconData,pageLabel:'1 / 2'});
  doc.addPage();
  band(tr('Costs · Profit · Products · Actions','مصارف · نتیجه مالی · کالا · اقدامات','التكاليف · النتائج · الأصناف · الإجراءات'),2);
