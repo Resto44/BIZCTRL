@@ -51,7 +51,9 @@ describe('Modern PDF font design is independent of SaaS CSS', () => {
       branchLabel: 'فرع الريان', businessName: 'مطاعم شمعة الريان' });
     expect(doc.getNumberOfPages()).toBe(2);
     expect(calls.some(c => c.value === 'گزارش جامع فروشات')).toBe(true);
-    expect(calls.some(c => c.value === '7,953 SAR' && c.size >= 12 && c.style === 'bold')).toBe(true);
+    // KPI now shows a larger compact number plus an exact 2-decimal amount.
+    expect(calls.some(c => c.value === '8.0K' && c.size >= 12 && c.style === 'bold')).toBe(true);
+    expect(calls.some(c => c.value === '7,953.00 SAR' && c.style === 'bold')).toBe(true);
     expect(calls.some(c => c.style === 'normal')).toBe(true);
     expect(calls.some(c => c.style === 'bold')).toBe(true);
     const body = calls.filter(c => c.size >= 7 && c.size <= 11);

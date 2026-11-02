@@ -1,12 +1,14 @@
 import {drawLocalizedPdfText} from './pdfLocalization';
 import {drawERPReportBrand} from './erpPdfBrand';
 import {buildFullSalesAnalyticsReport} from './fullSalesAnalyticsReport';
+import {buildPdfFinancialExecutiveSummary,compactPdfMoney,exactPdfMoney} from './pdfFinancialExecutiveSummary';
 
 /** Fixed two-page executive coverage of every Sales Analytics section. */
 export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,previousSnapshot:previous=null,growth=null,
  report:r=null,range = undefined,branchLabel = undefined,businessName = undefined,currency='SAR',lang='en',iconData = undefined,fullAnalytics=null}={}){
  if(!s||!range?.from||!range?.to)throw new Error('Verified report data and dates required');
  const a=fullAnalytics||buildFullSalesAnalyticsReport({snapshot:s,previousSnapshot:previous,operationsReport:r,range,lang});
+ const finance=buildPdfFinancialExecutiveSummary(s);
  // Map the detail grid into the space below the six executive cards. Keep
  // branding outside this viewport and preserve real text/font sizes.
  let detailViewport=false;
@@ -79,6 +81,30 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,p
   spark(vals,x+3,y+16,20,4,color);
   text(change==null?tr('Period trend','روند دوره','اتجاه الفترة'):((change>0?'+':'')+pct(change)),x+26,y+20,35,7.2,change<0?C.red:C.green);
  });detailViewport=true;};
+ // Compact executive overview: large abbreviation above the precise amount.
+ const financeExecutiveCards=()=>{
+  const items=[
+   [tr('Sales · all sources','فروشات تمام سورس‌ها','مبيعات كل المصادر'),finance.sales,C.blue],
+   [tr('Approved purchases','هزینه خرید','تكلفة المشتريات'),finance.purchases,C.purple],
+   [tr('Monthly fixed share','مصارف ثابت ماهانه*','حصة الثابت الشهري*'),finance.fixed,C.purple],
+   [tr('Variable expenses','مصارف متغیر','المصروفات المتغيرة'),finance.variable,C.orange],
+   [tr('Fixed + variable','مجموع مصارف','إجمالي المصروفات'),finance.operatingExpenses,C.orange],
+   [tr('Purchases + expenses','خرید + مصارف','المشتريات + المصروفات'),finance.totalCostIncludingPurchases,C.orange],
+   [tr('Gross estimate*','نتیجه ناخالص*','إجمالي تقديري*'),finance.grossPurchaseProxy,finance.grossPurchaseProxy<0?C.red:C.green],
+   [tr('Net estimate*','نتیجه خالص*','صافي تقديري*'),finance.netOperatingProxy,finance.netOperatingProxy<0?C.red:C.green],
+  ];
+  detailViewport=false;
+  const width=46.75;
+  items.forEach(([label,value,color],i)=>{
+    const x=7+(rtl?3-i%4:i%4)*49.75, y=46+Math.floor(i/4)*25;
+    doc.setFillColor(...tint(color,.94));doc.setDrawColor(...tint(color,.8));
+    doc.setLineWidth(.25);doc.roundedRect(x,y,width,23,2.5,2.5,'FD');
+    text(label,x+2.5,y+5,width-5,7.55,C.ink,rtl?'right':'left','heading');
+    text(compactPdfMoney(value),x+2.5,y+13.6,width-5,18,color,rtl?'right':'left','kpi');
+    text(exactPdfMoney(value,currency),x+2.5,y+20.4,width-5,7.4,C.muted,rtl?'right':'left','heading');
+  });
+  detailViewport=true;
+ };
  // Aggregate contiguous buckets without dropping values. Monetary axes include zero and corrections.
  const points=(rows,key,limit=31)=>{const n=Math.max(1,Math.ceil(rows.length/limit)),out=[];for(let i=0;i<rows.length;i+=n)out.push(rows.slice(i,i+n).reduce((v,r)=>v+(Number(r[key])||0),0));return out;};
  // Keep each swatch beside its own label in both writing directions.
@@ -113,7 +139,7 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,p
  const showCost=v=>v==null?'—':money(v);
 
  band(tr('Sales Analytics · Complete overview','تحلیل فروشات · گزارش جامع','تحليل المبيعات · نظرة شاملة'),1);
- kpis([[tr('Sales','فروشات','المبيعات'),money(s.sales)],[channelNames.cash,money(s.cash),C.green],[channelNames.network,money(s.network)],[channelNames.credit,money(s.credit),C.orange],[tr('Daily average','اوسط روزانه','المتوسط اليومي'),money(s.averageDailySales)],[tr('Growth','رشد','النمو'),pct(growth),growth<0?C.red:C.green]],['sales','cash','network','credit','averageDailySales','growth']);
+ financeExecutiveCards();
  chart(tr('Period sales trend','روند فروشات دوره','اتجاه مبيعات الفترة'),7,70,120,48,[{name:current,color:C.blue,values:points(daily,'sales')},...(previous?[{name:before,color:[151,190,240],values:points(prior,'sales')}]:[])]);
  panel(tr('Payment mix','ترکیب پرداخت‌ها','توزيع المدفوعات'),131,70,72,48);
  const mix=a.payment.channels,positiveMix=mix.every(c=>c.value>=0)&&a.payment.total>0;
@@ -175,6 +201,8 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,p
  note(tr('Best day: ','بهترین روز: ','أفضل يوم: ')+day(performance.best)+' · '+tr('Lowest posted day: ','کمترین روز ثبت‌شده: ','أقل يوم مسجل: ')+day(performance.worst)+' · '+tr('Closings: ','بستن‌ها: ','الإقفالات: ')+num(s.finalizedClosings),275);
  note(tr('All amounts: ','تمام مبالغ: ','جميع المبالغ: ')+currency+tr(' · Sources are non-additive. Calendar comparison ends on the shown date.',' · منابع دوباره جمع نمی‌شوند. مقایسهٔ تقویمی تا تاریخ نمایش‌داده‌شده است.',' · المصادر لا تُجمع مجدداً. المقارنة التقويمية حتى التاريخ المعروض.'),278);
  detailViewport=false;
+ // Preserve visibility of the missing historical comparison, previously in Growth KPI.
+ if(growth==null)note(tr('No comparable prior sales','فروش قبلی قابل مقایسه نیست','لا مبيعات سابقة قابلة للمقارنة'),281);
  drawERPReportBrand(document,{lang,title:tr('Complete Sales Analytics','گزارش جامع فروشات','تحليل المبيعات الشامل'),business:businessName,branch:branchLabel,period:range.from+' / '+range.to,iconData,pageLabel:'1 / 2'});
  doc.addPage();
  band(tr('Costs · Profit · Products · Actions','مصارف · نتیجه مالی · کالا · اقدامات','التكاليف · النتائج · الأصناف · الإجراءات'),2);
