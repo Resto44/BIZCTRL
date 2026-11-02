@@ -36,9 +36,18 @@ font shaping. Dense charts/tables stay below the new executive section.
 - Same source generator produces browser manual PDF via Reports and ScheduledReports.
 - The **automatic owner Edge worker** uses a separately compiled bundle
   `supabase/functions/automatic-report-email/report-bundle.js` (not committed).
-  It must be **rebuilt and redeployed separately** with
-  `node scripts/build-automatic-report.mjs` before new auto emails can be
-  claimed to use the updated PDF. No automatic worker/cron was changed by this PR.
+  After PR #240 merged, the bundle was rebuilt from production commit
+  `a5185f62b4cb7bf3e53264f0ed45136b1d97fc32` and deployed separately as
+  `automatic-report-email` **version 4, ACTIVE** on 2026-11-02.
+  Build SHA256:
+  `e89c3a1cd857926ea0da29912192144da12707da78e3b1022237bff4d95bceda`.
+  Supabase read-back confirmed the compiled finance labels; original
+  `index.ts`, `handler.ts`, `verify_jwt=false` plus the worker's private
+  `x-dispatch-secret` authentication were preserved. An anonymous POST
+  returned HTTP 401 UNAUTHORIZED and the existing automatic cron remained active.
+  No report was dispatched solely to test this rollout. Inbox delivery of a
+  **new-template** email and signed-in physical iPhone PDF layout still need
+  independent end-to-end confirmation.
 - Preserve two-page A4 output and do not alter historical PDFs already sent.
 - New regression tests check calculations, compact/exact money, missing values,
   three languages and the shared export entry points.
