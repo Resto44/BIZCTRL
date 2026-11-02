@@ -29,6 +29,9 @@ describe('Closing profit cards', () => {
     expect(html).toContain('SAR 150');
     expect(html).toContain('+SAR 450');
     expect(html).toContain('+SAR 300');
+    // Allocation details are missing: this must be a visible estimate, not verified profit.
+    expect(html).toContain(lang === 'fa' ? 'نتیجه عملیاتی تخمینی' : lang === 'ar' ? 'نتيجة تشغيلية تقديرية' : 'Estimated operating result');
+    expect(html).toContain('closing-result-provisional');
     expect(html).toContain('grid-cols-2');
     expect(html).not.toContain('100.0%');
   });
