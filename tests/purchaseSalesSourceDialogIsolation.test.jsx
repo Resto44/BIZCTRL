@@ -49,7 +49,7 @@ describe('Owner workspace purchase must not reveal Sales Source popup from an in
   expect(onClose).not.toHaveBeenCalled();
   await act(async()=>root.render(<Workspace active="sources" onSave={onSave} onClose={onClose}/>));
   expect(document.body.textContent).toContain('salesClosing.dialog.addSource');
-  expect(document.body.textContent).toContain('Preserve my draft');
+  expect([...document.querySelectorAll('input')].some(input=>input.value==='Preserve my draft')).toBe(true);
  });
  it('does not show a source popup on a normal purchase route even when its cached editor remains open',async()=>{
   await act(async()=>root.render(<Workspace active="purchase" onSave={vi.fn()} onClose={vi.fn()}/>));

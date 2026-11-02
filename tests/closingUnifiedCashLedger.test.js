@@ -4,22 +4,26 @@ import { cashReconciliationSnapshot } from '../src/lib/closing/CashReconciliatio
 import { closingFundingProposal } from '../src/lib/closing/ClosingFunding';
 
 const workspace = readFileSync('src/components/sales/UnifiedSalesClosing.jsx', 'utf8');
-const panel = readFileSync('src/components/sales/CashReconciliationPanel.jsx', 'utf8');
+const simple = readFileSync('src/components/sales/SimpleClosingCash.jsx', 'utf8');
+const wallet = readFileSync('src/components/sales/ClosingWalletChoice.jsx', 'utf8');
 const openingSql = readFileSync('supabase/migrations/20261021170000_sales_closing_audited_opening_verification.sql', 'utf8');
 const fundingSql = readFileSync('supabase/migrations/20261022213539_closing_drawer_funding.sql', 'utf8');
 
 describe('One canonical ERP Cash Reconciliation card', () => {
-  it('has exactly one live counted-cash editor and one funding form in the cash step', () => {
-    expect(workspace.match(/<CashReconciliationPanel/g)).toHaveLength(1);
-    expect(workspace.match(/<ClosingFundingPanel/g)).toHaveLength(1);
+  it('has one simple counted-cash editor and an owner/restaurant wallet choice', () => {
+    expect(workspace.match(/<SimpleClosingCash\b/g)).toHaveLength(1);
+    expect(workspace.match(/<ClosingFundingPanel\b/g)).toHaveLength(1);
     expect(workspace).toContain('data-testid="closing-cash-action"');
     expect(workspace).toContain('inputId="quick-closing-actualCash"');
     expect(workspace).toContain('fundingContent={cashContextReady ? <ClosingFundingPanel');
     expect(workspace).toContain('cashFundingRequired={reconciliation.cashFundingRequired}');
     expect(workspace).toContain('movements={asRecordArray(cashLedgerContext.movements)');
-    expect(workspace).toContain('data-testid="single-cash-ledger-note"');
-    expect(panel).toContain('data-testid="posted-cash-funding"');
-    expect(panel).toContain('data-testid="drawer-funding-inside-reconciliation"');
+    expect(simple).toContain('data-testid="simple-closing-cash"');
+    expect(simple).toContain('<ClosingNumericInput id={inputId}');
+    expect(simple).toContain('{fundingContent}');
+    expect(wallet).toContain("['restaurant','owner']");
+    expect(wallet).toContain('data-testid="closing-wallet-choice"');
+    expect(workspace).toContain("wallet_funding: requestedClosingState === 'finalized' ? activeFundingPlan : null");
   });
 
   it('shows counted drawer cash even when its ledger is negative, without fabricated overage', () => {
@@ -34,9 +38,10 @@ describe('One canonical ERP Cash Reconciliation card', () => {
     });
     expect(workspace).not.toContain('Unexplained difference from cash count');
     expect(workspace).not.toContain('actualCount - expectedCash');
-    expect(panel).toContain('Recorded cash balance gap · not count variance');
-    expect(panel).toContain('closingCash ?? actualCash');
-    expect(panel).toContain('Count is recorded for review; it will not be carried forward until the closing is finalized.');
+    expect(simple).toContain('ledgerOverdrawn &&');
+    expect(simple).toContain('!ledgerOverdrawn &&');
+    expect(simple).toContain('Count the notes and coins and enter the total.');
+    expect(workspace).toContain("const closingCash = actualCount !== null && cashContextReady && !ledgerOverdrawn ? actualCount : null;");
   });
 
   it('counts only a physically received, posted funding movement in the drawer; it never adds funding to sales', () => {

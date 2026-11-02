@@ -84,18 +84,19 @@ describe('Sales Closing ERP visual/accounting contract', () => {
   it('connects the main closing to one compact reconciliation, cash sources, funding and a visual ERP review', async () => {
     const [workspace, panel, salesCard, reviewCard] = await Promise.all([
       code('../src/components/sales/UnifiedSalesClosing.jsx'),
-      code('../src/components/sales/CashReconciliationPanel.jsx'),
+      code('../src/components/sales/SimpleClosingCash.jsx'),
       code('../src/components/sales/ClosingCashSalesSources.jsx'),
       code('../src/components/sales/ClosingFinalReview.jsx'),
     ]);
-    expect(workspace.match(/<CashReconciliationPanel/g)).toHaveLength(1);
+    expect(workspace.match(/<SimpleClosingCash\b/g)).toHaveLength(1);
     expect(workspace.match(/<ClosingFundingPanel/g)).toHaveLength(1);
     expect(workspace).toContain('compact');
     expect(workspace).toContain('<ClosingCashSalesSources breakdown={cashSalesBreakdown}');
     expect(workspace).toContain('<ClosingFinalReview');
     expect(workspace).toContain('cashSalesSourcesMatched');
-    expect(panel).toContain('data-testid="drawer-cash-equation"');
-    expect(panel).toContain('data-testid="compact-cash-variance"');
+    expect(panel).toContain('data-testid="simple-closing-cash"');
+    expect(panel).toContain('<ClosingNumericInput id={inputId}');
+    expect(panel).toContain('!ledgerOverdrawn &&');
     expect(salesCard).toContain('data-testid="closing-cash-sales-sources"');
     expect(reviewCard).toContain('data-testid="closing-next-opening-preview"');
     expect(reviewCard).toContain('canPreviewOpening');
@@ -106,11 +107,12 @@ describe('Sales Closing ERP visual/accounting contract', () => {
   it('never auto-posts a funding payment just by opening the visual cash card', async () => {
     const [workspace, funding] = await Promise.all([
       code('../src/components/sales/UnifiedSalesClosing.jsx'),
-      code('../src/components/sales/ClosingFundingPanel.jsx'),
+      code('../src/components/sales/ClosingWalletChoice.jsx'),
     ]);
     expect(workspace).toContain('fundingContent={cashContextReady ? <ClosingFundingPanel');
-    expect(funding).toContain("supabase.rpc('erp_fund_sales_closing_drawer',request)");
-    expect(funding).toContain('received&&note.trim().length>=10');
-    expect(funding).toContain("onClick={submit}");
+    expect(funding).toContain("['restaurant','owner']");
+    expect(funding).toContain('onClick={()=>onChange(');
+    expect(funding).toContain('received:true');
+    expect(workspace).toContain("wallet_funding: requestedClosingState === 'finalized' ? activeFundingPlan : null");
   });
 });

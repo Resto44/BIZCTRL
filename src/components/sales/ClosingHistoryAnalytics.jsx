@@ -28,6 +28,9 @@ export default function ClosingHistoryAnalytics({ sale, trend, currency = 'SAR',
   // Never draw a positive profit bar or label its figure as confirmed profit.
   const profitVerified = data.sales !== null && data.netProfit !== null &&
     !data.costsMissing && !data.noRecordedCosts && splitReady && !provisional;
+  // Complete purchase/expense totals may support a provisional value even when
+  // fixed/variable allocation is unverified. Show it as an estimate, never certified profit.
+  const estimatedResultAvailable = data.netProfit !== null && !data.costsMissing && !data.noRecordedCosts;
   const chartReady = profitVerified;
   const costWarning = data.costsMissing ? text.reviewMissing
     : data.noRecordedCosts ? text.reviewZero
@@ -59,7 +62,7 @@ export default function ClosingHistoryAnalytics({ sale, trend, currency = 'SAR',
       <div className="min-w-0"><p className="text-[10px] text-muted-foreground">{text.trend} ({points.length}/7)</p>{points.length >= 2 ? <Sparkline points={points} label={text.trend} /> : <p className="py-3 text-[10px] text-muted-foreground">{text.unavailable}</p>}</div>
     </div>
     <div data-testid="closing-three-cost-types" className="grid grid-cols-2 gap-2 border-y border-border/60 py-2 sm:grid-cols-4">
-      {[[text.purchases,data.purchases],[text.fixed,splitReady?data.fixedExpenses:null],[text.variable,splitReady?data.variableExpenses:null],[profitVerified?text.net:text.unverifiedProfit,profitVerified?data.netProfit:null]].map(([label,value],i)=><div key={label} className={`min-w-0 rounded-xl p-2 ${['bg-blue-50','bg-violet-50','bg-rose-50',provisional?'bg-amber-50':'bg-emerald-50'][i]} dark:bg-slate-900`}><p className="text-[10px] leading-4 text-muted-foreground">{label}</p><p dir="ltr" className={`break-words text-start text-xs font-black tabular-nums sm:text-sm ${i===3?(value<0?'text-red-700':provisional?'text-amber-700':'text-emerald-700'):''}`}>{i===3?profitMoney(value):money(value)}</p></div>)}
+      {[[text.purchases,data.purchases],[text.fixed,splitReady?data.fixedExpenses:null],[text.variable,splitReady?data.variableExpenses:null],[profitVerified?text.net:estimatedResultAvailable?text.estimatedProfit:text.unverifiedProfit,estimatedResultAvailable?data.netProfit:null]].map(([label,value],i)=><div key={label} className={`min-w-0 rounded-xl p-2 ${['bg-blue-50','bg-violet-50','bg-rose-50',provisional?'bg-amber-50':'bg-emerald-50'][i]} dark:bg-slate-900`}><p className="text-[10px] leading-4 text-muted-foreground">{label}</p><p dir="ltr" className={`break-words text-start text-xs font-black tabular-nums sm:text-sm ${i===3?(value<0?'text-red-700':provisional?'text-amber-700':'text-emerald-700'):''}`}>{i===3?profitMoney(value):money(value)}</p></div>)}
     </div>
     {costWarning && <details data-testid="closing-history-accounting-notes" className="rounded-lg border border-amber-200/70 bg-amber-50/60 px-2.5 py-1.5 text-[10px] text-amber-900">
       <summary data-testid="closing-result-provisional" className="min-h-7 cursor-pointer font-semibold leading-5">{costWarning}</summary>
@@ -75,9 +78,9 @@ export default function ClosingHistoryAnalytics({ sale, trend, currency = 'SAR',
     {shares && <div className="flex h-1.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={shareLabels.map((label,i)=>`${label} ${shares[i].toFixed(1)}%`).join("; ")} dir="ltr">{shares.map((value, i) => <span key={i} style={{ width: `${value}%`, background: shareColors[i] }} />)}</div>}
     {shares && <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">{shareLabels.map((label, i) => <span key={label}><i className="mx-1 inline-block h-1.5 w-1.5 rounded-full" style={{ background: shareColors[i] }} />{label} <bdi dir="ltr">{shares[i].toFixed(0)}%</bdi></span>)}</div>}
     {expanded && <div data-testid="closing-expanded-analysis" className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 sm:p-3">
-      {profitVerified ? <div className="flex items-center justify-between gap-2 text-xs">
+      {estimatedResultAvailable ? <div className="flex items-center justify-between gap-2 text-xs">
         <span className="font-medium text-slate-700">{text.estimatedProfit}</span>
-        <strong dir="ltr" className="tabular-nums text-emerald-700">{profitMoney(data.netProfit)}</strong>
+        <strong dir="ltr" className={`tabular-nums ${profitVerified ? 'text-emerald-700' : 'text-amber-800'}`}>{profitMoney(data.netProfit)}</strong>
       </div> : <div role="status" data-testid="closing-profit-unverified" className="space-y-0.5 text-xs text-amber-900">
         <p className="font-bold">{text.unverifiedProfit} · —</p>
         <p className="leading-4">{text.unverifiedHint}</p>
