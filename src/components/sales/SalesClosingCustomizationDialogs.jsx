@@ -122,7 +122,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
     const source = { ...newSalesClosingSource(), ...(editor?.source || {}) };
     setDraft({ ...source, ...(isCustomerCreditSource(source) ? customerCreditSourcePatch(true) : {}) });
     setError('');
-  }, [editor]);
+  }, [editor?.source, editor?.mode]);
 
   if (!editor) return null;
   const set = (patch) => setDraft((current) => ({ ...current, ...patch }));
