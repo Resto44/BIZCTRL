@@ -1,5 +1,6 @@
 -- Scope the Closing Sales "Previous" display to the selected calendar month.
 -- Preserve all historical daily_sales rows for Owner dashboard, reports, and audit.
+-- Include same-day finalized closings; exclude the edited closing by its UUID.
 -- Retain the original RPC signature and SECURITY INVOKER / tenant-branch predicates.
 CREATE OR REPLACE FUNCTION public.get_sales_source_previous_balances(
   p_restaurant_id text,
@@ -18,7 +19,7 @@ AS $function$
     WHERE closing.restaurant_id = p_restaurant_id
       AND p_before_date IS NOT NULL
       AND closing.date >= date_trunc('month', p_before_date::timestamp)::date
-      AND closing.date < p_before_date
+      AND closing.date <= p_before_date
       AND COALESCE(closing.closing_state, 'finalized') <> 'draft'
       AND (p_current_closing_id IS NULL OR closing.id <> p_current_closing_id)
       AND (
@@ -32,7 +33,7 @@ AS $function$
       )
   ), source_entries AS (
     SELECT
-      CASE WHEN entry.entry ->> 'source_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      CASE WHEN entry.entry ->> 'source_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         THEN (entry.entry ->> 'source_id')::uuid ELSE NULL END AS source_id,
       GREATEST(COALESCE(
         NULLIF(entry.entry ->> 'amount', '')::numeric,
