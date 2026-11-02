@@ -22,7 +22,9 @@ describe('Closing cost validity and RTL',()=>{
   // Numeric amounts use explicit LTR direction; forcing bidi-override would be redundant.
   expect(html).toContain('dir="ltr"');
   expect(html).toContain('<bdi dir="ltr" class="font-bold">18.5%</bdi>');expect(html).not.toContain('>-0</text>');
-  expect(html).toContain('fill="#b45309"');expect(html).not.toContain('#d97706');
+  // Unverified fixed-cost allocation must NOT render a positive-profit waterfall.
+  expect(html).not.toContain('data-testid="closing-profit-waterfall"');
+  expect(html).toContain('text-amber-700');
  });
  it('does not claim positive fixed allocation is missing',()=>{
   const html=renderToStaticMarkup(<ClosingHistoryAnalytics sale={{...row,fixed_expenses_total:100,expenses_total:100}}/>);
