@@ -1,7 +1,7 @@
 import {describe,it,expect,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {jsPDF} from 'jspdf';
-import {buildPdfFinancialExecutiveSummary,compactPdfMoney,exactPdfMoney} from '../src/lib/pdfFinancialExecutiveSummary.js';
+import {buildPdfFinancialExecutiveSummary,buildPdfBranchAttributionGap,compactPdfMoney,exactPdfMoney} from '../src/lib/pdfFinancialExecutiveSummary.js';
 import {drawTwoPageERPReport} from '../src/lib/twoPageERPReport.js';
 import {generateSalesAnalyticsPDF} from '../src/lib/salesAnalyticsPdf.js';
 
@@ -45,6 +45,24 @@ describe('ERP PDF eight-card executive summary (all manual and scheduled exports
   expect(compactPdfMoney(null)).toBe('—');
   expect(exactPdfMoney(undefined)).toBe('—');
   expect(buildPdfFinancialExecutiveSummary({...october,fixedDeduction:null}).operatingExpenses).toBeNull();
+ });
+ it('distinguishes purchases from consumed inventory and exposes mismatched branch totals',()=>{
+  const finance=buildPdfFinancialExecutiveSummary({...october,sales:16859,purchases:7391.75,
+   fixedDeduction:700.02,variableExpenses:1000,grossProfit:9467.25,netProfit:7767.23});
+  const branches=[{sales:8899,purchases:6266.75,expenses:1700.02,netProfit:932.23}];
+  expect(buildPdfBranchAttributionGap(finance,branches)).toEqual({
+   sales:7960,purchases:1125,expenses:0,operatingProxy:6835
+  });
+  expect(buildPdfBranchAttributionGap(finance,[])).toBeNull();
+  expect(buildPdfBranchAttributionGap(finance,[{
+   sales:16859,purchases:7391.75,expenses:1700.02,netProfit:7767.23
+  }])).toBeNull();
+  const pdfCode=source('../src/lib/completeSalesAnalyticsPdf.js');
+  expect(pdfCode).toContain("tr('Sales − purchases*'");
+  expect(pdfCode).toContain("tr('After recorded costs*'");
+  expect(pdfCode).toContain('const branchGapNote=branchGap?');
+  expect(pdfCode).not.toContain("tr('Gross estimate*'");
+  expect(pdfCode).not.toContain("tr('Profit / loss*'");
  });
  it('keeps A4 two-page PDF, localized for Persian Arabic and English',async()=>{
   for(const lang of ['fa','ar','en']){
