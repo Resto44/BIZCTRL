@@ -38,3 +38,19 @@ export function exactPdfMoney(value,currency='SAR'){
  const sign=n<0?'−':'';
  return sign+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+currency;
 }
+
+// Reconcile visible branch chart to the organization-wide executive figures.
+// A difference is not automatically profit or loss; records or allocations may
+// have missing branch attribution. Keep the source totals unchanged.
+export function buildPdfBranchAttributionGap(finance,branches){
+ if(!finance||!Array.isArray(branches)||!branches.length)return null;
+ const total=key=>branches.reduce((sum,row)=>sum+(Number.isFinite(Number(row?.[key]))?Number(row[key]):0),0);
+ const gap=(whole,part)=>whole==null?null:Math.round((Number(whole)-part)*100)/100;
+ const differences={
+  sales:gap(finance.sales,total('sales')),
+  purchases:gap(finance.purchases,total('purchases')),
+  expenses:gap(finance.operatingExpenses,total('expenses')),
+  operatingProxy:gap(finance.netOperatingProxy,total('netProfit')),
+ };
+ return Object.values(differences).some(value=>value!==null&&Math.abs(value)>0.01)?differences:null;
+}
