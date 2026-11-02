@@ -170,8 +170,8 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,p
  const bestValue=active.length?Math.max(...active.map(b=>Number(b.netProfit)||0)):null;
  const winners=active.filter(b=>Number(b.netProfit)===bestValue);
  const winnerLabel=active.length===0?tr('No branch activity in this period','در این دوره فعالیت شعبه ثبت نشده','لا نشاط للفروع خلال الفترة'):
-  active.length===1?tr('Only attributed branch active','تنها شعبه با فعالیت منتسب','الفرع الوحيد ذو نشاط منسوب'):
-  r?.branchProfitUnallocated?tr('Provisional: branch totals differ','موقت: جمع شعب تفاوت دارد','مؤقت: مجاميع الفروع مختلفة'):
+  active.length===1?tr('Only branch with recorded activity','تنها شعبه با فعالیت ثبت‌شده','الفرع الوحيد ذو نشاط مسجل'):
+  r?.branchProfitUnallocated?tr('Provisional leader (unallocated costs)','پیشتاز موقت (هزینهٔ تخصیص‌نیافته)','متصدر مؤقت (تكاليف غير موزعة)'):
   bestValue<0?tr('Lowest operating loss','کمترین زیان عملیاتی','أقل خسارة تشغيلية'):
   tr('Best branch by operating result','بهترین شعبه بر اساس نتیجه عملیاتی','أفضل فرع حسب النتيجة التشغيلية');
  text(winnerLabel,11,234,86,7.2,C.muted);
