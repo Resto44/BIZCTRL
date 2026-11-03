@@ -71,7 +71,7 @@ describe('ERP supplier payable and overpayment calculation',()=>{
     expect(totalOutstandingSupplierPayables([])).toBe(0);
   });
   it('shows a separate flagged supplier credit instead of concealing unpaid bills',()=>{
-    expect(purchase).toContain('totalOutstandingSupplierPayables(invoices)');
+    expect(purchase).toContain('invoices.reduce((sum, invoice) => sum + supplierOutstandingAmount(invoice), 0)');
     expect(purchase).toContain('totalUnallocatedSupplierOverpayments(invoices)');
     expect(purchase).toContain('supplierOverpaymentToReview > 0');
     expect(purchase).toContain('reconciliation required');
