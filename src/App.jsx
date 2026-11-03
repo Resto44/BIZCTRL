@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import {recoverModuleLoad} from '@/lib/moduleLoadRecovery';
 import {withStartupDeadline} from '@/lib/startupReadDeadline';
+import {verifiedERPRootHome} from '@/lib/rootEntryDecision';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -571,19 +572,42 @@ function RootEntryRoute() {
           return;
         }
 
-        const { data: snapshot, error: snapshotError } = await withStartupDeadline(supabase.rpc('platform_owner_session_snapshot'), 9000, 'ROOT_OWNER_AUTHORIZATION_TIMEOUT');
-        if (snapshotError || !snapshot?.authenticated) {
-          throw snapshotError || new Error('PLATFORM_OWNER_AUTHORIZATION_UNAVAILABLE');
-        }
+        // Resolve both server authorities independently. ERP users must not be
+        // blocked by a transient failure of the separate Platform Owner RPC.
+        // The ERP context is canonical: no browser-stored role is trusted.
+        // Start the ERP read before waiting for the Owner lookup, so a
+        // 9-second timeout cannot turn into two serial 9-second waits on iOS.
+        const erpContextLookup = withStartupDeadline(
+          supabase.rpc('erp_get_session_context'), 9000, 'ROOT_ERP_AUTHORIZATION_TIMEOUT'
+        ).catch(error => ({ data: null, error }));
+        const { data: snapshot, error: snapshotError } = await withStartupDeadline(supabase.rpc('platform_owner_session_snapshot'), 9000, 'ROOT_OWNER_AUTHORIZATION_TIMEOUT')
+          .catch(error => ({ data: null, error }));
 
-        if (snapshot.authorized) {
+        // Preserve Platform Owner's priority, including MFA. The check is
+        // authoritative and never inferred from client metadata or ERP role.
+        if (!snapshotError && snapshot?.authenticated && snapshot.authorized) {
           navigate(snapshot.mfa_required && !snapshot.mfa_verified ? '/platform-owner/login' : '/platform-owner', { replace: true });
           return;
         }
 
-        // A live non-owner session is never sent to public marketing. Existing
-        // ERP login resolves its normal profile and canonical tenant dashboard.
-        navigate('/erp-login', { replace: true });
+        const { data: erpContext, error: erpError } = await erpContextLookup;
+        const erpHome = !erpError ? verifiedERPRootHome(erpContext, ROLE_HOME) : null;
+        if (erpHome) {
+          navigate(erpHome, { replace: true });
+          return;
+        }
+
+        // A verified live non-owner session can use the ERP login screen to
+        // retry its membership check, but no ERP route is granted without a
+        // successful canonical session-context result.
+        if (!snapshotError && snapshot?.authenticated) {
+          navigate('/erp-login', { replace: true });
+          return;
+        }
+
+        // Both independent authorization lookups failed: retain a retryable
+        // fail-closed screen and a direct link to the protected ERP sign-in.
+        throw snapshotError || erpError || new Error('ROOT_AUTHORIZATION_UNAVAILABLE');
       } catch {
         // Do not silently downgrade a live but unresolved session to public.
         // The user may retry the authoritative authorization lookup in place.
@@ -597,7 +621,7 @@ function RootEntryRoute() {
 
   if (decision === 'checking') return <PageLoader />;
   if (decision === 'authorization-error') {
-    return <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-100"><section className="max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 text-center"><h1 className="text-xl font-bold">Authorization check unavailable</h1><p className="mt-3 text-sm leading-6 text-slate-300">Your active session could not be validated for routing. No access has been granted or removed. Retry the server authorization check.</p><button type="button" className="mt-5 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950" onClick={() => setAttempt((value) => value + 1)}>Retry authorization check</button></section></main>;
+    return <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-100"><section className="max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 text-center"><h1 className="text-xl font-bold">Authorization check unavailable</h1><p className="mt-3 text-sm leading-6 text-slate-300">Your active session could not be validated for routing. No access has been granted or removed. Retry the server authorization check.</p><button type="button" className="mt-5 min-h-11 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950" onClick={() => setAttempt((value) => value + 1)}>Retry authorization check</button><p className="mt-4 text-xs text-slate-400">ERP users can open the secure login directly, without changing or resetting their account.</p><a href="/erp-login" className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-white">Open ERP login / ورود به ERP</a></section></main>;
   }
   return <LandingPage />;
 }
