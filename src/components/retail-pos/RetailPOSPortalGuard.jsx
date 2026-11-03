@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useTenant } from '@/lib/TenantContext';
 import { ROLE_HOME, useRole } from '@/lib/RoleContext';
-import { isSupermarketProductPortal } from '@/lib/productImportAccess';
+import { isCommercePOSPortal } from '@/lib/productImportAccess';
 
 export default function RetailPOSPortalGuard({ children }) {
   const { activeRestaurant, loadingRestaurants } = useTenant();
@@ -17,7 +17,7 @@ export default function RetailPOSPortalGuard({ children }) {
     );
   }
 
-  if (!isSupermarketProductPortal(activeRestaurant)) {
+  if (!isCommercePOSPortal(activeRestaurant)) {
     return <Navigate to={ROLE_HOME[role] || '/owner-command-center'} replace />;
   }
 
