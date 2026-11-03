@@ -291,6 +291,8 @@ const auth = {
         id: user.id,
         email: user.email,
         ...sessionContext,
+        // Verified Supabase identity metadata, used only for first-login onboarding.
+        created_at: user.created_at,
       };
     } catch (e) {
       console.warn('[auth.me] error:', e.message);

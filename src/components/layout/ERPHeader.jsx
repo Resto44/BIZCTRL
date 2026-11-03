@@ -23,10 +23,11 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Search, Star, Sun, Moon, ChevronRight, Settings, Menu, X,
+  Search, Star, Sun, Moon, ChevronRight, Settings, Menu, X, BookOpen,
 } from 'lucide-react';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import { useERPNavigation } from '@/hooks/useERPNavigation';
+import { WELCOME_TOUR_OPEN_EVENT } from '@/lib/newUserWelcomeTour';
 import { ERP_NAV_GROUPS } from './ERPSidebar';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import { getCustomizedNavigationGroups } from '@/lib/workspaceCustomization';
@@ -262,7 +263,7 @@ function ThemeToggle() {
 // ─── User menu ────────────────────────────────────────────────────────────────
 function UserMenu() {
   const { user } = useAuth();
-  const { t, translateLabel } = useLanguage();
+  const { t, translateLabel, lang } = useLanguage();
   const { role } = useRole();
   const navigate = useNavigate();
 
@@ -309,6 +310,11 @@ function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => navigate('/settings')}>
           <Settings className="w-3.5 h-3.5 mr-2" /> {t('settings')}
+        </DropdownMenuItem>
+        <DropdownMenuItem data-testid="open-saas-welcome-tour"
+          onClick={() => window.dispatchEvent(new Event(WELCOME_TOUR_OPEN_EVENT))}>
+          <BookOpen className="w-3.5 h-3.5 mr-2" />
+          {lang === 'fa' ? 'راهنمای شروع BizCTRL' : lang === 'ar' ? 'دليل البدء في BizCTRL' : 'Getting started guide'}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
