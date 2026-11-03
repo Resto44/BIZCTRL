@@ -36,7 +36,7 @@ export function getWelcomeTourStages({ role = 'owner', mode = 'restaurant', can 
   const permitted = item => {
     if (item.role && item.role !== role) return false;
     if (item.permission && can[item.permission] !== true) return false;
-    return isWorkspacePathEnabled(configuration, item.path);
+    return isWorkspacePathEnabled(configuration, item.path.split('?')[0]);
   };
   const stage = (key, modules = []) => ({ key, modules: modules.filter(permitted) });
   const stages = [
