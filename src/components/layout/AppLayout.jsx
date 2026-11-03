@@ -8,7 +8,7 @@
  *   - Notification popups
  *   - PWA install banner
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import ERPLayout from './ERPLayout';
 import OwnerWorkspaceTabs from './OwnerWorkspaceTabs';
@@ -18,6 +18,8 @@ import { useAuth } from '@/lib/AuthContext';
 import { initAuditLogger } from '@/lib/auditLogger';
 import { useRouteGuard } from '@/lib/RoleContext';
 import PWAInstallBanner from '@/components/pwa/PWAInstallBanner';
+import NewUserWelcomeTour from '@/components/onboarding/NewUserWelcomeTour';
+import { isNewSaaSUser } from '@/lib/newUserWelcomeTour';
 import SubscriptionStatusBanner from '@/components/subscription/SubscriptionStatusBanner';
 
 function RouteEnforcer() {
@@ -27,6 +29,7 @@ function RouteEnforcer() {
 
 export default function AppLayout() {
   const { user } = useAuth();
+  const [tourOpen, setTourOpen] = useState(false);
 
   useEffect(() => {
     if (user) initAuditLogger(user);
@@ -40,7 +43,9 @@ export default function AppLayout() {
         <NotificationRecordLink><OwnerWorkspaceTabs /></NotificationRecordLink>
       </div>
       <NotificationPopups />
-      <PWAInstallBanner />
+      <NewUserWelcomeTour onVisibleChange={setTourOpen} />
+      {/* New users already get install instructions in the tour; avoid two prompts. */}
+      {!tourOpen && !isNewSaaSUser(user?.created_at) && <PWAInstallBanner />}
     </ERPLayout>
   );
 }
