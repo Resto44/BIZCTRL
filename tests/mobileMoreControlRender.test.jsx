@@ -63,7 +63,7 @@ vi.mock('@/lib/WorkspaceCustomizationContext', () => ({
 const { default: BottomNav } = await import('../src/components/layout/BottomNav.jsx');
 
 describe('mobile More and Control workspace', () => {
-  it.each(['restaurant', 'retail'])('shows a direct restaurant POS tab and shortcut only in %s scope', async portal => {
+  it.each(['restaurant', 'retail'])('shows the universal touch POS shortcut in %s scope', async portal => {
     tenantMocks.activeRestaurant.business_type = portal;
     const client = new QueryClient(); let renderer;
     await act(async () => { renderer = TestRenderer.create(<QueryClientProvider client={client}><MemoryRouter><BottomNav /></MemoryRouter></QueryClientProvider>); });
@@ -71,7 +71,7 @@ describe('mobile More and Control workspace', () => {
     const more = renderer.root.findAllByType('button').find(button => button.findAllByType('span').some(span => span.children.includes('more')));
     await act(async () => more.props.onClick());
     const quick = renderer.root.findByProps({'aria-labelledby': 'more-quick-access-title'});
-    expect(quick.findAllByType('a').some(link => link.props.href === '/restaurant/pos')).toBe(portal === 'restaurant');
+    expect(quick.findAllByType('a').some(link => link.props.href === '/pos')).toBe(true);
     await act(async () => renderer.unmount()); client.clear(); delete tenantMocks.activeRestaurant.business_type;
   });
   it('opens safely and exposes permanent quick actions plus grouped ERP modules', async () => {
