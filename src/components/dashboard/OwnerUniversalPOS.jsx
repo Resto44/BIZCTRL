@@ -60,6 +60,7 @@ function CommercePOSMonitor({ branchId, lang, currency }) {
     <div className="flex flex-wrap gap-2 text-xs">
       <Link to="/pos" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-3 font-semibold text-white"><Store className="h-4 w-4" />{c.touch}</Link>
       <Link to="/retail/pos-control" className="inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 font-semibold"><ShieldCheck className="h-4 w-4" />{c.monitor}</Link>
+      <Link to="/pos/stock" className="inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 font-semibold">{lang === 'fa' ? 'موجودی POS' : lang === 'ar' ? 'مخزون POS' : 'POS stock setup'}</Link>
       <button type="button" onClick={control.refetch} className="inline-flex min-h-11 items-center rounded-xl border px-3" aria-label={c.retry}><RefreshCw className="h-4 w-4" /></button>
     </div>
     {control.error ? <p role="alert" className="rounded-xl border border-red-300 p-3 text-sm text-red-600">{c.error}</p> :
