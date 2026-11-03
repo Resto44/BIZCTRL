@@ -161,10 +161,17 @@ export default function NewUserWelcomeTour({ onVisibleChange }) {
   }, [user?.id, user?.created_at, location.pathname, key]);
 
   useEffect(() => {
-    const show = () => { setStepIndex(0); setOpen(true); };
+    const show = () => {
+      // "Continue later" resumes the last section; "Finish" starts a fresh replay.
+      let saved;
+      try { saved = JSON.parse(readMarker(key) || 'null'); } catch { saved = null; }
+      const resumable = saved?.status === 'paused' && Number.isInteger(saved.step);
+      setStepIndex(resumable ? Math.max(0, Math.min(stages.length - 1, saved.step)) : 0);
+      setOpen(true);
+    };
     window.addEventListener(WELCOME_TOUR_OPEN_EVENT, show);
     return () => window.removeEventListener(WELCOME_TOUR_OPEN_EVENT, show);
-  }, []);
+  }, [key, stages.length]);
 
   useEffect(() => { onVisibleChange?.(open); }, [open, onVisibleChange]);
 
