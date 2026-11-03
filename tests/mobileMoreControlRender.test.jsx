@@ -99,7 +99,7 @@ describe('mobile More and Control workspace', () => {
     const links = renderer.root.findAllByType('a');
     expect(links.some((link) => link.props.href === '/sales')).toBe(true);
     expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
-    expect(links.some((link) => link.props.href === '/cash-register')).toBe(true);
+    expect(links.some((link) => link.props.href === '/pos')).toBe(true);
     expect(links.some((link) => link.props.href === '/reports')).toBe(true);
 
     const renderedText = JSON.stringify(renderer.toJSON());
