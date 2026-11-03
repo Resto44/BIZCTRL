@@ -1,5 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/api/supabaseClient';
+import { useTenant } from '@/lib/TenantContext';
 import { Activity, MonitorSmartphone, Radio, RefreshCw, ShieldCheck, Store } from 'lucide-react';
 import OwnerRestaurantPOS from '@/components/dashboard/OwnerRestaurantPOS';
 import { useRetailPOSControl } from '@/hooks/useRetailPOSControl';
@@ -22,7 +26,29 @@ const TEXT = {
 function CommercePOSMonitor({ branchId, lang, currency }) {
   const c = TEXT[lang] || TEXT.en;
   const control = useRetailPOSControl({ period: 'today', branchId: branchId || null });
+  const { activeRestaurant } = useTenant();
   const data = control.snapshot;
+  // Posted per-cashier totals are read from transaction.shift_id, NOT from the
+  // latest cashier on a device (which may have had several shifts today).
+  const cashiers = useQuery({
+    queryKey: ['owner_commerce_pos_cashiers', activeRestaurant?.id, branchId, control.period.from],
+    enabled: Boolean(activeRestaurant?.id),
+    queryFn: async () => {
+      const { data: result, error } = await supabase.rpc('erp_commerce_pos_owner_cashiers', {
+        p_restaurant_id: activeRestaurant.id,
+        p_branch_id: branchId || null,
+        p_date: new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),
+      });
+      if (error) throw error;
+      return result;
+    },
+    refetchInterval: 10000,
+    refetchIntervalInBackground: false,
+    retry: 1,
+  });
+  useEffect(() => {
+    if (control.lastEventAt) void cashiers.refetch();
+  }, [control.lastEventAt]);
   return <section data-testid="owner-universal-commerce-pos" className="min-w-0 space-y-3 rounded-2xl border border-blue-200 bg-card p-3 sm:p-4" aria-label={c.title}>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h2 className="flex items-center gap-2 text-sm font-bold"><MonitorSmartphone className="h-5 w-5 text-blue-600" />{c.title}</h2>
@@ -42,18 +68,21 @@ function CommercePOSMonitor({ branchId, lang, currency }) {
         <div className="rounded-lg bg-muted p-3"><span>{c.receipts}</span><strong className="mt-1 block text-base">{control.isLoading ? '—' : Number(data.summary.transaction_count || 0).toLocaleString()}</strong></div>
       </div>}
     {!control.error && !control.isLoading && !data.devices.length && <p className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">{c.noDevices}</p>}
-    {!control.error && !!data.devices.length && <div className="space-y-2">
-      <h3 className="text-xs font-bold">{c.cashiers} ({data.devices.length})</h3>
+    {cashiers.error && <p role="alert" className="rounded-lg border border-amber-300 p-3 text-xs text-amber-800">{c.error}</p>}
+    {!cashiers.error && !!data.devices.length && <div className="space-y-2">
+      <h3 className="text-xs font-bold">{c.cashiers} ({cashiers.data?.cashiers?.length ?? '—'})</h3>
       <div className="max-h-56 space-y-2 overflow-y-auto">
-        {data.devices.map(device => <div key={device.id} className="flex items-center justify-between gap-2 rounded-lg border p-3 text-xs">
+        {(cashiers.data?.cashiers || []).map(shift => <div key={shift.shift_id} className="flex items-center justify-between gap-2 rounded-lg border p-3 text-xs">
           <div className="min-w-0">
-            <p className="font-semibold">{device.cashier_name || device.display_name || device.code}</p>
-            <p className="truncate text-muted-foreground">{device.branch_name} · {device.code} · {deviceIsLive(device) ? c.online : c.offline}</p>
-            <p className="text-muted-foreground">{c.receipts}: {device.transaction_count || 0}</p>
+            <p className="font-semibold">{shift.cashier_name || shift.device_code}</p>
+            <p className="truncate text-muted-foreground">{shift.branch_name} · {shift.device_code}</p>
+            <p className="text-muted-foreground">{c.receipts}: {shift.receipt_count || 0}</p>
           </div>
-          <strong dir="ltr" className="shrink-0 text-sm">{money(device.net_sales, currency)}</strong>
+          <strong dir="ltr" className="shrink-0 text-sm">{money(shift.net_sales, currency)}</strong>
         </div>)}
+        {!cashiers.isLoading && !cashiers.data?.cashiers?.length && <p className="text-xs text-muted-foreground">{c.noSales}</p>}
       </div>
+      <p className="text-xs text-muted-foreground">{data.devices.filter(deviceIsLive).length}/{data.devices.length} {c.online}</p>
     </div>}
     <p className="text-[11px] leading-5 text-muted-foreground">{c.stock}</p>
   </section>;
