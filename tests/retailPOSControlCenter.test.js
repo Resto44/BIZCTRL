@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 const source = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 describe('Retail POS Control Center contract', () => {
-  it('keeps the four-page workspace restricted to supermarket portals and viewSales roles', async () => {
+  it('keeps four-page POS control role-gated while allowing all stock-backed business modes', async () => {
     const [app, guard, sidebar] = await Promise.all([
       source('../src/App.jsx'),
       source('../src/components/retail-pos/RetailPOSPortalGuard.jsx'),
@@ -16,8 +16,10 @@ describe('Retail POS Control Center contract', () => {
       expect(app).toContain(`permission="viewSales"`);
       expect(sidebar).toContain(`path: '${path}'`);
     }
-    expect(guard).toContain('isSupermarketProductPortal(activeRestaurant)');
-    expect(sidebar).toContain('supermarketOnly: true');
+    expect(guard).toContain('isCommercePOSPortal(activeRestaurant)');
+    expect(sidebar).toContain('commerceOnly: true');
+    expect(sidebar).toContain("path: '/pos'");
+    expect(app).toContain('path="/pos" element={<RoleGuard permission="uploadSales">');
   });
 
   it('loads all four POS control pages together without blocking other portals', async () => {
