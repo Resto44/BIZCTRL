@@ -465,6 +465,7 @@ const SubscribedRoutes = () => {
         <Route path="/retail/expiry"   element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="control" fallback={<ExpiryTracking />} /></RoleGuard>} />
         <Route path="/retail/serials"  element={<RoleGuard permission="viewInventory"><SerialNumbers /></RoleGuard>} />
         <Route path="/pos" element={<RoleGuard permission="uploadSales"><UniversalTouchPOSRoute /></RoleGuard>} />
+        <Route path="/pos/stock" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="stock" /></RoleGuard>} />
         <Route path="/retail/pos-control" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSExecutiveDashboard /></RetailPOSPortalGuard></RoleGuard>} />
         <Route path="/retail/pos-branches" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSBranchDevices /></RetailPOSPortalGuard></RoleGuard>} />
         <Route path="/retail/pos-device" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSTerminalAccount /></RetailPOSPortalGuard></RoleGuard>} />
