@@ -16,6 +16,9 @@ import PageHeader from '@/components/shared/PageHeader';
 import BranchSelect from '@/components/shared/BranchSelect';
 import PurchaseInvoiceForm from '@/components/purchases/PurchaseInvoiceForm';
 import PurchaseInvoiceList from '@/components/purchases/PurchaseInvoiceList';
+import SupplierWorkspacePayment from '@/components/suppliers/SupplierWorkspacePayment';
+import { supplierOutstandingAmount, isOpenSupplierPayable } from '@/lib/supplierOpenPayables';
+import { readAllPortalRows } from '@/lib/portalReliability';
 import { downloadPurchaseInvoicePDF, sharePurchaseInvoicePDF } from '@/lib/purchaseInvoicePdf';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,7 +33,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { deletePurchaseInvoiceWithRollback, getOverdueInfo } from '@/lib/procurementEngine';
 import { totalOutstandingSupplierPayables, totalUnallocatedSupplierOverpayments } from '@/lib/supplierPayablesIntegrity';
 
-const STATUS_FILTERS = ['all', 'draft', 'pending', 'approved', 'paid', 'partial', 'unpaid', 'cancelled'];
+const STATUS_FILTERS = ['all', 'outstanding', 'draft', 'pending', 'approved', 'paid', 'partial', 'unpaid', 'cancelled'];
 
 const imageDataForPDF = async source => {
   if(typeof source!=='string'||!source)return null;
@@ -57,13 +60,14 @@ export default function Purchases() {
   const { currency, lang } = useLanguage();
   const { activeRestaurant, branches } = useTenant();
   const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
-  const { role } = useRole();
+  const { role, can } = useRole();
   const qc = useQueryClient();
   const isOwner = role === ROLES.OWNER;
   const canDelete = role === ROLES.OWNER || role === ROLES.MANAGER || role === ROLES.GENERAL_MANAGER;
 
   const [showForm, setShowForm] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState(null);
+  const [payingInvoice, setPayingInvoice] = useState(null);
   const [shareFallback, setShareFallback] = useState(null);
   const [pdfError, setPdfError] = useState('');
   const [editing, setEditing] = useState(null);
@@ -76,7 +80,7 @@ export default function Purchases() {
     openedNotification.current=linked.event.id;setEditing(linked.record);setShowForm(true);
   },[linked]);
   const filterBranch = isAllBranches ? 'all' : (selectedBranchKey || 'all');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState(() => searchParams.get('payables') === 'open' ? 'outstanding' : 'all');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -88,30 +92,34 @@ export default function Purchases() {
     setSearchParams(nextParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  useEffect(() => {
+    if (searchParams.get('payables') !== 'open') return;
+    setFilterStatus('outstanding');
+    // Owner overview always reconciles against the complete organization.
+    // Branch-restricted users keep their authorized branch.
+    if (isOwner && !isAllBranches) setSelectedBranchId('all');
+  }, [searchParams, isOwner, isAllBranches, setSelectedBranchId]);
+
   // ── Fetch invoices ─────────────────────────────────────────────────────
   // Scope every request by the authenticated restaurant. For a selected branch,
   // canonical UUID records and legacy branch-keyed records are fetched server-side
   // and merged by primary key; no branch-name or client-side tenant-wide filter is used.
-  const { data: invoices = [], isLoading } = useQuery({
+  const { data: invoices = [], isLoading, isError: invoicesError, refetch: refetchInvoices } = useQuery({
     queryKey: ['supplier_invoices', activeRestaurant?.id, selectedBranchId],
     queryFn: async () => {
       if (!activeRestaurant?.id) return [];
       const baseQuery = () => supabase.from('supplier_invoices').select('*')
         .eq('restaurant_id', activeRestaurant.id)
         .order('date', { ascending: false })
-        .limit(5000);
-      if (isAllBranches) {
-        const { data, error } = await baseQuery();
-        if (error) throw error;
-        return data || [];
-      }
+        .order('id', { ascending: false });
+      // No 5,000-row truncation when the owner requests all unpaid invoices.
+      if (isAllBranches) return readAllPortalRows(baseQuery);
       if (!selectedBranchId || !selectedBranchKey) return [];
       const [canonical, legacy] = await Promise.all([
-        baseQuery().eq('branch_id', selectedBranchId),
-        baseQuery().is('branch_id', null).eq('branch', selectedBranchKey),
+        readAllPortalRows(() => baseQuery().eq('branch_id', selectedBranchId)),
+        readAllPortalRows(() => baseQuery().is('branch_id', null).eq('branch', selectedBranchKey)),
       ]);
-      if (canonical.error || legacy.error) throw canonical.error || legacy.error;
-      return Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
+      return Array.from(new Map([...canonical, ...legacy]
         .map((record) => [record.id, record])).values());
     },
     staleTime: 120000,
@@ -231,7 +239,7 @@ export default function Purchases() {
   // ── Filtered invoices ──────────────────────────────────────────────────
   const filtered = useMemo(() => {
     return invoices.filter(inv => {
-      const statusMatch = filterStatus === 'all' || inv.status === filterStatus;
+      const statusMatch = filterStatus === 'all' || (filterStatus === 'outstanding' ? isOpenSupplierPayable(inv) : inv.status === filterStatus);
       const searchMatch = !searchQuery ||
         (inv.supplier_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (inv.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase());
@@ -240,7 +248,7 @@ export default function Purchases() {
   }, [invoices, filterStatus, searchQuery]);
 
   // ── Summary stats ──────────────────────────────────────────────────────
-  const totalOutstanding = totalOutstandingSupplierPayables(invoices);
+  const totalOutstanding = invoices.reduce((sum, invoice) => sum + supplierOutstandingAmount(invoice), 0);
   const supplierOverpaymentToReview = totalUnallocatedSupplierOverpayments(invoices);
 
   const overdueCount = invoices.filter(i => getOverdueInfo(i).isOverdue).length;
@@ -344,7 +352,7 @@ export default function Purchases() {
             </SelectTrigger>
             <SelectContent>
               {STATUS_FILTERS.map(s => (
-                <SelectItem key={s} value={s}>{s === 'all' ? 'All Status' : s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+                <SelectItem key={s} value={s}>{s === 'all' ? 'All Status' : s === 'outstanding' ? (lang==='fa'?'فاکتورهای باقی‌مانده':lang==='ar'?'الفواتير غير المسددة':'Outstanding invoices') : s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -369,12 +377,18 @@ export default function Purchases() {
         ) : null}
       </div>
 
+      {invoicesError && (
+        <div role="alert" className="rounded-xl border border-red-300 p-3 text-sm">
+          {lang==='fa'?'خواندن فاکتورها ناموفق بود. پرداخت را بدون معلومات درست انجام ندهید.':lang==='ar'?'تعذّر تحميل الفواتير. لا تسجل دفعة من بيانات غير مكتملة.':'Invoices could not be loaded. Do not record payments from incomplete data.'}
+          <Button type="button" variant="outline" className="ms-2" onClick={() => refetchInvoices()}>{lang==='fa'?'تلاش دوباره':lang==='ar'?'إعادة المحاولة':'Retry'}</Button>
+        </div>
+      )}
       {/* Invoice list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : (
+      ) : invoicesError ? null : (
         <PurchaseInvoiceList
           invoices={filtered}
           branches={branches}
@@ -384,9 +398,26 @@ export default function Purchases() {
           onView={openInvoicePreview}
           onDownloadPDF={downloadPDF}
           onSharePDF={sharePDF}
+          onPayInvoice={can?.createPurchases ? invoice => setPayingInvoice(invoice) : undefined}
         />
       )}
 
+      {/* One canonical, idempotent supplier payment RPC for both Owner and Supplier workspace. */}
+      <Dialog open={Boolean(payingInvoice)} onOpenChange={open=>{if(!open)setPayingInvoice(null);}}>
+        <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{lang==='fa'?'پرداخت فاکتور تأمین‌کننده':lang==='ar'?'سداد فاتورة المورد':'Supplier invoice payment'}</DialogTitle>
+          </DialogHeader>
+          {payingInvoice && <SupplierWorkspacePayment key={payingInvoice.id} invoice={payingInvoice}
+            onSaved={() => {
+              invalidatePurchaseQueries();
+              qc.invalidateQueries({ queryKey: ['supplier-ledger'] });
+              qc.invalidateQueries({ queryKey: ['supplier_invoices', activeRestaurant?.id] });
+              setPayingInvoice(null);
+            }}
+            onClose={() => setPayingInvoice(null)}/>}
+        </DialogContent>
+      </Dialog>
       {/* Read-only saved invoice, with download or share PDF actions. */}
       <Dialog open={!!previewInvoice} onOpenChange={open=>{if(!open)setPreviewInvoice(null);}}>
         <DialogContent className="max-h-[90dvh] max-w-xl overflow-y-auto rounded-2xl">
