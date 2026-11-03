@@ -98,6 +98,7 @@ export function RetailPOSWorkspace({
             ) : null}
             {actions}
             {can?.uploadSales && <Button asChild className="h-10 gap-2 rounded-xl"><Link to="/retail/cashier"><MonitorSmartphone className="h-4 w-4" />{cashierCopy(lang).title}</Link></Button>}
+            {can?.viewInventory && <Button asChild variant="outline" className="h-10 gap-2 rounded-xl"><Link to="/pos/stock">{lang === 'fa' ? 'موجودی POS' : lang === 'ar' ? 'مخزون POS' : 'POS stock'}</Link></Button>}
             {onRefresh ? (
               <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={isFetching} className="h-10 gap-2 rounded-xl">
                 <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
