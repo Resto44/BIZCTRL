@@ -83,7 +83,7 @@ function CommercePOSMonitor({ branchId, lang, currency }) {
         </div>)}
         {!cashiers.isLoading && !cashiers.data?.cashiers?.length && <p className="text-xs text-muted-foreground">{c.noSales}</p>}
       </div>
-      <p className="text-xs text-muted-foreground">{data.devices.filter(deviceIsLive).length}/{data.devices.length} {c.online}</p>
+      <p className="text-xs text-muted-foreground">{data.devices.filter(device => deviceIsLive(device)).length}/{data.devices.length} {c.online}</p>
     </div>}
     <p className="text-[11px] leading-5 text-muted-foreground">{c.stock}</p>
   </section>;
