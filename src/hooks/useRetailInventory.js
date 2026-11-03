@@ -6,7 +6,7 @@ import { useBranchScope } from '@/lib/BranchScopeContext';
 import { useRetailInventoryScope } from '@/lib/RetailInventoryScopeContext';
 import { EMPTY_INVENTORY, inventoryRPC } from '@/lib/retailInventory';
 import { subscribeRetailInventoryRealtime } from '@/lib/retailInventoryRealtime';
-import { isSupermarketProductPortal } from '@/lib/productImportAccess';
+import { isCommercePOSPortal } from '@/lib/productImportAccess';
 
 export function useRetailInventory() {
   const { activeRestaurant, branches, isBranchScoped } = useTenant();
@@ -14,7 +14,7 @@ export function useRetailInventory() {
   const warehouse = useRetailInventoryScope();
   const restaurantId = activeRestaurant?.id;
   const branchId = scope.isAllBranches ? null : scope.selectedBranchId;
-  const enabled = Boolean(restaurantId && isSupermarketProductPortal(activeRestaurant));
+  const enabled = Boolean(restaurantId && isCommercePOSPortal(activeRestaurant));
   const qc = useQueryClient();
   const [realtime, setRealtime] = useState({ status: 'CONNECTING' });
   const params = { p_restaurant_id: restaurantId, p_branch_id: branchId, p_warehouse_id: warehouse.warehouseId };
