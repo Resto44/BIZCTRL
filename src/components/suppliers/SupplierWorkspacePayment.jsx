@@ -52,9 +52,9 @@ export default function SupplierWorkspacePayment({ invoice, onSaved, onClose }) 
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const busy = useRef(false);
-  const amount = mode === 'full' ? remaining : Number(form.amount);
+  const amount = attempted ? Number(form.amount) : mode === 'full' ? remaining : Number(form.amount);
   const validAmount = Number.isFinite(amount) && amount > 0
-    && Math.round(amount * 100) === amount * 100
+    && Math.abs(Math.round(amount * 100) - amount * 100) < 1e-6
     && amount <= remaining && (mode !== 'partial' || amount < remaining);
 
   const selectMode = nextMode => {
@@ -66,7 +66,7 @@ export default function SupplierWorkspacePayment({ invoice, onSaved, onClose }) 
 
   const save = async () => {
     if (busy.current || pending || !allowed) return;
-    if (!validAmount || !form.date) {
+    if ((!attempted && !validAmount) || !form.date) {
       setError(mode === 'partial' && amount >= remaining ? t.partialInvalid : t.invalid);
       return;
     }
