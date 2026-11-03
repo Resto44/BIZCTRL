@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { deletePurchaseInvoiceWithRollback, getOverdueInfo } from '@/lib/procurementEngine';
-import { totalOutstandingSupplierPayables, totalUnallocatedSupplierOverpayments } from '@/lib/supplierPayablesIntegrity';
+import { totalUnallocatedSupplierOverpayments } from '@/lib/supplierPayablesIntegrity';
 
 const STATUS_FILTERS = ['all', 'outstanding', 'draft', 'pending', 'approved', 'paid', 'partial', 'unpaid', 'cancelled'];
 
@@ -57,6 +57,7 @@ const imageDataForPDF = async source => {
 
 export default function Purchases() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const openPayablesLink = searchParams.get('payables') === 'open';
   const { currency, lang } = useLanguage();
   const { activeRestaurant, branches } = useTenant();
   const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
@@ -93,12 +94,12 @@ export default function Purchases() {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
-    if (searchParams.get('payables') !== 'open') return;
+    if (!openPayablesLink) return;
     setFilterStatus('outstanding');
-    // Owner overview always reconciles against the complete organization.
+    // Default to the full organization once; let the owner narrow by branch afterwards.
     // Branch-restricted users keep their authorized branch.
-    if (isOwner && !isAllBranches) setSelectedBranchId('all');
-  }, [searchParams, isOwner, isAllBranches, setSelectedBranchId]);
+    if (isOwner) setSelectedBranchId('all');
+  }, [openPayablesLink, isOwner, setSelectedBranchId]);
 
   // ── Fetch invoices ─────────────────────────────────────────────────────
   // Scope every request by the authenticated restaurant. For a selected branch,
