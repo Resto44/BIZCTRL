@@ -43,6 +43,7 @@ const CustomerDisplay = lazy(() => import('@/pages/retail/pos/CustomerDisplay'))
 const RestaurantPOS = lazy(() => import('@/pages/restaurant/RestaurantPOS'));
 import { restaurantRpc } from '@/lib/restaurantPOS';
 import RetailPOSPortalGuard from '@/components/retail-pos/RetailPOSPortalGuard';
+import UniversalTouchPOSRoute from '@/components/pos-touch/UniversalTouchPOSRoute';
 
 // ── Lazy-loaded pages (code splitting) ───────────────────────────────────────
 const Dashboard           = lazy(() => import('./pages/Dashboard'));
@@ -463,6 +464,7 @@ const SubscribedRoutes = () => {
         <Route path="/retail/batches"  element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="control" fallback={<BatchTracking />} /></RoleGuard>} />
         <Route path="/retail/expiry"   element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="control" fallback={<ExpiryTracking />} /></RoleGuard>} />
         <Route path="/retail/serials"  element={<RoleGuard permission="viewInventory"><SerialNumbers /></RoleGuard>} />
+        <Route path="/pos" element={<RoleGuard permission="uploadSales"><UniversalTouchPOSRoute /></RoleGuard>} />
         <Route path="/retail/pos-control" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSExecutiveDashboard /></RetailPOSPortalGuard></RoleGuard>} />
         <Route path="/retail/pos-branches" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSBranchDevices /></RetailPOSPortalGuard></RoleGuard>} />
         <Route path="/retail/pos-device" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSTerminalAccount /></RetailPOSPortalGuard></RoleGuard>} />
