@@ -22,8 +22,8 @@ import { cashierCopy } from './cashierCopy';
 const EN = {
   executive: 'Executive dashboard', branches: 'Branches & POS', device: 'Device account', audit: 'Audit & alerts',
   today: 'Today', week: 'This week', month: 'This month', live: 'Live', syncing: 'Syncing', offline: 'Offline',
-  refresh: 'Refresh', noData: 'No POS devices are configured in this scope.', setup: 'Configure 10 POS devices for a branch to start live control.',
-  unavailable: 'Retail POS database setup is not deployed yet.', retry: 'Retry', supermarketOnly: 'Retail POS Control is available only in the Supermarket portal.',
+  refresh: 'Refresh', noData: 'No POS devices are configured in this scope.', setup: 'Configure a POS device and sellable stock in this branch to start live control.',
+  unavailable: 'Retail POS database setup is not deployed yet.', retry: 'Retry', supermarketOnly: 'Touch POS is available to authorized cashiers in supported business portals.',
 };
 
 const COPY = {
@@ -32,15 +32,15 @@ const COPY = {
     ...EN,
     executive: 'داشبورد اجرایی', branches: 'فرع‌ها و POS', device: 'حساب دستگاه', audit: 'بررسی و هشدارها',
     today: 'امروز', week: 'این هفته', month: 'این ماه', live: 'زنده', syncing: 'در حال همگام‌سازی', offline: 'آفلاین',
-    refresh: 'تازه‌سازی', noData: 'در این محدوده هنوز دستگاه POS تنظیم نشده است.', setup: 'برای آغاز کنترل زنده، ۱۰ دستگاه POS فرع را تنظیم کنید.',
-    unavailable: 'ساختار دیتابیس Retail POS هنوز دیپلوی نشده است.', retry: 'تلاش دوباره', supermarketOnly: 'کنترل Retail POS فقط در پورتل سوپرمارکت فعال است.',
+    refresh: 'تازه‌سازی', noData: 'در این محدوده هنوز دستگاه POS تنظیم نشده است.', setup: 'برای شروع کنترول زنده، دستگاه POS و موجودی قابل فروش شعبه را تنظیم کنید.',
+    unavailable: 'ساختار دیتابیس Retail POS هنوز دیپلوی نشده است.', retry: 'تلاش دوباره', supermarketOnly: 'کنترول POS برای کاشیرهای مجاز در پورتال‌های تجاری فعال است.',
   },
   ar: {
     ...EN,
     executive: 'لوحة القيادة', branches: 'الفروع وPOS', device: 'حساب الجهاز', audit: 'التدقيق والتنبيهات',
     today: 'اليوم', week: 'هذا الأسبوع', month: 'هذا الشهر', live: 'مباشر', syncing: 'جارٍ التزامن', offline: 'غير متصل',
-    refresh: 'تحديث', noData: 'لا توجد أجهزة POS مهيأة في هذا النطاق.', setup: 'هيّئ 10 أجهزة POS للفرع لبدء التحكم المباشر.',
-    unavailable: 'لم يتم نشر بنية قاعدة بيانات Retail POS بعد.', retry: 'إعادة المحاولة', supermarketOnly: 'التحكم في Retail POS متاح فقط في بوابة السوبرماركت.',
+    refresh: 'تحديث', noData: 'لا توجد أجهزة POS مهيأة في هذا النطاق.', setup: 'هيّئ جهاز POS ومخزوناً قابلاً للبيع في الفرع لبدء التحكم المباشر.',
+    unavailable: 'لم يتم نشر بنية قاعدة بيانات Retail POS بعد.', retry: 'إعادة المحاولة', supermarketOnly: 'نقاط البيع متاحة للكاشير المصرح له في البوابات التجارية.',
   },
 };
 
@@ -98,6 +98,7 @@ export function RetailPOSWorkspace({
             ) : null}
             {actions}
             {can?.uploadSales && <Button asChild className="h-10 gap-2 rounded-xl"><Link to="/retail/cashier"><MonitorSmartphone className="h-4 w-4" />{cashierCopy(lang).title}</Link></Button>}
+            {can?.viewInventory && <Button asChild variant="outline" className="h-10 gap-2 rounded-xl"><Link to="/pos/stock">{lang === 'fa' ? 'موجودی POS' : lang === 'ar' ? 'مخزون POS' : 'POS stock'}</Link></Button>}
             {onRefresh ? (
               <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={isFetching} className="h-10 gap-2 rounded-xl">
                 <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />

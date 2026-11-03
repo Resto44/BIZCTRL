@@ -9,7 +9,7 @@ const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const allOwnerPermissions = {
   manageSettings: true, viewBrandSettings: true, viewInventory: true,
   viewSuppliers: true, viewPurchases: true, viewSales: true,
-  viewExpenses: true, viewReports: true,
+  viewExpenses: true, viewReports: true, uploadSales: true,
 };
 const flatten = stages => stages.flatMap(stage => stage.modules.map(mod => mod.key));
 
@@ -57,6 +57,8 @@ describe('New SaaS user onboarding tutorial', () => {
     expect(retail).toContain('retailPOS');
     expect(retail).toContain('inventory');
     expect(retail).not.toContain('restaurantPOS');
+    expect(flatten(getWelcomeTourStages({ role:'owner', mode:'warehouse', can: allOwnerPermissions }))).toContain('touchPOS');
+    expect(flatten(getWelcomeTourStages({ role:'owner', mode:'services', can: allOwnerPermissions }))).toContain('touchPOS');
   });
 
   it('hides unauthorized and disabled modules rather than bypassing route guards', () => {

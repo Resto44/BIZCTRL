@@ -53,7 +53,8 @@ export function getWelcomeTourStages({ role = 'owner', mode = 'restaurant', can 
     ]),
     stage('operate', supplier ? [{ key: 'supplierPortal', path: '/supplier-portal', role: 'supplier' }] : [
       ...(isRestaurant(mode) ? [module('restaurantPOS', '/restaurant/pos', 'viewSales')] : []),
-      ...(mode === 'retail' ? [module('retailPOS', '/retail/pos-control', 'viewSales')] : []),
+      ...(mode === 'retail' ? [module('retailPOS', '/pos', 'uploadSales')] :
+        !isRestaurant(mode) ? [module('touchPOS', '/pos', 'uploadSales')] : []),
       module('sales', '/sales', 'viewSales'),
       module('expenses', '/expenses', 'viewExpenses'),
     ]),

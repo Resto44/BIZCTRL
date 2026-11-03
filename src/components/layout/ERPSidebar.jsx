@@ -38,10 +38,14 @@ import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import { getCustomizedNavigationGroups } from '@/lib/workspaceCustomization';
 import LogoutButton from './LogoutButton';
 import { isSupermarketProductPortal } from '@/lib/productImportAccess';
+import { isCommercePOSPortal } from '@/lib/productImportAccess';
 import { isRestaurantPOSPortal } from '@/lib/productImportAccess';
 
 // ─── Nav groups definition ────────────────────────────────────────────────────
 export const ERP_NAV_GROUPS = [
+  { key: 'universal-touch-pos', label: 'Touch POS', items: [
+    { path: '/pos', label: 'Touch screen POS', icon: ScanLine, permission: 'uploadSales' },
+  ] },
   { key: 'restaurant-pos', label: 'Restaurant POS', restaurantOnly: true, items: [
     { path: '/restaurant/pos', label: 'Restaurant POS', icon: MonitorSmartphone, permission: 'viewSales' },
   ] },
@@ -70,7 +74,7 @@ export const ERP_NAV_GROUPS = [
   {
     key: 'retail-pos-control',
     label: 'Retail POS Control',
-    supermarketOnly: true,
+    commerceOnly: true,
     items: [
       { path: '/retail/cashier',      label: 'Cashier workspace',  icon: ScanLine,          permission: 'uploadSales' },
       { path: '/retail/pos-control',  label: 'Live Command Center', icon: MonitorSmartphone, permission: 'viewSales' },
@@ -708,7 +712,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
   const { configuration } = useWorkspaceCustomization();
   const navigationGroups = useMemo(
     () => getCustomizedNavigationGroups(
-      ERP_NAV_GROUPS.filter((group) => (!group.restaurantOnly || isRestaurantPOSPortal(activeRestaurant)) && (!group.supermarketOnly || isSupermarketProductPortal(activeRestaurant)) && !(group.key === 'inventory' && isSupermarketProductPortal(activeRestaurant))),
+      ERP_NAV_GROUPS.filter((group) => (!group.restaurantOnly || isRestaurantPOSPortal(activeRestaurant)) && (!group.supermarketOnly || isSupermarketProductPortal(activeRestaurant)) && (!group.commerceOnly || isCommercePOSPortal(activeRestaurant)) && !(group.key === 'inventory' && isSupermarketProductPortal(activeRestaurant))),
       configuration,
     ),
     [activeRestaurant, configuration],

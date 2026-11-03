@@ -79,7 +79,7 @@ describe('POSExecutiveDashboard', () => {
     ));
     await act(async () => new Promise((resolve) => globalThis.setTimeout(resolve, 0)));
 
-    expect(container.textContent).toContain('Supermarket Live Control');
+    expect(container.textContent).toContain('Live Cashier POS Control');
     expect(container.textContent).toContain('10');
 
     await act(async () => root.unmount());

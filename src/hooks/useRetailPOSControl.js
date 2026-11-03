@@ -41,7 +41,7 @@ export function useRetailPOSControl({ period = 'today', branchId = null, deviceI
     },
     enabled: Boolean(restaurantId),
     staleTime: 10_000,
-    refetchInterval: 60_000,
+    refetchInterval: 15_000, // Owner fallback when Realtime is disconnected
     retry: (failureCount, error) => !nonRetryable(error) && failureCount < 2,
   });
 

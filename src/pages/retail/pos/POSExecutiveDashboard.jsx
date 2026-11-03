@@ -122,7 +122,7 @@ export default function POSExecutiveDashboard() {
         </section>
 
         <section className="grid gap-4 xl:grid-cols-2">
-          <POSPanel title={translateLiteral('Branch performance')} description={translateLiteral('Sales across every active supermarket branch')} action={<Button asChild variant="ghost" size="sm"><Link to="/retail/pos-branches">{translateLiteral('Manage')}</Link></Button>}>
+          <POSPanel title={translateLiteral('Branch performance')} description={translateLiteral('Sales across every active business branch')} action={<Button asChild variant="ghost" size="sm"><Link to="/retail/pos-branches">{translateLiteral('Manage')}</Link></Button>}>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={branchChart} layout="vertical" margin={{ left: 5, right: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
@@ -168,7 +168,7 @@ export default function POSExecutiveDashboard() {
   })();
 
   return (
-    <RetailPOSWorkspace activePage="executive" title={translateLiteral('Supermarket Live Control')} subtitle={translateLiteral('Live sales, purchases, expenses and cashier devices across every branch')} period={period} onPeriodChange={setPeriod} realtimeStatus={control.realtimeStatus} isFetching={control.isFetching} onRefresh={control.refetch}>
+    <RetailPOSWorkspace activePage="executive" title={translateLiteral('Live Cashier POS Control')} subtitle={translateLiteral('Live sales, purchases, expenses and cashier devices across every branch')} period={period} onPeriodChange={setPeriod} realtimeStatus={control.realtimeStatus} isFetching={control.isFetching} onRefresh={control.refetch}>
       {body}
     </RetailPOSWorkspace>
   );

@@ -26,7 +26,7 @@ import { useBusinessMode } from '@/lib/BusinessModeContext';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
 import { useTenant } from '@/lib/TenantContext';
 import { isWorkspacePathEnabled } from '@/lib/workspaceCustomization';
-import { isSupermarketProductPortal } from '@/lib/productImportAccess';
+import { isSupermarketProductPortal, isCommercePOSPortal } from '@/lib/productImportAccess';
 import { isRestaurantPOSPortal } from '@/lib/productImportAccess';
 
 // ── Primary Nav by Role + Mode ────────────────────────────────────────────────
@@ -123,6 +123,7 @@ const MORE_PERMISSION_BY_PATH = {
   '/retail/pos-branches': 'viewSales',
   '/retail/pos-device': 'viewSales',
   '/retail/pos-audit': 'viewSales',
+  '/pos': 'uploadSales',
 };
 
 // ── More Menu Sections ────────────────────────────────────────────────────────
@@ -435,7 +436,7 @@ function MoreMenu({ sections, can, onClose }) {
   const quickActions = [
     can?.viewSales ? { path: '/sales', label: 'Add Sale', description: 'Create a new sale', icon: ShoppingCart, iconClass: 'bg-blue-50 text-blue-700' } : null,
     can?.viewPurchases ? { path: '/purchases?create=1', label: 'Add Purchase', description: 'Create a purchase invoice', icon: Package, iconClass: 'bg-emerald-50 text-emerald-700' } : null,
-    availablePaths.has('/restaurant/pos') ? { path: '/restaurant/pos', label: readableLabel(t, 'restaurant_pos'), description: 'Open POS', icon: ScanLine, iconClass: 'bg-violet-50 text-violet-700' } : availablePaths.has('/cash-register') ? { path: '/cash-register', label: 'Cash Register', description: 'Open the register', icon: CreditCard, iconClass: 'bg-violet-50 text-violet-700' } : null,
+    availablePaths.has('/pos') ? { path: '/pos', label: 'Touch POS', description: 'Open touch cashier', icon: ScanLine, iconClass: 'bg-violet-50 text-violet-700' } : availablePaths.has('/cash-register') ? { path: '/cash-register', label: 'Cash Register', description: 'Open the register', icon: CreditCard, iconClass: 'bg-violet-50 text-violet-700' } : null,
     can?.viewReports ? { path: '/reports', label: 'Reports', description: 'Analyze performance', icon: BarChart3, iconClass: 'bg-sky-50 text-sky-700' } : null,
   ].filter(Boolean);
 
@@ -602,12 +603,13 @@ const BottomNav = memo(function BottomNav() {
   const { isRetailLike } = useBusinessMode();
   const { activeRestaurant } = useTenant();
   const supermarket = isSupermarketProductPortal(activeRestaurant);
+  const commerce = isCommercePOSPortal(activeRestaurant);
   const restaurant = isRestaurantPOSPortal(activeRestaurant);
   const { configuration } = useWorkspaceCustomization();
   const [showMore, setShowMore] = useState(false);
 
   const { visibleNav: baseNav, moreSections: baseMoreSections } = useMemo(() => {
-    if (role === ROLES.EMPLOYEE) return { visibleNav: [...PRIMARY_NAV_EMPLOYEE, ...(restaurant && can.viewSales ? [{ path: '/restaurant/pos', icon: ScanLine, labelKey: 'restaurant_pos' }] : []), ...(supermarket && can.uploadSales ? [{ path: '/retail/cashier', icon: ScanLine, labelKey: 'cashier_workspace' }] : [])], moreSections: [] };
+    if (role === ROLES.EMPLOYEE) return { visibleNav: [...PRIMARY_NAV_EMPLOYEE, ...(can.uploadSales ? [{ path: '/pos', icon: ScanLine, labelKey: 'cashier_workspace' }] : [])], moreSections: [] };
     if (role === ROLES.SPONSOR) return { visibleNav: PRIMARY_NAV_SPONSOR, moreSections: [] };
     if (role === ROLES.CUSTOMER) return { visibleNav: PRIMARY_NAV_CUSTOMER, moreSections: [] };
     if (role === ROLES.SUPPLIER) return { visibleNav: [
@@ -625,7 +627,7 @@ const BottomNav = memo(function BottomNav() {
     return isRetailLike
       ? { visibleNav: PRIMARY_NAV_OWNER_RETAIL, moreSections: MORE_SECTIONS_OWNER_RETAIL }
       : { visibleNav: PRIMARY_NAV_OWNER_RESTAURANT, moreSections: MORE_SECTIONS_OWNER_RESTAURANT };
-  }, [role, isRetailLike, can.uploadSales, can.viewSales, supermarket, restaurant]);
+  }, [role, isRetailLike, can.uploadSales, can.viewSales, restaurant]);
 
   const { visibleNav, moreSections } = useMemo(() => {
     const hidden = new Set(configuration?.navigation?.hidden_paths || []);
@@ -638,20 +640,24 @@ const BottomNav = memo(function BottomNav() {
       .filter(item => item.path !== '/restaurant/pos' || (restaurant && can.viewSales && isWorkspacePathEnabled(configuration, item.path)))
       .filter((item) => item.isMore || !hidden.has(item.path))
       .sort((a, b) => a.isMore ? 1 : b.isMore ? -1 : compare(a, b));
-    const moreSections = baseMoreSections
+    const universalPOSSection = can.uploadSales ? [{
+      title: lang === 'fa' ? 'POS تاچ‌اسکرین' : lang === 'ar' ? 'نقاط البيع باللمس' : 'Touch POS',
+      items: [{ path: '/pos', icon: ScanLine, labelKey: 'cashier_workspace' }],
+    }] : [];
+    const moreSections = [...universalPOSSection, ...baseMoreSections]
       .map((section) => ({
         ...section,
         items: section.items
           .filter((item) => {
             if (item.path === '/restaurant/pos' && !restaurant) return false;
             const permission = MORE_PERMISSION_BY_PATH[item.path];
-            return (item.path !== '/retail/cashier' || supermarket) && (!permission || can[permission]) && !hidden.has(item.path) && isWorkspacePathEnabled(configuration, item.path);
+            return (item.path !== '/retail/cashier' || commerce) && (!permission || can[permission]) && !hidden.has(item.path) && isWorkspacePathEnabled(configuration, item.path);
           })
           .sort(compare),
       }))
       .filter((section) => section.items.length > 0);
     return { visibleNav, moreSections };
-  }, [baseMoreSections, baseNav, can, configuration, supermarket, restaurant]);
+  }, [baseMoreSections, baseNav, can, configuration, commerce, lang, restaurant]);
 
   return (
     <>

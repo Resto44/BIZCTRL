@@ -231,7 +231,7 @@ describe('Retail POS shared subscription and owner tab navigation', () => {
     expect(container.textContent).toBe('CHANNEL_ERROR||125');
     expect(log).toHaveBeenCalledWith('[Retail POS] Realtime subscription failed', error);
     state.client.rpc.mockResolvedValue({ data: { summary: { net_sales: 250 } }, error: null });
-    await act(async () => vi.advanceTimersByTimeAsync(60_001));
+    await act(async () => vi.advanceTimersByTimeAsync(15_001));
     expect(state.client.rpc).toHaveBeenCalledTimes(2);
     expect(container.textContent).toBe('CHANNEL_ERROR||250');
   });

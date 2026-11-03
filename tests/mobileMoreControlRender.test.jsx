@@ -35,7 +35,7 @@ vi.mock('@/lib/RoleContext', () => ({
   useRole: () => ({
     role: 'owner',
     can: {
-      viewDashboard: true, viewSales: true, viewPurchases: true, viewInventory: true,
+      viewDashboard: true, viewSales: true, uploadSales: true, viewPurchases: true, viewInventory: true,
       viewSuppliers: true, viewNetworkAccounts: true, viewReports: true, viewEmployees: true,
       manageUsers: true, manageCustomers: true, manageDrivers: true, viewDebts: true,
       viewTreasury: true, viewSponsorTreasury: true, viewPayroll: true, manageSettings: true, viewAlerts: true,
@@ -63,7 +63,7 @@ vi.mock('@/lib/WorkspaceCustomizationContext', () => ({
 const { default: BottomNav } = await import('../src/components/layout/BottomNav.jsx');
 
 describe('mobile More and Control workspace', () => {
-  it.each(['restaurant', 'retail'])('shows a direct restaurant POS tab and shortcut only in %s scope', async portal => {
+  it.each(['restaurant', 'retail'])('shows the universal touch POS shortcut in %s scope', async portal => {
     tenantMocks.activeRestaurant.business_type = portal;
     const client = new QueryClient(); let renderer;
     await act(async () => { renderer = TestRenderer.create(<QueryClientProvider client={client}><MemoryRouter><BottomNav /></MemoryRouter></QueryClientProvider>); });
@@ -71,7 +71,7 @@ describe('mobile More and Control workspace', () => {
     const more = renderer.root.findAllByType('button').find(button => button.findAllByType('span').some(span => span.children.includes('more')));
     await act(async () => more.props.onClick());
     const quick = renderer.root.findByProps({'aria-labelledby': 'more-quick-access-title'});
-    expect(quick.findAllByType('a').some(link => link.props.href === '/restaurant/pos')).toBe(portal === 'restaurant');
+    expect(quick.findAllByType('a').some(link => link.props.href === '/pos')).toBe(true);
     await act(async () => renderer.unmount()); client.clear(); delete tenantMocks.activeRestaurant.business_type;
   });
   it('opens safely and exposes permanent quick actions plus grouped ERP modules', async () => {
@@ -99,7 +99,7 @@ describe('mobile More and Control workspace', () => {
     const links = renderer.root.findAllByType('a');
     expect(links.some((link) => link.props.href === '/sales')).toBe(true);
     expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
-    expect(links.some((link) => link.props.href === '/cash-register')).toBe(true);
+    expect(links.some((link) => link.props.href === '/pos')).toBe(true);
     expect(links.some((link) => link.props.href === '/reports')).toBe(true);
 
     const renderedText = JSON.stringify(renderer.toJSON());
