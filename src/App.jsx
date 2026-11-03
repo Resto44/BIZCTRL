@@ -1,5 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import {recoverModuleLoad} from '@/lib/moduleLoadRecovery';
+import {withStartupDeadline} from '@/lib/startupReadDeadline';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -155,11 +156,34 @@ const EmployeeDashboardERP  = lazy(() => import('@/pages/EmployeeDashboardERP'))
 const SupplierPortalERP     = lazy(() => import('@/pages/SupplierPortalERP'));
 
 // ── Shared page loading fallback ─────────────────────────────────────────────
-const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-[50vh]">
-    <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
-  </div>
-);
+const PageLoader = () => {
+  const { lang = 'en' } = useLanguage();
+  const [stalled, setStalled] = React.useState(false);
+  React.useEffect(() => {
+    const handle = setTimeout(() => setStalled(true), 12000);
+    return () => clearTimeout(handle);
+  }, []);
+  if (stalled) {
+    const copy = lang === 'fa'
+      ? { title: 'بارگذاری برنامه متوقف شده', hint: 'ممکن است اتصال یا فایل‌های نسخه جدید در مرورگر گیر کرده باشند. معلومات شما تغییر نکرده است.', retry: 'بارگذاری دوباره', login: 'صفحه ورود' }
+      : lang === 'ar'
+        ? { title: 'توقف تحميل التطبيق', hint: 'قد يكون الاتصال أو تحميل ملفات الإصدار الجديد عالقاً. لم تتغير بياناتك.', retry: 'إعادة التحميل', login: 'صفحة الدخول' }
+        : { title: 'App loading has stalled', hint: 'The connection or new app files may be stuck. Your records have not been changed.', retry: 'Reload app', login: 'Sign-in page' };
+    return <div role="alert" data-testid="erp-startup-stalled" className="flex min-h-[50vh] items-center justify-center p-5">
+      <div className="w-full max-w-sm rounded-xl border bg-card p-5 text-center shadow-sm">
+        <h2 className="text-base font-bold">{copy.title}</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{copy.hint}</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <button type="button" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={() => window.location.reload()}>{copy.retry}</button>
+          <a className="rounded-lg border px-4 py-2 text-sm font-semibold" href={`/erp-login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`}>{copy.login}</a>
+        </div>
+      </div>
+    </div>;
+  }
+  return <div className="flex min-h-[50vh] items-center justify-center" role="status" aria-label="Loading BizCTRL">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
+  </div>;
+};
 
 // Never mistake an unavailable authorization read for an empty business or
 // expired subscription. Provide a retry without clearing local user preferences.
@@ -527,7 +551,7 @@ function RootEntryRoute() {
         return;
       }
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
+        const { data: sessionData } = await withStartupDeadline(supabase.auth.getSession(), 9000, 'ROOT_GET_SESSION_TIMEOUT');
         const session = sessionData?.session;
         if (!session?.access_token || !session?.user?.id) {
           if (!cancelled) setDecision('public');
@@ -536,7 +560,7 @@ function RootEntryRoute() {
 
         // A persisted browser session never selects a destination by itself. Auth
         // verifies the token first, then the server resolves the owner record.
-        const { data: userData, error: userError } = await supabase.auth.getUser(session.access_token);
+        const { data: userData, error: userError } = await withStartupDeadline(supabase.auth.getUser(session.access_token), 9000, 'ROOT_VERIFY_USER_TIMEOUT');
         if (userError) throw userError;
         if (userData?.user?.id !== session.user.id) {
           await supabase.auth.signOut({ scope: 'local' });
@@ -544,7 +568,7 @@ function RootEntryRoute() {
           return;
         }
 
-        const { data: snapshot, error: snapshotError } = await supabase.rpc('platform_owner_session_snapshot');
+        const { data: snapshot, error: snapshotError } = await withStartupDeadline(supabase.rpc('platform_owner_session_snapshot'), 9000, 'ROOT_OWNER_AUTHORIZATION_TIMEOUT');
         if (snapshotError || !snapshot?.authenticated) {
           throw snapshotError || new Error('PLATFORM_OWNER_AUTHORIZATION_UNAVAILABLE');
         }
