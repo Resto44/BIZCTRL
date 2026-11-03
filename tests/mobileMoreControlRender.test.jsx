@@ -35,7 +35,7 @@ vi.mock('@/lib/RoleContext', () => ({
   useRole: () => ({
     role: 'owner',
     can: {
-      viewDashboard: true, viewSales: true, viewPurchases: true, viewInventory: true,
+      viewDashboard: true, viewSales: true, uploadSales: true, viewPurchases: true, viewInventory: true,
       viewSuppliers: true, viewNetworkAccounts: true, viewReports: true, viewEmployees: true,
       manageUsers: true, manageCustomers: true, manageDrivers: true, viewDebts: true,
       viewTreasury: true, viewSponsorTreasury: true, viewPayroll: true, manageSettings: true, viewAlerts: true,
