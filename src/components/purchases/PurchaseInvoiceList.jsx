@@ -12,6 +12,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { treasuryBranchDisplayName } from '@/lib/treasuryBranchDisplay';
 import { Pencil, Trash2, CheckCircle2, Clock, AlertCircle, Eye, FileDown, Share2, Square, CheckSquare } from 'lucide-react';
 import { getOverdueInfo } from '@/lib/procurementEngine';
+import { supplierOutstandingAmount, canPaySupplierInvoice } from '@/lib/supplierOpenPayables';
 import { approveInvoice } from '@/lib/procurementEngine';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
@@ -36,7 +37,7 @@ const OVERDUE_COLORS = {
 const isMutableDraft = (invoice) =>
   invoice?.status === 'draft' && !['approved', 'auto_approved'].includes(invoice?.approval_status);
 
-export default function PurchaseInvoiceList({ invoices = [], branches = [], onEdit, onDelete, onBulkDelete, onView, onDownloadPDF, onSharePDF }) {
+export default function PurchaseInvoiceList({ invoices = [], branches = [], onEdit, onDelete, onBulkDelete, onView, onDownloadPDF, onSharePDF, onPayInvoice }) {
   const { currency,lang } = useLanguage();
   const labels=({
     en:{pdf:'Download purchase PDF',share:'Share purchase PDF on WhatsApp'},
@@ -118,7 +119,7 @@ export default function PurchaseInvoiceList({ invoices = [], branches = [], onEd
         const { isOverdue, daysOverdue, color } = getOverdueInfo(inv);
         const statusCfg = STATUS_CONFIG[inv.status] || STATUS_CONFIG.draft;
         const StatusIcon = statusCfg.Icon;
-        const remaining = (inv.total_amount || 0) - (inv.paid_amount || 0);
+        const remaining = supplierOutstandingAmount(inv);
         const branchDisplayName = treasuryBranchDisplayName(inv, branches, lang);
 
         return (
@@ -198,6 +199,15 @@ export default function PurchaseInvoiceList({ invoices = [], branches = [], onEd
                   <Button type="button" variant="ghost" size="icon" title={labels.share} aria-label={labels.share}
                     className="h-8 w-8 text-emerald-600" onClick={() => onSharePDF(inv)}>
                     <Share2 className="h-4 w-4"/>
+                  </Button>
+                )}
+                {onPayInvoice && remaining > 0 && (
+                  <Button type="button" size="sm" className="h-9 whitespace-nowrap"
+                    disabled={!canPaySupplierInvoice(inv)}
+                    title={!canPaySupplierInvoice(inv) ? 'Approval and linked supplier/branch are required' : undefined}
+                    onClick={() => onPayInvoice(inv)}
+                    data-testid="purchase-invoice-pay">
+                    {lang==='fa'?'پرداخت':lang==='ar'?'دفع':'Pay'}
                   </Button>
                 )}
                 {onEdit && isMutableDraft(inv) && (

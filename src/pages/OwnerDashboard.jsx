@@ -3,6 +3,7 @@
  * Financial values use the shared ERP accounting engine; consumption and rate
  * reports are built only from recorded tenant/branch-scoped ERP rows.
  */
+import { supplierOutstandingAmount } from '@/lib/supplierOpenPayables';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -426,7 +427,7 @@ function OwnerDashboardContent() {
     complete: !customerDebtsQuery.isError && !periodSalesQuery.isError &&
       (isAllBranches || Boolean(selectedBranchId && selectedBranchKey)),
   }), [periodSales, customerDebts, customerDebtsQuery.isError, periodSalesQuery.isError, isAllBranches, selectedBranchId, selectedBranchKey]);
-  const payables = supplierInvoices.filter(approvedPurchase).reduce((sum, invoice) => sum + Math.max(0, numeric(invoice.remaining_amount ?? invoice.balance ?? (numeric(invoice.total_amount) - numeric(invoice.paid_amount ?? invoice.amount_paid)))), 0);
+  const payables = supplierInvoices.reduce((sum, invoice) => sum + supplierOutstandingAmount(invoice), 0);
   const drawerCash = useMemo(
     () => normalizeDrawerCashAsOf(drawerCashQuery.data, {
       loading: drawerCashQuery.isLoading || drawerCashQuery.isFetching && !drawerCashQuery.data,

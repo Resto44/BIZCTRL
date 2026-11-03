@@ -267,9 +267,14 @@ export default function ExecutiveSnapshotV2({model,copy}) {
         <StatCard testId="snapshot-receivables" title={t(copy,'receivables','Receivables')} icon={ReceiptText}
           value={hasQueryError?'—':formatMoney(receivables)} tone="green"
           hint={t(copy,'receivablesHint','Current outstanding customer balance')}/>
-        <StatCard testId="snapshot-payables" title={t(copy,'payables','Payables')} icon={Landmark}
-          value={hasQueryError?'—':formatMoney(payables)} tone="amber"
-          hint={t(copy,'payablesHint','Current unpaid supplier balance')}/>
+        <button type="button" onClick={()=>navigate('/purchases?payables=open')}
+          aria-label={lang==='fa'?'نمایش تمام فاکتورهای پرداخت‌نشده تأمین‌کنندگان':lang==='ar'?'عرض جميع فواتير الموردين غير المدفوعة':'View all outstanding supplier invoices'}
+          className="block min-w-0 w-full rounded-2xl text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 hover:ring-2 hover:ring-amber-400"
+          data-testid="snapshot-payables-open">
+          <StatCard testId="snapshot-payables" title={t(copy,'payables','Payables')} icon={Landmark}
+            value={hasQueryError?'—':formatMoney(payables)} tone="amber"
+            hint={t(copy,'payablesHint','Current unpaid supplier balance')}/>
+        </button>
         <StatCard testId="snapshot-active-risks" title={t(copy,'activeRisks','Active risks')} icon={ShieldAlert}
           value={risksKnown?String(scopedAlerts.length):'—'} tone="rose"
           hint={t(copy,'risksHint','Recorded issues requiring attention')}/>
