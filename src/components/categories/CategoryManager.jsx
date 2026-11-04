@@ -40,6 +40,7 @@ import {
 import { NewIconPicker } from './NewIconPicker';
 import { CategoryIcon } from '@/components/shared/CategoryIcon';
 import { toast } from 'sonner';
+import CategoryTemplatePicker from './CategoryTemplatePicker';
 
 // ── Module config ─────────────────────────────────────────────────────────────
 export const CATEGORY_MODULES = {
@@ -689,6 +690,8 @@ function CategoryModulePanel({ moduleKey }) {
           <Plus className="w-3.5 h-3.5 mr-1" /> Add Category
         </Button>
       </div>
+
+      {moduleKey === 'product' && <CategoryTemplatePicker />}
 
       {/* Search & Filter bar */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
