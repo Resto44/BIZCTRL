@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import Navigate from '@/components/layout/WorkspaceNavigate';
 import { MonitorSmartphone } from 'lucide-react';
 import { useTenant } from '@/lib/TenantContext';
 import { businessTouchPosPath } from '@/lib/productImportAccess';
