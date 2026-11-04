@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
-import { Activity, MonitorSmartphone, Radio, RefreshCw, ShieldCheck, Store } from 'lucide-react';
+import { MonitorSmartphone, Radio, RefreshCw, ShieldCheck, Store } from 'lucide-react';
 import OwnerRestaurantPOS from '@/components/dashboard/OwnerRestaurantPOS';
 import { useRetailPOSControl } from '@/hooks/useRetailPOSControl';
 import { deviceIsLive } from '@/lib/retailPosControl';
