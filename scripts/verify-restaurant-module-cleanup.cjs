@@ -41,7 +41,8 @@ const managerDashboard = read('src/pages/ManagerDashboardERP.jsx');
 const ownerRealtime = read('src/hooks/useOwnerDashboardRealtime.js');
 const ownerDashboard = read('src/pages/OwnerDashboard.jsx');
 const profitLoss = read('src/pages/ProfitLoss.jsx');
-const customerPortal = read('src/pages/CustomerPortal.jsx');
+const customerPortal = exists('src/pages/CustomerPortal.jsx') ? read('src/pages/CustomerPortal.jsx') : '';
+assert(customerPortal || app.includes('path="/customer-portal"') && app.includes('to="/customer-management"'), 'Removed Customer Portal must retain its customer-management redirect.');
 const widgetRegistry = read('src/components/dashboard/DashboardWidgetRegistry.jsx');
 
 const removedPaths = [
@@ -75,7 +76,7 @@ assert(!widgetRegistry.includes("linkTo: '/order-management'"), 'dashboard widge
 assert(!widgetRegistry.includes("id: 'pending_orders'"), 'dashboard pending-orders widget remains');
 
 // Guard the active canonical Driver Sales ERP path against accidental removal.
-assert(exists('src/components/sales/ERPSalesWorkspace.jsx'), 'active Add Sales workspace was removed');
+assert(exists('src/components/sales/UnifiedSalesClosing.jsx') && read('src/pages/Sales.jsx').includes('<UnifiedSalesClosing'), 'active unified sales closing workspace was removed');
 assert(exists('src/pages/DriverManagement.jsx'), 'active Driver Management was removed');
 assert(exists('src/components/dashboard/DriverPerformance.jsx'), 'active Driver Analytics was removed');
 
