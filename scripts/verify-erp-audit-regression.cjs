@@ -16,9 +16,9 @@ const roles = read('src/lib/RoleContext.jsx');
 const tenant = read('src/lib/TenantContext.jsx');
 
 // Owner reporting must scope through restaurant_id; manager reporting must use the assigned branch.
-assert(reports.includes("if (activeRestaurant?.id) return { restaurantId: activeRestaurant.id };"), 'Reports must use active restaurant scope for Owner records.');
-assert(reports.includes("if (isManager) return branch ? { branch } : null;"), 'Reports must preserve Branch Manager branch scope.');
-assert(reports.includes(".in('status', ['approved', 'partial', 'paid'])"), 'Reports must use canonical approved supplier invoice states.');
+assert(reports.includes(".eq('restaurant_id', activeRestaurant.id)"), 'Reports must scope all reads by active restaurant.');
+assert(reports.includes('} = useBranchScope();') && reports.includes("if (!selectedBranchId) return [];") && reports.includes("q.eq('branch_id',selectedBranchId)"), 'Reports must preserve the authorized branch selection and fail closed without it.');
+assert(reports.includes("fetchReportRows('supplier_invoices')") && reports.includes("['approved','auto_approved'].includes(invoice.approval_status)") && reports.includes("['approved','paid','partial'].includes(invoice.status)"), 'Reports must use canonical approved supplier invoices and legacy approved states.');
 assert(!reports.includes(".eq('created_by', ownerFilter.created_by)"), 'Reports must not restrict Owner purchases to Owner-created records.');
 
 // BI Center must use canonical Daily Sales and approved invoice fields.
@@ -37,8 +37,8 @@ assert(branchManagement.includes(".from('supplier_invoices')"), 'Branch Manageme
 assert(alerts.includes("if (activeRestaurant?.id) return { restaurantId: activeRestaurant.id };"), 'Alerts must include all Owner restaurant activity.');
 assert(alerts.includes(".from('supplier_invoices')"), 'Alerts must use canonical supplier invoices.');
 
-// Owner realtime must invalidate corrected analytics and history queries.
-for (const key of ['bi_sales', 'bm_sales', 'purchases_erp', 'bi_purchases', 'bm_purchases', 'bi_expenses', 'bm_expenses', "'wallet_transactions'", "'inventory'"]) {
+// Owner dashboard realtime must invalidate its current query prefixes.
+for (const key of ['sales_report_period', 'sales_report_previous_period', 'supplier_invoices', 'expenses_report_period', 'expenses_report_fixed_pool', 'wallet_transactions_dash', 'inventory_dash']) {
   assert(realtime.includes(key), `Realtime map is missing ${key}.`);
 }
 

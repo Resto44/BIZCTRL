@@ -602,8 +602,21 @@ function CategoryModulePanel({ moduleKey }) {
     }
     if (filterActive === 'active') cats = cats.filter(c => c.is_active);
     if (filterActive === 'inactive') cats = cats.filter(c => !c.is_active);
-    return cats;
-  }, [categories, search, filterActive]);
+    if (!mod.hierarchical || (!search && filterActive === 'all')) return cats;
+    // A matching child still needs its ancestor path to be rendered in the tree.
+    const byId = new Map(categories.map(category => [category.id, category]));
+    const visibleIds = new Set(cats.map(category => category.id));
+    for (const category of cats) {
+      const visited = new Set([category.id]);
+      let parent = byId.get(category.parent_id);
+      while (parent && !visited.has(parent.id)) {
+        visited.add(parent.id);
+        visibleIds.add(parent.id);
+        parent = byId.get(parent.parent_id);
+      }
+    }
+    return categories.filter(category => visibleIds.has(category.id));
+  }, [categories, search, filterActive, mod.hierarchical]);
 
   // Root nodes (no parent)
   const rootNodes = useMemo(() =>
