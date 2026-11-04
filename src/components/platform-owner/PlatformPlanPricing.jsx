@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {Badge} from '@/components/ui/badge';
 import {formatPlatformMoney} from '@/lib/platformOwnerManagement';
-import {ownerAnnualCatalogState,expectedAnnualPriceCents} from '@/lib/platformAnnualBilling';
+import {ownerAnnualCatalogState} from '@/lib/platformAnnualBilling';
 
 const LANG={
  en:{monthly:'Monthly',annual:'Annual · 30% off',saving:'Save 30% annually',linked:'Paddle annual price linked',unlinked:'Annual Paddle price not linked',mismatch:'Paddle price mismatch — review required',tax:'Taxes, if applicable, calculated at checkout',monthlyRate:'Monthly recurring',annualRate:'Yearly recurring'},
