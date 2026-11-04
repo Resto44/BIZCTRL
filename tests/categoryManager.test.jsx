@@ -27,6 +27,20 @@ afterEach(async()=>{await act(async()=>root.unmount());container.remove();qc.cle
 const button=(text)=>[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===text);
 async function render(ui){await act(async()=>root.render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>));}
 describe('category editor regression',()=>{
+ it.each(['search', 'inactive'])('keeps the parent path visible when a child matches the %s filter',async(kind)=>{
+  const rows=[{id:'root',name:'Pantry',is_active:true,parent_id:null},{id:'child',name:'Rice',name_fa:'برنج',is_active:false,parent_id:'root'},{id:'unrelated',name:'Drinks',is_active:true,parent_id:null}];
+  fixture.filter.mockResolvedValue(rows);
+  qc.setQueryData(['product_categories','tenant-1'],rows);
+  await render(<CategoryManager/>);
+  if(kind==='search') {
+   const input=document.querySelector('input[placeholder="Search categories..."]');
+   expect(input).not.toBeNull();
+   await act(async()=>Simulate.change(input,{target:{value:'برنج'}}));
+  } else await act(async()=>button('inactive').click());
+  expect(container.textContent).toContain('Pantry');
+  expect(container.textContent).toContain('Rice');
+  expect(container.textContent).not.toContain('Drinks');
+ });
  it('opens Add Category on mobile and submits a tenant-scoped category',async()=>{
   await render(<Dialog open><DialogContent><DialogTitle>Product Categories</DialogTitle><CategoryManager/></DialogContent></Dialog>);
   await act(async()=>button('Add Category').click());
