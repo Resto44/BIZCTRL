@@ -61,7 +61,7 @@ const copy={
 };
 const fmt = n => n===null||!Number.isFinite(Number(n))?'—':
   Number(n).toLocaleString('en-US',{maximumFractionDigits:2,minimumFractionDigits:2});
-const pct = value => value==null?'—':(value>0?'+':'')+fmt(value)+'%';
+const pct = (value,showSign=false) => value==null?'—':(showSign&&value>0?'+':'')+fmt(value)+'%';
 const clamp = (value,min,max)=>Math.min(max,Math.max(min,value));
 
 /** An additive read-only appendix; the existing two-page financial report is not modified. */
@@ -96,7 +96,8 @@ export function drawPdfNetworkManagement(doc,{
     [t.mix,insights.shareOfAllSales,COLORS.cyan,false],
   ];
   function drawTable(rows,y=144,title=t.branches){
-    panel(title,7,y-21,196,Math.min(103,35+8.1*rows.length));
+    panel('',7,y-13,196,Math.min(91,18+8.1*rows.length));
+    T(title,10,y-7,190,8.6,COLORS.ink,true);
     const cols=[
       [t.branchName,10,64,'left'],
       [t.current,76,32,'right'],
@@ -104,16 +105,16 @@ export function drawPdfNetworkManagement(doc,{
       [t.growth,142,27,'right'],
       [t.share,174,24,'right'],
     ];
-    doc.setFillColor(...COLORS.bg);doc.rect(10,y-11,190,9,'F');
-    cols.forEach(([label,x,w,align])=>T(label,x,y-5,w,7.6,COLORS.muted,true,align));
-    if(!rows.length)T(t.noRecords,12,y+7,182,9,COLORS.muted);
+    doc.setFillColor(...COLORS.bg);doc.rect(10,y-5,190,7,'F');
+    cols.forEach(([label,x,w,align])=>T(label,x,y,w,7.1,COLORS.muted,true,align));
+    if(!rows.length)T(t.noRecords,12,y+10,182,9,COLORS.muted);
     rows.forEach((b,i)=>{
-      const yy=y+4+i*8.1;
+      const yy=y+8+i*8.1;
       if(i%2===1){doc.setFillColor(249,251,255);doc.rect(10,yy-5.8,190,8.1,'F');}
       T(b.name==='Unattributed branch'?t.unknown:b.name,11,yy,63,8.3,COLORS.ink,true);
       T(fmt(b.current.network),76,yy,32,8.2,COLORS.blue,true,'right');
       T(fmt(b.previous.network),111,yy,29,8.1,COLORS.muted,false,'right');
-      T(pct(b.growth),142,yy,27,8.0,b.growth<0?COLORS.amber:COLORS.green,false,'right');
+      T(pct(b.growth,true),142,yy,27,8.0,b.growth<0?COLORS.amber:COLORS.green,false,'right');
       T(pct(b.share),174,yy,24,8.0,COLORS.ink,false,'right');
     });
   }
@@ -127,7 +128,7 @@ export function drawPdfNetworkManagement(doc,{
         doc.setFillColor(247,250,255);doc.setDrawColor(...COLORS.line);
         doc.roundedRect(x,29,47.5,25,2.6,2.6,'FD');
         T(label,x+3,35,41.4,8,COLORS.muted,true);
-        T(isAmount?fmt(value):pct(value),x+3,45,41.4,16,color,true);
+        T(isAmount?fmt(value):pct(value,i===2),x+3,45,41.4,16,color,true);
         if(isAmount)T(currency,x+3,51,41.4,7,COLORS.muted);
       });
       // Plot the current and comparable previous period without mixing them.
