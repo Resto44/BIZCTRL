@@ -16,6 +16,13 @@ describe('Network account manager visibility contract', () => {
    expect(filter).toContain('String(a.branch_id) === String(branchId)');
    expect(filter).toContain('a.restaurant_id');
  });
+ it('loads branch manager settlement accounts only for the canonical assigned branch', () => {
+   const source = read('../src/components/network/NetworkAccountSelect.jsx');
+   expect(source).toContain('resolveCanonicalNetworkBranch(branches, branch)');
+   expect(source).toContain(".eq('branch_id', selected.id)");
+   expect(source).toContain(".eq('restaurant_id', activeRestaurant.id)");
+   expect(source).toContain('if (error) throw error;');
+ });
  it('does not broaden RLS or guess aliases when backfilling', () => {
    const sql = read('../supabase/migrations/20261106024500_network_accounts_canonical_branch_backfill.sql');
    expect(sql).toContain('b.restaurant_id::text = a.restaurant_id');
