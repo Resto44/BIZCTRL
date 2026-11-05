@@ -16,7 +16,7 @@ import {
 
 const COPY = {
   en: {
-    welcome: 'Welcome to BizCTRL', sub: 'A simple guide to your first day', progress: 'Step',
+    welcome: 'Welcome to BizCTRL', sub: 'A simple guide to your first day', progress: 'Step', language: 'Guide language',
     later: 'Continue later', skip: 'Skip guide', back: 'Back', next: 'Next', done: 'Finish',
     open: 'Open module', resume: 'You can reopen this guide from your profile menu.',
     install: { title: 'First, add BizCTRL to your phone',
@@ -64,7 +64,7 @@ const COPY = {
     },
   },
   fa: {
-    welcome: 'به BizCTRL خوش آمدید', sub: 'راهنمای آسان شروع کار', progress: 'مرحله',
+    welcome: 'به BizCTRL خوش آمدید', sub: 'راهنمای آسان شروع کار', progress: 'مرحله', language: 'زبان راهنما',
     later: 'بعداً ادامه می‌دهم', skip: 'رد کردن راهنما', back: 'قبلی', next: 'بعدی', done: 'پایان',
     open: 'باز کردن ماژول', resume: 'هر وقت خواستید، راهنما را از منوی پروفایل دوباره باز کنید.',
     install: { title: 'اول BizCTRL را روی موبایل اضافه کنید',
@@ -112,7 +112,7 @@ const COPY = {
     },
   },
   ar: {
-    welcome: 'مرحباً بك في BizCTRL', sub: 'دليل بسيط لبدء العمل', progress: 'الخطوة',
+    welcome: 'مرحباً بك في BizCTRL', sub: 'دليل بسيط لبدء العمل', progress: 'الخطوة', language: 'لغة الدليل',
     later: 'أكمل لاحقاً', skip: 'تخطي الدليل', back: 'السابق', next: 'التالي', done: 'إنهاء',
     open: 'فتح القسم', resume: 'يمكنك فتح الدليل من قائمة الملف الشخصي في أي وقت.',
     install: { title: 'أولاً، أضف BizCTRL إلى شاشة جوالك',
@@ -175,7 +175,7 @@ export default function NewUserWelcomeTour({ onVisibleChange }) {
   const { role, can } = useRole();
   const { activeMode } = useBusinessMode();
   const { configuration } = useWorkspaceCustomization();
-  const { lang = 'en' } = useLanguage();
+  const { lang = 'en', setLang, languages } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const { hasDeferredPrompt, triggerInstall, isInstalled } = usePWAInstall();
@@ -255,9 +255,25 @@ export default function NewUserWelcomeTour({ onVisibleChange }) {
     <DialogContent data-testid="saas-welcome-tour" dir={lang === 'en' ? 'ltr' : 'rtl'}
       className="max-h-[92dvh] w-[calc(100vw-1.5rem)] max-w-lg overflow-y-auto rounded-2xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6">
       <DialogHeader className="text-start">
-        <div className="flex items-center gap-2 text-primary">
-          <MonitorSmartphone className="h-5 w-5" />
-          <span className="text-xs font-semibold">{copy.welcome}</span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2 text-primary">
+            <MonitorSmartphone className="h-5 w-5 shrink-0" />
+            <span className="text-xs font-semibold">{copy.welcome}</span>
+          </div>
+          <div role="group" dir="ltr" aria-label={copy.language}
+            data-testid="welcome-language-switcher"
+            className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-border bg-muted/40 p-1">
+            {languages.map(language => (
+              <button type="button" key={language.code}
+                lang={language.code} dir={language.direction}
+                aria-label={language.nativeName} aria-pressed={lang === language.code}
+                data-testid={'welcome-language-' + language.code}
+                onClick={() => setLang(language.code)}
+                className={`min-h-9 rounded-lg px-2.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary ${lang === language.code ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-background hover:text-foreground'}`}>
+                {language.nativeName}
+              </button>
+            ))}
+          </div>
         </div>
         <DialogTitle className="text-xl font-bold leading-tight">{heading}</DialogTitle>
         <DialogDescription className="text-sm leading-6">{detail}</DialogDescription>
