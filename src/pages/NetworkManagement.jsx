@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Wifi, Plus, Edit2, Trash2, CheckCircle, XCircle, Building2, ArrowLeftRight, BarChart3, LayoutDashboard,
@@ -1230,7 +1231,8 @@ function DashboardTab({ accounts, currency, salesData, recons }) {
 export default function NetworkManagement() {
   const { ownerFilter, activeRestaurant, branches } = useTenant();
   const { currency } = useLanguage();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'accounts' ? 'accounts' : 'dashboard');
 
   // ── Fetch network accounts (scoped to owner, never restaurant selector)
   const { data: accounts = [], isLoading: loadingAccounts, refetch: refetchAccounts } = useQuery({
