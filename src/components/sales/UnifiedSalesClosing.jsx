@@ -513,9 +513,10 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     }));
   }, [branches, queryClient, setSelectedBranchId]);
 
-  // Previous source balances are calculated once in the database from immutable,
-  // earlier completed closing snapshots. The aggregate is scoped by tenant, branch
-  // and stable source UUID; it intentionally excludes the current date and drafts.
+  // Previous source balances are calculated from finalized snapshots within the
+  // selected closing's calendar month only. The database RPC applies the month
+  // boundary; history from prior months stays intact for reports and analytics.
+  // Scope is tenant + branch + stable source UUID, excluding today and drafts.
   const { data: sourcePreviousBalanceRows, isLoading: sourceHistoryLoading, isError: sourceHistoryUnavailable } = useQuery({
     queryKey: ['sales-source-previous-balances', activeRestaurant?.id, selectedBranchId, form.branch, form.date, initial?.id],
     enabled: Boolean(activeRestaurant?.id && form.date && (selectedBranchId || form.branch)),
