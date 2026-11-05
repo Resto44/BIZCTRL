@@ -3,7 +3,7 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { closingFundingProposal, activeClosingNetworkAccounts, closingNetworkBranchAliases, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
+import { closingFundingProposal, activeClosingNetworkAccounts, closingNetworkBranchAliases, closingNetworkAccountId, hasDuplicateClosingNetworkAccounts, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
 import { cashReconciliationSnapshot } from '@/lib/closing/CashReconciliationLedger';
 const mock=vi.hoisted(()=>({rpc:vi.fn()}));
 vi.mock('@/api/supabaseClient',()=>({supabase:{rpc:mock.rpc}}));
@@ -64,6 +64,26 @@ describe('closing funding and networks',()=>{
    const repeated = [{id:'b1',key:'one',name:'Shared'}, {id:'b2',key:'two',name:'Shared'}];
    expect(closingNetworkBranchAliases(repeated,'b1','one')).toEqual(['one']);
    expect(activeClosingNetworkAccounts([{id:'ambiguous',restaurant_id:'r',branch:'Shared',status:'active'}],'r','b1','one',closingNetworkBranchAliases(repeated,'b1','one'))).toEqual([]);
+ });
+ it('enforces one POS network account per closing, even when amounts are blank or zero',()=>{
+   const accounts=[{id:'mada-1'},{id:'mada-2'}];
+   const good=[{id:'p1',network_account_id:'mada-1',amount:'25'},{id:'p2',device_id:'mada-2',amount:'65'}];
+   expect(closingNetworkAccountId(good[1])).toBe('mada-2');
+   expect(hasDuplicateClosingNetworkAccounts(good)).toBe(false);
+   expect(validClosingNetworkEntries(good,accounts)).toBe(true);
+   for (const duplicateAmount of ['25','0','']) {
+     const bad=[good[0],{id:'p2',device_id:'mada-1',amount:duplicateAmount}];
+     expect(hasDuplicateClosingNetworkAccounts(bad)).toBe(true);
+     expect(validClosingNetworkEntries(bad,accounts)).toBe(false);
+   }
+   // A saved closing may have historical duplicate rows. Do not rewrite it;
+   // block any *new* save until the operator removes the duplicate rows.
+   const legacy=[{id:'a',device_id:'mada-1',amount:'25'},{id:'b',device_id:'mada-1',amount:'65'}];
+   expect(validClosingNetworkEntries(legacy,accounts)).toBe(false);
+   expect(legacy.map(x=>x.amount)).toEqual(['25','65']);
+   expect(validClosingNetworkEntries([{amount:'0'},{amount:''}],accounts)).toBe(true);
+   expect(validClosingNetworkEntries([{amount:'25',device_id:'missing'}],accounts)).toBe(false);
+   expect(validClosingNetworkEntries([{amount:'25',device_id:'mada-1'}],[{id:'mada-2'}])).toBe(false);
  });
  const mount=async(role='owner', expectedCash=-152, actualCash=95)=>{client=new QueryClient({defaultOptions:{queries:{retry:false}}});await act(async()=>{tree=create(<QueryClientProvider client={client}><ClosingFundingPanel restaurantId="r" branchId="b" branchKey="main" date="2026-10-23" shift="Morning" cashierId="c" expectedCash={expectedCash} actualCash={actualCash} role={role}/></QueryClientProvider>);});};
  const fill=()=>act(()=>{tree.root.findAllByType('input').find(x=>x.props.inputMode==='decimal').props.onChange({target:{value:'247'}});tree.root.findByType('textarea').props.onChange({target:{value:'Confirmed supplier cash funding'}});tree.root.findAllByType('input').find(x=>x.props.type==='checkbox').props.onChange({target:{checked:true}});});
