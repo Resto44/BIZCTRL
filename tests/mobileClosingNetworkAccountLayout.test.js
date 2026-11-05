@@ -16,7 +16,7 @@ describe('mobile Sales Closing network entry', () => {
     expect(section).toContain('data-testid="closing-primary-network-selector"');
     expect(section.indexOf('quick-closing-network-')).toBeLessThan(section.indexOf('closing-primary-network-selector'));
     expect(section).toContain('data-testid="closing-network-empty-state"');
-    expect(section).toContain('href="/network-management"');
+    expect(section).toContain('href="/network-management?tab=accounts"');
     expect(section).toContain('target="_blank"');
     expect(section).toContain('can?.viewNetworkAccounts');
     expect(section).toContain('reloadNetworks()');
@@ -30,6 +30,7 @@ describe('mobile Sales Closing network entry', () => {
     expect(closing).toContain("enabled: Boolean(activeRestaurant?.id && selectedBranchId)");
     expect(closing).toContain('closingNetworkBranchAliases(branches, selectedBranchId, form.branch)');
     expect(management.match(/invalidateQueries\(\{ queryKey: \['pos_devices_form'\] \}\)/g)).toHaveLength(3);
+    expect(management).toContain("searchParams.get('tab') === 'accounts'");
     expect(closing).not.toContain('setPosEntries([])');
   });
 });
