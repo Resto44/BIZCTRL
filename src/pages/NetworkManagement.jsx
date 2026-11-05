@@ -249,17 +249,17 @@ function NetworkAccountsTab({ accounts, branches, currency, onRefresh }) {
         created_by: ownerFilter?.created_by || '',
       });
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); setShowForm(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); qc.invalidateQueries({ queryKey: ['pos_devices_form'] }); setShowForm(false); },
   });
 
   const updateMut = useMutation({
     mutationFn: ({ id, data }) => base44.entities.NetworkAccount.update(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); setEditing(null); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); qc.invalidateQueries({ queryKey: ['pos_devices_form'] }); setEditing(null); },
   });
 
   const deleteMut = useMutation({
     mutationFn: (id) => base44.entities.NetworkAccount.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); setDeleting(null); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); qc.invalidateQueries({ queryKey: ['pos_devices_form'] }); setDeleting(null); },
   });
 
   const toggleStatus = useCallback((acc) => {
