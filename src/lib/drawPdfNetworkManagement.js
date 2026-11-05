@@ -79,7 +79,9 @@ const fmt = n => n===null||!Number.isFinite(Number(n))?'—':
 const pct = (value,showSign=false) => value==null?'—':(showSign&&value>0?'+':'')+fmt(value)+'%';
 const clamp = (value,min,max)=>Math.min(max,Math.max(min,value));
 
-/** An additive read-only appendix; the existing two-page financial report is not modified. */
+/** An additive read-only appendix; the existing two-page financial report is not modified.
+ * Keep each panel heading exactly once; missing POS metadata is not an accounting shortage.
+ */
 export function drawPdfNetworkManagement(doc,{
   insights,range,currency='SAR',lang='en',businessName='BizCTRL',
   branchLabel='All branches',iconData=null,
