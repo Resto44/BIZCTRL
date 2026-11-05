@@ -78,6 +78,24 @@ describe('Network ERP analytics financial invariants',()=>{
     expect(branchMatches({branch:'Shared'},'a',duplicates)).toBe(false);
     expect(branchMatches({branch_id:'b',branch:'Shared'},'a',duplicates)).toBe(false);
   });
+  it('keeps same-name branches separate and supports unique legacy settlement keys',()=>{
+    const duplicateNames = [
+      {id:'id1',key:'one',name:'Shared'},
+      {id:'id2',key:'two',name:'Shared'},
+    ];
+    const rows=[
+      {id:'p1',date:'2026-11-05',branch_id:'id1',branch:'one',reported_network_sales:20},
+      {id:'p2',date:'2026-11-05',branch_id:'id2',branch:'two',reported_network_sales:40},
+    ];
+    const m=networkInsights({sales:rows,branches:duplicateNames,window});
+    expect(m.byBranch).toHaveLength(2);
+    expect(m.byBranch.map(x=>x.value)).toEqual([40,20]);
+    expect(m.byBranch[0].id).not.toBe(m.byBranch[1].id);
+    expect(m.byBranch[0].name).not.toBe(m.byBranch[1].name);
+    expect(branchMatches({branch_id:'main'},'branch-a',branches)).toBe(true);
+    expect(branchMatches({branch_id:'second'},'branch-a',branches)).toBe(false);
+    expect(branchMatches({branch_id:'Shared'},'id1',duplicateNames)).toBe(false);
+  });
   it('does not invent POS account distribution when saved entries are absent',()=>{
     const result=model({sales:sales.map(s=>({...s,pos_entries_json:'[]'}))});
     expect(result.revenue).toBe(120);
