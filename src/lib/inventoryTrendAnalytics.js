@@ -116,7 +116,17 @@ export function computeInventoryInsights(liveStock = [], purchases = [], waste =
 }
 
 export function inventoryItemActivity(analytics, item) {
-  return analytics.byItem.get(itemKey(item)) || {
-    purchaseEvents: 0, wasteEvents: 0, purchasedQty: 0, wastedQty: 0,
-  };
+  // Legacy purchase/waste rows may have a branch key but no canonical branch_id.
+  // Merge the two *distinct* aliases rather than silently dropping older history.
+  const ids = [...new Set([item?.branch_id, item?.branch].filter(Boolean).map(String))];
+  const activity = { purchaseEvents: 0, wasteEvents: 0, purchasedQty: 0, wastedQty: 0 };
+  ids.forEach(branch => {
+    const source = analytics.byItem.get(String(item?.product_id || '') + '::' + branch);
+    if (!source) return;
+    activity.purchaseEvents += source.purchaseEvents;
+    activity.wasteEvents += source.wasteEvents;
+    activity.purchasedQty += source.purchasedQty;
+    activity.wastedQty += source.wastedQty;
+  });
+  return activity;
 }
