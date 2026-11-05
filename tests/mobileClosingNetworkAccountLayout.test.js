@@ -22,6 +22,21 @@ describe('mobile Sales Closing network entry', () => {
     expect(section).toContain('reloadNetworks()');
   });
 
+  it('disables already selected accounts in other POS rows and blocks extra rows without available devices', () => {
+    const closing = source('../src/components/sales/UnifiedSalesClosing.jsx');
+    const funding = source('../src/lib/closing/ClosingFunding.js');
+    expect(closing).toContain("new Set(posEntries.map(closingNetworkAccountId).filter(Boolean))");
+    expect(closing).toContain('disabled={selectedNetworkAccountIds.has(String(account.id)) && String(account.id) !== currentAccountId}');
+    expect(closing).toContain("rows.some(row => row.id !== rowId && closingNetworkAccountId(row) === selectedId)");
+    expect(closing).toContain('disabled={!canAddNetworkRow}');
+    expect(closing).toContain("newStableRowId('pos')");
+    expect(closing).toContain('data-testid="closing-duplicate-network-warning"');
+    expect(closing).toContain('duplicateNetworkAccount ? networkDuplicateMessage');
+    expect(funding).toContain('hasDuplicateClosingNetworkAccounts(entries)');
+    expect(closing).toContain('validClosingNetworkEntries(posEntries, posDevices)');
+    expect(closing).not.toContain('setPosEntries([])');
+  });
+
   it('keeps strict card-account validation and reloads network entries on account mutations', () => {
     const closing = source('../src/components/sales/UnifiedSalesClosing.jsx');
     const management = source('../src/pages/NetworkManagement.jsx');

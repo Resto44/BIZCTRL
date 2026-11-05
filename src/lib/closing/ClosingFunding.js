@@ -35,11 +35,29 @@ export function activeClosingNetworkAccounts(accounts, restaurantId, branchId, b
     && (a.branch_id ? String(a.branch_id) === String(branchId)
       : [a.branch, a.branch_key].some(value => legacyKeys.has(branchAlias(value)))));
 }
+// A network account can be used only once in a Closing. Multiple amounts for
+// the same physical POS terminal must be combined into its existing row rather
+// than counted as separate card sources. This applies even to zero/blank rows.
+// UI prevents re-selection; this validator also guards stale/historical records.
+export const closingNetworkAccountId = entry => String(entry?.network_account_id || entry?.device_id || '').trim();
+
+export function hasDuplicateClosingNetworkAccounts(entries) {
+  const seen = new Set();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const id = closingNetworkAccountId(entry);
+    if (!id) continue;
+    if (seen.has(id)) return true;
+    seen.add(id);
+  }
+  return false;
+}
+
 export function validClosingNetworkEntries(entries, accounts) {
-  const ids = new Set(accounts.map(a => a.id));
+  if (!Array.isArray(entries) || !Array.isArray(accounts) || hasDuplicateClosingNetworkAccounts(entries)) return false;
+  const ids = new Set(accounts.map(a => String(a.id)));
   return entries.every(e => e.amount === '' || e.amount == null ||
     (/^\d+(?:\.\d{1,2})?$/.test(String(e.amount)) && Number.isFinite(Number(e.amount)) &&
-      (Number(e.amount) === 0 || ids.has(e.network_account_id || e.device_id))));
+      (Number(e.amount) === 0 || ids.has(closingNetworkAccountId(e)))));
 }
 
 // Standalone receipts have no closing document ID. A new unsaved closing also
