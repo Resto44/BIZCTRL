@@ -30,6 +30,8 @@ export function getWelcomeTourStages({ role = 'owner', mode = 'restaurant', can 
   const owner = role === 'owner';
   const supplier = role === 'supplier';
   const employee = role === 'employee';
+  // Match the existing SalesClosingCustomizationProvider.canCustomize boundary.
+  const canCreateSalesSources = owner || can.manageDashboardCustomization === true;
   const home = owner ? '/owner-command-center' :
     role === 'manager' || role === 'general_manager' ? '/manager-dashboard' :
       employee ? '/employee-dashboard' : '/supplier-portal';
@@ -50,7 +52,7 @@ export function getWelcomeTourStages({ role = 'owner', mode = 'restaurant', can 
     ] : []),
     // Creation uses the same Owner/delegated customization permission as SalesSourceManagement.
     // The one-shot ?create=1 flag only opens the existing secure editor; it never saves a record.
-    stage('sources', (owner || can.manageDashboardCustomization === true) ? [
+    stage('sources', canCreateSalesSources ? [
       module('salesSources', '/sales-sources?create=1', 'viewSales'),
     ] : []),
     stage('prepare', supplier ? [] : [
