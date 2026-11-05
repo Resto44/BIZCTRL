@@ -11,7 +11,7 @@ export function closingFundingProposal(expectedCash, actualCash) {
 // Resolve legacy text-only network accounts against the *selected* canonical branch.
 // Only unique aliases from authorized branch metadata are accepted, so duplicate
 // display names cannot leak an account between branches.
-const branchAlias = value => String(value || '').trim().toLocaleLowerCase().replace(/[_\\s]+/g, ' ');
+const branchAlias = value => String(value || '').trim().toLocaleLowerCase().replace(/[_\s]+/g, ' ');
 
 export function closingNetworkBranchAliases(branches, selectedBranchId, branchKey) {
   if (!selectedBranchId) return [];
