@@ -14,6 +14,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { useWorkspaceTabActive } from '@/lib/WorkspaceTabVisibilityContext';
 import { Check } from 'lucide-react';
 import { SALES_SOURCE_COLOR_OPTIONS, SALES_SOURCE_ICON_OPTIONS, salesSourceToneFor } from '@/lib/salesSourceAppearance';
+import { SALES_SOURCE_CATEGORIES } from '@/lib/salesSourceCategories';
 
 const asArray = (value) => Array.isArray(value) ? value.filter(Boolean) : [];
 const localizedDataName = (record, lang) => {
@@ -22,7 +23,6 @@ const localizedDataName = (record, lang) => {
   return record?.name_en || record?.name_ar || record?.name_fa || '';
 };
 
-const SOURCE_CATEGORIES = ['delivery', 'wholesale', 'counter', 'online', 'corporate', 'credit', 'bank_transfer', 'other'];
 
 export function newSalesClosingSource(order = 10) {
   return {
@@ -174,7 +174,7 @@ export function SalesSourceDialog({ editor, onClose, onSave, isSaving, paymentMe
           <section className="grid gap-3 rounded-xl border bg-muted/20 p-3">
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t('salesSourceManagement.configuration')}</p>
             <div className="grid gap-3 sm:grid-cols-3">
-              <div><Label>{t('salesSourceManagement.category')}</Label><Select value={draft.category || 'other'} onValueChange={(category) => set({ category })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SOURCE_CATEGORIES.map((category) => <SelectItem key={category} value={category}>{t(`salesSourceManagement.category.${category}`)}</SelectItem>)}</SelectContent></Select></div>
+              <div><Label>{t('salesSourceManagement.category')}</Label><Select value={draft.category || 'other'} onValueChange={(category) => set({ category })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SALES_SOURCE_CATEGORIES.map((category) => <SelectItem key={category} value={category}>{t(`salesSourceManagement.category.${category}`)}</SelectItem>)}</SelectContent></Select></div>
               <div><Label>{local('Optional Subcategory')}</Label><Input value={draft.subcategory || ''} onChange={(event) => set({ subcategory: event.target.value })} placeholder={local("e.g. Drivers")} maxLength={120} /></div>
               <div><Label>{t('salesClosing.dialog.defaultPayment')}</Label><Select disabled={isCustomerCreditSource(draft)} value={draft.default_payment_method || 'cash'} onValueChange={(default_payment_method) => set({ default_payment_method })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{salesPaymentOptions(paymentMethods).map((method) => <SelectItem key={method.id} value={method.code}>{localizedDataName(method, lang)}</SelectItem>)}</SelectContent></Select></div>
               <div><Label>{t('salesClosing.dialog.displayOrder')}</Label><Input type="number" min="0" value={draft.sort_order ?? 0} onChange={(event) => set({ sort_order: Number(event.target.value) || 0 })} /></div>
