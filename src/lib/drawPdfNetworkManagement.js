@@ -88,7 +88,7 @@ export function drawPdfNetworkManagement(doc,{
   const t=copy[lang]||copy.en;
   const rtl=lang==='fa'||lang==='ar';
   const branches=insights.branches||[];
-  const chunkSize=9;
+  const chunkSize=8; // leave a readable gap before the A4 accounting notes
   const pageCount=Math.max(1,Math.ceil(branches.length/chunkSize));
   const numberPages=2+pageCount;
   const T=(v,x,y,w=40,size=8.3,color=COLORS.ink,bold=false,align=rtl?'right':'left')=>
