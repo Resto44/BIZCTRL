@@ -6,14 +6,13 @@ import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import PageHeader from '@/components/shared/PageHeader';
 import BranchSelect from '@/components/shared/BranchSelect';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertTriangle, Plus, Package, Pencil, MessageSquare, Bell } from 'lucide-react';
+import { Plus, MessageSquare, Bell } from 'lucide-react';
+import InventoryERPInsights from '@/components/inventory/InventoryERPInsights';
 import { format } from 'date-fns';
 import { computeLiveStock, sendWhatsAppAlert, groupLowStockByBranch } from '@/lib/stockEngine';
 import { useTenant } from '@/lib/TenantContext';
@@ -161,11 +160,6 @@ export default function Inventory() {
   const lowStockByBranch = useMemo(() => groupLowStockByBranch(liveStock), [liveStock]);
   const totalLow = liveStock.filter(i => i.isLow).length;
 
-  const filtered = useMemo(() =>
-    liveStock,
-    [liveStock]
-  );
-
   const branchLabel = (key) => branches.find(b => b.key === key)?.label || key;
 
   return (
@@ -194,39 +188,14 @@ export default function Inventory() {
         />
       </div>
 
-      <div className="space-y-2">
-        {filtered.length === 0 && (
-          <div className="text-center py-10 text-muted-foreground">
-            <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
-            <p className="text-sm">{lang === 'ar' ? 'لا توجد بيانات مخزون' : lang === 'fa' ? 'داده انباری وجود ندارد' : 'No inventory records'}</p>
-          </div>
-        )}
-        {filtered.map((item) => (
-          <Card key={`${item.product_id}_${item.branch}`} className="p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${item.isLow ? 'bg-red-50' : 'bg-secondary'}`}>
-                  {item.isLow ? <AlertTriangle className="w-5 h-5 text-red-500" /> : <Package className="w-5 h-5 text-muted-foreground" />}
-                </div>
-                <div>
-                  <p className="font-medium text-sm">{item.product_name || item.product_id}</p>
-                  <p className="text-xs text-muted-foreground">{branchLabel(item.branch)} · {item.unit}</p>
-                  {item.wastedQty > 0 && <p className="text-xs text-orange-500">−{item.wastedQty} wasted</p>}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="text-end">
-                  <p className={`font-bold text-sm ${item.isLow ? 'text-red-500' : 'text-emerald-600'}`}>{item.currentStock?.toFixed(1) ?? item.opening_stock}</p>
-                  <Badge variant={item.isLow ? 'destructive' : 'secondary'} className="text-[10px]">
-                    {item.isLow ? m.low_stock : m.ok}
-                  </Badge>
-                </div>
-                <Button size="icon" variant="ghost" onClick={() => openEdit(item)}><Pencil className="w-4 h-4" /></Button>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+      <InventoryERPInsights
+        lang={lang}
+        liveStock={liveStock}
+        purchases={purchases}
+        wastage={wastage}
+        branchLabel={branchLabel}
+        onEdit={openEdit}
+      />
 
       {/* WhatsApp Alert Setup */}
       <Dialog open={showAlertSetup} onOpenChange={setShowAlertSetup}>
