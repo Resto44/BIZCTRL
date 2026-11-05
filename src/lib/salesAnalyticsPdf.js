@@ -31,6 +31,12 @@ export async function generateSalesAnalyticsPDF({
   snapshot,previousSnapshot,growth,range,report:operationsReport,branchLabel,
   businessName,currency,lang:language,iconData,fullAnalytics,
  });
+ // The canonical financial pages remain unchanged; add a separate, read-only
+ // Network Management ERP appendix when verified network detail was provided.
+ if (fullAnalytics?.networkBranches?.available) {
+  drawPdfNetworkManagement(doc,{insights:fullAnalytics.networkBranches,range,currency,
+   lang:language,businessName,branchLabel,iconData});
+ }
 
  if(download)doc.save(safePdfFilename('BizCTRL-ERP-Analytics-v2-'+range.from+'-'+range.to,language));
  return doc;
