@@ -343,7 +343,7 @@ export default function Reports() {
   const fullAnalytics = useMemo(()=>buildFullSalesAnalyticsReport({
     sales,purchases,walletTransactions,snapshot:periodSnapshot,previousSnapshot,
     operationsReport,range:reportRange,revenueSources,branches:scopedBranches,lang,historyAvailable:true,
-  }),[sales,purchases,walletTransactions,periodSnapshot,previousSnapshot,operationsReport,reportRange,revenueSources,lang]);
+  }),[sales,purchases,walletTransactions,periodSnapshot,previousSnapshot,operationsReport,reportRange,revenueSources,scopedBranches,lang]);
   const productQtyAnalytics = {
     monthlyProducts:fullAnalytics.products.map(p=>({productId:p.id,productName:p.name,totalQuantity:p.quantity,unit:p.unit,totalCost:p.cost})),
   };
