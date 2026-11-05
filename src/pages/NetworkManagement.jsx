@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Wifi, Plus, Edit2, Trash2, CheckCircle, XCircle, Building2, ArrowLeftRight, BarChart3, LayoutDashboard,
@@ -249,17 +250,17 @@ function NetworkAccountsTab({ accounts, branches, currency, onRefresh }) {
         created_by: ownerFilter?.created_by || '',
       });
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); setShowForm(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); qc.invalidateQueries({ queryKey: ['pos_devices_form'] }); setShowForm(false); },
   });
 
   const updateMut = useMutation({
     mutationFn: ({ id, data }) => base44.entities.NetworkAccount.update(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); setEditing(null); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); qc.invalidateQueries({ queryKey: ['pos_devices_form'] }); setEditing(null); },
   });
 
   const deleteMut = useMutation({
     mutationFn: (id) => base44.entities.NetworkAccount.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); setDeleting(null); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); qc.invalidateQueries({ queryKey: ['pos_devices_form'] }); setDeleting(null); },
   });
 
   const toggleStatus = useCallback((acc) => {
@@ -1230,7 +1231,8 @@ function DashboardTab({ accounts, currency, salesData, recons }) {
 export default function NetworkManagement() {
   const { ownerFilter, activeRestaurant, branches } = useTenant();
   const { currency } = useLanguage();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'accounts' ? 'accounts' : 'dashboard');
 
   // ── Fetch network accounts (scoped to owner, never restaurant selector)
   const { data: accounts = [], isLoading: loadingAccounts, refetch: refetchAccounts } = useQuery({

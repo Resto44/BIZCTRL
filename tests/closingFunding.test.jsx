@@ -3,7 +3,7 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { closingFundingProposal, activeClosingNetworkAccounts, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
+import { closingFundingProposal, activeClosingNetworkAccounts, closingNetworkBranchAliases, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
 import { cashReconciliationSnapshot } from '@/lib/closing/CashReconciliationLedger';
 const mock=vi.hoisted(()=>({rpc:vi.fn()}));
 vi.mock('@/api/supabaseClient',()=>({supabase:{rpc:mock.rpc}}));
@@ -42,6 +42,28 @@ describe('closing funding and networks',()=>{
   expect(validClosingNetworkEntries([{amount:50}],accounts)).toBe(false);
   expect(validClosingNetworkEntries([{amount:'1.001',network_account_id:'a'}],accounts)).toBe(false);
   expect(validClosingNetworkEntries([{amount:0}],[])).toBe(true);
+ });
+ it('matches only unique canonical branch aliases for legacy network records', () => {
+   const branches = [
+     {id:'b1',key:'فرع_دخل',name:'فرع دخل'},
+     {id:'b2',key:'فرع_ربان',name:'فرع ربان'},
+   ];
+   const names = closingNetworkBranchAliases(branches,'b1','فرع_دخل');
+   expect(names).toContain('فرع دخل');
+   const accounts = [
+     {id:'old',restaurant_id:'r',branch_id:null,branch:'فرع دخل',status:'active',is_active:false},
+     {id:'other-branch',restaurant_id:'r',branch_id:null,branch:'فرع ربان',status:'active'},
+     {id:'other-tenant',restaurant_id:'foreign',branch_id:null,branch:'فرع دخل',status:'active'},
+     {id:'inactive',restaurant_id:'r',branch_id:null,branch:'فرع دخل',status:'inactive'},
+     {id:'canonical',restaurant_id:'r',branch_id:'b1',status:'active'},
+   ];
+   expect(activeClosingNetworkAccounts(accounts,'r','b1','فرع_دخل',names).map(x=>x.id)).toEqual(['old','canonical']);
+   expect(validClosingNetworkEntries([{amount:'25',network_account_id:'old'}],accounts.filter(x => ['old','canonical'].includes(x.id)))).toBe(true);
+   expect(closingNetworkBranchAliases(branches,'b-missing','فرع دخل')).toEqual([]);
+   // Duplicate names are ambiguous: legacy account must not be assigned to either branch.
+   const repeated = [{id:'b1',key:'one',name:'Shared'}, {id:'b2',key:'two',name:'Shared'}];
+   expect(closingNetworkBranchAliases(repeated,'b1','one')).toEqual(['one']);
+   expect(activeClosingNetworkAccounts([{id:'ambiguous',restaurant_id:'r',branch:'Shared',status:'active'}],'r','b1','one',closingNetworkBranchAliases(repeated,'b1','one'))).toEqual([]);
  });
  const mount=async(role='owner', expectedCash=-152, actualCash=95)=>{client=new QueryClient({defaultOptions:{queries:{retry:false}}});await act(async()=>{tree=create(<QueryClientProvider client={client}><ClosingFundingPanel restaurantId="r" branchId="b" branchKey="main" date="2026-10-23" shift="Morning" cashierId="c" expectedCash={expectedCash} actualCash={actualCash} role={role}/></QueryClientProvider>);});};
  const fill=()=>act(()=>{tree.root.findAllByType('input').find(x=>x.props.inputMode==='decimal').props.onChange({target:{value:'247'}});tree.root.findByType('textarea').props.onChange({target:{value:'Confirmed supplier cash funding'}});tree.root.findAllByType('input').find(x=>x.props.type==='checkbox').props.onChange({target:{checked:true}});});

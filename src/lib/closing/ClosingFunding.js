@@ -8,10 +8,32 @@ export function closingFundingProposal(expectedCash, actualCash) {
   return { minimum, toCount: actualCash === null || !Number.isFinite(Number(actualCash)) ? null : Math.max(0, sumClosingMoney(Number(actualCash), -Number(expectedCash))) };
 }
 
-export function activeClosingNetworkAccounts(accounts, restaurantId, branchId, branchKey) {
+// Resolve legacy text-only network accounts against the *selected* canonical branch.
+// Only unique aliases from authorized branch metadata are accepted, so duplicate
+// display names cannot leak an account between branches.
+const branchAlias = value => String(value || '').trim().toLocaleLowerCase().replace(/[_\s]+/g, ' ');
+
+export function closingNetworkBranchAliases(branches, selectedBranchId, branchKey) {
+  if (!selectedBranchId) return [];
+  const records = Array.isArray(branches) ? branches : [];
+  const selected = records.find(branch => String(branch.id) === String(selectedBranchId));
+  if (!selected) return [];
+  const values = branch => [branch.key, branch.branch_key, branch.name, branch.label].filter(Boolean);
+  const candidates = [...values(selected), branchKey].filter(Boolean);
+  return [...new Set(candidates.map(branchAlias).filter(Boolean))].filter(alias =>
+    records.filter(branch => values(branch).some(value => branchAlias(value) === alias)).length === 1
+  );
+}
+
+export function activeClosingNetworkAccounts(accounts, restaurantId, branchId, branchKey, branchAliases = null) {
+  // A supplied empty alias list means that branch metadata is ambiguous.
+  // Do not fall back to a potentially shared human-readable branch name.
+  const keys = Array.isArray(branchAliases) ? branchAliases : [branchKey];
+  const legacyKeys = new Set(keys.map(branchAlias).filter(Boolean));
   return accounts.filter(a => String(a.restaurant_id) === String(restaurantId)
-    && (a.status ? a.status.toLowerCase() === 'active' : a.is_active === true)
-    && (a.branch_id ? a.branch_id === branchId : [a.branch, a.branch_key].includes(branchKey)));
+    && (a.status ? String(a.status).toLowerCase() === 'active' : a.is_active === true)
+    && (a.branch_id ? String(a.branch_id) === String(branchId)
+      : [a.branch, a.branch_key].some(value => legacyKeys.has(branchAlias(value)))));
 }
 export function validClosingNetworkEntries(entries, accounts) {
   const ids = new Set(accounts.map(a => a.id));

@@ -68,7 +68,7 @@ import { closingCashSalesSources } from '@/lib/closing/ClosingCashSalesSources';
 import ClosingControlOverview from '@/components/sales/ClosingControlOverview';
 import ClosingStepNavigation, { closingStepCopy, closingStepIssues } from '@/components/sales/ClosingStepNavigation';
 import ClosingFundingPanel from '@/components/sales/ClosingWalletChoice';
-import { activeClosingNetworkAccounts, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
+import { activeClosingNetworkAccounts, closingNetworkBranchAliases, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { hasCanonicalCustomerScope, loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
 import { recordCustomerReceivablePayment, newReceivableRequestId, invalidateCustomerReceivableQueries, customerDebtPaymentErrorMessage } from '@/lib/debt/customerReceivableRepository';
@@ -337,7 +337,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const closingTr = useClosingTranslation();
   const { currency, lang, t } = useLanguage();
   const { user } = useAuth();
-  const { role } = useRole();
+  const { role, can } = useRole();
   const { ownerFilter, branches: tenantBranches, managerBranch, activeRestaurant, isManager } = useTenant();
   const { selectedBranchId: activeBranchId, selectedBranchKey: activeBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const queryClient = useQueryClient();
@@ -890,8 +890,9 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   // apply a late response from a previously selected branch.
 
   // Account options come from Network Management in the active tenant/branch.
+  const networkBranchAliases = useMemo(() => closingNetworkBranchAliases(branches, selectedBranchId, form.branch), [branches, selectedBranchId, form.branch]);
   const { data: posDevicesData, isLoading: posLoading, isError: posUnavailable, refetch: reloadNetworks } = useQuery({
-    queryKey: ['pos_devices_form', activeRestaurant?.id, form.branch, selectedBranchId],
+    queryKey: ['pos_devices_form', activeRestaurant?.id, form.branch, selectedBranchId, networkBranchAliases.join('|')],
     enabled: Boolean(activeRestaurant?.id && selectedBranchId),
     queryFn: async () => {
       const all = [];
@@ -901,7 +902,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           .eq('restaurant_id', activeRestaurant.id).order('id').range(offset, offset + 499);
         if (error) throw error;
         all.push(...data);
-        if (data.length < 500) return activeClosingNetworkAccounts(all, activeRestaurant.id, selectedBranchId, form.branch);
+        if (data.length < 500) return activeClosingNetworkAccounts(all, activeRestaurant.id, selectedBranchId, form.branch, networkBranchAliases);
       }
       throw new Error('Network account list exceeds safe pagination limit');
     },
@@ -1949,13 +1950,26 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 </div>
               </div>
               </details>
-              <div data-testid="offline-sales-audit" className="grid min-w-0 grid-cols-1 gap-2.5 min-[360px]:grid-cols-2">
-                <div className="min-w-0"><Label htmlFor="quick-closing-cashSales" className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'فروش نقدی قبل از پرداخت‌ها' : lang === 'ar' ? 'مبيعات نقدية قبل المدفوعات' : closingTr('Cash sales before payments')}</Label><ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} disabled={useAutomaticSales || isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" /></div>
-                <div className="min-w-0"><Label htmlFor={`quick-closing-network-${posEntries[0]?.id || 'empty'}`} className="mb-1.5 block text-xs font-bold text-slate-700">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : closingTr('Network / Card')}</Label>
-                  {posEntries[0] && networkSelector(posEntries[0])}
+              <div data-testid="offline-sales-audit" className="grid min-w-0 grid-cols-1 items-end gap-2.5 min-[360px]:grid-cols-2">
+                <div className="flex min-w-0 flex-col justify-end">
+                  <Label htmlFor="quick-closing-cashSales" className="mb-1.5 block min-h-10 text-xs font-bold text-slate-700">{lang === 'fa' ? 'فروش نقدی قبل از پرداخت‌ها' : lang === 'ar' ? 'مبيعات نقدية قبل المدفوعات' : closingTr('Cash sales before payments')}</Label>
+                  <ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} disabled={useAutomaticSales || isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" />
+                </div>
+                <div className="flex min-w-0 flex-col justify-end">
+                  <Label htmlFor={`quick-closing-network-${posEntries[0]?.id || 'empty'}`} className="mb-1.5 block min-h-10 text-xs font-bold text-slate-700">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : closingTr('Network / Card')}</Label>
                   {posEntries[0] && <ClosingNumericInput id={`quick-closing-network-${posEntries[0].id}`} value={posEntries[0].amount ?? ''} onChange={value => updatePos(posEntries[0].id, 'amount', value)} prefix={currency} disabled={isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" />}
                 </div>
               </div>
+              {posEntries[0] && <div data-testid="closing-primary-network-selector" className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-2.5">{networkSelector(posEntries[0])}</div>}
+              {!posLoading && !posUnavailable && selectedBranchId && posDevices.length === 0 && (
+                <div data-testid="closing-network-empty-state" role="status" className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+                  <p>{lang === 'fa' ? 'برای این شعبه حساب شبکه فعال پیدا نشد. از مدیریت شبکه حساب را در شعبه درست ایجاد یا فعال کنید؛ سپس فهرست را تازه کنید.' : lang === 'ar' ? 'لا يوجد حساب شبكة نشط لهذا الفرع. أضف الحساب أو فعّله في إدارة الشبكات، ثم حدّث القائمة.' : 'No active network account for this branch. Add or activate one in Network Management, then refresh this list.'}</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {can?.viewNetworkAccounts && <a href="/network-management?tab=accounts" target="_blank" rel="noopener noreferrer" className="font-bold text-blue-700 underline">{lang === 'fa' ? 'باز کردن مدیریت شبکه' : lang === 'ar' ? 'فتح إدارة الشبكات' : 'Open Network Management'}</a>}
+                    <Button type="button" variant="outline" size="sm" className="min-h-10 bg-white" onClick={() => reloadNetworks()}>{lang === 'fa' ? 'تازه‌کردن حساب‌ها' : lang === 'ar' ? 'تحديث الحسابات' : 'Refresh accounts'}</Button>
+                  </div>
+                </div>
+              )}
               {posUnavailable && <p role="alert" className="text-sm text-red-700">{lang === 'fa' ? 'حساب‌های شبکه بارگذاری نشد.' : lang === 'ar' ? 'تعذر تحميل حسابات الشبكة.' : closingTr('Network accounts could not load.')}<Button type="button" variant="outline" onClick={() => reloadNetworks()}>↻</Button></p>}
               {inlineErrors.pos && <p role="alert" className="text-sm text-red-700">{closingTr(inlineErrors.pos)}</p>}
               {(posEntries.length > 1 || showNetworkDetail) && <div data-testid="closing-extra-network" className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
