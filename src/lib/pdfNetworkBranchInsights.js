@@ -1,5 +1,6 @@
 import { calculateSalesRevenue } from './helpers';
 
+// Read-only network PDF appendix. This source is included in the final Preview.
 // Read-only: all rows must already be authenticated and tenant/branch scoped by
 // fetchScheduledERPReportData. POS entries and bank settlements are not new sales.
 const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value||''));
