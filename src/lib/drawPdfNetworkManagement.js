@@ -23,6 +23,11 @@ const copy={
     continuation:'Branch detail · continued',previousShort:'Prior',
     branchTrend:'Branch-by-branch card contribution',period:'Reporting period',
     unassigned:'Unattributed',source:'Source: authenticated Sales Closing data',
+    mappingTitle:'POS account attribution',mappedShort:'Matched to saved POS accounts',
+    unmappedShort:'Unmapped in closing metadata',mappingMissing:'No saved POS mapping available',
+    accountingNotes:'Accounting notes',noteShort:'Finalized card sales are counted only once.',
+    receiptShort:'Bank transfers are not extra revenue or proof of collection.',
+    noPriorShort:'No prior confirmed closings',mappingNotLoss:'Unmapped is not a cash shortage',
   },
   fa:{
     title:'مدیریت شبکه · تحلیل شعبه‌ها',branch:'شعبه / کانال POS',
@@ -40,6 +45,11 @@ const copy={
     continuation:'جزئیات شعبه‌ها · ادامه',previousShort:'قبلی',
     branchTrend:'سهم فروش شبکه به تفکیک شعبه',period:'دوره گزارش',
     unassigned:'تخصیص‌نیافته',source:'منبع: کلوزینگ نهایی و مجاز سازمان',
+    mappingTitle:'تخصیص حساب POS',mappedShort:'مبلغ مرتبط با حساب ثبت‌شده POS',
+    unmappedShort:'بدون تخصیص POS در کلوزینگ',mappingMissing:'اطلاعات تخصیص POS موجود نیست',
+    accountingNotes:'یادداشت حسابداری',noteShort:'فروش نهایی کارت فقط یک بار محاسبه شده است.',
+    receiptShort:'تسویه بانک درآمد جدید یا تأیید وصول وجه نیست.',
+    noPriorShort:'کلوزینگ تأییدشده قبلی موجود نیست',mappingNotLoss:'این اختلاف کسری صندوق نیست',
   },
   ar:{
     title:'إدارة الشبكات · تحليلات الفروع',branch:'الفرع / قناة POS',
@@ -57,6 +67,11 @@ const copy={
     continuation:'تفاصيل الفروع · متابعة',previousShort:'السابق',
     branchTrend:'مساهمة كل فرع في مبيعات البطاقة',period:'فترة التقرير',
     unassigned:'غير مخصص',source:'المصدر: إقفالات المبيعات المصرح بها',
+    mappingTitle:'تخصيص حسابات POS',mappedShort:'المربوط بحسابات POS المسجلة',
+    unmappedShort:'غير مخصص لجهاز في الإقفال',mappingMissing:'بيانات تخصيص POS غير متاحة',
+    accountingNotes:'ملاحظات محاسبية',noteShort:'تُحتسب مبيعات البطاقة النهائية مرة واحدة فقط.',
+    receiptShort:'التسوية البنكية ليست إيراداً أو إثبات تحصيل.',
+    noPriorShort:'لا إقفالات مؤكدة للفترة السابقة',mappingNotLoss:'الفرق ليس نقصاً في الصندوق',
   },
 };
 const fmt = n => n===null||!Number.isFinite(Number(n))?'—':
@@ -64,7 +79,9 @@ const fmt = n => n===null||!Number.isFinite(Number(n))?'—':
 const pct = (value,showSign=false) => value==null?'—':(showSign&&value>0?'+':'')+fmt(value)+'%';
 const clamp = (value,min,max)=>Math.min(max,Math.max(min,value));
 
-/** An additive read-only appendix; the existing two-page financial report is not modified. */
+/** An additive read-only appendix; the existing two-page financial report is not modified.
+ * Keep each panel heading exactly once; missing POS metadata is not an accounting shortage.
+ */
 export function drawPdfNetworkManagement(doc,{
   insights,range,currency='SAR',lang='en',businessName='BizCTRL',
   branchLabel='All branches',iconData=null,
@@ -73,7 +90,7 @@ export function drawPdfNetworkManagement(doc,{
   const t=copy[lang]||copy.en;
   const rtl=lang==='fa'||lang==='ar';
   const branches=insights.branches||[];
-  const chunkSize=9;
+  const chunkSize=8; // leave a readable gap before the A4 accounting notes
   const pageCount=Math.max(1,Math.ceil(branches.length/chunkSize));
   const numberPages=2+pageCount;
   const T=(v,x,y,w=40,size=8.3,color=COLORS.ink,bold=false,align=rtl?'right':'left')=>
@@ -128,8 +145,10 @@ export function drawPdfNetworkManagement(doc,{
         doc.setFillColor(247,250,255);doc.setDrawColor(...COLORS.line);
         doc.roundedRect(x,29,47.5,25,2.6,2.6,'FD');
         T(label,x+3,35,41.4,8,COLORS.muted,true);
-        T(isAmount?fmt(value):pct(value,i===2),x+3,45,41.4,16,color,true);
-        if(isAmount)T(currency,x+3,51,41.4,7,COLORS.muted);
+        const noPrior=(i===1||i===2)&&!insights.previousClosings;
+        T(noPrior?'—':isAmount?fmt(value):pct(value,i===2),x+3,45,41.4,16,color,true);
+        if(noPrior)T(t.noPriorShort,x+3,51,41.4,6.8,COLORS.muted);
+        else if(isAmount)T(currency,x+3,51,41.4,7,COLORS.muted);
       });
       // Plot the current and comparable previous period without mixing them.
       panel(t.trend,7,58,123,56);
@@ -151,19 +170,20 @@ export function drawPdfNetworkManagement(doc,{
           doc.setFillColor(...color);doc.circle(x,yFor(v),.5,'F');
         });
       };
-      plot(previous,[153,181,220]);plot(current,COLORS.blue);
+      if(insights.previousClosings>0)plot(previous,[153,181,220]);
+      plot(current,COLORS.blue);
       T(t.current,14,109,42,7,COLORS.blue,true);
-      T(t.previous,70,109,47,7,COLORS.muted);
+      T(insights.previousClosings>0?t.previous:t.none,70,109,47,7,COLORS.muted);
       // Weekday pattern is not an amount added to network revenue.
       panel(t.weekday,134,58,69,56);
       const weekdays=insights.weekdays||[];
       const highest=Math.max(1,...weekdays.map(x=>x.value));
       weekdays.forEach((item,i)=>{
-        const x=139+i*8.7,w=5.1,h=28*clamp(item.value/highest,0,1);
+        const x=139+i*8.7,w=5.1,h=20*clamp(item.value/highest,0,1);
         doc.setFillColor(...COLORS.cyan);doc.roundedRect(x,101-h,w,h,.75,.75,'F');
         T(item.day.slice(0,2),x-2,107,w+4,6.7,COLORS.muted,false,'center');
       });
-      T(fmt(highest),140,77,56,8,COLORS.muted);
+      T(fmt(highest),140,77,56,7.5,COLORS.muted); // Above the highest bar, never overprint data
       // Branch network contribution: positive and negative values displayed without hiding adjustments.
       panel(t.branchTrend,7,118,196,24);
       const positive=Math.max(1,...branches.map(x=>Math.abs(x.current.network)));
@@ -176,16 +196,27 @@ export function drawPdfNetworkManagement(doc,{
         T(b.name==='Unattributed branch'?t.unknown:b.name,x,139,w,6.9,COLORS.ink);
       });
       drawTable(rows,158);
-      panel(t.allocation,7,236,94,36);
-      T(t.allocation,10,243,88,8,COLORS.muted,true);
-      T(fmt(insights.allocation)+' '+currency,10,253,88,11.8,COLORS.blue,true);
-      T(t.gap,10,261,88,7.5,COLORS.muted);
-      T(fmt(insights.allocationGap)+' '+currency,10,268,88,10,COLORS.amber,true);
-      panel(t.note,106,236,97,36);
-      T(t.note,109,249,91,7.3,COLORS.muted);
-      T(t.receipt,109,259,91,7.2,COLORS.muted);
-      if(insights.sourceMismatch!=null && Math.abs(insights.sourceMismatch)>.01)
-        T(t.mismatch+': '+fmt(insights.sourceMismatch),109,267,91,7,COLORS.amber,true);
+      // Position both footer panels below the last branch row without covering
+      // either the table or the fixed BizCTRL footer on the A4 page.
+      const tableBottom=145+Math.min(91,18+8.1*rows.length);
+      const notesY=Math.min(236,Math.max(205,tableBottom+7));
+      panel(t.mappingTitle,7,notesY,94,36);
+      if(insights.allocationCoverage==='unavailable'){
+        T(t.mappingMissing,10,notesY+18,88,10,COLORS.muted,true);
+        T(t.mappingNotLoss,10,notesY+28,88,8.2,COLORS.amber);
+      }else if(insights.allocationCoverage==='not_applicable'){
+        T(t.noRecords,10,notesY+19,88,8.6,COLORS.muted);
+      }else{
+        T(t.mappedShort,10,notesY+14,88,7.9,COLORS.muted);
+        T(fmt(insights.allocation)+' '+currency,10,notesY+21,88,11,COLORS.blue,true);
+        T(t.unmappedShort,10,notesY+27,88,7.5,COLORS.muted);
+        T(fmt(insights.allocationGap)+' '+currency,10,notesY+33,88,9.4,COLORS.amber,true);
+      }
+      panel(t.accountingNotes,106,notesY,97,36);
+      T(t.noteShort,109,notesY+15,91,8.2,COLORS.muted);
+      T(t.receiptShort,109,notesY+25,91,8.2,COLORS.muted);
+      if(insights.sourceMismatch!=null&&Math.abs(insights.sourceMismatch)>.01)
+        T(t.mismatch+': '+fmt(insights.sourceMismatch),109,notesY+32,91,7.1,COLORS.amber,true);
     }else{
       T(t.continuation,9,36,190,12,COLORS.ink,true);
       drawTable(rows,65,t.branches);
