@@ -9,7 +9,7 @@ const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const allOwnerPermissions = {
   manageSettings: true, viewBrandSettings: true, viewInventory: true,
   viewSuppliers: true, viewPurchases: true, viewSales: true,
-  viewExpenses: true, viewReports: true, uploadSales: true,
+  viewExpenses: true, viewReports: true, uploadSales: true, viewAlerts: true,
 };
 const flatten = stages => stages.flatMap(stage => stage.modules.map(mod => mod.key));
 
@@ -41,7 +41,8 @@ describe('New SaaS user onboarding tutorial', () => {
 
   it('guides a restaurant owner through settings, branches, products, POS, closing and reports', () => {
     const stages = getWelcomeTourStages({ role:'owner', mode:'restaurant', can: allOwnerPermissions });
-    expect(stages.map(s => s.key)).toEqual(['install', 'setup', 'prepare', 'operate', 'review']);
+    expect(stages.map(s => s.key)).toEqual(['install', 'notifications', 'setup', 'prepare', 'operate', 'review']);
+    expect(stages[1].modules).toEqual([{ key: 'notifications', path: '/notifications', permission: 'viewAlerts' }]);
     const modules = flatten(stages);
     for (const key of ['settings', 'branches', 'products', 'suppliers', 'purchases', 'restaurantPOS', 'sales', 'reports', 'payables']) {
       expect(modules).toContain(key);
@@ -78,6 +79,38 @@ describe('New SaaS user onboarding tutorial', () => {
     const supplier = getWelcomeTourStages({ role:'supplier', mode:'restaurant', can:{} });
     expect(flatten(supplier)).toEqual(['supplierPortal']);
     expect(supplier[0].key).toBe('install');
+  });
+
+  it('adds a safe and role-scoped push onboarding step without automatically requesting permission', () => {
+    const owner = getWelcomeTourStages({ role: 'owner', mode: 'factory', can: allOwnerPermissions });
+    expect(owner[0].key).toBe('install');
+    expect(owner[1].key).toBe('notifications');
+    expect(owner[1].modules[0].path).toBe('/notifications');
+    const noAlerts = getWelcomeTourStages({ role: 'manager', mode: 'factory', can: { viewAlerts: false } });
+    expect(noAlerts.map(stage => stage.key)).not.toContain('notifications');
+    const manager = getWelcomeTourStages({ role: 'manager', mode: 'factory', can: { viewAlerts: true } });
+    expect(manager.map(stage => stage.key)).toContain('notifications');
+
+    const dialog = source('../src/components/onboarding/NewUserWelcomeTour.jsx');
+    const center = source('../src/pages/NotificationCenter.jsx');
+    const ownerSettings = source('../src/components/notifications/OwnerPushSettings.jsx');
+    const app = source('../src/App.jsx');
+    expect(dialog).toContain('data-testid="welcome-push-step"');
+    expect(dialog).toContain('data-testid="welcome-open-push-settings"');
+    expect(dialog).toContain("isIOSDevice && device !== 'installed'");
+    expect(dialog).toContain("role === 'owner'");
+    expect(dialog).toContain("visit(current.modules[0].path)");
+    expect(dialog).toContain('Gmail');
+    expect(dialog).toContain('Send test notification');
+    expect(dialog).toContain('إشعارات');
+    expect(dialog).toContain('اعلان‌های');
+    expect(dialog).not.toContain('Notification.requestPermission');
+    expect(dialog).not.toContain('pushManager.subscribe');
+    expect(center).toContain('<OwnerPushSettings />');
+    expect(ownerSettings).toContain("if(role!=='owner') return null");
+    expect(ownerSettings).toContain('Notification.requestPermission()');
+    expect(ownerSettings).toContain("pushRequest('subscribe'");
+    expect(app).toContain('path="/notifications" element={<RoleGuard permission="viewAlerts">');
   });
 
   it('integrates a dismissible dialog and manual replay without database writes', () => {
