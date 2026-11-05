@@ -5,7 +5,7 @@ import {buildPdfFinancialExecutiveSummary,buildPdfBranchAttributionGap,compactPd
 
 /** Fixed two-page executive coverage of every Sales Analytics section. */
 export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,previousSnapshot:previous=null,growth=null,
- report:r=null,range = undefined,branchLabel = undefined,businessName = undefined,currency='SAR',lang='en',iconData = undefined,fullAnalytics=null}={}){
+ report:r=null,range = undefined,branchLabel = undefined,businessName = undefined,currency='SAR',lang='en',iconData = undefined,fullAnalytics=null,totalPages=2}={}){
  if(!s||!range?.from||!range?.to)throw new Error('Verified report data and dates required');
  const a=fullAnalytics||buildFullSalesAnalyticsReport({snapshot:s,previousSnapshot:previous,operationsReport:r,range,lang});
  const finance=buildPdfFinancialExecutiveSummary(s);
