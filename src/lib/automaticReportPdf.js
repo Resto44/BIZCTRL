@@ -63,7 +63,7 @@ export async function buildAutomaticReportPdf({db,job,context}) {
   businessName:context.name,currency:context.currency||'SAR',lang,
   operationsReport:report,
   fullAnalytics:buildFullSalesAnalyticsReport({...data,snapshot,previousSnapshot:previous,
-   operationsReport:report,range,revenueSources,lang,historyAvailable:true}),
+   operationsReport:report,range,revenueSources,branches:reportBranches,lang,historyAvailable:true}),
   download:false
  });
  return doc.output('datauristring').split(',')[1];
