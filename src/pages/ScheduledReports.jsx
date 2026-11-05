@@ -150,7 +150,7 @@ export default function ScheduledReports() {
         snapshot:periodSnapshot,previousSnapshot,growth,range:reportRange,
         branchLabel:isAllBranches?(lang==='ar'?'جميع الفروع':lang==='fa'?'تمام شعبه‌ها':'All branches'):selectedBranchLabel,
         businessName:activeRestaurant?.name||'BizCTRL',currency,lang,dir,
-        operationsReport,fullAnalytics:buildFullSalesAnalyticsReport({...d,snapshot:periodSnapshot,previousSnapshot,operationsReport,range:reportRange,revenueSources,lang,historyAvailable:true}),download:true,
+        operationsReport,fullAnalytics:buildFullSalesAnalyticsReport({...d,snapshot:periodSnapshot,previousSnapshot,operationsReport,range:reportRange,revenueSources,branches:scopedBranches,lang,historyAvailable:true}),download:true,
       });
 
       setPdfDone(true);
