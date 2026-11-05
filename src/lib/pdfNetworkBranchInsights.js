@@ -71,6 +71,7 @@ export function buildPdfNetworkBranchInsights({
   const accounts=new Map();
   const trend=new Map(),priorTrend=new Map(),weekdayTotals=Array(7).fill(0);
   const totals={current:empty(),previous:empty()};
+  let mappedClosings=0,unmappedClosings=0,explicitMapped=0,singleAccountMapped=0;
   const step=lastWeeks(range);
   for(const row of periodRows){
     const current=row.date>=range.from&&row.date<=range.to;
@@ -81,12 +82,32 @@ export function buildPdfNetworkBranchInsights({
     if(current){
       for(const entry of entries){
         const value=Number(entry.amount);
-        const id=String(entry.network_account_id||entry.device_id||'').trim();
+        // The Closing UI persists network_account_id/device_id, while older
+        // closings may use account_id. Ignore blank/non-finite or negative splits.
+        const id=String(entry?.network_account_id||entry?.device_id||entry?.account_id||'').trim();
         if(!id||!Number.isFinite(value)||value<0)continue;
         allocated+=value;
         transactions++;
+        explicitMapped+=value;
         const record=accounts.get(id)||{id,name:cleanName(entry.device_name||entry.network_name||entry.account_name||id),value:0};
         record.value+=value;accounts.set(id,record);
+      }
+      if(transactions===0 && network>0){
+        // Historical closings often have no pos_entries_json but do carry a
+        // single saved network account reference. Credit this as *account
+        // attribution*, never as an additional card sale or bank settlement.
+        const id=String(row.restaurant_network_account_id||row.network_account_id||row.pos_device_id||'').trim();
+        if(id){
+          allocated=network;
+          transactions=1;
+          singleAccountMapped+=network;
+          const record=accounts.get(id)||{id,name:cleanName(id),value:0};
+          record.value+=network;accounts.set(id,record);
+        }
+      }
+      if(network>0){
+        if(transactions>0)mappedClosings++;
+        if(network-allocated>0.009)unmappedClosings++;
       }
     }
     const values={network,total,allocated,transactions};
@@ -132,6 +153,12 @@ export function buildPdfNetworkBranchInsights({
     currentClosings:totals.current.closings,previousClosings:totals.previous.closings,
     allocation:money(totals.current.allocated),
     allocationGap:money(currentNetwork-totals.current.allocated),
+    // No evidence of POS attribution means "unavailable", not a cash shortage.
+    allocationCoverage:currentNetwork<=0?'not_applicable'
+      :mappedClosings===0?'unavailable'
+      :Math.abs(currentNetwork-totals.current.allocated)<=0.009?'complete':'partial',
+    mappedClosings,unmappedClosings,
+    explicitMapped:money(explicitMapped),singleAccountMapped:money(singleAccountMapped),
     sourceMismatch,priorMismatch,
     branches:withShare,
     trend:currentSeries,previousTrend:previousSeries,
