@@ -68,7 +68,7 @@ import { closingCashSalesSources } from '@/lib/closing/ClosingCashSalesSources';
 import ClosingControlOverview from '@/components/sales/ClosingControlOverview';
 import ClosingStepNavigation, { closingStepCopy, closingStepIssues } from '@/components/sales/ClosingStepNavigation';
 import ClosingFundingPanel from '@/components/sales/ClosingWalletChoice';
-import { activeClosingNetworkAccounts, closingNetworkBranchAliases, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
+import { activeClosingNetworkAccounts, closingNetworkBranchAliases, closingNetworkAccountId, hasDuplicateClosingNetworkAccounts, validClosingNetworkEntries, isClosingSettlementMovement } from '@/lib/closing/ClosingFunding';
 import { closingErrorDetails } from '@/lib/closing/ClosingRepository';
 import { hasCanonicalCustomerScope, loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
 import { recordCustomerReceivablePayment, newReceivableRequestId, invalidateCustomerReceivableQueries, customerDebtPaymentErrorMessage } from '@/lib/debt/customerReceivableRepository';
@@ -618,7 +618,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const debtPaymentInFlight = useRef(false);
   const debtPaymentRequests = useRef(new Map());
 
-  const addPos = () => setPosEntries(prev => [...prev, { id: Date.now(), device_id: '', device_name: '', amount: '', notes: '' }]);
+  const addPos = () => setPosEntries(prev => [...prev, { id: newStableRowId('pos'), device_id: '', network_account_id: '', device_name: '', amount: '', notes: '' }]);
   const removePos = (id) => setPosEntries(prev => prev.filter(e => e.id !== id));
   const updatePos = (id, field, value) => updateCalculatedInput(setPosEntries, prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
   const removeCustomerCreditSale = (id) => setCustomerCreditSales((previous) => previous.filter((entry) => entry.id !== id));
@@ -909,20 +909,52 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     staleTime: 0,
   });
   const posDevices = useMemo(() => asRecordArray(posDevicesData), [posDevicesData]);
+  const selectedNetworkAccountIds = useMemo(
+    () => new Set(posEntries.map(closingNetworkAccountId).filter(Boolean)), [posEntries],
+  );
+  const duplicateNetworkAccount = hasDuplicateClosingNetworkAccounts(posEntries);
+  const canAddNetworkRow = !isSubmitting && !posLoading && !posUnavailable
+    && !posEntries.some(entry => !closingNetworkAccountId(entry))
+    && posDevices.some(account => !selectedNetworkAccountIds.has(String(account.id)));
+  const networkDuplicateMessage = lang === 'fa'
+    ? 'هر حساب POS فقط یک‌بار قابل انتخاب است. مبلغ‌های همان حساب را در یک ردیف جمع کنید.'
+    : lang === 'ar'
+      ? 'يمكن اختيار كل حساب شبكة مرة واحدة فقط. اجمع مبالغ الحساب نفسه في صف واحد.'
+      : 'Each POS account may be selected once. Combine amounts for that account in one row.';
   const chooseNetwork = (rowId, accountId) => {
-    const account = posDevices.find(item => item.id === accountId);
-    setPosEntries(rows => rows.map(row => row.id === rowId ? { ...row, device_id: accountId, network_account_id: accountId,
-      device_name: account?.account_name || account?.network_name || '', provider: account?.network_provider || '' } : row));
+    const selectedId = String(accountId || '');
+    if (selectedId && posEntries.some(row => row.id !== rowId && closingNetworkAccountId(row) === selectedId)) {
+      toast.error(networkDuplicateMessage);
+      return;
+    }
+    const account = posDevices.find(item => String(item.id) === selectedId);
+    if (selectedId && !account) return;
+    setPosEntries(rows => {
+      // Guard against a second selection event arriving before React re-renders.
+      if (selectedId && rows.some(row => row.id !== rowId && closingNetworkAccountId(row) === selectedId)) return rows;
+      return rows.map(row => row.id === rowId ? { ...row, device_id: selectedId, network_account_id: selectedId,
+        device_name: account?.account_name || account?.network_name || '', provider: account?.network_provider || '' } : row);
+    });
+    setInlineErrors(previous => {
+      if (!previous.pos) return previous;
+      const next = { ...previous }; delete next.pos; return next;
+    });
   };
-  const networkSelector = (entry) => <label className="block min-w-0 space-y-1 text-xs font-semibold">
-    <span>{lang === 'fa' ? 'حساب شبکه' : lang === 'ar' ? 'حساب الشبكة' : closingTr('Network account')}</span>
-    <select aria-label={closingTr("Network account")} className="min-h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm" value={entry.network_account_id || entry.device_id || ''}
-      disabled={isSubmitting || posLoading || posUnavailable} onChange={event => chooseNetwork(entry.id, event.target.value)}>
-      <option value="">{lang === 'fa' ? 'انتخاب از مدیریت شبکه' : lang === 'ar' ? 'اختر من إدارة الشبكات' : closingTr('Choose from Network Management')}</option>
-      {(entry.network_account_id || entry.device_id) && !posDevices.some(a => a.id === (entry.network_account_id || entry.device_id)) && <option value={entry.network_account_id || entry.device_id} disabled>{entry.device_name || closingTr('Unavailable account')}</option>}
-      {posDevices.map(account => <option key={account.id} value={account.id}>{account.account_name || account.network_name} {account.network_provider || ''}</option>)}
-    </select>
-  </label>;
+  const networkSelector = (entry) => {
+    const currentAccountId = closingNetworkAccountId(entry);
+    return <label className="block min-w-0 space-y-1 text-xs font-semibold">
+      <span>{lang === 'fa' ? 'حساب شبکه' : lang === 'ar' ? 'حساب الشبكة' : closingTr('Network account')}</span>
+      <select aria-label={closingTr("Network account")} className="min-h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm" value={currentAccountId}
+        disabled={isSubmitting || posLoading || posUnavailable} onChange={event => chooseNetwork(entry.id, event.target.value)}>
+        <option value="">{lang === 'fa' ? 'انتخاب از مدیریت شبکه' : lang === 'ar' ? 'اختر من إدارة الشبكات' : closingTr('Choose from Network Management')}</option>
+        {currentAccountId && !posDevices.some(a => String(a.id) === currentAccountId) && <option value={currentAccountId} disabled>{entry.device_name || closingTr('Unavailable account')}</option>}
+        {posDevices.map(account => <option key={account.id} value={account.id}
+          disabled={selectedNetworkAccountIds.has(String(account.id)) && String(account.id) !== currentAccountId}>
+          {account.account_name || account.network_name} {account.network_provider || ''}
+        </option>)}
+      </select>
+    </label>;
+  };
 
   useEffect(() => {
     if (initial?.id || posDevices.length !== 1) return;
@@ -1442,7 +1474,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       key: 'pos',
       label: 'POS Totals Valid',
       passed: validClosingNetworkEntries(posEntries, posDevices) && !(manualNetworkTotal > 0 && (posLoading || posUnavailable)),
-      message: validClosingNetworkEntries(posEntries, posDevices) ? `${currency} ${networkTotal.toLocaleString()}` : (lang === 'fa' ? 'برای هر مبلغ کارت یک حساب شبکه فعال انتخاب کنید.' : lang === 'ar' ? 'اختر حساب شبكة نشطاً لكل مبلغ بطاقة.' : 'Choose an active network account for each card amount.'),
+      message: duplicateNetworkAccount ? networkDuplicateMessage : validClosingNetworkEntries(posEntries, posDevices) ? `${currency} ${networkTotal.toLocaleString()}` : (lang === 'fa' ? 'برای هر مبلغ کارت یک حساب شبکه فعال انتخاب کنید.' : lang === 'ar' ? 'اختر حساب شبكة نشطاً لكل مبلغ بطاقة.' : 'Choose an active network account for each card amount.'),
     },
     {
       key: 'credit',
@@ -1483,7 +1515,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
       passed: !!form.date && !!form.branch && customClosingFields.every((field) => !field.is_required || hasCustomClosingFieldValue(field)),
       message: form.date || 'Date required',
     },
-  ], [expenseContextReady, expenseContextMessage, form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, posDevices, posLoading, posUnavailable, lang, closingTr, creditPosted, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, cashSalesSourcesMatched, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
+  ], [expenseContextReady, expenseContextMessage, form, automaticClosingUnavailable, cashLedgerUnavailable, cashContextReady, openingReviewRequired, ledgerOverdrawn, useAutomaticSales, cashierDisplayName, effectiveCashierId, approvedPurchasesForDate, posEntries, posDevices, posLoading, posUnavailable, duplicateNetworkAccount, networkDuplicateMessage, lang, closingTr, creditPosted, customerCreditSales, customClosingFields, customClosingFieldValues, hasCustomClosingFieldValue, cashSales, cashSalesSourcesMatched, networkTotal, creditTotal, actualCount, remainingDifference, requiresCashReconciliation, currency]);
 
   const allValid = useMemo(() => validations.every(v => v.passed), [validations]);
   const networkCounterTotal = baseNetworkTotal;
@@ -1553,7 +1585,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
         const ids = driverEntries.map((entry) => String(entry.driver_id || '')).filter(Boolean);
         return new Set(ids).size !== ids.length;
       });
-    if (!validClosingNetworkEntries(posEntries, posDevices) || (manualNetworkTotal > 0 && (posLoading || posUnavailable))) nextErrors.pos = 'Choose an active branch network account for each card amount.';
+    if (!validClosingNetworkEntries(posEntries, posDevices) || (manualNetworkTotal > 0 && (posLoading || posUnavailable))) nextErrors.pos = duplicateNetworkAccount ? networkDuplicateMessage : 'Choose an active branch network account for each card amount.';
     if (!form.date) nextErrors.date = 'Date is required.';
     if (!form.branch) nextErrors.branch = 'Branch is required.';
     if (!form.shift) nextErrors.shift = 'Shift is required.';
@@ -1971,6 +2003,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 </div>
               )}
               {posUnavailable && <p role="alert" className="text-sm text-red-700">{lang === 'fa' ? 'حساب‌های شبکه بارگذاری نشد.' : lang === 'ar' ? 'تعذر تحميل حسابات الشبكة.' : closingTr('Network accounts could not load.')}<Button type="button" variant="outline" onClick={() => reloadNetworks()}>↻</Button></p>}
+              {duplicateNetworkAccount && <p data-testid="closing-duplicate-network-warning" role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs font-bold text-amber-900">{networkDuplicateMessage}</p>}
               {inlineErrors.pos && <p role="alert" className="text-sm text-red-700">{closingTr(inlineErrors.pos)}</p>}
               {(posEntries.length > 1 || showNetworkDetail) && <div data-testid="closing-extra-network" className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
                 {posEntries.slice(1).map(entry => <div key={entry.id} className="grid min-w-0 grid-cols-[1fr_auto] items-end gap-2">
@@ -1978,7 +2011,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                   <span className="min-w-0 flex-1"><ClosingNumericInput id={`quick-closing-network-${entry.id}`} value={entry.amount ?? ''} onChange={value => updatePos(entry.id, 'amount', value)} prefix={currency} disabled={isSubmitting} inputClassName="h-11 bg-white" /></span>
                   <Button type="button" size="icon" variant="ghost" onClick={() => removePos(entry.id)} disabled={isSubmitting} aria-label={closingTr("Remove network total")}><Trash2 className="h-4 w-4" /></Button>
                 </div>)}
-                <Button type="button" variant="outline" size="sm" className="min-h-10 bg-white" onClick={addPos} disabled={isSubmitting}><PlusCircle className="mr-1.5 h-4 w-4" />{lang === 'fa' ? 'ترمینال دیگر' : lang === 'ar' ? 'إضافة جهاز' : closingTr('Add network total')}</Button>
+                <Button type="button" variant="outline" size="sm" className="min-h-10 bg-white" onClick={addPos} disabled={!canAddNetworkRow} title={!canAddNetworkRow ? (lang === 'fa' ? 'برای افزودن ردیف، ابتدا حساب آزاد داشته باشید و ردیف خالی را تکمیل کنید.' : lang === 'ar' ? 'اختر حساباً متاحاً وأكمل الصف الفارغ أولاً.' : 'Select an available account and complete the empty row first.') : undefined}><PlusCircle className="mr-1.5 h-4 w-4" />{lang === 'fa' ? 'ترمینال دیگر' : lang === 'ar' ? 'إضافة جهاز' : closingTr('Add network total')}</Button>
               </div>}
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => {setShowFullDetails(true);}} className="flex min-h-12 min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label={closingTr("Edit customer credit sales")}><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'فروش قرضه' : lang === 'ar' ? 'البيع الآجل' : closingTr('Credit sales')}</span><Money currency={currency} value={creditTotal} className="text-sm font-black text-violet-700" /></button>
