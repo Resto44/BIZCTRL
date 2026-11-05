@@ -38,6 +38,7 @@ export function activeClosingNetworkAccounts(accounts, restaurantId, branchId, b
 // A network account can be used only once in a Closing. Multiple amounts for
 // the same physical POS terminal must be combined into its existing row rather
 // than counted as separate card sources. This applies even to zero/blank rows.
+// UI prevents re-selection; this validator also guards stale/historical records.
 export const closingNetworkAccountId = entry => String(entry?.network_account_id || entry?.device_id || '').trim();
 
 export function hasDuplicateClosingNetworkAccounts(entries) {
