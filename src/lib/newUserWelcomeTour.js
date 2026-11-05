@@ -48,6 +48,11 @@ export function getWelcomeTourStages({ role = 'owner', mode = 'restaurant', can 
       module('settings', '/settings', 'manageSettings'),
       module('branches', '/branch-management', 'viewBrandSettings'),
     ] : []),
+    // Creation uses the same Owner/delegated customization permission as SalesSourceManagement.
+    // The one-shot ?create=1 flag only opens the existing secure editor; it never saves a record.
+    stage('sources', (owner || can.manageDashboardCustomization === true) ? [
+      module('salesSources', '/sales-sources?create=1', 'viewSales'),
+    ] : []),
     stage('prepare', supplier ? [] : [
       module('products', '/product-management', 'viewInventory'),
       ...(isRestaurant(mode) ? [] : [module('inventory', '/inventory', 'viewInventory')]),
