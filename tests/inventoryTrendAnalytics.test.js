@@ -11,6 +11,7 @@ describe('restaurant inventory ERP analytics', () => {
   ];
   const purchases = [
     { product_id: 'rice', branch_id: 'b1', qty: 4, date },
+    { product_id: 'rice', branch: 'rayyan', qty: 7, date },
     { product_id: 'chicken', branch_id: 'b1', qty: 3, date: '2026-11-05' },
     { product_id: 'rice', branch_id: 'b1', qty: 99, date: '2026-09-01' },
   ];
@@ -26,21 +27,21 @@ describe('restaurant inventory ERP analytics', () => {
 
   it('counts real movement records in the selected window, never sales or mixed-unit quantities', () => {
     const result = computeInventoryInsights(stock, purchases, waste, { period: 'week', todayISO: date });
-    expect(result.incomingCount).toBe(2);
+    expect(result.incomingCount).toBe(3);
     expect(result.wasteCount).toBe(1);
-    expect(result.series.reduce((sum, point) => sum + point.purchases, 0)).toBe(2);
+    expect(result.series.reduce((sum, point) => sum + point.purchases, 0)).toBe(3);
     expect(result.series.reduce((sum, point) => sum + point.waste, 0)).toBe(1);
     expect(result.itemsCount).toBe(2);
     expect(result.lowCount).toBe(1);
     expect(result.outCount).toBe(1);
-    expect(inventoryItemActivity(result, stock[0]).purchasedQty).toBe(4);
+    expect(inventoryItemActivity(result, stock[0]).purchasedQty).toBe(11);
     expect(inventoryItemActivity(result, stock[0]).wastedQty).toBe(2);
   });
 
   it('preserves historical balances when the movement time filter changes', () => {
     const result = computeInventoryInsights(stock, purchases, waste, { period: 'day', todayISO: date });
     expect(result.itemsCount).toBe(2);
-    expect(result.incomingCount).toBe(1);
+    expect(result.incomingCount).toBe(2);
     expect(result.lowPercent).toBe(50);
     expect(result.series).toHaveLength(1);
   });
