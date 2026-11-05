@@ -2,6 +2,7 @@ import {jsPDF} from 'jspdf';
 import {prepareLocalizedPdf,safePdfFilename} from './pdfLocalization';
 import {loadERPReportIcon} from './erpPdfBrand';
 import {drawTwoPageERPReport} from './twoPageERPReport';
+import {drawPdfNetworkManagement} from './drawPdfNetworkManagement';
 
 
 /**
