@@ -252,7 +252,7 @@ export default function NewUserWelcomeTour({ onVisibleChange }) {
   const detail = current.key === 'install' ? installCopy.detail : copy[current.key].detail;
 
   return <Dialog open={open} onOpenChange={value => { if (!value) pause(); }}>
-    <DialogContent data-testid="saas-welcome-tour" dir={lang === 'en' ? 'ltr' : 'rtl'}
+    <DialogContent data-testid="saas-welcome-tour" data-i18n-skip="true" dir={lang === 'en' ? 'ltr' : 'rtl'}
       className="max-h-[92dvh] w-[calc(100vw-1.5rem)] max-w-lg overflow-y-auto rounded-2xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6">
       <DialogHeader className="text-start">
         <div className="flex flex-wrap items-center justify-between gap-2">
