@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, MonitorSmartphone, Smartphone } from 'lucide-react';
+import { BellRing, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, MonitorSmartphone, Smartphone } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthContext';
@@ -27,6 +27,14 @@ const COPY = {
       android: ['Open mybizctrl.site in Chrome.', 'Tap menu (⋮) → Install app or Add to Home screen.', 'Confirm Install / Add.'],
       desktop: 'On desktop, use your browser install option if available; otherwise keep using the website.',
       action: 'Install on this device', manual: 'If no install prompt appears, follow the steps above.',
+    },
+    notifications: {
+      title: 'Next, set up notifications', detail: 'Choose if you want to receive alerts. BizCTRL asks for notification permission only when you enable it yourself.',
+      ownerSteps: ['On iPhone, first open BizCTRL from its Home Screen icon.', 'Tap the bell and open Notifications.', 'Find Owner notifications on your device and tap Enable notifications.', 'Choose Allow when your device asks, then use Send test notification to check delivery.'],
+      iosFirst: 'On iPhone, background push is available only in the installed Home Screen app (iOS 16.4+). It cannot be enabled from a Gmail browser tab. Install BizCTRL first, then reopen this guide or open Notifications from the app.',
+      ownerAction: 'Open push settings',
+      staff: 'The bell opens your in-app notification history. Background business-record push on this page is currently for Owners; other roles may have feature-specific alerts.',
+      staffAction: 'Open notification center',
     },
     setup: { title: 'Confirm your business and branch', detail: 'Check the correct organization and branch before saving any transaction. Owners should configure the business and tax settings first.' },
     prepare: { title: 'Prepare your everyday records', detail: 'Create products and suppliers, then record purchases as needed. A saved record should appear in the correct branch.' },
@@ -63,6 +71,14 @@ const COPY = {
       desktop: 'در کامپیوتر در صورت وجود گزینه Install در مرورگر، آن را بزنید؛ در غیر آن از خود سایت استفاده کنید.',
       action: 'نصب در این دستگاه', manual: 'اگر پنجره نصب باز نشد، مراحل بالا را انجام دهید.',
     },
+    notifications: {
+      title: 'بعد، اعلان‌های موبایل را فعال کنید', detail: 'فعال‌سازی اختیاری است. BizCTRL فقط وقتی خودتان دکمه فعال‌کردن را بزنید، اجازه اعلان می‌خواهد.',
+      ownerSteps: ['در آیفون، اول BizCTRL را از آیکن صفحه اصلی موبایل باز کنید.', 'روی علامت زنگوله بزنید و Notifications را باز کنید.', 'در بخش Owner notifications on your device روی Enable notifications بزنید.', 'در پنجره آیفون Allow را انتخاب کنید و با Send test notification اعلان را آزمایش کنید.'],
+      iosFirst: 'در آیفون، پوش نوتیفیکیشن فقط از برنامه نصب‌شده روی صفحه اصلی (iOS 16.4 یا جدیدتر) فعال می‌شود، نه از داخل Gmail. اول نصب کنید و سپس راهنما یا Notifications را دوباره باز کنید.',
+      ownerAction: 'رفتن به تنظیمات پوش نوتیفیکیشن',
+      staff: 'از علامت زنگوله می‌توانید اعلان‌های داخل برنامه را ببینید. پوش رویدادهای کسب‌وکار در این صفحه فعلاً مخصوص Owner است؛ بعضی نقش‌ها اعلان‌های اختصاصی خود را دارند.',
+      staffAction: 'بازکردن مرکز اعلان‌ها',
+    },
     setup: { title: 'اول کسب‌وکار و شعبه را بررسی کنید', detail: 'قبل از هر ثبت، سازمان و شعبه درست را انتخاب کنید. اونر مشخصات کسب‌وکار، ارز و مالیات را تنظیم کند.' },
     prepare: { title: 'محصولات و سپلایرها را آماده کنید', detail: 'منو یا محصولات و سپلایرها را وارد کنید و فاکتور خرید را در شعبه درست ثبت کنید.' },
     operate: { title: 'اولین فروش را ثبت کنید', detail: 'از POS یا Sales شروع کنید. در آخر شیفت، Closing Sales و پول صندوق را بررسی کنید. فروش را دوباره ثبت نکنید.' },
@@ -97,6 +113,14 @@ const COPY = {
       android: ['افتح mybizctrl.site في Chrome.', 'اضغط القائمة (⋮) ثم تثبيت التطبيق أو إضافة إلى الشاشة الرئيسية.', 'أكّد التثبيت أو الإضافة.'],
       desktop: 'على الكمبيوتر، استخدم خيار التثبيت في المتصفح إذا توفر، أو تابع استخدام الموقع.',
       action: 'تثبيت على هذا الجهاز', manual: 'إذا لم تظهر نافذة التثبيت، اتبع الخطوات أعلاه.',
+    },
+    notifications: {
+      title: 'ثانياً، فعّل إشعارات الجوال', detail: 'التفعيل اختياري؛ لا يطلب BizCTRL إذن الإشعارات إلا عند اختيارك التفعيل.',
+      ownerSteps: ['على الآيفون افتح BizCTRL من أيقونته على الشاشة الرئيسية أولاً.', 'اضغط رمز الجرس وافتح الإشعارات Notifications.', 'في قسم Owner notifications on your device اضغط Enable notifications.', 'اختر Allow عندما يطلب الجهاز الإذن، ثم اختبر عبر Send test notification.'],
+      iosFirst: 'إشعارات الآيفون بالخلفية تحتاج تطبيق الشاشة الرئيسية (iOS 16.4 أو أحدث)، ولا يمكن تفعيلها من متصفح Gmail الداخلي. ثبّت BizCTRL ثم أعد فتح الدليل أو الإشعارات.',
+      ownerAction: 'فتح إعدادات الإشعارات الفورية',
+      staff: 'يمكنك مشاهدة إشعارات التطبيق من رمز الجرس. إشعارات سجلات المنشأة في هذه الصفحة متاحة حالياً للمالك فقط؛ قد توجد تنبيهات أخرى خاصة بكل دور.',
+      staffAction: 'فتح مركز الإشعارات',
     },
     setup: { title: 'تأكد من المنشأة والفرع', detail: 'اختر المنشأة والفرع الصحيح قبل حفظ العمليات. يضبط المالك بيانات المنشأة والعملة والضريبة أولاً.' },
     prepare: { title: 'جهّز المنتجات والموردين', detail: 'أضف الأصناف والموردين ثم سجّل المشتريات في الفرع الصحيح.' },
@@ -150,7 +174,10 @@ export default function NewUserWelcomeTour({ onVisibleChange }) {
     [role, activeMode, can, configuration]);
   const currentIndex = Math.min(stepIndex, stages.length - 1);
   const current = stages[currentIndex];
-  const device = detectInstallDevice(typeof navigator === 'undefined' ? '' : navigator.userAgent,
+  const browserAgent = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+  const isIOSDevice = /iPad|iPhone|iPod/i.test(browserAgent) ||
+    (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const device = detectInstallDevice(browserAgent,
     isInstalled || installedNow || (typeof window !== 'undefined' &&
       (window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true)));
 
@@ -203,6 +230,7 @@ export default function NewUserWelcomeTour({ onVisibleChange }) {
 
   if (!user?.id || !current) return null;
   const installCopy = copy.install;
+  const pushCopy = copy.notifications;
   const instructions = device === 'ios-safari' || device === 'ios-other'
     ? installCopy.ios : device === 'android' ? installCopy.android : [];
   const heading = current.key === 'install' ? installCopy.title : copy[current.key].title;
@@ -249,6 +277,39 @@ export default function NewUserWelcomeTour({ onVisibleChange }) {
                 <Smartphone className="h-4 w-4" />{installCopy.action}
               </Button>}
               <p className="text-xs leading-5 text-muted-foreground">{installCopy.manual}</p>
+            </>
+          )}
+        </section>
+      ) : current.key === 'notifications' ? (
+        <section data-testid="welcome-push-step" className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <BellRing className="h-5 w-5 text-primary" />
+            {role === 'owner' ? pushCopy.ownerAction : pushCopy.staffAction}
+          </div>
+          {role === 'owner' ? (
+            <>
+              <ol className="space-y-2">
+                {pushCopy.ownerSteps.map((instruction, index) => (
+                  <li key={index} className="flex items-start gap-3 rounded-xl border p-3 text-sm">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 font-bold text-primary">{index + 1}</span>
+                    <span className="leading-6">{instruction}</span>
+                  </li>
+                ))}
+              </ol>
+              {isIOSDevice && device !== 'installed' ? (
+                <p role="status" className="rounded-xl border border-amber-300 p-3 text-sm leading-6">{pushCopy.iosFirst}</p>
+              ) : (
+                <Button type="button" data-testid="welcome-open-push-settings"
+                  className="min-h-11 w-full" onClick={() => visit(current.modules[0].path)}>
+                  <BellRing className="me-2 h-4 w-4" />{pushCopy.ownerAction}
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="rounded-xl border p-3 text-sm leading-6">{pushCopy.staff}</p>
+              <Button type="button" variant="outline" className="min-h-11 w-full"
+                onClick={() => visit(current.modules[0].path)}>{pushCopy.staffAction}</Button>
             </>
           )}
         </section>
