@@ -20,7 +20,7 @@ const COPY = {
     later: 'Continue later', skip: 'Skip guide', back: 'Back', next: 'Next', done: 'Finish',
     open: 'Open module', resume: 'You can reopen this guide from your profile menu.',
     install: { title: 'First, add BizCTRL to your phone',
-      detail: 'BizCTRL is a web app. Installation is optional for normal use, but required for push notifications on iPhone. No App Store download is needed.'
+      detail: 'BizCTRL is a web app. Installation is optional for normal use, but required for push notifications on iPhone. No App Store download is needed.',
       installed: 'Already running from your Home Screen — no installation needed.',
       ios: ['Open mybizctrl.site in Safari.', 'Tap Share (square with upward arrow).', 'Choose Add to Home Screen, then tap Add.'],
       iosOther: 'Open this site in Safari first. Some in-app browsers cannot add it to your Home Screen.',
@@ -63,7 +63,7 @@ const COPY = {
     later: 'بعداً ادامه می‌دهم', skip: 'رد کردن راهنما', back: 'قبلی', next: 'بعدی', done: 'پایان',
     open: 'باز کردن ماژول', resume: 'هر وقت خواستید، راهنما را از منوی پروفایل دوباره باز کنید.',
     install: { title: 'اول BizCTRL را روی موبایل اضافه کنید',
-      detail: 'BizCTRL یک برنامه تحت وب است. برای استفاده عادی نصب اختیاری است؛ اما برای پوش نوتیفیکیشن آیفون باید روی صفحه اصلی نصب شود. به App Store ضرورت ندارد.'
+      detail: 'BizCTRL یک برنامه تحت وب است. برای استفاده عادی نصب اختیاری است؛ اما برای پوش نوتیفیکیشن آیفون باید روی صفحه اصلی نصب شود. به App Store ضرورت ندارد.',
       installed: 'برنامه از صفحه اصلی موبایل باز شده؛ نصب دوباره لازم نیست.',
       ios: ['سایت mybizctrl.site را در Safari باز کنید.', 'دکمه Share (مربع با فلش رو به بالا) را بزنید.', 'گزینه Add to Home Screen را انتخاب کنید و بعد Add را بزنید.'],
       iosOther: 'اول این سایت را در Safari باز کنید؛ بعضی مرورگرهای داخل اپ امکان نصب ندارند.',
@@ -106,7 +106,7 @@ const COPY = {
     later: 'أكمل لاحقاً', skip: 'تخطي الدليل', back: 'السابق', next: 'التالي', done: 'إنهاء',
     open: 'فتح القسم', resume: 'يمكنك فتح الدليل من قائمة الملف الشخصي في أي وقت.',
     install: { title: 'أولاً، أضف BizCTRL إلى شاشة جوالك',
-      detail: 'BizCTRL تطبيق ويب. التثبيت اختياري للاستخدام العادي، لكنه ضروري لإشعارات الآيفون في الخلفية، ولا يحتاج إلى متجر التطبيقات.'
+      detail: 'BizCTRL تطبيق ويب. التثبيت اختياري للاستخدام العادي، لكنه ضروري لإشعارات الآيفون في الخلفية، ولا يحتاج إلى متجر التطبيقات.',
       installed: 'التطبيق يعمل بالفعل من الشاشة الرئيسية؛ لا يلزم تثبيته مرة أخرى.',
       ios: ['افتح mybizctrl.site في Safari.', 'اضغط مشاركة (مربع وسهم للأعلى).', 'اختر إضافة إلى الشاشة الرئيسية ثم اضغط إضافة.'],
       iosOther: 'افتح الموقع أولاً في Safari؛ قد لا تدعم المتصفحات المدمجة إضافته للشاشة الرئيسية.',
