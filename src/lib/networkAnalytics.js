@@ -53,11 +53,14 @@ export const branchMatches = (sale, selected, branches = []) => {
   if (!selected || selected === 'all') return true;
   const branch = branches.find(b => String(b.id) === String(selected));
   if (!branch) return false;
-  if (sale.branch_id) return String(sale.branch_id) === String(branch.id);
+  if (sale.branch_id && String(sale.branch_id) === String(branch.id)) return true;
   const candidates = [branch.key, branch.branch_key, branch.name].map(alias).filter(Boolean);
   const unambiguous = candidates.filter(value =>
     branches.filter(b => [b.key, b.branch_key, b.name].some(name => alias(name) === value)).length === 1);
-  return [sale.branch, sale.branch_key].some(v => unambiguous.includes(alias(v)));
+  // Some legacy settlement rows have a text branch_id rather than the branch UUID.
+  // Accept it only when uniquely mapped to the selected canonical branch.
+  if (sale.branch_id && !unambiguous.includes(alias(sale.branch_id))) return false;
+  return [sale.branch_id, sale.branch, sale.branch_key].some(v => unambiguous.includes(alias(v)));
 };
 const sum = (rows, getAmount) => rows.reduce((n, row) => n + getAmount(row), 0);
 const round = n => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -65,7 +68,7 @@ const goodDate = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && 
 
 export function networkInsights({ sales = [], accounts = [], branches = [], recons = [], window, branchId = 'all' }) {
   if (!window) throw new Error('Network analytics requires an explicit period');
-  // Only the final/locked view is fed in by the tenant-scoped caller.
+  // Tenant-scoped caller accepts final, locked, and older legacy rows with null closing state.
   const scoped = sales.filter(row => goodDate(row.date) && branchMatches(row, branchId, branches));
   const current = scoped.filter(row => row.date >= window.start && row.date <= window.end);
   const previous = scoped.filter(row => row.date >= window.previousStart && row.date <= window.previousEnd);
@@ -123,8 +126,8 @@ export function networkInsights({ sales = [], accounts = [], branches = [], reco
   const currentRecons = recons.filter(r => goodDate(r.recon_date) && r.recon_date >= window.start &&
     r.recon_date <= window.end && branchMatches(r, branchId, branches));
   const variance = round(sum(currentRecons, r => {
-    const v = Number(r.variance);
-    return Number.isFinite(v) ? Math.abs(v) : 0;
+    const value = r.variance == null ? Number(r.actual_amount) - Number(r.expected_amount) : Number(r.variance);
+    return Number.isFinite(value) ? Math.abs(value) : 0;
   }));
   const pending = currentRecons.filter(r => r.status === 'pending').length;
   const unmatched = currentRecons.filter(r => r.status === 'variance').length;
