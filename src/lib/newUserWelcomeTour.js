@@ -41,6 +41,9 @@ export function getWelcomeTourStages({ role = 'owner', mode = 'restaurant', can 
   const stage = (key, modules = []) => ({ key, modules: modules.filter(permitted) });
   const stages = [
     stage('install'),
+    // Push setup is a guided link to the existing, permission-gated Notification Center.
+    // No automatic browser permission requests or push subscriptions occur in the tour.
+    stage('notifications', [module('notifications', '/notifications', 'viewAlerts')]),
     stage('setup', owner ? [
       module('settings', '/settings', 'manageSettings'),
       module('branches', '/branch-management', 'viewBrandSettings'),
