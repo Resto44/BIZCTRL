@@ -55,6 +55,10 @@ const STATUS_COLORS = {
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
+// A module-level date helper is used to initialize Transfer and Reconciliation forms.
+// Keep it defined at import time and aligned with the ERP Riyadh business date.
+// Import-time defaults must never depend on a missing browser/runtime global.
+const today = () => riyadhBusinessDate();
 const fmtAmt = (n, cur = 'SAR') => `${cur} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // ─────────────────────────────────────────────────────────────────────────────
