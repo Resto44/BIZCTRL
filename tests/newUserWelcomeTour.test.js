@@ -41,13 +41,49 @@ describe('New SaaS user onboarding tutorial', () => {
 
   it('guides a restaurant owner through settings, branches, products, POS, closing and reports', () => {
     const stages = getWelcomeTourStages({ role:'owner', mode:'restaurant', can: allOwnerPermissions });
-    expect(stages.map(s => s.key)).toEqual(['install', 'notifications', 'setup', 'prepare', 'operate', 'review']);
+    expect(stages.map(s => s.key)).toEqual(['install', 'notifications', 'setup', 'sources', 'prepare', 'operate', 'review']);
     expect(stages[1].modules).toEqual([{ key: 'notifications', path: '/notifications', permission: 'viewAlerts' }]);
     const modules = flatten(stages);
     for (const key of ['settings', 'branches', 'products', 'suppliers', 'purchases', 'restaurantPOS', 'sales', 'reports', 'payables']) {
       expect(modules).toContain(key);
     }
     expect(modules).not.toContain('retailPOS');
+  });
+
+  it('guides eligible owners to the real Add Sales Source dialog without creating records', () => {
+    const owner = getWelcomeTourStages({ role: 'owner', mode: 'restaurant', can: allOwnerPermissions });
+    const sourceStage = owner.find(stage => stage.key === 'sources');
+    expect(sourceStage).toBeTruthy();
+    expect(sourceStage.modules).toEqual([
+      { key: 'salesSources', path: '/sales-sources?create=1', permission: 'viewSales' },
+    ]);
+    for (const mode of ['factory', 'retail', 'restaurant', 'services', 'clinic']) {
+      expect(getWelcomeTourStages({ role: 'owner', mode, can: allOwnerPermissions }).some(stage => stage.key === 'sources')).toBe(true);
+    }
+    const denied = getWelcomeTourStages({ role: 'owner', mode: 'restaurant', can: { viewSales: false } });
+    expect(denied.some(stage => stage.key === 'sources')).toBe(false);
+    const managerReadOnly = getWelcomeTourStages({ role: 'manager', mode: 'restaurant', can: { viewSales: true } });
+    expect(managerReadOnly.some(stage => stage.key === 'sources')).toBe(false);
+    const managerDelegated = getWelcomeTourStages({ role: 'manager', mode: 'restaurant', can: { viewSales: true, manageDashboardCustomization: true } });
+    expect(managerDelegated.some(stage => stage.key === 'sources')).toBe(true);
+    const disabled = getWelcomeTourStages({ role: 'owner', mode: 'restaurant', can: allOwnerPermissions,
+      configuration: { business: { disabled_modules: ['sales'] } },
+    });
+    expect(disabled.some(stage => stage.key === 'sources')).toBe(false);
+
+    const tour = source('../src/components/onboarding/NewUserWelcomeTour.jsx');
+    const page = source('../src/pages/SalesSourceManagement.jsx');
+    const app = source('../src/App.jsx');
+    expect(tour).toContain('data-testid="welcome-sales-sources-step"');
+    expect(tour).toContain('data-testid="welcome-add-sales-source"');
+    expect(tour).toContain("visit(current.modules[0].path)");
+    expect(tour).toContain('دوباره‌شماری');
+    expect(tour).toContain('إضافة مصدر مبيعات');
+    expect(page).toContain("search.get('create') !== '1'");
+    expect(page).toContain("const canManage = canCustomize;");
+    expect(page).toContain("setSourceEditor({ mode: 'create'");
+    expect(app).toContain('path="/sales-sources" element={<RoleGuard permission="viewSales">');
+    expect(tour).not.toContain("supabase.from('sales_sources')");
   });
 
   it('offers retail POS only to retail, not restaurant, warehouse or services', () => {

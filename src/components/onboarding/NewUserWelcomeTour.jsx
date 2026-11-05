@@ -36,6 +36,11 @@ const COPY = {
       staff: 'The bell opens your in-app notification history. Background business-record push on this page is currently for Owners; other roles may have feature-specific alerts.',
       staffAction: 'Open notification center',
     },
+    sources: {
+      title: 'Add your Sales Sources', detail: 'Before your first closing, define where sales come from (counter, delivery, online or catering). A Sales Source is not a payment method and must not add duplicate revenue.',
+      steps: ['Open Sales → Sales Source Management.', 'Tap Add Sales Source. Enter the source name, category, payment method and applicable branches.', 'Save the source. Use it when recording or closing sales; do not count its total as extra revenue.'],
+      action: 'Add Sales Source',
+    },
     setup: { title: 'Confirm your business and branch', detail: 'Check the correct organization and branch before saving any transaction. Owners should configure the business and tax settings first.' },
     prepare: { title: 'Prepare your everyday records', detail: 'Create products and suppliers, then record purchases as needed. A saved record should appear in the correct branch.' },
     operate: { title: 'Make the first sale', detail: 'Start with POS or Sales. At the end of each shift, use Sales Closing and check the cash count. Never register the same sale twice.' },
@@ -79,6 +84,11 @@ const COPY = {
       staff: 'از علامت زنگوله می‌توانید اعلان‌های داخل برنامه را ببینید. پوش رویدادهای کسب‌وکار در این صفحه فعلاً مخصوص Owner است؛ بعضی نقش‌ها اعلان‌های اختصاصی خود را دارند.',
       staffAction: 'بازکردن مرکز اعلان‌ها',
     },
+    sources: {
+      title: 'منابع فروش (Sales Sources) را اضافه کنید', detail: 'قبل از کلوزینگ، مشخص کنید فروش از کجا می‌آید: حضوری، دلیوری، آنلاین یا قراردادها. منبع فروش با روش پرداخت فرق دارد و نباید باعث دوباره‌شماری درآمد شود.',
+      steps: ['از منوی Sales وارد Sales Source Management شوید.', 'روی Add Sales Source بزنید؛ نام منبع، دسته‌بندی، روش پرداخت و شعبه‌های مربوط را انتخاب کنید.', 'منبع را Save کنید و هنگام ثبت یا کلوزینگ فروش استفاده کنید؛ مبلغ آن را دوباره به درآمد اضافه نکنید.'],
+      action: 'اضافه‌کردن Sales Source',
+    },
     setup: { title: 'اول کسب‌وکار و شعبه را بررسی کنید', detail: 'قبل از هر ثبت، سازمان و شعبه درست را انتخاب کنید. اونر مشخصات کسب‌وکار، ارز و مالیات را تنظیم کند.' },
     prepare: { title: 'محصولات و سپلایرها را آماده کنید', detail: 'منو یا محصولات و سپلایرها را وارد کنید و فاکتور خرید را در شعبه درست ثبت کنید.' },
     operate: { title: 'اولین فروش را ثبت کنید', detail: 'از POS یا Sales شروع کنید. در آخر شیفت، Closing Sales و پول صندوق را بررسی کنید. فروش را دوباره ثبت نکنید.' },
@@ -121,6 +131,11 @@ const COPY = {
       ownerAction: 'فتح إعدادات الإشعارات الفورية',
       staff: 'يمكنك مشاهدة إشعارات التطبيق من رمز الجرس. إشعارات سجلات المنشأة في هذه الصفحة متاحة حالياً للمالك فقط؛ قد توجد تنبيهات أخرى خاصة بكل دور.',
       staffAction: 'فتح مركز الإشعارات',
+    },
+    sources: {
+      title: 'أضف مصادر المبيعات (Sales Sources)', detail: 'قبل أول إقفال، حدد مصدر البيع: المحل أو التوصيل أو الطلبات الإلكترونية أو التموين. مصدر المبيعات غير طريقة الدفع، ولا يُضاف مرة ثانية إلى الإيرادات.',
+      steps: ['من القائمة افتح Sales ثم Sales Source Management.', 'اضغط Add Sales Source، وحدد اسم المصدر والفئة وطريقة الدفع والفروع المرتبطة.', 'احفظ المصدر ثم استخدمه أثناء تسجيل المبيعات أو الإقفال، دون احتساب المبلغ مرتين.'],
+      action: 'إضافة مصدر مبيعات',
     },
     setup: { title: 'تأكد من المنشأة والفرع', detail: 'اختر المنشأة والفرع الصحيح قبل حفظ العمليات. يضبط المالك بيانات المنشأة والعملة والضريبة أولاً.' },
     prepare: { title: 'جهّز المنتجات والموردين', detail: 'أضف الأصناف والموردين ثم سجّل المشتريات في الفرع الصحيح.' },
@@ -312,6 +327,22 @@ export default function NewUserWelcomeTour({ onVisibleChange }) {
                 onClick={() => visit(current.modules[0].path)}>{pushCopy.staffAction}</Button>
             </>
           )}
+        </section>
+      ) : current.key === 'sources' ? (
+        <section data-testid="welcome-sales-sources-step" className="space-y-3">
+          <ol className="space-y-2">
+            {copy.sources.steps.map((instruction, index) => (
+              <li key={index} className="flex items-start gap-3 rounded-xl border p-3 text-sm">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 font-bold text-primary">{index + 1}</span>
+                <span className="leading-6">{instruction}</span>
+              </li>
+            ))}
+          </ol>
+          <Button data-testid="welcome-add-sales-source" type="button" className="min-h-11 w-full"
+            onClick={() => visit(current.modules[0].path)}>
+            {copy.sources.action}
+            <ExternalLink className="ms-2 h-4 w-4" />
+          </Button>
         </section>
       ) : (
         <section data-testid="welcome-module-step" className="space-y-2">
