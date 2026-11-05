@@ -129,7 +129,7 @@ export default function ScheduledReports() {
       const report = buildOperationsPdfReport({...data,branches:(branch?[branch]:branches).map(b=>({...b,key:b.branch_key||b.key||String(b.id),label:b.name})),range,revenueSources});
       const doc = await generateSalesAnalyticsPDF({snapshot,previousSnapshot:previous,growth:salesReportGrowth(snapshot,previous),range,
         branchLabel:branch?.name||t('all_branches'),businessName:activeRestaurant.name,currency,lang,dir,operationsReport:report,
-        fullAnalytics:buildFullSalesAnalyticsReport({...data,snapshot,previousSnapshot:previous,operationsReport:report,range,revenueSources,lang,historyAvailable:true}),download:false});
+        fullAnalytics:buildFullSalesAnalyticsReport({...data,snapshot,previousSnapshot:previous,operationsReport:report,range,revenueSources,branches:branch?[branch]:branches,lang,historyAvailable:true}),download:false});
       const result = await invokeReportEmail(supabase,{action:'send',schedule_id:schedule.id,pdf:doc.output('datauristring').split(',')[1]});
       toast.success(messages.accepted);
       if(!result.status_saved) toast.warning(messages.statusFailed);
@@ -150,7 +150,7 @@ export default function ScheduledReports() {
         snapshot:periodSnapshot,previousSnapshot,growth,range:reportRange,
         branchLabel:isAllBranches?(lang==='ar'?'جميع الفروع':lang==='fa'?'تمام شعبه‌ها':'All branches'):selectedBranchLabel,
         businessName:activeRestaurant?.name||'BizCTRL',currency,lang,dir,
-        operationsReport,fullAnalytics:buildFullSalesAnalyticsReport({...d,snapshot:periodSnapshot,previousSnapshot,operationsReport,range:reportRange,revenueSources,lang,historyAvailable:true}),download:true,
+        operationsReport,fullAnalytics:buildFullSalesAnalyticsReport({...d,snapshot:periodSnapshot,previousSnapshot,operationsReport,range:reportRange,revenueSources,branches:scopedBranches,lang,historyAvailable:true}),download:true,
       });
 
       setPdfDone(true);

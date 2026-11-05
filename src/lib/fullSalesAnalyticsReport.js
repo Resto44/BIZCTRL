@@ -1,13 +1,14 @@
 import {calculateSalesRevenue} from './helpers';
 import {buildERPFinancialPaymentAnalytics} from './erpPaymentAnalytics';
 import {buildPdfConsumptionCostControl} from './reportConsumptionCostControl';
+import {buildPdfNetworkBranchInsights} from './pdfNetworkBranchInsights';
 const number=v=>Number.isFinite(Number(v))?Number(v):0;
 const active=r=>!['cancelled','canceled','void','voided','deleted','rejected'].includes(String(r.status||'').toLowerCase());
 const approved=r=>['approved','auto_approved'].includes(r.approval_status)||(!r.approval_status&&['approved','paid','partial'].includes(r.status));
 const within=(d,range)=>d>=range.from&&d<=range.to;
 /** All inputs inherit authenticated tenant/branch scope. Never infer usage from buying. */
 export function buildFullSalesAnalyticsReport({sales=[],purchases=[],walletTransactions=null,
- snapshot = undefined,previousSnapshot=null,operationsReport=null,range = undefined,revenueSources=[],lang='en',historyAvailable=false}={}){
+ snapshot = undefined,previousSnapshot=null,operationsReport=null,range = undefined,revenueSources=[],branches=null,lang='en',historyAvailable=false}={}){
  const confirmed=sales.filter(s=>['finalized','locked'].includes(s.closing_state));
  const daily=new Map(),weekdays=new Map();
  for(const sale of confirmed.filter(s=>within(s.date,range))){
@@ -52,6 +53,9 @@ export function buildFullSalesAnalyticsReport({sales=[],purchases=[],walletTrans
   payment,performance:{best:days[0]||null,worst:days.at(-1)||null,peakWeekday:[...weekdays].sort((a,b)=>b[1]-a[1])[0]?.[0]??null},
   history:{available:historyAvailable,year,previousYear:year-1,through:range.to,rows:calendar},
   network:{available:Array.isArray(walletTransactions),sales:number(snapshot.network),received,difference:number(snapshot.network)-received,count:networkRows.length},
+  networkBranches:range?.previousFrom&&range?.previousTo ? buildPdfNetworkBranchInsights({
+   sales,branches:branches||operationsReport?.branches||[],range,revenueSources,snapshot,previousSnapshot,
+  }) : null,
   cost:buildPdfConsumptionCostControl({snapshot,previousSnapshot,operationsReport}),
   products:[...products.values()].sort((a,b)=>b.cost-a.cost||a.name.localeCompare(b.name)),
   signals:{loss:number(snapshot.netProfit)<0,missingExpenses:snapshot.hasExpenseSource===false,

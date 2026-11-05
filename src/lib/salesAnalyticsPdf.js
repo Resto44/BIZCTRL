@@ -2,6 +2,7 @@ import {jsPDF} from 'jspdf';
 import {prepareLocalizedPdf,safePdfFilename} from './pdfLocalization';
 import {loadERPReportIcon} from './erpPdfBrand';
 import {drawTwoPageERPReport} from './twoPageERPReport';
+import {drawPdfNetworkManagement} from './drawPdfNetworkManagement';
 
 
 /**
@@ -29,7 +30,15 @@ export async function generateSalesAnalyticsPDF({
  drawTwoPageERPReport(doc,{
   snapshot,previousSnapshot,growth,range,report:operationsReport,branchLabel,
   businessName,currency,lang:language,iconData,fullAnalytics,
+  totalPages:2+(fullAnalytics?.networkBranches?.available ?
+   Math.max(1,Math.ceil((fullAnalytics.networkBranches.branches?.length||0)/9)):0),
  });
+ // The canonical financial pages remain unchanged; add a separate, read-only
+ // Network Management ERP appendix when verified network detail was provided.
+ if (fullAnalytics?.networkBranches?.available) {
+  drawPdfNetworkManagement(doc,{insights:fullAnalytics.networkBranches,range,currency,
+   lang:language,businessName,branchLabel,iconData});
+ }
 
  if(download)doc.save(safePdfFilename('BizCTRL-ERP-Analytics-v2-'+range.from+'-'+range.to,language));
  return doc;

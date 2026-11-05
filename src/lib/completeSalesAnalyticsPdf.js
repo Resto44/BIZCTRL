@@ -5,7 +5,7 @@ import {buildPdfFinancialExecutiveSummary,buildPdfBranchAttributionGap,compactPd
 
 /** Fixed two-page executive coverage of every Sales Analytics section. */
 export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,previousSnapshot:previous=null,growth=null,
- report:r=null,range = undefined,branchLabel = undefined,businessName = undefined,currency='SAR',lang='en',iconData = undefined,fullAnalytics=null}={}){
+ report:r=null,range = undefined,branchLabel = undefined,businessName = undefined,currency='SAR',lang='en',iconData = undefined,fullAnalytics=null,totalPages=2}={}){
  if(!s||!range?.from||!range?.to)throw new Error('Verified report data and dates required');
  const a=fullAnalytics||buildFullSalesAnalyticsReport({snapshot:s,previousSnapshot:previous,operationsReport:r,range,lang});
  const finance=buildPdfFinancialExecutiveSummary(s);
@@ -208,7 +208,7 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,p
  detailViewport=false;
  // Preserve visibility of the missing historical comparison, previously in Growth KPI.
  if(growth==null)note(tr('No comparable prior sales','فروش قبلی قابل مقایسه نیست','لا مبيعات سابقة قابلة للمقارنة'),281);
- drawERPReportBrand(document,{lang,title:tr('Complete Sales Analytics','گزارش جامع فروشات','تحليل المبيعات الشامل'),business:businessName,branch:branchLabel,period:range.from+' / '+range.to,iconData,pageLabel:'1 / 2'});
+ drawERPReportBrand(document,{lang,title:tr('Complete Sales Analytics','گزارش جامع فروشات','تحليل المبيعات الشامل'),business:businessName,branch:branchLabel,period:range.from+' / '+range.to,iconData,pageLabel:'1 / '+totalPages});
  doc.addPage();
  band(tr('Costs · Profit · Products · Actions','مصارف · نتیجه مالی · کالا · اقدامات','التكاليف · النتائج · الأصناف · الإجراءات'),2);
  kpis([[tr('Purchases','خریداری','المشتريات'),money(s.purchases)],[tr('Fixed','مصارف ثابت','الثابتة'),money(s.fixedDeduction),C.purple],[tr('Variable','مصارف متغیر','المتغيرة'),money(s.variableExpenses),C.orange],[tr('Sales − purchases','فروش − خرید','المبيعات − المشتريات'),money(s.grossProfit),C.green],[tr('Operating result*','نتیجه عملیاتی*','النتيجة التشغيلية*'),money(s.netProfit),s.netProfit<0?C.red:C.green],[tr('Operating margin*','حاشیه عملیاتی*','الهامش التشغيلي*'),pct(s.netMargin),s.netMargin<0?C.red:C.blue]],['purchases','fixedDeduction','variableExpenses','grossProfit','netProfit','netMargin']);
@@ -246,6 +246,6 @@ export function drawCompleteSalesAnalyticsPdf(document,{snapshot:s = undefined,p
   '*نتیجه عملیاتی = فروش − خرید − مصارف؛ سود حسابرسی‌شده نیست. واحدهای متفاوت جمع نمی‌شوند.',
   '*مؤشر تشغيلي = المبيعات − المشتريات − المصروفات؛ ليس ربحاً مدققاً. لا تُجمع الوحدات المختلفة.'),278);
  detailViewport=false;
- drawERPReportBrand(document,{lang,title:tr('Costs, products & management','مصارف، کالا و مدیریت','التكاليف والأصناف والإدارة'),business:businessName,branch:branchLabel,period:range.from+' / '+range.to,iconData,pageLabel:'2 / 2'});
+ drawERPReportBrand(document,{lang,title:tr('Costs, products & management','مصارف، کالا و مدیریت','التكاليف والأصناف والإدارة'),business:businessName,branch:branchLabel,period:range.from+' / '+range.to,iconData,pageLabel:'2 / '+totalPages});
  if(doc.getNumberOfPages()!==2)throw new Error('ERP management PDF must be exactly two pages');
 }

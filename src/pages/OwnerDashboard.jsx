@@ -202,7 +202,7 @@ function OwnerDashboardContent() {
         range, branchLabel: isAllBranches ? copy.allBranches : selectedBranchLabel,
         businessName: activeRestaurant.name || 'BizCTRL', currency, lang, dir: isRTL ? 'rtl' : 'ltr',
         operationsReport, fullAnalytics: buildFullSalesAnalyticsReport({ ...data, snapshot, previousSnapshot,
-          operationsReport, range, revenueSources, lang, historyAvailable: true }), download: true });
+          operationsReport, range, revenueSources, branches:scopedBranches, lang, historyAvailable: true }), download: true });
     } catch (error) {
       console.error('Owner dashboard PDF failed:', error);
       setPdfError(true);
