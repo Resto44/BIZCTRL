@@ -182,7 +182,7 @@ export default function NetworkERPInsights({
                 tickFormatter={s=>String(s).length>13?String(s).slice(0,12)+'…':s}/>
               <Tooltip formatter={format} contentStyle={{borderRadius:12,fontSize:12}}/>
               <Bar dataKey="value" radius={[0,5,5,0]} maxBarSize={24} isAnimationActive={false}>
-                {v.byBranch.slice(0,8).map((b,i)=><Cell key={b.name} fill={COLORS[i%COLORS.length]}/>)}
+                {v.byBranch.slice(0,8).map((b,i)=><Cell key={b.id} fill={COLORS[i%COLORS.length]}/>)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -220,7 +220,7 @@ export default function NetworkERPInsights({
       <Card className="min-w-0 p-4">
         <h3 className="mb-3 text-sm font-extrabold">{t.branches}</h3>
         {v.byBranch.length ? v.byBranch.slice(0,6).map(b=>
-          <div key={b.name} className="mb-3">
+          <div key={b.id} className="mb-3">
             <div className="mb-1 flex justify-between gap-2 text-xs">
               <span className="min-w-0 break-words">{b.name}</span><b className="shrink-0">{format(b.value)}</b>
             </div>
