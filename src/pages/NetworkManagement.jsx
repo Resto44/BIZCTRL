@@ -10,7 +10,7 @@
  *  - Sales → Network Sales dropdown loads accounts WHERE branch_id = selected_branch
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -33,6 +33,8 @@ import { base44 } from '@/api/base44Client';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import PageHeader from '@/components/shared/PageHeader';
+import NetworkERPInsights from '@/components/network/NetworkERPInsights';
+import { networkDateWindow, riyadhBusinessDate } from '@/lib/networkAnalytics';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -54,44 +56,10 @@ const STATUS_COLORS = {
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 const fmtAmt = (n, cur = 'SAR') => `${cur} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const today = () => new Date().toISOString().slice(0, 10);
-const monthStart = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STAT CARD
 // ─────────────────────────────────────────────────────────────────────────────
-function StatCard({ icon: Icon, label, value, sub, color = 'blue', trend }) {
-  const colors = {
-    blue:    'from-blue-500 to-blue-600',
-    emerald: 'from-emerald-500 to-emerald-600',
-    violet:  'from-violet-500 to-violet-600',
-    amber:   'from-amber-500 to-amber-600',
-  };
-  return (
-    <Card className="overflow-hidden">
-      <div className={`h-1 bg-gradient-to-r ${colors[color]}`} />
-      <div className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-muted-foreground font-medium truncate">{label}</p>
-            <p className="text-2xl font-extrabold text-foreground mt-0.5 leading-none">{value}</p>
-            {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
-          </div>
-          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors[color]} flex items-center justify-center shrink-0 ml-3`}>
-            <Icon className="w-5 h-5 text-white" />
-          </div>
-        </div>
-        {trend !== undefined && (
-          <div className={`flex items-center gap-1 mt-2 text-xs font-medium ${trend >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-            {trend >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {Math.abs(trend).toFixed(1)}% vs last month
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // BRANCH SELECTOR (used inside forms)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1010,229 +978,23 @@ function ReconForm({ accounts, currency, onSubmit, onCancel }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ANALYTICS TAB
-// ─────────────────────────────────────────────────────────────────────────────
-function AnalyticsTab({ accounts, branches, currency, salesData }) {
-  // Revenue by network account
-  const revenueByAccount = useMemo(() => {
-    const map = {};
-    (salesData || []).forEach(s => {
-      const entries = (() => {
-        try { const value = typeof s.pos_entries_json === 'string' ? JSON.parse(s.pos_entries_json) : s.pos_entries_json; return Array.isArray(value) ? value : []; } catch { return []; }
-      })();
-      entries.forEach(e => {
-        const id = e.device_id || e.account_id || 'unknown';
-        map[id] = (map[id] || 0) + Number(e.amount || 0);
-      });
-    });
-    return Object.entries(map)
-      .map(([id, total]) => {
-        const acc = accounts.find(a => a.id === id);
-        return { id, name: acc ? (acc.account_name || acc.network_name) : 'Unknown', total };
-      })
-      .sort((a, b) => b.total - a.total);
-  }, [salesData, accounts]);
-
-  // Revenue by branch
-  const revenueByBranch = useMemo(() => {
-    const map = {};
-    (salesData || []).forEach(s => {
-      const branch = s.branch || 'Unknown';
-      const net = Number(s.reported_network_sales ?? s.restaurant_network ?? s.network ?? 0);
-      map[branch] = (map[branch] || 0) + net;
-    });
-    return Object.entries(map)
-      .map(([branch, total]) => {
-        const b = branches.find(br => br.key === branch || br.name === branch);
-        return { branch, name: b?.name || branch, total };
-      })
-      .sort((a, b) => b.total - a.total);
-  }, [salesData, branches]);
-
-  const totalNetworkRevenue = revenueByBranch.reduce((s, r) => s + r.total, 0);
-  const maxBranch = revenueByBranch[0]?.total || 1;
-  const maxAccount = revenueByAccount[0]?.total || 1;
-
-  return (
-    <div className="space-y-6">
-      {/* Revenue by Branch */}
-      <Card className="p-4">
-        <h3 className="font-bold text-sm mb-4 flex items-center gap-2">
-          <Building2 className="w-4 h-4 text-primary" />Revenue by Branch
-        </h3>
-        {revenueByBranch.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-6">No sales data available</p>
-        ) : (
-          <div className="space-y-3">
-            {revenueByBranch.map(r => (
-              <div key={r.branch}>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-medium">{r.name}</span>
-                  <span className="font-bold">{fmtAmt(r.total, currency)}</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all"
-                    style={{ width: `${(r.total / maxBranch) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Top Network Accounts */}
-      <Card className="p-4">
-        <h3 className="font-bold text-sm mb-4 flex items-center gap-2">
-          <Wifi className="w-4 h-4 text-emerald-500" />Top Network Accounts
-        </h3>
-        {revenueByAccount.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-6">No POS entry data available</p>
-        ) : (
-          <div className="space-y-3">
-            {revenueByAccount.slice(0, 10).map((r, i) => (
-              <div key={r.id}>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-medium flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">
-                      {i + 1}
-                    </span>
-                    {r.name}
-                  </span>
-                  <span className="font-bold">{fmtAmt(r.total, currency)}</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all"
-                    style={{ width: `${(r.total / maxAccount) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Summary */}
-      <Card className="p-4 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground font-medium">Total Network Revenue (all time)</p>
-            <p className="text-2xl font-extrabold text-primary mt-0.5">{fmtAmt(totalNetworkRevenue, currency)}</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center">
-            <BarChart3 className="w-6 h-6 text-primary" />
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-}
+// Canonical network analytics are rendered by NetworkERPInsights, shared by the
+// Dashboard and Analytics tabs. No additional ledger or settlement writes occur.
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD TAB
-// ─────────────────────────────────────────────────────────────────────────────
-function DashboardTab({ accounts, currency, salesData, recons }) {
-  const totalAccounts = accounts.length;
-  const activeAccounts = accounts.filter(a => a.status === 'active' || a.is_active).length;
-
-  const todayStr = today();
-  const monthStr = monthStart();
-
-  const todaySales = useMemo(() =>
-    (salesData || [])
-      .filter(s => s.date === todayStr)
-      .reduce((sum, s) => sum + Number(s.reported_network_sales ?? s.restaurant_network ?? s.network ?? 0), 0),
-    [salesData, todayStr]
-  );
-
-  const monthlySales = useMemo(() =>
-    (salesData || [])
-      .filter(s => s.date >= monthStr && s.date <= todayStr)
-      .reduce((sum, s) => sum + Number(s.reported_network_sales ?? s.restaurant_network ?? s.network ?? 0), 0),
-    [salesData, monthStr, todayStr]
-  );
-
-  const pendingRecons = (recons || []).filter(r => r.status === 'pending').length;
-  const varianceRecons = (recons || []).filter(r => r.status === 'variance').length;
-
-  return (
-    <div className="space-y-4">
-      {/* Overview Cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard icon={Network} label="Total Networks" value={totalAccounts} color="blue" />
-        <StatCard icon={CheckCircle} label="Active Networks" value={activeAccounts} color="emerald" />
-        <StatCard icon={DollarSign} label="Today's Network Sales" value={fmtAmt(todaySales, currency)} color="violet" />
-        <StatCard icon={TrendingUp} label="Monthly Network Sales" value={fmtAmt(monthlySales, currency)} color="amber" />
-      </div>
-
-      {/* Alerts */}
-      {(pendingRecons > 0 || varianceRecons > 0) && (
-        <Card className="p-4 border-amber-200 bg-amber-50">
-          <h3 className="font-bold text-sm text-amber-800 mb-2 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" />Reconciliation Alerts
-          </h3>
-          <div className="space-y-1">
-            {pendingRecons > 0 && (
-              <p className="text-xs text-amber-700">{pendingRecons} settlement{pendingRecons > 1 ? 's' : ''} pending review</p>
-            )}
-            {varianceRecons > 0 && (
-              <p className="text-xs text-red-700 font-semibold">{varianceRecons} variance{varianceRecons > 1 ? 's' : ''} detected — requires attention</p>
-            )}
-          </div>
-        </Card>
-      )}
-
-      <Card className="p-4 min-w-0">
-        <h3 className="font-bold text-sm mb-3">Recent Network Sales</h3>
-        <div className="divide-y">
-          {salesData.filter(s => Number(s.reported_network_sales) > 0).slice(0, 20).map(sale => (
-            <div key={sale.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-              <div className="min-w-0"><p>{sale.date}</p><p className="break-words text-xs text-muted-foreground">{sale.branch || '—'}</p></div>
-              <span className="font-semibold tabular-nums">{fmtAmt(sale.reported_network_sales, currency)}</span>
-            </div>
-          ))}
-          {!salesData.some(s => Number(s.reported_network_sales) > 0) && <p className="py-3 text-sm text-muted-foreground">No network sales recorded.</p>}
-        </div>
-      </Card>
-
-      {/* Recent Accounts */}
-      <Card className="p-4">
-        <h3 className="font-bold text-sm mb-3 flex items-center gap-2">
-          <Wifi className="w-4 h-4 text-primary" />Network Accounts
-          <Badge variant="secondary" className="ml-auto text-xs">{totalAccounts}</Badge>
-        </h3>
-        {accounts.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-4">No accounts yet</p>
-        ) : (
-          <div className="space-y-2">
-            {accounts.slice(0, 5).map(acc => (
-              <div key={acc.id} className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full shrink-0 ${acc.status === 'active' || acc.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                <span className="text-xs font-medium flex-1 truncate">{acc.account_name || acc.network_name || 'Unnamed'}</span>
-                <span className="text-xs text-muted-foreground">{acc.network_provider || ''}</span>
-              </div>
-            ))}
-            {accounts.length > 5 && (
-              <p className="text-xs text-muted-foreground text-center pt-1">+{accounts.length - 5} more</p>
-            )}
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 export default function NetworkManagement() {
   const { ownerFilter, activeRestaurant, branches } = useTenant();
-  const { currency } = useLanguage();
+  const { currency, lang } = useLanguage();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'accounts' ? 'accounts' : 'dashboard');
+  const [period, setPeriod] = useState('day');
+  const [analyticsBranch, setAnalyticsBranch] = useState('all');
+  const currentRiyadhDate = riyadhBusinessDate();
+  const analyticsWindow = useMemo(() => networkDateWindow(period, currentRiyadhDate), [period, currentRiyadhDate]);
+  useEffect(() => { setAnalyticsBranch('all'); }, [activeRestaurant?.id]);
 
   // ── Fetch network accounts (scoped to owner, never restaurant selector)
   const { data: accounts = [], isLoading: loadingAccounts, refetch: refetchAccounts } = useQuery({
@@ -1247,30 +1009,57 @@ export default function NetworkManagement() {
     enabled: !!(ownerFilter?.created_by || activeRestaurant?.id),
   });
 
-  // ── Fetch sales data for analytics/dashboard
-  const { data: salesData = [], error: salesError, refetch: refetchSales } = useQuery({
-    queryKey: ['daily_sales_network', activeRestaurant?.id],
+  // The view includes one canonical, finalized network-sales figure per Closing.
+  // Read the requested current and comparable previous window with explicit
+  // pagination; the former 500-row all-time cap silently understated annual KPIs.
+  const { data: salesResult, error: salesError, isLoading: salesLoading, refetch: refetchSales } = useQuery({
+    queryKey: ['daily_sales_network_erp', activeRestaurant?.id, analyticsWindow.previousStart, analyticsWindow.end],
     queryFn: async () => {
-      const { data, error } = await supabase.from('daily_sales_network_report')
-        .select('id,date,branch,branch_id,reference_id,restaurant_network,network,reported_network_sales,pos_entries_json')
-        .eq('restaurant_id', activeRestaurant.id)
-        .or('closing_state.is.null,closing_state.in.(finalized,locked)')
-        .order('date', { ascending: false }).limit(500);
-      if (error) throw error;
-      return data || [];
+      const rows = [];
+      for (let offset = 0; offset < 10000; offset += 500) {
+        const { data, error } = await supabase.from('daily_sales_network_report')
+          .select('id,date,branch,branch_id,reference_id,restaurant_network,network,reported_network_sales,pos_entries_json,total,restaurant_network_account_id,network_account_id')
+          .eq('restaurant_id', activeRestaurant.id)
+          .or('closing_state.is.null,closing_state.in.(finalized,locked)')
+          .gte('date', analyticsWindow.previousStart).lte('date', analyticsWindow.end)
+          .order('date', { ascending: false }).order('id', { ascending: true })
+          .range(offset, offset + 499);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if ((data || []).length < 500) return { rows, incomplete: false };
+      }
+      return { rows, incomplete: true };
     },
-    staleTime: 15000,
+    staleTime: 30000,
     refetchInterval: 30000,
     enabled: Boolean(activeRestaurant?.id),
   });
+  const salesData = salesResult?.rows || [];
 
-  // ── Fetch reconciliations for dashboard alerts
-  const { data: recons = [], refetch: refetchRecons } = useQuery({
-    queryKey: ['network_reconciliations_dash', activeRestaurant?.id],
-    queryFn: () => base44.entities.NetworkReconciliation.filter({ restaurant_id: activeRestaurant?.id || '' }, '-created_at', 100),
-    enabled: !!activeRestaurant?.id,
-    staleTime: 60000,
+  // Network settlement movements are independent of revenue and must never be
+  // added to card sales. Their own period totals are monitored as risk only.
+  const { data: reconResult, error: reconError, isLoading: reconLoading, refetch: refetchRecons } = useQuery({
+    queryKey: ['network_reconciliations_erp', activeRestaurant?.id, analyticsWindow.start, analyticsWindow.end],
+    queryFn: async () => {
+      const rows = [];
+      for (let offset = 0; offset < 10000; offset += 500) {
+        const { data, error } = await supabase.from('network_reconciliations')
+          .select('id,recon_date,branch_id,network_account_id,variance,status,expected_amount,actual_amount')
+          .eq('restaurant_id', activeRestaurant.id)
+          .gte('recon_date', analyticsWindow.start).lte('recon_date', analyticsWindow.end)
+          .order('recon_date', { ascending: false }).order('id', { ascending: true })
+          .range(offset, offset + 499);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if ((data || []).length < 500) return { rows, incomplete: false };
+      }
+      return { rows, incomplete: true };
+    },
+    staleTime: 30000,
+    refetchInterval: 30000,
+    enabled: Boolean(activeRestaurant?.id),
   });
+  const recons = reconResult?.rows || [];
 
   const TAB_CONFIG = [
     { id: 'dashboard',     label: 'Dashboard',      icon: LayoutDashboard },
@@ -1292,7 +1081,8 @@ export default function NetworkManagement() {
         }
       />
 
-      {salesError && <p role="alert" className="mb-4 rounded-lg border border-destructive p-3 text-sm text-destructive">Unable to load network sales. Please refresh or try again.</p>}
+      {salesError && <p role="alert" className="mb-4 rounded-lg border border-destructive p-3 text-sm text-destructive">Unable to load finalized network sales for this period. Refresh before relying on financial figures.</p>}
+      {reconError && <p role="alert" className="mb-4 rounded-lg border border-destructive p-3 text-sm text-destructive">Settlement variance data is unavailable. Do not treat settlement indicators as zero.</p>}
 
       {/* Tab Navigation — horizontal scroll on mobile */}
       <div className="overflow-x-auto -mx-4 px-4 mb-4">
@@ -1326,7 +1116,11 @@ export default function NetworkManagement() {
       ) : (
         <>
           {activeTab === 'dashboard' && (
-            <DashboardTab accounts={accounts} currency={currency} salesData={salesData} recons={recons} />
+            <NetworkERPInsights mode="dashboard" sales={salesData} recons={recons} accounts={accounts} branches={branches}
+              window={analyticsWindow} period={period} onPeriod={setPeriod} branchId={analyticsBranch} onBranch={setAnalyticsBranch}
+              currency={currency} lang={lang} loading={salesLoading} unavailable={Boolean(salesError)}
+              riskUnavailable={Boolean(reconError || reconLoading)}
+              incomplete={Boolean(salesResult?.incomplete || reconResult?.incomplete)} />
           )}
           {activeTab === 'accounts' && (
             <NetworkAccountsTab accounts={accounts} branches={branches} currency={currency} onRefresh={refetchAccounts} />
@@ -1341,7 +1135,11 @@ export default function NetworkManagement() {
             <ReconciliationTab accounts={accounts} branches={branches} currency={currency} />
           )}
           {activeTab === 'analytics' && (
-            <AnalyticsTab accounts={accounts} branches={branches} currency={currency} salesData={salesData} />
+            <NetworkERPInsights mode="analytics" sales={salesData} recons={recons} accounts={accounts} branches={branches}
+              window={analyticsWindow} period={period} onPeriod={setPeriod} branchId={analyticsBranch} onBranch={setAnalyticsBranch}
+              currency={currency} lang={lang} loading={salesLoading} unavailable={Boolean(salesError)}
+              riskUnavailable={Boolean(reconError || reconLoading)}
+              incomplete={Boolean(salesResult?.incomplete || reconResult?.incomplete)} />
           )}
         </>
       )}
