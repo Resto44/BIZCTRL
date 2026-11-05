@@ -32,6 +32,8 @@ import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
+import { toast } from 'sonner';
+import { resolveCanonicalNetworkBranch, networkAccountSavePayload } from '@/lib/networkAccountBranch';
 import PageHeader from '@/components/shared/PageHeader';
 import NetworkERPInsights from '@/components/network/NetworkERPInsights';
 import { networkDateWindow, riyadhBusinessDate } from '@/lib/networkAnalytics';
@@ -95,13 +97,19 @@ const EMPTY_ACCOUNT = {
 };
 
 function NetworkAccountForm({ initial, onSubmit, onCancel }) {
-  const [form, setForm] = useState({ ...EMPTY_ACCOUNT, ...initial });
+  const [form, setForm] = useState({
+    ...EMPTY_ACCOUNT, ...initial,
+    branch_id: initial?.branch_id || initial?.branch || initial?.branch_key || '',
+  });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const { branches } = useTenant();
+  const resolvedBranch = resolveCanonicalNetworkBranch(branches, form.branch_id);
+  const selectedBranchKey = resolvedBranch
+    ? String(resolvedBranch.key || resolvedBranch.branch_key || resolvedBranch.id) : '';
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.branch_id) return;
+    if (!resolvedBranch?.id) return;
     onSubmit(form);
   };
 
@@ -112,8 +120,8 @@ function NetworkAccountForm({ initial, onSubmit, onCancel }) {
         <Label className="text-xs font-semibold text-muted-foreground mb-1 block">
           Branch <span className="text-red-500">*</span>
         </Label>
-        <BranchSelect value={form.branch_id} onChange={v => set('branch_id', v)} required />
-        {!form.branch_id && (
+        <BranchSelect value={selectedBranchKey} onChange={v => set('branch_id', v)} required />
+        {!resolvedBranch && (
           <p className="text-xs text-amber-600 mt-1">Branch selection is required.</p>
         )}
       </div>
@@ -188,7 +196,7 @@ function NetworkAccountForm({ initial, onSubmit, onCancel }) {
       </div>
 
       <div className="flex gap-2 pt-2">
-        <Button type="submit" className="flex-1 h-11 font-bold" disabled={!form.branch_id}>
+        <Button type="submit" className="flex-1 h-11 font-bold" disabled={!resolvedBranch?.id}>
           <Save className="w-4 h-4 mr-2" />Save Account
         </Button>
         {onCancel && (
@@ -212,22 +220,24 @@ function NetworkAccountsTab({ accounts, branches, currency, onRefresh }) {
   const [filterBranch, setFilterBranch] = useState('all');
 
   const createMut = useMutation({
-    mutationFn: (data) => {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.branch_id);
-      return base44.entities.NetworkAccount.create({
-        ...data,
-        branch: isUuid ? undefined : data.branch_id,
-        branch_id: isUuid ? data.branch_id : null,
-        restaurant_id: activeRestaurant?.id || '',
-        created_by: ownerFilter?.created_by || '',
-      });
-    },
+    mutationFn: (data) => base44.entities.NetworkAccount.create({
+      ...networkAccountSavePayload(data, branches),
+      restaurant_id: activeRestaurant?.id || '',
+      created_by: ownerFilter?.created_by || '',
+    }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); qc.invalidateQueries({ queryKey: ['pos_devices_form'] }); setShowForm(false); },
+    onError: error => toast.error(error?.message || 'Unable to save network account'),
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.NetworkAccount.update(id, data),
+    // Status-only toggles leave branch metadata unchanged. A full edit must
+    // select exactly one authorized canonical branch UUID.
+    mutationFn: ({ id, data }) => base44.entities.NetworkAccount.update(
+      id, Object.prototype.hasOwnProperty.call(data, 'branch_id')
+        ? networkAccountSavePayload(data, branches) : data,
+    ),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['network_accounts'] }); qc.invalidateQueries({ queryKey: ['pos_devices_form'] }); setEditing(null); },
+    onError: error => toast.error(error?.message || 'Unable to update network account'),
   });
 
   const deleteMut = useMutation({
@@ -241,7 +251,7 @@ function NetworkAccountsTab({ accounts, branches, currency, onRefresh }) {
 
   const filtered = useMemo(() => {
     let list = accounts;
-    if (filterBranch !== 'all') list = list.filter(a => a.branch_id === filterBranch || a.branch === filterBranch);
+    if (filterBranch !== 'all') list = list.filter(a => resolveCanonicalNetworkBranch(branches, a.branch_id || a.branch || a.branch_key)?.id === resolveCanonicalNetworkBranch(branches, filterBranch)?.id);
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(a =>
@@ -252,12 +262,15 @@ function NetworkAccountsTab({ accounts, branches, currency, onRefresh }) {
       );
     }
     return list;
-  }, [accounts, filterBranch, search]);
+  }, [accounts, branches, filterBranch, search]);
 
   const getBranchName = (acc) => {
-    const b = branches.find(br => br.key === acc.branch_id || br.id === acc.branch_id || br.name === acc.branch_id || br.key === acc.branch || br.name === acc.branch);
-    return b?.name || acc.branch_id || acc.branch || '—';
+    const b = resolveCanonicalNetworkBranch(branches, acc.branch_id || acc.branch || acc.branch_key);
+    return b?.label || b?.name || acc.branch || '—';
   };
+  const unassignedAccounts = accounts.filter(account =>
+    !account.branch_id || !resolveCanonicalNetworkBranch(branches, account.branch_id),
+  );
 
   return (
     <div className="space-y-4">
@@ -283,6 +296,14 @@ function NetworkAccountsTab({ accounts, branches, currency, onRefresh }) {
           <Plus className="w-4 h-4 mr-1" />Add Account
         </Button>
       </div>
+
+      {unassignedAccounts.length > 0 && (
+        <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+          <AlertTriangle className="me-2 inline h-4 w-4" />
+          {unassignedAccounts.length} network account(s) have no verified canonical branch.
+          Edit each account and select its correct branch. These accounts remain hidden from branch managers until assigned.
+        </div>
+      )}
 
       {/* Account Cards */}
       {filtered.length === 0 ? (
