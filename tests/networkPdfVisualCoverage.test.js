@@ -7,7 +7,7 @@ import {buildSalesReportSnapshot} from '../src/lib/salesReportPeriod.js';
 import {buildFullSalesAnalyticsReport} from '../src/lib/fullSalesAnalyticsReport.js';
 import {generateSalesAnalyticsPDF} from '../src/lib/salesAnalyticsPdf.js';
 
-const range={from:'2026-06-01',to:'2026-11-06',previousFrom:'2025-12-27',previousTo:'2026-06-01'};
+const range={from:'2026-06-01',to:'2026-11-06',previousFrom:'2025-12-24',previousTo:'2026-05-31'};
 const branches=[{id:'b1',branch_key:'main',name:'Main'},{id:'b2',branch_key:'east',name:'East'}];
 const closing=(id,date,branch_id,network,more={})=>({
  id,date,branch_id,closing_state:'finalized',restaurant_network:network,restaurant_cash:0,credit:0,...more,
