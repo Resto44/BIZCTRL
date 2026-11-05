@@ -1118,7 +1118,8 @@ export default function NetworkManagement() {
           {activeTab === 'dashboard' && (
             <NetworkERPInsights mode="dashboard" sales={salesData} recons={recons} accounts={accounts} branches={branches}
               window={analyticsWindow} period={period} onPeriod={setPeriod} branchId={analyticsBranch} onBranch={setAnalyticsBranch}
-              currency={currency} lang={lang} loading={salesLoading || reconLoading || Boolean(salesError) || Boolean(reconError)}
+              currency={currency} lang={lang} loading={salesLoading} unavailable={Boolean(salesError)}
+              riskUnavailable={Boolean(reconError || reconLoading)}
               incomplete={Boolean(salesResult?.incomplete || reconResult?.incomplete)} />
           )}
           {activeTab === 'accounts' && (
@@ -1136,7 +1137,8 @@ export default function NetworkManagement() {
           {activeTab === 'analytics' && (
             <NetworkERPInsights mode="analytics" sales={salesData} recons={recons} accounts={accounts} branches={branches}
               window={analyticsWindow} period={period} onPeriod={setPeriod} branchId={analyticsBranch} onBranch={setAnalyticsBranch}
-              currency={currency} lang={lang} loading={salesLoading || reconLoading || Boolean(salesError) || Boolean(reconError)}
+              currency={currency} lang={lang} loading={salesLoading} unavailable={Boolean(salesError)}
+              riskUnavailable={Boolean(reconError || reconLoading)}
               incomplete={Boolean(salesResult?.incomplete || reconResult?.incomplete)} />
           )}
         </>
