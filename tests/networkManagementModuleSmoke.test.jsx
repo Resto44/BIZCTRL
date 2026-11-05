@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import NetworkManagement from '../src/pages/NetworkManagement.jsx';
 import { riyadhBusinessDate } from '../src/lib/networkAnalytics.js';
