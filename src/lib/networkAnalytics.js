@@ -92,7 +92,11 @@ export function networkInsights({ sales = [], accounts = [], branches = [], reco
     const branch = branches.find(b => String(b.id) === String(sale.branch_id)) ||
       branches.find(b => [b.key, b.branch_key, b.name].some(v => alias(v) === alias(sale.branch)));
     const branchName = branch?.name || sale.branch || 'Unassigned branch';
-    branchTotals.set(branchName, (branchTotals.get(branchName) || 0) + amount);
+    const branchIdentifier = String(branch?.id || sale.branch_id || 'legacy:' + (sale.branch || 'unassigned'));
+    const previousBranch = branchTotals.get(branchIdentifier);
+    branchTotals.set(branchIdentifier, {
+      id: branchIdentifier, name: branchName, value: (previousBranch?.value || 0) + amount,
+    });
     const sourceTotal = networkTotalSales(sale);
     if (sourceTotal !== null) { totalSales += sourceTotal; totalSalesRows++; }
     let rowAllocated = 0;
@@ -118,7 +122,10 @@ export function networkInsights({ sales = [], accounts = [], branches = [], reco
   }
   const trend = [...intervals.entries()].map(([date, value]) => ({date, value: round(value)}));
   const weekdays = weekdayTotals.map((value, day) => ({day: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][day], value: round(value)}));
-  const byBranch = [...branchTotals.entries()].map(([name, value]) => ({name, value: round(value)})).sort((a,b) => b.value - a.value);
+  const byBranch = [...branchTotals.values()].map(row => ({...row, value: round(row.value)})).sort((a,b) => b.value - a.value);
+  // Equal display names can occur in two different branches; never merge their revenue.
+  const repeatedNames = new Set(byBranch.filter((a,i) => byBranch.some((b,j) => i !== j && a.name === b.name)).map(row => row.name));
+  byBranch.forEach(row => { if (repeatedNames.has(row.name)) row.name += ' (' + row.id.slice(0,8) + ')'; });
   const byAccount = [...accountTotals.entries()].map(([id,value]) => {
     const a = accounts.find(a => String(a.id) === id);
     return {id, name: a?.account_name || a?.network_name || 'Account not found', value: round(value)};
