@@ -25,8 +25,11 @@ export function closingNetworkBranchAliases(branches, selectedBranchId, branchKe
   );
 }
 
-export function activeClosingNetworkAccounts(accounts, restaurantId, branchId, branchKey, branchAliases = []) {
-  const legacyKeys = new Set([branchKey, ...branchAliases].map(branchAlias).filter(Boolean));
+export function activeClosingNetworkAccounts(accounts, restaurantId, branchId, branchKey, branchAliases = null) {
+  // A supplied empty alias list means that branch metadata is ambiguous.
+  // Do not fall back to a potentially shared human-readable branch name.
+  const keys = Array.isArray(branchAliases) ? branchAliases : [branchKey];
+  const legacyKeys = new Set(keys.map(branchAlias).filter(Boolean));
   return accounts.filter(a => String(a.restaurant_id) === String(restaurantId)
     && (a.status ? String(a.status).toLowerCase() === 'active' : a.is_active === true)
     && (a.branch_id ? String(a.branch_id) === String(branchId)
