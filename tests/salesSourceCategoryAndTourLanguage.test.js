@@ -40,7 +40,7 @@ describe('Sales Source category expansion and tutorial language choice', () => {
     expect(migration).toContain('ADD CONSTRAINT sales_sources_category_check');
     expect(migration).toContain('CHECK (category IN (');
     for (const key of SALES_SOURCE_CATEGORIES) expect(migration).toContain(`'${key}'`);
-    expect(migration).not.toMatch(/\\b(?:DELETE\\s+FROM|TRUNCATE|UPDATE\\s+public\\.sales_sources|DROP\\s+TABLE|DROP\\s+POLICY|ALTER\\s+POLICY)\\b/i);
+    expect(migration).not.toMatch(/\b(?:DELETE\s+FROM|TRUNCATE|UPDATE\s+public\.sales_sources|DROP\s+TABLE|DROP\s+POLICY|ALTER\s+POLICY)\b/i);
   });
 
   it('offers three explicit language buttons in every onboarding step and switches the existing app locale', () => {
