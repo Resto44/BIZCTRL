@@ -24,8 +24,9 @@ const labels = {
     recent:'Recent finalized network sales',empty:'No finalized card sales for this period.',
     emptyAccounts:'No identified POS allocations for this period.',
     caution:'Results may be incomplete due to the safe record cap. Shorten the period.',
-    scope:'Finalized/locked sales only. Settlements are not new revenue.',
+    scope:'Finalized/locked sales and legacy closings without state. Settlements are not new revenue.',
     tz:'Dates and comparison use Asia/Riyadh.',rows:'records',review:'records need allocation review',
+    loading:'Loading verified financial data…',unavailable:'Unable to verify financial data. Refresh and check access.',riskUnavailable:'Settlement data unavailable',
   },
   fa: {
     title:'تحلیل هوشمند شبکه',desc:'فروش نهایی کارت • تاریخ کاری عربستان',
@@ -41,8 +42,9 @@ const labels = {
     recent:'جدیدترین فروش‌های نهایی شبکه',empty:'در این دوره فروش نهایی کارت وجود ندارد.',
     emptyAccounts:'در این دوره حساب POS مشخص نشده.',
     caution:'ممکن است نتیجه ناقص باشد؛ سقف ایمن دریافت رکورد پر شده است. دوره را کوتاه کنید.',
-    scope:'فقط کلوزینگ نهایی/قفل‌شده؛ تسویه درآمد تازه نیست.',
+    scope:'کلوزینگ نهایی/قفل‌شده و رکوردهای قدیمیِ بدون وضعیت؛ تسویه درآمد جدید نیست.',
     tz:'محاسبه تاریخ و مقایسه بر اساس Asia/Riyadh است.',rows:'رکورد',review:'رکورد نیازمند بررسی تخصیص',
+    loading:'در حال دریافت ارقام تأییدشده…',unavailable:'اطلاعات مالی قابل تأیید نیست. صفحه و مجوز دسترسی را بررسی کنید.',riskUnavailable:'اطلاعات تسویه در دسترس نیست',
   },
   ar: {
     title:'ذكاء مبيعات الشبكة',desc:'إيراد البطاقات النهائي • توقيت الرياض',
@@ -58,8 +60,9 @@ const labels = {
     recent:'أحدث مبيعات الشبكة النهائية',empty:'لا توجد مبيعات نهائية للشبكة في هذه الفترة.',
     emptyAccounts:'لا توجد تخصيصات لأجهزة POS في هذه الفترة.',
     caution:'قد تكون النتائج ناقصة بسبب الحد الآمن للسجلات؛ قلّص الفترة.',
-    scope:'الإقفالات النهائية فقط. التسويات لا تعتبر إيراداً جديداً.',
+    scope:'الإقفالات النهائية والمقفلة والسجلات القديمة دون حالة. التسويات ليست إيراداً جديداً.',
     tz:'التاريخ والمقارنة حسب توقيت الرياض.',rows:'سجل',review:'سجلات تحتاج مراجعة التخصيص',
+    loading:'جارٍ تحميل البيانات المالية المعتمدة…',unavailable:'تعذر التحقق من البيانات المالية. راجع الاتصال والصلاحيات.',riskUnavailable:'بيانات التسويات غير متاحة',
   },
 };
 const money = (value,currency) => currency+' '+Number(value||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -86,7 +89,7 @@ function Graph({title,children,empty,caption}) {
 }
 export default function NetworkERPInsights({
   mode='dashboard',sales=[],recons=[],accounts=[],branches=[],window,period,onPeriod,
-  branchId,onBranch,currency='SAR',lang='en',incomplete=false,loading=false,
+  branchId,onBranch,currency='SAR',lang='en',incomplete=false,loading=false,unavailable=false,riskUnavailable=false,
 }) {
   const t = labels[lang]||labels.en;
   const v = useMemo(()=>networkInsights({sales,recons,accounts,branches,window,branchId}),
@@ -127,7 +130,9 @@ export default function NetworkERPInsights({
     {incomplete && <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
       <AlertTriangle className="me-1 inline h-4 w-4"/>{t.caution}
     </p>}
-    {loading && <p role="status" className="text-sm text-slate-500">…</p>}
+    {unavailable ? <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">{t.unavailable}</p>
+      : loading ? <p role="status" className="rounded-xl border bg-white p-6 text-sm text-slate-600">{t.loading}</p>
+      : <>
     <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
       <Metric name={t.revenue} value={format(v.revenue)} icon={CreditCard} highlight sub={v.currentRows+' '+t.rows}/>
       <Metric name={t.growth} value={percent(v.change)} icon={v.change!=null&&v.change<0?ArrowDownRight:ArrowUpRight}
@@ -136,8 +141,8 @@ export default function NetworkERPInsights({
       <Metric name={t.share} value={percent(v.cardShare)} icon={Activity}/>
       <Metric name={t.active} value={v.activeAccounts} icon={Wifi}/>
       <Metric name={t.closings} value={v.currentRows} icon={Layers3}/>
-      <Metric name={t.variance} value={format(v.variance)} warning={v.variance>0} icon={AlertTriangle}/>
-      <Metric name={t.pending} value={v.pending} warning={v.pending>0} icon={Activity}/>
+      <Metric name={t.variance} value={riskUnavailable?t.riskUnavailable:format(v.variance)} warning={!riskUnavailable&&v.variance>0} icon={AlertTriangle}/>
+      <Metric name={t.pending} value={riskUnavailable?'—':v.pending} warning={!riskUnavailable&&v.pending>0} icon={Activity}/>
     </div>
     <div className="grid min-w-0 gap-3 lg:grid-cols-2">
       <Graph title={t.trend} caption={t.tz} empty={v.currentRows?null:t.empty}>
@@ -235,4 +240,5 @@ export default function NetworkERPInsights({
         {!v.currentRows && <p className="text-sm text-slate-500">{t.empty}</p>}
       </Card>
     </div>}
+    </>}
   </section>;
