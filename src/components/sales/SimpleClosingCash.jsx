@@ -30,7 +30,7 @@ export default function SimpleClosingCash({ lang = 'en', currency = 'SAR', input
     {ledgerLoading && <p role="status" className="text-sm text-slate-500">{t.loading}</p>}
     {ledgerUnavailable && <p role="alert" className="text-sm text-red-700">{t.error} <button type="button" onClick={onRetryLedger} className="min-h-11 underline">{t.retry}</button></p>}
     {!openingRequired && !ledgerLoading && !ledgerUnavailable && <>
-      {ledgerOverdrawn && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{role === 'owner' ? t.funding : t.manager}</p>}
+      {ledgerOverdrawn && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{['owner', 'manager'].includes(role) ? t.funding : t.manager}</p>}
       {fundingContent}
       {!ledgerOverdrawn && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3"><span className="text-sm font-bold">{t.difference}</span><strong dir="ltr" className={difference < 0 ? 'text-red-700' : 'text-emerald-700'}>{money(difference)}</strong>{difference !== null && difference !== 0 && <p className="w-full text-xs text-slate-500">{t.variance}</p>}</div>}
       <details className="rounded-xl border border-slate-100 p-3"><summary className="min-h-9 cursor-pointer text-sm font-bold text-slate-600">{t.details}</summary><dl className="space-y-2 text-sm">{[[t.opening, openingCash], [t.sales, cashSales], [t.inflow, cashIn], [t.outflow, cashOut], [t.expected, expectedCash]].map(([label, value]) => <div key={label} className="flex justify-between gap-3"><dt>{label}</dt><dd dir="ltr">{money(value)}</dd></div>)}</dl></details>
