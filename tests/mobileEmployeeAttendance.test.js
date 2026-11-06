@@ -9,13 +9,16 @@ describe('Employee personal-phone attendance integrity', () => {
     expect(portal).toContain('<EmployeeMobileAttendance userId={user?.id} />');
     expect(portal).not.toContain(".from('attendance').insert(");
     expect(portal).not.toContain(".from('attendance').update(");
-    expect(control).toContain("supabase.rpc('erp_attendance_mobile_event'");
+    expect(control).toContain("supabase.rpc('erp_attendance_email_event'");
+    expect(control).toContain("supabase.functions.invoke('attendance-email-otp'");
     expect(control).toContain("supabase.rpc('erp_attendance_mobile_status'");
     expect(control).toContain("navigator.geolocation.getCurrentPosition");
     expect(control).toContain('maximumAge: 0');
-    expect(control).not.toContain('employee_id:');
+    expect(control).toContain('p_employee_id: null');
+    expect(control).not.toContain('p_employee_id: userId');
     expect(control).not.toContain('new Date().toISOString()');
     expect(control).toContain("pin.length !== 6");
+    expect(control).toContain('codeTicket.expires_at');
   });
   it('requires server-linked employee identity, hashed PIN and precise location', () => {
     const sql = read('../supabase/migrations/20261014173000_employee_mobile_attendance.sql');
