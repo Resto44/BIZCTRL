@@ -14,7 +14,8 @@ describe('Employee personal-phone attendance integrity', () => {
     expect(control).toContain("supabase.rpc('erp_attendance_mobile_status'");
     expect(control).toContain("navigator.geolocation.getCurrentPosition");
     expect(control).toContain('maximumAge: 0');
-    expect(control).not.toContain('employee_id:');
+    expect(control).toContain('p_employee_id: null');
+    expect(control).not.toContain('p_employee_id: userId');
     expect(control).not.toContain('new Date().toISOString()');
     expect(control).toContain("pin.length !== 6");
     expect(control).toContain('codeTicket.expires_at');
