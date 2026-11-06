@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Pencil, Trash2, Archive, Eye, UserRound, Phone, Mail, Building2, UserPlus, Bell, Megaphone } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, Eye, UserRound, Phone, Mail, Building2, UserPlus, Bell, Megaphone, ShieldCheck } from 'lucide-react';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { formatCurrency } from '@/lib/helpers';
 import { useTenant } from '@/lib/TenantContext';
@@ -206,6 +206,16 @@ export default function Employees({ embedded = false }) {
     (!search || [e.full_name, e.employee_id, e.position, e.phone].some(value => String(value || '').toLowerCase().includes(search.toLowerCase())))
   );
 
+  // Owner readiness: an email OTP can only be issued when staff email and
+  // canonical branch metadata are both present. Never infer a branch by name.
+  const attendanceEmailReady=employees.filter(e=>e.is_active!==false
+    && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(String(e.email||''))
+    && branches.some(b=>b.id===e.branch_id)).length;
+  const attendanceNeedsEmail=employees.filter(e=>e.is_active!==false
+    && !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(String(e.email||''))).length;
+  const attendanceNeedsBranch=employees.filter(e=>e.is_active!==false
+    && !branches.some(b=>b.id===e.branch_id)).length;
+
   if (role === 'cashier') {
     return <div className="text-center py-20 text-muted-foreground text-sm">Access restricted.</div>;
   }
@@ -244,6 +254,22 @@ export default function Employees({ embedded = false }) {
         </TabsList>
 
         <TabsContent value="list">
+          {mayEdit && !isLoading && !isError && <Card className="mb-3 border-sky-200 bg-sky-50/60 p-3">
+            <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+              <ShieldCheck className="h-4 w-4 text-sky-600" />{tr('Attendance email OTP readiness')}
+            </p>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
+              {[
+                [tr('Email + branch ready'),attendanceEmailReady,'text-emerald-700'],
+                [tr('Missing employee email'),attendanceNeedsEmail,'text-amber-700'],
+                [tr('Missing branch assignment'),attendanceNeedsBranch,'text-amber-700'],
+              ].map(([label,n,tone])=><div key={label} className="rounded-xl border bg-white p-2">
+                <strong className={`block text-xl ${tone}`}>{n}</strong>
+                <span className="text-slate-600">{label}</span>
+              </div>)}
+            </div>
+            <p className="mt-2 text-xs text-slate-600">{tr('Assign each active employee to an existing branch and verify their email before enabling 30-minute Check In / Check Out codes. GPS geofence and approved employee login must also be configured.')}</p>
+          </Card>}
           <div className="mb-3 mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <BranchSelect value={filterBranch} onChange={setFilterBranch} includeAll disabled={role === 'manager'} />
             <Input aria-label={tr('Search employees')} placeholder={tr('Search name, ID, position or phone')}
@@ -284,6 +310,10 @@ export default function Employees({ embedded = false }) {
                         <div className="flex gap-3 mt-0.5">
                           {e.phone && <span className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-2.5 h-2.5" />{e.phone}</span>}
                           {e.email && <span className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-2.5 h-2.5" />{e.email}</span>}
+                          {!/^[^\\s@<>]+@[^\\s@<>]+\\.[^\\s@<>]+$/.test(String(e.email||'')) &&
+                            <Badge variant="outline" className="border-amber-300 text-amber-700 text-[10px]">{tr('Email required for OTP')}</Badge>}
+                          {!branches.some(branch=>branch.id===e.branch_id) &&
+                            <Badge variant="outline" className="border-amber-300 text-amber-700 text-[10px]">{tr('Assign canonical branch')}</Badge>}
                         </div>
                       </div>
                     </div>
