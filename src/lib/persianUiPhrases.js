@@ -1,5 +1,11 @@
 // Reviewed Persian interface copy. Source values and user-entered records remain unchanged.
 export default {
+  "No tasks match this filter.": "هیچ وظیفه‌ای با این فیلتر مطابقت ندارد.",
+  "Sign out": "خروج",
+  "Employee portal": "پورتل کارمند",
+  "In progress": "در حال انجام",
+
+  "Latest 100 assigned tasks": "جدیدترین ۱۰۰ وظیفه محول‌شده",
   "Authorization check unavailable": "بررسی مجوز در دسترس نیست",
   "Retry authorization check": "تلاش دوباره برای بررسی مجوز",
   "Your active session could not be validated for routing. No access has been granted or removed. Retry the server authorization check.": "نشست فعلی شما برای ورود به صفحه تأیید نشد. هیچ دسترسی اضافه یا حذف نشده است. بررسی مجوز سرور را دوباره انجام دهید.",

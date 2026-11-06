@@ -6,6 +6,7 @@ import {MemoryRouter} from 'react-router-dom';
 import {describe,it,expect,vi,afterEach,beforeEach} from 'vitest';
 const mocks=vi.hoisted(()=>({fail:'',reads:[],invalid:[]}));
 vi.mock('@/lib/AuthContext',()=>({useAuth:()=>({user:{id:'u',restaurant_id:'r',branch_id:'b',linked_entity_id:'profile',email:'test@example.com'},logout:vi.fn()})}));
+vi.mock('@/lib/RoleContext',()=>({useRole:()=>({can:{recordAttendance:true,viewTasks:true}})}));
 vi.mock('@/lib/TenantContext',()=>({useTenant:()=>({managerBranchObject:{id:'b',name:'Branch',branch_key:'branch'}})}));
 vi.mock('@/lib/LanguageContext',()=>({useLanguage:()=>({lang:'en',translateLiteral:(value)=>value})}));
 vi.mock('@/api/supabaseClient',()=>({supabase:{rpc:async()=>({data:{configured:false,reason:'APPROVED_EMPLOYEE_LINK_REQUIRED'},error:null}),from:table=>{
@@ -55,16 +56,16 @@ describe('portal failed reads',()=>{
     for(let i=0;i<5;i++)await act(async()=>{await new Promise(r=>setTimeout(r,15));});
     expect(tree.root.findAllByProps({role:'alert'})).toHaveLength(0);
   });
-  it('employee portal still displays a secure attendance clock when employee profile read fails',async()=>{
+  it('employee portal does not require management profile access to display personal attendance',async()=>{
     mocks.fail='employees';mocks.reads=[];mocks.invalid=[];
     client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
     await act(async()=>{tree=create(<MemoryRouter><QueryClientProvider client={client}><Employee/></QueryClientProvider></MemoryRouter>);});
     for(let i=0;i<5;i++)await act(async()=>{await new Promise(r=>setTimeout(r,15));});
-    expect(mocks.reads).toContain('employees');
+    expect(mocks.reads).not.toContain('employees');
     expect(mocks.invalid).toEqual([]);
     const ui=JSON.stringify(tree.toJSON());
     expect(ui).toContain('My attendance');
-    expect(ui).toContain('Profile unavailable');
+    expect(ui).not.toContain('Profile unavailable');
   });
 
 });

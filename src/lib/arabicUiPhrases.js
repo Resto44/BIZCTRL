@@ -1,5 +1,11 @@
 // Additional Arabic interface copy. Existing ERP catalog takes precedence.
 export default {
+  "No tasks match this filter.": "لا توجد مهام تطابق هذا الفلتر.",
+  "Sign out": "تسجيل الخروج",
+  "Employee portal": "بوابة الموظف",
+  "In progress": "قيد التنفيذ",
+
+  "Latest 100 assigned tasks": "آخر ١٠٠ مهمة مسندة إليك",
   "in": "في",
   "Record attendance": "تسجيل الحضور",
   "Payroll sections": "أقسام الرواتب",

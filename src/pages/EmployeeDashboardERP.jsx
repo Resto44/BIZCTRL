@@ -3,6 +3,9 @@ import HelpLink from '@/components/help/HelpLink';
 import PortalDataState from '@/components/shared/PortalDataState';
 import EmployeeMobileAttendance from '@/components/attendance/EmployeeMobileAttendance';
 import React, { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useLanguage } from '@/lib/LanguageContext';
+import { useRole } from '@/lib/RoleContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useQuery } from '@tanstack/react-query';
@@ -19,47 +22,43 @@ import { format } from 'date-fns';
 export default function EmployeeDashboardERP() {
   const { user, logout } = useAuth();
   const { managerBranchObject } = useTenant();
-  const [activeTab, setActiveTab] = useState('home');
+  const { translateLiteral: tr, isRTL } = useLanguage();
+  const { can } = useRole();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [taskFilter, setTaskFilter] = useState('all');
+  const activeTab = location.pathname === '/tasks' ? 'tasks'
+    : ['/employee-attendance', '/staff-attendance'].includes(location.pathname) ? 'attendance'
+    : new URLSearchParams(location.search).get('tab') === 'announcements' ? 'announcements' : 'home';
+  const setActiveTab = (tab) => navigate(tab === 'tasks' ? '/tasks'
+    : tab === 'attendance' ? '/employee-attendance'
+    : tab === 'announcements' ? '/employee-dashboard?tab=announcements' : '/employee-dashboard');
   const activeBranch = managerBranchObject || (user?.branch_id
     ? { id: user.branch_id, name: user.branch_name || 'Assigned Branch' }
     : null);
   const branchId = activeBranch?.id;
 
-  // Employee profile
-  const { data: empProfile, isError: empProfileError, refetch: retryEmpProfile, isLoading: empProfileLoading } = useQuery({
-    queryKey: ['emp-profile', user?.id, user?.linked_entity_id, user?.restaurant_id, branchId],
-    queryFn: async () => {
-      let query = supabase.from('employees').select('id,restaurant_id,branch_id,full_name,email,position,is_active');
-      if (user?.linked_entity_id) {
-        query = query.eq('id', user.linked_entity_id).eq('restaurant_id',user.restaurant_id).eq('branch_id',branchId);
-      } else {
-        query = query
-          .eq('restaurant_id', user?.restaurant_id)
-          .eq('branch_id', branchId)
-          .eq('email', user?.email);
-      }
-      const { data, error } = await query.maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!branchId && (!!user?.linked_entity_id || !!user?.email),
-  });
+  // Identity comes from the authenticated session. Employees must not need
+  // viewEmployees (which exposes the management directory) to see their own name.
+  const empProfile = { full_name: user?.full_name || user?.name || user?.email,
+    email: user?.email, position: tr('Employee') };
 
   // My tasks
   const { data: myTasks = [], isError: myTasksError, refetch: retryMyTasks, isLoading: myTasksLoading } = useQuery({
-    queryKey: ['emp-tasks', user?.id, branchId],
+    queryKey: ['emp-tasks', user?.id, user?.email, user?.restaurant_id, branchId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
         .eq('branch_id', branchId)
-        .eq('assigned_to', user?.id)
+        .eq('restaurant_id', user.restaurant_id)
+        .in('assigned_to', [user.id, user.email].filter(Boolean))
         .order('created_date', { ascending: false })
-        .limit(10);
+        .limit(100);
       if (error) throw error;
       return data || [];
     },
-    enabled: !!branchId && !!user?.id,
+    enabled: !!branchId && !!user?.id && !!user?.restaurant_id && can.viewTasks,
   });
 
   // Announcements
@@ -82,25 +81,29 @@ export default function EmployeeDashboardERP() {
     enabled: !!branchId && !!user?.restaurant_id,
   });
 
+  const completed = task => ['done', 'completed'].includes(task.status);
+  const filteredTasks = myTasks.filter(task => taskFilter === 'all' || (taskFilter === 'done' ? completed(task) : !completed(task)));
+
   // Attendance RPC independently checks the approved membership and employee UUID.
   // A failed tasks/announcements read must never hide the attendance clock.
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },
-    { id: 'tasks', label: 'Tasks', icon: ClipboardList },
+    ...(can.recordAttendance ? [{ id: 'attendance', label: 'Attendance', icon: ClipboardList }] : []),
+    ...(can.viewTasks ? [{ id: 'tasks', label: 'Tasks', icon: ClipboardList }] : []),
     { id: 'announcements', label: 'News', icon: Bell },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 pb-20">
+    <div dir={isRTL ? 'rtl' : 'ltr'} className="min-w-0 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 pb-6 text-white">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur border-b border-white/10">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <header className="bg-slate-950/80 backdrop-blur border-b border-white/10">
+        <div className="max-w-5xl mx-auto px-4 min-h-16 py-3 flex items-center justify-between">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-600 to-orange-700 flex items-center justify-center">
               <User className="w-4 h-4 text-white" />
             </div>
-            <div>
-              <p className="text-white font-bold text-sm">{empProfile?.full_name || user?.email}</p>
+            <div className="min-w-0">
+              <p className="truncate text-white font-bold text-sm">{empProfile?.full_name || user?.email}</p>
               <div className="flex items-center gap-1 text-slate-500 text-xs">
                 <GitBranch className="w-3 h-3" />
                 {activeBranch?.name}
@@ -108,28 +111,29 @@ export default function EmployeeDashboardERP() {
             </div>
           </div>
           <HelpLink guide="employee" />
-          <Button variant="ghost" size="sm" onClick={logout} className="text-slate-400 hover:text-white">
+          <Button variant="ghost" size="sm" aria-label={tr('Sign out')} onClick={logout} className="text-slate-400 hover:text-white">
             <LogOut className="w-4 h-4" />
           </Button>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-        {activeTab === 'home' && (
+      <nav aria-label={tr('Employee portal')} className="mx-auto flex max-w-5xl flex-wrap gap-2 border-b border-white/10 px-4 pb-3">
+        {tabs.map(item => <button key={item.id} onClick={() => setActiveTab(item.id)}
+          aria-current={activeTab === item.id ? 'page' : undefined}
+          className={`min-h-11 rounded-xl px-4 text-sm font-semibold ${activeTab === item.id ? 'bg-amber-500 text-slate-950' : 'bg-white/5 text-slate-300 hover:bg-white/10'}`}>
+          {tr(item.label)}
+        </button>)}
+      </nav>
+      <main className="max-w-5xl mx-auto px-4 py-5 space-y-4">
+        {['home', 'attendance'].includes(activeTab) && (
           <>
             {/* All attendance mutations now use the authenticated employee's server-side identity. */}
-            <EmployeeMobileAttendance userId={user?.id} />
+            {can.recordAttendance && <EmployeeMobileAttendance userId={user?.id} />}
             {!branchId && <p role="alert" className="rounded-lg border border-amber-600/40 bg-amber-500/10 p-3 text-sm text-amber-200">
               Your employee account needs an active branch assignment. Ask the Owner to link your employee record.
             </p>}
-            {empProfileError && <p role="alert" className="rounded-lg border border-red-600/40 p-3 text-sm text-red-200">
-              Profile unavailable. Attendance can still be checked separately.
-              <Button variant="ghost" size="sm" onClick={() => retryEmpProfile()}>Retry profile</Button>
-            </p>}
-            {empProfileLoading && <p className="text-xs text-slate-400">Loading employee profile…</p>}
-
             {/* Profile Summary */}
-            {empProfile && (
+            {activeTab === 'home' && (
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-4">
@@ -150,26 +154,36 @@ export default function EmployeeDashboardERP() {
 
         {activeTab === 'tasks' && (
           <div className="space-y-3">
-            <h2 className="text-white font-bold">My Tasks</h2>
-            {myTasksError ? <PortalDataState onRetry={retryMyTasks}/> : myTasksLoading ? <PortalDataState loading/> : myTasks.length === 0 ? (
-              <p className="text-slate-500 text-sm py-4 text-center">No tasks assigned.</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-white text-xl font-bold">{tr('My Tasks')}</h2>
+              <Button variant="outline" className="border-white/20 bg-transparent" onClick={() => retryMyTasks()}>{tr('Refresh')}</Button>
+            </div>
+            <p className="text-xs text-slate-400">{tr('Latest 100 assigned tasks')}</p>
+            <div className="flex flex-wrap gap-2">
+              {[['all', 'All'], ['open', 'Open'], ['done', 'Completed']].map(([value, label]) =>
+                <button key={value} aria-pressed={taskFilter === value} onClick={() => setTaskFilter(value)}
+                  className={`min-h-11 rounded-lg border px-4 text-sm ${taskFilter === value ? 'border-amber-400 text-amber-300' : 'border-white/15 text-slate-300'}`}>{tr(label)}</button>)}
+            </div>
+            {myTasksError ? <PortalDataState onRetry={retryMyTasks}/> : myTasksLoading ? <PortalDataState loading/> : filteredTasks.length === 0 ? (
+              <p className="text-slate-500 text-sm py-4 text-center">{tr(taskFilter === 'all' ? 'No tasks assigned.' : 'No tasks match this filter.')}</p>
             ) : (
-              myTasks.map(task => (
+              filteredTasks.map(task => (
                 <Card key={task.id} className="bg-white/5 border-white/10">
                   <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-white text-sm font-medium">{task.title}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words text-white text-sm font-medium">{task.title}</p>
+                        {task.due_date && <p className="mt-1 text-xs text-slate-400">{tr('Due date')}: {task.due_date}</p>}
                         {task.description && (
                           <p className="text-slate-400 text-xs mt-1">{task.description}</p>
                         )}
                       </div>
                       <Badge className={`text-[10px] ${
-                        task.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
+                        completed(task) ? 'bg-emerald-500/20 text-emerald-400' :
                         task.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400' :
                         'bg-amber-500/20 text-amber-400'
                       }`}>
-                        {task.status || 'pending'}
+                        {tr(completed(task) ? 'Completed' : task.status === 'in_progress' ? 'In progress' : 'Pending')}
                       </Badge>
                     </div>
                   </CardContent>
@@ -191,7 +205,7 @@ export default function EmployeeDashboardERP() {
                     <p className="text-white text-sm font-medium">{ann.title}</p>
                     {ann.content && <p className="text-slate-400 text-xs mt-1">{ann.content}</p>}
                     <p className="text-slate-600 text-xs mt-2">
-                      {ann.created_date ? format(new Date(ann.created_date), 'MMM d, yyyy') : ''}
+                      {ann.created_date && !Number.isNaN(new Date(ann.created_date).getTime()) ? format(new Date(ann.created_date), 'MMM d, yyyy') : ''}
                     </p>
                   </CardContent>
                 </Card>
@@ -201,26 +215,7 @@ export default function EmployeeDashboardERP() {
         )}
       </main>
 
-      {/* Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur border-t border-white/10 z-40">
-        <div className="max-w-2xl mx-auto px-4 flex">
-          {tabs.map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
-                  activeTab === tab.id ? 'text-amber-400' : 'text-slate-500 hover:text-slate-300'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+
     </div>
   );
 }
