@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS public.attendance_email_codes (
  expires_at timestamptz NOT NULL,
  delivered_at timestamptz,
  used_at timestamptz,
+ verified_at timestamptz,
+ attendance_id uuid,
  tries integer NOT NULL DEFAULT 0 CHECK(tries BETWEEN 0 AND 5)
 );
 CREATE INDEX IF NOT EXISTS attendance_email_codes_employee_idx
@@ -144,8 +146,11 @@ DECLARE e public.employees%ROWTYPE; b public.branches%ROWTYPE;
  v_time text; v_action text; v_minutes numeric;
 BEGIN
  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'AUTH_REQUIRED' USING ERRCODE='42501'; END IF;
- SELECT * INTO e FROM public.employees WHERE id=p_employee_id
-   AND restaurant_id IS NOT NULL AND is_active IS TRUE;
+ SELECT * INTO e FROM public.employees WHERE id=coalesce(p_employee_id,(
+   SELECT m.linked_entity_id FROM public.erp_memberships m
+   WHERE m.user_id=auth.uid() AND m.status='approved' AND m.role='employee'
+     AND m.linked_entity_id IS NOT NULL ORDER BY m.updated_at DESC LIMIT 1
+ )) AND restaurant_id IS NOT NULL AND is_active IS TRUE;
  SELECT * INTO b FROM public.branches WHERE id=e.branch_id
    AND restaurant_id=e.restaurant_id AND is_active IS TRUE;
  IF e.id IS NULL OR b.id IS NULL OR NOT EXISTS(
@@ -224,7 +229,7 @@ BEGIN
    'present',0,0,auth.uid()::text,v_t) RETURNING * INTO a;
   v_action:='in';
  END IF;
- UPDATE public.attendance_email_codes SET used_at=v_t WHERE id=c.id;
+ UPDATE public.attendance_email_codes SET used_at=v_t,verified_at=v_t,attendance_id=a.id WHERE id=c.id;
  INSERT INTO public.attendance_mobile_audit(actor_id,restaurant_id,branch_id,
     employee_id,attendance_id,action,distance_m,accuracy_m)
  VALUES(auth.uid(),e.restaurant_id,b.id,e.id,a.id,v_action,
@@ -243,3 +248,33 @@ GRANT EXECUTE ON FUNCTION public.erp_attendance_email_event(uuid,text,double pre
 -- The legacy PIN and static QR routines are left untouched for migration
 -- compatibility; they must be retired only after live OTP email delivery is
 -- proven working across employee and manager workflows.
+
+
+-- Read-only, tenant-scoped owner / assigned-manager dashboard counts. No
+-- secrets, raw GPS or recipient emails are surfaced.
+CREATE OR REPLACE FUNCTION public.erp_attendance_email_owner_summary(
+ p_restaurant uuid,p_branch uuid
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=public,pg_temp AS $$
+DECLARE v_today date;
+BEGIN
+ IF auth.uid() IS NULL OR NOT EXISTS(SELECT 1 FROM public.erp_memberships m
+ WHERE m.user_id=auth.uid() AND m.status='approved' AND m.restaurant_id=p_restaurant
+ AND (
+  m.role='owner' OR (m.role='manager' AND p_branch IS NOT NULL AND m.branch_id=p_branch)
+ )) THEN RAISE EXCEPTION 'ATTENDANCE_SUMMARY_FORBIDDEN' USING ERRCODE='42501'; END IF;
+ v_today:=(clock_timestamp() AT TIME ZONE 'Asia/Riyadh')::date;
+ RETURN (SELECT jsonb_build_object(
+ 'provider_accepted',count(*) FILTER (WHERE c.delivered_at IS NOT NULL),
+ 'verified_in',count(*) FILTER (WHERE c.verified_at IS NOT NULL AND c.action='in'),
+ 'verified_out',count(*) FILTER (WHERE c.verified_at IS NOT NULL AND c.action='out'),
+ 'expired_unused',count(*) FILTER (WHERE c.expires_at<clock_timestamp()
+      AND c.verified_at IS NULL AND c.delivered_at IS NOT NULL),
+ 'locked_invalid',count(*) FILTER (WHERE c.tries>=5),
+ 'local_date',v_today)
+ FROM public.attendance_email_codes c
+ WHERE c.restaurant_id=p_restaurant AND (p_branch IS NULL OR c.branch_id=p_branch)
+ AND (c.issued_at AT TIME ZONE 'Asia/Riyadh')::date=v_today);
+END; $$;
+REVOKE ALL ON FUNCTION public.erp_attendance_email_owner_summary(uuid,uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.erp_attendance_email_owner_summary(uuid,uuid) TO authenticated;
