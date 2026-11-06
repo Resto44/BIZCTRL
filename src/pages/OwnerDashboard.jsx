@@ -7,7 +7,7 @@ import { supplierOutstandingAmount } from '@/lib/supplierOpenPayables';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { endOfMonth, format, startOfMonth } from 'date-fns';
+import { format, startOfMonth } from 'date-fns';
 import { AlertCircle, AlertTriangle, BarChart3, Building2, CalendarDays, ChevronRight, CircleDollarSign, ClipboardList, FileDown, Loader2, Radio, ShoppingBasket, Target } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
@@ -213,12 +213,12 @@ function OwnerDashboardContent() {
   };
 
   const today = period.currentEnd;
-  const usesAllocatedFixedCosts = activePeriod === 'today' || activePeriod === 'week';
-  const currentReferenceDate = new Date(`${period.currentEnd}T12:00:00`);
-  const previousReferenceDate = new Date(`${period.previousEnd}T12:00:00`);
+  const usesAllocatedFixedCosts = true;
+  const currentReferenceDate = new Date(`${period.currentStart}T12:00:00`);
+  const previousReferenceDate = new Date(`${period.previousStart}T12:00:00`);
   const currentReferenceMonthStart = format(startOfMonth(currentReferenceDate), 'yyyy-MM-dd');
   const previousReferenceMonthStart = format(startOfMonth(previousReferenceDate), 'yyyy-MM-dd');
-  const previousReferenceMonthEnd = format(endOfMonth(previousReferenceDate), 'yyyy-MM-dd');
+  const previousReferenceMonthEnd = period.previousEnd;
   const createdBy = user?.email || ownerFilter?.created_by || activeRestaurant?.created_by;
   const enabled = !!(activeRestaurant?.id);
 
@@ -327,7 +327,9 @@ function OwnerDashboardContent() {
   const previousPeriodSales = previousPeriodSalesQuery.data || [];
   const periodExpenses = periodExpensesQuery.data || [];
   const previousPeriodExpenses = previousPeriodExpensesQuery.data || [];
-  const expenseCategories = expenseCategoriesQuery.data || [];
+  const expenseCategories = useMemo(() => (expenseCategoriesQuery.data || []).filter(
+    category => isAllBranches || !category.branch_id || String(category.branch_id) === String(selectedBranchId),
+  ), [expenseCategoriesQuery.data, isAllBranches, selectedBranchId]);
   const supplierInvoices = supplierInvoicesQuery.data || [];
   const customerDebts = customerDebtsQuery.data || [];
   const inventory = inventoryQuery.data || [];
@@ -367,7 +369,8 @@ function OwnerDashboardContent() {
     revenueSources,
     daysInPeriod: period.daysInPeriod,
     asOfDate: period.currentEnd,
-  }), [period.currentEnd, period.daysInPeriod, period.rangeType, periodPurchases, periodSales, revenueSources, taggedCurrentFixedExpensePool, taggedPeriodExpenses, usesAllocatedFixedCosts]);
+    periodFrom: period.currentStart, expenseCategories,
+  }), [expenseCategories, period.currentStart, period.currentEnd, period.daysInPeriod, period.rangeType, periodPurchases, periodSales, revenueSources, taggedCurrentFixedExpensePool, taggedPeriodExpenses, usesAllocatedFixedCosts]);
   const previousPeriodMetrics = useMemo(() => calculateERPAccounting({
     sales: previousPeriodSales,
     purchases: previousPeriodPurchases,
@@ -377,8 +380,9 @@ function OwnerDashboardContent() {
     revenueSources,
     daysInPeriod: period.daysInPeriod,
     asOfDate: period.previousEnd,
-  }), [period.daysInPeriod, period.previousEnd, period.rangeType, previousPeriodPurchases, previousPeriodSales, revenueSources, taggedPreviousFixedExpensePool, taggedPreviousPeriodExpenses, usesAllocatedFixedCosts]);
-  const todayMetricsForAlerts = useMemo(() => calculateERPAccounting({ sales: todaySales, purchases: todayPurchases, periodExpenses: taggedTodayExpenses, monthlyExpenses: taggedCurrentFixedExpensePool, rangeType: 'day', revenueSources, daysInPeriod: 1, asOfDate: today }), [revenueSources, taggedCurrentFixedExpensePool, taggedTodayExpenses, today, todayPurchases, todaySales]);
+    periodFrom: period.previousStart, expenseCategories,
+  }), [expenseCategories, period.previousStart, period.daysInPeriod, period.previousEnd, period.rangeType, previousPeriodPurchases, previousPeriodSales, revenueSources, taggedPreviousFixedExpensePool, taggedPreviousPeriodExpenses, usesAllocatedFixedCosts]);
+  const todayMetricsForAlerts = useMemo(() => calculateERPAccounting({ sales: todaySales, purchases: todayPurchases, periodExpenses: taggedTodayExpenses, monthlyExpenses: taggedCurrentFixedExpensePool, rangeType: 'day', revenueSources, daysInPeriod: 1, asOfDate: today, periodFrom: today, expenseCategories }), [expenseCategories, revenueSources, taggedCurrentFixedExpensePool, taggedTodayExpenses, today, todayPurchases, todaySales]);
 
   const scopedAlerts = useMemo(() => isAllBranches ? persistedActiveAlerts : persistedActiveAlerts.filter((alert) => String(alert.branch_id || '') === String(selectedBranchId || '') || (!alert.branch_id && String(alert.branch || '') === String(selectedBranchKey || ''))), [isAllBranches, persistedActiveAlerts, selectedBranchId, selectedBranchKey]);
   const visibleBranches = useMemo(() => isAllBranches ? normalizedBranches : normalizedBranches.filter((branch) => String(branch.id) === String(selectedBranchId)), [isAllBranches, normalizedBranches, selectedBranchId]);
@@ -389,14 +393,14 @@ function OwnerDashboardContent() {
     const branchFixedExpensePool = taggedCurrentFixedExpensePool.filter((record) => recordMatchesBranch(record, branch));
     const branchInventory = inventory.filter((record) => recordMatchesBranch(record, branch));
     const branchAlerts = scopedAlerts.filter((record) => recordMatchesBranch(record, branch));
-    const metrics = calculateERPAccounting({ sales: branchSales, purchases: branchPurchases, periodExpenses: branchPeriodExpenses, monthlyExpenses: usesAllocatedFixedCosts ? branchFixedExpensePool : branchPeriodExpenses, rangeType: period.rangeType, revenueSources, daysInPeriod: period.daysInPeriod, asOfDate: period.currentEnd });
+    const metrics = calculateERPAccounting({ sales: branchSales, purchases: branchPurchases, periodExpenses: branchPeriodExpenses, monthlyExpenses: usesAllocatedFixedCosts ? branchFixedExpensePool : branchPeriodExpenses, rangeType: period.rangeType, revenueSources, daysInPeriod: period.daysInPeriod, asOfDate: period.currentEnd, periodFrom: period.currentStart, expenseCategories: expenseCategories.filter(category => !category.branch_id || String(category.branch_id) === String(branch.id)) });
     const lowStockCount = branchInventory.filter((item) => {
       const quantity = numeric(item.quantity ?? item.opening_stock);
       const threshold = numeric(item.low_stock_threshold ?? item.min_quantity ?? item.reorder_point);
       return quantity <= 0 || (threshold > 0 && quantity <= threshold);
     }).length;
     return { ...branch, metrics, alerts: branchAlerts.length, lowStockCount, health: healthScore({ metrics, alertCount: branchAlerts.length, lowStockCount }) };
-  }).sort((left, right) => right.metrics.totalSales - left.metrics.totalSales), [inventory, period.currentEnd, period.daysInPeriod, period.rangeType, periodPurchases, periodSales, revenueSources, scopedAlerts, taggedCurrentFixedExpensePool, taggedPeriodExpenses, usesAllocatedFixedCosts, visibleBranches]);
+  }).sort((left, right) => right.metrics.totalSales - left.metrics.totalSales), [expenseCategories, inventory, period.currentStart, period.currentEnd, period.daysInPeriod, period.rangeType, periodPurchases, periodSales, revenueSources, scopedAlerts, taggedCurrentFixedExpensePool, taggedPeriodExpenses, usesAllocatedFixedCosts, visibleBranches]);
 
   const activeAlertCandidates = useMemo(() => buildActiveAlertCandidates({ inventory, todaySales, customerDebts, supplierInvoices, netProfit: todayMetricsForAlerts.netProfit, branches: normalizedBranches, today, currency: `${String(currency || 'SAR').trim()} ` }), [currency, customerDebts, inventory, normalizedBranches, supplierInvoices, today, todayMetricsForAlerts.netProfit, todaySales]);
   const activeAlertSignature = useMemo(() => JSON.stringify(activeAlertCandidates.map((alert) => ({ source_key: alert.source_key, severity: alert.severity, message: alert.message })).sort((left, right) => left.source_key.localeCompare(right.source_key))), [activeAlertCandidates]);

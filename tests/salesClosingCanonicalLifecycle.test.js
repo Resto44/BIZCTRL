@@ -90,7 +90,8 @@ describe('Sales Closing branch-isolation regression', () => {
     expect(workspace).toContain("queryClient.cancelQueries({ queryKey: ['sales-closing-cash-ledger-context'] })");
     expect(workspace).not.toContain('branches.at(0)?.key');
 
-    expect(sales).toContain("qc.cancelQueries({ queryKey: ['sales'] })");
+    expect(sales).toContain("qc.cancelQueries({ queryKey: ['sales'], type: 'inactive' })");
+    expect(sales).not.toContain("qc.cancelQueries({ queryKey: ['sales'] })");
     expect(sales).toContain('setEditing(null)');
     expect(sales).toContain('setNewClosingDefaults(null)');
     expect(sales).toContain('setSessionContext(null)');

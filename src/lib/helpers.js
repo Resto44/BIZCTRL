@@ -1,3 +1,4 @@
+import { allocateReportExpenses } from './reportExpenseAllocation';
 import { subDays, subWeeks, subMonths, subYears, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
 
 export function formatDate(d) {
@@ -52,6 +53,8 @@ export function calculateERPAccounting({
   revenueSources = [],
   daysInPeriod = null,
   asOfDate = null,
+  periodFrom = null,
+  expenseCategories = null,
 } = {}) {
   const safeSales = Array.isArray(sales) ? sales : [];
   const safePurchases = Array.isArray(purchases) ? purchases : [];
@@ -87,7 +90,7 @@ export function calculateERPAccounting({
   const totalFixedExpenses = safeMonthlyExpenses
     .filter(isFixedExpense)
     .reduce((sum, expense) => sum + amountOf(expense), 0);
-  const totalVariableExpenses = safePeriodExpenses
+  let totalVariableExpenses = safePeriodExpenses
     .filter(expense => !isFixedExpense(expense))
     .reduce((sum, expense) => sum + amountOf(expense), 0);
 
@@ -101,6 +104,16 @@ export function calculateERPAccounting({
   let fixedDeduction = totalFixedExpenses;
   if (rangeType === 'day' || rangeType === 'week') {
     fixedDeduction = (totalFixedExpenses / calendarDays) * periodDays;
+  }
+
+  // Date-bounded callers share the same configured-cost allocation as Reports.
+  // Legacy callers retain their existing row-based accounting contract.
+  if (periodFrom && asOfDate && Array.isArray(expenseCategories)) {
+    const rows = Array.from(new Map([...safeMonthlyExpenses, ...safePeriodExpenses]
+      .map((row, index) => [row.id || `unidentified-${index}`, row])).values());
+    const allocation = allocateReportExpenses(rows, expenseCategories, periodFrom, asOfDate);
+    fixedDeduction = allocation.fixed;
+    totalVariableExpenses = allocation.variable;
   }
 
   const totalExpenses = totalVariableExpenses + fixedDeduction;
