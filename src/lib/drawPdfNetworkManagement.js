@@ -74,6 +74,29 @@ const copy={
     noPriorShort:'لا إقفالات مؤكدة للفترة السابقة',mappingNotLoss:'الفرق ليس نقصاً في الصندوق',
   },
 };
+const advancedCopy={
+  en:{
+    operations:'Finalized network operations',closings:'Final closings',
+    avgClose:'Avg card / closing',peakDay:'Peak card day',weekend:'Fri + Sat share',
+    branchReliance:'Card reliance by branch',signals:'Card sales intelligence',
+    topWeekday:'Top weekday',activeDays:'Card-active days',
+    topBranch:'Largest card branch',noBranchActivity:'No branch sales mix available',
+  },
+  ar:{
+    operations:'مؤشرات عمليات الشبكة النهائية',closings:'الإقفالات النهائية',
+    avgClose:'متوسط البطاقة / إقفال',peakDay:'أعلى يوم للبطاقة',weekend:'حصة الجمعة والسبت',
+    branchReliance:'اعتماد الفروع على البطاقة',signals:'مؤشرات مبيعات البطاقة',
+    topWeekday:'أقوى يوم أسبوعي',activeDays:'أيام نشاط البطاقة',
+    topBranch:'أعلى فرع للشبكة',noBranchActivity:'لا توجد بيانات لمزيج مبيعات الفروع',
+  },
+  fa:{
+    operations:'شاخص‌های نهایی فروش شبکه',closings:'کلوزینگ نهایی',
+    avgClose:'میانگین کارت / کلوزینگ',peakDay:'روز پرفروش شبکه',weekend:'سهم جمعه و شنبه',
+    branchReliance:'وابستگی شعبه به کارت',signals:'هوش فروشات شبکه',
+    topWeekday:'بهترین روز هفته',activeDays:'روزهای دارای فروش کارت',
+    topBranch:'بالاترین شعبه',noBranchActivity:'معلومات سهم کارت شعبه موجود نیست',
+  },
+};
 const fmt = n => n===null||!Number.isFinite(Number(n))?'—':
   Number(n).toLocaleString('en-US',{maximumFractionDigits:2,minimumFractionDigits:2});
 const pct = (value,showSign=false) => value==null?'—':(showSign&&value>0?'+':'')+fmt(value)+'%';
@@ -87,9 +110,10 @@ export function drawPdfNetworkManagement(doc,{
   branchLabel='All branches',iconData=null,
 }={}){
   if(!insights?.available)return 0;
-  const t=copy[lang]||copy.en;
+  const t={...(copy[lang]||copy.en),...(advancedCopy[lang]||advancedCopy.en)};
   const rtl=lang==='fa'||lang==='ar';
   const branches=insights.branches||[];
+  const ops=insights.operational||{};
   const chunkSize=8; // leave a readable gap before the A4 accounting notes
   const pageCount=Math.max(1,Math.ceil(branches.length/chunkSize));
   const numberPages=2+pageCount;
@@ -184,16 +208,21 @@ export function drawPdfNetworkManagement(doc,{
         T(item.day.slice(0,2),x-2,107,w+4,6.7,COLORS.muted,false,'center');
       });
       T(fmt(highest),140,77,56,7.5,COLORS.muted); // Above the highest bar, never overprint data
-      // Branch network contribution: positive and negative values displayed without hiding adjustments.
-      panel(t.branchTrend,7,118,196,24);
-      const positive=Math.max(1,...branches.map(x=>Math.abs(x.current.network)));
-      const swatches=[[COLORS.blue,0],[COLORS.cyan,1],[COLORS.purple,2],[COLORS.green,3],[COLORS.amber,4]];
-      branches.slice(0,5).forEach((b,i)=>{
-        const x=11+i*37.5,w=33,h=6;
-        doc.setFillColor(237,242,250);doc.roundedRect(x,128,w,h,1,1,'F');
-        doc.setFillColor(...swatches[i][0]);
-        doc.roundedRect(x,128,Math.max(0.3,clamp(Math.abs(b.current.network)/positive,0,1)*w),h,1,1,'F');
-        T(b.name==='Unattributed branch'?t.unknown:b.name,x,139,w,6.9,COLORS.ink);
+      // Four diagnostics are based exclusively on finalized or locked Closing
+      // records and never represent additional revenue.
+      panel(t.operations,7,118,196,24);
+      const operationalTiles=[
+        [t.closings,String(ops.closingCount??insights.currentClosings??0),'',COLORS.blue],
+        [t.avgClose,ops.averageCardPerClosing==null?'—':fmt(ops.averageCardPerClosing),currency,COLORS.green],
+        [t.peakDay,ops.peakDay?fmt(ops.peakDay.value):'—',ops.peakDay?.date||'',COLORS.purple],
+        [t.weekend,pct(ops.weekendShare),t.period,COLORS.cyan],
+      ];
+      operationalTiles.forEach(([label,value,detail,color],i)=>{
+        const x=10+i*48.5;
+        if(i){doc.setDrawColor(...COLORS.line);doc.line(x-2,126,x-2,139);}
+        T(label,x,129,44,7.2,COLORS.muted,true);
+        T(value,x,136,44,10.7,color,true);
+        if(detail)T(detail,x,140.1,44,6.5,COLORS.muted);
       });
       drawTable(rows,158);
       // Position both footer panels below the last branch row without covering
@@ -217,6 +246,33 @@ export function drawPdfNetworkManagement(doc,{
       T(t.receiptShort,109,notesY+25,91,8.2,COLORS.muted);
       if(insights.sourceMismatch!=null&&Math.abs(insights.sourceMismatch)>.01)
         T(t.mismatch+': '+fmt(insights.sourceMismatch),109,notesY+32,91,7.1,COLORS.amber,true);
+      // Typical 1-5 branch businesses had a large unused lower-page area.
+      // Use it for a true branch card-mix bar chart and explainable signals.
+      // For 6-8 branch tables preserve legibility and footer clearance.
+      const diagnosticY=notesY+38;
+      if(rows.length<=5 && diagnosticY+25<=273){
+        panel(t.branchReliance,7,diagnosticY,96,25);
+        const activeBranches=branches.filter(b=>b.current.total>0).slice(0,3);
+        if(!activeBranches.length)T(t.noBranchActivity,10,diagnosticY+16,89,7.7,COLORS.muted);
+        activeBranches.forEach((branch,i)=>{
+          const y=diagnosticY+11+i*6;
+          T(branch.name==='Unattributed branch'?t.unknown:branch.name,10,y,37,7,COLORS.ink);
+          const mix=branch.cardMix;
+          doc.setFillColor(233,239,248);
+          doc.roundedRect(51,y-2.9,27,2.8,.7,.7,'F');
+          if(mix!=null && mix>=0 && mix<=100){
+            doc.setFillColor(...[COLORS.blue,COLORS.cyan,COLORS.purple][i]);
+            if(mix>0)doc.roundedRect(51,y-2.9,27*mix/100,2.8,.7,.7,'F');
+          }
+          T(pct(mix),80,y,19,7.2,COLORS.blue,true,'right');
+        });
+        panel(t.signals,106,diagnosticY,97,25);
+        const peak=ops.peakWeekday;
+        T(t.topWeekday+': '+(peak?peak.day+' · '+fmt(peak.value):'—'),109,diagnosticY+12,91,7.1,COLORS.ink);
+        T(t.activeDays+': '+String(ops.activeCardDays??'—'),109,diagnosticY+18,91,7.1,COLORS.ink);
+        const top=ops.topBranch;
+        T(t.topBranch+': '+(top?top.name+' · '+pct(top.share):'—'),109,diagnosticY+24,91,7.1,COLORS.blue,true);
+      }
     }else{
       T(t.continuation,9,36,190,12,COLORS.ink,true);
       drawTable(rows,65,t.branches);
