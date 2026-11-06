@@ -11,14 +11,19 @@ let tree,client;
 afterEach(()=>{if(tree)act(()=>tree.unmount());tree=null;client?.clear();sessionStorage.clear();vi.resetAllMocks();});
 const payload=(id)=>({restaurant_id:id,branch_id:'branch',date:'2026-10-26',shift:'Morning',cashier_id:'owner',closing_state:'finalized',actual_cash:180,wallet_funding:{source:'treasury',amount:289,source_account_id:'owner-wallet',destination_account_id:'branch-wallet',received:true}});
 describe('atomic closing wallet confirmation',()=>{
- it('selects a wallet without posting any transfer',async()=>{
+ it.each(['owner','manager'])('%s selects a wallet without posting any transfer',async(role)=>{
   mock.rpc.mockResolvedValue({data:[{id:'owner-wallet',currency:'SAR',account_type:'cash',available_balance:2000},{id:'branch-wallet',branch_id:'branch',currency:'SAR',account_type:'cash',available_balance:0}]});
   const onChange=vi.fn();client=new QueryClient({defaultOptions:{queries:{retry:false}}});
-  await act(async()=>{tree=create(<QueryClientProvider client={client}><ClosingWalletChoice restaurantId="r" branchId="branch" branchKey="main" currency="SAR" expectedCash={-109} actualCash={180} lang="fa" role="owner" onChange={onChange}/></QueryClientProvider>);});
+  await act(async()=>{tree=create(<QueryClientProvider client={client}><ClosingWalletChoice restaurantId="r" branchId="branch" branchKey="main" currency="SAR" expectedCash={-109} actualCash={180} lang="fa" role={role} onChange={onChange}/></QueryClientProvider>);});
   await act(async()=>new Promise(r=>setTimeout(r,30)));
   const choices=tree.root.findAllByProps({role:'radio'});expect(choices).toHaveLength(2);expect(choices[0].props.disabled).toBe(true);
   act(()=>choices[1].props.onClick());expect(onChange).toHaveBeenCalledWith(expect.objectContaining({amount:289,source:'treasury'}));
   expect(mock.rpc.mock.calls.every(([name])=>name==='erp_closing_funding_accounts')).toBe(true);
+ });
+ it('does not expose funding choices to other roles',async()=>{
+  client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+  await act(async()=>{tree=create(<QueryClientProvider client={client}><ClosingWalletChoice restaurantId="r" branchId="branch" currency="SAR" expectedCash={-100} actualCash={85} lang="en" role="employee" onChange={vi.fn()}/></QueryClientProvider>);});
+  expect(tree.toJSON()).toBeNull();expect(mock.rpc).not.toHaveBeenCalled();
  });
  it('finalizes through a single atomic RPC and reuses the frozen request after timeout',async()=>{
   mock.rpc.mockResolvedValueOnce({error:{message:'network timeout'}}).mockResolvedValueOnce({data:{closing:{id:'existing',closing_state:'finalized'},idempotent:true}});

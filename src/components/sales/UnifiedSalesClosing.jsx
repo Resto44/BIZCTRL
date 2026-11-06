@@ -1405,7 +1405,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
     branchWalletAvailable,
   });
   const fundingScope = JSON.stringify([activeRestaurant?.id, selectedBranchId, form.date, form.shift, effectiveCashierId, rawReconciliation.expectedCash, actualCount]);
-  const activeFundingPlan = role === 'owner' && fundingPlan?.scope === fundingScope ? fundingPlan.value : null;
+  const activeFundingPlan = ['owner', 'manager'].includes(role) && fundingPlan?.scope === fundingScope ? fundingPlan.value : null;
   // This is an explicitly labelled preview. Only the atomic RPC posts money.
   const reconciliation = activeFundingPlan ? {
     ...rawReconciliation, cashIn: sumClosingMoney(rawReconciliation.cashIn, activeFundingPlan.amount),
