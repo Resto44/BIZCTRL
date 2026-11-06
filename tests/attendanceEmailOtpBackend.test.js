@@ -31,10 +31,12 @@ describe('Staged ERP email attendance backend security',()=>{
   expect(edge).toContain('erp_attendance_email_delivery_admin');
   expect(edge).not.toContain('console.log(code)');
  });
- it('keeps the current kiosk and employee screens untouched until mail delivery is proven',()=>{
-  const old=read('../src/components/attendance/EmployeeMobileAttendance.jsx');
-  expect(old).toContain("erp_attendance_mobile_event");
+ it('uses server-side email verification in the opt-in portal UI',()=>{
+  const employee=read('../src/components/attendance/EmployeeMobileAttendance.jsx');
   const owner=read('../src/pages/EmployeeAttendance.jsx');
-  expect(owner).toContain("erp_attendance_kiosk_event");
+  expect(employee).toContain("erp_attendance_email_event");
+  expect(owner).toContain("erp_attendance_email_event");
+  expect(employee).not.toContain("supabase.rpc('erp_attendance_mobile_event'");
+  expect(owner).not.toContain("supabase.rpc('erp_attendance_kiosk_event'");
  });
 });
