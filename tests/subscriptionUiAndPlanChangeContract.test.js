@@ -26,9 +26,11 @@ describe('subscription UI and plan-change contract', () => {
 
   it('renders landing pricing only from canonical public plan data through the shared pricing component', async () => {
     const landing = await readFile(landingPath, 'utf8');
-    expect(landing).toContain("from('subscription_plans')");
-    expect(landing).toContain(".eq('is_public', true)");
-    expect(landing).toContain('PUBLIC_PLAN_FIELDS');
+    const catalogRead = await readFile(new URL('../src/lib/usePublicPlanCatalog.js', import.meta.url), 'utf8');
+    expect(landing).toContain('usePublicPlanCatalog()');
+    expect(catalogRead).toContain("from('subscription_plans')");
+    expect(catalogRead).toContain(".eq('is_public', true)");
+    expect(catalogRead).toContain('PUBLIC_PLAN_FIELDS');
     expect(landing).toContain('<PublicPricingCards');
   });
 

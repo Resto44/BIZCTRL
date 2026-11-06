@@ -9,10 +9,15 @@ import { Button } from '@/components/ui/button';
 import PublicPricingCards from '@/components/marketing/PublicPricingCards';
 import LandingMarketingShowcase from '@/components/marketing/LandingMarketingShowcase';
 import { useLanguage } from '@/lib/LanguageContext';
-import { supabase } from '@/api/supabaseClient';
 import { ContentSection, PRODUCT_DESCRIPTION, PublicHero, PublicLayout, SectionHeading, usePublicPageMetadata } from '@/components/marketing/PublicLayout';
-import { PUBLIC_PLAN_FIELDS } from '@/lib/pricingCatalog';
+import { usePublicPlanCatalog } from '@/lib/usePublicPlanCatalog';
 import { usePublicPlanCheckout } from '@/lib/publicPlanCheckout';
+
+const CATALOG_COPY = {
+  en: { loading: 'Loading subscription plans…', error: 'Subscription plans could not be loaded. Please try again.', empty: 'No subscription plans are available right now. Please contact support.' },
+  ar: { loading: 'جارٍ تحميل خطط الاشتراك…', error: 'تعذّر تحميل خطط الاشتراك. يرجى المحاولة مرة أخرى.', empty: 'لا تتوفر خطط اشتراك حالياً. يرجى التواصل مع الدعم.' },
+  fa: { loading: 'در حال دریافت پلن‌های اشتراک…', error: 'پلن‌های اشتراک دریافت نشد. دوباره تلاش کنید.', empty: 'فعلاً پلن اشتراک موجود نیست. با پشتیبانی تماس بگیرید.' },
+};
 
 const WALLET_LOGIN_COPY = {
   en:{
@@ -105,23 +110,13 @@ function DashboardPreview() {
 export default function LandingPage() {
   const { translateLiteral: tr, lang } = useLanguage();
   const walletCopy = WALLET_LOGIN_COPY[lang] || WALLET_LOGIN_COPY.en;
+  const catalogCopy = CATALOG_COPY[lang] || CATALOG_COPY.en;
   usePublicPageMetadata(tr('BizCTRL — Multi-Tenant ERP SaaS'), tr(PRODUCT_DESCRIPTION));
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [catalogPlans, setCatalogPlans] = useState([]);
+  const { plans: catalogPlans, status: catalogStatus, retry: retryCatalog } = usePublicPlanCatalog();
   const resumedCheckoutPlanId = useRef('');
   const { beginPlanCheckout, contactSales, checkoutNotice, checkoutPlanId, isLoadingAuth, setCheckoutNotice } = usePublicPlanCheckout();
-
-  useEffect(() => {
-    let active = true;
-    supabase.from('subscription_plans')
-      .select(PUBLIC_PLAN_FIELDS)
-      .eq('is_active', true)
-      .eq('is_public', true)
-      .order('sort_order', { ascending: true })
-      .then(({ data }) => { if (active) setCatalogPlans(Array.isArray(data) ? data : []); });
-    return () => { active = false; };
-  }, []);
 
   useEffect(() => {
     const planId = String(searchParams.get('checkout_plan') || '').trim();
@@ -207,6 +202,10 @@ export default function LandingPage() {
 
       <ContentSection id="pricing" className="border-y border-white/10 bg-gradient-to-b from-slate-900/40 to-slate-950">
         <SectionHeading eyebrow="Launch Pricing" title="Simple promotional pricing, clearly disclosed" description="Every public price comes from BizCTRL’s active plan catalog. Starter includes a free first month (a 30-day trial), then renews at its displayed monthly price unless cancelled." />
+        {catalogStatus !== 'ready' && <div role={catalogStatus === 'error' ? 'alert' : 'status'} className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-slate-200">
+          <p>{catalogCopy[catalogStatus]}</p>
+          {catalogStatus !== 'loading' && <Button onClick={retryCatalog} className="mt-4">{lang === 'fa' ? 'تلاش دوباره' : lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}</Button>}
+        </div>}
         {catalogPlans.length > 0 && <PublicPricingCards plans={catalogPlans} compact onStartFree={beginPlanCheckout} onContactSales={contactSales} busyPlanId={checkoutPlanId} disabled={isLoadingAuth} enterpriseContactMode />}
         {checkoutNotice && <p role="status" className="mx-auto mt-6 max-w-3xl rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-5 py-4 text-center text-sm leading-6 text-cyan-50">{checkoutNotice}</p>}
 

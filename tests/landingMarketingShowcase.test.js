@@ -5,9 +5,10 @@ import { PORTAL_SHOWCASE_IMAGE, ERP_SHOWCASE_IMAGE } from '../src/assets/landing
 const source = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 describe('BizCTRL public landing marketing art import', () => {
-  it('embeds both real optimized WebP images, independent of expiring third-party URLs', () => {
+  it('serves both real optimized WebP images as cacheable files, independent of expiring third-party URLs', () => {
     for (const illustration of [PORTAL_SHOWCASE_IMAGE, ERP_SHOWCASE_IMAGE]) {
-      const decoded = Buffer.from(illustration, 'base64');
+      expect(illustration).toMatch(/^\/marketing\/landing-.*\.webp$/);
+      const decoded = readFileSync(new URL(`../public${illustration}`, import.meta.url));
       expect(decoded.subarray(0,4).toString('ascii')).toBe('RIFF');
       expect(decoded.subarray(8,12).toString('ascii')).toBe('WEBP');
       expect(decoded.length).toBeGreaterThan(15000);

@@ -158,7 +158,10 @@ export default function Sales() {
     // A branch switch invalidates every mutable Closing artifact from the former
     // scope: draft/edit selection, history selections, session identity, and the
     // component key used to mount its local input state.
-    qc.cancelQueries({ queryKey: ['sales'] });
+    // Only cancel inactive scopes. Cancelling the whole prefix here also
+    // cancels the newly mounted history observer and leaves it without data.
+    // Active reads are already isolated by the complete scope in their key.
+    qc.cancelQueries({ queryKey: ['sales'], type: 'inactive' });
     setEditing(null);
     setNewClosingDefaults(null);
     setSessionContext(null);

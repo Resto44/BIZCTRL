@@ -17,7 +17,7 @@ import ERPRoleGuard from '@/components/rbac/ERPRoleGuard';
 import { TenantProvider, useTenant } from '@/lib/TenantContext';
 import { BranchScopeProvider } from '@/lib/BranchScopeContext';
 import { RetailInventoryScopeProvider } from '@/lib/RetailInventoryScopeContext';
-import RetailInventoryRoute from '@/components/retail-inventory/RetailInventoryRoute';
+const RetailInventoryRoute = lazy(() => import('@/components/retail-inventory/RetailInventoryRoute'));
 import { WorkspaceCustomizationProvider } from '@/lib/WorkspaceCustomizationContext';
 import { SalesClosingCustomizationProvider } from '@/lib/SalesClosingCustomizationContext';
 import { BusinessModeProvider } from '@/lib/BusinessModeContext';

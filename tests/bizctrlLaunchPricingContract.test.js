@@ -26,7 +26,9 @@ describe('BizCTRL launch pricing contract', () => {
       readFile(landingPath, 'utf8'),
       readFile(catalogPath, 'utf8'),
     ]);
-    expect(landing).toContain('PUBLIC_PLAN_FIELDS');
+    const catalogRead = await readFile(new URL('../src/lib/usePublicPlanCatalog.js', import.meta.url), 'utf8');
+    expect(landing).toContain('usePublicPlanCatalog()');
+    expect(catalogRead).toContain('PUBLIC_PLAN_FIELDS');
     expect(landing).toContain('<PublicPricingCards');
     expect(landing).toContain('id="pricing"');
     expect(catalog).toContain('First month free (${days}-day trial)');
