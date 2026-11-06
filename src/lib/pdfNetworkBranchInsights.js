@@ -70,6 +70,8 @@ export function buildPdfNetworkBranchInsights({
   const unattributed={id:'__unattributed__',name:'Unattributed branch',current:empty(),previous:empty()};
   const accounts=new Map();
   const trend=new Map(),priorTrend=new Map(),weekdayTotals=Array(7).fill(0);
+  const dailyCardSales=new Map();
+  let cardPositiveClosings=0;
   const totals={current:empty(),previous:empty()};
   let mappedClosings=0,unmappedClosings=0,explicitMapped=0,singleAccountMapped=0;
   const step=lastWeeks(range);
@@ -117,7 +119,11 @@ export function buildPdfNetworkBranchInsights({
     const target=current?trend:priorTrend;
     const k=bucketKey(row.date,step);
     target.set(k,(target.get(k)||0)+network);
-    if(current)weekdayTotals[(asDate(row.date).getUTCDay()+6)%7]+=network;
+    if(current){
+      weekdayTotals[(asDate(row.date).getUTCDay()+6)%7]+=network;
+      dailyCardSales.set(row.date,(dailyCardSales.get(row.date)||0)+network);
+      if(network>0)cardPositiveClosings++;
+    }
   }
   const listed=[...branchMap.values()];
   if(unattributed.current.closings||unattributed.previous.closings)listed.push(unattributed);
@@ -141,6 +147,29 @@ export function buildPdfNetworkBranchInsights({
   };
   const currentSeries=schedule(range.from,range.to).map(date=>({date,value:money(trend.get(date)||0)}));
   const previousSeries=schedule(range.previousFrom,range.previousTo).map(date=>({date,value:money(priorTrend.get(date)||0)}));
+  // Operational KPIs are derived only from finalized/locked closings.
+  // Date buckets in "trend" can be weeks or months, so the peak daily value
+  // comes from a separate date-level map rather than those aggregates.
+  const postedDaily=[...dailyCardSales].map(([date,value])=>({date,value:money(value)}));
+  const positiveDays=postedDaily.filter(item=>item.value>0);
+  const peakDay=positiveDays.sort((a,b)=>b.value-a.value||a.date.localeCompare(b.date))[0]||null;
+  const peakWeekday=weekdayTotals.map((value,index)=>({
+    day:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][index],value:money(value),
+  })).sort((a,b)=>b.value-a.value)[0]||null;
+  const safeRatio=(part,whole)=>whole>0&&part>=-0.01&&part<=whole+0.01?
+    money(Math.max(0,Math.min(100,part/whole*100))):null;
+  const operational={
+    closingCount:totals.current.closings,
+    cardPositiveClosings,
+    averageCardPerClosing:totals.current.closings>0?
+      money(currentNetwork/totals.current.closings):null,
+    activeCardDays:positiveDays.length,
+    peakDay,
+    peakWeekday:currentNetwork>0?peakWeekday:null,
+    weekendShare:safeRatio(weekdayTotals[4]+weekdayTotals[5],currentNetwork),
+    topBranch:withShare.find(branch=>branch.current.network>0)||null,
+    allocationRate: mappedClosings>0 ? safeRatio(totals.current.allocated,currentNetwork) : null,
+  };
   const sourceMismatch=snapshot&&Number.isFinite(Number(snapshot.network))?
     money(Number(snapshot.network)-currentNetwork):null;
   const priorMismatch=previousSnapshot&&Number.isFinite(Number(previousSnapshot.network))?
@@ -161,6 +190,7 @@ export function buildPdfNetworkBranchInsights({
     explicitMapped:money(explicitMapped),singleAccountMapped:money(singleAccountMapped),
     sourceMismatch,priorMismatch,
     branches:withShare,
+    operational,
     trend:currentSeries,previousTrend:previousSeries,
     weekdays:weekdayTotals.map((value,index)=>({day:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][index],value:money(value)})),
     accounts:[...accounts.values()].map(row=>({...row,value:money(row.value)})).sort((a,b)=>b.value-a.value),
