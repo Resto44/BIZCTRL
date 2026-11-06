@@ -73,6 +73,14 @@ describe('Network PDF visual/attribution regression (screenshot repair)',()=>{
     'Bank transfers are not extra revenue or proof of collection.']){
     expect(get(title),title).toHaveLength(1);
   }
+  // New ERP diagnostics fill unused A4 space without losing audit notes.
+  for(const title of ['Finalized network operations','Final closings',
+    'Avg card / closing','Peak card day','Fri + Sat share',
+    'Card reliance by branch','Card sales intelligence']){
+    expect(get(title),title).toHaveLength(1);
+  }
+  expect(get('Card reliance by branch')[0].y).toBeGreaterThan(get('POS account attribution')[0].y);
+  expect(get('Card sales intelligence')[0].y).toBeLessThan(275);
   // Longer disclaimer is not repeated as a box heading and body.
   expect(get('Only finalized or locked closings. Card / POS allocations are included in sales, not additional income.')).toHaveLength(0);
   const [posTitle]=get('POS account attribution');
