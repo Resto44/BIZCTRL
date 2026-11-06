@@ -49,8 +49,7 @@ export default function EmployeeAttendance() {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [result, setResult] = useState(null);
   const [analyticsRange, setAnalyticsRange] = useState(30);
-  const [pinEmployee, setPinEmployee] = useState('');
-  const [newPin, setNewPin] = useState('');
+  const [codeTicket, setCodeTicket] = useState(null);
 
   const restaurantId = activeRestaurant?.id || null;
   const isOwner = role === ROLES.OWNER;
@@ -66,7 +65,8 @@ export default function EmployeeAttendance() {
     if (!valid) setSelectedBranch(isManager ? managerBranchKey : (branches[0]?.key || ''));
     if (isManager && managerBranchKey && selectedBranch !== managerBranchKey) setSelectedBranch(managerBranchKey);
   }, [branches, isManager, managerBranchKey, selectedBranch]);
-  useEffect(() => { setSelectedEmployee(''); setPinEmployee(''); setResult(null); }, [restaurantId, selectedBranch]);
+  useEffect(() => { setSelectedEmployee(''); setCodeTicket(null); setResult(null); }, [restaurantId, selectedBranch]);
+  useEffect(() => { setCodeTicket(null); }, [selectedEmployee]);
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(interval);
@@ -137,52 +137,81 @@ export default function EmployeeAttendance() {
     qc.invalidateQueries({ queryKey: ['kiosk-employee-open-shift'] });
   };
 
-  const kioskMutation = useMutation({
-    mutationFn: async ({ employeeId, method, credential }) => {
-      if (!ready) throw new Error(tr('Select an active branch first.'));
-      const { data, error } = await supabase.rpc('erp_attendance_kiosk_event', {
-        p_restaurant_id: restaurantId, p_branch_id: branchId,
-        p_employee_id: employeeId, p_method: method, p_credential: credential,
-      });
-      if (error) throw error;
-      if (!data || data.type !== 'success') {
-        throw new Error(data?.message || tr('Credential rejected'));
-      }
-      return data;
-    },
-    onSuccess: data => {
-      setResult(data);
-      refresh();
-      qc.invalidateQueries({ queryKey: ['attendance'] });
-      qc.invalidateQueries({ queryKey: ['payroll-attendance'] });
-      qc.invalidateQueries({ queryKey: ['payroll-dashboard-attendance'] });
-    },
-    onError: error => {
-      setResult({ type: 'error', title: tr('Attendance not recorded'), message: error.message });
-    },
+  const getOnsitePosition = () => new Promise((resolve,reject)=>{
+    if(typeof navigator==='undefined'||!navigator.geolocation){
+      reject(new Error('Location is unavailable. Enable precise GPS at your branch.')); return;
+    }
+    navigator.geolocation.getCurrentPosition(({coords})=>resolve(coords),()=>reject(new Error(
+      'Precise branch location permission is required.')),
+      {enableHighAccuracy:true,maximumAge:0,timeout:15000});
   });
-  const submitQR = code => {
+  const currentPhase=selectedAttendanceState==='checked_in'?'out'
+    :selectedAttendanceState==='not_checked_in'?'in':null;
+  const emailCodeMutation=useMutation({
+    mutationFn:async()=>{
+      if(!canManage||!ready||!selectedEmployee||!currentPhase) throw new Error('Select an employee eligible for Check In or Check Out.');
+      const {data,error}=await supabase.functions.invoke('attendance-email-otp',{
+        body:{action:'issue',employee_id:selectedEmployee,phase:currentPhase},
+      });
+      if(error)throw error;
+      if(!data?.sent||!data?.ok)throw new Error(data?.error||'Email code unavailable.');
+      return {...data,phase:currentPhase,employeeId:selectedEmployee};
+    },
+    onSuccess:data=>{setCodeTicket(data);toast.success(tr('Email provider accepted the attendance code.'));},
+    onError:e=>{setCodeTicket(null);toast.error(e.message);},
+  });
+  const kioskMutation=useMutation({
+    mutationFn:async({employeeId,credential})=>{
+      if(!ready||!canManage||!codeTicket||codeTicket.employeeId!==employeeId)
+        throw new Error('Request a fresh email code for this employee.');
+      if(Date.parse(codeTicket.expires_at)<=Date.now())throw new Error('OTP_EXPIRED');
+      const position=await getOnsitePosition();
+      const {data,error}=await supabase.rpc('erp_attendance_email_event',{
+        p_employee_id:employeeId,p_code:credential,
+        p_latitude:position.latitude,p_longitude:position.longitude,
+        p_accuracy_m:position.accuracy,
+      });
+      if(error)throw error;
+      if(data?.type!=='success')throw new Error(data?.reason||'Attendance not recorded.');
+      return { ...data,title: data.action==='in'?'Check In':'Check Out',
+        message:'Email code and branch location verified.' };
+    },
+    onSuccess:data=>{
+      setCodeTicket(null);setResult(data);refresh();
+      qc.invalidateQueries({queryKey:['attendance-email-summary']});
+      qc.invalidateQueries({queryKey:['attendance']});
+      qc.invalidateQueries({queryKey:['payroll-attendance']});
+      qc.invalidateQueries({queryKey:['payroll-dashboard-attendance']});
+    },
+    onError:error=>setResult({type:'error',title:tr('Attendance not recorded'),message:error.message}),
+  });
+  const submitQR=code=>{
     setShowQRScanner(false);
-    const emp = employees.find(e => e.qr_code === code.trim());
-    if (!emp) {
-      setResult({ type: 'error', title: tr('QR Error'), message: tr('This QR badge is not assigned to the selected branch.') });
+    const emp=employees.find(e=>e.qr_code===code.trim());
+    if(!emp){
+      setResult({type:'error',title:tr('QR Error'),
+        message:tr('This QR badge is not assigned to the selected branch.')});
       return;
     }
-    kioskMutation.mutate({ employeeId: emp.id, method: 'qr', credential: code.trim() });
+    // A printed/stolen QR identifies the employee ONLY. It cannot check
+    // anyone in/out without a fresh emailed code and onsite GPS.
+    setSelectedEmployee(emp.id);
+    setCodeTicket(null);
+    toast.success(tr('Employee selected. Send a one-time code to their email.'));
   };
 
-  const setPinMutation = useMutation({
-    mutationFn: async () => {
-      if (!/^[0-9]{6}$/.test(newPin) || !pinEmployee || !employees.some(e => e.id === pinEmployee))
-        throw new Error(tr('Choose an employee and enter a six-digit PIN.'));
-      const { error } = await supabase.rpc('erp_attendance_set_kiosk_pin', {
-        p_restaurant_id: restaurantId, p_employee_id: pinEmployee, p_pin: newPin,
+  const { data: emailSummary }=useQuery({
+    queryKey:['attendance-email-summary',restaurantId,branchId,today],
+    queryFn:async()=>{
+      const {data,error}=await supabase.rpc('erp_attendance_email_owner_summary',{
+        p_restaurant:restaurantId,p_branch:branchId,
       });
-      if (error) throw error;
+      if(error)throw error;return data;
     },
-    onSuccess: () => { setNewPin(''); toast.success(tr('Employee PIN saved securely')); },
-    onError: error => toast.error(error.message),
+    enabled:canManage&&ready,
+    refetchInterval:60000,
   });
+
   const qrMutation = useMutation({
     mutationFn: async ({ emp, rotate = false }) => {
       const { data, error } = await supabase.rpc('erp_attendance_issue_kiosk_qr', {
@@ -288,7 +317,7 @@ export default function EmployeeAttendance() {
               <CardContent className="space-y-2 px-4 pb-4 pt-4">
                 <div className="text-center">
                   <p className="font-semibold">{tr('Scan QR Code')}</p>
-                  <p className="text-xs text-muted-foreground">{tr('Point camera at employee QR badge')}</p>
+                  <p className="text-xs text-muted-foreground">{tr('Scan employee badge to select them. Email code + onsite GPS are still required.')}</p>
                 </div>
                 <Button type="button" className="h-12 w-full gap-2"
                   disabled={!ready || !employees.length || loadError || kioskMutation.isPending}
@@ -299,8 +328,8 @@ export default function EmployeeAttendance() {
             </Card>
             <Card>
               <CardHeader className="px-4 pb-2 pt-4">
-                <CardTitle className="flex items-center gap-2 text-sm"><Lock className="h-4 w-4" />{tr('Enter PIN')}</CardTitle>
-                <p className="text-xs text-muted-foreground">{tr('Choose an employee, then enter the six-digit PIN.')}</p>
+                <CardTitle className="flex items-center gap-2 text-sm"><Lock className="h-4 w-4" />{tr('Employee email verification (6 digits)')}</CardTitle>
+                <p className="text-xs text-muted-foreground">{tr('A fresh one-time code is sent to the employee email for each Check In and Check Out. It expires after 30 minutes and needs accurate onsite GPS.')}</p>
               </CardHeader>
               <CardContent className="space-y-3 px-4 pb-4">
                 <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
@@ -309,12 +338,12 @@ export default function EmployeeAttendance() {
                 </Select>
                 {selectedEmployee && <p role="status" className="rounded-lg border bg-muted/50 p-3 text-center text-xs">
                   {selectedAttendanceState === 'checked_in'
-                    ? tr('Check In recorded. Enter PIN again to Check Out.')
+                    ? tr('Check In recorded. Request a new email code to Check Out.')
                     : selectedAttendanceState === 'completed'
                       ? tr('Check In and Check Out are already recorded for today.')
                       : selectedAttendanceState === 'review'
                         ? tr('Attendance requires manager review before another scan.')
-                        : tr('No Check In yet. Enter PIN to record arrival.')}
+                        : tr('No Check In yet. Request an email code to record arrival.')}
                   {selectedOpenShift && <span className="block mt-1 text-muted-foreground">
                     {tr('Open shift date')}: {selectedOpenShift.date} · {selectedOpenShift.check_in}
                   </span>}
@@ -322,12 +351,36 @@ export default function EmployeeAttendance() {
                 {openShiftError && <p role="alert" className="text-sm text-destructive">
                   {tr('Unable to read current employee shift. The server will verify the next action.')}
                 </p>}
-                <KioskPINPad key={`${restaurantId}-${selectedBranch}-${selectedEmployee}`}
-                  loading={kioskMutation.isPending}
-                  disabled={!ready || !selectedEmployee || loadError}
-                  onSubmit={pin => kioskMutation.mutate({ employeeId: selectedEmployee, method: 'pin', credential: pin })} />
+                <Button type="button" className="w-full h-12" variant="secondary"
+                  disabled={!ready || !selectedEmployee || !currentPhase || emailCodeMutation.isPending}
+                  onClick={()=>emailCodeMutation.mutate()}>
+                  {emailCodeMutation.isPending?tr('Sending email code…'):tr(codeTicket?'Request a new email code':'Send one-time code to employee email')}
+                </Button>
+                {codeTicket && codeTicket.employeeId===selectedEmployee && <p role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
+                  {tr('Code sent to')}: <strong>{codeTicket.masked_email}</strong> · {tr('Expires after 30 minutes')} · {new Date(codeTicket.expires_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Riyadh'})}
+                </p>}
+                {codeTicket && codeTicket.employeeId===selectedEmployee &&
+                  <KioskPINPad key={`${restaurantId}-${selectedBranch}-${selectedEmployee}-${codeTicket.expires_at}`}
+                    loading={kioskMutation.isPending}
+                    disabled={!ready || !selectedEmployee || loadError}
+                    onSubmit={pin => kioskMutation.mutate({employeeId:selectedEmployee,credential:pin})} />}
+                <p className="text-xs text-muted-foreground">{tr('GPS from this device is checked when recording attendance. GPS is not an absolute guarantee of physical presence.')}</p>
               </CardContent>
             </Card>
+            {emailSummary && <Card className="border-blue-100 bg-blue-50/50"><CardContent className="p-3">
+              <p className="text-xs font-semibold mb-2">{tr('Email OTP & location audit · today')}</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  [tr('Email provider accepted'),emailSummary.provider_accepted],
+                  [tr('Verified Check In'),emailSummary.verified_in],
+                  [tr('Verified Check Out'),emailSummary.verified_out],
+                  [tr('Expired unused'),emailSummary.expired_unused],
+                ].map(([label,value])=><div key={label} className="rounded-lg border bg-white p-2 text-center">
+                  <p className="text-lg font-bold tabular-nums">{value??0}</p>
+                  <p className="text-[10px] text-muted-foreground">{label}</p>
+                </div>)}
+              </div>
+            </CardContent></Card>}
             <div className="grid grid-cols-3 gap-2 text-center">
               {[
                 [tr('Present'), presentlyIn],
@@ -342,28 +395,13 @@ export default function EmployeeAttendance() {
           <TabsContent value="live">
             {loadingEmp ? <p className="py-8 text-center">{t('loading')}</p> : loadError ? null
               : <AttendanceLiveBoard employees={employees} todayAttendance={todayAttendance} />}
-            <p className="mt-3 text-xs text-muted-foreground">{tr('Check-out requires employee QR or PIN in the Kiosk tab.')}</p>
+            <p className="mt-3 text-xs text-muted-foreground">{tr('Check-out requires an emailed six-digit code and onsite GPS in Kiosk or Employee Portal.')}</p>
           </TabsContent>
 
           <TabsContent value="qrcodes" className="space-y-4">
-            {canManage && <Card className="border-primary/20">
-              <CardHeader className="px-4 pb-2 pt-4"><CardTitle className="flex items-center gap-2 text-sm">
-                <ShieldCheck className="h-4 w-4" />{tr('Set employee kiosk PIN')}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 px-4 pb-4">
-                <Select value={pinEmployee} onValueChange={setPinEmployee}>
-                  <SelectTrigger className="w-full"><SelectValue placeholder={tr('Select employee')} /></SelectTrigger>
-                  <SelectContent>{employees.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>)}</SelectContent>
-                </Select>
-                <Input type="password" value={newPin}
-                  onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  inputMode="numeric" autoComplete="new-password" maxLength={6}
-                  placeholder={tr('New six-digit PIN')} />
-                <Button className="w-full" disabled={!pinEmployee || newPin.length !== 6 || setPinMutation.isPending}
-                  onClick={() => setPinMutation.mutate()}>{tr('Save PIN')}</Button>
-                <p className="text-xs text-muted-foreground">{tr('The PIN is encrypted and is never displayed after saving.')}</p>
-              </CardContent>
-            </Card>}
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              {tr('Old permanent PINs and printed QR badges are no longer accepted by this kiosk as stand-alone attendance proof. A fresh emailed code and branch GPS are required.')}
+            </p>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-muted-foreground">
                 {employees.filter(e => e.qr_code).length}/{employees.length} {tr('employees have QR codes')}
