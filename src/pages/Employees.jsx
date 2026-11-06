@@ -310,7 +310,7 @@ export default function Employees({ embedded = false }) {
                         <div className="flex gap-3 mt-0.5">
                           {e.phone && <span className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-2.5 h-2.5" />{e.phone}</span>}
                           {e.email && <span className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-2.5 h-2.5" />{e.email}</span>}
-                          {!/^[^\\s@<>]+@[^\\s@<>]+\\.[^\\s@<>]+$/.test(String(e.email||'')) &&
+                          {!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(String(e.email||'')) &&
                             <Badge variant="outline" className="border-amber-300 text-amber-700 text-[10px]">{tr('Email required for OTP')}</Badge>}
                           {!branches.some(branch=>branch.id===e.branch_id) &&
                             <Badge variant="outline" className="border-amber-300 text-amber-700 text-[10px]">{tr('Assign canonical branch')}</Badge>}
