@@ -36,7 +36,12 @@ Deno.serve(async req=>{
   const {data:{user},error:userError}=await caller.auth.getUser();
   if(userError||!user)return respondError('AUTH_REQUIRED',401);
   let body: Record<string,unknown>;
-  try{body=await req.json();}catch{return respondError('INVALID_REQUEST',400);}
+  try {
+    const raw=await req.text();
+    if(raw.length>4096)return respondError('REQUEST_TOO_LARGE',413);
+    body=JSON.parse(raw);
+    if(!body||typeof body!=='object'||Array.isArray(body))return respondError('INVALID_REQUEST',400);
+  } catch{return respondError('INVALID_REQUEST',400);}
   if(body?.action==='status')return reply({ok:true,configured:Boolean(resend&&from),max_minutes:30});
   if(body?.action!=='issue'||!['in','out'].includes(String(body?.phase)))
     return respondError('INVALID_REQUEST',400);
@@ -68,7 +73,7 @@ Deno.serve(async req=>{
     return respondError(reason,limited?429:400);
   }
   const challenge=issue.challenge_id as string;
-  const mark=async accepted=>{
+  const mark=async (accepted:boolean)=>{
     const {error}=await admin.rpc('erp_attendance_email_delivery_admin',{
       p_challenge:challenge,p_accepted:accepted,
     });
