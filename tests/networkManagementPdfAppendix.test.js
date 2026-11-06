@@ -50,6 +50,13 @@ describe('Network Management ERP appendix in canonical PDF reports',()=>{
   expect(model.previousTrend.reduce((t,b)=>t+b.value,0)).toBe(30);
   expect(model.weekdays.reduce((t,b)=>t+b.value,0)).toBe(105);
   expect(model.accounts.map(a=>a.value)).toEqual([65,25]);
+  // Distinct closing, daily and weekend metrics must not change the sales total.
+  expect(model.operational).toMatchObject({
+    closingCount:4, cardPositiveClosings:4, activeCardDays:3,
+    averageCardPerClosing:26.25, weekendShare:0,
+    peakDay:{date:'2026-11-05',value:90},topBranch:{id:'b2'},
+  });
+  expect(model.operational.peakWeekday).toEqual({day:'Thu',value:90});
  });
  it('does not misattribute a legacy row to a branch with a duplicate human-readable name',()=>{
   const duplicated=[{id:'one',branch_key:'one',name:'Shared'},{id:'two',branch_key:'two',name:'Shared'}];
