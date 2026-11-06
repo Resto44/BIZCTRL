@@ -250,7 +250,7 @@ export function drawPdfNetworkManagement(doc,{
       // Use it for a true branch card-mix bar chart and explainable signals.
       // For 6-8 branch tables preserve legibility and footer clearance.
       const diagnosticY=notesY+38;
-      if(rows.length<=5 && diagnosticY+25<=273){
+      if(rows.length<=5 && diagnosticY+25<=274){
         panel(t.branchReliance,7,diagnosticY,96,25);
         const activeBranches=branches.filter(b=>b.current.total>0).slice(0,3);
         if(!activeBranches.length)T(t.noBranchActivity,10,diagnosticY+16,89,7.7,COLORS.muted);
