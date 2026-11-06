@@ -275,6 +275,12 @@ function OnboardingGate({ children }) {
   return children;
 }
 
+// Employees use their personal workspace, never the manager kiosk or task editor.
+function EmployeeWorkspaceRoute({ children }) {
+  const { role } = useRole();
+  return role === ROLES.EMPLOYEE ? <EmployeeDashboardERP /> : children;
+}
+
 // ── Role-based home redirect ──────────────────────────────────────────────────
 function RoleHomeRedirect() {
   const navigate = useNavigate();
@@ -386,8 +392,8 @@ const SubscribedRoutes = () => {
         {/* ── People ── */}
         <Route path="/employees" element={<RoleGuard permission="viewEmployees"><EmployeeManagementCenter /></RoleGuard>} />
         <Route path="/employee-control" element={<RoleGuard permission="viewEmployeeControl"><EmployeeControl /></RoleGuard>} />
-        <Route path="/employee-attendance" element={<RoleGuard permission="recordAttendance"><EmployeeAttendance /></RoleGuard>} />
-        <Route path="/staff-attendance" element={<RoleGuard permission="viewStaffAttendance"><EmployeeAttendance /></RoleGuard>} />
+        <Route path="/employee-attendance" element={<RoleGuard permission="recordAttendance"><EmployeeWorkspaceRoute><EmployeeAttendance /></EmployeeWorkspaceRoute></RoleGuard>} />
+        <Route path="/staff-attendance" element={<RoleGuard permission="viewStaffAttendance"><EmployeeWorkspaceRoute><EmployeeAttendance /></EmployeeWorkspaceRoute></RoleGuard>} />
         <Route path="/payroll" element={<RoleGuard permission="viewPayroll"><Payroll /></RoleGuard>} />
 
         {/* ── Finance ── */}
@@ -422,7 +428,7 @@ const SubscribedRoutes = () => {
         <Route path="/billing" element={<RoleGuard permission="viewBilling"><SubscriptionErrorBoundary><Billing /></SubscriptionErrorBoundary></RoleGuard>} />
         <Route path="/notifications" element={<RoleGuard permission="viewAlerts"><NotificationCenter /></RoleGuard>} />
         <Route path="/alerts" element={<RoleGuard permission="viewAlerts"><SmartAlertCenter /></RoleGuard>} />
-        <Route path="/tasks" element={<RoleGuard permission="viewTasks"><Tasks /></RoleGuard>} />
+        <Route path="/tasks" element={<RoleGuard permission="viewTasks"><EmployeeWorkspaceRoute><Tasks /></EmployeeWorkspaceRoute></RoleGuard>} />
         <Route path="/support" element={<Support />} />
         <Route path="/super-admin" element={<Navigate to="/platform-owner/login" replace />} />
 

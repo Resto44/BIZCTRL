@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CalendarClock, CircleAlert, Clock3, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useRole } from '@/lib/RoleContext';
 import { useSubscription } from '@/lib/SubscriptionContext';
 
 const COPY = {
@@ -11,9 +12,10 @@ const COPY = {
 };
 
 export default function SubscriptionStatusBanner() {
+  const { can } = useRole();
   const { lang, isRTL } = useLanguage();
   const { loading, summary, status, trialDaysRemaining } = useSubscription();
-  if (loading || !summary?.found) return null;
+  if (!can.viewBilling || loading || !summary?.found) return null;
   const copy = COPY[lang] || COPY.en;
   const trial = status === 'TRIAL';
   const pending = status === 'PENDING_PAYMENT';
