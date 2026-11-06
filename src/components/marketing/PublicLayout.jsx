@@ -114,7 +114,7 @@ export function PublicLayout({ children }) {
       <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/90 backdrop-blur-xl">
         {/* Mobile header has equal outer columns and an isolated LTR brand.
             RTL translation no longer mirrors/collapses the company wordmark. */}
-        <div dir="ltr" className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_56px_minmax(0,1fr)] items-center gap-1 px-3 py-3 md:hidden" data-testid="public-mobile-header">
+        <div dir="ltr" className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_56px_minmax(0,1fr)] items-center gap-1 px-3 py-3 xl:hidden" data-testid="public-mobile-header">
           <div className="flex min-w-0 items-center justify-start gap-1">
             <button type="button" aria-label={tr(menuOpen ? 'Close menu' : 'Open menu')} className="flex h-11 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:bg-white/10" onClick={() => setMenuOpen((open) => !open)}>
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -124,7 +124,7 @@ export function PublicLayout({ children }) {
           <div className="flex h-12 w-14 items-center justify-center justify-self-center" data-testid="public-mobile-brand-icon"><BrandMark compact /></div>
           <div aria-hidden="true" />
         </div>
-        <div dir="ltr" className="mx-auto hidden max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 md:flex" data-testid="public-desktop-header">
+        <div dir="ltr" className="mx-auto hidden max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 xl:flex" data-testid="public-desktop-header">
           <BrandMark />
           <div className="flex items-center gap-5">
             {headerLinks.map((item) => <HeaderLink key={item.label} item={item} />)}
@@ -140,7 +140,7 @@ export function PublicLayout({ children }) {
           </div>
         </div>
         {menuOpen && (
-          <div className="border-t border-white/10 bg-slate-950 px-4 py-5 md:hidden">
+          <div className="border-t border-white/10 bg-slate-950 px-4 py-5 xl:hidden">
             <div className="mx-auto flex max-w-7xl flex-col gap-4">
               {headerLinks.map((item) => <HeaderLink key={item.label} item={item} onClick={closeMenu} />)}
               <div className="grid grid-cols-2 gap-3 pt-2">

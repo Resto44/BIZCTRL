@@ -121,3 +121,14 @@
     column-gap: .25rem;
   }
 }
+
+/* Preserve readable content at narrow widths and browser text zoom. */
+.public-landing :is(h1, h2, h3, p, li) { overflow-wrap: anywhere; }
+.public-landing :is(article, section, main) { min-width: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .public-landing[data-public-language] *, .public-landing[data-public-language] *::before, .public-landing[data-public-language] *::after {
+    animation: none;
+    transition: none;
+    scroll-behavior: auto;
+  }
+}

@@ -64,3 +64,12 @@ Use clearly named, isolated QA organizations; never post simulated transactions 
 | Device/reliability | Real mobile, touch POS, scanner/printer, interrupted connection, duplicate submit, concurrent cashiers and month rollover |
 
 The earlier prepared browser form was `BizCTRL QA Launch 2026-11-06`, restaurant mode, branch `QA Branch 01`. Email and password remain blank for secure user completion. The form is not an existing account.
+
+## Responsive startup follow-up
+
+- Keep optional inventory charts out of the public startup graph on all viewport sizes.
+- Move the two existing WebP illustrations out of base64 JavaScript into same-origin static assets, preserving intrinsic dimensions and async decoding. The second image remains lazy-loaded. This removes roughly 38 KB gzip from initial JavaScript; it does not claim a measured load-time improvement.
+- Use the compact navigation below 1280 px, with the full desktop navigation on wider screens.
+- Pricing cards use smaller narrow-screen padding/type, wrapping touch buttons and a wrapping title/discount row instead of an overlapping absolute badge. Text can wrap without widening the page; reduced-motion styles are scoped to the public site.
+- Full regression suite: 303 files / 1,768 tests passed before the final cosmetic badge layout adjustment; focused landing/pricing checks and build are run again for that adjustment. Physical mobile, browser zoom and a full viewport screenshot matrix remain unverified.
+- These updates are prepared in PR 266 and are not deployed to production.

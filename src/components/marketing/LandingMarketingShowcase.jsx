@@ -59,7 +59,7 @@ function MarketingImage({ src, alt, priority }) {
   return <div className="relative isolate overflow-hidden rounded-[1.45rem] border border-cyan-200/15 bg-slate-950 shadow-2xl shadow-blue-950/40">
     <div aria-hidden="true" className="absolute inset-x-[12%] top-0 h-24 rounded-full bg-cyan-400/20 blur-3xl" />
     <img
-      src={`data:image/webp;base64,${src}`}
+      src={src}
       alt={alt}
       width="540"
       height="405"
