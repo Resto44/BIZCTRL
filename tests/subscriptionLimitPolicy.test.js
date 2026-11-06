@@ -123,7 +123,9 @@ describe('central subscription limit policy', () => {
       readFile(invitationUiPath, 'utf8'),
     ]);
 
-    expect(landing).toContain("from('subscription_plans')");
+    const catalogRead = await readFile(new URL('../src/lib/usePublicPlanCatalog.js', import.meta.url), 'utf8');
+    expect(landing).toContain('usePublicPlanCatalog()');
+    expect(catalogRead).toContain("from('subscription_plans')");
     // Capacity labels now require locale to match the selected app language.
     expect(cards).toMatch(/planCapacities\(plan,\s*lang\)/);
     expect(billing).toContain('limits, usage, exceededLimits, isWithinCapacity');
