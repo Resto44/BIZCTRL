@@ -41,12 +41,15 @@ describe('ERP six-digit email attendance OTP',()=>{
    expect(client).toContain("supabase.rpc('erp_attendance_email_event'");
    expect(client).toContain('enableHighAccuracy:');
    expect(client).toContain('maximumAge:');
-   expect(client).not.toContain("supabase.rpc('erp_attendance_mobile_event'");
-   expect(client).not.toContain("supabase.rpc('erp_attendance_kiosk_event'");
+   expect(client).toContain("supabase.rpc('erp_attendance_email_event'");
   }
   expect(mobile).toContain("p_employee_id: null");
   expect(kiosk).toContain("p_employee_id:employeeId");
   expect(kiosk).toContain('QR identifies the employee ONLY');
+  expect(kiosk).toContain("supabase.rpc('erp_attendance_kiosk_event'");
+  expect(kiosk).toContain("!canUseEmailOtp");
+  expect(mobile).toContain('<EmployeeMobileAttendanceLegacy userId={userId} />');
+  expect(mobile).toContain("emailCapability?.eligible");
  });
  it('provides non-sensitive, tenant-scoped owner and manager audit counts',()=>{
   expect(sql).toContain('erp_attendance_email_owner_summary');
