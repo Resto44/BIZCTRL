@@ -32,11 +32,30 @@ describe('consented shift location lifecycle',()=>{
   expect(geo.getCurrentPosition).not.toHaveBeenCalled();
   expect(rpc).toHaveBeenCalledWith('erp_attendance_location_stop',{p_session:'shift',p_token:'late-token'});
  });
- it('does not send an old GPS fix or retry after a permission failure',async()=>{
+ it('does not send an old GPS fix and requests a fresh one',async()=>{
   start();await flush();await geo.getCurrentPosition.mock.calls[0][0]({...point(),timestamp:Date.now()-16000});
   expect(rpc.mock.calls.some(([n])=>n.endsWith('_update'))).toBe(false);
-  expect(onState).toHaveBeenLastCalledWith('error');
+  expect(onState).toHaveBeenLastCalledWith('retrying');
+  await vi.advanceTimersByTimeAsync(3000);expect(geo.getCurrentPosition).toHaveBeenCalledTimes(2);
+ });
+ it('recovers from a temporary timeout without discarding consent',async()=>{
+  start();await flush();geo.getCurrentPosition.mock.calls[0][1]({code:3});
+  expect(onState).toHaveBeenLastCalledWith('retrying');
+  expect(rpc.mock.calls.some(([n])=>n.endsWith('_stop'))).toBe(false);
+  await vi.advanceTimersByTimeAsync(3000);
+  await geo.getCurrentPosition.mock.calls[1][0](point());
+  expect(onState).toHaveBeenLastCalledWith('sharing');
+ });
+ it('reports denied permission and does not retry it',async()=>{
+  start();await flush();geo.getCurrentPosition.mock.calls[0][1]({code:1});
+  expect(onState).toHaveBeenLastCalledWith('permission-denied');
   await vi.advanceTimersByTimeAsync(60000);expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
+ });
+ it('limits repeated GPS timeouts to three attempts',async()=>{
+  start();await flush();
+  for(let i=0;i<3;i++){geo.getCurrentPosition.mock.calls[i][1]({code:3});await vi.advanceTimersByTimeAsync(3000);}
+  expect(geo.getCurrentPosition).toHaveBeenCalledTimes(3);
+  expect(onState).toHaveBeenLastCalledWith('gps-timeout');
  });
  it('supports Supabase RPC thenables without a catch method when stopping',async()=>{
   rpc.mockImplementation(name=>({then:resolve=>resolve({data:name.endsWith('_start')?'token':null})}));
@@ -47,6 +66,6 @@ describe('consented shift location lifecycle',()=>{
   rpc.mockImplementation(async name=>name.endsWith('_update')?{error:new Error('closed')}:{data:'token'});
   start();await flush();await geo.getCurrentPosition.mock.calls[0][0](point());
   await vi.advanceTimersByTimeAsync(60000);expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
-  expect(onState).toHaveBeenLastCalledWith('error');
+  expect(onState).toHaveBeenLastCalledWith('connection-error');
  });
 });
