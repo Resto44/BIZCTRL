@@ -34,7 +34,7 @@ describe('ERP check-in/out business state invariants', () => {
     expect(page).toContain('<EmployeeMobileAttendance userId={user?.id} />');
     expect(page).not.toContain('if (empProfileError || myTasksError || announcementsError) return');
     expect(clock).toContain("employeeAttendanceAction(status)");
-    expect(clock).toContain("supabase.rpc('erp_attendance_mobile_status')");
+    expect(clock).toContain("supabase.rpc('erp_attendance_code_status')");
     expect(clock).not.toContain("from('attendance').insert");
     expect(clock).not.toContain("from('attendance').update");
   });

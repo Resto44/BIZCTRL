@@ -9,11 +9,11 @@ describe('Employee personal-phone attendance integrity', () => {
     expect(portal).toContain('<EmployeeMobileAttendance userId={user?.id} />');
     expect(portal).not.toContain(".from('attendance').insert(");
     expect(portal).not.toContain(".from('attendance').update(");
-    expect(control).toContain("supabase.rpc('erp_attendance_mobile_event'");
-    expect(control).toContain("supabase.rpc('erp_attendance_mobile_status'");
+    expect(control).toContain("supabase.rpc('erp_attendance_email_event'");
+    expect(control).toContain("supabase.rpc('erp_attendance_code_status'");
     expect(control).toContain("navigator.geolocation.getCurrentPosition");
     expect(control).toContain('maximumAge: 0');
-    expect(control).not.toContain('employee_id:');
+    expect(control).toContain('p_employee_id: null');
     expect(control).not.toContain('new Date().toISOString()');
     expect(control).toContain("pin.length !== 6");
   });

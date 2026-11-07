@@ -31,9 +31,10 @@ describe('Staged ERP email attendance backend security',()=>{
   expect(edge).toContain('erp_attendance_email_delivery_admin');
   expect(edge).not.toContain('console.log(code)');
  });
- it('keeps the current kiosk and employee screens untouched until mail delivery is proven',()=>{
+ it('uses expiring OTP on employee phones while preserving the owner kiosk',()=>{
   const old=read('../src/components/attendance/EmployeeMobileAttendance.jsx');
-  expect(old).toContain("erp_attendance_mobile_event");
+  expect(old).toContain("erp_attendance_email_event");
+  expect(old).not.toContain("erp_attendance_mobile_event");
   const owner=read('../src/pages/EmployeeAttendance.jsx');
   expect(owner).toContain("erp_attendance_kiosk_event");
  });

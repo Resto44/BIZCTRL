@@ -1,0 +1,3 @@
+
+[functions.attendance-scheduled-mail]
+verify_jwt = false

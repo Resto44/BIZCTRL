@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -14,6 +14,12 @@ const messages = {
   BRANCH_GEOFENCE_REQUIRED: 'Owner must configure the attendance location for this branch.',
   GPS_ACCURACY_REQUIRED: 'GPS is not accurate enough. Move outdoors and retry with precise location enabled.',
   OUTSIDE_BRANCH: 'You are outside the configured branch attendance area.',
+  OTP_EXPIRED: 'Attendance code expired. Request a new code.',
+  OTP_INVALID: 'Incorrect attendance code.',
+  OTP_LOCKED: 'Too many attempts. Request a new code.',
+  OTP_NOT_REQUESTED: 'Request your attendance code first.',
+  OTP_ACTION_CHANGED: 'Attendance state changed. Refresh before retrying.',
+  EMPLOYEE_VERIFIED_EMAIL_MISMATCH: 'Your verified login email must match your employee record.',
   INVALID_PIN: 'Invalid six-digit employee PIN. Ask the manager to set/reset your PIN.',
   PIN_RATE_LIMITED: 'Too many PIN attempts. Wait 15 minutes before retrying.',
   SHIFT_REVIEW_REQUIRED: 'Shift needs manager review (too short or more than 16 hours).',
@@ -33,7 +39,7 @@ const location = () => new Promise((resolve, reject) => {
   );
 });
 
-/** Employee-owned device check-in. Only employee session + own PIN + branch GPS,
+/** Employee-owned device check-in. Verified session + expiring code + branch GPS,
  * never a client-provided employee UUID or device timestamp.
  */
 export default function EmployeeMobileAttendance({ userId }) {
@@ -41,28 +47,31 @@ export default function EmployeeMobileAttendance({ userId }) {
   const qc = useQueryClient();
   const [pin, setPin] = useState('');
   const [success, setSuccess] = useState(null);
-  const { data: status, isPending, isError, refetch } = useQuery({
+  const [now,setNow]=useState(Date.now());
+  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
+  const { data: status, isPending, isError, refetch, dataUpdatedAt: statusReceivedAt } = useQuery({
     queryKey: ['employee-mobile-attendance', userId],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('erp_attendance_mobile_status');
+      const { data, error } = await supabase.rpc('erp_attendance_code_status');
       if (error) throw error;
       return data;
     },
     enabled: !!userId,
-    refetchInterval: 30000,
+    refetchInterval: 15000,
+    gcTime: 0,
     retry: 1,
   });
   const attendance = useMutation({
     mutationFn: async () => {
-      if (!/^[0-9]{6}$/.test(pin)) throw new Error('Enter your six-digit PIN.');
-      const latest = await supabase.rpc('erp_attendance_mobile_status');
+      if (!/^[0-9]{6}$/.test(pin)) throw new Error('Enter your six-digit attendance code.');
+      const latest = await supabase.rpc('erp_attendance_code_status');
       if (latest.error) throw latest.error;
       if (!['in', 'out'].includes(employeeAttendanceAction(latest.data))) {
         throw new Error('Attendance state changed. Refresh before retrying.');
       }
       const coords = await location();
-      const { data, error } = await supabase.rpc('erp_attendance_mobile_event', {
-        p_pin: pin, p_latitude: coords.latitude, p_longitude: coords.longitude,
+      const { data, error } = await supabase.rpc('erp_attendance_email_event', {
+        p_employee_id: null, p_code: pin, p_latitude: coords.latitude, p_longitude: coords.longitude,
         p_accuracy_m: coords.accuracy,
       });
       if (error) throw error;
@@ -80,7 +89,14 @@ export default function EmployeeMobileAttendance({ userId }) {
     },
     onError: async () => { setPin(''); await qc.invalidateQueries({ queryKey: ['employee-mobile-attendance', userId] }); },
   });
+  const requestCode=useMutation({mutationFn:async()=>{
+    const {error}=await supabase.rpc('erp_attendance_request_code',{p_action:employeeAttendanceAction(status)});
+    if(error)throw error;
+  },onSuccess:()=>qc.invalidateQueries({queryKey:['employee-mobile-attendance',userId]})});
   const errorText = attendance.error?.message;
+  // Server clock offset prevents a mis-set handset clock extending displayed validity.
+  const serverOffset = status?.server_now ? Date.parse(status.server_now)-statusReceivedAt : 0;
+  const remaining = status?.expires_at ? Math.max(0,Math.ceil((Date.parse(status.expires_at)-now-serverOffset)/1000)) : 0;
   const ready = Boolean(status?.configured && status?.branch_id);
   const action = employeeAttendanceAction(status);
   const checkedIn = action === 'out';
@@ -96,7 +112,7 @@ export default function EmployeeMobileAttendance({ userId }) {
     </CardHeader>
     <CardContent className="space-y-3">
       <p className="text-xs text-slate-300">
-        {tr('Only your approved employee account can record attendance. GPS and your six-digit PIN are required.')}
+        {tr('Your verified employee account, a single-use attendance code and precise branch GPS are required.')}
       </p>
       {isPending && <p role="status" className="text-sm">{tr('Loading attendance...')}</p>}
       {isError && <p role="alert" className="text-sm text-red-300">{tr('Attendance status unavailable.')} <Button variant="ghost" size="sm" onClick={() => refetch()}>{tr('Retry')}</Button></p>}
@@ -107,7 +123,7 @@ export default function EmployeeMobileAttendance({ userId }) {
         <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 p-3 text-sm">
           <span className="min-w-0 truncate">{status.branch_name}</span>
           <span className="flex shrink-0 items-center gap-1 text-xs text-slate-300">
-            <MapPin className="h-3 w-3" /> {tr('GPS verified at check-in/out')}
+            <MapPin className="h-3 w-3" /> {tr('Location checked when you submit')}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
@@ -123,13 +139,28 @@ export default function EmployeeMobileAttendance({ userId }) {
         {needsReview && <p role="alert" className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-200">
           {tr(messages[status?.reason] || 'This attendance entry requires manager review before another check-in or check-out.')}
         </p>}
+        {status.schedule && <div className="rounded-lg border border-white/10 p-3 text-sm">
+          <p>{tr('Your shift')} <span dir="ltr">{status.schedule.start_time?.slice(0,5)} → {status.schedule.end_time?.slice(0,5)}</span></p>
+          <p className="text-xs text-slate-300">{tr('Saudi Arabia time (Asia/Riyadh)')}</p>
+          <p className="text-xs text-slate-300">{tr(status.schedule.enabled?'Automatic daily attendance codes':'Automatic codes disabled')}</p>
+        </div>}
+        {!status.schedule && <p className="text-xs text-amber-200">{tr('Owner must set your working days and shift times in Employee Management.')}</p>}
+        {status.code_reason && <p role="alert" className="text-sm text-amber-200">{tr(messages[status.code_reason] || status.code_reason)}</p>}
         {allowAction && <>
-          <label htmlFor="employee-mobile-pin" className="block text-xs text-slate-200">{tr('Employee PIN (6 digits)')}</label>
+          {status.code && remaining>0 && status.code_action===action && <div className="rounded-lg bg-amber-500/10 p-3 text-center" aria-label={tr('Current attendance code')}>
+            <p className="text-xs text-slate-200">{tr(action==='in'?'Check-in code':'Check-out code')}</p>
+            <p className="my-2 text-3xl font-bold tracking-[0.3em] text-amber-300" dir="ltr">{status.code}</p>
+            <p className="text-xs">{tr('Expires in')} <span dir="ltr">{Math.floor(remaining/60)}:{String(remaining%60).padStart(2,'0')}</span></p>
+            <p className="mt-1 text-xs text-slate-300">{tr(status.mail_state==='accepted'?'Email accepted by provider; inbox delivery is not confirmed.':status.mail_state==='failed'?'Email failed. Your dashboard code is still valid.':'Email queued or retrying. Your dashboard code is ready.')}</p>
+          </div>}
+          <Button variant="outline" className="w-full border-white/25 bg-slate-800 text-white" disabled={requestCode.isPending||!!status.code_reason||(remaining>0&&!!status.code)} onClick={()=>requestCode.mutate()}>{tr(requestCode.isPending?'Preparing code…':'Request new attendance code')}</Button>
+          {requestCode.isError&&<p role="alert" className="text-xs text-red-300">{tr('Unable to issue code. Check your verified email and branch setup; wait 60 seconds before retrying.')}</p>}
+          <label htmlFor="employee-mobile-pin" className="block text-xs text-slate-200">{tr('Attendance code (6 digits)')}</label>
           <Input id="employee-mobile-pin" type="password" inputMode="numeric"
-            autoComplete="off" pattern="[0-9]{6}" maxLength={6}
+            autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6}
             value={pin} onChange={e => setPin(e.target.value.replace(/\D/g,'').slice(0,6))}
             className="border-white/25 bg-slate-900 text-white"
-            placeholder={tr('Enter your six-digit PIN')} />
+            placeholder={tr('Enter your six-digit attendance code')} />
           <Button className="h-12 w-full bg-emerald-600 text-white hover:bg-emerald-700"
             disabled={attendance.isPending || pin.length !== 6 || !allowAction}
             onClick={() => { setSuccess(null); attendance.mutate(); }}>
@@ -137,6 +168,7 @@ export default function EmployeeMobileAttendance({ userId }) {
             {attendance.isPending ? tr('Verifying location...') : tr(checkedIn ? 'Check Out' : 'Check In')}
           </Button>
         </>}
+        {status.shift_date && <p className="text-xs text-slate-300">{tr('Shift date')}: {status.shift_date}</p>}
         {done && <p className="rounded-lg bg-emerald-500/15 p-3 text-sm text-emerald-200">
           {tr('Attendance has been completed for this shift.')}
         </p>}
