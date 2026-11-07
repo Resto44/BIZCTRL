@@ -35,6 +35,7 @@ function ScheduleForm({ employee, schedule }) {
 }
 export default function EmployeeShiftSchedule({employees,restaurantId}) {
  const {translateLiteral:tr}=useLanguage();
+ const qc=useQueryClient();
  const [selected,setSelected]=useState('');
  const schedules=useQuery({queryKey:['employee-shift-schedules',restaurantId],enabled:!!restaurantId,queryFn:async()=>{
   const {data,error}=await supabase.from('employee_attendance_schedules').select('*').eq('restaurant_id',restaurantId);if(error)throw error;return data||[];
