@@ -184,16 +184,28 @@ export default function ExecutiveSnapshotV2({model,copy}) {
           <p data-testid="snapshot-drawer-cash-value" className="mt-2 text-[clamp(1.45rem,4vw,2rem)] font-black text-emerald-950 dark:text-emerald-100" dir="ltr">
             {drawerCash?.complete ? formatMoney(drawerCash.amount)
               : drawerCash?.error || drawerCash?.loading ? '—'
-              : drawerCash?.latestVerifiedDetail ? formatMoney(drawerCash.latestVerifiedDetail.cash) : '—'}
+              : drawerCash?.latestPhysicalDetail
+                ? formatMoney(drawerCash.latestPhysicalDetail.status==='verified'
+                  ? drawerCash.latestPhysicalDetail.cash
+                  : drawerCash.latestPhysicalDetail.reportedCash)
+                : '—'}
           </p>
           {drawerCash?.complete ? <p className="mt-1 text-[11px] leading-4 text-emerald-700 dark:text-emerald-300">
               {t(copy,'drawerCashHint','Last verified physical count · not a live bank balance')}
             </p> : drawerCash?.error || drawerCash?.loading
               ? <p className="mt-1 text-[11px] text-amber-700">{t(copy,'syncRequired','Sync required')}</p>
-              : drawerCash?.latestVerifiedDetail
+              : drawerCash?.latestPhysicalDetail
                 ? <div data-testid="snapshot-drawer-partial" className="mt-1 space-y-1 text-[11px] leading-4 text-emerald-900">
-                    <p className="font-semibold">{lang==='fa'?'آخرین شمارش یک شعبه؛ نه مجموع شعبه‌ها':lang==='ar'?'آخر جرد لفرع واحد؛ ليس إجمالي الفروع':'Last verified branch count · NOT all-branch total'}</p>
-                    <p className="break-words">{drawerCash.latestVerifiedDetail.branchName||drawerCash.latestVerifiedDetail.branchKey||'—'} · {drawerCash.latestVerifiedDetail.date||'—'}</p>
+                    {drawerCash.latestPhysicalDetail.status==='ambiguous_drawer'
+                      ? <p data-testid="snapshot-drawer-needs-review" className="font-bold text-amber-800">
+                          {lang==='fa'?'آخرین شمارش ثبت‌شده؛ مسئول صندوق نیازمند بررسی است':lang==='ar'?'آخر جرد مسجل؛ ملكية الصندوق تحتاج مراجعة':'Latest recorded cash count · cashier ownership needs review'}
+                        </p>
+                      : <p className="font-semibold">{lang==='fa'?'آخرین شمارش معتبر یک شعبه؛ نه مجموع شعبه‌ها':lang==='ar'?'آخر جرد مؤكد لفرع واحد؛ ليس إجمالي الفروع':'Last verified branch count · NOT all-branch total'}</p>}
+                    <p className="break-words">{drawerCash.latestPhysicalDetail.branchName||drawerCash.latestPhysicalDetail.branchKey||'—'} · {drawerCash.latestPhysicalDetail.date||'—'}</p>
+                    {drawerCash.latestPhysicalDetail.status==='ambiguous_drawer' &&
+                      <p className="text-amber-800">
+                        {lang==='fa'?'این مبلغ آخرین شمارش گزارش‌شده است، نه موجودی قطعی صندوق. چند مسئول در شیفت ثبت شده‌اند؛ شمارش‌ها قابل جمع‌کردن نیستند.':lang==='ar'?'هذه آخر قيمة جرد مسجلة، وليست رصيداً نقدياً مؤكداً. يوجد أكثر من مسؤول في الوردية ولا تُجمع الجردات.':'Reported count only, not a verified cash balance. Multiple cashiers recorded in the same shift; do not sum the counts.'}
+                      </p>}
                     <p className="text-amber-800">{lang==='fa'?`${drawerCash.missingBranches} شعبه از ${drawerCash.branches} بدون شمارش معتبر؛ مجموع کل نامعلوم است.`:lang==='ar'?`${drawerCash.missingBranches} من ${drawerCash.branches} فروع بدون جرد مؤكد؛ الإجمالي غير معروف.`:`${drawerCash.missingBranches} of ${drawerCash.branches} branches unverified; all-branch total unavailable.`}</p>
                   </div>
                 : <p className="mt-1 text-[11px] text-amber-800">{t(copy,'drawerCashMissing','Not recorded')}</p>}
@@ -202,10 +214,14 @@ export default function ExecutiveSnapshotV2({model,copy}) {
             <div className="mt-1 space-y-1">
               {drawerCash.details.map((item,i)=><div key={item.branchId||i} className="flex min-w-0 items-center justify-between gap-2 text-[11px]">
                 <span className="min-w-0 truncate">{item.branchName||item.branchKey||'—'} <span className="text-muted-foreground">{item.date||''}</span></span>
-                <strong className="shrink-0 tabular-nums" dir="ltr">{item.status==='verified' && item.cash!=null ? formatMoney(item.cash):'—'}</strong>
+                <strong className={`shrink-0 tabular-nums ${item.status==='ambiguous_drawer'?'text-amber-700':''}`} dir="ltr">
+                  {item.status==='verified' && item.cash!=null ? formatMoney(item.cash)
+                    : item.status==='ambiguous_drawer' && item.reportedCash!=null
+                      ? `${formatMoney(item.reportedCash)} *`:'—'}
+                </strong>
               </div>)}
             </div>
-            <p className="mt-1 text-[10px] leading-4 text-amber-800">{lang==='fa'?'— یعنی شمارش معتبر موجود نیست؛ صفر حساب نمی‌شود.':lang==='ar'?'— يعني عدم توفر جرد مؤكد، وليس صفراً.':'— means no verified count, not zero cash.'}</p>
+            <p className="mt-1 text-[10px] leading-4 text-amber-800">{lang==='fa'?'* یعنی آخرین شمارش گزارش‌شده که هنوز به دلیل اختلاف مسئول صندوق تأیید نشده. — یعنی مبلغ قابل اتکا موجود نیست؛ صفر حساب نمی‌شود.':lang==='ar'?'* تعني آخر جرد مسجل غير مؤكد بسبب تعدد المسؤولين. — تعني عدم توفر جرد مؤكد، وليس صفراً.':'* latest reported count awaiting cashier reconciliation, NOT verified. — means no verified count, not zero cash.'}</p>
           </details>}
         </div>
         <div className="min-w-0 rounded-2xl border border-border/80 p-3.5">
