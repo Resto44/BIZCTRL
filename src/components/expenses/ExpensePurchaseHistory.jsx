@@ -105,7 +105,7 @@ export default function ExpensePurchaseHistory({
             <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${record.type==='fixed'?'bg-blue-50 text-blue-700':'bg-amber-50 text-amber-700'}`}>
               {record.type==='fixed'?copy.fixed:copy.variable} · {categoryLabel(record.category)}
             </span>
-            <strong className="tabular-nums text-sm text-slate-900">{copy.invoiced}: {record.invoiceAmount===null?'—':formatCurrency(record.invoiceAmount,currency)}</strong>
+            <strong className="tabular-nums text-sm text-slate-900">{copy.invoiced}: {record.invoiceAmount===null?'—':formatCurrency(record.invoiceAmount,record.invoiceCurrency||currency)}</strong>
           </div>
           <div className="mt-2 flex items-start gap-1.5 text-xs text-slate-600">
             <Link2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600"/>
