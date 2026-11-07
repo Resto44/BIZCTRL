@@ -29,6 +29,16 @@ describe('Employee attendance code screen',()=>{
   expect(JSON.stringify(view.toJSON())).toContain('Attendance has been completed');
   expect(view.root.findAllByType('input')).toHaveLength(0);
  });
+ it('keeps Request Code visible before the opening window and permits early requests only when the server allows them',()=>{
+  state.status={...state.status,phase:'waiting',can_check_in:false,request_action:'in',can_request_code:true,code:null,opens_at:'2026-11-07T10:10:00Z',shift_date:'2026-11-07'};
+  act(()=>{view=create(<EmployeeMobileAttendance userId="employee"/>);});
+  const request=view.root.findAllByType('button').find(b=>b.children.includes('Request new attendance code'));
+  expect(request.props.disabled).toBe(false);
+  expect(JSON.stringify(view.toJSON())).toContain('Your next shift opens at');
+  expect(view.root.findAllByType('input')).toHaveLength(0);
+  state.status={...state.status,can_request_code:false};act(()=>view.update(<EmployeeMobileAttendance userId="employee"/>));
+  expect(view.root.findAllByType('button').find(b=>b.children.includes('Request new attendance code')).props.disabled).toBe(true);
+ });
  it('revalidates server phase before requesting GPS or posting attendance',async()=>{
   act(()=>{view=create(<EmployeeMobileAttendance userId="employee"/>);});
   act(()=>view.root.findByType('input').props.onChange({target:{value:'012345'}}));

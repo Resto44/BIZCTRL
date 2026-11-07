@@ -9,6 +9,8 @@ import { MapPin, ShieldCheck, Clock3, Loader2 } from 'lucide-react';
 import { employeeAttendanceAction } from '@/lib/employeeAttendancePhase';
 
 const messages = {
+  SHIFT_NOT_OPEN: 'Your next shift has not opened yet. The opening time is shown below.',
+  SHIFT_NOT_AVAILABLE: 'This shift cannot receive another code yet. Check the shift time or ask the owner to review.',
   APPROVED_EMPLOYEE_LINK_REQUIRED: 'Your employee account needs Owner approval and an Employee record link.',
   ASSIGNMENT_INVALID: 'Your employee record must be assigned to an active branch.',
   BRANCH_GEOFENCE_REQUIRED: 'Owner must configure the attendance location for this branch.',
@@ -66,7 +68,7 @@ export default function EmployeeMobileAttendance({ userId }) {
       if (!/^[0-9]{6}$/.test(pin)) throw new Error('Enter your six-digit attendance code.');
       const latest = await supabase.rpc('erp_attendance_code_status');
       if (latest.error) throw latest.error;
-      if (!['in', 'out'].includes(employeeAttendanceAction(latest.data))) {
+      if (!['in', 'out'].includes(employeeAttendanceAction(latest.data)) || (latest.data?.phase==='checked_in' && latest.data?.can_check_out===false)) {
         throw new Error('Attendance state changed. Refresh before retrying.');
       }
       const coords = await location();
@@ -90,7 +92,7 @@ export default function EmployeeMobileAttendance({ userId }) {
     onError: async () => { setPin(''); await qc.invalidateQueries({ queryKey: ['employee-mobile-attendance', userId] }); },
   });
   const requestCode=useMutation({mutationFn:async()=>{
-    const {error}=await supabase.rpc('erp_attendance_request_code',{p_action:employeeAttendanceAction(status)});
+    const {error}=await supabase.rpc('erp_attendance_request_code',{p_action:status?.request_action || employeeAttendanceAction(status)});
     if(error)throw error;
   },onSuccess:()=>qc.invalidateQueries({queryKey:['employee-mobile-attendance',userId]})});
   const errorText = attendance.error?.message;
@@ -100,6 +102,10 @@ export default function EmployeeMobileAttendance({ userId }) {
   const ready = Boolean(status?.configured && status?.branch_id);
   const action = employeeAttendanceAction(status);
   const checkedIn = action === 'out';
+  const requestAction = status?.request_action || action;
+  const activeCode = Boolean(status?.code && remaining>0 && status.code_action===requestAction);
+  const canRequestCode = status?.can_request_code ?? (action==='in'||action==='out');
+  const formatServerTime = value => value ? new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Riyadh',hour:'2-digit',minute:'2-digit'}).format(new Date(value)) : '—';
   const done = action === 'completed';
   const needsReview = action === 'review';
   const allowAction = action === 'in' || action === 'out';
@@ -146,15 +152,20 @@ export default function EmployeeMobileAttendance({ userId }) {
         </div>}
         {!status.schedule && <p className="text-xs text-amber-200">{tr('Owner must set your working days and shift times in Employee Management.')}</p>}
         {status.code_reason && <p role="alert" className="text-sm text-amber-200">{tr(messages[status.code_reason] || status.code_reason)}</p>}
-        {allowAction && <>
-          {status.code && remaining>0 && status.code_action===action && <div className="rounded-lg bg-amber-500/10 p-3 text-center" aria-label={tr('Current attendance code')}>
-            <p className="text-xs text-slate-200">{tr(action==='in'?'Check-in code':'Check-out code')}</p>
+        {action==='waiting'&&<p role="status" className="rounded-lg bg-blue-500/10 p-3 text-sm text-blue-200">{tr('Your next shift opens at')} <span dir="ltr">{formatServerTime(status.opens_at)}</span> — {status.shift_date}</p>}
+        {status.previous_check_in&&<p className="text-xs text-slate-300">{tr('Earlier attendance — kept in history')}: <span dir="ltr">{status.previous_check_in} → {status.previous_check_out||'—'}</span></p>}
+        <>
+          {activeCode && !done && !needsReview && <div className="rounded-lg bg-amber-500/10 p-3 text-center" aria-label={tr('Current attendance code')}>
+            <p className="text-xs text-slate-200">{tr(requestAction==='in'?'Check-in code':'Check-out code')}</p>
             <p className="my-2 text-3xl font-bold tracking-[0.3em] text-amber-300" dir="ltr">{status.code}</p>
             <p className="text-xs">{tr('Expires in')} <span dir="ltr">{Math.floor(remaining/60)}:{String(remaining%60).padStart(2,'0')}</span></p>
             <p className="mt-1 text-xs text-slate-300">{tr(status.mail_state==='accepted'?'Email accepted by provider; inbox delivery is not confirmed.':status.mail_state==='failed'?'Email failed. Your dashboard code is still valid.':'Email queued or retrying. Your dashboard code is ready.')}</p>
           </div>}
-          <Button variant="outline" className="w-full border-white/25 bg-slate-800 text-white" disabled={requestCode.isPending||!!status.code_reason||(remaining>0&&!!status.code)} onClick={()=>requestCode.mutate()}>{tr(requestCode.isPending?'Preparing code…':'Request new attendance code')}</Button>
+          <Button variant="outline" className="w-full border-white/25 bg-slate-800 text-white" disabled={requestCode.isPending||!!status.code_reason||!canRequestCode||activeCode} onClick={()=>requestCode.mutate()}>{tr(requestCode.isPending?'Preparing code…':'Request new attendance code')}</Button>
+          {!canRequestCode&&!done&&<p className="text-xs text-slate-300">{tr('Code requests open 30 minutes before the shift. Automatic delivery starts 10 minutes before it.')}</p>}
           {requestCode.isError&&<p role="alert" className="text-xs text-red-300">{tr('Unable to issue code. Check your verified email and branch setup; wait 60 seconds before retrying.')}</p>}
+          {checkedIn&&status.can_check_out===false&&<p className="text-xs text-slate-300">{tr('Check-out becomes available two minutes after check-in.')}</p>}
+          {allowAction&&<>
           <label htmlFor="employee-mobile-pin" className="block text-xs text-slate-200">{tr('Attendance code (6 digits)')}</label>
           <Input id="employee-mobile-pin" type="password" inputMode="numeric"
             autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6}
@@ -162,12 +173,13 @@ export default function EmployeeMobileAttendance({ userId }) {
             className="border-white/25 bg-slate-900 text-white"
             placeholder={tr('Enter your six-digit attendance code')} />
           <Button className="h-12 w-full bg-emerald-600 text-white hover:bg-emerald-700"
-            disabled={attendance.isPending || pin.length !== 6 || !allowAction}
+            disabled={attendance.isPending || pin.length !== 6 || !allowAction || (checkedIn && status.can_check_out===false)}
             onClick={() => { setSuccess(null); attendance.mutate(); }}>
             {attendance.isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <Clock3 className="me-2 h-4 w-4" />}
             {attendance.isPending ? tr('Verifying location...') : tr(checkedIn ? 'Check Out' : 'Check In')}
           </Button>
-        </>}
+          </>}
+        </>
         {status.shift_date && <p className="text-xs text-slate-300">{tr('Shift date')}: {status.shift_date}</p>}
         {done && <p className="rounded-lg bg-emerald-500/15 p-3 text-sm text-emerald-200">
           {tr('Attendance has been completed for this shift.')}
