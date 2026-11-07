@@ -31,7 +31,7 @@ describe('ERP check-in/out business state invariants', () => {
   it('keeps worker attendance usable independently of task and notification failures', () => {
     const page = read('../src/pages/EmployeeDashboardERP.jsx');
     const clock = read('../src/components/attendance/EmployeeMobileAttendance.jsx');
-    expect(page).toContain('<EmployeeMobileAttendance userId={user?.id} />');
+    expect(page).toMatch(/<EmployeeMobileAttendance\s+userId=\{user\?\.id\}\s*\/>/);
     expect(page).not.toContain('if (empProfileError || myTasksError || announcementsError) return');
     expect(clock).toContain("employeeAttendanceAction(status)");
     expect(clock).toContain("supabase.rpc('erp_attendance_code_status')");
