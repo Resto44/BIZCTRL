@@ -11,6 +11,10 @@ import {
   CartesianGrid, Cell, PieChart, Pie
 } from 'recharts';
 
+const categoryKey = e => e.expense_category_id || e.category_id || e.category || '__unknown__';
+const expenseAmount = e => { const n=Number(e.amount);return Number.isFinite(n)?n:0; };
+const branchKey = e => e.branch_key || e.branch || 'all';
+
 export default function ExpenseAnalytics({ expenses, categories = [] }) {
   const { lang, currency } = useLanguage();
   const { branches } = useTenant();
@@ -24,7 +28,7 @@ export default function ExpenseAnalytics({ expenses, categories = [] }) {
     if (!cat) return '—';
     if (lang === 'ar' && cat.name_ar) return cat.name_ar;
     if (lang === 'fa' && cat.name_fa) return cat.name_fa;
-    return cat.name_en;
+    return cat.name_en || cat.name;
   };
 
   const catMap = useMemo(() => {
@@ -34,7 +38,7 @@ export default function ExpenseAnalytics({ expenses, categories = [] }) {
   }, [categories]);
 
   const filtered = useMemo(() =>
-    expenses.filter(e => selectedBranch === 'all' || e.branch === selectedBranch || e.branch === 'all'),
+    expenses.filter(e => selectedBranch === 'all' || branchKey(e) === selectedBranch || branchKey(e) === 'all'),
     [expenses, selectedBranch]
   );
 
@@ -42,11 +46,11 @@ export default function ExpenseAnalytics({ expenses, categories = [] }) {
   const categoryBreakdown = useMemo(() => {
     const map = {};
     filtered.forEach(e => {
-      const catId = e.category || '__unknown__';
+      const catId = categoryKey(e);
       const year = e.date?.slice(0, 4);
       if (!map[catId]) map[catId] = { cur: 0, prev: 0 };
-      if (year === String(currentYear)) map[catId].cur += (e.amount || 0);
-      if (year === String(prevYear)) map[catId].prev += (e.amount || 0);
+      if (year === String(currentYear)) map[catId].cur += expenseAmount(e);
+      if (year === String(prevYear)) map[catId].prev += expenseAmount(e);
     });
     return Object.entries(map).map(([catId, vals]) => {
       const cat = catMap[catId];
@@ -65,16 +69,16 @@ export default function ExpenseAnalytics({ expenses, categories = [] }) {
 
   // ── Monthly trend ─────────────────────────────────────────────────────
   const monthlyTrend = useMemo(() => {
-    const activeCatIds = [...new Set(filtered.map(e => e.category).filter(Boolean))];
+    const activeCatIds = [...new Set(filtered.map(categoryKey))];
     const months = Array.from({ length: 12 }, (_, i) => {
       const m = String(i + 1).padStart(2, '0');
       const key = `${currentYear}-${m}`;
       const obj = { month: new Date(currentYear, i, 1).toLocaleString('default', { month: 'short' }), total: 0 };
       activeCatIds.forEach(id => { obj[id] = 0; });
       filtered.filter(e => e.date?.startsWith(key)).forEach(e => {
-        const cid = e.category || '__unknown__';
-        obj[cid] = (obj[cid] || 0) + (e.amount || 0);
-        obj.total += (e.amount || 0);
+        const cid = categoryKey(e);
+        obj[cid] = (obj[cid] || 0) + expenseAmount(e);
+        obj.total += expenseAmount(e);
       });
       return obj;
     });
@@ -85,8 +89,9 @@ export default function ExpenseAnalytics({ expenses, categories = [] }) {
   const branchBreakdown = useMemo(() => {
     const map = {};
     expenses.forEach(e => {
-      const b = e.branch === 'all' ? 'Shared' : (branches.find(br => br.key === e.branch)?.label || e.branch);
-      map[b] = (map[b] || 0) + (e.amount || 0);
+      const key=branchKey(e);
+      const b=key==='all'?'Shared':(branches.find(br=>br.key===key||br.id===e.branch_id)?.label||key);
+      map[b]=(map[b]||0)+expenseAmount(e);
     });
     return Object.entries(map).map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
@@ -116,7 +121,7 @@ export default function ExpenseAnalytics({ expenses, categories = [] }) {
   const totalPrev = categoryBreakdown.reduce((s, c) => s + c.previous, 0);
   const yoyChange = totalPrev > 0 ? ((totalCur - totalPrev) / totalPrev * 100) : 0;
 
-  const activeCatIds = [...new Set(filtered.map(e => e.category).filter(Boolean))];
+  const activeCatIds = [...new Set(filtered.map(categoryKey))];
 
   if (expenses.length === 0) {
     return (
@@ -231,7 +236,7 @@ export default function ExpenseAnalytics({ expenses, categories = [] }) {
       )}
 
       {/* Category pie + branch breakdown */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {pieData.length > 0 && (
           <Card className="p-3">
             <p className="text-xs font-semibold mb-2">Category Share</p>
