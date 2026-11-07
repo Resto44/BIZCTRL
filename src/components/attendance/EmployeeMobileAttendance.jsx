@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MapPin, ShieldCheck, Clock3, Loader2 } from 'lucide-react';
 import { employeeAttendanceAction } from '@/lib/employeeAttendancePhase';
+import EmployeeMobileAttendanceLegacy from './EmployeeMobileAttendanceLegacy';
 
 const messages = {
   APPROVED_EMPLOYEE_LINK_REQUIRED: 'Your employee account needs Owner approval and an Employee record link.',
@@ -52,6 +53,16 @@ export default function EmployeeMobileAttendance({ userId }) {
     issue:'Email my 6-digit code',verify:'Verify code and GPS',prompt:'One-time code valid for 30 minutes.',pending:'Sending code…',expiry:'Expires',request:'Request a new code',notice:'Email provider accepted the message.',invalid:'A fresh code is required for every action.'
   };
   const qc = useQueryClient();
+  const { data: emailCapability, isPending: emailCapabilityPending, isError: emailCapabilityError } = useQuery({
+    queryKey: ['attendance-email-capability',userId],
+    queryFn: async () => {
+      const {data,error} = await supabase.functions.invoke('attendance-email-otp',{body:{action:'status'}});
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || 'Attendance email status unavailable');
+      return data;
+    },
+    enabled: Boolean(userId), staleTime: 60000, retry: 1,
+  });
   const [pin, setPin] = useState('');
   const [codeTicket, setCodeTicket] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -122,6 +133,19 @@ export default function EmployeeMobileAttendance({ userId }) {
   const done = action === 'completed';
   const needsReview = action === 'review';
   const allowAction = action === 'in' || action === 'out';
+  // During rollout, unenrolled employees retain their original authenticated
+  // PIN+GPS path instead of being locked out by missing email, mapping or
+  // provider configuration. This fallback is explicit, not a success claim.
+  if (!emailCapabilityPending && (emailCapabilityError || !emailCapability?.configured || !emailCapability?.eligible)) {
+    return <>
+      <p role="status" className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+        {tr(emailCapabilityError ? 'Email verification is temporarily unavailable. Existing GPS + PIN attendance remains available.'
+          : !emailCapability?.configured ? 'Email verification has not been configured by the Owner yet. Existing GPS + PIN remains available.'
+          : 'Your verified employee email, branch assignment or GPS setup needs Owner review. Existing GPS + PIN remains available until enrollment is complete.')}
+      </p>
+      <EmployeeMobileAttendanceLegacy userId={userId} />
+    </>;
+  }
   return <Card className="border-white/15 bg-white/5 text-white">
     <CardHeader className="pb-2">
       <CardTitle className="flex items-center gap-2 text-sm">
@@ -187,7 +211,7 @@ export default function EmployeeMobileAttendance({ userId }) {
         </>}
         {emailCode.isError && <p role="alert" className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{tr(emailCode.error?.message || 'Unable to send email code.')}</p>}
         {done && <p className="rounded-lg bg-emerald-500/15 p-3 text-sm text-emerald-200">
-          {tr('Attendance has been completed for this shift.')}
+          {tr('Today’s Check In and Check Out are already saved. Another check-in today requires a separate authorized shift, not a new email code. This record remains preserved.')}
         </p>}
       </>}
       {success && <p role="status" className="rounded-lg bg-emerald-500/15 p-2 text-sm text-emerald-200">{tr(success.action === 'in' ? 'Check-in saved' : 'Check-out saved')} {success.time}</p>}
