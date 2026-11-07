@@ -612,6 +612,10 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
       });
 
       qc.invalidateQueries({ queryKey: ['supplier_invoices'] });
+      // After a posted or updated invoice links a fixed/variable expense,
+      // Expenses must show the reference in its purchase history immediately.
+      // No Expense insert happens here; supplier_invoices is source of truth.
+      qc.invalidateQueries({ queryKey: ['expense_purchase_invoice_history'] });
       qc.invalidateQueries({ queryKey: ['supplier_invoices_dash'] });
       qc.invalidateQueries({ queryKey: ['inventory'] });
       qc.invalidateQueries({ queryKey: ['debt_records'] });
