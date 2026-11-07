@@ -6,32 +6,38 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import BranchSelect from '@/components/shared/BranchSelect';
+import { useTenant } from '@/lib/TenantContext';
+import { calcTotal, rosterPayload } from '@/lib/roster';
+import { toast } from 'sonner';
 import RosterForm from './RosterForm';
 import RosterCard from './RosterCard';
 import { format, startOfWeek, addDays, subDays } from 'date-fns';
 
 export default function WeeklyRosterView() {
   const qc = useQueryClient();
+  const { activeRestaurant, branches } = useTenant();
+  const [saveError, setSaveError] = useState('');
   const [weekStart, setWeekStart] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'));
   const [branch, setBranch] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
 
   const { data: rosters = [], isLoading } = useQuery({
-    queryKey: ['staff_rosters'],
-    queryFn: () => base44.entities.StaffRoster.list('-week_starting', 500),
+    queryKey: ['staff_rosters', activeRestaurant?.id],
+    enabled: !!activeRestaurant?.id,
+    queryFn: () => base44.entities.StaffRoster.filter({ restaurant_id: activeRestaurant.id }, '-week_starting', 500),
   });
 
   const createMut = useMutation({
     mutationFn: d => base44.entities.StaffRoster.create(d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['staff_rosters'] }); setShowForm(false); },
-    onError: (error) => { console.error('INSERT FAILED', error); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['staff_rosters'] }); setShowForm(false); toast.success('Roster saved'); },
+    onError: (error) => { setSaveError(error.message || 'Unable to save roster. Please try again.'); },
   });
 
   const updateMut = useMutation({
     mutationFn: ({ id, data }) => base44.entities.StaffRoster.update(id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['staff_rosters'] }); setEditing(null); },
-    onError: (error) => { console.error('UPDATE FAILED', error); },
+    onError: (error) => { setSaveError(error.message || 'Unable to save roster. Please try again.'); },
   });
 
   const deleteMut = useMutation({
@@ -45,26 +51,21 @@ export default function WeeklyRosterView() {
   ), [rosters, weekStart, branch]);
 
 
-  const totalHours = filtered.reduce((s, r) => s + (r.total_hours || 0), 0);
+  const totalHours = filtered.reduce((s, r) => s + calcTotal(r.shifts), 0);
 
   const prevWeek = () => setWeekStart(format(subDays(new Date(weekStart), 7), 'yyyy-MM-dd'));
   const nextWeek = () => setWeekStart(format(addDays(new Date(weekStart), 7), 'yyyy-MM-dd'));
 
-  const handleEdit = (r) => { setEditing(r); setShowForm(false); };
+  const handleEdit = (r) => { setSaveError(''); setEditing(r); setShowForm(false); };
   const handleSubmit = (data) => {
-    const payload = {
-      ...data,
-      week_starting: data.week_start,
-      email: data.staff_email,
-      whatsapp: data.staff_phone,
-    };
-    delete payload.week_start;
-    delete payload.staff_email;
-    delete payload.staff_phone;
-    delete payload.total_hours;
-
-    if (editing) updateMut.mutate({ id: editing.id, data: payload });
-    else createMut.mutate(payload);
+    setSaveError('');
+    try {
+      const payload = rosterPayload(data, activeRestaurant?.id, branches);
+      setWeekStart(payload.week_starting);
+      setBranch(payload.branch);
+      if (editing) updateMut.mutate({ id: editing.id, data: payload });
+      else createMut.mutate(payload);
+    } catch (error) { setSaveError(error.message); }
   };
 
   return (
@@ -81,7 +82,7 @@ export default function WeeklyRosterView() {
 
       <div className="flex gap-2">
         <div className="flex-1"><BranchSelect value={branch} onChange={setBranch} includeAll /></div>
-        <Button size="sm" onClick={() => { setShowForm(true); setEditing(null); }}>
+        <Button size="sm" onClick={() => { setSaveError(''); setShowForm(true); setEditing(null); }}>
           <Plus className="w-4 h-4 mr-1" /> Add
         </Button>
       </div>
@@ -102,7 +103,7 @@ export default function WeeklyRosterView() {
         <div className="text-center py-12 text-muted-foreground">
           <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="text-sm">No roster for this week</p>
-          <Button size="sm" variant="outline" className="mt-3" onClick={() => { setShowForm(true); setEditing(null); }}>
+          <Button size="sm" variant="outline" className="mt-3" onClick={() => { setSaveError(''); setShowForm(true); setEditing(null); }}>
             <Plus className="w-3.5 h-3.5 mr-1" /> Create Roster
           </Button>
         </div>
@@ -118,7 +119,9 @@ export default function WeeklyRosterView() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>{editing ? 'Edit Roster' : 'New Roster Entry'}</DialogTitle></DialogHeader>
           <RosterForm
-            initial={editing}
+            initial={editing || { week_starting: weekStart, branch: branch === 'all' ? '' : branch }}
+            saving={createMut.isPending || updateMut.isPending}
+            error={saveError}
             onSubmit={handleSubmit}
             onCancel={() => { setShowForm(false); setEditing(null); }}
           />

@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2, Send, MessageSquare, ChevronUp } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { calcTotal } from '@/lib/roster';
 import { toast } from 'sonner';
 
 const DAY_SHORT = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
@@ -30,12 +31,12 @@ export default function RosterCard({ roster, onEdit, onDelete }) {
         await base44.integrations.Core.SendEmail({
           to: staffEmail,
           subject: `Your Schedule — Week of ${weekLabel}`,
-          body: `Hi ${roster.staff_name},\n\nHere is your schedule for the week starting ${weekLabel} at branch ${roster.branch}:\n\n${shiftText}\n\nTotal: ${roster.total_hours?.toFixed(1) || '?'}h\n\n${roster.notes ? `Notes: ${roster.notes}\n\n` : ''}Please confirm receipt of this message.\n\nThank you!`,
+          body: `Hi ${roster.staff_name},\n\nHere is your schedule for the week starting ${weekLabel} at branch ${roster.branch}:\n\n${shiftText}\n\nTotal: ${calcTotal(roster.shifts).toFixed(1) || '?'}h\n\n${roster.notes ? `Notes: ${roster.notes}\n\n` : ''}Please confirm receipt of this message.\n\nThank you!`,
         });
         toast.success('Shift reminder sent via email');
       } else if (via === 'whatsapp' && staffPhone) {
         const shiftText = shifts.map(s => `${DAY_SHORT[s.day]}: ${s.start}–${s.end}`).join(', ');
-        const msg = encodeURIComponent(`Hi ${roster.staff_name}! Your schedule for week of ${weekLabel} (${roster.branch}): ${shiftText}. Total: ${roster.total_hours?.toFixed(1) || '?'}h.`);
+        const msg = encodeURIComponent(`Hi ${roster.staff_name}! Your schedule for week of ${weekLabel} (${roster.branch}): ${shiftText}. Total: ${calcTotal(roster.shifts).toFixed(1) || '?'}h.`);
         window.open(`https://wa.me/${staffPhone.replace(/\D/g, '')}?text=${msg}`, '_blank');
       } else {
         toast.error(`No ${via} contact available`);
@@ -53,7 +54,7 @@ export default function RosterCard({ roster, onEdit, onDelete }) {
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <Badge variant="outline" className="text-xs">{roster.branch}</Badge>
             <span className="text-xs text-muted-foreground">w/o {weekLabel}</span>
-            {roster.total_hours > 0 && <Badge variant="secondary" className="text-xs">{roster.total_hours.toFixed(1)}h</Badge>}
+            {calcTotal(roster.shifts) > 0 && <Badge variant="secondary" className="text-xs">{calcTotal(roster.shifts).toFixed(1)}h</Badge>}
           </div>
           {shifts.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
