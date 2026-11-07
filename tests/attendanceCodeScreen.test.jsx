@@ -41,7 +41,7 @@ describe('Employee attendance code screen',()=>{
  });
  it('revalidates server phase before requesting GPS or posting attendance',async()=>{
   act(()=>{view=create(<EmployeeMobileAttendance userId="employee"/>);});
-  act(()=>view.root.findByType('input').props.onChange({target:{value:'012345'}}));
+  act(()=>view.root.findAllByType('input').find(n=>n.props.id==='employee-mobile-pin').props.onChange({target:{value:'012345'}}));
   state.rpc.mockResolvedValue({data:{configured:true,phase:'completed'}});
   const mutation=state.mutations[state.mutations.length-2];
   await expect(mutation.mutationFn()).rejects.toThrow('Attendance state changed');

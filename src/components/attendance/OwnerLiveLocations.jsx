@@ -1,3 +1,5 @@
+import LocationHistory from './LocationHistory';
+import { attendanceDistance } from '@/lib/attendanceDistance';
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
@@ -46,12 +48,13 @@ export default function OwnerLiveLocations({ restaurantId }) {
     <p className={`text-sm font-semibold ${status==='inside'?'text-emerald-700':status==='outside'?'text-red-700':'text-amber-700'}`}>{tr(labels[status]||labels.unknown)}</p>
     <p className="text-xs">{tr('Last location received')}: {row.received_at?new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Riyadh',dateStyle:'short',timeStyle:'medium'}).format(new Date(row.received_at)):'—'}</p>
     {fresh&&<>
-     <p className="text-xs">{tr('Distance from branch')}: {row.distance_m??'—'} m · {tr('GPS accuracy')}: ±{Math.round(row.accuracy_m)} m</p>
+     <p className="text-xs">{tr('Distance from branch')}: {attendanceDistance(row.distance_m)} · {tr('GPS accuracy')}: ±{Math.round(row.accuracy_m)} m</p>
      {row.branch_latitude!=null&&row.radius_m&&<RelativeLocation row={row} tr={tr}/>}
      <p className="break-all text-xs tabular-nums" dir="ltr">GPS: {row.latitude.toFixed(6)}, {row.longitude.toFixed(6)}</p>
      <a className="inline-block text-sm text-blue-600 underline" href={`https://www.google.com/maps/search/?api=1&query=${row.latitude},${row.longitude}`} target="_blank" rel="noopener noreferrer">{tr('Open location in Google Maps')}</a>
     </>}
    </article>;
   })}</div>
+ <LocationHistory restaurantId={restaurantId}/>
  </Card>;
 }
