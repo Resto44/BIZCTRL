@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/base44Client';
+import EmployeeShiftSchedule from '@/components/attendance/EmployeeShiftSchedule';
 import EmployeeRecord360 from '@/components/employees/EmployeeRecord360';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useRole } from '@/lib/RoleContext';
@@ -227,6 +228,7 @@ export default function Employees({ embedded = false }) {
         <Button size="sm" onClick={openAdd}><Plus className="me-1 h-4 w-4" />{tr('Add Employee')}</Button>
       </div>}
 
+      {role === 'owner' && <EmployeeShiftSchedule employees={employees} restaurantId={activeRestaurant?.id} />}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-3">
         <TabsList className={`grid w-full ${embedded ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <TabsTrigger value="list" className="text-xs flex items-center gap-1">
