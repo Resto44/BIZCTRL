@@ -1,5 +1,12 @@
 // Additional Arabic interface copy. Existing ERP catalog takes precedence.
 export default {
+  "Select an existing user": "اختر مستخدمًا موجودًا",
+  "Select a person to create their invitation link.": "اختر الشخص لإنشاء رابط دعوته.",
+  "Search users": "البحث عن المستخدمين",
+  "Unable to load users. Retry": "تعذر تحميل المستخدمين. أعد المحاولة",
+  "No matching users. Enter new user details below.": "لا يوجد مستخدم مطابق. أدخل بيانات مستخدم جديد أدناه.",
+  "Add an email or phone below": "أضف البريد أو الهاتف أدناه",
+
   "No tasks match this filter.": "لا توجد مهام تطابق هذا الفلتر.",
   "Sign out": "تسجيل الخروج",
   "Employee portal": "بوابة الموظف",

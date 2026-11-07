@@ -1,5 +1,12 @@
 // Reviewed Persian interface copy. Source values and user-entered records remain unchanged.
 export default {
+  "Select an existing user": "انتخاب کاربر موجود",
+  "Select a person to create their invitation link.": "شخص را انتخاب کن تا لینک دعوتش ساخته شود.",
+  "Search users": "جستجوی کاربران",
+  "Unable to load users. Retry": "فهرست بارگیری نشد؛ دوباره تلاش کن",
+  "No matching users. Enter new user details below.": "کاربری یافت نشد؛ مشخصات کاربر جدید را پایین وارد کن.",
+  "Add an email or phone below": "ایمیل یا شماره را پایین اضافه کن",
+
   "No tasks match this filter.": "هیچ وظیفه‌ای با این فیلتر مطابقت ندارد.",
   "Sign out": "خروج",
   "Employee portal": "پورتل کارمند",

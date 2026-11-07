@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
@@ -14,6 +14,7 @@ import {
   Mail, MapPin, Phone, RefreshCw, RotateCw, Share2, ShieldCheck, Truck,
   UserPlus, UserRound, XCircle,
 } from 'lucide-react';
+import InvitationDirectory from './InvitationDirectory';
 import { cn } from '@/lib/utils';
 
 const STAFF_ROLES = [
@@ -72,6 +73,8 @@ function InviteMetric({ icon: Icon, label, value, tone }) {
 export default function OwnerStaffProvisioning() {
   const { user } = useAuth();
   const { activeRestaurant, setActiveRestaurant } = useTenant();
+  const issuanceLock = useRef(false);
+  const resultRef = useRef(null);
   const [organizations, setOrganizations] = useState([]);
   const [branches, setBranches] = useState([]);
   const [invitations, setInvitations] = useState([]);
@@ -181,9 +184,15 @@ export default function OwnerStaffProvisioning() {
       .finally(() => setLoading(false));
   }, [selectedOrganizationId, loadBranches, loadInvitations]);
 
-  const updateForm = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const updateForm = (field, value) => {
+    if (field === 'role' || field === 'branchId') {
+      setGeneratedInvitation(null);
+      setForm(current => ({ ...current, [field]: value, fullName: '', contact: '' }));
+    } else setForm(current => ({ ...current, [field]: value }));
+  };
   const changeOrganization = (organizationId) => {
     setSelectedOrganizationId(organizationId);
+    setForm(current => ({ ...current, branchId: '', fullName: '', contact: '' }));
     setGeneratedInvitation(null);
     if (organizationId) setActiveRestaurant(organizationId);
   };
@@ -193,6 +202,9 @@ export default function OwnerStaffProvisioning() {
   };
 
   const issueInvitation = async ({ role, branchId, fullName, email, phone }) => {
+    if (issuanceLock.current) return;
+    issuanceLock.current = true;
+    try {
     const { data, error } = await supabase.rpc('create_erp_invitation', {
       p_role: role,
       p_restaurant_id: selectedOrganizationId,
@@ -223,6 +235,7 @@ export default function OwnerStaffProvisioning() {
       toast.warning('Invitation created, but the activity list could not refresh.');
     }
     return generated;
+    } finally { issuanceLock.current = false; }
   };
 
   const createInvitation = async (event) => {
@@ -251,6 +264,27 @@ export default function OwnerStaffProvisioning() {
       setSubmitting(false);
     }
   };
+
+  const selectExistingPerson = async (person) => {
+    if (issuanceLock.current || submitting) return;
+    const email = person.email?.trim().toLowerCase();
+    const phone = person.phone?.trim();
+    setGeneratedInvitation(null);
+    setContactMode(email ? 'email' : 'phone');
+    setForm(current => ({ ...current, fullName: person.full_name, contact: email || phone || '' }));
+    if (!email && !phone) return;
+    setSubmitting(true);
+    try {
+      await issueInvitation({ role: form.role, branchId: form.branchId, fullName: person.full_name, email: email || null, phone: email ? null : phone });
+      toast.success('Secure invitation is ready to share.');
+    } catch (error) {
+      toast.error(subscriptionLimitErrorMessage(error, 'Unable to create the secure invitation.'));
+    } finally { setSubmitting(false); }
+  };
+
+  useEffect(() => {
+    if (generatedInvitation) resultRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+  }, [generatedInvitation]);
 
   const copyInvitationLink = async () => {
     if (!generatedInvitation?.invitationUrl) return;
@@ -335,13 +369,13 @@ export default function OwnerStaffProvisioning() {
           <form onSubmit={createInvitation} className="space-y-5">
             <div className="grid min-w-0 gap-2 sm:grid-cols-2">
               <ScopeField icon={Building2} label="Store">
-                <select aria-label="Select invitation store" value={selectedOrganizationId} onChange={(event) => changeOrganization(event.target.value)} className="mt-0.5 h-7 w-full min-w-0 bg-transparent text-sm font-black text-slate-900 outline-none dark:text-white" required>
+                <select aria-label="Select invitation store" disabled={submitting || !!actionInvitationId} value={selectedOrganizationId} onChange={(event) => changeOrganization(event.target.value)} className="mt-0.5 h-7 w-full min-w-0 bg-transparent text-sm font-black text-slate-900 outline-none dark:text-white" required>
                   <option value="">Select store</option>
                   {organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
                 </select>
               </ScopeField>
               <ScopeField icon={MapPin} label="Branch">
-                <select aria-label="Select invitation branch" value={form.branchId} onChange={(event) => updateForm('branchId', event.target.value)} className="mt-0.5 h-7 w-full min-w-0 bg-transparent text-sm font-black text-slate-900 outline-none disabled:opacity-50 dark:text-white" disabled={!selectedOrganizationId || branches.length === 0} required>
+                <select aria-label="Select invitation branch" value={form.branchId} onChange={(event) => updateForm('branchId', event.target.value)} className="mt-0.5 h-7 w-full min-w-0 bg-transparent text-sm font-black text-slate-900 outline-none disabled:opacity-50 dark:text-white" disabled={submitting || !!actionInvitationId || !selectedOrganizationId || branches.length === 0} required>
                   <option value="">Select branch</option>
                   {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name || branch.label || branch.branch_key}</option>)}
                 </select>
@@ -355,13 +389,15 @@ export default function OwnerStaffProvisioning() {
                   const Icon = role.icon;
                   const active = form.role === role.value;
                   return (
-                    <button key={role.value} type="button" aria-pressed={active} onClick={() => updateForm('role', role.value)} className={cn('min-w-0 rounded-2xl border p-2.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:p-3', active ? `${ROLE_TONES[role.tone]} ring-2 ring-current/10` : 'border-slate-200 bg-white text-slate-500 hover:border-blue-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400')}>
+                    <button key={role.value} type="button" aria-pressed={active} disabled={submitting || !!actionInvitationId} onClick={() => updateForm('role', role.value)} className={cn('min-w-0 rounded-2xl border p-2.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:p-3', active ? `${ROLE_TONES[role.tone]} ring-2 ring-current/10` : 'border-slate-200 bg-white text-slate-500 hover:border-blue-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400')}>
                       <Icon className="h-5 w-5" /><p className="mt-2 truncate text-xs font-black sm:text-sm">{role.short}</p><p className="mt-0.5 hidden text-[10px] leading-4 opacity-75 sm:block">{role.description}</p>
                     </button>
                   );
                 })}
               </div>
             </fieldset>
+
+            <InvitationDirectory key={`${selectedOrganizationId}:${form.branchId}:${form.role}`} restaurantId={selectedOrganizationId} branchId={form.branchId} role={form.role} busy={submitting || loading || !!actionInvitationId} onSelect={selectExistingPerson} />
 
             <div>
               <p className="mb-2 text-xs font-black text-slate-700 dark:text-slate-200">2. Enter user details</p>
@@ -390,7 +426,7 @@ export default function OwnerStaffProvisioning() {
       </Card>
 
       {generatedInvitation && (
-        <div role="status" className="overflow-hidden rounded-3xl border border-emerald-200 bg-emerald-50 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/25">
+        <div ref={resultRef} role="status" className="overflow-hidden rounded-3xl border border-emerald-200 bg-emerald-50 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/25">
           <div className="flex min-w-0 flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white"><CheckCircle2 className="h-6 w-6" /></span>
             <div className="min-w-0 flex-1"><p className="font-black text-emerald-950 dark:text-emerald-100">Invitation ready for {generatedInvitation.fullName}</p><p className="mt-0.5 break-all text-xs text-emerald-800/75 dark:text-emerald-200/70">{generatedInvitation.recipient} · {generatedInvitation.role} · {generatedInvitation.branch}</p></div>
