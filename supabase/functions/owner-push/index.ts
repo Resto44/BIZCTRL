@@ -66,6 +66,11 @@ async function dispatch(keys: any) {
     const { data: event } = await db.from('owner_record_events').select('*').eq('id',job.event_id).single();
     if (!device?.enabled || !event || device.restaurant_id!==event.restaurant_id || !await owner(device.user_id,event.restaurant_id)) state='cancelled';
     else {
+     if(event.entity==='attendance_alert' && event.context?.attendance_kind==='missing_check_in') {
+      const current=await db.rpc('erp_attendance_missing_checkin_current',{p_employee:event.context.employee_id,p_shift_start:event.context.shift_start});
+      if(current.error)throw current.error;
+      if(!current.data){await db.from('owner_push_deliveries').update({state:'cancelled',last_error:null}).eq('id',job.id).eq('attempts',job.attempts);return;}
+     }
      const view=await presentation(event.restaurant_id);
      view.settings=preferencesForLanguage(view.settings,device.language);
      const branch=resolveBranch(event,view.branches);

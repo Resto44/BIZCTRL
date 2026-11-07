@@ -1,6 +1,6 @@
 import { isWorkspacePathEnabled } from './workspaceCustomization';
 
-export const WELCOME_TOUR_VERSION = '20261103';
+export const WELCOME_TOUR_VERSION = '20261107-attendance';
 export const WELCOME_TOUR_OPEN_EVENT = 'bizctrl:open-welcome-tour';
 const NEW_ACCOUNT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -55,6 +55,7 @@ export function getWelcomeTourStages({ role = 'owner', mode = 'restaurant', can 
     stage('sources', canCreateSalesSources ? [
       module('salesSources', '/sales-sources?create=1', 'viewSales'),
     ] : []),
+    stage('people', employee ? [module('employeeAttendance','/employee-dashboard','recordAttendance')] : [module('employeeManagement','/employees','viewEmployees')]),
     stage('prepare', supplier ? [] : [
       module('products', '/product-management', 'viewInventory'),
       ...(isRestaurant(mode) ? [] : [module('inventory', '/inventory', 'viewInventory')]),

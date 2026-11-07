@@ -18,6 +18,7 @@ export function recordRoute(entity: string): string {
  if(/^(cash_|daily_cash|owner_cash|owner_personal|treasury|wallet|settlement)/.test(entity)) return '/treasury';
  if(entity.startsWith('sponsor_')) return '/sponsor-treasury';
  if(/^(payroll|salary|deduction|employee_bonus)/.test(entity)) return '/payroll';
+ if(entity==='attendance_alert') return '/employees';
  if(entity==='attendance' || entity==='staff_attendance') return '/employee-attendance';
  if(/^(employee|staff|manager_invite)/.test(entity)) return '/employees';
  if(entity==='branches' || entity==='branch_assignments') return '/branch-management';
