@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MapPin, ShieldCheck, Clock3, Loader2 } from 'lucide-react';
+import EmployeeLiveLocation from './EmployeeLiveLocation';
 import { employeeAttendanceAction } from '@/lib/employeeAttendancePhase';
 
 const messages = {
@@ -180,6 +181,7 @@ export default function EmployeeMobileAttendance({ userId }) {
           </Button>
           </>}
         </>
+        {status.phase==='checked_in' && status.session_id && <EmployeeLiveLocation key={status.session_id} sessionId={status.session_id} />}
         {status.shift_date && <p className="text-xs text-slate-300">{tr('Shift date')}: {status.shift_date}</p>}
         {done && <p className="rounded-lg bg-emerald-500/15 p-3 text-sm text-emerald-200">
           {tr('Attendance has been completed for this shift.')}
@@ -187,7 +189,7 @@ export default function EmployeeMobileAttendance({ userId }) {
       </>}
       {success && <p role="status" className="rounded-lg bg-emerald-500/15 p-2 text-sm text-emerald-200">{tr(success.action === 'in' ? 'Check-in saved' : 'Check-out saved')} {success.time}</p>}
       {errorText && <p role="alert" className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{tr(errorText)}</p>}
-      <p className="text-xs text-slate-400">{tr('Location is requested only when you tap Check In or Check Out. Raw GPS coordinates are not stored in the attendance history.')}</p>
+      <p className="text-xs text-slate-400">{tr('GPS is checked at entry and exit. Optional live sharing requires your permission during an open shift; no location route is stored in attendance history.')}</p>
     </CardContent>
   </Card>;
 }
