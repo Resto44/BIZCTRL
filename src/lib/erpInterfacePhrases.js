@@ -4,6 +4,18 @@
  * free-text business values or code identifiers.
  */
 export const erpInterfacePhrases = Object.freeze({
+  "Check-out becomes available two minutes after check-in.": {ar:"يتاح تسجيل الخروج بعد دقيقتين من الدخول.",fa:"خروج دو دقیقه پس از ورود باز می‌شود."},
+  "Your next shift opens at": {"ar": "يفتح الدوام القادم الساعة", "fa": "شیفت بعدی باز می‌شود ساعت"},
+  "Earlier attendance — kept in history": {"ar": "الحضور السابق — محفوظ في السجل", "fa": "حاضری قبلی — محفوظ در تاریخچه"},
+  "Code requests open 30 minutes before the shift. Automatic delivery starts 10 minutes before it.": {"ar": "يتاح طلب الرمز قبل الدوام بـ٣٠ دقيقة. يبدأ الإرسال التلقائي قبله بـ١٠ دقائق.", "fa": "درخواست کد ۳۰ دقیقه پیش از شیفت باز می‌شود. ارسال خودکار ۱۰ دقیقه پیش از آن شروع می‌شود."},
+  "Generate code for employee": {"ar": "إنشاء رمز للموظف", "fa": "صدور کد برای کارمند"},
+  "The code appears in the employee dashboard and is queued for their verified email. Entry requests open 30 minutes before the shift.": {"ar": "يظهر الرمز في لوحة الموظف ويُرسل إلى بريده المؤكد. يتاح طلب رمز الدخول قبل الدوام بـ٣٠ دقيقة.", "fa": "کد در داشبورد کارمند ظاهر و برای ایمیل تأییدشدهٔ او ارسال می‌شود. درخواست کد ورود ۳۰ دقیقه پیش از شیفت باز است."},
+  "Employee code generated; valid for 30 minutes.": {"ar": "تم إنشاء رمز الموظف؛ صالح لمدة ٣٠ دقيقة.", "fa": "کد کارمند صادر شد؛ اعتبار ۳۰ دقیقه."},
+  "Code could not be generated. Check the shift time and verified employee email; wait 60 seconds before retrying.": {"ar": "تعذر إنشاء الرمز. تحقق من وقت الدوام وبريد الموظف المؤكد؛ وانتظر ٦٠ ثانية قبل المحاولة.", "fa": "کد صادر نشد. ساعت شیفت و ایمیل تأییدشدهٔ کارمند را بررسی کنید؛ ۶۰ ثانیه بعد دوباره تلاش کنید."},
+  "Recent shift sessions": {"ar": "جلسات الدوام الأخيرة", "fa": "شیفت‌های اخیر"},
+  "Your next shift has not opened yet. The opening time is shown below.": {"ar": "لم يفتح الدوام القادم بعد. وقت الفتح موضح أدناه.", "fa": "شیفت بعدی هنوز باز نشده است. زمان بازشدن در پایین نشان داده شده."},
+  "This shift cannot receive another code yet. Check the shift time or ask the owner to review.": {"ar": "لا يمكن إصدار رمز آخر لهذا الدوام حالياً. تحقق من الوقت أو اطلب مراجعة المالك.", "fa": "این شیفت فعلاً کد جدید نمی‌گیرد. ساعت را بررسی کنید یا از اونر بخواهید بررسی کند."},
+
   "Shift start": {"ar": "بداية الدوام", "fa": "شروع وظیفه"},
   "Shift end": {"ar": "نهاية الدوام", "fa": "پایان وظیفه"},
   "Times use Saudi Arabia time (Asia/Riyadh). An earlier end time means the next day. Maximum shift: 16 hours.": {"ar": "الأوقات بتوقيت السعودية. إذا كانت النهاية قبل البداية فهي في اليوم التالي. الحد الأقصى ١٦ ساعة.", "fa": "ساعت‌ها به وقت عربستان است. پایان زودتر از شروع یعنی روز بعد. حداکثر شیفت: ۱۶ ساعت."},

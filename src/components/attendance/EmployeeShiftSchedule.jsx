@@ -42,12 +42,26 @@ export default function EmployeeShiftSchedule({employees,restaurantId}) {
  const summary=useQuery({queryKey:['attendance-code-summary',restaurantId],enabled:!!restaurantId,refetchInterval:30000,queryFn:async()=>{
   const {data,error}=await supabase.rpc('erp_attendance_email_owner_summary',{p_restaurant:restaurantId,p_branch:null});if(error)throw error;return data;
  }});
+ const issueCode=useMutation({mutationFn:async()=>{
+  const {data,error}=await supabase.rpc('erp_attendance_owner_issue_code',{p_employee:selected});if(error)throw error;return data;
+ },onSuccess:()=>qc.invalidateQueries({queryKey:['attendance-code-summary']})});
+ const sessions=useQuery({queryKey:['employee-shift-sessions',restaurantId,selected],enabled:!!restaurantId&&!!selected,queryFn:async()=>{
+  const {data,error}=await supabase.from('attendance_shift_sessions').select('id,shift_date,checked_in_at,checked_out_at,prior_daily_snapshot').eq('restaurant_id',restaurantId).eq('employee_id',selected).order('checked_in_at',{ascending:false}).limit(5);if(error)throw error;return data||[];
+ }});
+ const formatTime=value=>value?new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Riyadh',hour:'2-digit',minute:'2-digit'}).format(new Date(value)):'—';
  const employee=employees.find(e=>e.id===selected);
  const schedule=schedules.data?.find(s=>s.employee_id===selected);
  return <Card className="space-y-3 p-4">
   {summary.data&&<div><h3 className="mb-2 text-sm">{tr('Email delivery today')}</h3><div className="grid grid-cols-2 gap-2 lg:grid-cols-4">{[['provider_accepted','Provider accepted'],['verified_in','Verified check-ins'],['verified_out','Verified check-outs'],['expired_unused','Expired unused codes']].map(([key,label])=><div key={key} className="rounded-lg bg-muted p-2"><p className="text-xs text-muted-foreground">{tr(label)}</p><p className="text-xl font-semibold">{summary.data[key]??0}</p></div>)}</div></div>}
   <h2 className="font-semibold">{tr('Employee shift & automatic codes')}</h2>
-  <label className="block text-sm">{tr('Employee')}<select className="mt-1 block w-full rounded-md border bg-background p-2" aria-label={tr('Employee shift schedule')} value={selected} onChange={e=>setSelected(e.target.value)}><option value="">{tr('Select employee')}</option>{employees.filter(e=>e.is_active!==false).map(e=><option key={e.id} value={e.id}>{e.full_name} — {e.position||e.branch}</option>)}</select></label>
+  <label className="block text-sm">{tr('Employee')}<select className="mt-1 block w-full rounded-md border bg-background p-2" aria-label={tr('Employee shift schedule')} value={selected} onChange={e=>{setSelected(e.target.value);issueCode.reset();}}><option value="">{tr('Select employee')}</option>{employees.filter(e=>e.is_active!==false).map(e=><option key={e.id} value={e.id}>{e.full_name} — {e.position||e.branch}</option>)}</select></label>
   {schedules.isError?<p role="alert">{tr('Unable to load shift schedules.')} <Button onClick={()=>schedules.refetch()}>{tr('Retry')}</Button></p>:employee&&!schedules.isPending&&<ScheduleForm key={`${selected}-${schedule?.updated_at||'new'}`} employee={employee} schedule={schedule}/>}
+  {employee&&<div className="space-y-2 border-t pt-3">
+   <Button variant="outline" disabled={issueCode.isPending} onClick={()=>issueCode.mutate()}>{tr('Generate code for employee')}</Button>
+   <p className="text-xs text-muted-foreground">{tr('The code appears in the employee dashboard and is queued for their verified email. Entry requests open 30 minutes before the shift.')}</p>
+   {issueCode.isSuccess&&<p role="status" className="text-sm text-emerald-600">{tr('Employee code generated; valid for 30 minutes.')}</p>}
+   {issueCode.isError&&<p role="alert" className="text-sm text-red-600">{tr('Code could not be generated. Check the shift time and verified employee email; wait 60 seconds before retrying.')}</p>}
+   {sessions.data?.length>0&&<div className="space-y-2"><h3 className="text-sm font-semibold">{tr('Recent shift sessions')}</h3>{sessions.data.map(row=><div key={row.id} className="rounded-md bg-muted p-2 text-xs"><span dir="ltr">{row.shift_date} · {formatTime(row.checked_in_at)} → {formatTime(row.checked_out_at)}</span>{row.prior_daily_snapshot?.check_in&&<p>{tr('Earlier attendance — kept in history')}: <span dir="ltr">{row.prior_daily_snapshot.check_in} → {row.prior_daily_snapshot.check_out}</span></p>}</div>)}</div>}
+  </div>}
  </Card>;
 }
