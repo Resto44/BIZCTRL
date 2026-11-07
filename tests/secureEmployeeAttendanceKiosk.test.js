@@ -6,14 +6,17 @@ const read = async path => readFile(new URL(path, import.meta.url), 'utf8');
 describe('Secure employee kiosk boundaries', () => {
   it('does not match PIN or calculate check-in times in the browser', async () => {
     const page = await read('../src/pages/EmployeeAttendance.jsx');
+    expect(page).toContain("supabase.rpc('erp_attendance_email_event'");
+    expect(page).toContain("supabase.functions.invoke('attendance-email-otp'");
+    expect(page).not.toContain("supabase.rpc('erp_attendance_set_kiosk_pin'");
     expect(page).toContain("supabase.rpc('erp_attendance_kiosk_event'");
-    expect(page).toContain("supabase.rpc('erp_attendance_set_kiosk_pin'");
+    expect(page).toContain("!canUseEmailOtp");
     expect(page).not.toContain('e.pin === pin');
     expect(page).not.toContain('Math.random()');
     expect(page).not.toContain('base44.entities.Attendance.create(');
     expect(page).not.toContain('base44.entities.Attendance.update(');
-    expect(page).toContain("p_restaurant_id: restaurantId");
-    expect(page).toContain("p_branch_id: branchId");
+    expect(page).toContain("p_employee_id:employeeId");
+    expect(page).toContain('maximumAge:0');
   });
 
   it('enforces scoped server time and serialized attendance transitions', async () => {

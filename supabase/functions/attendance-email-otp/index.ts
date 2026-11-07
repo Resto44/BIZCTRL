@@ -42,11 +42,35 @@ Deno.serve(async req=>{
     body=JSON.parse(raw);
     if(!body||typeof body!=='object'||Array.isArray(body))return respondError('INVALID_REQUEST',400);
   } catch{return respondError('INVALID_REQUEST',400);}
-  if(body?.action==='status')return reply({ok:true,configured:Boolean(resend&&from),max_minutes:30});
+  const admin=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});
+  if(body?.action==='status'){
+    const configured=Boolean(resend && from);
+    const {data:members,error:memberError}=await admin.from('erp_memberships')
+      .select('restaurant_id,branch_id,linked_entity_id,role')
+      .eq('user_id',user.id).eq('status','approved').eq('role','employee').limit(3);
+    if(memberError)return respondError('ATTENDANCE_STATUS_UNAVAILABLE',503);
+    if(!members || members.length!==1 || !members[0].linked_entity_id)
+      return reply({ok:true,configured,eligible:false,reason:'APPROVED_EMPLOYEE_LINK_REQUIRED',max_minutes:30});
+    const m=members[0];
+    const {data:employee,error:empError}=await admin.from('employees')
+      .select('id,restaurant_id,branch_id,email,is_active')
+      .eq('restaurant_id',m.restaurant_id).eq('id',m.linked_entity_id).maybeSingle();
+    if(empError)return respondError('ATTENDANCE_STATUS_UNAVAILABLE',503);
+    if(!employee?.is_active || !employee?.branch_id || employee.branch_id!==m.branch_id)
+      return reply({ok:true,configured,eligible:false,reason:'ASSIGNMENT_INVALID',max_minutes:30});
+    const mail=String(employee.email||'').trim().toLowerCase();
+    if(!mail || mail!==String(user.email||'').trim().toLowerCase() || !user.email_confirmed_at)
+      return reply({ok:true,configured,eligible:false,reason:'EMPLOYEE_EMAIL_MISMATCH',max_minutes:30});
+    const {data:geofence,error:geoError}=await admin.from('attendance_branch_geofences')
+      .select('branch_id').eq('branch_id',employee.branch_id)
+      .eq('restaurant_id',m.restaurant_id).maybeSingle();
+    if(geoError)return respondError('ATTENDANCE_STATUS_UNAVAILABLE',503);
+    return reply({ok:true,configured,eligible:Boolean(geofence?.branch_id),
+      reason:geofence?.branch_id?null:'BRANCH_GEOFENCE_REQUIRED',max_minutes:30});
+  }
   if(body?.action!=='issue'||!['in','out'].includes(String(body?.phase)))
     return respondError('INVALID_REQUEST',400);
   if(!resend||!from)return respondError('EMAIL_NOT_CONFIGURED',503);
-  const admin=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});
   let employeeId=body.employee_id;
   if(!employeeId){
     const {data,error}=await admin.from('erp_memberships')
