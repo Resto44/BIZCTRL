@@ -9,6 +9,8 @@ describe('Secure employee kiosk boundaries', () => {
     expect(page).toContain("supabase.rpc('erp_attendance_email_event'");
     expect(page).toContain("supabase.functions.invoke('attendance-email-otp'");
     expect(page).not.toContain("supabase.rpc('erp_attendance_set_kiosk_pin'");
+    expect(page).toContain("supabase.rpc('erp_attendance_kiosk_event'");
+    expect(page).toContain("!canUseEmailOtp");
     expect(page).not.toContain('e.pin === pin');
     expect(page).not.toContain('Math.random()');
     expect(page).not.toContain('base44.entities.Attendance.create(');
