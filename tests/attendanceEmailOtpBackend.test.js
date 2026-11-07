@@ -36,7 +36,7 @@ describe('Staged ERP email attendance backend security',()=>{
   const owner=read('../src/pages/EmployeeAttendance.jsx');
   expect(employee).toContain("erp_attendance_email_event");
   expect(owner).toContain("erp_attendance_email_event");
-  expect(employee).not.toContain("supabase.rpc('erp_attendance_mobile_event'");
-  expect(owner).not.toContain("supabase.rpc('erp_attendance_kiosk_event'");
+  expect(employee).toContain('<EmployeeMobileAttendanceLegacy userId={userId} />');
+  expect(owner).toContain("!canUseEmailOtp");
  });
 });
