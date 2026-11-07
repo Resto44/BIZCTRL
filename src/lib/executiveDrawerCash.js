@@ -87,14 +87,24 @@ export function normalizeDrawerCashAsOf(payload, { loading = false, error = fals
     const stamp=Date.parse(row?.countedAt||'');
     return Number.isFinite(stamp)?stamp:0;
   };
-  const latestVerifiedDetail=[...verifiedDetails].sort((a,b) =>
+  const compareRecency=(a,b)=>
     String(b?.date||'').localeCompare(String(a?.date||'')) ||
     eventTime(b)-eventTime(a) ||
-    Number(b?.sessionNo||0)-Number(a?.sessionNo||0)
-  )[0]||null;
+    Number(b?.sessionNo||0)-Number(a?.sessionNo||0);
+  const latestVerifiedDetail=[...verifiedDetails].sort(compareRecency)[0]||null;
+  // Ambiguous cashier identity must NOT be silently promoted into an actual
+  // verified drawer balance. It can still be displayed as a clearly labeled,
+  // unverified count reported in the latest finalized Closing session.
+  const reportedDetails=details.filter(row=>row?.status==='ambiguous_drawer'
+    && moneyOrNull(row?.reportedCash)!==null);
+  const latestReportedDetail=[...reportedDetails].sort(compareRecency)[0]||null;
+  const latestPhysicalDetail=[...verifiedDetails,...reportedDetails]
+    .sort(compareRecency)[0]||null;
   return {
     amount: complete ? cash : null,
     latestVerifiedDetail,
+    latestReportedDetail,
+    latestPhysicalDetail,
     verifiedBranches:verifiedDetails.length,
     branches: Number.isInteger(count) && count >= 0 ? count : 0,
     missingBranches: Number.isInteger(missing) && missing >= 0 ? missing : 0,
