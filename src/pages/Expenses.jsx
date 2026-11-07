@@ -43,19 +43,28 @@ function ExpenseForm({ initial, onSubmit, onCancel, categories, isSaving = false
     date: initial?.date || format(new Date(), 'yyyy-MM-dd'),
     branch_key: resolvedBranchKey,
     branch_id: initial?.branch_id || (!isAllBranches ? selectedBranchId : (branches.find((branch) => (branch.key || branch.branch_key) === resolvedBranchKey)?.id || null)),
-    category_id: initial?.category_id || '',
+    category_id: initial?.expense_category_id || initial?.category_id || '',
     description: initial?.description || '',
     amount: initial?.amount || '',
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const activeCats = categories.filter(c => c.is_active !== false);
+  const effectiveBranchId=branches.find(b=>(b.key||b.branch_key)===form.branch_key)?.id||form.branch_id;
+  const activeCats=categories.filter(cat=>cat.is_active!==false
+    && (!cat.branch_id||cat.branch_id===effectiveBranchId));
 
   return (
     <div className="space-y-3">
       <div><Label>{t('date')}</Label><Input type="date" value={form.date} onChange={e => set('date', e.target.value)} /></div>
       <div><Label>{t('branch')}</Label>
-        <Select value={form.branch_key} onValueChange={v => set('branch_key', v)}>
+        <Select value={form.branch_key} onValueChange={v => {
+          const target=branches.find(b=>(b.key||b.branch_key)===v);
+          setForm(current=>({
+            ...current,branch_key:v,branch_id:target?.id||null,
+            category_id:categories.find(cat=>cat.id===current.category_id
+              && (!cat.branch_id||cat.branch_id===target?.id))?.id||'',
+          }));
+        }}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             {!isBranchScoped && <SelectItem value="all">{t('all_branches')}</SelectItem>}
@@ -403,7 +412,10 @@ export default function Expenses() {
                             <p className="text-sm font-semibold">{e.description || getCatDisplayName(e.category_id)}</p>
                             <p className="text-xs text-muted-foreground">{e.date} · {e.branch_key === 'all' ? t('all_branches') : (branches.find(b => b.key === e.branch_key)?.label || e.branch_key)}</p>
                             <p className="text-xs text-muted-foreground italic">{getCatDisplayName(e.expense_category_id || e.category_id)}</p>
-                            <p data-testid="expense-accounting-type" className="mt-1 text-xs font-semibold text-blue-700">{isReportFixedCategory(cat) ? (lang === 'fa' ? 'نوع حسابداری: ثابت ماهانه' : lang === 'ar' ? 'النوع المحاسبي: ثابت شهري' : 'Accounting type: fixed monthly') : (lang === 'fa' ? 'نوع حسابداری: متغیر؛ فقط در تاریخ ثبت‌شده' : lang === 'ar' ? 'النوع المحاسبي: متغير؛ في التاريخ المسجل فقط' : 'Accounting type: variable; recorded date only')}</p>
+                            <span data-testid="expense-accounting-type" className={`mt-1 inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${isReportFixedCategory(cat)?'bg-blue-50 text-blue-700':'bg-amber-50 text-amber-700'}`}>
+                              {isReportFixedCategory(cat)?(lang==='fa'?'ثابت ماهانه':lang==='ar'?'ثابت شهري':'Fixed monthly'):
+                                (lang==='fa'?'متغیر · روز ثبت':lang==='ar'?'متغير · يوم التسجيل':'Variable · recorded date')}
+                            </span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
