@@ -16,8 +16,10 @@ export function expenseMonthModel(expenses=[],categories=[],options={}) {
   const type=options.type||'all';
   const categoryId=options.categoryId||'all';
   const categoryMap=new Map(categories.map(c=>[c.id,c]));
+  const excluded=new Set(['cancelled','canceled','rejected','void','voided','deleted']);
   const monthly=(Array.isArray(expenses)?expenses:[])
-    .filter(e=>String(e.date||'').slice(0,7)===month);
+    .filter(e=>String(e.date||'').slice(0,7)===month
+      && !excluded.has(String(e.status||'').toLowerCase()));
   const isFixed=e=>isReportFixedCategory(categoryMap.get(e.expense_category_id||e.category_id));
   const amount=e=>{const v=Number(e.amount);return Number.isFinite(v)&&v>0?v:0;};
   const sum=items=>Math.round(items.reduce((acc,e)=>acc+Math.round(amount(e)*100),0))/100;
