@@ -51,6 +51,7 @@ export function expenseInvoiceHistoryModel(invoices=[],expenses=[],categories=[]
         category,
         type:isReportFixedCategory(category)?'fixed':'variable',
         invoiceAmount:safeAmount(i.total_amount),
+        invoiceCurrency:i.currency||null,
         originalExpenseAmount:existing?safeAmount(existing.amount):null,
         originalExpenseDate:existing?.date||null,
         supplierName:i.supplier_name||null,
