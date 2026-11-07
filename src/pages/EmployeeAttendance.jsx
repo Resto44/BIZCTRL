@@ -88,7 +88,7 @@ export default function EmployeeAttendance() {
     queryKey: ['kiosk-employee-list', restaurantId],
     queryFn: async () => {
       const { data, error } = await supabase.from('employees')
-        .select('id,full_name,position,branch,branch_id,restaurant_id,is_active,qr_code')
+        .select('id,full_name,position,branch,branch_id,restaurant_id,is_active,qr_code,email')
         .eq('restaurant_id', restaurantId).eq('is_active', true).order('full_name').limit(1000);
       if (error) throw error;
       return data || [];
@@ -147,6 +147,17 @@ export default function EmployeeAttendance() {
   });
   const currentPhase=selectedAttendanceState==='checked_in'?'out'
     :selectedAttendanceState==='not_checked_in'?'in':null;
+  const {data:emailProvider,isError:emailProviderError}=useQuery({
+    queryKey:['attendance-otp-provider-ready',restaurantId],
+    queryFn:async()=>{
+      const {data,error}=await supabase.functions.invoke('attendance-email-otp',{body:{action:'status'}});
+      if(error || !data?.ok)throw error || new Error('Attendance email status unavailable');
+      return data;
+    },enabled:canManage&&Boolean(restaurantId),staleTime:60000,retry:1,
+  });
+  const selectedEmployeeData=employees.find(emp=>emp.id===selectedEmployee);
+  const canUseEmailOtp=Boolean(emailProvider?.configured && selectedEmployeeData?.email
+    && selectedEmployeeData?.branch_id===branchId);
   const emailCodeMutation=useMutation({
     mutationFn:async()=>{
       if(!canManage||!ready||!selectedEmployee||!currentPhase) throw new Error('Select an employee eligible for Check In or Check Out.');
@@ -159,6 +170,25 @@ export default function EmployeeAttendance() {
     },
     onSuccess:data=>{setCodeTicket(data);toast.success(tr('Email provider accepted the attendance code.'));},
     onError:e=>{setCodeTicket(null);toast.error(e.message);},
+  });
+  const legacyKioskMutation=useMutation({
+    mutationFn:async({employeeId,credential})=>{
+      if(!canManage||!ready||canUseEmailOtp)throw new Error('Email OTP required for enrolled staff.');
+      const {data,error}=await supabase.rpc('erp_attendance_kiosk_event',{
+        p_restaurant_id:restaurantId,p_branch_id:branchId,
+        p_employee_id:employeeId,p_method:'pin',p_credential:credential,
+      });
+      if(error)throw error;
+      if(data?.type!=='success')throw new Error(data?.message||'Attendance not recorded.');
+      return data;
+    },
+    onSuccess:data=>{
+      setResult(data);refresh();
+      qc.invalidateQueries({queryKey:['attendance']});
+      qc.invalidateQueries({queryKey:['payroll-attendance']});
+      qc.invalidateQueries({queryKey:['payroll-dashboard-attendance']});
+    },
+    onError:error=>setResult({type:'error',title:tr('Attendance not recorded'),message:error.message}),
   });
   const kioskMutation=useMutation({
     mutationFn:async({employeeId,credential})=>{
@@ -351,15 +381,26 @@ export default function EmployeeAttendance() {
                 {openShiftError && <p role="alert" className="text-sm text-destructive">
                   {tr('Unable to read current employee shift. The server will verify the next action.')}
                 </p>}
+                {!canUseEmailOtp && selectedEmployee && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  {tr(emailProviderError?'Email provider could not be checked. Temporary managed PIN attendance is available.'
+                    :!emailProvider?.configured?'Email delivery is not configured. Temporary owner-supervised PIN attendance is available.'
+                    :!selectedEmployeeData?.email?'This employee has no email. Add and verify their email to enable the new six-digit code.'
+                    :'The employee needs a verified canonical branch assignment for email OTP.')}
+                  <p className="mt-1 text-xs">{tr('Legacy supervised PIN does not prove onsite GPS. Review the attendance audit; do not treat it as GPS verified.')}</p>
+                  <KioskPINPad key={`${restaurantId}-${selectedBranch}-${selectedEmployee}-fallback`}
+                    disabled={!ready || !selectedEmployee || !currentPhase || legacyKioskMutation.isPending}
+                    loading={legacyKioskMutation.isPending}
+                    onSubmit={credential=>legacyKioskMutation.mutate({employeeId:selectedEmployee,credential})}/>
+                </div>}
                 <Button type="button" className="w-full h-12" variant="secondary"
-                  disabled={!ready || !selectedEmployee || !currentPhase || emailCodeMutation.isPending}
+                  disabled={!ready || !selectedEmployee || !currentPhase || !canUseEmailOtp || emailCodeMutation.isPending}
                   onClick={()=>emailCodeMutation.mutate()}>
                   {emailCodeMutation.isPending?tr('Sending email code…'):tr(codeTicket?'Request a new email code':'Send one-time code to employee email')}
                 </Button>
-                {codeTicket && codeTicket.employeeId===selectedEmployee && <p role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
+                {canUseEmailOtp && codeTicket && codeTicket.employeeId===selectedEmployee && <p role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
                   {tr('Code sent to')}: <strong>{codeTicket.masked_email}</strong> · {tr('Expires after 30 minutes')} · {new Date(codeTicket.expires_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Riyadh'})}
                 </p>}
-                {codeTicket && codeTicket.employeeId===selectedEmployee &&
+                {canUseEmailOtp && codeTicket && codeTicket.employeeId===selectedEmployee &&
                   <KioskPINPad key={`${restaurantId}-${selectedBranch}-${selectedEmployee}-${codeTicket.expires_at}`}
                     loading={kioskMutation.isPending}
                     disabled={!ready || !selectedEmployee || loadError}
