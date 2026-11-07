@@ -18,6 +18,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Pencil, Trash2, ScanLine, BarChart3, FolderOpen, Tag } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import ExpenseAnalytics from '@/components/expenses/ExpenseAnalytics';
+import ExpensePurchaseHistory from '@/components/expenses/ExpensePurchaseHistory';
 import ExpenseCategoryManager, { useExpenseCategories } from '@/components/expenses/ExpenseCategoryManager';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/helpers';
@@ -396,6 +397,12 @@ export default function Expenses() {
             </Card>)}
           </div>
           <p className="mb-3 text-xs text-muted-foreground">{labels.budgetNote} · {model.recordCount} {labels.entries}</p>
+          <ExpensePurchaseHistory restaurantId={activeRestaurant?.id}
+            branchId={selectedBranchId} branchKey={selectedBranchKey}
+            isAllBranches={isAllBranches} month={expenseMonth}
+            type={expenseType} categoryId={expenseCategory}
+            categories={categories} expenses={expenses} currency={currency}/>
+
 
           {isLoading ? <p className="text-center text-muted-foreground text-sm py-8">{t('loading')}</p>
             : filtered.length === 0 ? <EmptyState />
