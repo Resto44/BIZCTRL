@@ -86,6 +86,14 @@ describe('New SaaS user onboarding tutorial', () => {
     expect(tour).not.toContain("supabase.from('sales_sources')");
   });
 
+  it('guides permitted owners and employees to their attendance workspace',()=>{
+    const owner=getWelcomeTourStages({role:'owner',can:{viewEmployees:true}}).find(s=>s.key==='people');
+    expect(owner.modules[0].path).toBe('/employees');
+    const employee=getWelcomeTourStages({role:'employee',can:{recordAttendance:true}}).find(s=>s.key==='people');
+    expect(employee.modules[0].path).toBe('/employee-dashboard');
+    expect(getWelcomeTourStages({role:'supplier',can:{}}).some(s=>s.key==='people')).toBe(false);
+  });
+
   it('offers retail POS only to retail, not restaurant, warehouse or services', () => {
     for (const mode of ['restaurant', 'warehouse', 'services']) {
       expect(flatten(getWelcomeTourStages({ role:'owner', mode, can: allOwnerPermissions }))).not.toContain('retailPOS');

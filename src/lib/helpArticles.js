@@ -1,10 +1,11 @@
+import { EMPLOYEE_HELP_GUIDES } from './employeeHelpGuides';
 import { SALES_CLOSING_FIELD_GUIDES } from './helpSalesClosingFields';
 import { PRODUCT_MASTER_FIELD_GUIDES } from './helpProductMasterFields';
 import { ERP_INSTALL_GUIDES } from './helpInstallGuides';
 import { RESTAURANT_PRODUCT_FIELD_GUIDES } from './helpRestaurantProductFields';
 
 // Reviewed against the linked application source; update guides when workflows change.
-export const HELP_REVIEWED_AT = "2026-10-21";
+export const HELP_REVIEWED_AT = "2026-11-07";
 export const helpArticles = [
   {
     "id": "start",
@@ -823,44 +824,6 @@ export const helpArticles = [
     }
   },
   {
-    "id": "employee",
-    "category": "portals",
-    "roles": [
-      "employee"
-    ],
-    "route": "/employee-dashboard",
-    "source": "src/pages/EmployeeDashboardERP.jsx",
-    "content": {
-      "en": {
-        "title": "Employee portal",
-        "steps": [
-          "Use the employee account provided by your business and confirm your linked employee profile and branch.",
-          "In attendance, use the available check-in or check-out action at the actual time and verify the recorded status.",
-          "Review My Tasks and Announcements. Update assigned work using the actions available to your account."
-        ],
-        "note": "If your profile is missing, ask the owner to link your account correctly. Do not create another employee identity to bypass the problem."
-      },
-      "ar": {
-        "title": "بوابة الموظف",
-        "steps": [
-          "استخدم حساب الموظف المخصص من المنشأة وتأكد من ملف الموظف المرتبط والفرع.",
-          "في الحضور استخدم تسجيل الدخول أو الانصراف في الوقت الفعلي، وتحقق من الحالة المحفوظة.",
-          "راجع مهامي والإعلانات، وحدّث العمل المخصص لك بالإجراءات المتاحة لحسابك."
-        ],
-        "note": "إذا لم يظهر ملفك اطلب من المالك ربط الحساب بشكل صحيح. لا تنشئ هوية موظف ثانية لتجاوز المشكلة."
-      },
-      "fa": {
-        "title": "پورتل کارمند",
-        "steps": [
-          "از حساب کارمند تعیین‌شده استفاده و پروفایل کارمند و شعبه مربوط را بررسی کنید.",
-          "در حاضری، ورود یا خروج را در وقت واقعی ثبت و وضعیت ذخیره‌شده را تأیید کنید.",
-          "وظایف من و اطلاعیه‌ها را ببینید. کار تعیین‌شده را با گزینه‌های مجاز حساب خود به‌روز کنید."
-        ],
-        "note": "اگر پروفایل نیست، از اونر بخواهید حساب را درست وصل کند. برای دور زدن مشکل هویت کارمند دوم نسازید."
-      }
-    }
-  },
-  {
     "id": "supplier-portal",
     "category": "portals",
     "roles": [
@@ -1526,6 +1489,7 @@ export const helpArticles = [
   ...SALES_CLOSING_FIELD_GUIDES,
   ...PRODUCT_MASTER_FIELD_GUIDES,
   ...ERP_INSTALL_GUIDES,
+  ...EMPLOYEE_HELP_GUIDES,
   ...RESTAURANT_PRODUCT_FIELD_GUIDES,
 ];
 

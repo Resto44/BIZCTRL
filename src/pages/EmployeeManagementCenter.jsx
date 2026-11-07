@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useState } from 'react';
 import { useRole } from '@/lib/RoleContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
+import HelpLink from '@/components/help/HelpLink';
 import PageHeader from '@/components/shared/PageHeader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
@@ -9,6 +10,7 @@ import { Users, CalendarCheck, Wallet, UserCog, ShieldCheck } from 'lucide-react
 
 // Only the active workspace section is mounted; permissions still govern the
 // underlying data and mutations. Legacy deep links remain valid for bookmarks.
+const OwnerPushSettings = lazy(() => import('@/components/notifications/OwnerPushSettings'));
 const Employees = lazy(() => import('@/pages/Employees'));
 const EmployeeAttendance = lazy(() => import('@/pages/EmployeeAttendance'));
 const OwnerLiveLocations = lazy(() => import('@/components/attendance/OwnerLiveLocations'));
@@ -35,6 +37,8 @@ export default function EmployeeManagementCenter() {
   return <main className="mx-auto w-full min-w-0 max-w-7xl space-y-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
     <PageHeader title={tr('Employee Management Center')}
       subtitle={tr('Employee profiles, attendance, shifts, payroll and access in one workspace')} />
+    <div className="flex justify-end"><HelpLink guide="employee-management"/></div>
+    {role==='owner'&&<details className="rounded-xl border p-3"><summary className="cursor-pointer text-sm font-semibold">{tr('Attendance push notifications')}</summary><p className="my-2 text-xs text-muted-foreground">{tr('Enable this owner device and keep People, Insert and your branches selected. Missing check-in after 15 minutes is a review alert, not confirmed absence.')}</p><Suspense fallback={null}><OwnerPushSettings/></Suspense></details>}
     {!activeRestaurant?.id ? <Card role="alert" className="p-4 text-sm text-amber-700">
       {tr('Select a business to manage its employees.')}
     </Card> : sections.length === 0 ? <Card className="p-4 text-sm text-muted-foreground">

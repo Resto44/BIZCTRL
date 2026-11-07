@@ -1,3 +1,4 @@
+import { renderAttendanceNotification } from './attendance.ts';
 import { entityLabel, recordDetails, isFinancialEvent, readablePushReference } from './events.ts';
 export const MODULES = ['sales', 'purchases', 'inventory', 'finance', 'people', 'other'];
 export const TOKENS = ['business', 'branch', 'action', 'entity', 'reference', 'time', 'sales', 'expenses', 'purchases', 'net_profit', 'date', 'currency', 'network_sales', 'pos_sales', 'source_sales', 'delivery_sales', 'delivery_cash', 'delivery_network', 'credit_sales', 'receivables'];
@@ -93,6 +94,8 @@ export function needsFinancialSummary(settings: any, event: any = {}) {
 export function renderNotification(settings: any, event: any, business: any, branch: any, financial: any = null) {
  const p = settings || DEFAULT_PREFERENCES;
  const language = ACTIONS[p.language] ? p.language : 'en';
+ const attendance=renderAttendanceNotification(event,business,branch,language);
+ if(attendance)return attendance;
  const globalBranch = {en:'All business',fa:'سطح کسب‌وکار',ar:'على مستوى المنشأة'}[language];
  let time = '';
  if (event.created_at && Number.isFinite(Date.parse(event.created_at))) {
