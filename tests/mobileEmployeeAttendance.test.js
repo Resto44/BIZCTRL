@@ -6,7 +6,7 @@ describe('Employee personal-phone attendance integrity', () => {
   it('never lets the employee portal directly write attendance or time', () => {
     const portal = read('../src/pages/EmployeeDashboardERP.jsx');
     const control = read('../src/components/attendance/EmployeeMobileAttendance.jsx');
-    expect(portal).toContain('<EmployeeMobileAttendance userId={user?.id} />');
+    expect(portal).toMatch(/<EmployeeMobileAttendance\s+userId=\{user\?\.id\}\s*\/>/);
     expect(portal).not.toContain(".from('attendance').insert(");
     expect(portal).not.toContain(".from('attendance').update(");
     expect(control).toContain("supabase.rpc('erp_attendance_email_event'");

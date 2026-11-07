@@ -38,6 +38,7 @@ import {
   createPurchaseInvoice, updatePurchaseInvoice, addInvoicePayment
 } from '@/lib/procurementEngine';
 import OcrScanDialog from './OcrScanDialog';
+import PurchaseExpenseOptions from './PurchaseExpenseOptions';
 import { resumePurchaseSubmission } from '@/lib/purchaseSubmission';
 
 const CURRENCIES = ['SAR', 'USD', 'AED', 'EGP', 'KWD', 'QAR', 'BHD', 'OMR', 'EUR', 'GBP'];
@@ -315,6 +316,11 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
     status: invoice?.status || 'draft',
   });
 
+  // The optional expense association is reference-only; it never adds a cost line.
+  const [expenseLink, setExpenseLink] = useState({
+    expense_id:invoice?.expense_id||null,expense_category_id:invoice?.expense_category_id||null,
+  });
+
   const [items, setItems] = useState(
     invoice?.items?.length
       ? invoice.items.map(i => ({ ...normalizePurchaseLine(i), _id: Math.random().toString(36).slice(2) }))
@@ -571,6 +577,8 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
         // Always include restaurant_id and branch_id so RLS erp_scope_insert passes
         restaurant_id: restaurantId || null,
         branch_id: branchId,
+        expense_id:expenseLink.expense_id||null,
+        expense_category_id:expenseLink.expense_category_id||null,
       };
 
       // Prevent the common accidental duplicate when an invoice number is
@@ -689,7 +697,11 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
           </InvoiceAccordion>
 
           <InvoiceAccordion title="Branch" subtitle={selectedBranchName} icon={Store} verified={Boolean(form.branch)} open={openSection === 'branch'} onToggle={() => setOpenSection(current => current === 'branch' ? null : 'branch')}>
-            <div><Label className="mb-1.5 block text-xs text-slate-600">Receiving branch *</Label><BranchSelect value={form.branch} onChange={value => setForm(current => ({ ...current, branch: value }))} /></div>
+            <div><Label className="mb-1.5 block text-xs text-slate-600">Receiving branch *</Label><BranchSelect value={form.branch}
+              onChange={value=>{
+                setForm(current=>({...current,branch:value}));
+                setExpenseLink({expense_id:null,expense_category_id:null});
+              }} /></div>
           </InvoiceAccordion>
 
           <InvoiceAccordion title="Payment" subtitle={paymentMethodLabel} icon={WalletCards} open={openSection === 'payment'} onToggle={() => setOpenSection(current => current === 'payment' ? null : 'payment')} trailing={form.due_date ? <span className="hidden flex-none items-center gap-1 text-xs font-bold text-orange-600 sm:inline-flex"><span className="h-2 w-2 rounded-full bg-orange-500" />Due {form.due_date}</span> : null}>
@@ -701,6 +713,15 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
               <div className="border-t border-slate-200 pt-3"><div className="mb-2 flex items-center justify-between"><div className="flex items-center gap-2"><Truck className="h-4 w-4 text-blue-600" /><span className="text-xs font-bold text-slate-800">Additional costs</span></div><span className="text-xs font-bold text-slate-500">{form.currency} {totals.additionalTotal.toFixed(2)}</span></div>{additionalCosts.map(cost => <div key={cost._id} className="mb-2 grid grid-cols-[1fr_1fr_auto] gap-2 rounded-xl bg-white p-2"><Select value={cost.type} onValueChange={value => updateAdditionalCost(cost._id, 'type', value)}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent>{ADDITIONAL_COST_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent></Select><Input type="number" min="0" step="0.01" value={cost.amount} onChange={event => updateAdditionalCost(cost._id, 'amount', Number(event.target.value || 0))} className="h-9" placeholder="Amount" /><Button type="button" variant="ghost" size="icon" onClick={() => removeAdditionalCost(cost._id)} className="h-9 w-9 text-red-600"><Trash2 className="h-4 w-4" /></Button><Input value={cost.description} onChange={event => updateAdditionalCost(cost._id, 'description', event.target.value)} className="col-span-3 h-9" placeholder="Description" /></div>)}<Button type="button" variant="ghost" size="sm" onClick={addAdditionalCost} className="h-8 gap-1 px-0 text-xs font-bold text-blue-700"><Plus className="h-3.5 w-3.5" /> Add cost</Button></div>
               <div className="flex justify-between rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold"><span>Remaining balance</span><span>{form.currency} {Math.max(0, remaining).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
             </div>
+          </InvoiceAccordion>
+
+          <InvoiceAccordion title="Options · Expense reference" subtitle={expenseLink.expense_id?'Existing expense linked':expenseLink.expense_category_id?'Expense type selected':'Optional · No extra posting'} icon={ClipboardCheck}
+            open={openSection==='expenseOptions'}
+            onToggle={()=>setOpenSection(current=>current==='expenseOptions'?null:'expenseOptions')}>
+            <PurchaseExpenseOptions restaurantId={restaurantId}
+              branchId={selectedBranch?.id||null}
+              branchKey={form.branch}
+              value={expenseLink} onChange={setExpenseLink} disabled={saving||Boolean(submissionRef.current.invoice)}/>
           </InvoiceAccordion>
 
           <InvoiceAccordion title="Attachments" subtitle={attachments.length ? `${attachments.length} invoice ${attachments.length === 1 ? 'file' : 'files'}` : 'No invoice file'} icon={Paperclip} open={openSection === 'attachments'} onToggle={() => setOpenSection(current => current === 'attachments' ? null : 'attachments')} trailing={attachments.length ? <span className="hidden h-9 w-9 flex-none items-center justify-center rounded-lg bg-blue-50 text-blue-700 sm:flex"><FileText className="h-4 w-4" /></span> : null}>
