@@ -5,7 +5,7 @@ const NON_APPROVED_STATES=new Set(['pending','draft','rejected','declined','canc
 
 /** Return the next Gregorian month boundary without relying on browser timezone. */
 export function nextExpenseHistoryMonthStart(month) {
-  if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(String(month||''))) return null;
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month||''))) return null;
   const [year,part]=month.split('-').map(Number);
   return new Date(Date.UTC(year,part,1)).toISOString().slice(0,10);
 }
