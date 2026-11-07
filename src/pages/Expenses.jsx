@@ -22,6 +22,7 @@ import ExpenseCategoryManager, { useExpenseCategories } from '@/components/expen
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/helpers';
 import ReceiptScanner from '@/components/expenses/ReceiptScanner';
+import { expenseMonthModel, riyadhCurrentMonth } from '@/lib/expenseInvoiceMonthly';
 import { Dialog as ScanDialog, DialogContent as ScanDialogContent, DialogHeader as ScanDialogHeader, DialogTitle as ScanDialogTitle } from '@/components/ui/dialog';
 import { useNotify } from '@/lib/useNotify';
 import { useTenant } from '@/lib/TenantContext';
@@ -130,6 +131,30 @@ export default function Expenses() {
   const filterBranch = isAllBranches ? 'all' : (selectedBranchKey || 'all');
   const [showScanner, setShowScanner] = useState(false);
   const [scannedData, setScannedData] = useState(null);
+  const [expenseMonth,setExpenseMonth] = useState(riyadhCurrentMonth);
+  const [expenseType,setExpenseType] = useState('all');
+  const [expenseCategory,setExpenseCategory] = useState('all');
+  const labels = {
+    en:{month:'Calendar month (Saudi time)',type:'Expense type',all:'All types',
+      fixed:'Fixed monthly',variable:'Variable / occasional',category:'Category',allCategories:'All categories',
+      actual:'Recorded expenses',actualFixed:'Fixed expense records',actualVariable:'Variable expense records',
+      budget:'Configured fixed monthly budget',budgetNote:'Current category settings, not historical payment. The fixed budget is NOT added to recorded spending.',
+      monthlyNote:'Only entries dated in the selected month are counted. Change month to inspect older records.',
+      entries:'Records'},
+    ar:{month:'الشهر (بتوقيت السعودية)',type:'نوع المصروف',all:'كل الأنواع',
+      fixed:'ثابت شهري',variable:'متغير / حسب الحاجة',category:'الفئة',allCategories:'كل الفئات',
+      actual:'مصروفات الشهر المسجلة',actualFixed:'المصروفات الثابتة المسجلة',actualVariable:'المصروفات المتغيرة المسجلة',
+      budget:'ميزانية الثابت الشهري المحددة',budgetNote:'هذه إعدادات الفئات الحالية وليست دفعة تاريخية. لا نضيف الميزانية مرة ثانية إلى المصروفات.',
+      monthlyNote:'يعرض السجل مصروفات الشهر المحدد فقط؛ يمكن اختيار شهر سابق.',
+      entries:'سجل'},
+    fa:{month:'ماه (به وقت عربستان)',type:'نوع مصرف',all:'همه',
+      fixed:'ثابت ماهانه',variable:'متغیر / موردی',category:'دسته',allCategories:'همه دسته‌ها',
+      actual:'مصارف ثبت‌شدهٔ ماه',actualFixed:'مصارف ثابت ثبت‌شده',actualVariable:'مصارف متغیر ثبت‌شده',
+      budget:'بودجهٔ ثابت ماهانهٔ تنظیم‌شده',budgetNote:'مبلغ از تنظیمات فعلی دسته‌هاست، نه سند پرداخت تاریخی. بودجه دوباره به مصرف واقعی جمع نمی‌شود.',
+      monthlyNote:'فقط رکوردهای همین ماه شمرده می‌شود؛ برای دیدن ماه‌های گذشته ماه را عوض کنید.',
+      entries:'رکورد'},
+  }[lang]||{};
+
 
   // Canonical and legacy records are both restricted by restaurant server-side.
   // The legacy path accepts only null-UUID rows of the selected branch key.
@@ -273,8 +298,13 @@ export default function Expenses() {
     },
   });
 
-  const filtered = expenses;
-  const totalAmt = filtered.reduce((s, e) => s + (e.amount || 0), 0);
+  const model = expenseMonthModel(expenses,categories,{
+    month:expenseMonth,type:expenseType,categoryId:expenseCategory,
+    branchId:isAllBranches?null:selectedBranchId,
+  });
+  const filtered=model.visible;
+  const expenseDisplayName=cat=>lang==='fa'?(cat.name_fa||cat.name):
+    lang==='ar'?(cat.name_ar||cat.name):cat.name;
 
   return (
     <div>
@@ -314,11 +344,49 @@ export default function Expenses() {
             />
           </div>
 
-          {totalAmt > 0 && (
-            <Card className="p-3 mb-4 bg-destructive/10 border-destructive/20">
-              <p className="text-sm font-semibold text-destructive">{t('total_expenses')}: {formatCurrency(totalAmt, currency)}</p>
-            </Card>
-          )}
+          <Card className="mb-3 space-y-3 p-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div><Label className="mb-1 block text-xs">{labels.month}</Label>
+                <Input aria-label={labels.month} type="month" value={expenseMonth}
+                  onChange={e=>setExpenseMonth(e.target.value||riyadhCurrentMonth())}
+                  className="h-10"/>
+              </div>
+              <div><Label className="mb-1 block text-xs">{labels.type}</Label>
+                <Select value={expenseType} onValueChange={setExpenseType}>
+                  <SelectTrigger className="h-10"><SelectValue/></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{labels.all}</SelectItem>
+                    <SelectItem value="fixed">{labels.fixed}</SelectItem>
+                    <SelectItem value="variable">{labels.variable}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div><Label className="mb-1 block text-xs">{labels.category}</Label>
+                <Select value={expenseCategory} onValueChange={setExpenseCategory}>
+                  <SelectTrigger className="h-10"><SelectValue/></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{labels.allCategories}</SelectItem>
+                    {categories.filter(cat=>cat.is_active!==false||cat.id===expenseCategory)
+                      .filter(cat=>isAllBranches||!cat.branch_id||cat.branch_id===selectedBranchId)
+                      .map(cat=><SelectItem key={cat.id} value={cat.id}>{expenseDisplayName(cat)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">{labels.monthlyNote}</p>
+          </Card>
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              [labels.actual,model.recordedTotal,'text-red-700'],
+              [labels.actualFixed,model.recordedFixed,'text-blue-700'],
+              [labels.actualVariable,model.recordedVariable,'text-amber-700'],
+              [labels.budget,model.configuredFixed,'text-slate-700'],
+            ].map(([title,value,color])=><Card key={title} className="min-w-0 p-3">
+              <p className="text-[11px] leading-4 text-muted-foreground">{title}</p>
+              <p className={`mt-1 break-words text-base font-bold tabular-nums ${color}`}>{formatCurrency(value,currency)}</p>
+            </Card>)}
+          </div>
+          <p className="mb-3 text-xs text-muted-foreground">{labels.budgetNote} · {model.recordCount} {labels.entries}</p>
 
           {isLoading ? <p className="text-center text-muted-foreground text-sm py-8">{t('loading')}</p>
             : filtered.length === 0 ? <EmptyState />
