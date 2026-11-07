@@ -125,10 +125,13 @@ export default function EmployeeDashboardERP() {
         </button>)}
       </nav>
       <main className="max-w-5xl mx-auto px-4 py-5 space-y-4">
+        {can.recordAttendance && <details open={['home','attendance'].includes(activeTab)} className="rounded-xl border border-white/10">
+          <summary className="cursor-pointer p-3 text-sm text-white">{tr('Attendance & location sharing')}</summary>
+          <EmployeeMobileAttendance userId={user?.id}/>
+        </details>}
         {['home', 'attendance'].includes(activeTab) && (
           <>
             {/* All attendance mutations now use the authenticated employee's server-side identity. */}
-            {can.recordAttendance && <EmployeeMobileAttendance userId={user?.id} />}
             {!branchId && <p role="alert" className="rounded-lg border border-amber-600/40 bg-amber-500/10 p-3 text-sm text-amber-200">
               Your employee account needs an active branch assignment. Ask the Owner to link your employee record.
             </p>}

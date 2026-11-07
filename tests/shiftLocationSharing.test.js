@@ -9,7 +9,7 @@ beforeEach(()=>{
  geo={getCurrentPosition:vi.fn()};visibility=new EventTarget();visibility.visibilityState='visible';onState=vi.fn();
 });
 afterEach(()=>{stop?.();stop=null;vi.useRealTimers();});
-const start=()=>{stop=startShiftLocationSharing({sessionId:'shift',rpc,geolocation:geo,visibility,onState});};
+const start=(resumeOnVisible=false)=>{stop=startShiftLocationSharing({sessionId:'shift',rpc,geolocation:geo,visibility,onState,resumeOnVisible});};
 describe('consented shift location lifecycle',()=>{
  it('requests a new fix for every heartbeat instead of replaying a cached location',async()=>{
   start();await flush();expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
@@ -56,6 +56,21 @@ describe('consented shift location lifecycle',()=>{
   for(let i=0;i<3;i++){geo.getCurrentPosition.mock.calls[i][1]({code:3});await vi.advanceTimersByTimeAsync(3000);}
   expect(geo.getCurrentPosition).toHaveBeenCalledTimes(3);
   expect(onState).toHaveBeenLastCalledWith('gps-timeout');
+ });
+ it('resumes only the same consented shift on visibility return and rejects old callbacks',async()=>{
+  start(true);await flush();const oldCallback=geo.getCurrentPosition.mock.calls[0][0];
+  visibility.visibilityState='hidden';visibility.dispatchEvent(new Event('visibilitychange'));
+  await vi.advanceTimersByTimeAsync(240000);await oldCallback(point());
+  expect(rpc.mock.calls.some(([n])=>n.endsWith('_update'))).toBe(false);
+  expect(rpc.mock.calls.some(([n])=>n.endsWith('_stop'))).toBe(false);
+  visibility.visibilityState='visible';visibility.dispatchEvent(new Event('visibilitychange'));await flush();
+  expect(rpc.mock.calls.filter(([n])=>n.endsWith('_start'))).toHaveLength(2);
+  expect(rpc.mock.calls[0][1].p_consent_version).toBe('shift-history-v2');
+  await oldCallback(point());expect(rpc.mock.calls.some(([n])=>n.endsWith('_update'))).toBe(false);
+  await geo.getCurrentPosition.mock.calls[1][0](point());expect(onState).toHaveBeenLastCalledWith('sharing');
+  stop();visibility.visibilityState='hidden';visibility.dispatchEvent(new Event('visibilitychange'));
+  visibility.visibilityState='visible';visibility.dispatchEvent(new Event('visibilitychange'));await flush();
+  expect(rpc.mock.calls.filter(([n])=>n.endsWith('_start'))).toHaveLength(2);
  });
  it('supports Supabase RPC thenables without a catch method when stopping',async()=>{
   rpc.mockImplementation(name=>({then:resolve=>resolve({data:name.endsWith('_start')?'token':null})}));

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MapPin, ShieldCheck, Clock3, Loader2 } from 'lucide-react';
+import LocationHistory from './LocationHistory';
 import EmployeeLiveLocation from './EmployeeLiveLocation';
 import { employeeAttendanceAction } from '@/lib/employeeAttendancePhase';
 
@@ -49,6 +50,8 @@ export default function EmployeeMobileAttendance({ userId }) {
   const { translateLiteral: tr } = useLanguage();
   const qc = useQueryClient();
   const [pin, setPin] = useState('');
+  const [shareAfterCheckIn,setShareAfterCheckIn]=useState(false);
+  const [startSharing,setStartSharing]=useState(false);
   const [success, setSuccess] = useState(null);
   const [now,setNow]=useState(Date.now());
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
@@ -64,6 +67,9 @@ export default function EmployeeMobileAttendance({ userId }) {
     gcTime: 0,
     retry: 1,
   });
+  useEffect(()=>{
+    if(status?.phase==='completed'&&status.session_id){try{sessionStorage.removeItem(`attendance-history-consent:${status.session_id}`);}catch{/* Storage unavailable. */}}
+  },[status?.phase,status?.session_id]);
   const attendance = useMutation({
     mutationFn: async () => {
       if (!/^[0-9]{6}$/.test(pin)) throw new Error('Enter your six-digit attendance code.');
@@ -84,6 +90,8 @@ export default function EmployeeMobileAttendance({ userId }) {
     onSuccess: async data => {
       setPin('');
       setSuccess({ action: data.action, time: data.server_time });
+      if(data.action==='in')setStartSharing(shareAfterCheckIn);
+      if(data.action==='out'){setStartSharing(false);setShareAfterCheckIn(false);try{sessionStorage.removeItem(`attendance-history-consent:${status?.session_id}`);}catch{/* No persisted consent available. */}}
       await qc.invalidateQueries({ queryKey: ['employee-mobile-attendance', userId] });
       await qc.invalidateQueries({ queryKey: ['emp-attendance'] });
       await qc.invalidateQueries({ queryKey: ['attendance-today'] });
@@ -167,6 +175,7 @@ export default function EmployeeMobileAttendance({ userId }) {
           {requestCode.isError&&<p role="alert" className="text-xs text-red-300">{tr('Unable to issue code. Check your verified email and branch setup; wait 60 seconds before retrying.')}</p>}
           {checkedIn&&status.can_check_out===false&&<p className="text-xs text-slate-300">{tr('Check-out becomes available two minutes after check-in.')}</p>}
           {allowAction&&<>
+          {!checkedIn&&<label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={shareAfterCheckIn} onChange={e=>setShareAfterCheckIn(e.target.checked)}/>{tr('After check-in, share my location during this shift and keep distance/accuracy history for 90 days, visible to me and the owner. I can stop sharing. Updates resume when I return to this page.')}</label>}
           <label htmlFor="employee-mobile-pin" className="block text-xs text-slate-200">{tr('Attendance code (6 digits)')}</label>
           <Input id="employee-mobile-pin" type="password" inputMode="numeric"
             autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6}
@@ -181,7 +190,7 @@ export default function EmployeeMobileAttendance({ userId }) {
           </Button>
           </>}
         </>
-        {status.phase==='checked_in' && status.session_id && <EmployeeLiveLocation key={status.session_id} sessionId={status.session_id} />}
+        {status.phase==='checked_in' && status.session_id && <EmployeeLiveLocation key={status.session_id} sessionId={status.session_id} startWithConsent={startSharing} onStop={()=>setStartSharing(false)} />}
         {status.shift_date && <p className="text-xs text-slate-300">{tr('Shift date')}: {status.shift_date}</p>}
         {done && <p className="rounded-lg bg-emerald-500/15 p-3 text-sm text-emerald-200">
           {tr('Attendance has been completed for this shift.')}
@@ -190,6 +199,7 @@ export default function EmployeeMobileAttendance({ userId }) {
       {success && <p role="status" className="rounded-lg bg-emerald-500/15 p-2 text-sm text-emerald-200">{tr(success.action === 'in' ? 'Check-in saved' : 'Check-out saved')} {success.time}</p>}
       {errorText && <p role="alert" className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{tr(errorText)}</p>}
       <p className="text-xs text-slate-400">{tr('GPS is checked at entry and exit. Optional live sharing requires your permission during an open shift; no location route is stored in attendance history.')}</p>
+      <LocationHistory userId={userId}/>
     </CardContent>
   </Card>;
 }
