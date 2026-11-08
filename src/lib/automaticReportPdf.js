@@ -57,14 +57,21 @@ export async function buildAutomaticReportPdf({db,job,context}) {
  const report=buildOperationsPdfReport({...data,
   branches:reportBranches.map(b=>({...b,key:b.branch_key||String(b.id),label:b.name})),
   range,revenueSources});
+ const fullAnalytics=buildFullSalesAnalyticsReport({...data,snapshot,previousSnapshot:previous,
+  operationsReport:report,range,revenueSources,branches:reportBranches,lang,historyAvailable:true});
+ // Automatic email MUST use the same network appendix as the manual Reports PDF.
+ // Never silently attach the old two-page template: no verified appendix means
+ // retry with a visible error instead of marking an incomplete report accepted.
+ if (!fullAnalytics?.networkBranches?.available)
+  throw new Error('REPORT_NETWORK_APPENDIX_MISSING');
+ const requiredPages=2+Math.max(1,Math.ceil((fullAnalytics.networkBranches.branches?.length||0)/8));
  const doc=await generateSalesAnalyticsPDF({
   snapshot,previousSnapshot:previous,growth:salesReportGrowth(snapshot,previous),range,
   branchLabel:selected?.name||'All branches',
   businessName:context.name,currency:context.currency||'SAR',lang,
-  operationsReport:report,
-  fullAnalytics:buildFullSalesAnalyticsReport({...data,snapshot,previousSnapshot:previous,
-   operationsReport:report,range,revenueSources,branches:reportBranches,lang,historyAvailable:true}),
-  download:false
+  operationsReport:report,fullAnalytics,download:false
  });
+ if (doc.getNumberOfPages() !== requiredPages)
+  throw new Error('REPORT_NETWORK_APPENDIX_MISSING');
  return doc.output('datauristring').split(',')[1];
 }

@@ -15,9 +15,9 @@ vi.mock('../src/lib/salesReportPeriod.js',()=>({
  salesReportGrowth:vi.fn(()=>null)
 }));
 vi.mock('../src/lib/operationsPdfReport.js',()=>({buildOperationsPdfReport:vi.fn(()=>({}))}));
-vi.mock('../src/lib/fullSalesAnalyticsReport.js',()=>({buildFullSalesAnalyticsReport:vi.fn(()=>({}))}));
+vi.mock('../src/lib/fullSalesAnalyticsReport.js',()=>({buildFullSalesAnalyticsReport:vi.fn(()=>({networkBranches:{available:true,branches:[]}}))}));
 vi.mock('../src/lib/salesAnalyticsPdf.js',()=>({
- generateSalesAnalyticsPDF:vi.fn(async()=>({output:()=> 'data:application/pdf;base64,JVBERi0xLjQK'}))
+ generateSalesAnalyticsPDF:vi.fn(async()=>({getNumberOfPages:()=>3,output:()=> 'data:application/pdf;base64,JVBERi0xLjQK'}))
 }));
 const job={restaurant_id:'org-1',report_date:'2026-10-29'};
 const context={restaurant_id:'org-1',name:'Test',currency:'SAR',inventoryTransactions:[],
@@ -45,6 +45,26 @@ describe('owner report delivery scope and localization',()=>{
   expect(generateSalesAnalyticsPDF).toHaveBeenCalledWith(expect.objectContaining({
    lang:'fa',branchLabel:'Branch One',download:false
   }));
+ });
+ it('refuses to send an automatic two-page report without the Network appendix',async()=>{
+  generateSalesAnalyticsPDF.mockResolvedValueOnce({getNumberOfPages:()=>2,output:()=> 'data:application/pdf;base64,JVBERi0xLjQK'});
+  await expect(buildAutomaticReportPdf({db:dbWith(),job,context}))
+    .rejects.toThrow('REPORT_NETWORK_APPENDIX_MISSING');
+ });
+ it('refuses missing verified network analytics instead of treating this as a complete report',async()=>{
+  const {buildFullSalesAnalyticsReport}=await import('../src/lib/fullSalesAnalyticsReport.js');
+  buildFullSalesAnalyticsReport.mockReturnValueOnce({networkBranches:null});
+  await expect(buildAutomaticReportPdf({db:dbWith(),job,context}))
+    .rejects.toThrow('REPORT_NETWORK_APPENDIX_MISSING');
+  expect(generateSalesAnalyticsPDF).not.toHaveBeenCalled();
+ });
+ it('requires extra appendix pages for more than eight reporting branches',async()=>{
+  const {buildFullSalesAnalyticsReport}=await import('../src/lib/fullSalesAnalyticsReport.js');
+  buildFullSalesAnalyticsReport.mockReturnValueOnce({networkBranches:{
+    available:true,branches:Array.from({length:15},(_,i)=>({id:'b'+i}))
+  }});
+  generateSalesAnalyticsPDF.mockResolvedValueOnce({getNumberOfPages:()=>4,output:()=> 'data:application/pdf;base64,JVBERi0xLjQK'});
+  await expect(buildAutomaticReportPdf({db:dbWith(),job,context})).resolves.toBe('JVBERi0xLjQK');
  });
  it('keeps all branches when no branch has been selected',async()=>{
   await buildAutomaticReportPdf({db:dbWith(),job,context:{...context,branch_id:null,language:'ar'}});
