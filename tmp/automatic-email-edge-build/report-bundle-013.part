@@ -1,0 +1,195 @@
+pingTitle:"\u062A\u062E\u0635\u06CC\u0635 \u062D\u0633\u0627\u0628 POS",mappedShort:"\u0645\u0628\u0644\u063A \u0645\u0631\u062A\u0628\u0637 \u0628\u0627 \u062D\u0633\u0627\u0628 \u062B\u0628\u062A\u200C\u0634\u062F\u0647 POS",unmappedShort:"\u0628\u062F\u0648\u0646 \u062A\u062E\u0635\u06CC\u0635 POS \u062F\u0631 \u06A9\u0644\u0648\u0632\u06CC\u0646\u06AF",mappingMissing:"\u0627\u0637\u0644\u0627\u0639\u0627\u062A \u062A\u062E\u0635\u06CC\u0635 POS \u0645\u0648\u062C\u0648\u062F \u0646\u06CC\u0633\u062A",accountingNotes:"\u06CC\u0627\u062F\u062F\u0627\u0634\u062A \u062D\u0633\u0627\u0628\u062F\u0627\u0631\u06CC",noteShort:"\u0641\u0631\u0648\u0634 \u0646\u0647\u0627\u06CC\u06CC \u06A9\u0627\u0631\u062A \u0641\u0642\u0637 \u06CC\u06A9 \u0628\u0627\u0631 \u0645\u062D\u0627\u0633\u0628\u0647 \u0634\u062F\u0647 \u0627\u0633\u062A.",receiptShort:"\u062A\u0633\u0648\u06CC\u0647 \u0628\u0627\u0646\u06A9 \u062F\u0631\u0622\u0645\u062F \u062C\u062F\u06CC\u062F \u06CC\u0627 \u062A\u0623\u06CC\u06CC\u062F \u0648\u0635\u0648\u0644 \u0648\u062C\u0647 \u0646\u06CC\u0633\u062A.",noPriorShort:"\u06A9\u0644\u0648\u0632\u06CC\u0646\u06AF \u062A\u0623\u06CC\u06CC\u062F\u0634\u062F\u0647 \u0642\u0628\u0644\u06CC \u0645\u0648\u062C\u0648\u062F \u0646\u06CC\u0633\u062A",mappingNotLoss:"\u0627\u06CC\u0646 \u0627\u062E\u062A\u0644\u0627\u0641 \u06A9\u0633\u0631\u06CC \u0635\u0646\u062F\u0648\u0642 \u0646\u06CC\u0633\u062A"},ar:{title:"\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0634\u0628\u0643\u0627\u062A \xB7 \u062A\u062D\u0644\u064A\u0644\u0627\u062A \u0627\u0644\u0641\u0631\u0648\u0639",branch:"\u0627\u0644\u0641\u0631\u0639 / \u0642\u0646\u0627\u0629 POS",current:"\u0645\u0628\u064A\u0639\u0627\u062A \u0627\u0644\u0634\u0628\u0643\u0629",previous:"\u0627\u0644\u0641\u062A\u0631\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629",growth:"\u062A\u063A\u064A\u0631 \u0627\u0644\u0641\u062A\u0631\u0629",mix:"\u0646\u0633\u0628\u0629 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0645\u0646 \u0627\u0644\u0645\u0628\u064A\u0639\u0627\u062A",trend:"\u0627\u062A\u062C\u0627\u0647 \u0645\u0628\u064A\u0639\u0627\u062A \u0627\u0644\u0634\u0628\u0643\u0629",weekday:"\u0646\u0645\u0637 \u0623\u064A\u0627\u0645 \u0627\u0644\u0623\u0633\u0628\u0648\u0639",branches:"\u0623\u062F\u0627\u0621 \u0627\u0644\u0641\u0631\u0648\u0639 \u0648\u0627\u0644\u0645\u0642\u0627\u0631\u0646\u0629",branchName:"\u0627\u0644\u0641\u0631\u0639",share:"\u0627\u0644\u062D\u0635\u0629",gap:"\u0641\u0631\u0642 \u062A\u062E\u0635\u064A\u0635 \u0623\u062C\u0647\u0632\u0629 POS",allocation:"\u062A\u062E\u0635\u064A\u0635 \u0623\u062C\u0647\u0632\u0629 POS (\u0644\u064A\u0633 \u0625\u064A\u0631\u0627\u062F\u0627\u064B \u062C\u062F\u064A\u062F\u0627\u064B)",noRecords:"\u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u0628\u064A\u0639\u0627\u062A \u0634\u0628\u0643\u0629 \u0646\u0647\u0627\u0626\u064A\u0629 \u062E\u0644\u0627\u0644 \u0627\u0644\u0641\u062A\u0631\u0629",unknown:"\u0641\u0631\u0639 \u063A\u064A\u0631 \u0645\u062E\u0635\u0635",other:"\u0641\u0631\u0648\u0639 \u0625\u0636\u0627\u0641\u064A\u0629",note:"\u0627\u0644\u0625\u0642\u0641\u0627\u0644\u0627\u062A \u0627\u0644\u0646\u0647\u0627\u0626\u064A\u0629 \u0623\u0648 \u0627\u0644\u0645\u0642\u0641\u0644\u0629 \u0641\u0642\u0637. \u0645\u0628\u0627\u0644\u063A POS \u0636\u0645\u0646 \u0627\u0644\u0625\u064A\u0631\u0627\u062F\u0627\u062A \u0648\u0644\u0627 \u062A\u064F\u062C\u0645\u0639 \u0645\u0631\u0629 \u0623\u062E\u0631\u0649.",receipt:"\u0627\u0644\u062A\u0633\u0648\u064A\u0627\u062A \u0627\u0644\u0628\u0646\u0643\u064A\u0629 \u0644\u064A\u0633\u062A \u0625\u064A\u0631\u0627\u062F\u0627\u064B \u062C\u062F\u064A\u062F\u0627\u064B. \u0627\u0644\u0641\u0631\u0642 \u0644\u064A\u0633 \u0631\u0635\u064A\u062F \u0628\u0646\u0643 \u0645\u0639\u062A\u0645\u062F\u0627\u064B.",mismatch:"\u0631\u0627\u062C\u0639: \u0645\u0628\u064A\u0639\u0627\u062A \u0627\u0644\u0634\u0628\u0643\u0629 \u0644\u0627 \u062A\u0637\u0627\u0628\u0642 \u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u0639\u062A\u0645\u062F",none:"\u0644\u0627 \u062A\u0648\u062C\u062F \u0641\u062A\u0631\u0629 \u0633\u0627\u0628\u0642\u0629 \u0644\u0644\u0645\u0642\u0627\u0631\u0646\u0629",growthInfo:"\u0644\u0627 \u062A\u064F\u062D\u0633\u0628 \u0646\u0633\u0628\u0629 \u0627\u0644\u0646\u0645\u0648 \u0639\u0646\u062F\u0645\u0627 \u062A\u0643\u0648\u0646 \u0627\u0644\u0641\u062A\u0631\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629 \u0635\u0641\u0631\u0627\u064B.",noAccounts:"\u0644\u0627 \u062A\u0648\u062C\u062F \u062A\u062E\u0635\u064A\u0635\u0627\u062A \u0644\u0623\u062C\u0647\u0632\u0629 POS \u062E\u0644\u0627\u0644 \u0627\u0644\u0641\u062A\u0631\u0629",continuation:"\u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u0641\u0631\u0648\u0639 \xB7 \u0645\u062A\u0627\u0628\u0639\u0629",previousShort:"\u0627\u0644\u0633\u0627\u0628\u0642",branchTrend:"\u0645\u0633\u0627\u0647\u0645\u0629 \u0643\u0644 \u0641\u0631\u0639 \u0641\u064A \u0645\u0628\u064A\u0639\u0627\u062A \u0627\u0644\u0628\u0637\u0627\u0642\u0629",period:"\u0641\u062A\u0631\u0629 \u0627\u0644\u062A\u0642\u0631\u064A\u0631",unassigned:"\u063A\u064A\u0631 \u0645\u062E\u0635\u0635",source:"\u0627\u0644\u0645\u0635\u062F\u0631: \u0625\u0642\u0641\u0627\u0644\u0627\u062A \u0627\u0644\u0645\u0628\u064A\u0639\u0627\u062A \u0627\u0644\u0645\u0635\u0631\u062D \u0628\u0647\u0627",mappingTitle:"\u062A\u062E\u0635\u064A\u0635 \u062D\u0633\u0627\u0628\u0627\u062A POS",mappedShort:"\u0627\u0644\u0645\u0631\u0628\u0648\u0637 \u0628\u062D\u0633\u0627\u0628\u0627\u062A POS \u0627\u0644\u0645\u0633\u062C\u0644\u0629",unmappedShort:"\u063A\u064A\u0631 \u0645\u062E\u0635\u0635 \u0644\u062C\u0647\u0627\u0632 \u0641\u064A \u0627\u0644\u0625\u0642\u0641\u0627\u0644",mappingMissing:"\u0628\u064A\u0627\u0646\u0627\u062A \u062A\u062E\u0635\u064A\u0635 POS \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629",accountingNotes:"\u0645\u0644\u0627\u062D\u0638\u0627\u062A \u0645\u062D\u0627\u0633\u0628\u064A\u0629",noteShort:"\u062A\u064F\u062D\u062A\u0633\u0628 \u0645\u0628\u064A\u0639\u0627\u062A \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0646\u0647\u0627\u0626\u064A\u0629 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629 \u0641\u0642\u0637.",receiptShort:"\u0627\u0644\u062A\u0633\u0648\u064A\u0629 \u0627\u0644\u0628\u0646\u0643\u064A\u0629 \u0644\u064A\u0633\u062A \u0625\u064A\u0631\u0627\u062F\u0627\u064B \u0623\u0648 \u0625\u062B\u0628\u0627\u062A \u062A\u062D\u0635\u064A\u0644.",noPriorShort:"\u0644\u0627 \u0625\u0642\u0641\u0627\u0644\u0627\u062A \u0645\u0624\u0643\u062F\u0629 \u0644\u0644\u0641\u062A\u0631\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629",mappingNotLoss:"\u0627\u0644\u0641\u0631\u0642 \u0644\u064A\u0633 \u0646\u0642\u0635\u0627\u064B \u0641\u064A \u0627\u0644\u0635\u0646\u062F\u0648\u0642"}},gD={en:{operations:"Finalized network operations",closings:"Final closings",avgClose:"Avg card / closing",peakDay:"Peak card day",weekend:"Fri + Sat share",branchReliance:"Card reliance by branch",signals:"Card sales intelligence",topWeekday:"Top weekday",activeDays:"Card-active days",topBranch:"Largest card branch",noBranchActivity:"No branch sales mix available"},ar:{operations:"\u0645\u0624\u0634\u0631\u0627\u062A \u0639\u0645\u0644\u064A\u0627\u062A \u0627\u0644\u0634\u0628\u0643\u0629 \u0627\u0644\u0646\u0647\u0627\u0626\u064A\u0629",closings:"\u0627\u0644\u0625\u0642\u0641\u0627\u0644\u0627\u062A \u0627\u0644\u0646\u0647\u0627\u0626\u064A\u0629",avgClose:"\u0645\u062A\u0648\u0633\u0637 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 / \u0625\u0642\u0641\u0627\u0644",peakDay:"\u0623\u0639\u0644\u0649 \u064A\u0648\u0645 \u0644\u0644\u0628\u0637\u0627\u0642\u0629",weekend:"\u062D\u0635\u0629 \u0627\u0644\u062C\u0645\u0639\u0629 \u0648\u0627\u0644\u0633\u0628\u062A",branchReliance:"\u0627\u0639\u062A\u0645\u0627\u062F \u0627\u0644\u0641\u0631\u0648\u0639 \u0639\u0644\u0649 \u0627\u0644\u0628\u0637\u0627\u0642\u0629",signals:"\u0645\u0624\u0634\u0631\u0627\u062A \u0645\u0628\u064A\u0639\u0627\u062A \u0627\u0644\u0628\u0637\u0627\u0642\u0629",topWeekday:"\u0623\u0642\u0648\u0649 \u064A\u0648\u0645 \u0623\u0633\u0628\u0648\u0639\u064A",activeDays:"\u0623\u064A\u0627\u0645 \u0646\u0634\u0627\u0637 \u0627\u0644\u0628\u0637\u0627\u0642\u0629",topBranch:"\u0623\u0639\u0644\u0649 \u0641\u0631\u0639 \u0644\u0644\u0634\u0628\u0643\u0629",noBranchActivity:"\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A \u0644\u0645\u0632\u064A\u062C \u0645\u0628\u064A\u0639\u0627\u062A \u0627\u0644\u0641\u0631\u0648\u0639"},fa:{operations:"\u0634\u0627\u062E\u0635\u200C\u0647\u0627\u06CC \u0646\u0647\u0627\u06CC\u06CC \u0641\u0631\u0648\u0634 \u0634\u0628\u06A9\u0647",closings:"\u06A9\u0644\u0648\u0632\u06CC\u0646\u06AF \u0646\u0647\u0627\u06CC\u06CC",avgClose:"\u0645\u06CC\u0627\u0646\u06AF\u06CC\u0646 \u06A9\u0627\u0631\u062A / \u06A9\u0644\u0648\u0632\u06CC\u0646\u06AF",peakDay:"\u0631\u0648\u0632 \u067E\u0631\u0641\u0631\u0648\u0634 \u0634\u0628\u06A9\u0647",weekend:"\u0633\u0647\u0645 \u062C\u0645\u0639\u0647 \u0648 \u0634\u0646\u0628\u0647",branchReliance:"\u0648\u0627\u0628\u0633\u062A\u06AF\u06CC \u0634\u0639\u0628\u0647 \u0628\u0647 \u06A9\u0627\u0631\u062A",signals:"\u0647\u0648\u0634 \u0641\u0631\u0648\u0634\u0627\u062A \u0634\u0628\u06A9\u0647",topWeekday:"\u0628\u0647\u062A\u0631\u06CC\u0646 \u0631\u0648\u0632 \u0647\u0641\u062A\u0647",activeDays:"\u0631\u0648\u0632\u0647\u0627\u06CC \u062F\u0627\u0631\u0627\u06CC \u0641\u0631\u0648\u0634 \u06A9\u0627\u0631\u062A",topBranch:"\u0628\u0627\u0644\u0627\u062A\u0631\u06CC\u0646 \u0634\u0639\u0628\u0647",noBranchActivity:"\u0645\u0639\u0644\u0648\u0645\u0627\u062A \u0633\u0647\u0645 \u06A9\u0627\u0631\u062A \u0634\u0639\u0628\u0647 \u0645\u0648\u062C\u0648\u062F \u0646\u06CC\u0633\u062A"}},Vi=e=>e===null||!Number.isFinite(Number(e))?"\u2014":Number(e).toLocaleString("en-US",{maximumFractionDigits:2,minimumFractionDigits:2}),Tc=(e,A=!1)=>e==null?"\u2014":(A&&e>0?"+":"")+Vi(e)+"%",GO=(e,A,t)=>Math.min(t,Math.max(A,e));function uD(e,{insights:A,range:t,currency:r="SAR",lang:n="en",businessName:i="BizCTRL",branchLabel:s="All branches",iconData:a=null}={}){if(!A?.available)return 0;let o={...cD[n]||cD.en,...gD[n]||gD.en},g=n==="fa"||n==="ar",f=A.branches||[],Q=A.operational||{},C=8,d=Math.max(1,Math.ceil(f.length/C)),y=2+d,I=(U,P,oA,G=40,W=8.3,L=He.ink,$=!1,T=g?"right":"left")=>ji(e,String(U??"\u2014"),T==="right"?P+G:T==="center"?P+G/2:P,oA,{rtl:g,size:W,color:L,bold:$,align:T,fit:!0,maxWidth:G}),D=(U,P,oA,G,W)=>{e.setFillColor(255,255,255),e.setDrawColor(...He.line),e.setLineWidth(.23),e.roundedRect(P,oA,G,W,2.4,2.4,"FD"),U&&I(U,P+3,oA+6,G-6,10,He.ink,!0)},M=(U,P)=>{bu(e,{lang:n,title:P,business:i,branch:s,period:t.from+" / "+t.to,iconData:a,pageLabel:3+U+" / "+y})},k=[[o.current,A.total,He.blue,!0],[o.previous,A.previousTotal,He.purple,!0],[o.growth,A.change,He.green,!1],[o.mix,A.shareOfAllSales,He.cyan,!1]];function S(U,P=144,oA=o.branches){D("",7,P-13,196,Math.min(91,18+8.1*U.length)),I(oA,10,P-7,190,8.6,He.ink,!0);let G=[[o.branchName,10,64,"left"],[o.current,76,32,"right"],[o.previousShort,111,29,"right"],[o.growth,142,27,"right"],[o.share,174,24,"right"]];e.setFillColor(...He.bg),e.rect(10,P-5,190,7,"F"),G.forEach(([W,L,$,T])=>I(W,L,P,$,7.1,He.muted,!0,T)),U.length||I(o.noRecords,12,P+10,182,9,He.muted),U.forEach((W,L)=>{let $=P+8+L*8.1;L%2===1&&(e.setFillColor(249,251,255),e.rect(10,$-5.8,190,8.1,"F")),I(W.name==="Unattributed branch"?o.unknown:W.name,11,$,63,8.3,He.ink,!0),I(Vi(W.current.network),76,$,32,8.2,He.blue,!0,"right"),I(Vi(W.previous.network),111,$,29,8.1,He.muted,!1,"right"),I(Tc(W.growth,!0),142,$,27,8,W.growth<0?He.amber:He.green,!1,"right"),I(Tc(W.share),174,$,24,8,He.ink,!1,"right")})}for(let U=0;U<d;U++){e.addPage();let P=U===0,oA=f.slice(U*C,(U+1)*C);if(P){k.forEach(([O,iA,sA,uA],mA)=>{let yA=7+mA*49.7;e.setFillColor(247,250,255),e.setDrawColor(...He.line),e.roundedRect(yA,29,47.5,25,2.6,2.6,"FD"),I(O,yA+3,35,41.4,8,He.muted,!0);let DA=(mA===1||mA===2)&&!A.previousClosings;I(DA?"\u2014":uA?Vi(iA):Tc(iA,mA===2),yA+3,45,41.4,16,sA,!0),DA?I(o.noPriorShort,yA+3,51,41.4,6.8,He.muted):uA&&I(r,yA+3,51,41.4,7,He.muted)}),D(o.trend,7,58,123,56);let G=22,W=126,L=75,$=100,T=(A.trend||[]).map(O=>Number(O.value)||0),j=(A.previousTrend||[]).map(O=>Number(O.value)||0),tA=[0,...T,...j],nA=Math.min(...tA),rA=Math.max(1,...tA),lA=O=>$-(O-nA)*($-L)/(rA-nA);[0,.5,1].forEach(O=>{let iA=$-($-L)*O;e.setDrawColor(...He.line),e.line(G,iA,W,iA),I(Vi(nA+(rA-nA)*O),9,iA+1,11,6.8,He.muted,!1,"right")});let EA=(O,iA)=>{e.setDrawColor(...iA),e.setLineWidth(.6),O.forEach((sA,uA)=>{let mA=G+(O.length===1?.5:uA/Math.max(1,O.length-1))*(W-G);uA&&e.line(G+(uA-1)/Math.max(1,O.length-1)*(W-G),lA(O[uA-1]),mA,lA(sA)),e.setFillColor(...iA),e.circle(mA,lA(sA),.5,"F")})};A.previousClosings>0&&EA(j,[153,181,220]),EA(T,He.blue),I(o.current,14,109,42,7,He.blue,!0),I(A.previousClosings>0?o.previous:o.none,70,109,47,7,He.muted),D(o.weekday,134,58,69,56);let hA=A.weekdays||[],IA=Math.max(1,...hA.map(O=>O.value));hA.forEach((O,iA)=>{let sA=139+iA*8.7,uA=5.1,mA=20*GO(O.value/IA,0,1);e.setFillColor(...He.cyan),e.roundedRect(sA,101-mA,uA,mA,.75,.75,"F"),I(O.day.slice(0,2),sA-2,107,uA+4,6.7,He.muted,!1,"center")}),I(Vi(IA),140,77,56,7.5,He.muted),D(o.operations,7,118,196,24),[[o.closings,String(Q.closingCount??A.currentClosings??0),"",He.blue],[o.avgClose,Q.averageCardPerClosing==null?"\u2014":Vi(Q.averageCardPerClosing),r,He.green],[o.peakDay,Q.peakDay?Vi(Q.peakDay.value):"\u2014",Q.peakDay?.date||"",He.purple],[o.weekend,Tc(Q.weekendShare),o.period,He.cyan]].forEach(([O,iA,sA,uA],mA)=>{let yA=10+mA*48.5;mA&&(e.setDrawColor(...He.line),e.line(yA-2,126,yA-2,139)),I(O,yA,129,44,7.2,He.muted,!0),I(iA,yA,136,44,10.7,uA,!0),sA&&I(sA,yA,140.1,44,6.5,He.muted)}),S(oA,158);let BA=145+Math.min(91,18+8.1*oA.length),N=Math.min(236,Math.max(205,BA+7));D(o.mappingTitle,7,N,94,36),A.allocationCoverage==="unavailable"?(I(o.mappingMissing,10,N+18,88,10,He.muted,!0),I(o.mappingNotLoss,10,N+28,88,8.2,He.amber)):A.allocationCoverage==="not_applicable"?I(o.noRecords,10,N+19,88,8.6,He.muted):(I(o.mappedShort,10,N+14,88,7.9,He.muted),I(Vi(A.allocation)+" "+r,10,N+21,88,11,He.blue,!0),I(o.unmappedShort,10,N+27,88,7.5,He.muted),I(Vi(A.allocationGap)+" "+r,10,N+33,88,9.4,He.amber,!0)),D(o.accountingNotes,106,N,97,36),I(o.noteShort,109,N+15,91,8.2,He.muted),I(o.receiptShort,109,N+25,91,8.2,He.muted),A.sourceMismatch!=null&&Math.abs(A.sourceMismatch)>.01&&I(o.mismatch+": "+Vi(A.sourceMismatch),109,N+32,91,7.1,He.amber,!0);let K=N+38;if(oA.length<=5&&K+25<=274){D(o.branchReliance,7,K,96,25);let O=f.filter(uA=>uA.current.total>0).slice(0,3);O.length||I(o.noBranchActivity,10,K+16,89,7.7,He.muted),O.forEach((uA,mA)=>{let yA=K+11+mA*6;I(uA.name==="Unattributed branch"?o.unknown:uA.name,10,yA,37,7,He.ink);let DA=uA.cardMix;e.setFillColor(233,239,248),e.roundedRect(51,yA-2.9,27,2.8,.7,.7,"F"),DA!=null&&DA>=0&&DA<=100&&(e.setFillColor(...[He.blue,He.cyan,He.purple][mA]),DA>0&&e.roundedRect(51,yA-2.9,27*DA/100,2.8,.7,.7,"F")),I(Tc(DA),80,yA,19,7.2,He.blue,!0,"right")}),D(o.signals,106,K,97,25);let iA=Q.peakWeekday;I(o.topWeekday+": "+(iA?iA.day+" \xB7 "+Vi(iA.value):"\u2014"),109,K+12,91,7.1,He.ink),I(o.activeDays+": "+String(Q.activeCardDays??"\u2014"),109,K+18,91,7.1,He.ink);let sA=Q.topBranch;I(o.topBranch+": "+(sA?sA.name+" \xB7 "+Tc(sA.share):"\u2014"),109,K+24,91,7.1,He.blue,!0)}}else I(o.continuation,9,36,190,12,He.ink,!0),S(oA,65,o.branches),I(o.note,10,245,188,8,He.muted),I(o.receipt,10,255,188,7.8,He.muted);M(U,P?o.title:o.continuation)}return d}async function lD({snapshot:e=void 0,previousSnapshot:A=null,growth:t=null,range:r=void 0,branchLabel:n=void 0,businessName:i="BizCTRL",currency:s="SAR",lang:a="en",dir:o=void 0,operationsReport:g=null,fullAnalytics:f=null,download:Q=!0}={}){if(!e||!r?.from||!r?.to||!n)throw new Error("A verified report, period and selected branch are required");let C=["ar","fa","en"].includes(a)?a:"en",d=new xe({unit:"mm",format:"a4",putOnlyUsedFonts:!0});q5(d,{lang:C,dir:C==="en"?"ltr":"rtl"}),d.__erpPdfTypographyVersion="2026-10-16-modern",d.setProperties({title:"BizCTRL ERP | Two-page financial analytics",subject:"Modernized embedded Arabic/Persian PDF typography, revision 2026-10-16",creator:"BizCTRL ERP"});let y=await tD();return BD(d,{snapshot:e,previousSnapshot:A,growth:t,range:r,report:g,branchLabel:n,businessName:i,currency:s,lang:C,iconData:y,fullAnalytics:f,totalPages:2+(f?.networkBranches?.available?Math.max(1,Math.ceil((f.networkBranches.branches?.length||0)/8)):0)}),f?.networkBranches?.available&&uD(d,{insights:f.networkBranches,range:r,currency:s,lang:C,businessName:i,branchLabel:n,iconData:y}),Q&&d.save($5("BizCTRL-ERP-Analytics-v2-"+r.from+"-"+r.to,C)),d}function kO(e){let A=/^\d{4}-\d{2}-\d{2}$/,t=e?.period_start||e?.report_date,r=e?.report_date,n=e?.frequency||"daily",i={monthly:1,quarterly:3,semiannual:6,nine_months:9,yearly:12};if(!A.test(t||"")||!A.test(r||"")||t>r||!["daily","weekly",...Object.keys(i)].includes(n))throw new Error("INVALID_REPORT_PERIOD");let s=f=>new Date(f+"T12:00:00Z"),a=f=>f.toISOString().slice(0,10),o=s(t);o.setUTCDate(o.getUTCDate()-1);let g=s(t);return i[n]?g.setUTCMonth(g.getUTCMonth()-i[n]):g.setUTCDate(g.getUTCDate()-(n==="weekly"?7:1)),{type:n,from:t,to:r,previousFrom:a(g),previousTo:a(o)}}async function nX({db:e,job:A,context:t}){let r=kO(A),n=A.restaurant_id;if(t.restaurant_id!==n||!Array.isArray(t.inventoryTransactions))throw new Error("REPORT_SCOPE_DENIED");let i=t.branch_id||null,s=["en","ar","fa"].includes(t.language)?t.language:"en";async function a(U,P=!1){let oA=e.from(U).select("*").eq("restaurant_id",n);P&&(oA=oA.eq("is_global",!0));let{data:G,error:W}=await oA.limit(1001);if(W)throw W;if(!Array.isArray(G)||G.length>1e3)throw new Error("REPORT_ROW_LIMIT");return G}let[o,g]=await Promise.all([a("branches"),a("sales_sources",!0)]),f=i?o.find(U=>String(U.id)===String(i)):null;if(i&&!f)throw new Error("REPORT_BRANCH_NOT_IN_ORGANIZATION");let Q=f?[f]:o,C=await DC({db:e,restaurantId:n,range:r,allBranches:!i,branchId:i,branchKey:f?.branch_key||f?.key||null,stockConsumptionReader:async()=>t.inventoryTransactions}),d=g.filter(U=>U.is_active!==!1&&U.included_in_revenue!==!1),y=VB({...C,revenueSources:d,from:r.from,to:r.to}),I=VB({...C,revenueSources:d,from:r.previousFrom,to:r.previousTo}),D=ap({...C,branches:Q.map(U=>({...U,key:U.branch_key||String(U.id),label:U.name})),range:r,revenueSources:d}),M=Ml({...C,snapshot:y,previousSnapshot:I,operationsReport:D,range:r,revenueSources:d,branches:Q,lang:s,historyAvailable:!0});if(!M?.networkBranches?.available)throw new Error("REPORT_NETWORK_APPENDIX_MISSING");let k=2+Math.max(1,Math.ceil((M.networkBranches.branches?.length||0)/8)),S=await lD({snapshot:y,previousSnapshot:I,growth:ip(y,I),range:r,branchLabel:f?.name||"All branches",businessName:t.name,currency:t.currency||"SAR",lang:s,operationsReport:D,fullAnalytics:M,download:!1});if(S.getNumberOfPages()!==k)throw new Error("REPORT_NETWORK_APPENDIX_MISSING");return S.output("datauristring").split(",")[1]}export{kO as automaticReportDateRange,nX as buildAutomaticReportPdf};
+/*! Bundled license information:
+
+html2canvas/dist/html2canvas.js:
+  (*!
+   * html2canvas 1.4.1 <https://html2canvas.hertzen.com>
+   * Copyright (c) 2022 Niklas von Hertzen <https://hertzen.com>
+   * Released under MIT License
+   *)
+  (*! *****************************************************************************
+      Copyright (c) Microsoft Corporation.
+  
+      Permission to use, copy, modify, and/or distribute this software for any
+      purpose with or without fee is hereby granted.
+  
+      THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+      REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+      AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+      INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+      LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+      OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+      PERFORMANCE OF THIS SOFTWARE.
+      ***************************************************************************** *)
+
+dompurify/dist/purify.es.mjs:
+  (*! @license DOMPurify 3.4.14 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.4.14/LICENSE *)
+
+svg-pathdata/lib/SVGPathData.module.js:
+  (*! *****************************************************************************
+  Copyright (c) Microsoft Corporation.
+  
+  Permission to use, copy, modify, and/or distribute this software for any
+  purpose with or without fee is hereby granted.
+  
+  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+  REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+  AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+  INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+  LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+  OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+  PERFORMANCE OF THIS SOFTWARE.
+  ***************************************************************************** *)
+
+pako/dist/pako.esm.mjs:
+  (*! pako 2.1.0 https://github.com/nodeca/pako @license (MIT AND Zlib) *)
+
+jspdf/dist/jspdf.es.min.js:
+  (** @license
+   *
+   * jsPDF - PDF Document creation from JavaScript
+   * Version 4.2.1 Built on 2026-03-17T11:11:27.057Z
+   *                      CommitID 00000000
+   *
+   * Copyright (c) 2010-2025 James Hall <james@parall.ax>, https://github.com/MrRio/jsPDF
+   *               2015-2025 yWorks GmbH, http://www.yworks.com
+   *               2015-2025 Lukas Holländer <lukas.hollaender@yworks.com>, https://github.com/HackbrettXXX
+   *               2016-2018 Aras Abbasi <aras.abbasi@gmail.com>
+   *               2010 Aaron Spike, https://github.com/acspike
+   *               2012 Willow Systems Corporation, https://github.com/willowsystems
+   *               2012 Pablo Hess, https://github.com/pablohess
+   *               2012 Florian Jenett, https://github.com/fjenett
+   *               2013 Warren Weckesser, https://github.com/warrenweckesser
+   *               2013 Youssef Beddad, https://github.com/lifof
+   *               2013 Lee Driscoll, https://github.com/lsdriscoll
+   *               2013 Stefan Slonevskiy, https://github.com/stefslon
+   *               2013 Jeremy Morel, https://github.com/jmorel
+   *               2013 Christoph Hartmann, https://github.com/chris-rock
+   *               2014 Juan Pablo Gaviria, https://github.com/juanpgaviria
+   *               2014 James Makes, https://github.com/dollaruw
+   *               2014 Diego Casorran, https://github.com/diegocr
+   *               2014 Steven Spungin, https://github.com/Flamenco
+   *               2014 Kenneth Glassey, https://github.com/Gavvers
+   *
+   * Permission is hereby granted, free of charge, to any person obtaining
+   * a copy of this software and associated documentation files (the
+   * "Software"), to deal in the Software without restriction, including
+   * without limitation the rights to use, copy, modify, merge, publish,
+   * distribute, sublicense, and/or sell copies of the Software, and to
+   * permit persons to whom the Software is furnished to do so, subject to
+   * the following conditions:
+   *
+   * The above copyright notice and this permission notice shall be
+   * included in all copies or substantial portions of the Software.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+   * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+   * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   *
+   * Contributor(s):
+   *    siefkenj, ahwolf, rickygu, Midnith, saintclair, eaparango,
+   *    kim3er, mfo, alnorth, Flamenco
+   *)
+  (**
+   * A class to parse color values
+   * @author Stoyan Stefanov <sstoo@gmail.com>
+   * {@link   http://www.phpied.com/rgb-color-parser-in-javascript/}
+   * @license Use it if you like it
+   *)
+  (**
+   * @license
+   * Joseph Myers does not specify a particular license for his work.
+   *
+   * Author: Joseph Myers
+   * Accessed from: http://www.myersdaily.org/joseph/javascript/md5.js
+   *
+   * Modified by: Owen Leong
+   *)
+  (**
+   * @license
+   * FPDF is released under a permissive license: there is no usage restriction.
+   * You may embed it freely in your application (commercial or not), with or
+   * without modifications.
+   *
+   * Reference: http://www.fpdf.org/en/script/script37.php
+   *)
+  (**
+   * @license
+   * Licensed under the MIT License.
+   * http://opensource.org/licenses/mit-license
+   * Author: Owen Leong (@owenl131)
+   * Date: 15 Oct 2020
+   * References:
+   * https://www.cs.cmu.edu/~dst/Adobe/Gallery/anon21jul01-pdf-encryption.txt
+   * https://github.com/foliojs/pdfkit/blob/master/lib/security.js
+   * http://www.fpdf.org/en/script/script37.php
+   *)
+  (**
+   * @license
+    Copyright (c) 2008, Adobe Systems Incorporated
+    All rights reserved.
+  
+    Redistribution and use in source and binary forms, with or without 
+    modification, are permitted provided that the following conditions are
+    met:
+  
+    * Redistributions of source code must retain the above copyright notice, 
+      this list of conditions and the following disclaimer.
+    
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the 
+      documentation and/or other materials provided with the distribution.
+    
+    * Neither the name of Adobe Systems Incorporated nor the names of its 
+      contributors may be used to endorse or promote products derived from 
+      this software without specific prior written permission.
+  
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+    THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+    PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR 
+    CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+    EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+    PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+    PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+    LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  *)
+  (**
+   * @license
+   * Copyright (c) 2017 Aras Abbasi
+   *
+   * Licensed under the MIT License.
+   * http://opensource.org/licenses/mit-license
+   *)
+  (** ====================================================================
+   * @license
+   * jsPDF XMP metadata plugin
+   * Copyright (c) 2016 Jussi Utunen, u-jussi@suomi24.fi
+   *
+   * Permission is hereby granted, free of charge, to any person obtaining
+   * a copy of this software and associated documentation files (the
+   * "Software"), to deal in the Software without restriction, including
+   * without limitation the rights to use, copy, modify, merge, publish,
+   * distribute, sublicense, and/or sell copies of the Software, and to
+   * permit persons to whom the Software is furnished to do so, subject to
+   * the following conditions:
+   *
+   * The above copyright notice and this permission notice shall be
+   * included in all copies or substantial portions of the Software.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+   * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+   * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   * ====================================================================
+   *)
+*/

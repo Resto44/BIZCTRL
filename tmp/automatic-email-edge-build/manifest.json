@@ -1,0 +1,22 @@
+{
+  "source": "supabase/functions/automatic-report-email/report-bundle.js",
+  "parts": [
+    "report-bundle-000.part",
+    "report-bundle-001.part",
+    "report-bundle-002.part",
+    "report-bundle-003.part",
+    "report-bundle-004.part",
+    "report-bundle-005.part",
+    "report-bundle-006.part",
+    "report-bundle-007.part",
+    "report-bundle-008.part",
+    "report-bundle-009.part",
+    "report-bundle-010.part",
+    "report-bundle-011.part",
+    "report-bundle-012.part",
+    "report-bundle-013.part"
+  ],
+  "sha256": "49653c3ccd54b8de61ac5ff783aec8edcdf25a387fd783611d3ba8becff456f9",
+  "bytes": 1263635,
+  "build": "automatic-email-network-v3-2026-11-08"
+}
