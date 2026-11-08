@@ -25,7 +25,7 @@ const db={from:table=>{
 function pageCount(base64){
  const raw=Buffer.from(base64,'base64');
  expect(raw.subarray(0,5).toString()).toBe('%PDF-');
- return (raw.toString('latin1').match(/\\/Type\\s*\\/Page\\b/g)||[]).length;
+ return (raw.toString('latin1').match(/\/Type\s*\/Page\b/g)||[]).length;
 }
 describe('automatic emailed PDF must match manual Network Management appendix',()=>{
  it.each(['en','ar','fa'])('generates a full A4 three-page attachment with network data (%s)',async language=>{
