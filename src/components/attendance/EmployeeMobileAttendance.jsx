@@ -118,71 +118,71 @@ export default function EmployeeMobileAttendance({ userId }) {
   const done = action === 'completed';
   const needsReview = action === 'review';
   const allowAction = action === 'in' || action === 'out';
-  return <Card className="border-white/15 bg-white/5 text-white">
-    <CardHeader className="pb-2">
-      <CardTitle className="flex items-center gap-2 text-sm">
-        <ShieldCheck className="h-4 w-4 text-emerald-400" />
+  return <Card data-testid="employee-attendance-card" className="min-w-0 rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50">
+    <CardHeader className="px-3.5 pb-2 pt-4 sm:px-5">
+      <CardTitle className="flex items-center gap-2 text-base font-bold">
+        <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
         {tr('My attendance — personal phone')}
       </CardTitle>
     </CardHeader>
-    <CardContent className="space-y-3">
-      <p className="text-xs text-slate-300">
+    <CardContent className="space-y-3 px-3.5 pb-4 sm:px-5 sm:pb-5">
+      <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
         {tr('Your verified employee account, a single-use attendance code and precise branch GPS are required.')}
       </p>
       {isPending && <p role="status" className="text-sm">{tr('Loading attendance...')}</p>}
-      {isError && <p role="alert" className="text-sm text-red-300">{tr('Attendance status unavailable.')} <Button variant="ghost" size="sm" onClick={() => refetch()}>{tr('Retry')}</Button></p>}
-      {!isPending && !isError && !ready && <p role="alert" className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-200">
+      {isError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{tr('Attendance status unavailable.')} <Button variant="ghost" size="sm" onClick={() => refetch()}>{tr('Retry')}</Button></p>}
+      {!isPending && !isError && !ready && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
         {tr(messages[status?.reason] || 'Your branch attendance location is not configured.')}
       </p>}
       {ready && <>
-        <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 p-3 text-sm">
-          <span className="min-w-0 truncate">{status.branch_name}</span>
-          <span className="flex shrink-0 items-center gap-1 text-xs text-slate-300">
-            <MapPin className="h-3 w-3" /> {tr('Location checked when you submit')}
+        <div className="flex min-w-0 flex-wrap items-start justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800">
+          <span className="min-w-0 flex-1 break-words font-semibold text-slate-900 dark:text-white">{status.branch_name}</span>
+          <span className="flex max-w-full items-start gap-1 text-xs text-slate-600 dark:text-slate-300">
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600 dark:text-blue-400"/> {tr('Location checked when you submit')}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-lg bg-white/5 p-3">
-            <p className="text-xs text-slate-400">{tr('Check In')}</p>
-            <p className="mt-1 font-semibold tabular-nums">{status.check_in || '—'}</p>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+            <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">{tr('Check In')}</p>
+            <p className="mt-1 text-lg font-extrabold tabular-nums text-slate-950 dark:text-white">{status.check_in || '—'}</p>
           </div>
-          <div className="rounded-lg bg-white/5 p-3">
-            <p className="text-xs text-slate-400">{tr('Check Out')}</p>
-            <p className="mt-1 font-semibold tabular-nums">{status.check_out || '—'}</p>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+            <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">{tr('Check Out')}</p>
+            <p className="mt-1 text-lg font-extrabold tabular-nums text-slate-950 dark:text-white">{status.check_out || '—'}</p>
           </div>
         </div>
-        {needsReview && <p role="alert" className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-200">
+        {needsReview && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
           {tr(messages[status?.reason] || 'This attendance entry requires manager review before another check-in or check-out.')}
         </p>}
-        {status.schedule && <div className="rounded-lg border border-white/10 p-3 text-sm">
+        {status.schedule && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800">
           <p>{tr('Your shift')} <span dir="ltr">{status.schedule.start_time?.slice(0,5)} → {status.schedule.end_time?.slice(0,5)}</span></p>
-          <p className="text-xs text-slate-300">{tr('Saudi Arabia time (Asia/Riyadh)')}</p>
-          <p className="text-xs text-slate-300">{tr(status.schedule.enabled?'Automatic daily attendance codes':'Automatic codes disabled')}</p>
+          <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">{tr('Saudi Arabia time (Asia/Riyadh)')}</p>
+          <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">{tr(status.schedule.enabled?'Automatic daily attendance codes':'Automatic codes disabled')}</p>
         </div>}
-        {!status.schedule && <p className="text-xs text-amber-200">{tr('Owner must set your working days and shift times in Employee Management.')}</p>}
-        {status.code_reason && <p role="alert" className="text-sm text-amber-200">{tr(messages[status.code_reason] || status.code_reason)}</p>}
-        {action==='waiting'&&<p role="status" className="rounded-lg bg-blue-500/10 p-3 text-sm text-blue-200">{tr('Your next shift opens at')} <span dir="ltr">{formatServerTime(status.opens_at)}</span> — {status.shift_date}</p>}
-        {status.previous_check_in&&<p className="text-xs text-slate-300">{tr('Earlier attendance — kept in history')}: <span dir="ltr">{status.previous_check_in} → {status.previous_check_out||'—'}</span></p>}
+        {!status.schedule && <p className="text-xs text-amber-800 dark:text-amber-200">{tr('Owner must set your working days and shift times in Employee Management.')}</p>}
+        {status.code_reason && <p role="alert" className="text-sm text-amber-800 dark:text-amber-200">{tr(messages[status.code_reason] || status.code_reason)}</p>}
+        {action==='waiting'&&<p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">{tr('Your next shift opens at')} <span dir="ltr">{formatServerTime(status.opens_at)}</span> — {status.shift_date}</p>}
+        {status.previous_check_in&&<p className="text-xs leading-5 text-slate-600 dark:text-slate-300">{tr('Earlier attendance — kept in history')}: <span dir="ltr">{status.previous_check_in} → {status.previous_check_out||'—'}</span></p>}
         <>
-          {activeCode && !done && !needsReview && <div className="rounded-lg bg-amber-500/10 p-3 text-center" aria-label={tr('Current attendance code')}>
-            <p className="text-xs text-slate-200">{tr(requestAction==='in'?'Check-in code':'Check-out code')}</p>
-            <p className="my-2 text-3xl font-bold tracking-[0.3em] text-amber-300" dir="ltr">{status.code}</p>
+          {activeCode && !done && !needsReview && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center dark:border-amber-900 dark:bg-amber-950" aria-label={tr('Current attendance code')}>
+            <p className="text-xs text-slate-700 dark:text-slate-200">{tr(requestAction==='in'?'Check-in code':'Check-out code')}</p>
+            <p className="my-2 break-all text-2xl font-extrabold tracking-[0.2em] text-amber-900 dark:text-amber-200 sm:text-3xl sm:tracking-[0.3em]" dir="ltr">{status.code}</p>
             <p className="text-xs">{tr('Expires in')} <span dir="ltr">{Math.floor(remaining/60)}:{String(remaining%60).padStart(2,'0')}</span></p>
             <p className="mt-1 text-xs text-slate-300">{tr(status.mail_state==='accepted'?'Email accepted by provider; inbox delivery is not confirmed.':status.mail_state==='failed'?'Email failed. Your dashboard code is still valid.':'Email queued or retrying. Your dashboard code is ready.')}</p>
           </div>}
-          <Button variant="outline" className="w-full border-white/25 bg-slate-800 text-white" disabled={requestCode.isPending||!!status.code_reason||!canRequestCode||activeCode} onClick={()=>requestCode.mutate()}>{tr(requestCode.isPending?'Preparing code…':'Request new attendance code')}</Button>
-          {!canRequestCode&&!done&&<p className="text-xs text-slate-300">{tr('Code requests open 30 minutes before the shift. Automatic delivery starts 10 minutes before it.')}</p>}
-          {requestCode.isError&&<p role="alert" className="text-xs text-red-300">{tr('Unable to issue code. Check your verified email and branch setup; wait 60 seconds before retrying.')}</p>}
-          {checkedIn&&status.can_check_out===false&&<p className="text-xs text-slate-300">{tr('Check-out becomes available two minutes after check-in.')}</p>}
+          <Button variant="outline" className="min-h-11 w-full rounded-xl border-blue-200 bg-blue-50 font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-slate-800 dark:text-blue-300 dark:hover:bg-slate-700" disabled={requestCode.isPending||!!status.code_reason||!canRequestCode||activeCode} onClick={()=>requestCode.mutate()}>{tr(requestCode.isPending?'Preparing code…':'Request new attendance code')}</Button>
+          {!canRequestCode&&!done&&<p className="text-xs leading-5 text-slate-600 dark:text-slate-300">{tr('Code requests open 30 minutes before the shift. Automatic delivery starts 10 minutes before it.')}</p>}
+          {requestCode.isError&&<p role="alert" className="text-xs text-red-700 dark:text-red-300">{tr('Unable to issue code. Check your verified email and branch setup; wait 60 seconds before retrying.')}</p>}
+          {checkedIn&&status.can_check_out===false&&<p className="text-xs leading-5 text-slate-600 dark:text-slate-300">{tr('Check-out becomes available two minutes after check-in.')}</p>}
           {allowAction&&<>
-          {!checkedIn&&<label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={shareAfterCheckIn} onChange={e=>setShareAfterCheckIn(e.target.checked)}/>{tr('After check-in, share my location during this shift and keep distance/accuracy history for 90 days, visible to me and the owner. I can stop sharing. Updates resume when I return to this page.')}</label>}
-          <label htmlFor="employee-mobile-pin" className="block text-xs text-slate-200">{tr('Attendance code (6 digits)')}</label>
+          {!checkedIn&&<label className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"><input type="checkbox" checked={shareAfterCheckIn} onChange={e=>setShareAfterCheckIn(e.target.checked)}/>{tr('After check-in, share my location during this shift and keep distance/accuracy history for 90 days, visible to me and the owner. I can stop sharing. Updates resume when I return to this page.')}</label>}
+          <label htmlFor="employee-mobile-pin" className="block text-xs font-semibold text-slate-700 dark:text-slate-200">{tr('Attendance code (6 digits)')}</label>
           <Input id="employee-mobile-pin" type="password" inputMode="numeric"
             autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6}
             value={pin} onChange={e => setPin(e.target.value.replace(/\D/g,'').slice(0,6))}
-            className="border-white/25 bg-slate-900 text-white"
+            className="h-12 rounded-xl border-slate-300 bg-white text-slate-950 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
             placeholder={tr('Enter your six-digit attendance code')} />
-          <Button className="h-12 w-full bg-emerald-600 text-white hover:bg-emerald-700"
+          <Button className="h-12 w-full rounded-xl bg-emerald-600 font-bold text-white hover:bg-emerald-700"
             disabled={attendance.isPending || pin.length !== 6 || !allowAction || (checkedIn && status.can_check_out===false)}
             onClick={() => { setSuccess(null); attendance.mutate(); }}>
             {attendance.isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <Clock3 className="me-2 h-4 w-4" />}
@@ -191,14 +191,14 @@ export default function EmployeeMobileAttendance({ userId }) {
           </>}
         </>
         {status.phase==='checked_in' && status.session_id && <EmployeeLiveLocation key={status.session_id} sessionId={status.session_id} startWithConsent={startSharing} onStop={()=>setStartSharing(false)} />}
-        {status.shift_date && <p className="text-xs text-slate-300">{tr('Shift date')}: {status.shift_date}</p>}
-        {done && <p className="rounded-lg bg-emerald-500/15 p-3 text-sm text-emerald-200">
+        {status.shift_date && <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">{tr('Shift date')}: {status.shift_date}</p>}
+        {done && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
           {tr('Attendance has been completed for this shift.')}
         </p>}
       </>}
-      {success && <p role="status" className="rounded-lg bg-emerald-500/15 p-2 text-sm text-emerald-200">{tr(success.action === 'in' ? 'Check-in saved' : 'Check-out saved')} {success.time}</p>}
-      {errorText && <p role="alert" className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{tr(errorText)}</p>}
-      <p className="text-xs text-slate-400">{tr('GPS is checked at entry and exit. Optional live sharing requires your permission during an open shift; no location route is stored in attendance history.')}</p>
+      {success && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">{tr(success.action === 'in' ? 'Check-in saved' : 'Check-out saved')} {success.time}</p>}
+      {errorText && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">{tr(errorText)}</p>}
+      <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">{tr('GPS is checked at entry and exit. Optional live sharing requires your permission during an open shift; no location route is stored in attendance history.')}</p>
       <LocationHistory userId={userId}/>
     </CardContent>
   </Card>;
