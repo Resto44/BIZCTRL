@@ -65,6 +65,7 @@ export default function ERPRegister() {
   const ownerRegistrationPath = `/erp-register?owner=1${selectedPlanId ? `&plan=${encodeURIComponent(selectedPlanId)}` : ''}&returnTo=${encodeURIComponent(postAuthenticationDestination)}`;
   const signInPath = `/erp-login?returnTo=${encodeURIComponent(postAuthenticationDestination)}`;
   const started = useRef(false);
+  const lastConfirmationResendAt = useRef(0);
   const [session, setSession] = useState(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [mode, setMode] = useState('create');
@@ -73,6 +74,7 @@ export default function ERPRegister() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [smsCode, setSmsCode] = useState('');
   const [awaitingEmail, setAwaitingEmail] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
   const [awaitingSms, setAwaitingSms] = useState(false);
   const [activating, setActivating] = useState(false);
   const [activationError, setActivationError] = useState('');
@@ -108,7 +110,11 @@ export default function ERPRegister() {
       window.setTimeout(() => navigate(data?.dashboard || ROLE_HOME[data?.role] || '/erp-login', { replace: true }), 600);
     } catch (error) {
       started.current = false;
-      setActivationError(error.message || 'This invitation cannot be activated.');
+      setActivationError(
+        /This identity already has an ERP account/i.test(error?.message||'')
+          ? 'This email already belongs to a BizControl ERP account. This invitation cannot add a second role to that account. Ask the Owner for a new invitation to a different unused email. Your existing account is unchanged.'
+          : (error.message || 'This invitation cannot be activated.')
+      );
       setActivating(false);
     }
   }, [navigate, session?.user?.id, token]);
@@ -127,11 +133,59 @@ export default function ERPRegister() {
         ? { email: identifier.toLowerCase(), password, options: { emailRedirectTo: `${window.location.origin}${activationUrl}`, data: { invitation_token: token } } }
         : { phone: identifier, password, options: { data: { invitation_token: token } } };
       const { data, error } = await supabase.auth.signUp(payload);
-      if (error) throw error;
+      if (error) {
+        if (/already registered|already exists|user already/i.test(error.message||'')) {
+          setAwaitingEmail(false);
+          setMode('signin');
+          toast.warning('This address may already have an account. Sign in with its existing password instead of waiting for a new verification email.');
+          return;
+        }
+        throw error;
+      }
       if (data.session) { setSession(data.session); return; }
-      if (emailMode) { setAwaitingEmail(true); toast.success('Verify the email sent to the invited address to activate your account.'); }
-      else { setAwaitingSms(true); toast.success('Enter the SMS verification code to activate your account.'); }
+      if (emailMode && !data?.user?.id) {
+        throw new Error('Signup did not create a confirmed new identity. Try signing in if you already have an account, or contact the Owner.');
+      }
+      // Supabase Auth may intentionally return an obfuscated user with an
+      // empty identities array for repeat signup. It sends NO confirmation.
+      // Never claim the provider sent an email in that case.
+      if (emailMode && data.user && Array.isArray(data.user.identities) && data.user.identities.length===0) {
+        setAwaitingEmail(false);
+        setMode('signin');
+        toast.warning('No new confirmation email was requested. This address may already be registered. Sign in with its existing password; ask the Owner for a different invitation email if it already has an ERP role.');
+        return;
+      }
+      if (emailMode) {
+        setAwaitingEmail(true);
+        toast.info('Signup submitted. Check your email for the confirmation link. Delivery to your inbox is not guaranteed.');
+      } else {
+        setAwaitingSms(true);
+        toast.info('Check your phone for a verification SMS.');
+      }
     } catch (error) { toast.error(error.message || 'Unable to create this invited account.'); } finally { setSubmitting(false); }
+  };
+
+  const resendInvitationEmail = async () => {
+    if (!emailMode || !contact.trim() || resendingEmail || !awaitingEmail) return;
+    // Explicit button, bounded client-side cadence. Provider limits remain
+    // enforced server-side. No automatic background resends or duplicate users.
+    if (Date.now() - lastConfirmationResendAt.current < 60000) {
+      toast.warning('Please allow a minute between confirmation email requests.');
+      return;
+    }
+    lastConfirmationResendAt.current=Date.now();
+    setResendingEmail(true);
+    try {
+      const {error}=await supabase.auth.resend({
+        type:'signup',
+        email:contact.trim().toLowerCase(),
+        options:{emailRedirectTo:`${window.location.origin}${activationUrl}`},
+      });
+      if(error)throw error;
+      toast.info('Confirmation request submitted. Check Inbox and Spam. This does not guarantee the email was delivered.');
+    }catch(error){
+      toast.error(error?.message||'Unable to request confirmation. Ask the Owner to check SMTP email configuration.');
+    }finally{setResendingEmail(false);}
   };
 
   const signInInvitationAccount = async (event) => {
@@ -177,7 +231,7 @@ export default function ERPRegister() {
 
   if (token && session?.user?.id) return <Shell><Panel><div className="py-8 text-center">{activationError ? <LockKeyhole className="mx-auto mb-4 h-11 w-11 text-red-400" /> : <Loader2 className="mx-auto mb-4 h-11 w-11 animate-spin text-violet-400" />}<h1 className="text-xl font-black text-white">{activationError ? 'Invitation cannot be activated' : 'Activating your assigned workspace'}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-400">{activationError || 'Your verified identity is receiving the organization, branch, role, and permissions issued by the owner.'}</p>{activationError && <div className="mt-5 flex justify-center gap-2"><Button variant="outline" onClick={() => supabase.auth.signOut().then(() => setSession(null))}>Use another identity</Button><Button onClick={activate}>Try again</Button></div>}{!activationError && !activating && <Loader2 className="mx-auto mt-4 h-4 w-4 animate-spin text-violet-300" />}</div></Panel></Shell>;
 
-  if (token) return <Shell><div className="mb-6 text-center"><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-1.5 text-sm font-medium text-emerald-200"><ShieldCheck className="h-4 w-4" /> Secure staff activation</div><h1 className="text-3xl font-black text-white">Activate your invited account</h1><p className="mt-2 text-sm leading-relaxed text-slate-400">Verify the invited identity, create a password, and access only the workspace assigned by the owner.</p></div><Panel>{awaitingEmail ? <div className="py-5 text-center"><MailCheck className="mx-auto mb-4 h-11 w-11 text-emerald-300" /><h2 className="text-lg font-bold text-white">Verify your email</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-400">Open the verification link sent to your invited email address. You will return here and your account will activate automatically.</p></div> : awaitingSms ? <form onSubmit={verifySms} className="space-y-4"><div className="mb-2 flex items-center gap-3 border-b border-white/10 pb-4"><Smartphone className="h-6 w-6 text-violet-300" /><div><h2 className="font-bold text-white">Verify your phone</h2><p className="text-xs text-slate-400">Enter the code sent to the invited phone number.</p></div></div><div><Label htmlFor="sms-code" className="text-slate-300">SMS verification code</Label><Input id="sms-code" inputMode="numeric" autoComplete="one-time-code" value={smsCode} onChange={(event) => setSmsCode(event.target.value)} className="mt-1.5 h-11 border-white/10 bg-white/5 text-white" required /></div><Button type="submit" disabled={submitting} className="h-11 w-full">{submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verify and activate</Button></form> : <><div className="mb-5 flex gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"><UserRoundCheck className="mt-0.5 h-5 w-5 shrink-0 text-violet-300" /><p className="text-xs leading-relaxed text-slate-300">Organization and branch lists are intentionally unavailable. The owner’s invitation is the sole source of your organization, branch, role, and permissions.</p></div><div className="mb-5 grid grid-cols-2 rounded-xl bg-white/[0.04] p-1 text-xs"><button type="button" onClick={() => setMode('create')} className={`rounded-lg px-3 py-2 font-semibold ${mode === 'create' ? 'bg-violet-600 text-white' : 'text-slate-400'}`}>Create password</button><button type="button" onClick={() => setMode('signin')} className={`rounded-lg px-3 py-2 font-semibold ${mode === 'signin' ? 'bg-violet-600 text-white' : 'text-slate-400'}`}>Already have an account</button></div><form onSubmit={mode === 'create' ? createInvitationAccount : signInInvitationAccount} className="space-y-4"><div><Label htmlFor="invited-contact" className="text-slate-300">Invited email address or phone number</Label><Input id="invited-contact" value={contact} onChange={(event) => setContact(event.target.value)} type={emailMode ? 'email' : 'text'} placeholder="you@company.com or +1 555 0100" autoComplete="username" className="mt-1.5 h-11 border-white/10 bg-white/5 text-white placeholder:text-slate-600" required /></div><div><Label htmlFor="invited-password" className="text-slate-300">{mode === 'create' ? 'Create password' : 'Password'}</Label><div className="mt-1.5"><PasswordInput id="invited-password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'create' ? 'new-password' : 'current-password'} /></div>{mode === 'create' && <p className="mt-1.5 text-[11px] text-slate-500">At least 10 characters with letters and numbers.</p>}</div>{mode === 'create' && <div><Label htmlFor="confirm-password" className="text-slate-300">Confirm password</Label><div className="mt-1.5"><PasswordInput id="confirm-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></div></div>}<Button type="submit" disabled={submitting} className="h-11 w-full bg-gradient-to-r from-violet-600 to-indigo-600 font-bold text-white">{submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}{mode === 'create' ? 'Verify identity and create account' : 'Verify identity and activate'}</Button></form></>}</Panel><p className="mt-4 text-center text-xs text-slate-500">Need help? Contact the owner who sent the invitation.</p></Shell>;
+  if (token) return <Shell><div className="mb-6 text-center"><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-1.5 text-sm font-medium text-emerald-200"><ShieldCheck className="h-4 w-4" /> Secure staff activation</div><h1 className="text-3xl font-black text-white">Activate your invited account</h1><p className="mt-2 text-sm leading-relaxed text-slate-400">Verify the invited identity, create a password, and access only the workspace assigned by the owner.</p></div><Panel>{awaitingEmail ? <div className="py-5 text-center"><MailCheck className="mx-auto mb-4 h-11 w-11 text-emerald-300" /><h2 className="text-lg font-bold text-white">Verify your email</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-400">If this is a new email account, open the confirmation link from your inbox or spam folder. Delivery may be delayed or blocked by the email provider.</p><div className="mt-5 flex flex-col gap-2"><Button type="button" variant="outline" disabled={resendingEmail} onClick={resendInvitationEmail} className="min-h-11 border-emerald-400/40 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20">{resendingEmail?'Requesting…':'Resend verification email'}</Button><Button type="button" variant="ghost" onClick={()=>{setAwaitingEmail(false);setMode('signin');}} className="min-h-11 text-violet-200 hover:bg-white/10 hover:text-white">Already have a BizControl account? Sign in</Button></div><p className="mt-3 text-xs leading-relaxed text-slate-400">An existing ERP account cannot activate another organization’s Supplier invitation with this email. Ask the Owner to issue a new link to another unused email. Never delete your old account.</p></div> : awaitingSms ? <form onSubmit={verifySms} className="space-y-4"><div className="mb-2 flex items-center gap-3 border-b border-white/10 pb-4"><Smartphone className="h-6 w-6 text-violet-300" /><div><h2 className="font-bold text-white">Verify your phone</h2><p className="text-xs text-slate-400">Enter the code sent to the invited phone number.</p></div></div><div><Label htmlFor="sms-code" className="text-slate-300">SMS verification code</Label><Input id="sms-code" inputMode="numeric" autoComplete="one-time-code" value={smsCode} onChange={(event) => setSmsCode(event.target.value)} className="mt-1.5 h-11 border-white/10 bg-white/5 text-white" required /></div><Button type="submit" disabled={submitting} className="h-11 w-full">{submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verify and activate</Button></form> : <><div className="mb-5 flex gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"><UserRoundCheck className="mt-0.5 h-5 w-5 shrink-0 text-violet-300" /><p className="text-xs leading-relaxed text-slate-300">Organization and branch lists are intentionally unavailable. The owner’s invitation is the sole source of your organization, branch, role, and permissions.</p></div><div className="mb-5 grid grid-cols-2 rounded-xl bg-white/[0.04] p-1 text-xs"><button type="button" onClick={() => setMode('create')} className={`rounded-lg px-3 py-2 font-semibold ${mode === 'create' ? 'bg-violet-600 text-white' : 'text-slate-400'}`}>Create password</button><button type="button" onClick={() => setMode('signin')} className={`rounded-lg px-3 py-2 font-semibold ${mode === 'signin' ? 'bg-violet-600 text-white' : 'text-slate-400'}`}>Already have an account</button></div><form onSubmit={mode === 'create' ? createInvitationAccount : signInInvitationAccount} className="space-y-4"><div><Label htmlFor="invited-contact" className="text-slate-300">Invited email address or phone number</Label><Input id="invited-contact" value={contact} onChange={(event) => setContact(event.target.value)} type={emailMode ? 'email' : 'text'} placeholder="you@company.com or +1 555 0100" autoComplete="username" className="mt-1.5 h-11 border-white/10 bg-white/5 text-white placeholder:text-slate-600" required /></div><div><Label htmlFor="invited-password" className="text-slate-300">{mode === 'create' ? 'Create password' : 'Password'}</Label><div className="mt-1.5"><PasswordInput id="invited-password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'create' ? 'new-password' : 'current-password'} /></div>{mode === 'create' && <p className="mt-1.5 text-[11px] text-slate-500">At least 10 characters with letters and numbers.</p>}</div>{mode === 'create' && <div><Label htmlFor="confirm-password" className="text-slate-300">Confirm password</Label><div className="mt-1.5"><PasswordInput id="confirm-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></div></div>}<Button type="submit" disabled={submitting} className="h-11 w-full bg-gradient-to-r from-violet-600 to-indigo-600 font-bold text-white">{submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}{mode === 'create' ? 'Verify identity and create account' : 'Verify identity and activate'}</Button></form></>}</Panel><p className="mt-4 text-center text-xs text-slate-500">Need help? Contact the owner who sent the invitation.</p></Shell>;
 
   if (!isOwnerSetup) return <Shell><Panel><div className="py-6 text-center"><LockKeyhole className="mx-auto mb-4 h-11 w-11 text-violet-300" /><h1 className="text-xl font-black text-white">Staff accounts are invitation-only</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-400">Ask your organization owner to create a secure invitation. Public organization and branch selection are not available.</p><Button className="mt-5" onClick={() => navigate('/erp-login')}><ArrowLeft className="mr-2 h-4 w-4" /> Go to sign in</Button><button onClick={() => navigate('/erp-register?owner=1')} className="mt-5 block w-full text-xs font-medium text-violet-300 hover:text-violet-200">Create a new owner organization account</button></div></Panel></Shell>;
 

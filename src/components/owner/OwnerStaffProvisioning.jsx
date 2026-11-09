@@ -70,6 +70,13 @@ function InviteMetric({ icon: Icon, label, value, tone }) {
   );
 }
 
+const inviteErrorMessage = error => {
+  if (/INVITEE_ALREADY_HAS_ERP_ACCOUNT_USE_NEW_EMAIL/.test(error?.message||'')) {
+    return 'This email already belongs to an existing BizControl ERP account. Existing Owner or staff access must be preserved. Ask for another unused email address before creating a Supplier or Employee invitation.';
+  }
+  return subscriptionLimitErrorMessage(error, 'Unable to create the secure invitation.');
+};
+
 export default function OwnerStaffProvisioning() {
   const { user } = useAuth();
   const { activeRestaurant, setActiveRestaurant } = useTenant();
@@ -259,7 +266,7 @@ export default function OwnerStaffProvisioning() {
       toast.success('Secure invitation is ready to share.');
     } catch (error) {
       console.error('[OwnerStaffProvisioning] invitation creation failed', error);
-      toast.error(subscriptionLimitErrorMessage(error, 'Unable to create the secure invitation.'));
+      toast.error(inviteErrorMessage(error));
     } finally {
       setSubmitting(false);
     }
@@ -278,7 +285,7 @@ export default function OwnerStaffProvisioning() {
       await issueInvitation({ role: form.role, branchId: form.branchId, fullName: person.full_name, email: email || null, phone: email ? null : phone });
       toast.success('Secure invitation is ready to share.');
     } catch (error) {
-      toast.error(subscriptionLimitErrorMessage(error, 'Unable to create the secure invitation.'));
+      toast.error(inviteErrorMessage(error));
     } finally { setSubmitting(false); }
   };
 
@@ -327,7 +334,7 @@ export default function OwnerStaffProvisioning() {
       toast.success('A new one-time link replaced the previous invitation.');
     } catch (error) {
       console.error('[OwnerStaffProvisioning] invitation reissue failed', error);
-      toast.error(subscriptionLimitErrorMessage(error, 'Unable to renew this invitation.'));
+      toast.error(inviteErrorMessage(error));
     } finally {
       setActionInvitationId(null);
     }
@@ -416,7 +423,7 @@ export default function OwnerStaffProvisioning() {
 
             <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-3 dark:border-blue-900/50 dark:bg-blue-950/25 sm:flex-row sm:items-center">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm dark:bg-slate-900"><ShieldCheck className="h-5 w-5" /></span>
-              <div className="min-w-0 flex-1"><p className="break-words text-xs font-black text-slate-900 dark:text-white">{selectedRole.label} · {selectedBranch?.name || selectedBranch?.label || 'Select branch'}</p><p className="mt-0.5 text-[11px] leading-4 text-slate-500">Single-use owner-issued link · server-enforced 7-day expiry</p></div>
+              <div className="min-w-0 flex-1"><p className="break-words text-xs font-black text-slate-900 dark:text-white">{selectedRole.label} · {selectedBranch?.name || selectedBranch?.label || 'Select branch'}</p><p className="mt-0.5 text-[11px] leading-4 text-slate-500">Single-use owner-issued link · server-enforced 7-day expiry</p><p className="mt-1 text-[11px] leading-4 text-amber-700 dark:text-amber-300">Use an email that is not already registered as a BizControl Owner or staff member. Sharing this link does not itself send a verification email; the recipient completes signup and verifies their new address.</p></div>
               <Button type="submit" disabled={submitting || loading || !user?.id || !isFormReady} className="min-h-11 shrink-0 rounded-xl bg-blue-600 px-5 font-black hover:bg-blue-700">
                 {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}Create secure link
               </Button>
