@@ -65,7 +65,7 @@ describe('Driver ERP account and secure login',()=>{
   expect(reports).toContain("status text NOT NULL DEFAULT 'pending'");
   expect(reports).toContain('driver_daily_reports_once_per_day');
   expect(reports).toContain("role='driver'");
-  expect(reports).toContain('d.id=m.linked_entity_id');
+  expect(reports).toContain('id=m.linked_entity_id AND restaurant_id=m.restaurant_id');
   expect(reports).toContain('REVIEWED_OR_MATCHED_REPORT_CANNOT_BE_EDITED');
   expect(reports).toContain("round(v_cash,2)<>report.cash_amount");
   expect(reports).toContain("round(v_network,2)<>report.network_amount");
