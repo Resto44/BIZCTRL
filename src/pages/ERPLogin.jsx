@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Building2, UserCheck, User, Package,
+  Building2, UserCheck, User, Package, Truck,
   Eye, EyeOff, Loader2, ArrowLeft, ShieldCheck, LogIn, Wallet
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -46,6 +46,16 @@ const ROLE_CONFIG = [
     border: 'border-amber-500/40',
     bg: 'bg-amber-500/10',
     textColor: 'text-amber-300',
+  },
+  {
+    role: ROLES.DRIVER,
+    label: 'Delivery Driver',
+    description: 'Your sales, delivery history and daily reports',
+    icon: Truck,
+    color: 'from-blue-600 to-cyan-700',
+    border: 'border-blue-500/40',
+    bg: 'bg-blue-500/10',
+    textColor: 'text-blue-300',
   },
   {
     role: ROLES.SUPPLIER,

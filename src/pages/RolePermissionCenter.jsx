@@ -45,6 +45,7 @@ export const ALL_ROLES = [
   { value: 'manager',         label: 'Branch Manager',  color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300', description: 'Single branch management' },
   { value: 'employee',        label: 'Employee',        color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',     description: 'Owner-authorized branch duties' },
   { value: 'supplier',        label: 'Supplier',        color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',             description: 'Assigned purchase workflow' },
+  { value: 'driver',          label: 'Driver',          color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',          description: 'Own delivery reporting (read-only finalized sales)' },
 ];
 
 export const MODULE_PERMISSIONS = [
@@ -244,13 +245,13 @@ function UserCard({ membership, branches, onRoleChange, onStatusChange, onPermis
           {/* Actions */}
           <div data-testid="role-user-actions" className="flex w-full min-w-0 flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 sm:w-auto sm:shrink-0 sm:flex-nowrap sm:border-0 sm:pt-0">
             {/* Role selector */}
-            <Select value={membership.role} onValueChange={(v) => onRoleChange(membership.id, v)}>
+            <Select disabled={membership.role === 'driver'} value={membership.role} onValueChange={(v) => onRoleChange(membership.id, v)}>
               <SelectTrigger aria-label="User role" className="h-10 min-w-[7.5rem] flex-1 text-xs sm:w-32 sm:flex-none">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ALL_ROLES.filter(r => r.value !== 'owner').map(r => (
-                  <SelectItem key={r.value} value={r.value} className="text-xs">
+                {ALL_ROLES.filter(r => r.value !== 'owner' && (r.value !== 'driver' || membership.role === 'driver')).map(r => (
+                  <SelectItem key={r.value} value={r.value} disabled={r.value === 'driver'} className="text-xs">
                     {r.label}
                   </SelectItem>
                 ))}

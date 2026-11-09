@@ -21,6 +21,7 @@ const STAFF_ROLES = [
   { value: 'manager', label: 'Branch Manager', short: 'Manager', description: 'Run the assigned branch', icon: BriefcaseBusiness, tone: 'blue' },
   { value: 'employee', label: 'Employee', short: 'Employee', description: 'Daily assigned operations', icon: UserRound, tone: 'violet' },
   { value: 'supplier', label: 'Supplier', short: 'Supplier', description: 'Supplier portal access', icon: Truck, tone: 'emerald' },
+  { value: 'driver', label: 'Driver', short: 'Driver', description: 'Own delivery sales and reports', icon: Truck, tone: 'blue' },
 ];
 
 const ROLE_TONES = {
