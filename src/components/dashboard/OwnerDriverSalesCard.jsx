@@ -187,7 +187,7 @@ export default function OwnerDriverSalesCard({ restaurantId, branchId, branchLab
 
     <div data-testid="owner-driver-sales-filters" className="flex min-w-0 flex-wrap items-end gap-2 rounded-2xl border border-border/60 bg-card/80 p-2.5">
       <label className="min-w-0 flex-1 basis-[130px] text-[11px] font-semibold text-muted-foreground"><span>{t.filter}</span>
-        <select aria-label={t.filter} value={period} onChange={e=>setPeriod(e.target.value)} className="mt-1 block h-10 w-full rounded-xl border border-border bg-background px-2.5 text-xs font-bold text-foreground">
+        <select aria-label={t.filter} value={period} onChange={e=>{const next=e.target.value;setPeriod(next);setBucket(['6m','9m','year'].includes(next)?'month':next==='3m'?'week':'day');}} className="mt-1 block h-10 w-full rounded-xl border border-border bg-background px-2.5 text-xs font-bold text-foreground">
           {OWNER_DRIVER_PERIODS.map(key=><option key={key} value={key}>{t[key]}</option>)}
         </select>
       </label>
@@ -238,7 +238,7 @@ export default function OwnerDriverSalesCard({ restaurantId, branchId, branchLab
       {!ownerDriverReconciliation(current.data)&&<p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-800">{t.mismatch}</p>}
       <div className="rounded-2xl border border-border bg-card p-3 sm:p-4">
         <h3 className="text-sm font-black text-foreground">{t.trend}</h3>
-        {!trend.length?<p className="py-8 text-center text-xs text-muted-foreground">{t.noData}</p>:
+        {(!trend.length||n(totals.entries)===0)?<p className="py-8 text-center text-xs text-muted-foreground">{t.noData}</p>:
         <div className="mt-3 h-60 w-full min-w-0 sm:h-72" data-testid="owner-driver-sales-trend">
           <ResponsiveContainer width="100%" height="100%">
             {chartKind==='bar'?<BarChart data={trend} margin={{top:8,right:4,left:-18,bottom:2}}>
