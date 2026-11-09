@@ -143,6 +143,9 @@ export default function ERPRegister() {
         throw error;
       }
       if (data.session) { setSession(data.session); return; }
+      if (emailMode && !data?.user?.id) {
+        throw new Error('Signup did not create a confirmed new identity. Try signing in if you already have an account, or contact the Owner.');
+      }
       // Supabase Auth may intentionally return an obfuscated user with an
       // empty identities array for repeat signup. It sends NO confirmation.
       // Never claim the provider sent an email in that case.
