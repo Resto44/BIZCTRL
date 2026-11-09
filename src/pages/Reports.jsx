@@ -172,7 +172,7 @@ export default function Reports() {
     if (!selectedBranchId) return [];
     const [canonical, legacy] = await Promise.all([
       load(q=>q.eq('branch_id',selectedBranchId)),
-      selectedBranchKey ? load(q=>q.is('branch_id',null).eq(legacyColumn,selectedBranchKey)) : Promise.resolve([]),
+      legacyColumn && selectedBranchKey ? load(q=>q.is('branch_id',null).eq(legacyColumn,selectedBranchKey)) : Promise.resolve([]),
     ]);
     return Array.from(new Map([...canonical,...legacy].map(row=>[row.id,row])).values());
   };
@@ -215,6 +215,19 @@ export default function Reports() {
     queryFn: async () => (await fetchReportRows('daily_sales')).filter(row => ['finalized','locked'].includes(row.closing_state)),
     staleTime: 120000,
     enabled: hasScope,
+  });
+
+  // Driver collections are a verified SUBSET of finalized Sales Closing.
+  // Failed or truncated driver reads block PDF export rather than claim zero.
+  const {data:driverSalesEntries=[],isLoading:loadingDriverEntries,isError:driverEntriesError}=useQuery({
+    queryKey:['pdf_driver_sales_entries',activeRestaurant?.id,selectedBranchId,earliestReportDate,todayReportDate],
+    queryFn:()=>fetchReportRows('driver_sales_entries',null),
+    staleTime:60000,enabled:hasScope,
+  });
+  const {data:pdfDrivers=[],isLoading:loadingPdfDrivers,isError:pdfDriversError}=useQuery({
+    queryKey:['pdf_drivers',activeRestaurant?.id,selectedBranchId],
+    queryFn:()=>fetchOperationsRows('drivers',{legacyColumn:null}),
+    staleTime:60000,enabled:hasScope,
   });
 
   const { data: purchases = [], isLoading: loadingPurchases, isError: purchasesError } = useQuery({
@@ -272,9 +285,9 @@ export default function Reports() {
     queryFn:()=>fetchOperationsRows('debt_records'),enabled:hasScope,staleTime:60000,
   });
   const isLoading = loadingSales || loadingPurchases || loadingExpenses || loadingSources || loadingCategories ||
-    loadingInventory || loadingMovements || loadingDebts || loadingWallet;
+    loadingInventory || loadingMovements || loadingDebts || loadingWallet || loadingDriverEntries || loadingPdfDrivers;
   const hasReportError = salesError || purchasesError || expensesError || categoriesError ||
-    inventoryError || movementsError || debtsError || walletError;
+    inventoryError || movementsError || debtsError || walletError || driverEntriesError || pdfDriversError;
 
   const periodSnapshot = useMemo(() => buildSalesReportSnapshot({
     sales,purchases,expenses,expenseCategories,revenueSources,
@@ -341,9 +354,9 @@ export default function Reports() {
   );
 
   const fullAnalytics = useMemo(()=>buildFullSalesAnalyticsReport({
-    sales,purchases,walletTransactions,snapshot:periodSnapshot,previousSnapshot,
+    sales,purchases,walletTransactions,driverSalesEntries,drivers:pdfDrivers,snapshot:periodSnapshot,previousSnapshot,
     operationsReport,range:reportRange,revenueSources,branches:scopedBranches,lang,historyAvailable:true,
-  }),[sales,purchases,walletTransactions,periodSnapshot,previousSnapshot,operationsReport,reportRange,revenueSources,scopedBranches,lang]);
+  }),[sales,purchases,walletTransactions,driverSalesEntries,pdfDrivers,periodSnapshot,previousSnapshot,operationsReport,reportRange,revenueSources,scopedBranches,lang]);
   const productQtyAnalytics = {
     monthlyProducts:fullAnalytics.products.map(p=>({productId:p.id,productName:p.name,totalQuantity:p.quantity,unit:p.unit,totalCost:p.cost})),
   };
@@ -785,7 +798,7 @@ export default function Reports() {
       <Section title={t('generate_pdf_report')} icon={FileText}>
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            {lang==='fa'?'گزارش دوصفحه‌ای: صفحه اول فروشات و روند فروش؛ صفحه دوم خرید، مصارف و تحلیل هزینه':lang==='ar'?'تقرير من صفحتين: المبيعات واتجاهاتها؛ المشتريات والمصروفات وتحليل التكاليف':'Two-page report: sales and sales trends; purchases, expenses and cost analysis'}
+            {lang==='fa'?'گزارش ۳ صفحه‌ای: دو صفحه مالی؛ صفحه سوم تحلیل شبکه و فروش راننده‌ها':lang==='ar'?'تقرير من ٣ صفحات: صفحتان ماليتان؛ الصفحة الثالثة للشبكة ومبيعات السائقين':'Three-page report: two finance pages and Network + Driver Sales analytics on page three'}
           </p>
           {/* Recommendations preview */}
           {recommendations.length > 0 && (

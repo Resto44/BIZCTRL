@@ -36,6 +36,7 @@ export async function fetchScheduledERPReportData({
  }
  const [
   sales,purchases,expenses,inventory,inventoryTransactions,customerDebts,expenseCategories,walletTransactions,
+  driverSalesEntries,drivers,
  ]=await Promise.all([
   read('daily_sales',{from:`${Number(range.to.slice(0,4))-1}-01-01`,to:range.to}),
   read('supplier_invoices',{from:range.previousFrom,to:range.to}),
@@ -49,6 +50,9 @@ export async function fetchScheduledERPReportData({
    return (data||[]).filter(c=>allBranches||!c.branch_id||String(c.branch_id)===String(branchId));
   })(),
   read('wallet_transactions',{dateColumn:'transaction_date',from:range.from+'T00:00:00',to:range.to+'T23:59:59.999'}),
+  read('driver_sales_entries',{legacyColumn:null,from:range.previousFrom,to:range.to}),
+  read('drivers',{legacyColumn:null,dateColumn:null}),
  ]);
- return {sales,purchases,expenses,inventory,inventoryTransactions,customerDebts,expenseCategories,walletTransactions};
+ return {sales,purchases,expenses,inventory,inventoryTransactions,customerDebts,expenseCategories,walletTransactions,
+  driverSalesEntries,drivers};
 }

@@ -1,5 +1,6 @@
 import {drawLocalizedPdfText} from './pdfLocalization';
 import {drawERPReportBrand} from './erpPdfBrand';
+import {drawPdfDriverSalesSection} from './drawPdfDriverSalesSection';
 
 const COLORS={
   ink:[15,32,60], muted:[92,110,136],line:[221,232,247],
@@ -107,16 +108,39 @@ const clamp = (value,min,max)=>Math.min(max,Math.max(min,value));
  */
 export function drawPdfNetworkManagement(doc,{
   insights,range,currency='SAR',lang='en',businessName='BizCTRL',
-  branchLabel='All branches',iconData=null,
+  branchLabel='All branches',iconData=null,driverSales=null,
 }={}){
   if(!insights?.available)return 0;
   const t={...(copy[lang]||copy.en),...(advancedCopy[lang]||advancedCopy.en)};
   const rtl=lang==='fa'||lang==='ar';
   const branches=insights.branches||[];
   const ops=insights.operational||{};
-  const chunkSize=8; // leave a readable gap before the A4 accounting notes
-  const pageCount=Math.max(1,Math.ceil(branches.length/chunkSize));
-  const numberPages=2+pageCount;
+  // Page 3 is shared by Network and Driver Sales. Never create a fourth page.
+  // Large tenants retain totals by combining overflow rows, not dropping sales.
+  const driverAvailable=driverSales?.available===true;
+  const maxRows=driverAvailable?4:8;
+  const visibleRows=branches.length<=maxRows?branches:[...branches.slice(0,maxRows-1),(()=>{
+    const rest=branches.slice(maxRows-1);
+    const current=rest.reduce((acc,b)=>({
+      network:acc.network+Number(b.current?.network||0),
+      total:acc.total+Number(b.current?.total||0),
+      closings:acc.closings+Number(b.current?.closings||0),
+    }),{network:0,total:0,closings:0});
+    const previous=rest.reduce((acc,b)=>({
+      network:acc.network+Number(b.previous?.network||0),
+      total:acc.total+Number(b.previous?.total||0),
+      closings:acc.closings+Number(b.previous?.closings||0),
+    }),{network:0,total:0,closings:0});
+    return {
+      id:'__other_branches__',name:t.other+' ('+rest.length+')',
+      current,previous,
+      share:insights.total>0?current.network/insights.total*100:null,
+      growth:previous.network>0?(current.network-previous.network)/previous.network*100:null,
+      cardMix:current.total>0?current.network/current.total*100:null,
+    };
+  })()];
+  const pageCount=1;
+  const numberPages=3;
   const T=(v,x,y,w=40,size=8.3,color=COLORS.ink,bold=false,align=rtl?'right':'left')=>
     drawLocalizedPdfText(doc,String(v??'—'),align==='right'?x+w:align==='center'?x+w/2:x,y,{
       rtl,size,color,bold,align,fit:true,maxWidth:w,
@@ -162,7 +186,7 @@ export function drawPdfNetworkManagement(doc,{
   for(let page=0;page<pageCount;page++){
     doc.addPage();
     const first=page===0;
-    const rows=branches.slice(page*chunkSize,(page+1)*chunkSize);
+    const rows=visibleRows;
     if(first){
       tiles.forEach(([label,value,color,isAmount],i)=>{
         const x=7+i*49.7;
@@ -225,6 +249,13 @@ export function drawPdfNetworkManagement(doc,{
         if(detail)T(detail,x,140.1,44,6.5,COLORS.muted);
       });
       drawTable(rows,158);
+      if(driverAvailable){
+        // Replace lower POS diagnostic boxes with a compact two-line audit
+        // note and the Driver Sales panel; all remain on this third A4 page.
+        T(t.noteShort,10,200,190,7,COLORS.muted);
+        T(insights.allocationCoverage==='unavailable'?t.mappingNotLoss:t.receiptShort,10,205,190,7,COLORS.muted);
+        drawPdfDriverSalesSection(doc,{insights:driverSales,lang,currency});
+      }else{
       // Position both footer panels below the last branch row without covering
       // either the table or the fixed BizCTRL footer on the A4 page.
       const tableBottom=145+Math.min(91,18+8.1*rows.length);
@@ -272,6 +303,7 @@ export function drawPdfNetworkManagement(doc,{
         T(t.activeDays+': '+String(ops.activeCardDays??'—'),109,diagnosticY+18,91,7.1,COLORS.ink);
         const top=ops.topBranch;
         T(t.topBranch+': '+(top?top.name+' · '+pct(top.share):'—'),109,diagnosticY+24,91,7.1,COLORS.blue,true);
+      }
       }
     }else{
       T(t.continuation,9,36,190,12,COLORS.ink,true);

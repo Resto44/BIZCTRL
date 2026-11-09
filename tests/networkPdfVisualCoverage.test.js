@@ -100,7 +100,7 @@ describe('Network PDF visual/attribution regression (screenshot repair)',()=>{
    expect(labels.filter(r=>r.page===2).length).toBeGreaterThan(15);
    expect(Buffer.from(doc.output('arraybuffer')).subarray(0,5).toString()).toBe('%PDF-');
  });
- it('paginates nine branches safely: append two pages and number every page correctly',async()=>{
+ it('consolidates nine branch rows into one appendix without creating page 4',async()=>{
    const many=Array.from({length:9},(_,i)=>({id:'id'+i,name:'Branch '+(i+1),branch_key:'k'+i}));
    const sales=many.map((b,i)=>closing('sale'+i,'2026-11-06',b.id,100+i));
    const snapshot=buildSalesReportSnapshot({sales,from:range.from,to:range.to});
@@ -109,6 +109,6 @@ describe('Network PDF visual/attribution regression (screenshot repair)',()=>{
    expect(fullAnalytics.networkBranches.branches).toHaveLength(9);
    const pdf=await generateSalesAnalyticsPDF({snapshot,previousSnapshot,range,fullAnalytics,
     branchLabel:'All branches',lang:'en',download:false});
-   expect(pdf.getNumberOfPages()).toBe(4); // two financial pages + two 8-row network pages
+   expect(pdf.getNumberOfPages()).toBe(3); // two finance pages + one capped Network/Driver page
  });
 });

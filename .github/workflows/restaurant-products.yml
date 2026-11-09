@@ -42,4 +42,10 @@ jobs:
           name: language-coverage-audit
           path: reports/i18n-coverage-audit.json
       - run: pnpm run build
+      - run: node scripts/build-automatic-report.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bizctrl-automatic-email-pdf-bundle
+          path: supabase/functions/automatic-report-email/report-bundle.js
+          retention-days: 7
       - run: node scripts/check-portal-startup-bundle.mjs

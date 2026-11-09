@@ -58,12 +58,12 @@ describe('owner report delivery scope and localization',()=>{
     .rejects.toThrow('REPORT_NETWORK_APPENDIX_MISSING');
   expect(generateSalesAnalyticsPDF).not.toHaveBeenCalled();
  });
- it('requires extra appendix pages for more than eight reporting branches',async()=>{
+ it('does not require extra pages for more than eight reporting branches',async()=>{
   const {buildFullSalesAnalyticsReport}=await import('../src/lib/fullSalesAnalyticsReport.js');
   buildFullSalesAnalyticsReport.mockReturnValueOnce({networkBranches:{
     available:true,branches:Array.from({length:15},(_,i)=>({id:'b'+i}))
   }});
-  generateSalesAnalyticsPDF.mockResolvedValueOnce({getNumberOfPages:()=>4,output:()=> 'data:application/pdf;base64,JVBERi0xLjQK'});
+  generateSalesAnalyticsPDF.mockResolvedValueOnce({getNumberOfPages:()=>3,output:()=> 'data:application/pdf;base64,JVBERi0xLjQK'});
   await expect(buildAutomaticReportPdf({db:dbWith(),job,context})).resolves.toBe('JVBERi0xLjQK');
  });
  it('keeps all branches when no branch has been selected',async()=>{

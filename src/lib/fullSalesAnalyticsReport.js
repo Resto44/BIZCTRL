@@ -2,12 +2,14 @@ import {calculateSalesRevenue} from './helpers';
 import {buildERPFinancialPaymentAnalytics} from './erpPaymentAnalytics';
 import {buildPdfConsumptionCostControl} from './reportConsumptionCostControl';
 import {buildPdfNetworkBranchInsights} from './pdfNetworkBranchInsights';
+import {buildPdfDriverSalesInsights} from './pdfDriverSalesInsights';
 const number=v=>Number.isFinite(Number(v))?Number(v):0;
 const active=r=>!['cancelled','canceled','void','voided','deleted','rejected'].includes(String(r.status||'').toLowerCase());
 const approved=r=>['approved','auto_approved'].includes(r.approval_status)||(!r.approval_status&&['approved','paid','partial'].includes(r.status));
 const within=(d,range)=>d>=range.from&&d<=range.to;
 /** All inputs inherit authenticated tenant/branch scope. Never infer usage from buying. */
 export function buildFullSalesAnalyticsReport({sales=[],purchases=[],walletTransactions=null,
+ driverSalesEntries=null,drivers=null,
  snapshot = undefined,previousSnapshot=null,operationsReport=null,range = undefined,revenueSources=[],branches=null,lang='en',historyAvailable=false}={}){
  const confirmed=sales.filter(s=>['finalized','locked'].includes(s.closing_state));
  const daily=new Map(),weekdays=new Map();
@@ -56,6 +58,9 @@ export function buildFullSalesAnalyticsReport({sales=[],purchases=[],walletTrans
   networkBranches:range?.previousFrom&&range?.previousTo ? buildPdfNetworkBranchInsights({
    sales,branches:branches||operationsReport?.branches||[],range,revenueSources,snapshot,previousSnapshot,
   }) : null,
+  driverSales:buildPdfDriverSalesInsights({
+   driverSalesEntries,drivers,sales,branches:branches||operationsReport?.branches||[],range,snapshot,
+  }),
   cost:buildPdfConsumptionCostControl({snapshot,previousSnapshot,operationsReport}),
   products:[...products.values()].sort((a,b)=>b.cost-a.cost||a.name.localeCompare(b.name)),
   signals:{loss:number(snapshot.netProfit)<0,missingExpenses:snapshot.hasExpenseSource===false,
