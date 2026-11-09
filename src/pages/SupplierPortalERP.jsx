@@ -16,7 +16,6 @@ import {
   ShoppingCart, History, Truck, ArrowRight, ShieldCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
 
 const PO_STATUS = {
   pending:   { label: 'Pending',   color: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300' },
