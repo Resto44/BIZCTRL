@@ -71,8 +71,8 @@ describe('Driver ERP account and secure login',()=>{
   expect(reports).toContain("driver_id=public.erp_current_linked_entity_id()");
   expect(reports).toContain('public.erp_can_access_scope_text(restaurant_id::text,branch_id::text)');
   expect(reports).toContain('m.branch_id IS NULL');
-  expect(reports).toContain("actor.role");
-  expect(reports).toContain('actor.branch_id');
+  expect(reports).toContain("role IN ('manager','owner')");
+  expect(reports).toContain("(role='owner' OR branch_id=report.branch_id)");
   expect(reports).toContain("role IN ('manager','owner')");
   expect(reports).toContain("report.status='matched'");
  });
