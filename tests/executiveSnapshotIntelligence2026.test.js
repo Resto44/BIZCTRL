@@ -80,7 +80,7 @@ describe('Executive ERP Snapshot IQ financial analytics',()=>{
   expect(snapshot).toContain('data-testid="snapshot-advanced-toggle"');
   expect(snapshot).toContain('aria-expanded={advancedOpen}');
   expect(snapshot).toContain('data-testid="snapshot-period-selector"');
-  expect(snapshot).toContain('data-testid="snapshot-purchases-primary"');
+  expect(snapshot).toContain('testId="snapshot-purchases-primary"');
   expect(snapshot).toContain('snapshot-estimate-warning');
   expect(owner).toContain('periodPurchases, previousPeriodSales, previousPeriodPurchases');
   expect(owner).toContain("{ key: 'three-months'");
