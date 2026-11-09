@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import {
   Activity, ArrowDownRight, ArrowRight, ArrowUpRight, BadgeDollarSign,
   Banknote, BarChart3, ChevronDown, CreditCard, Landmark, Layers3, ReceiptText,
-  ShieldAlert, ShoppingBasket, TrendingUp,
+  ShieldAlert, ShoppingBasket, SlidersHorizontal, TrendingUp,
 } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { buildExecutiveSnapshotPresentation, buildExecutiveComparisonTrend, moneyChange } from '@/lib/executiveSnapshotPresentation';
 import OwnerOrderSourcesAnalytics from './OwnerOrderSourcesAnalytics';
+const ExecutiveAnalyticsDrilldown = React.lazy(() => import('./ExecutiveAnalyticsDrilldown'));
 import { buildOwnerOrderSourceAnalytics } from '@/lib/ownerOrderSourceAnalytics';
 
 const t = (copy,key,fallback) => copy?.[key] || fallback;
@@ -79,6 +80,7 @@ function DetailTile({title,amount,icon:Icon,onClick,tone='blue',hint}) {
 
 export default function ExecutiveSnapshotV2({model,copy}) {
   const navigate=useNavigate();
+  const [advancedOpen,setAdvancedOpen]=React.useState(false);
   const {
     periodMetrics={},previousPeriodMetrics={},revenueTrend=[],periodKey='today',
     periodLabel,formatMoney,hasQueryError,accountingProvisional,drawerCash,receivables,payables,scopedAlerts=[],
@@ -99,7 +101,7 @@ export default function ExecutiveSnapshotV2({model,copy}) {
   },{sum:0,colors:[]});
   const comparisonTrend=useMemo(()=>buildExecutiveComparisonTrend({revenueTrend,previousRevenueTrend,periodKey,period:reportPeriod}),[revenueTrend,previousRevenueTrend,periodKey,reportPeriod]);
   const canChart=comparisonTrend.some(row=>row.sales!=null||row.previousSales!=null);
-  const slotLabel=(periodKey==='year'||periodKey==='six-months')?(lang==='fa'?'ماه':lang==='ar'?'شهر':'Month'):(lang==='fa'?'روز':lang==='ar'?'يوم':'Day');
+  const slotLabel=(['year','three-months','six-months','nine-months'].includes(periodKey))?(lang==='fa'?'ماه':lang==='ar'?'شهر':'Month'):(lang==='fa'?'روز':lang==='ar'?'يوم':'Day');
   const compareLabel=t(copy,'vsPreviousPeriod','vs previous period');
   const money=value=>hasQueryError?'—':formatMoney(value);
 
@@ -112,6 +114,7 @@ export default function ExecutiveSnapshotV2({model,copy}) {
           {changeReportPeriod && <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900" aria-label={t(copy,'choosePeriod','Report period')}>
             {[['today','today','Today'],['week','thisWeek','This week'],['month','thisMonth','This month']].map(([key,label,fallback])=><button type="button" key={key} aria-pressed={periodKey===key} onClick={()=>changeReportPeriod(key)} className={`min-h-9 rounded-lg px-2.5 text-[11px] font-bold ${periodKey===key?'bg-blue-600 text-white shadow-sm':'text-muted-foreground hover:bg-background'}`}>{t(copy,label,fallback)}</button>)}
           </div>}
+          {changeReportPeriod && <label className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-muted-foreground"><span className="sr-only">{t(copy,'choosePeriod','Period')}</span><select data-testid="snapshot-period-selector" value={periodKey} onChange={event=>changeReportPeriod(event.target.value)} className="min-h-9 min-w-0 max-w-40 rounded-xl border border-border bg-background px-2 text-xs font-bold text-foreground"><option value="today">{t(copy,'today','Today')}</option><option value="yesterday">{t(copy,'yesterday','Yesterday')}</option><option value="week">{t(copy,'thisWeek','This week')}</option><option value="month">{t(copy,'thisMonth','This month')}</option><option value="three-months">{t(copy,'threeMonths','3 months')}</option><option value="six-months">{t(copy,'sixMonths','6 months')}</option><option value="nine-months">{t(copy,'nineMonths','9 months')}</option><option value="year">{t(copy,'thisYear','Year')}</option></select></label>}
           {(hasQueryError||accountingProvisional)&&<span role="status" className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">{hasQueryError?t(copy,'syncRequired','Sync required'):t(copy,'accountingProvisionalLabel','Management estimate · pending expenses')}</span>}
         </div>
       </SectionHeader>
@@ -123,17 +126,20 @@ export default function ExecutiveSnapshotV2({model,copy}) {
           <p className="mt-1 text-[10px] text-muted-foreground">{compareLabel}</p>
         </div>
         <StatCard testId="snapshot-purchases-primary" title={t(copy,'purchases','Purchases')} value={money(periodMetrics.totalPurchaseCost)} icon={ShoppingBasket} tone="amber"
-          hint={t(copy,'purchasesHint','Approved purchases in the selected period')} />
+          hint={lang==='fa'?'فاکتورهای خرید تأییدشده':lang==='ar'?'فواتير الشراء المعتمدة':'Approved purchase invoices'} />
         <StatCard testId="snapshot-profit" title={t(copy,'netProfit','Operating estimate')} value={money(periodMetrics.netProfit)} icon={TrendingUp} tone={periodMetrics.netProfit<0?'rose':'violet'}
           change={hasQueryError?null:presentation.profitChange} comparisonLabel={compareLabel}/>
         <StatCard testId="snapshot-expenses" title={t(copy,'operatingExpense','Recorded expenses')} value={money(periodMetrics.totalExpenses)} icon={ReceiptText} tone="rose" lowerIsBetter
-          change={hasQueryError?null:moneyChange(periodMetrics.totalExpenses,prev.totalExpenses)} comparisonLabel={compareLabel}/>
+          change={hasQueryError?null:moneyChange(periodMetrics.totalExpenses,prev.totalExpenses)} hint={lang==='fa'?'مصارف متغیر + سهم ثابت':lang==='ar'?'المصروفات المتغيرة + حصة الثابتة':'Variable + allocated fixed costs'} comparisonLabel={compareLabel}/>
       </div>
       <dl data-testid="executive-expense-breakdown" className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-border/70 bg-slate-50/50 p-3 dark:bg-slate-900/40">
         {[[lang==='fa'?'سهم مصارف ثابت':lang==='ar'?'نصيب المصروفات الثابتة':'Allocated fixed costs',periodMetrics.fixedDeduction],
           [lang==='fa'?'مصارف متغیر':lang==='ar'?'المصروفات المتغيرة':'Variable expenses',periodMetrics.totalVariableExpenses]].map(([label,value])=><div key={label} className="min-w-0"><dt className="text-[10px] text-muted-foreground">{label}</dt><dd className="mt-1 text-sm font-bold tabular-nums" dir="ltr">{value==null?'—':money(value)}</dd></div>)}
       </dl>
       <p className="mt-2 text-[10px] leading-4 text-muted-foreground">{t(copy,'profitHint','Sales less purchases and expenses; not inventory-COGS profit')}</p>
+      {!hasQueryError && Number(periodMetrics.netProfit)<0 && <p data-testid="snapshot-estimate-warning" role="note" className="mt-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[11px] font-semibold leading-5 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">{lang==='fa'?'نتیجهٔ این بازه بر مبنای خرید منفی است؛ تا روشن‌شدن هزینهٔ واقعی مواد مصرف‌شده، آن را ضرر نهایی حساب نکنید.':lang==='ar'?'التقدير خلال الفترة سالب على أساس المشتريات، وليس خسارة محاسبية نهائية دون تكلفة المخزون المستهلك.':'The purchase-basis operating estimate is negative; this is not a final accounting loss without inventory COGS.'}</p>}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-200/70 bg-indigo-50/50 p-2.5 dark:border-indigo-900/60 dark:bg-indigo-950/30"><div className="flex items-center gap-2 text-xs font-bold text-foreground"><SlidersHorizontal className="h-4 w-4 text-indigo-600"/>{lang==='fa'?'تحلیل پیشرفتهٔ فروش، خرید و فایده':lang==='ar'?'التحليلات المتقدمة للمبيعات والمشتريات والنتائج':'Sales, purchases & operating intelligence'}</div><button type="button" data-testid="snapshot-advanced-toggle" aria-expanded={advancedOpen} onClick={()=>setAdvancedOpen(value=>!value)} className="min-h-9 rounded-lg bg-indigo-600 px-3 text-[11px] font-black text-white hover:bg-indigo-700">{advancedOpen?(lang==='fa'?'بستن':lang==='ar'?'إغلاق':'Close'):(lang==='fa'?'نمایش تحلیل‌ها':lang==='ar'?'عرض التحليلات':'Explore trends')}</button></div>
+      {advancedOpen && <React.Suspense fallback={<div role="status" className="rounded-xl border border-border p-3 text-xs text-muted-foreground">{lang==='fa'?'در حال بارگذاری تحلیل‌ها…':lang==='ar'?'جارٍ تحميل التحليلات…':'Loading ERP analytics…'}</div>}><ExecutiveAnalyticsDrilldown model={model}/></React.Suspense>}
       <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
         <div className="min-w-0 rounded-2xl border border-border/80 p-3">
           <h4 className="text-xs font-black">{t(copy,'revenueTrend','Revenue trend')}</h4>
