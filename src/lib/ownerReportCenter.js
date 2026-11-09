@@ -16,7 +16,7 @@ import { latestInventorySnapshots } from '@/lib/inventorySnapshotView';
 const CONSUMPTION_TYPES = new Set(['recipe_consumption', 'sale', 'stock_out']);
 
 export const OWNER_PRICE_TARGET_MARGIN = 35;
-export const OWNER_REPORT_PERIOD_KEYS = ['today', 'week', 'month', 'six-months', 'year'];
+export const OWNER_REPORT_PERIOD_KEYS = ['today', 'yesterday', 'week', 'month', 'three-months', 'six-months', 'nine-months', 'year'];
 
 export function buildOwnerReportPeriod(periodKey = 'today', now = new Date()) {
   const key = OWNER_REPORT_PERIOD_KEYS.includes(periodKey) ? periodKey : 'today';
@@ -25,7 +25,11 @@ export function buildOwnerReportPeriod(periodKey = 'today', now = new Date()) {
   let previousStart;
   let previousEnd;
 
-  if (key === 'week') {
+  if (key === 'yesterday') {
+    currentStart = subDays(currentEnd, 1);
+    previousStart = subDays(currentEnd, 2);
+    previousEnd = previousStart;
+  } else if (key === 'week') {
     currentStart = startOfWeek(currentEnd, { weekStartsOn: 0 });
     previousStart = subDays(currentStart, 7);
     previousEnd = subDays(currentStart, 1);
@@ -37,10 +41,11 @@ export function buildOwnerReportPeriod(periodKey = 'today', now = new Date()) {
       previousStart.getMonth(),
       Math.min(currentEnd.getDate(), endOfMonth(previousStart).getDate()),
     );
-  } else if (key === 'six-months') {
-    currentStart = startOfMonth(subMonths(currentEnd, 5));
-    previousStart = startOfMonth(subMonths(currentEnd, 11));
-    previousEnd = subMonths(currentEnd, 6);
+  } else if (key === 'three-months' || key === 'six-months' || key === 'nine-months') {
+    const months = key === 'three-months' ? 3 : key === 'nine-months' ? 9 : 6;
+    currentStart = startOfMonth(subMonths(currentEnd, months - 1));
+    previousStart = startOfMonth(subMonths(currentEnd, months * 2 - 1));
+    previousEnd = subMonths(currentEnd, months);
   } else if (key === 'year') {
     currentStart = startOfYear(currentEnd);
     previousStart = startOfYear(subYears(currentEnd, 1));
@@ -53,7 +58,7 @@ export function buildOwnerReportPeriod(periodKey = 'today', now = new Date()) {
   const daysInPeriod = differenceInCalendarDays(currentEnd, currentStart) + 1;
   return {
     key,
-    rangeType: key === 'today' ? 'day' : key === 'week' ? 'week' : 'month',
+    rangeType: (key === 'today' || key === 'yesterday') ? 'day' : key === 'week' ? 'week' : 'month',
     daysInPeriod,
     currentStart: format(currentStart, 'yyyy-MM-dd'),
     currentEnd: format(currentEnd, 'yyyy-MM-dd'),
