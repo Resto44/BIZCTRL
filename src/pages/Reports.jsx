@@ -172,7 +172,7 @@ export default function Reports() {
     if (!selectedBranchId) return [];
     const [canonical, legacy] = await Promise.all([
       load(q=>q.eq('branch_id',selectedBranchId)),
-      selectedBranchKey ? load(q=>q.is('branch_id',null).eq(legacyColumn,selectedBranchKey)) : Promise.resolve([]),
+      legacyColumn && selectedBranchKey ? load(q=>q.is('branch_id',null).eq(legacyColumn,selectedBranchKey)) : Promise.resolve([]),
     ]);
     return Array.from(new Map([...canonical,...legacy].map(row=>[row.id,row])).values());
   };
