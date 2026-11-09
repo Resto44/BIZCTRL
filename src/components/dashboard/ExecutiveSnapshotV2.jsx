@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity, ArrowDownRight, ArrowRight, ArrowUpRight, BadgeDollarSign,
-  Banknote, BarChart3, CreditCard, Landmark, Layers3, ReceiptText,
+  Banknote, BarChart3, ChevronDown, CreditCard, Landmark, Layers3, ReceiptText,
   ShieldAlert, ShoppingBasket, TrendingUp,
 } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -179,49 +179,68 @@ export default function ExecutiveSnapshotV2({model,copy}) {
         </button>
       </SectionHeader>
       <div className="grid gap-2.5 sm:grid-cols-[minmax(0,0.75fr)_minmax(0,1.65fr)]">
-        <div data-testid="snapshot-drawer-cash" className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
-          <p className="flex items-center gap-2 text-xs font-black text-emerald-800 dark:text-emerald-300"><Banknote className="h-4 w-4"/>{t(copy,'drawerCash','Cash in drawer')}</p>
-          <p data-testid="snapshot-drawer-cash-value" className="mt-2 text-[clamp(1.45rem,4vw,2rem)] font-black text-emerald-950 dark:text-emerald-100" dir="ltr">
-            {drawerCash?.complete ? formatMoney(drawerCash.amount)
-              : drawerCash?.error || drawerCash?.loading ? '—'
-              : drawerCash?.latestPhysicalDetail
-                ? formatMoney(drawerCash.latestPhysicalDetail.status==='verified'
-                  ? drawerCash.latestPhysicalDetail.cash
-                  : drawerCash.latestPhysicalDetail.reportedCash)
-                : '—'}
-          </p>
-          {drawerCash?.complete ? <p className="mt-1 text-[11px] leading-4 text-emerald-700 dark:text-emerald-300">
-              {t(copy,'drawerCashHint','Last verified physical count · not a live bank balance')}
-            </p> : drawerCash?.error || drawerCash?.loading
+        <div data-testid="snapshot-drawer-cash" className="min-w-0 self-start rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <p className="flex min-w-0 items-center gap-1.5 text-[11px] font-black text-emerald-800 dark:text-emerald-300">
+              <Banknote className="h-4 w-4 shrink-0"/>{t(copy,'drawerCash','Cash in drawer')}
+            </p>
+            <p data-testid="snapshot-drawer-cash-value" className="text-[clamp(1.35rem,5vw,1.7rem)] font-black leading-tight tabular-nums text-emerald-950 dark:text-emerald-100" dir="ltr">
+              {drawerCash?.complete ? formatMoney(drawerCash.amount)
+                : drawerCash?.error || drawerCash?.loading ? '—'
+                : drawerCash?.latestPhysicalDetail
+                  ? formatMoney(drawerCash.latestPhysicalDetail.status==='verified'
+                    ? drawerCash.latestPhysicalDetail.cash
+                    : drawerCash.latestPhysicalDetail.reportedCash)
+                  : '—'}
+            </p>
+          </div>
+          {drawerCash?.complete
+            ? <p className="mt-1 text-[10px] leading-4 text-emerald-800 dark:text-emerald-300">
+                {t(copy,'drawerCashHint','Last verified physical count · not a live bank balance')}
+              </p>
+            : drawerCash?.error || drawerCash?.loading
               ? <p className="mt-1 text-[11px] text-amber-700">{t(copy,'syncRequired','Sync required')}</p>
               : drawerCash?.latestPhysicalDetail
-                ? <div data-testid="snapshot-drawer-partial" className="mt-1 space-y-1 text-[11px] leading-4 text-emerald-900">
-                    {drawerCash.latestPhysicalDetail.status==='ambiguous_drawer'
-                      ? <p data-testid="snapshot-drawer-needs-review" className="font-bold text-amber-800">
-                          {lang==='fa'?'آخرین شمارش ثبت‌شده؛ مسئول صندوق نیازمند بررسی است':lang==='ar'?'آخر جرد مسجل؛ ملكية الصندوق تحتاج مراجعة':'Latest recorded cash count · cashier ownership needs review'}
-                        </p>
-                      : <p className="font-semibold">{lang==='fa'?'آخرین شمارش معتبر یک شعبه؛ نه مجموع شعبه‌ها':lang==='ar'?'آخر جرد مؤكد لفرع واحد؛ ليس إجمالي الفروع':'Last verified branch count · NOT all-branch total'}</p>}
-                    <p className="break-words">{drawerCash.latestPhysicalDetail.branchName||drawerCash.latestPhysicalDetail.branchKey||'—'} · {drawerCash.latestPhysicalDetail.date||'—'}</p>
+                ? <div data-testid="snapshot-drawer-partial" className="mt-1.5 space-y-1 text-[11px] leading-4">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      {drawerCash.latestPhysicalDetail.status==='ambiguous_drawer'
+                        ? <span data-testid="snapshot-drawer-needs-review" className="inline-flex rounded-md bg-amber-100 px-1.5 py-0.5 font-bold text-amber-900 dark:bg-amber-900/50 dark:text-amber-200">
+                            {lang==='fa'?'نیازمند بررسی مسئول صندوق':lang==='ar'?'مراجعة مسؤول الصندوق':'Cashier review needed'}
+                          </span>
+                        : <span className="font-semibold text-emerald-900 dark:text-emerald-200">
+                            {lang==='fa'?'آخرین شمارش یک شعبه':lang==='ar'?'آخر جرد لفرع واحد':'Last verified branch count · NOT all-branch total'}
+                          </span>}
+                      <span className="min-w-0 break-words text-emerald-950 dark:text-emerald-200">
+                        {drawerCash.latestPhysicalDetail.branchName||drawerCash.latestPhysicalDetail.branchKey||'—'} · {drawerCash.latestPhysicalDetail.date||'—'}
+                      </span>
+                    </div>
                     {drawerCash.latestPhysicalDetail.status==='ambiguous_drawer' &&
-                      <p className="text-amber-800">
-                        {lang==='fa'?'این مبلغ آخرین شمارش گزارش‌شده است، نه موجودی قطعی صندوق. چند مسئول در شیفت ثبت شده‌اند؛ شمارش‌ها قابل جمع‌کردن نیستند.':lang==='ar'?'هذه آخر قيمة جرد مسجلة، وليست رصيداً نقدياً مؤكداً. يوجد أكثر من مسؤول في الوردية ولا تُجمع الجردات.':'Reported count only, not a verified cash balance. Multiple cashiers recorded in the same shift; do not sum the counts.'}
+                      <p className="text-[10px] leading-4 text-amber-900 dark:text-amber-200">
+                        {lang==='fa'?'فقط آخرین شمارش گزارش‌شده؛ موجودی تأییدشده یا مجموع شعبه‌ها نیست.':lang==='ar'?'آخر جرد مسجل فقط؛ ليس رصيداً مؤكداً أو مجموع الفروع.':'Reported count only · NOT verified cash or an all-branch total.'}
                       </p>}
-                    <p className="text-amber-800">{lang==='fa'?`${drawerCash.missingBranches} شعبه از ${drawerCash.branches} بدون شمارش معتبر؛ مجموع کل نامعلوم است.`:lang==='ar'?`${drawerCash.missingBranches} من ${drawerCash.branches} فروع بدون جرد مؤكد؛ الإجمالي غير معروف.`:`${drawerCash.missingBranches} of ${drawerCash.branches} branches unverified; all-branch total unavailable.`}</p>
                   </div>
                 : <p className="mt-1 text-[11px] text-amber-800">{t(copy,'drawerCashMissing','Not recorded')}</p>}
-          {drawerCash?.details?.length>1 && <details data-testid="snapshot-drawer-branch-breakdown" className="mt-2 border-t border-emerald-200/80 pt-2">
-            <summary className="min-h-7 cursor-pointer text-[11px] font-bold text-emerald-800">{lang==='fa'?'شمارش صندوق هر شعبه':lang==='ar'?'جرد صندوق كل فرع':'Cash count by branch'} ({drawerCash.details.length})</summary>
-            <div className="mt-1 space-y-1">
+          {drawerCash?.details?.length>1 && <details data-testid="snapshot-drawer-branch-breakdown" className="group mt-2 border-t border-emerald-200/80 pt-1.5 dark:border-emerald-900">
+            <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-2 rounded-md text-[11px] font-bold text-emerald-900 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:text-emerald-200 [&::-webkit-details-marker]:hidden">
+              <span className="min-w-0 truncate">{lang==='fa'?'جزئیات صندوق شعبه‌ها':lang==='ar'?'تفاصيل صندوق الفروع':'Cash by branch'} ({drawerCash.details.length})</span>
+              <span className="flex shrink-0 items-center gap-1 text-[10px] text-amber-800 dark:text-amber-200">
+                {!drawerCash.complete && (lang==='fa'? `${drawerCash.missingBranches} تأییدنشده` : lang==='ar'? `${drawerCash.missingBranches} غير مؤكد` : `${drawerCash.missingBranches} unverified`)}
+                <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180"/>
+              </span>
+            </summary>
+            <div className="max-h-44 space-y-1 overflow-y-auto border-t border-emerald-200/70 pt-2 dark:border-emerald-900" role="region">
               {drawerCash.details.map((item,i)=><div key={item.branchId||i} className="flex min-w-0 items-center justify-between gap-2 text-[11px]">
                 <span className="min-w-0 truncate">{item.branchName||item.branchKey||'—'} <span className="text-muted-foreground">{item.date||''}</span></span>
-                <strong className={`shrink-0 tabular-nums ${item.status==='ambiguous_drawer'?'text-amber-700':''}`} dir="ltr">
+                <strong className={`shrink-0 tabular-nums ${item.status==='ambiguous_drawer'?'text-amber-700 dark:text-amber-300':'text-emerald-950 dark:text-emerald-100'}`} dir="ltr">
                   {item.status==='verified' && item.cash!=null ? formatMoney(item.cash)
                     : item.status==='ambiguous_drawer' && item.reportedCash!=null
                       ? `${formatMoney(item.reportedCash)} *`:'—'}
                 </strong>
               </div>)}
+              <p className="pt-1 text-[10px] leading-4 text-amber-900 dark:text-amber-200">
+                {lang==='fa'?'* شمارش گزارش‌شده هنوز تأیید نشده؛ شمارش چند مسئول صندوق قابل جمع نیست. — به معنی صفر نیست.':lang==='ar'?'* جرد مسجل غير مؤكد؛ لا تجمع جردات عدة مسؤولين. — ليست صفراً.':'* Reported count only, NOT verified. Never sum multiple cashier counts. — is unknown, not zero.'}
+              </p>
             </div>
-            <p className="mt-1 text-[10px] leading-4 text-amber-800">{lang==='fa'?'* یعنی آخرین شمارش گزارش‌شده که هنوز به دلیل اختلاف مسئول صندوق تأیید نشده. — یعنی مبلغ قابل اتکا موجود نیست؛ صفر حساب نمی‌شود.':lang==='ar'?'* تعني آخر جرد مسجل غير مؤكد بسبب تعدد المسؤولين. — تعني عدم توفر جرد مؤكد، وليس صفراً.':'* latest reported count awaiting cashier reconciliation, NOT verified. — means no verified count, not zero cash.'}</p>
           </details>}
         </div>
         <div className="min-w-0 rounded-2xl border border-border/80 p-3.5">
