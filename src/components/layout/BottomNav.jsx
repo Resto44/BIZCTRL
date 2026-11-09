@@ -612,6 +612,7 @@ const BottomNav = memo(function BottomNav() {
     if (role === ROLES.EMPLOYEE) return { visibleNav: [...PRIMARY_NAV_EMPLOYEE, ...(can.uploadSales ? [{ path: '/pos', icon: ScanLine, labelKey: 'cashier_workspace' }] : [])], moreSections: [] };
     if (role === ROLES.SPONSOR) return { visibleNav: PRIMARY_NAV_SPONSOR, moreSections: [] };
     if (role === ROLES.CUSTOMER) return { visibleNav: PRIMARY_NAV_CUSTOMER, moreSections: [] };
+    if (role === ROLES.DRIVER) return { visibleNav: [{ path: '/driver-dashboard', icon: Truck, labelKey: 'dashboard' }], moreSections: [] };
     if (role === ROLES.SUPPLIER) return { visibleNav: [
       { path: '/supplier-portal', icon: Package, labelKey: 'dashboard' },
     ], moreSections: [] };
