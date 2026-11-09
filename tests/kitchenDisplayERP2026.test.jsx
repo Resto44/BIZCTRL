@@ -5,6 +5,8 @@ import {MemoryRouter} from 'react-router-dom';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {describe,it,expect,vi,afterEach,beforeEach} from 'vitest';
 import {readFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+const source = path => readFileSync(resolve(process.cwd(),path),'utf8');
 
 const state=vi.hoisted(()=>({
   portal:'restaurant',can:true,subscribe:vi.fn(),rpc:vi.fn(),branches:[
@@ -136,10 +138,10 @@ describe('Restaurant Kitchen TV workflow',()=>{
   });
 
   it('exposes a private, nonfinancial, permission-checked branch board and a separate route',()=>{
-    const sql=readFileSync(new URL('../supabase/migrations/20261110001500_restaurant_kitchen_tv_portal.sql',import.meta.url),'utf8');
-    const app=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');
-    const sidebar=readFileSync(new URL('../src/components/layout/ERPSidebar.jsx',import.meta.url),'utf8');
-    const mobile=readFileSync(new URL('../src/components/layout/BottomNav.jsx',import.meta.url),'utf8');
+    const sql=source('supabase/migrations/20261110001500_restaurant_kitchen_tv_portal.sql');
+    const app=source('src/App.jsx');
+    const sidebar=source('src/components/layout/ERPSidebar.jsx');
+    const mobile=source('src/components/layout/BottomNav.jsx');
     expect(sql).toContain("restaurant_pos_private.guard(p_restaurant_id,p_branch_id,'viewOrders')");
     expect(sql).toContain("d.branch_id=p_branch_id");
     expect(sql).toContain("o.kitchen_status in ('queued','preparing','ready')");
