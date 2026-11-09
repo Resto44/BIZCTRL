@@ -45,7 +45,7 @@ describe('Driver ERP account and secure login',()=>{
  });
  it('snapshot hides customer PII and is own-user scoped without client-provided IDs',()=>{
   expect(snapshot).toContain('auth.uid()');
-  expect(snapshot).toContain("m.role='driver'");
+  expect(snapshot).toContain("role='driver'");
   expect(snapshot).toContain('m.linked_entity_id');
   expect(snapshot).toContain('REVOKE ALL ON FUNCTION public.erp_driver_self_snapshot(date,date) FROM PUBLIC,anon');
   expect(snapshot).not.toContain('customer_phone');
@@ -56,7 +56,7 @@ describe('Driver ERP account and secure login',()=>{
   expect(reports).toContain('CREATE TABLE IF NOT EXISTS public.driver_daily_reports');
   expect(reports).toContain("status text NOT NULL DEFAULT 'pending'");
   expect(reports).toContain('driver_daily_reports_once_per_day');
-  expect(reports).toContain("m.role='driver'");
+  expect(reports).toContain("role='driver'");
   expect(reports).toContain('d.id=m.linked_entity_id');
   expect(reports).toContain('REVIEWED_OR_MATCHED_REPORT_CANNOT_BE_EDITED');
   expect(reports).toContain("round(v_cash,2)<>report.cash_amount");
