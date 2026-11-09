@@ -48,13 +48,13 @@ begin
     select o.id,o.number,o.revision,o.status,o.kitchen_status,o.order_type,
            o.table_label,o.notes,o.submitted_at,d.code as device_code,
            coalesce((select jsonb_agg(jsonb_build_object(
-             'name',line->>'name',
-             'name_ar',line->>'name_ar',
-             'name_fa',line->>'name_fa',
-             'quantity',line->'quantity',
-             'station',line->>'station',
-             'option_key',line->>'option_key'
-           )) from jsonb_array_elements(o.lines) as line),'[]'::jsonb) as safe_lines
+             'name',line.value->>'name',
+             'name_ar',line.value->>'name_ar',
+             'name_fa',line.value->>'name_fa',
+             'quantity',line.value->'quantity',
+             'station',line.value->>'station',
+             'option_key',line.value->>'option_key'
+           )) from jsonb_array_elements(o.lines) as line(value)),'[]'::jsonb) as safe_lines
     from restaurant_pos_private.orders o
     join restaurant_pos_private.terminals d on d.id=o.device_id
     where d.restaurant_id=p_restaurant_id and d.branch_id=p_branch_id
