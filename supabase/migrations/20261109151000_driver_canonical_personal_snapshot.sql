@@ -11,6 +11,7 @@ DECLARE
  v_network numeric := 0;
  v_count integer := 0;
  v_entries jsonb := '[]'::jsonb;
+ v_trend jsonb := '[]'::jsonb;
  v_deliveries jsonb := '[]'::jsonb;
  v_reports jsonb := '[]'::jsonb;
 BEGIN
@@ -38,6 +39,21 @@ BEGIN
   AND e.branch_id=m.branch_id AND e.date BETWEEN p_from AND p_to
   AND e.status='finalized' AND s.closing_state IN ('finalized','locked')
   AND s.branch_id=m.branch_id AND s.restaurant_id::text=m.restaurant_id::text;
+
+ SELECT coalesce(jsonb_agg(t.row ORDER BY t.day ASC),'[]'::jsonb)
+ INTO v_trend FROM (
+  SELECT e.date AS day,
+    jsonb_build_object('date',e.date,'cash',sum(e.cash_amount),
+     'network',sum(e.network_amount),'total',sum(e.cash_amount+e.network_amount),
+     'records',count(*)) AS row
+  FROM public.driver_sales_entries e
+  JOIN public.daily_sales s ON s.id=e.closing_id
+  WHERE e.driver_id=d.id AND e.restaurant_id=m.restaurant_id
+   AND e.branch_id=m.branch_id AND e.date BETWEEN p_from AND p_to
+   AND e.status='finalized' AND s.closing_state IN ('finalized','locked')
+   AND s.branch_id=m.branch_id AND s.restaurant_id::text=m.restaurant_id::text
+  GROUP BY e.date ORDER BY e.date ASC LIMIT 367
+ ) t;
 
  SELECT coalesce(jsonb_agg(t.row ORDER BY t.day DESC,t.entry_id DESC),'[]'::jsonb)
  INTO v_entries FROM (
@@ -86,7 +102,7 @@ BEGIN
   'period',jsonb_build_object('from',p_from,'to',p_to),
   'totals',jsonb_build_object('cash',v_cash,'network',v_network,
     'sales',v_cash+v_network,'entries',v_count),
-  'finalized_entries',v_entries,'delivery_orders',v_deliveries,
+  'finalized_entries',v_entries,'daily_trend',v_trend,'delivery_orders',v_deliveries,
   'daily_reports',v_reports,
   'accounting_note','Only finalized closing amounts count as sales; driver reports and delivery orders are not additional revenue'
  );
