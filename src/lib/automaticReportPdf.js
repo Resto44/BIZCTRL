@@ -64,7 +64,7 @@ export async function buildAutomaticReportPdf({db,job,context}) {
  // retry with a visible error instead of marking an incomplete report accepted.
  if (!fullAnalytics?.networkBranches?.available)
   throw new Error('REPORT_NETWORK_APPENDIX_MISSING');
- const requiredPages=2+Math.max(1,Math.ceil((fullAnalytics.networkBranches.branches?.length||0)/8));
+ const requiredPages=3; // Finance 1-2 and combined Network/Driver analytics on page 3.
  const doc=await generateSalesAnalyticsPDF({
   snapshot,previousSnapshot:previous,growth:salesReportGrowth(snapshot,previous),range,
   branchLabel:selected?.name||'All branches',
