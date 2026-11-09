@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity, ArrowDownRight, ArrowRight, ArrowUpRight, BadgeDollarSign,
-  Banknote, BarChart3, CreditCard, Landmark, Layers3, ReceiptText,
+  Banknote, BarChart3, ChevronDown, CreditCard, Landmark, Layers3, ReceiptText,
   ShieldAlert, ShoppingBasket, TrendingUp,
 } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
