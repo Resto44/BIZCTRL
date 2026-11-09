@@ -8,6 +8,7 @@ import { useTenant } from '@/lib/TenantContext';
 import { buildDriverSalesAnalytics, canonicalDriverSaleAmounts, DRIVER_ANALYTICS_PERIODS, getDriverAnalyticsDateRange } from '@/lib/driverAnalytics';
 import BranchSelect from '@/components/shared/BranchSelect';
 import DriverTrendAnalytics from '@/components/dashboard/DriverTrendAnalytics';
+import DriverDailyReportsReview from '@/components/drivers/DriverDailyReportsReview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -393,6 +394,14 @@ export default function DriverManagement() {
           {!analytics.totals.orders && <p className="text-sm text-muted-foreground">{accountCopy.empty}</p>}
         </CardContent>
       </Card>
+
+      {canLoad && <DriverDailyReportsReview
+        restaurantId={activeRestaurant.id}
+        branchId={effectiveBranchId}
+        from={dateRange.startDate}
+        to={dateRange.endDate}
+        drivers={drivers}
+      />}
 
       <DriverTrendAnalytics
         drivers={drivers}
