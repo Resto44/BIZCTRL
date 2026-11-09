@@ -316,7 +316,7 @@ export default function SupplierPortalERP() {
             </section>}
 
             {(isLoading||invoicesLoading) && <p role="status" className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-300"><RefreshCw className="h-4 w-4 animate-spin"/>{copy.loading}</p>}
-            {!invoicesLoading && invoices.length>0 && <section className="space-y-2">
+            {!invoicesLoading && invoices.length > 0 && <section className="space-y-2">
               <div className="flex items-center justify-between gap-2 px-0.5">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">{copy.recent}</h3>
                 <button type="button" className="min-h-10 text-xs font-bold text-blue-700 hover:underline dark:text-blue-300" onClick={()=>setActiveTab('invoices')}>{copy.viewAll} →</button>
@@ -331,7 +331,7 @@ export default function SupplierPortalERP() {
                 {pending.map(po=><POCard key={po.id} po={po} copy={copy} onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)} loading={confirmShipmentMutation.isPending}/>)}
               </div>
             </section>}
-            {!isLoading && !invoicesLoading && pending.length===0 && invoices.length===0 &&
+            {!isLoading && !invoicesLoading && pending.length === 0 && invoices.length === 0 &&
               <div data-testid="supplier-erp-empty" className="flex min-w-0 items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                   <CheckCircle2 className="h-5 w-5" aria-hidden="true"/>
