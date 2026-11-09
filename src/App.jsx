@@ -43,6 +43,7 @@ const POSAuditCenter = lazy(() => loadRetailControl().then(module => ({ default:
 const RetailCashier = lazy(() => import('@/pages/retail/pos/RetailCashier'));
 const CustomerDisplay = lazy(() => import('@/pages/retail/pos/CustomerDisplay'));
 const RestaurantPOS = lazy(() => import('@/pages/restaurant/RestaurantPOS'));
+const KitchenDisplayERP = lazy(() => import('@/pages/restaurant/KitchenDisplayERP'));
 import { restaurantRpc } from '@/lib/restaurantPOS';
 import RetailPOSPortalGuard from '@/components/retail-pos/RetailPOSPortalGuard';
 import UniversalTouchPOSRoute from '@/components/pos-touch/UniversalTouchPOSRoute';
@@ -482,6 +483,7 @@ const SubscribedRoutes = () => {
         <Route path="/retail/pos-audit" element={<RoleGuard permission="viewSales"><RetailPOSPortalGuard><POSAuditCenter /></RetailPOSPortalGuard></RoleGuard>} />
         <Route path="/retail/cashier" element={<RoleGuard permission="uploadSales"><RetailPOSPortalGuard><RetailCashier /></RetailPOSPortalGuard></RoleGuard>} />
         <Route path="/restaurant/pos" element={<RoleGuard permission="viewSales"><RestaurantPOS /></RoleGuard>} />
+        <Route path="/restaurant/kitchen" element={<RoleGuard permission="viewOrders"><KitchenDisplayERP /></RoleGuard>} />
 
       </Route>
       <Route path="*" element={<PageNotFound />} />
