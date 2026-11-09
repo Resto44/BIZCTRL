@@ -15,8 +15,8 @@ const add = (total,row) => {
   total.network += amount(row.network_amount);
   total.entries++;
 };
-const finalize = row => Object.fromEntries(Object.entries(row).map(([k,v])=>
-  [k,k==='entries'?v:cents(v)]));
+const finalize = row => ({...row,sales:cents(row.sales),cash:cents(row.cash),
+  network:cents(row.network),entries:row.entries});
 
 function stepFor(from,to){
   const days=Math.round((Date.parse(to+'T12:00:00Z')-Date.parse(from+'T12:00:00Z'))/86400000)+1;
