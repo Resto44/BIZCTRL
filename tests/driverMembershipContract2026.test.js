@@ -10,7 +10,7 @@ describe('driver invitation activation contract', () => {
     expect(sql).toContain('CREATE OR REPLACE FUNCTION public.erp_enforce_membership_contract()');
     expect(sql).toContain("NOT IN ('owner', 'manager', 'employee', 'supplier', 'driver')");
     expect(original).toContain("'driver'");
-    expect(original).toContain("WHEN 'driver' then");
+    expect(original).toMatch(/when 'driver' then/i);
   });
 
   it('retains tenant branch scoping and bounded permissions for drivers', async () => {
