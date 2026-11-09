@@ -106,7 +106,7 @@ describe('Network Management ERP appendix in canonical PDF reports',()=>{
   const doc=new jsPDF({unit:'mm',format:'a4'});
   prepareLocalizedPdf(doc,{lang:'en'});
   const count=drawPdfNetworkManagement(doc,{insights:{...model,branches:many},range,lang:'en'});
-  expect(count).toBe(2);
+  expect(count).toBe(1);
   expect(doc.getNumberOfPages()).toBe(2); // 1 starting page + 1 consolidated appendix
   expect(many.reduce((n,b)=>n+b.current.network,0)).toBe(255);
  });
