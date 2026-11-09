@@ -1,7 +1,7 @@
-export function invitationCandidates({ employees = [], suppliers = [], memberships = [], invitations = [] }, role, branchId) {
+export function invitationCandidates({ employees = [], suppliers = [], drivers = [], memberships = [], invitations = [] }, role, branchId) {
   const rows = [
     ...memberships.filter(r => r.role === role).map(r => ({ ...r, source: 'membership' })),
-    ...(role === 'employee' ? employees : role === 'supplier' ? suppliers : []).map(r => ({ ...r, full_name: r.full_name || r.name, source: 'record' })),
+    ...(role === 'employee' ? employees : role === 'supplier' ? suppliers : role === 'driver' ? drivers : []).map(r => ({ ...r, full_name: r.full_name || r.name, source: 'record' })),
     ...invitations.filter(r => r.role === role).map(r => ({ ...r, source: 'invitation' })),
   ];
   const seen = new Set();
@@ -16,6 +16,7 @@ export async function loadInvitationDirectory(client, restaurantId) {
   const tables = [
     ['employees', 'id,full_name,email,phone,branch_id'],
     ['suppliers', 'id,name,email,phone,branch_id'],
+    ['drivers', 'id,full_name,email,phone,branch_id'],
     ['erp_memberships', 'id,full_name,email,phone,branch_id,role,status'],
     ['erp_invitations', 'id,full_name,email,phone,branch_id,role,status'],
   ];
@@ -28,5 +29,5 @@ export async function loadInvitationDirectory(client, restaurantId) {
       if ((result.data || []).length < 500) return rows;
     }
   }));
-  return { employees: data[0], suppliers: data[1], memberships: data[2], invitations: data[3] };
+  return { employees: data[0], suppliers: data[1], drivers: data[2], memberships: data[3], invitations: data[4] };
 }
