@@ -28,7 +28,7 @@ export function buildExecutiveSnapshotPresentation({
   }));
   const methodsTotal = methods.reduce((total, item) => total + item.amount, 0);
   const reconciled = Math.abs(methodsTotal - sales) < 0.01;
-  const monthly = periodKey === 'year' || periodKey === 'six-months';
+  const monthly = ['year','three-months','six-months','nine-months'].includes(periodKey);
   const series = new Map();
   for (const item of Array.isArray(revenueTrend) ? revenueTrend : []) {
     if (!item?.date || !Number.isFinite(Number(item?.sales))) continue;
@@ -56,7 +56,7 @@ export function buildExecutiveComparisonTrend({revenueTrend=[],previousRevenueTr
   if (!period?.currentStart || !period?.previousStart) {
     return buildExecutiveSnapshotPresentation({revenueTrend,periodKey}).trend.map((row,index)=>({...row,slot:index+1,previousSales:null}));
   }
-  const monthly=periodKey==='year'||periodKey==='six-months';
+  const monthly=['year','three-months','six-months','nine-months'].includes(periodKey);
   const slot=(date,start)=>monthly
     ? (Number(date.slice(0,4))-Number(start.slice(0,4)))*12+Number(date.slice(5,7))-Number(start.slice(5,7))
     : Math.round((Date.parse(date+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000);
