@@ -651,7 +651,8 @@ const BottomNav = memo(function BottomNav() {
         ...section,
         items: section.items
           .filter((item) => {
-            if ((item.path === '/restaurant/pos' || item.path === '/restaurant/kitchen') && !restaurant) return false;
+            if (item.path === '/restaurant/pos' && !restaurant) return false;
+            if (item.path === '/restaurant/kitchen' && !restaurant) return false;
             const permission = MORE_PERMISSION_BY_PATH[item.path];
             return (item.path !== '/retail/cashier' || commerce) && (!permission || can[permission]) && !hidden.has(item.path) && isWorkspacePathEnabled(configuration, item.path);
           })
