@@ -94,6 +94,7 @@ export default function OwnerStaffProvisioning() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [form, setForm] = useState({ role: 'employee', branchId: '', fullName: '', contact: '' });
   const [generatedInvitation, setGeneratedInvitation] = useState(null);
+  const [emailSending, setEmailSending] = useState(false);
 
   const selectedOrganization = useMemo(
     () => organizations.find((organization) => String(organization.id) === String(selectedOrganizationId)) || null,
@@ -209,6 +210,29 @@ export default function OwnerStaffProvisioning() {
     updateForm('contact', '');
   };
 
+  const deliverInvitationEmail = async (invitation) => {
+    if (!invitation?.email || !invitation?.token || !invitation?.invitation_id) return;
+    setEmailSending(true);
+    setGeneratedInvitation(current => current?.invitation_id === invitation.invitation_id
+      ? { ...current, emailStatus: 'sending' } : current);
+    try {
+      const { data, error } = await supabase.functions.invoke('erp-invitation-email', {
+        body: { invitation_id: invitation.invitation_id, token: invitation.token },
+      });
+      if (error || !data?.provider_accepted) throw error || new Error(data?.error || 'Email provider did not accept the invitation.');
+      setGeneratedInvitation(current => current?.invitation_id === invitation.invitation_id
+        ? { ...current, emailStatus: 'accepted' } : current);
+      toast.success('Invitation email accepted for sending. Inbox delivery is not confirmed.');
+    } catch (error) {
+      console.error('[OwnerStaffProvisioning] invitation email failed', error?.message || 'provider error');
+      setGeneratedInvitation(current => current?.invitation_id === invitation.invitation_id
+        ? { ...current, emailStatus: 'failed' } : current);
+      toast.warning('Invitation email was not accepted. Use Copy or Share now; the link is still valid.');
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
   const issueInvitation = async ({ role, branchId, fullName, email, phone }) => {
     if (issuanceLock.current) return;
     issuanceLock.current = true;
@@ -231,11 +255,14 @@ export default function OwnerStaffProvisioning() {
       invitationUrl: `${window.location.origin}/erp-register?token=${encodeURIComponent(data.token)}`,
       fullName,
       recipient: email || phone,
+      email: email || null,
+      emailStatus: email ? 'sending' : 'manual',
       role: roleMeta(role).label,
       organization: selectedOrganization?.name || 'Selected organization',
       branch: branch?.name || branch?.label || 'Selected branch',
     };
     setGeneratedInvitation(generated);
+    if (email) await deliverInvitationEmail(generated);
     try {
       await loadInvitations(selectedOrganizationId);
     } catch (refreshError) {
@@ -437,8 +464,14 @@ export default function OwnerStaffProvisioning() {
         <div ref={resultRef} role="status" className="overflow-hidden rounded-3xl border border-emerald-200 bg-emerald-50 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/25">
           <div className="flex min-w-0 flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white"><CheckCircle2 className="h-6 w-6" /></span>
-            <div className="min-w-0 flex-1"><p className="font-black text-emerald-950 dark:text-emerald-100">Invitation ready for {generatedInvitation.fullName}</p><p className="mt-0.5 break-all text-xs text-emerald-800/75 dark:text-emerald-200/70">{generatedInvitation.recipient} · {generatedInvitation.role} · {generatedInvitation.branch}</p></div>
+            <div className="min-w-0 flex-1"><p className="font-black text-emerald-950 dark:text-emerald-100">Invitation ready for {generatedInvitation.fullName}</p><p className="mt-0.5 break-all text-xs text-emerald-800/75 dark:text-emerald-200/70">{generatedInvitation.recipient} · {generatedInvitation.role} · {generatedInvitation.branch}</p>
+              {generatedInvitation.email && <p aria-live="polite" className="mt-1 text-xs text-emerald-900 dark:text-emerald-100">{generatedInvitation.emailStatus === 'accepted'
+                ? 'Invitation email accepted by provider; delivery to Inbox is not guaranteed. Email verification follows signup.'
+                : generatedInvitation.emailStatus === 'failed'
+                  ? 'Invitation email failed. Copy or share the valid link manually, or retry email.'
+                  : 'Requesting delivery of invitation email…'}</p>}</div>
             <div className="grid grid-cols-2 gap-2 sm:flex">
+              {generatedInvitation.email && <Button type="button" variant="outline" disabled={emailSending || generatedInvitation.emailStatus === 'accepted'} onClick={() => deliverInvitationEmail(generatedInvitation)} className="min-h-11 rounded-xl border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-100"><Mail className="mr-2 h-4 w-4" />{emailSending ? 'Sending…' : generatedInvitation.emailStatus === 'accepted' ? 'Email accepted' : 'Retry email'}</Button>}
               <Button type="button" variant="outline" onClick={copyInvitationLink} className="min-h-11 rounded-xl border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-slate-900 dark:text-emerald-300"><Copy className="mr-2 h-4 w-4" />Copy</Button>
               <Button type="button" onClick={shareInvitation} className="min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700"><Share2 className="mr-2 h-4 w-4" />Share now</Button>
             </div>
