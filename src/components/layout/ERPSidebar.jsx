@@ -31,7 +31,7 @@ import {
   PieChart, Target, Layers, ClipboardList, Handshake,
   ArrowLeftRight, ShieldCheck, SlidersHorizontal, Truck, X,
   Search, Plus, CircleAlert, CheckCircle2, LifeBuoy, MapPinned,
-  MonitorSmartphone, ScanLine, FileSearch, ShieldAlert
+  MonitorSmartphone, ScanLine, FileSearch, ShieldAlert, ChefHat
 } from 'lucide-react';
 import { useERPNavigation } from '@/hooks/useERPNavigation';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
@@ -48,6 +48,7 @@ export const ERP_NAV_GROUPS = [
   ] },
   { key: 'restaurant-pos', label: 'Restaurant POS', restaurantOnly: true, items: [
     { path: '/restaurant/pos', label: 'Restaurant POS', icon: MonitorSmartphone, permission: 'viewSales' },
+    { path: '/restaurant/kitchen', label: 'Kitchen Display · TV', icon: ChefHat, permission: 'viewOrders' },
   ] },
   {
     key: 'overview',

@@ -18,7 +18,7 @@ import {
   Package, CreditCard, ShoppingCart, Star, Grid3x3, X,
   TrendingUp, Calendar, Zap, Barcode, Boxes, Tags,
   ScanLine, Hash, Layers, ShieldCheck, Search, ChevronDown,
-  AlertTriangle, CheckCircle2,
+  AlertTriangle, CheckCircle2, ChefHat,
 } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
@@ -86,6 +86,7 @@ const PRIMARY_NAV_CUSTOMER = [];
 // cannot use in the first place, especially when General Manager shares Owner sections.
 const MORE_PERMISSION_BY_PATH = {
   '/restaurant/pos': 'viewSales',
+  '/restaurant/kitchen': 'viewOrders',
   '/erp-approval-center': 'manageSettings',
   '/cash-register': 'viewSales',
   '/sales/invoices': 'viewSales',
@@ -129,7 +130,7 @@ const MORE_PERMISSION_BY_PATH = {
 // ── More Menu Sections ────────────────────────────────────────────────────────
 
 const MORE_SECTIONS_OWNER_RESTAURANT = [
-  { title: 'Restaurant POS', items: [{ path: '/restaurant/pos', icon: ScanLine, labelKey: 'restaurant_pos' }] },
+  { title: 'Restaurant POS', items: [{ path: '/restaurant/pos', icon: ScanLine, labelKey: 'restaurant_pos' }, { path: '/restaurant/kitchen', icon: ChefHat, labelKey: 'kitchen_display' }] },
   {
     title: 'Approvals',
     items: [
@@ -245,7 +246,7 @@ const MORE_SECTIONS_OWNER_RETAIL = [
 ];
 
 const MORE_SECTIONS_MANAGER_RESTAURANT = [
-  { title: 'Restaurant POS', items: [{ path: '/restaurant/pos', icon: ScanLine, labelKey: 'restaurant_pos' }] },
+  { title: 'Restaurant POS', items: [{ path: '/restaurant/pos', icon: ScanLine, labelKey: 'restaurant_pos' }, { path: '/restaurant/kitchen', icon: ChefHat, labelKey: 'kitchen_display' }] },
   {
     title: 'Operations',
     items: [
@@ -609,7 +610,7 @@ const BottomNav = memo(function BottomNav() {
   const [showMore, setShowMore] = useState(false);
 
   const { visibleNav: baseNav, moreSections: baseMoreSections } = useMemo(() => {
-    if (role === ROLES.EMPLOYEE) return { visibleNav: [...PRIMARY_NAV_EMPLOYEE, ...(can.uploadSales ? [{ path: '/pos', icon: ScanLine, labelKey: 'cashier_workspace' }] : [])], moreSections: [] };
+    if (role === ROLES.EMPLOYEE) return { visibleNav: [...PRIMARY_NAV_EMPLOYEE, ...(restaurant && can.viewOrders ? [{ path: '/restaurant/kitchen', icon: ChefHat, labelKey: 'kitchen_display' }] : []), ...(can.uploadSales ? [{ path: '/pos', icon: ScanLine, labelKey: 'cashier_workspace' }] : [])], moreSections: [] };
     if (role === ROLES.SPONSOR) return { visibleNav: PRIMARY_NAV_SPONSOR, moreSections: [] };
     if (role === ROLES.CUSTOMER) return { visibleNav: PRIMARY_NAV_CUSTOMER, moreSections: [] };
     if (role === ROLES.DRIVER) return { visibleNav: [{ path: '/driver-dashboard', icon: Truck, labelKey: 'dashboard' }], moreSections: [] };
@@ -628,7 +629,7 @@ const BottomNav = memo(function BottomNav() {
     return isRetailLike
       ? { visibleNav: PRIMARY_NAV_OWNER_RETAIL, moreSections: MORE_SECTIONS_OWNER_RETAIL }
       : { visibleNav: PRIMARY_NAV_OWNER_RESTAURANT, moreSections: MORE_SECTIONS_OWNER_RESTAURANT };
-  }, [role, isRetailLike, can.uploadSales, can.viewSales, restaurant]);
+  }, [role, isRetailLike, can.uploadSales, can.viewSales, can.viewOrders, restaurant]);
 
   const { visibleNav, moreSections } = useMemo(() => {
     const hidden = new Set(configuration?.navigation?.hidden_paths || []);
@@ -651,6 +652,7 @@ const BottomNav = memo(function BottomNav() {
         items: section.items
           .filter((item) => {
             if (item.path === '/restaurant/pos' && !restaurant) return false;
+            if (item.path === '/restaurant/kitchen' && !restaurant) return false;
             const permission = MORE_PERMISSION_BY_PATH[item.path];
             return (item.path !== '/retail/cashier' || commerce) && (!permission || can[permission]) && !hidden.has(item.path) && isWorkspacePathEnabled(configuration, item.path);
           })

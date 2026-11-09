@@ -9,6 +9,19 @@ Entry: `/restaurant/pos`. Only restaurant/café workspaces can use it. Navigatio
 3. Choose a device, open its shift, and create an order. Touch food cards, set dine-in/takeaway/delivery and table/pickup details, then send to kitchen or confirm payment.
 4. Open Kitchen & orders on the kitchen screen. Pair Customer screen using its revocable eight-hour link, never the owner's credentials. Live control shows recorded sales, unpaid orders, purchases, expenses, and device activity.
 
+
+## Dedicated Kitchen TV / KDS portal (November 2026)
+
+- Direct signed-in URL: `/restaurant/kitchen`. It works as an independent kitchen screen, not a shared cashier account.
+- Owner/manager: open **Restaurant POS → Kitchen Display · TV**, choose an authorized branch, and use **TV mode** on a browser-connected television. An optional sound toggle is user-activated; browser autoplay restrictions apply.
+- Kitchen employee: invite or use a scoped **Employee** login with the Owner-assigned `viewOrders` permission (no `viewSales`, `uploadSales` or wallet permissions are required). Log in with that staff account on the TV. Employee branch selection is limited to their approved assigned branch; the server validates tenant, membership, permission and branch independently of the URL.
+- Cashier: open a shift, create an order, add products, and select **Send to kitchen**. The existing POS command is authoritative and deducts ingredients only once; the new KDS does not create sales or change inventory.
+- Kitchen: **New → Preparing → Ready**; once payment is finalized the order can be **Handed over**. Both legacy POS Kitchen tab and KDS call the same revision-checked RPC, preventing conflicting state changes and unpaid handover.
+- Updates: existing `restaurant-pos:<tenant>` Realtime topic contains only a change signal, with a 5-second authorized RPC fallback, refetch on reconnect and visibility return, and visible connection/error states. A stale/disconnected KDS disables mutations. Orders from earlier days remain in the board until served/cancelled.
+- TV: high-contrast cards, quantity/food/table/delivery/notes, station filtering, elapsed-time warning after 10 minutes and late indicator after 20 minutes. Multistation orders cannot be advanced from a single-station filtered view; select **All stations** to advance the whole order.
+- The private board returns only preparation details, no prices, receipts, stock recipes, cash balances or customer contact details. Only 200 oldest active orders appear at once; overflow is shown explicitly, not silently discarded. All active orders remain persisted in the existing POS tables.
+- Deployment order: add read-only KDS RPC migration, test the existing POS and permissions, deploy frontend, and verify real cashier → TV → paid handover on the actual restaurant network. This is NOT proof of real television/audio reliability without physical-device acceptance.
+
 ## Accounting and inventory guarantees
 
 - Adding food to a draft does not consume stock. Sending to the kitchen consumes the recipe once; checkout consumes it only if not already submitted. Server-side prices and recipe snapshots are authoritative.
