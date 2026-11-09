@@ -13,6 +13,13 @@ vi.mock('../src/lib/scheduledERPReportData.js',()=>({
  fetchScheduledERPReportData:vi.fn(async()=>({
   sales,purchases:[],expenses:[],inventory:[],inventoryTransactions:[],
   customerDebts:[],expenseCategories:[],walletTransactions:[],
+  drivers:[{id:'driver-1',restaurant_id:'org-1',branch_id:'branch-1',full_name:'Delivery Driver'}],
+  driverSalesEntries:[
+   {id:'e-current',restaurant_id:'org-1',branch_id:'branch-1',driver_id:'driver-1',
+    closing_id:'current',date:'2026-11-07',status:'finalized',cash_amount:30,network_amount:20,total_amount:50},
+   {id:'e-prior',restaurant_id:'org-1',branch_id:'branch-1',driver_id:'driver-1',
+    closing_id:'prior',date:'2026-11-06',status:'finalized',cash_amount:20,network_amount:10,total_amount:30},
+  ],
  }))
 }));
 const db={from:table=>{
