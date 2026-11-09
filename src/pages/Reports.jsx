@@ -217,6 +217,19 @@ export default function Reports() {
     enabled: hasScope,
   });
 
+  // Driver collections are a verified SUBSET of finalized Sales Closing.
+  // Failed or truncated driver reads block PDF export rather than claim zero.
+  const {data:driverSalesEntries=[],isLoading:loadingDriverEntries,isError:driverEntriesError}=useQuery({
+    queryKey:['pdf_driver_sales_entries',activeRestaurant?.id,selectedBranchId,earliestReportDate,todayReportDate],
+    queryFn:()=>fetchReportRows('driver_sales_entries',null),
+    staleTime:60000,enabled:hasScope,
+  });
+  const {data:pdfDrivers=[],isLoading:loadingPdfDrivers,isError:pdfDriversError}=useQuery({
+    queryKey:['pdf_drivers',activeRestaurant?.id,selectedBranchId],
+    queryFn:()=>fetchOperationsRows('drivers',{legacyColumn:null}),
+    staleTime:60000,enabled:hasScope,
+  });
+
   const { data: purchases = [], isLoading: loadingPurchases, isError: purchasesError } = useQuery({
     queryKey: ['purchases_erp', activeRestaurant?.id, selectedBranchId],
     queryFn: async () => {
@@ -272,9 +285,9 @@ export default function Reports() {
     queryFn:()=>fetchOperationsRows('debt_records'),enabled:hasScope,staleTime:60000,
   });
   const isLoading = loadingSales || loadingPurchases || loadingExpenses || loadingSources || loadingCategories ||
-    loadingInventory || loadingMovements || loadingDebts || loadingWallet;
+    loadingInventory || loadingMovements || loadingDebts || loadingWallet || loadingDriverEntries || loadingPdfDrivers;
   const hasReportError = salesError || purchasesError || expensesError || categoriesError ||
-    inventoryError || movementsError || debtsError || walletError;
+    inventoryError || movementsError || debtsError || walletError || driverEntriesError || pdfDriversError;
 
   const periodSnapshot = useMemo(() => buildSalesReportSnapshot({
     sales,purchases,expenses,expenseCategories,revenueSources,
@@ -341,9 +354,9 @@ export default function Reports() {
   );
 
   const fullAnalytics = useMemo(()=>buildFullSalesAnalyticsReport({
-    sales,purchases,walletTransactions,snapshot:periodSnapshot,previousSnapshot,
+    sales,purchases,walletTransactions,driverSalesEntries,drivers:pdfDrivers,snapshot:periodSnapshot,previousSnapshot,
     operationsReport,range:reportRange,revenueSources,branches:scopedBranches,lang,historyAvailable:true,
-  }),[sales,purchases,walletTransactions,periodSnapshot,previousSnapshot,operationsReport,reportRange,revenueSources,scopedBranches,lang]);
+  }),[sales,purchases,walletTransactions,driverSalesEntries,pdfDrivers,periodSnapshot,previousSnapshot,operationsReport,reportRange,revenueSources,scopedBranches,lang]);
   const productQtyAnalytics = {
     monthlyProducts:fullAnalytics.products.map(p=>({productId:p.id,productName:p.name,totalQuantity:p.quantity,unit:p.unit,totalCost:p.cost})),
   };
