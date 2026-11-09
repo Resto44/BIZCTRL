@@ -11,7 +11,7 @@ import { audit } from '@/lib/auditLogger';
  * 3. Employee         — assigned branch, permissions granted by Owner
  * 4. Supplier         — assigned supplier workflow, permissions granted by Owner
  *
- * Drivers are managed records, not authenticated ERP portal users.
+ * Driver accounts are restricted self-service, with server-authorized own sales only.
  */
 
 export const ROLES = {
@@ -19,6 +19,7 @@ export const ROLES = {
   MANAGER:         'manager',
   EMPLOYEE:        'employee',
   SUPPLIER:        'supplier',
+  DRIVER:          'driver',
   // Temporary source-compatibility alias. Canonical session resolution maps
   // every legacy general_manager membership to manager in the database.
   GENERAL_MANAGER: 'general_manager',
@@ -34,6 +35,7 @@ export const ROLE_HOME = {
   [ROLES.MANAGER]:         '/manager-dashboard',
   [ROLES.EMPLOYEE]:        '/employee-dashboard',
   [ROLES.SUPPLIER]:        '/supplier-portal',
+  [ROLES.DRIVER]:          '/driver-dashboard',
   // Legacy
   [ROLES.SPONSOR]:         '/sponsor-dashboard',
   [ROLES.CUSTOMER]:        '/customer-dashboard',
@@ -44,6 +46,7 @@ export const NON_OWNER_ROLES = new Set([
   ROLES.MANAGER,
   ROLES.EMPLOYEE,
   ROLES.SUPPLIER,
+  ROLES.DRIVER,
   ROLES.SPONSOR,
   ROLES.CUSTOMER,
 ]);
@@ -95,7 +98,7 @@ export function RoleProvider({ children }) {
     // Normalize role strings to match our ROLES constant
     const r = (user?.role || '').toLowerCase();
     if (r === ROLES.GENERAL_MANAGER) return ROLES.MANAGER;
-    if ([ROLES.OWNER, ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.SUPPLIER].includes(r)) return r;
+    if ([ROLES.OWNER, ROLES.MANAGER, ROLES.EMPLOYEE, ROLES.SUPPLIER, ROLES.DRIVER].includes(r)) return r;
     if (r === 'admin' || r === 'restaurant_admin') return ROLES.OWNER;
     if (r === 'staff') return ROLES.EMPLOYEE;
     return ROLES.EMPLOYEE; // Deny by default until a recognized role is available
