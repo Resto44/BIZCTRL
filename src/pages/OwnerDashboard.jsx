@@ -476,7 +476,7 @@ function OwnerDashboardContent() {
 
   const model = useMemo(() => ({
     formatMoney, periodMetrics, previousPeriodMetrics, periodSalesChange, periodLabel, periodKey: activePeriod,
-    periodSales, periodPurchases, previousPeriodSales, previousPeriodPurchases, revenueSources, lang,
+    periodSales, revenueSources, lang, periodPurchases, previousPeriodSales, previousPeriodPurchases,
     branchRankings, scopedAlerts, inventoryOverview, receivables, receivablesStatus: creditLedgerAudit.status === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : customerCreditPosition.status, receivablesCount: customerCreditPosition.count, creditLedgerAudit, payables, cashRegister, drawerCash,
     consumption, priceReport, supplierComparisons, branchPriceInconsistencies, priceHistory,
     previousRevenueTrend, reportPeriod: period, changeReportPeriod,
