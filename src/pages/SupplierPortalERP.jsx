@@ -319,6 +319,11 @@ export default function SupplierPortalERP() {
         </nav>
 
         <main className="space-y-4">
+          {paymentsError && <div role="alert" data-testid="supplier-payment-history-error"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+            <span className="min-w-0 flex-1">{copy.noPaymentFeed}</span>
+            <Button type="button" variant="outline" size="sm" onClick={()=>refetchPayments()}>{copy.retry}</Button>
+          </div>}
           {activeTab==='home' && <>
             <div className="px-0.5">
               <h2 className="text-base font-extrabold text-slate-900 dark:text-white sm:text-lg">{copy.home}</h2>
@@ -350,6 +355,38 @@ export default function SupplierPortalERP() {
                 <p className="mt-1 text-xs font-semibold leading-4 text-slate-600 dark:text-slate-300">{copy.outstanding}</p>
               </button>
             </div>
+
+            {!invoicesLoading && invoices.length>0 && <div data-testid="supplier-invoice-settlement-status"
+              className="grid grid-cols-2 gap-2.5">
+              <button type="button" onClick={()=>setActiveTab('invoices')}
+                className="flex min-h-14 min-w-0 items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 text-start hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-300"/>
+                <div className="min-w-0"><p className="text-lg font-extrabold tabular-nums text-slate-950 dark:text-white">{invoiceProgress.fullyPaid}</p>
+                  <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">{copy.paidInvoices}</p></div>
+              </button>
+              <button type="button" onClick={()=>setActiveTab('invoices')}
+                className="flex min-h-14 min-w-0 items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-3.5 text-start hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950">
+                <Wallet className="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-300"/>
+                <div className="min-w-0"><p className="text-lg font-extrabold tabular-nums text-slate-950 dark:text-white">{invoiceProgress.partiallyPaid}</p>
+                  <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">{copy.partialInvoices}</p></div>
+              </button>
+            </div>}
+
+            {!paymentsLoading && !paymentsError && recentPayments.length>0 && <section data-testid="supplier-recent-payments" className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">{copy.recentPayments}</h3>
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {recentPayments.map(({payment,invoice})=><div key={payment.id}
+                  className="flex min-w-0 items-start justify-between gap-2 py-2 text-xs">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-all font-semibold text-slate-900 dark:text-white">{invoice?.invoice_number||invoice?.id?.slice(0,8)}</p>
+                    <p className="mt-1 text-slate-500 dark:text-slate-400">{dateLabel(payment.date)} · {copy[payment.payment_method]||payment.payment_method||'—'}</p>
+                  </div>
+                  <strong dir="ltr" className="shrink-0 tabular-nums text-emerald-700 dark:text-emerald-300">
+                    {invoice?.currency||'—'} {moneyLabel(payment.amount)}
+                  </strong>
+                </div>)}
+              </div>
+            </section>}
 
             {purchaseOrders.length>0 && !isLoading && <section data-testid="supplier-order-progress" className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
