@@ -139,4 +139,4 @@ BEGIN
     'status', v_invitation.status
   );
 END;
-$function$
+$function$ ;
