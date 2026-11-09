@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BarChart3, CalendarDays, CreditCard,
-  RefreshCw, Truck, Wallet, Users, ReceiptText, AlertTriangle, ExternalLink,
+  RefreshCw, Truck, Wallet, Users, ReceiptText, AlertTriangle, ExternalLink, ChevronDown,
 } from 'lucide-react';
 import {
   Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer,
@@ -33,6 +33,7 @@ const LABELS = {
     mismatch:'Payment split does not reconcile. Review the finalized closings.',
     invalidRange:'Choose a valid date range of up to 371 days.',currencyHint:'Currency follows the organization settings.',
     previous:'Previous',current:'Current',chart:'Chart type',filter:'Analytics filters',
+    explore:'Explore trends',collapse:'Hide trends',compactNote:'Already included in total business sales',
   },
   fa: {
     title:'فروشات راننده‌ها · تحلیل ERP',subtitle:'فروشات نهایی راننده‌ها از قبل در فروش عمومی شامل است؛ درآمد اضافی نیست',
@@ -51,6 +52,7 @@ const LABELS = {
     mismatch:'جمع نقد و شبکه با مجموع فروش برابر نیست؛ کلوزینگ‌ها بررسی شوند.',
     invalidRange:'تاریخ درست در بازهٔ حداکثر ۳۷۱ روز انتخاب کنید.',currencyHint:'ارز مطابق تنظیمات سازمان است.',
     previous:'قبلی',current:'جاری',chart:'نوع نمودار',filter:'فیلترهای تحلیل',
+    explore:'نمایش ترندها',collapse:'بستن تحلیل‌ها',compactNote:'این مبلغ از قبل در فروش عمومی شامل است',
   },
   ar: {
     title:'مبيعات السائقين · تحليلات ERP',subtitle:'مبيعات السائقين المعتمدة مشمولة في إجمالي المبيعات وليست إيراداً إضافياً',
@@ -69,6 +71,7 @@ const LABELS = {
     mismatch:'إجمالي النقد والشبكة لا يطابق المبيعات؛ راجع الإقفالات.',
     invalidRange:'اختر فترة صحيحة لا تزيد عن ٣٧١ يوماً.',currencyHint:'العملة حسب إعدادات المؤسسة.',
     previous:'السابق',current:'الحالي',chart:'نوع الرسم',filter:'فلاتر التحليل',
+    explore:'استعراض الاتجاهات',collapse:'إخفاء التحليلات',compactNote:'هذه المبيعات مشمولة بالفعل في الإجمالي',
   },
 };
 const n = value => Number(value) || 0;
@@ -112,6 +115,7 @@ export default function OwnerDriverSalesCard({ restaurantId, branchId, branchLab
   const t=LABELS[lang]||LABELS.en;
   const navigate=useNavigate();
   const queryClient=useQueryClient();
+  const [expanded,setExpanded]=useState(false);
   const [period,setPeriod]=useState('month');
   const [bucket,setBucket]=useState('day');
   const [driverId,setDriverId]=useState('');
@@ -140,7 +144,7 @@ export default function OwnerDriverSalesCard({ restaurantId, branchId, branchLab
   });
   const prior=useQuery({
     queryKey:['owner-driver-sales',restaurantId,branch,driverId,previous?.from,previous?.to,bucket],
-    queryFn:()=>request(previous),enabled,staleTime:60000,retry:1,
+    queryFn:()=>request(previous),enabled:enabled && expanded,staleTime:60000,retry:1,
   });
 
   useEffect(()=>{
@@ -172,17 +176,41 @@ export default function OwnerDriverSalesCard({ restaurantId, branchId, branchLab
   const handleRefresh=()=>queryClient.invalidateQueries({queryKey:['owner-driver-sales',restaurantId]});
   const yearMax=new Date().toISOString().slice(0,10);
 
-  return <section data-testid="owner-driver-sales-analytics" aria-label={t.title} className="min-w-0 space-y-3 overflow-hidden rounded-[1.45rem] border border-blue-200/80 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/20 p-3 shadow-sm dark:border-blue-900/70 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/30 sm:p-5">
+  return <section data-testid="owner-driver-sales-analytics" aria-label={t.title} className="min-w-0 space-y-2 overflow-hidden rounded-[1.45rem] border border-blue-200/80 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/20 p-3 shadow-sm dark:border-blue-900/70 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/30 sm:p-4">
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div className="flex min-w-0 items-start gap-2.5">
         <span className="rounded-xl bg-blue-600 p-2.5 text-white"><Truck className="h-5 w-5"/></span>
-        <div className="min-w-0"><h2 className="text-base font-black text-foreground sm:text-lg">{t.title}</h2>
-          <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{t.subtitle}</p></div>
+        <div className="min-w-0"><h2 className="text-sm font-black text-foreground sm:text-base">{t.title}</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{expanded?t.subtitle:(t[period]+' · '+(branchLabel||t.allBranches))}</p></div>
       </div>
-      <div className="flex gap-2">
-        <button type="button" aria-label={t.retry} onClick={handleRefresh} className="rounded-xl border border-border bg-card p-2.5 hover:bg-muted"><RefreshCw className={'h-4 w-4 '+(current.isFetching?'animate-spin':'')}/></button>
-        <button type="button" onClick={()=>navigate('/driver-management')} className="inline-flex items-center gap-1 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold hover:bg-muted">{t.details}<ExternalLink className="h-3.5 w-3.5"/></button>
+      <button type="button" data-testid="owner-driver-explore-trends"
+        aria-expanded={expanded} aria-controls="owner-driver-sales-details"
+        onClick={()=>setExpanded(value=>!value)}
+        className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 text-xs font-black text-white shadow-sm hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">
+        {expanded?t.collapse:t.explore}
+        <ChevronDown className={'h-4 w-4 transition-transform '+(expanded?'rotate-180':'')}/>
+      </button>
+    </div>
+
+    {!expanded&&<div data-testid="owner-driver-sales-compact" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-blue-100 bg-white/85 px-3 py-2.5 dark:border-blue-900/70 dark:bg-slate-900/60">
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold text-muted-foreground">{t.revenue} · {t[period]}</p>
+        <p className="mt-0.5 text-lg font-black text-foreground" data-testid="owner-driver-compact-revenue">
+          {invalid||loading||failed?'—':amount(totals?.revenue)}
+        </p>
       </div>
+      {!invalid&&!loading&&!failed&&totals&&<div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+        <span>{t.cash}: <strong className="font-semibold text-foreground">{amount(totals.cash)}</strong></span>
+        <span>{t.network}: <strong className="font-semibold text-foreground">{amount(totals.network)}</strong></span>
+      </div>}
+      <p className="w-full text-[10px] leading-4 text-muted-foreground">{t.compactNote}</p>
+    </div>}
+    {invalid&&<p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-800">{t.invalidRange}</p>}
+    {failed&&<div role="alert" className="flex items-center gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-xs font-bold text-red-800"><AlertTriangle className="h-4 w-4"/>{t.unavailable}<button type="button" onClick={handleRefresh} className="ms-auto underline">{t.retry}</button></div>}
+    {expanded&&<div id="owner-driver-sales-details" data-testid="owner-driver-sales-details" className="space-y-3">
+    <div className="flex flex-wrap gap-2">
+      <button type="button" aria-label={t.retry} onClick={handleRefresh} className="rounded-xl border border-border bg-card p-2.5 hover:bg-muted"><RefreshCw className={'h-4 w-4 '+(current.isFetching?'animate-spin':'')}/></button>
+      <button type="button" onClick={()=>navigate('/driver-management')} className="inline-flex items-center gap-1 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold hover:bg-muted">{t.details}<ExternalLink className="h-3.5 w-3.5"/></button>
     </div>
 
     <div data-testid="owner-driver-sales-filters" className="flex min-w-0 flex-wrap items-end gap-2 rounded-2xl border border-border/60 bg-card/80 p-2.5">
@@ -214,9 +242,7 @@ export default function OwnerDriverSalesCard({ restaurantId, branchId, branchLab
     </div>
 
     <p className="text-[11px] text-muted-foreground"><CalendarDays className="me-1 inline h-3.5 w-3.5"/>{range?range.from+' — '+range.to:t.invalidRange} · {branchLabel||t.allBranches} · {t.lastUpdated}</p>
-    {invalid&&<p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-800">{t.invalidRange}</p>}
     {loading&&<div role="status" className="animate-pulse rounded-xl border border-border p-6 text-sm text-muted-foreground">{t.title}…</div>}
-    {failed&&<div role="alert" className="flex items-center gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-xs font-bold text-red-800"><AlertTriangle className="h-4 w-4"/>{t.unavailable}<button type="button" onClick={handleRefresh} className="ms-auto underline">{t.retry}</button></div>}
     {!invalid&&!loading&&!failed&&totals&&<>
       <div data-testid="owner-driver-sales-kpis" className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
         <Kpi label={t.revenue} icon={BarChart3} value={amount(totals.revenue)}/>
@@ -268,5 +294,6 @@ export default function OwnerDriverSalesCard({ restaurantId, branchId, branchLab
       </div>
       <p className="text-[11px] leading-5 text-muted-foreground">{t.noRevenue}</p>
     </>}
+    </div>}
   </section>;
 }
