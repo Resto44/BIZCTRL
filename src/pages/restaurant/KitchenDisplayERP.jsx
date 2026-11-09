@@ -32,6 +32,7 @@ const WORDS={
     dine_in:'Dine-in',takeaway:'Takeaway',delivery:'Delivery',
     age:'Elapsed',minutes:'min',orders:'Active tickets',unit:'×',
     error:'Order changed or the connection failed. The kitchen board has been refreshed.',
+    stationOnly:'Select All stations to advance an order that has items for several stations.',
   },
   fa:{
     title:'نمایشگر مطبخ',subtitle:'سفارش‌های زنده از POS رستورانت',
@@ -50,6 +51,7 @@ const WORDS={
     dine_in:'داخل رستورانت',takeaway:'بیرون‌بر',delivery:'دلیوری',
     age:'مدت انتظار',minutes:'دقیقه',orders:'سفارش فعال',unit:'×',
     error:'سفارش تغییر کرده یا اتصال قطع شده است؛ فهرست مطبخ تازه‌سازی شد.',
+    stationOnly:'این سفارش مربوط چند بخش است؛ برای تغییر وضعیت تمام بخش‌ها را انتخاب کنید.',
   },
   ar:{
     title:'شاشة المطبخ',subtitle:'الطلبات المباشرة من كاشير المطعم',
@@ -68,6 +70,7 @@ const WORDS={
     dine_in:'محلي',takeaway:'سفري',delivery:'توصيل',
     age:'مدة الانتظار',minutes:'دقيقة',orders:'طلب نشط',unit:'×',
     error:'تغير الطلب أو انقطع الاتصال؛ تم تحديث لوحة المطبخ.',
+    stationOnly:'الطلب يحتوي أصنافاً من عدة محطات؛ اختر كل المحطات لتغيير حالته.',
   },
 };
 const STAGES=['queued','preparing','ready'];
@@ -118,11 +121,13 @@ function useKitchenLive(restaurantId,branchId,enabled){
   return q;
 }
 
-function Ticket({order,stage,lang,t,now,advance,pending,fresh}){
+function Ticket({order,stage,station,lang,t,now,advance,pending,fresh}){
   const elapsed=kitchenMinutes(order.submitted_at,now);
   const urgency=kitchenUrgency(elapsed);
   const done=stage==='ready'&&order.status!=='paid';
-  const can=kitchenCanAdvance(order,fresh,Boolean(pending));
+  const differentStations=new Set((order.lines||[]).map(l=>l.station||'Kitchen')).size>1;
+  const stationBlocked=Boolean(station&&differentStations);
+  const can=kitchenCanAdvance(order,fresh,Boolean(pending))&&!stationBlocked;
   return <article data-testid="kds-ticket" data-stage={stage} className={'rounded-2xl border p-4 shadow-lg '+tone[stage].bg}>
     <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
       <div><strong className="text-3xl font-black tracking-tight">#{order.number}</strong>
@@ -135,7 +140,7 @@ function Ticket({order,stage,lang,t,now,advance,pending,fresh}){
     </div>
     <p className="mb-3 text-xs text-slate-400">{order.device_code||'POS'}</p>
     <div className="space-y-2 border-t border-white/10 pt-3">
-      {(order.lines||[]).map((line,i)=><div key={i} className="flex items-start gap-3 text-lg leading-snug">
+      {(order.lines||[]).filter(line=>!station||line.station===station).map((line,i)=><div key={i} className="flex items-start gap-3 text-lg leading-snug">
         <strong className="min-w-12 shrink-0 text-right font-black text-cyan-300" dir="ltr">{line.quantity} {t.unit}</strong>
         <span className="font-bold">{restaurantProductName(line,lang)||line.name||'—'}</span>
       </div>)}
@@ -147,6 +152,7 @@ function Ticket({order,stage,lang,t,now,advance,pending,fresh}){
       </span>
       {done&&<span className="text-xs font-semibold text-amber-200">{t.serviceHint}</span>}
     </div>
+    {stationBlocked&&<p className="mt-3 text-xs font-bold text-amber-200">{t.stationOnly}</p>}
     <button type="button" data-testid="kds-advance" onClick={()=>advance(order)}
       disabled={!can} className={'mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-xl px-3 text-base font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45 '+tone[stage].badge}>
       {pending?<RefreshCw className="h-5 w-5 animate-spin"/>:<Check className="h-5 w-5"/>}
@@ -215,8 +221,10 @@ export default function KitchenDisplayERP(){
   useEffect(()=>{soundRef.current=sound;},[sound]);
   useEffect(()=>{
     const onFullScreen=()=>{if(!document.fullscreenElement)setTv(false);};
+    const escape=event=>{if(event.key==='Escape')setTv(false);};
     document.addEventListener('fullscreenchange',onFullScreen);
-    return()=>document.removeEventListener('fullscreenchange',onFullScreen);
+    window.addEventListener('keydown',escape);
+    return()=>{document.removeEventListener('fullscreenchange',onFullScreen);window.removeEventListener('keydown',escape);};
   },[]);
   const toggleTv=async()=>{
     if(tv){
@@ -228,7 +236,8 @@ export default function KitchenDisplayERP(){
     }
   };
   const advance=async order=>{
-    if(!kitchenCanAdvance(order,fresh,pendingRef.current)||!id||!branchId)return;
+    if(!kitchenCanAdvance(order,fresh,pendingRef.current)||!id||!branchId ||
+      (station&&new Set((order.lines||[]).map(l=>l.station||'Kitchen')).size>1))return;
     const next=kitchenNextState(order.kitchen_status);
     if(!next)return;
     pendingRef.current=true;setBusy(order.id);setError('');
@@ -302,7 +311,7 @@ export default function KitchenDisplayERP(){
           <span className={'rounded-xl px-3 py-1 text-lg font-black '+tone[stage].badge}>{counts[i]}</span>
         </div>
         <div className="max-h-[70dvh] space-y-3 overflow-y-auto pe-1 lg:max-h-[calc(100dvh-275px)]">
-          {groups[stage].map(order=><Ticket key={order.id} order={order} stage={stage}
+          {groups[stage].map(order=><Ticket key={order.id} order={order} stage={stage} station={station}
             lang={lang} t={t} now={now} advance={o=>void advance(o)} pending={busy===order.id} fresh={fresh}/>)}
           {!groups[stage].length&&<p className="rounded-xl border border-dashed border-white/20 px-3 py-10 text-center text-sm text-slate-400">{t.empty}</p>}
         </div>
