@@ -19,20 +19,24 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 const PO_STATUS = {
-  pending:   { label: 'Pending',   color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-  approved:  { label: 'Approved',  color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-  shipped:   { label: 'Shipped',   color: 'bg-violet-500/20 text-violet-400 border-violet-500/30' },
-  received:  { label: 'Received',  color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-  cancelled: { label: 'Cancelled', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+  pending:   { label: 'Pending',   color: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300' },
+  approved:  { label: 'Approved',  color: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300' },
+  shipped:   { label: 'Shipped',   color: 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-300' },
+  received:  { label: 'Received',  color: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300' },
+  cancelled: { label: 'Cancelled', color: 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300' },
 };
-
 const INV_STATUS = {
-  pending:  { label: 'Pending',  color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-  approved: { label: 'Approved', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-  paid:     { label: 'Paid',     color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-  rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
-  overdue:  { label: 'Overdue',  color: 'bg-rose-500/20 text-rose-400 border-rose-500/30' },
+  pending:  PO_STATUS.pending,
+  approved: PO_STATUS.approved,
+  paid:     PO_STATUS.received,
+  partial:  PO_STATUS.shipped,
+  rejected: PO_STATUS.cancelled,
+  overdue:  { label:'Overdue',color:'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300' },
 };
+const dateLabel = value => value && !Number.isNaN(new Date(value).getTime()) ? String(value).slice(0,10) : '—';
+const moneyLabel = value => value == null || value === '' || !Number.isFinite(Number(value))
+  ? '—' : Number(value).toLocaleString(undefined,{maximumFractionDigits:2});
+
 
 const SUPPLIER_COPY = {
   en: {
@@ -397,99 +401,66 @@ export default function SupplierPortalERP() {
   );
 }
 
-// ── Invoice card ──────────────────────────────────────────────────────────────
-function InvoiceCard({ inv }) {
+// ── Invoice card: accessible financial detail, no duplicate totals ──────────
+function InvoiceCard({ inv, copy }) {
   const statusConf = INV_STATUS[inv.status] || INV_STATUS.pending;
-  return (
-    <Card className="bg-white/5 border-white/10">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-white font-bold text-sm">
-              Invoice #{inv.invoice_number || inv.id?.slice(0, 8)}
-            </p>
-            <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
-              <Calendar className="w-3 h-3" />
-              {inv.date ? format(new Date(inv.date), 'MMM d, yyyy') : (inv.created_date ? format(new Date(inv.created_date), 'MMM d, yyyy') : '—')}
-              {inv.due_date && (
-                <>
-                  <Clock className="w-3 h-3 ml-1" />
-                  Due {format(new Date(inv.due_date), 'MMM d')}
-                </>
-              )}
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-white font-bold text-sm">
-              {inv.currency || ''} {parseFloat(inv.total_amount || 0).toLocaleString()}
-            </p>
-            <Badge className={`text-[10px] border ${statusConf.color}`}>{statusConf.label}</Badge>
+  return <Card data-testid="supplier-invoice-card" className="min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <CardContent className="min-w-0 space-y-2 p-3.5 sm:p-4">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="min-w-0 break-all text-sm font-extrabold text-slate-900 dark:text-white">{copy.invoice} #{inv.invoice_number || inv.id?.slice(0,8)}</p>
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5 shrink-0"/>{dateLabel(inv.date||inv.created_date)}</span>
+            {inv.due_date && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 shrink-0"/>{copy.due}: {dateLabel(inv.due_date)}</span>}
           </div>
         </div>
-        {inv.notes && (
-          <p className="text-slate-500 text-xs mt-2 truncate">{inv.notes}</p>
-        )}
-      </CardContent>
-    </Card>
-  );
+        <Badge className={'shrink-0 rounded-full border px-2.5 py-1 text-[11px] '+statusConf.color}>{copy.status[inv.status]||statusConf.label}</Badge>
+      </div>
+      <div className="flex min-w-0 items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+        <p className="text-xs text-slate-500 dark:text-slate-400">{copy.invoiced}</p>
+        <p dir="ltr" className="min-w-0 break-words text-end text-sm font-extrabold tabular-nums text-slate-900 dark:text-white">{inv.currency||''} {moneyLabel(inv.total_amount)}</p>
+      </div>
+      {inv.notes && <p className="line-clamp-2 break-words text-xs leading-5 text-slate-500 dark:text-slate-400">{inv.notes}</p>}
+    </CardContent>
+  </Card>;
 }
 
-// ── Purchase order card ───────────────────────────────────────────────────────
-function POCard({ po, onConfirmShipment, loading }) {
+// ── Purchase order card: unchanged branch-scoped confirmShipment mutation ────
+function POCard({ po, onConfirmShipment, loading, copy }) {
   const statusConf = PO_STATUS[po.status] || PO_STATUS.pending;
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <Card className="bg-white/5 border-white/10">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <div>
-            <p className="text-white font-bold text-sm">PO #{po.id?.slice(0, 8)}</p>
-            <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
-              <Building2 className="w-3 h-3" />
-              {po.branch || 'Unknown Branch'}
-              <Calendar className="w-3 h-3 ml-1" />
-              {po.created_date ? format(new Date(po.created_date), 'MMM d') : ''}
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-white font-bold text-sm">{(Number(po.total_amount) || 0).toLocaleString()}</p>
-            <Badge className={`text-[10px] border ${statusConf.color}`}>{statusConf.label}</Badge>
+  const [expanded,setExpanded]=useState(false);
+  return <Card data-testid="supplier-purchase-order-card" className="min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <CardContent className="min-w-0 space-y-2.5 p-3.5 sm:p-4">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="break-all text-sm font-extrabold text-slate-900 dark:text-white">{copy.purchaseOrder} #{po.id?.slice(0,8)}</p>
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+            <span className="flex min-w-0 items-center gap-1"><Building2 className="h-3.5 w-3.5 shrink-0"/><span className="min-w-0 truncate">{po.branch||copy.unknownBranch}</span></span>
+            <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5 shrink-0"/>{dateLabel(po.created_date)}</span>
           </div>
         </div>
-
-        {po.items?.length > 0 && (
-          <button
-            onClick={() => setExpanded(v => !v)}
-            className="text-slate-500 text-xs hover:text-slate-300 mb-2"
-          >
-            {expanded ? 'Hide' : 'Show'} {po.items.length} item{po.items.length > 1 ? 's' : ''}
-          </button>
-        )}
-
-        {expanded && po.items?.length > 0 && (
-          <div className="space-y-1 mb-3 bg-white/5 rounded-lg p-2">
-            {po.items.map((item, i) => (
-              <div key={i} className="flex items-center justify-between text-xs">
-                <span className="text-slate-300">{item.product_name || item.name || 'Item'}</span>
-                <span className="text-white">×{item.quantity} @ {item.unit_price}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {po.status === 'approved' && (
-          <Button
-            size="sm"
-            onClick={onConfirmShipment}
-            disabled={loading}
-            className="w-full bg-violet-600 hover:bg-violet-700 text-white text-xs h-8 mt-2"
-          >
-            <Package className="w-3.5 h-3.5 mr-1.5" />
-            Confirm Shipment
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  );
+        <Badge className={'shrink-0 rounded-full border px-2.5 py-1 text-[11px] '+statusConf.color}>{copy.status[po.status]||statusConf.label}</Badge>
+      </div>
+      <div className="flex min-w-0 items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+        <span className="text-xs text-slate-500 dark:text-slate-400">{copy.total}</span>
+        <span dir="ltr" className="break-words text-end text-sm font-extrabold tabular-nums text-slate-900 dark:text-white">{po.currency||''} {moneyLabel(po.total_amount)}</span>
+      </div>
+      {Array.isArray(po.items) && po.items.length>0 && <>
+        <button type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}
+          className="min-h-10 rounded-lg px-2 text-xs font-bold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950">
+          {expanded?copy.hide:copy.show} · {po.items.length} {copy.items}
+        </button>
+        {expanded && <div className="space-y-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
+          {po.items.map((item,i)=><div key={i} className="flex min-w-0 items-start justify-between gap-2 text-xs">
+            <span className="min-w-0 flex-1 break-words text-slate-700 dark:text-slate-200">{item.product_name||item.name||'—'}</span>
+            <span dir="ltr" className="shrink-0 whitespace-nowrap font-semibold text-slate-900 dark:text-white">×{item.quantity} · {moneyLabel(item.unit_price)}</span>
+          </div>)}
+        </div>}
+      </>}
+      {po.status==='approved' && <Button type="button" disabled={loading} onClick={onConfirmShipment}
+        className="mt-1 min-h-11 w-full rounded-xl bg-blue-600 font-bold text-white hover:bg-blue-700">
+        <Truck className="me-2 h-4 w-4" aria-hidden="true"/>{copy.confirmShip}
+      </Button>}
+    </CardContent>
+  </Card>;
 }
