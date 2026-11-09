@@ -29,12 +29,13 @@ const isRestaurant = mode => mode === 'restaurant' || mode === 'cafe';
 export function getWelcomeTourStages({ role = 'owner', mode = 'restaurant', can = {}, configuration = null } = {}) {
   const owner = role === 'owner';
   const supplier = role === 'supplier';
+  const driver = role === 'driver';
   const employee = role === 'employee';
   // Match the existing SalesClosingCustomizationProvider.canCustomize boundary.
   const canCreateSalesSources = owner || can.manageDashboardCustomization === true;
   const home = owner ? '/owner-command-center' :
     role === 'manager' || role === 'general_manager' ? '/manager-dashboard' :
-      employee ? '/employee-dashboard' : '/supplier-portal';
+      employee ? '/employee-dashboard' : driver ? '/driver-dashboard' : '/supplier-portal';
   const permitted = item => {
     if (item.role && item.role !== role) return false;
     if (item.permission && can[item.permission] !== true) return false;
@@ -56,13 +57,13 @@ export function getWelcomeTourStages({ role = 'owner', mode = 'restaurant', can 
       module('salesSources', '/sales-sources?create=1', 'viewSales'),
     ] : []),
     stage('people', employee ? [module('employeeAttendance','/employee-dashboard','recordAttendance')] : [module('employeeManagement','/employees','viewEmployees')]),
-    stage('prepare', supplier ? [] : [
+    stage('prepare', supplier || driver ? [] : [
       module('products', '/product-management', 'viewInventory'),
       ...(isRestaurant(mode) ? [] : [module('inventory', '/inventory', 'viewInventory')]),
       module('suppliers', '/suppliers', 'viewSuppliers'),
       module('purchases', '/purchases', 'viewPurchases'),
     ]),
-    stage('operate', supplier ? [{ key: 'supplierPortal', path: '/supplier-portal', role: 'supplier' }] : [
+    stage('operate', driver ? [{ key: 'driverPortal', path: '/driver-dashboard', role: 'driver' }] : supplier ? [{ key: 'supplierPortal', path: '/supplier-portal', role: 'supplier' }] : [
       ...(isRestaurant(mode) ? [module('restaurantPOS', '/restaurant/pos', 'viewSales')] : []),
       ...(mode === 'retail' ? [module('retailPOS', '/pos', 'uploadSales')] :
         !isRestaurant(mode) ? [module('touchPOS', '/pos', 'uploadSales')] : []),
@@ -70,7 +71,7 @@ export function getWelcomeTourStages({ role = 'owner', mode = 'restaurant', can 
       module('expenses', '/expenses', 'viewExpenses'),
     ]),
     stage('review', [
-      ...(supplier ? [] : [{ key: 'home', path: home, role }]),
+      ...(supplier || driver ? [] : [{ key: 'home', path: home, role }]),
       module('reports', '/reports', 'viewReports'),
       module('payables', '/purchases?payables=open', 'viewPurchases'),
     ]),
