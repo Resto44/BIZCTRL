@@ -17,6 +17,7 @@ import OwnerUniversalPOS from '@/components/dashboard/OwnerUniversalPOS';
 
 // Load the authenticated Copilot chat only when the owner opens it.
 const OwnerCopilotPanel = React.lazy(() => import('@/components/dashboard/OwnerCopilotPanel'));
+const OwnerDriverSalesCard = React.lazy(() => import('@/components/dashboard/OwnerDriverSalesCard'));
 import QuickAddBranchDialog from '@/components/dashboard/QuickAddBranchDialog';
 import { useActiveAlerts } from '@/hooks/useActiveAlerts';
 import { useOwnerDashboardRealtime } from '@/hooks/useOwnerDashboardRealtime';
@@ -526,6 +527,14 @@ function OwnerDashboardContent() {
         </div>
       </nav>
 
+      {role === 'owner' && activePage === 'executive' && (
+        <React.Suspense fallback={<div role="status" className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">Driver Sales Analytics…</div>}>
+          <OwnerDriverSalesCard key={String(activeRestaurant?.id)+'-'+String(isAllBranches?'all':selectedBranchId)}
+            restaurantId={activeRestaurant?.id} branchId={isAllBranches?null:selectedBranchId}
+            branchLabel={isAllBranches?copy.allBranches:selectedBranchLabel}
+            lang={lang} currency={currency}/>
+        </React.Suspense>
+      )}
       <OwnerReportCenter activePage={activePage} model={model} copy={copy} />
       <QuickAddBranchDialog open={isQuickAddBranchOpen} onOpenChange={setQuickAddBranchOpen} />
       {isCopilotOpen && role === 'owner' && activeRestaurant?.id && user?.id && (
