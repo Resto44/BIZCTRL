@@ -32,6 +32,19 @@ describe('Quick owner user invitations', () => {
     expect(source).toContain('Share now');
   });
 
+  it('sends a separate provider-verified invitation email without claiming inbox delivery', async () => {
+    const source = await readFile(invitationPath, 'utf8');
+    expect(source).toContain("supabase.functions.invoke('erp-invitation-email'");
+    expect(source).toContain('body: { invitation_id: invitation.invitation_id, token: invitation.token }');
+    expect(source).toContain('if (email) await deliverInvitationEmail(generated)');
+    expect(source).toContain("emailStatus: 'failed'");
+    expect(source).toContain("emailStatus: 'accepted'");
+    expect(source).toContain('Inbox delivery is not confirmed.');
+    expect(source).toContain('Retry email');
+    expect(source).toContain('Copy');
+    expect(source).toContain('Share now');
+  });
+
   it('renews a real token instead of claiming an unreadable old token was resent', async () => {
     const source = await readFile(invitationPath, 'utf8');
     expect(source).toContain('reissueInvitation');
