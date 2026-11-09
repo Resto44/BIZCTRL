@@ -50,8 +50,8 @@ export async function fetchScheduledERPReportData({
    return (data||[]).filter(c=>allBranches||!c.branch_id||String(c.branch_id)===String(branchId));
   })(),
   read('wallet_transactions',{dateColumn:'transaction_date',from:range.from+'T00:00:00',to:range.to+'T23:59:59.999'}),
-  read('driver_sales_entries',{from:range.previousFrom,to:range.to}),
-  read('drivers',{dateColumn:null}),
+  read('driver_sales_entries',{legacyColumn:null,from:range.previousFrom,to:range.to}),
+  read('drivers',{legacyColumn:null,dateColumn:null}),
  ]);
  return {sales,purchases,expenses,inventory,inventoryTransactions,customerDebts,expenseCategories,walletTransactions,
   driverSalesEntries,drivers};
