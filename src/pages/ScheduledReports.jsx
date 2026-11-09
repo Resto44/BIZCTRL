@@ -198,7 +198,7 @@ export default function ScheduledReports() {
       <Card className="p-4 mb-4 border-primary/20 bg-primary/5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h3 className="font-semibold text-sm">{lang==='ar'?'تقرير تحليلات المبيعات ERP (صفحتان)':lang==='fa'?'گزارش تحلیل فروشات ERP (دو صفحه)':'ERP Management PDF · Two pages'}</h3>
+            <h3 className="font-semibold text-sm">{lang==='ar'?'تقرير ERP من ٣ صفحات: المالية والشبكة والسائقون':lang==='fa'?'گزارش ۳ صفحه‌ای ERP: مالی، شبکه و راننده‌ها':'ERP PDF · 3 pages: finance, network & drivers'}</h3>
             <p className="text-xs text-muted-foreground">{t('pdf_period')}: {fromStr} → {toStr}</p>
           </div>
           <button
