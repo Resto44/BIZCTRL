@@ -99,9 +99,23 @@ BEGIN
     ) FROM posted),
     'trend', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
-        'date', t.bucket, 'revenue',t.revenue, 'cash',t.cash,
-        'network',t.network,'entries',t.entries
-      ) ORDER BY t.bucket) FROM time_totals t
+        'date', calendar.bucket,
+        'revenue',COALESCE(t.revenue,0), 'cash',COALESCE(t.cash,0),
+        'network',COALESCE(t.network,0),'entries',COALESCE(t.entries,0)
+      ) ORDER BY calendar.bucket)
+      FROM (
+        SELECT tick::date AS bucket
+        FROM generate_series(
+          date_trunc(p_bucket,p_from::timestamp),
+          date_trunc(p_bucket,p_to::timestamp),
+          CASE p_bucket
+            WHEN 'day' THEN interval '1 day'
+            WHEN 'week' THEN interval '1 week'
+            ELSE interval '1 month'
+          END
+        ) AS ticks(tick)
+      ) calendar
+      LEFT JOIN time_totals t ON t.bucket=calendar.bucket
     ),'[]'::jsonb),
     'drivers',COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
