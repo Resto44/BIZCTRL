@@ -6,8 +6,8 @@ import {drawPdfNetworkManagement} from './drawPdfNetworkManagement';
 
 
 /**
- * Canonical two-page A4 Sales Analytics export for both Reports and Scheduled Reports.
- * Summarizes all scoped data in sales and purchases/expenses pages.
+ * Canonical three-page maximum A4 Sales Analytics export for manual and scheduled reports.
+ * Pages 1-2: core finance; page 3: Network and Driver Sales analytics.
  */
 export async function generateSalesAnalyticsPDF({
  snapshot = undefined,previousSnapshot=null,growth=null,range = undefined,branchLabel = undefined,businessName='BizCTRL',
@@ -22,7 +22,7 @@ export async function generateSalesAnalyticsPDF({
  // Saved PDFs are immutable: changing the SaaS UI never edits an older file.
  doc.__erpPdfTypographyVersion = '2026-10-16-modern';
  doc.setProperties({
-  title: 'BizCTRL ERP | Two-page financial analytics',
+  title: 'BizCTRL ERP | Three-page financial and driver sales analytics',
   subject: 'Modernized embedded Arabic/Persian PDF typography, revision 2026-10-16',
   creator: 'BizCTRL ERP',
  });
@@ -30,16 +30,17 @@ export async function generateSalesAnalyticsPDF({
  drawTwoPageERPReport(doc,{
   snapshot,previousSnapshot,growth,range,report:operationsReport,branchLabel,
   businessName,currency,lang:language,iconData,fullAnalytics,
-  totalPages:2+(fullAnalytics?.networkBranches?.available ?
-   Math.max(1,Math.ceil((fullAnalytics.networkBranches.branches?.length||0)/8)):0),
+  totalPages:fullAnalytics?.networkBranches?.available ? 3 : 2,
  });
- // The canonical financial pages remain unchanged; add a separate, read-only
- // Network Management ERP appendix when verified network detail was provided.
+ // Share page 3 between Network Management and Driver Sales. Never paginate
+ // driver analytics to another page or add driver collections to total revenue.
  if (fullAnalytics?.networkBranches?.available) {
-  drawPdfNetworkManagement(doc,{insights:fullAnalytics.networkBranches,range,currency,
+  drawPdfNetworkManagement(doc,{insights:fullAnalytics.networkBranches,
+   driverSales:fullAnalytics.driverSales,range,currency,
    lang:language,businessName,branchLabel,iconData});
  }
 
+ if(doc.getNumberOfPages()>3)throw new Error('ERP_PDF_PAGE_LIMIT_EXCEEDED');
  if(download)doc.save(safePdfFilename('BizCTRL-ERP-Analytics-v2-'+range.from+'-'+range.to,language));
  return doc;
 }
