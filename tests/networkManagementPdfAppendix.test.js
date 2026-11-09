@@ -98,7 +98,7 @@ describe('Network Management ERP appendix in canonical PDF reports',()=>{
   expect(doc.__erpPdfRTL).toBe(lang!=='en');
   expect(Buffer.from(doc.output('arraybuffer')).subarray(0,5).toString()).toBe('%PDF-');
  });
- it('paginates 15 enterprise branches without losing any totals or touching earlier pages',()=>{
+ it('aggregates 15 enterprise branches into one appendix without losing any total',()=>{
   const many=Array.from({length:15},(_,i)=>({
    id:'b'+i,name:'Branch '+(i+1),current:{network:10+i,total:10+i,closings:1},
    previous:{network:5},share:5,growth:10,cardMix:100,
@@ -107,7 +107,7 @@ describe('Network Management ERP appendix in canonical PDF reports',()=>{
   prepareLocalizedPdf(doc,{lang:'en'});
   const count=drawPdfNetworkManagement(doc,{insights:{...model,branches:many},range,lang:'en'});
   expect(count).toBe(2);
-  expect(doc.getNumberOfPages()).toBe(3); // 1 starting page + 2 appendix pages
+  expect(doc.getNumberOfPages()).toBe(2); // 1 starting page + 1 consolidated appendix
   expect(many.reduce((n,b)=>n+b.current.network,0)).toBe(255);
  });
 });
