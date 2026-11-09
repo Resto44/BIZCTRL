@@ -21,7 +21,7 @@ describe('role directory interaction',()=>{
   expect(view.root.findByType('button').props.disabled).toBe(true);
   act(()=>view.update(<InvitationDirectory restaurantId="r" branchId="b" role="driver" onSelect={select}/>));
   const driverView=JSON.stringify(view.toJSON());
-  expect(driverView).toContain('Select an existing user · 3');
+  expect(view.root.findAllByType('p')[0].children.join('')).toBe('Select an existing user · 3');
   expect(driverView).toContain('Driver 1');
   expect(driverView).toContain('Driver 2');
   expect(driverView).toContain('Driver 3');
