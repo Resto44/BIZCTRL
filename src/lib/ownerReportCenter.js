@@ -16,7 +16,7 @@ import { latestInventorySnapshots } from '@/lib/inventorySnapshotView';
 const CONSUMPTION_TYPES = new Set(['recipe_consumption', 'sale', 'stock_out']);
 
 export const OWNER_PRICE_TARGET_MARGIN = 35;
-export const OWNER_REPORT_PERIOD_KEYS = ['today', 'yesterday', 'week', 'month', 'three-months', 'six-months', 'nine-months', 'year'];
+export const OWNER_REPORT_PERIOD_KEYS = ['today', 'week', 'month', 'three-months', 'six-months', 'nine-months', 'year'];
 
 export function buildOwnerReportPeriod(periodKey = 'today', now = new Date()) {
   const key = OWNER_REPORT_PERIOD_KEYS.includes(periodKey) ? periodKey : 'today';
@@ -25,11 +25,7 @@ export function buildOwnerReportPeriod(periodKey = 'today', now = new Date()) {
   let previousStart;
   let previousEnd;
 
-  if (key === 'yesterday') {
-    currentStart = subDays(currentEnd, 1);
-    previousStart = subDays(currentEnd, 2);
-    previousEnd = previousStart;
-  } else if (key === 'week') {
+  if (key === 'week') {
     currentStart = startOfWeek(currentEnd, { weekStartsOn: 0 });
     previousStart = subDays(currentStart, 7);
     previousEnd = subDays(currentStart, 1);
@@ -58,7 +54,7 @@ export function buildOwnerReportPeriod(periodKey = 'today', now = new Date()) {
   const daysInPeriod = differenceInCalendarDays(currentEnd, currentStart) + 1;
   return {
     key,
-    rangeType: (key === 'today' || key === 'yesterday') ? 'day' : key === 'week' ? 'week' : 'month',
+    rangeType: key === 'today' ? 'day' : key === 'week' ? 'week' : 'month',
     daysInPeriod,
     currentStart: format(currentStart, 'yyyy-MM-dd'),
     currentEnd: format(currentEnd, 'yyyy-MM-dd'),
