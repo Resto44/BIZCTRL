@@ -459,25 +459,108 @@ export default function SupplierPortalERP() {
 }
 
 // ── Invoice card: accessible financial detail, no duplicate totals ──────────
-function InvoiceCard({ inv, copy }) {
-  const statusConf = INV_STATUS[inv.status] || INV_STATUS.pending;
-  return <Card data-testid="supplier-invoice-card" className="min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-    <CardContent className="min-w-0 space-y-2 p-3.5 sm:p-4">
+function InvoiceCard({inv,copy,payments=[],paymentsLoading=false,paymentsError=false}){
+  const [expanded,setExpanded]=useState(false);
+  const statusConf=INV_STATUS[inv.status]||INV_STATUS.pending;
+  const evidence=supplierInvoicePaymentEvidence(inv,payments,!paymentsLoading&&!paymentsError);
+  const currency=inv.currency||'—';
+  const itemRows=Array.isArray(inv.items)?inv.items:[];
+  const extraRows=Array.isArray(inv.additional_costs)?inv.additional_costs:[];
+  const formatValue=value=>value==null?'—':currency+' '+moneyLabel(value);
+  const paymentDetailId='supplier-invoice-detail-'+String(inv.id||'').replace(/[^a-zA-Z0-9-]/g,'');
+  return <Card data-testid="supplier-invoice-card" className="min-w-0 overflow-hidden rounded-2xl border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <CardContent className="min-w-0 space-y-2.5 p-3.5 sm:p-4">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="min-w-0 break-all text-sm font-extrabold text-slate-900 dark:text-white">{copy.invoice} #{inv.invoice_number || inv.id?.slice(0,8)}</p>
+          <p className="min-w-0 break-all text-sm font-extrabold text-slate-900 dark:text-white">
+            {copy.invoice} #{inv.invoice_number||inv.id?.slice(0,8)}
+          </p>
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
             <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5 shrink-0"/>{dateLabel(inv.date||inv.created_date)}</span>
             {inv.due_date && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 shrink-0"/>{copy.due}: {dateLabel(inv.due_date)}</span>}
           </div>
         </div>
-        <Badge className={'shrink-0 rounded-full border px-2.5 py-1 text-[11px] '+statusConf.color}>{copy.status[inv.status]||statusConf.label}</Badge>
+        <Badge className={'shrink-0 rounded-full border px-2.5 py-1 text-[11px] '+statusConf.color}>
+          {copy.status[inv.status]||statusConf.label}
+        </Badge>
       </div>
-      <div className="flex min-w-0 items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
-        <p className="text-xs text-slate-500 dark:text-slate-400">{copy.invoiced}</p>
-        <p dir="ltr" className="min-w-0 break-words text-end text-sm font-extrabold tabular-nums text-slate-900 dark:text-white">{inv.currency||''} {moneyLabel(inv.total_amount)}</p>
+      <div className="grid grid-cols-3 gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+        <div className="min-w-0">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">{copy.total}</p>
+          <p dir="ltr" className="break-words text-start text-xs font-extrabold tabular-nums text-slate-900 dark:text-white sm:text-sm">{formatValue(evidence.total)}</p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">{copy.paid}</p>
+          <p dir="ltr" data-testid="supplier-invoice-paid" className="break-words text-start text-xs font-extrabold tabular-nums text-emerald-700 dark:text-emerald-300 sm:text-sm">{formatValue(evidence.paid)}</p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">{copy.remaining}</p>
+          <p dir="ltr" data-testid="supplier-invoice-remaining" className="break-words text-start text-xs font-extrabold tabular-nums text-rose-700 dark:text-rose-300 sm:text-sm">{formatValue(evidence.remaining)}</p>
+        </div>
       </div>
-      {inv.notes && <p className="line-clamp-2 break-words text-xs leading-5 text-slate-500 dark:text-slate-400">{inv.notes}</p>}
+      {evidence.paidPercent!=null && <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+        aria-label={copy.paymentBalance} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={evidence.paidPercent}>
+        <div className="h-full rounded-full bg-emerald-500" style={{width:evidence.paidPercent+'%'}}/>
+      </div>}
+      <button type="button" aria-expanded={expanded} aria-controls={paymentDetailId}
+        data-testid="supplier-invoice-open-details"
+        className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
+        onClick={()=>setExpanded(v=>!v)}>
+        <span>{expanded?copy.hideDetails:copy.viewDetails}</span>
+        <ChevronDown className={'h-4 w-4 shrink-0 transition-transform '+(expanded?'rotate-180':'')}/>
+      </button>
+      {expanded && <div id={paymentDetailId} data-testid="supplier-invoice-detail" className="min-w-0 space-y-4 border-t border-slate-200 pt-3 dark:border-slate-700">
+        <section aria-label={copy.itemsTitle} className="space-y-2">
+          <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">{copy.itemsTitle} ({itemRows.length})</h3>
+          {itemRows.length>0 ? <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+            {itemRows.map((item,i)=><div key={i} className="flex min-w-0 flex-wrap items-start justify-between gap-2 p-2.5 text-xs">
+              <div className="min-w-0 flex-1">
+                <p className="break-words font-semibold text-slate-900 dark:text-white">{item.product_name||item.name||'—'}</p>
+                <p className="mt-1 text-slate-600 dark:text-slate-300">
+                  {item.quantity??item.qty??'—'} × {moneyLabel(item.unit_cost??item.unit_price??item.price)} {item.unit||''}
+                </p>
+              </div>
+              <span dir="ltr" className="shrink-0 font-bold tabular-nums text-slate-900 dark:text-white">{formatValue(item.line_total)}</span>
+            </div>)}
+          </div> : <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">{copy.noInvoicesHint}</p>}
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-800">
+            {[[copy.subtotal,inv.subtotal],[copy.tax,inv.tax_amount],[copy.discount,inv.discount_amount]].map(([label,value])=>
+              <React.Fragment key={label}><span className="text-slate-600 dark:text-slate-300">{label}</span><strong dir="ltr" className="text-end tabular-nums text-slate-900 dark:text-white">{formatValue(value)}</strong></React.Fragment>)}
+            {extraRows.map((item,i)=><React.Fragment key={i}>
+              <span className="min-w-0 break-words text-slate-600 dark:text-slate-300">{item.label||item.name||copy.additionalCosts}</span>
+              <strong dir="ltr" className="text-end tabular-nums text-slate-900 dark:text-white">{formatValue(item.amount??item.total)}</strong>
+            </React.Fragment>)}
+            <span className="border-t border-slate-200 pt-2 font-bold text-slate-900 dark:border-slate-700 dark:text-white">{copy.total}</span>
+            <strong dir="ltr" className="border-t border-slate-200 pt-2 text-end tabular-nums text-slate-900 dark:border-slate-700 dark:text-white">{formatValue(evidence.total)}</strong>
+          </div>
+          {inv.notes && <p className="break-words rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{copy.notes}: {inv.notes}</p>}
+        </section>
+        <section aria-label={copy.paymentsTitle} data-testid="supplier-invoice-payment-history" className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="flex items-center gap-1.5 text-sm font-extrabold text-slate-900 dark:text-white"><Wallet className="h-4 w-4 text-blue-600"/>{copy.paymentsTitle}</h3>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{evidence.paymentCount}</span>
+          </div>
+          {paymentsError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">{copy.noPaymentFeed}</p>
+          : paymentsLoading ? <p role="status" className="text-xs text-slate-600 dark:text-slate-300">{copy.paymentHistoryLoading}</p>
+          : evidence.paymentHistory.length===0 ? <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">{copy.noPayments}</p>
+          : <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+              {evidence.paymentHistory.map(payment=><div key={payment.id} data-testid="supplier-recorded-payment"
+                className="flex min-w-0 flex-wrap items-center justify-between gap-2 p-3 text-xs">
+                <div><p className="font-semibold text-slate-900 dark:text-white">{copy.recorded} · {dateLabel(payment.date)}</p>
+                  <p className="mt-1 text-slate-500 dark:text-slate-400">{copy.paymentMethod}: {copy[payment.payment_method]||payment.payment_method||'—'}</p></div>
+                <strong dir="ltr" className="tabular-nums text-emerald-700 dark:text-emerald-300">{formatValue(payment.amount)}</strong>
+              </div>)}
+            </div>}
+          {evidence.historyNeedsReview && <p role="alert" className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/>{copy.historyMismatch}
+          </p>}
+          {evidence.legacyHistoryMissing && <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">{copy.historyGap}</p>}
+          <div className="flex flex-wrap justify-between gap-2 rounded-lg border border-slate-200 p-3 text-xs dark:border-slate-700">
+            <span className="text-slate-700 dark:text-slate-200">{copy.remaining}</span>
+            <strong dir="ltr" className="tabular-nums text-slate-900 dark:text-white">{formatValue(evidence.remaining)}</strong>
+          </div>
+        </section>
+      </div>}
     </CardContent>
   </Card>;
 }
