@@ -122,12 +122,12 @@ export default function ExecutiveSnapshotV2({model,copy}) {
           {!hasQueryError&&<Change percent={presentation.salesChange}/>}
           <p className="mt-1 text-[10px] text-muted-foreground">{compareLabel}</p>
         </div>
-        <StatCard testId="snapshot-sales-less-purchases" title={t(copy,'grossProfit','Sales less purchases')} value={money(periodMetrics.grossProfit)} icon={BadgeDollarSign} tone="green"
-          change={hasQueryError?null:moneyChange(periodMetrics.grossProfit,prev.grossProfit)} comparisonLabel={compareLabel}/>
-        <StatCard testId="snapshot-expenses" title={t(copy,'operatingExpense','Recorded expenses')} value={money(periodMetrics.totalExpenses)} icon={ReceiptText} tone="rose" lowerIsBetter
-          change={hasQueryError?null:moneyChange(periodMetrics.totalExpenses,prev.totalExpenses)} comparisonLabel={compareLabel}/>
+        <StatCard testId="snapshot-purchases-primary" title={t(copy,'purchases','Purchases')} value={money(periodMetrics.totalPurchaseCost)} icon={ShoppingBasket} tone="amber"
+          hint={t(copy,'purchasesHint','Approved purchases in the selected period')} />
         <StatCard testId="snapshot-profit" title={t(copy,'netProfit','Operating estimate')} value={money(periodMetrics.netProfit)} icon={TrendingUp} tone={periodMetrics.netProfit<0?'rose':'violet'}
           change={hasQueryError?null:presentation.profitChange} comparisonLabel={compareLabel}/>
+        <StatCard testId="snapshot-expenses" title={t(copy,'operatingExpense','Recorded expenses')} value={money(periodMetrics.totalExpenses)} icon={ReceiptText} tone="rose" lowerIsBetter
+          change={hasQueryError?null:moneyChange(periodMetrics.totalExpenses,prev.totalExpenses)} comparisonLabel={compareLabel}/>
       </div>
       <dl data-testid="executive-expense-breakdown" className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-border/70 bg-slate-50/50 p-3 dark:bg-slate-900/40">
         {[[lang==='fa'?'سهم مصارف ثابت':lang==='ar'?'نصيب المصروفات الثابتة':'Allocated fixed costs',periodMetrics.fixedDeduction],
@@ -164,10 +164,10 @@ export default function ExecutiveSnapshotV2({model,copy}) {
           <p className="mt-3 text-[10px] leading-4 text-muted-foreground">{t(copy,'marginHint','Estimated result as a share of sales')}</p>
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50/40 p-3 dark:border-blue-900 dark:bg-blue-950/30">
-        <span className="flex items-center gap-2 text-xs font-bold"><ShoppingBasket className="h-4 w-4 text-blue-600"/>{t(copy,'purchases','Purchases')}</span>
-        <strong className="text-base tabular-nums" dir="ltr">{money(periodMetrics.totalPurchaseCost)}</strong>
-        <span className="text-[10px] text-muted-foreground">{t(copy,'purchasesHint','Approved purchases in the selected period')}</span>
+      <div data-testid="snapshot-sales-less-purchases" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50/40 p-3 dark:border-blue-900 dark:bg-blue-950/30">
+        <span className="flex items-center gap-2 text-xs font-bold"><BadgeDollarSign className="h-4 w-4 text-blue-600"/>{t(copy,'grossProfit','Sales less purchases')}</span>
+        <strong className="text-base tabular-nums" dir="ltr">{money(periodMetrics.grossProfit)}</strong>
+        <span className="text-[10px] text-muted-foreground">{t(copy,'profitHint','Purchase-basis estimate, not inventory COGS profit')}</span>
       </div>
     </section>
 
