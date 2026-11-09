@@ -4,12 +4,12 @@ import {create,act} from 'react-test-renderer';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {MemoryRouter} from 'react-router-dom';
 import {describe,it,expect,vi,afterEach,beforeEach} from 'vitest';
-const mocks=vi.hoisted(()=>({fail:'',reads:[],invalid:[]}));
-vi.mock('@/lib/AuthContext',()=>({useAuth:()=>({user:{id:'u',restaurant_id:'r',branch_id:'b',linked_entity_id:'profile',email:'test@example.com'},logout:vi.fn()})}));
+const mocks=vi.hoisted(()=>({fail:'',reads:[],invalid:[],role:'manager'}));
+vi.mock('@/lib/AuthContext',()=>({useAuth:()=>({user:{id:'u',restaurant_id:'r',branch_id:'b',linked_entity_id:'profile',email:'test@example.com',role:mocks.role},logout:vi.fn()})}));
 vi.mock('@/lib/RoleContext',()=>({useRole:()=>({can:{recordAttendance:true,viewTasks:true}})}));
 vi.mock('@/lib/TenantContext',()=>({useTenant:()=>({managerBranchObject:{id:'b',name:'Branch',branch_key:'branch'}})}));
 vi.mock('@/lib/LanguageContext',()=>({useLanguage:()=>({lang:'en',translateLiteral:(value)=>value})}));
-vi.mock('@/api/supabaseClient',()=>({supabase:{rpc:async()=>({data:{configured:false,reason:'APPROVED_EMPLOYEE_LINK_REQUIRED'},error:null}),from:table=>{
+vi.mock('@/api/supabaseClient',()=>({supabase:{rpc:async name=> name==='erp_supplier_self_profile' ? ({data:{id:'profile',restaurant_id:'r',branch_id:'b',name:'Test Supplier'},error:null}) : ({data:{configured:false,reason:'APPROVED_EMPLOYEE_LINK_REQUIRED'},error:null}),from:table=>{
  let single=false;
  const chain=new Proxy({}, {get:(_,key)=>{
   if(key==='then')return (resolve)=>{mocks.reads.push(table);resolve({data:single?{id:'profile'}:[],error:table===mocks.fail?new Error('offline'):null});};
@@ -30,7 +30,7 @@ afterEach(()=>{if(tree)act(()=>tree.unmount());client?.clear();tree=null;vi.unst
 describe('portal failed reads',()=>{
  for(const [name,Component,table] of [['manager',Manager,'daily_sales'],['supplier',Supplier,'supplier_invoices']]){
   it(`${name} shows retry instead of totals/actions after a failed read`,async()=>{
-   mocks.fail=table;mocks.reads=[];mocks.invalid=[];
+   mocks.fail=table;mocks.reads=[];mocks.invalid=[];mocks.role=name==='supplier'?'supplier':'manager';
    client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
    await act(async()=>{tree=create(<MemoryRouter><QueryClientProvider client={client}><Component/></QueryClientProvider></MemoryRouter>, { createNodeMock: element => { const node = document.createElement(element.type); node.getBoundingClientRect = () => ({ width: 800, height: 300 }); return node; } });});
    for(let i=0;i<5;i++)await act(async()=>{await new Promise(r=>setTimeout(r,15));});
@@ -42,7 +42,7 @@ describe('portal failed reads',()=>{
   });
  }
   it('manager keeps verified core totals available when a secondary inventory read fails', async () => {
-    mocks.fail='inventory'; mocks.reads=[]; mocks.invalid=[];
+    mocks.fail='inventory'; mocks.reads=[]; mocks.invalid=[];mocks.role='manager';
     client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
     await act(async()=>{tree=create(<MemoryRouter><QueryClientProvider client={client}><Manager/></QueryClientProvider></MemoryRouter>, {createNodeMock: element => {const node=document.createElement(element.type); node.getBoundingClientRect=()=>({width:800,height:300}); return node;}});});
     for(let i=0;i<5;i++)await act(async()=>{await new Promise(r=>setTimeout(r,15));});
@@ -57,7 +57,7 @@ describe('portal failed reads',()=>{
     expect(tree.root.findAllByProps({role:'alert'})).toHaveLength(0);
   });
   it('employee portal does not require management profile access to display personal attendance',async()=>{
-    mocks.fail='employees';mocks.reads=[];mocks.invalid=[];
+    mocks.fail='employees';mocks.reads=[];mocks.invalid=[];mocks.role='employee';
     client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
     await act(async()=>{tree=create(<MemoryRouter><QueryClientProvider client={client}><Employee/></QueryClientProvider></MemoryRouter>);});
     for(let i=0;i<5;i++)await act(async()=>{await new Promise(r=>setTimeout(r,15));});

@@ -210,31 +210,31 @@ function UserCard({ membership, branches, onRoleChange, onStatusChange, onPermis
   };
 
   return (
-    <Card className={cn('transition-all', expanded && 'ring-1 ring-primary/30')}>
-      <CardContent className="p-4">
+    <Card data-testid="role-user-card" className={cn('min-w-0 overflow-hidden transition-all', expanded && 'ring-1 ring-primary/30')}>
+      <CardContent className="min-w-0 p-3 sm:p-4">
         {/* Header row */}
-        <div className="flex items-start gap-3">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
           {/* Avatar */}
-          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+          <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary sm:flex">
             {(membership.full_name || membership.email || 'U').charAt(0).toUpperCase()}
           </div>
 
           {/* Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-sm text-foreground truncate">
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <span className="max-w-full break-words text-sm font-semibold text-foreground">
                 {membership.full_name || 'Unknown'}
               </span>
               <StatusDot status={membership.status} />
               <RoleBadge role={membership.role} />
             </div>
-            <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
-              <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{membership.email}</span>
-              {membership.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{membership.phone}</span>}
-              <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{branchName}</span>
+            <div className="mt-2 grid min-w-0 grid-cols-1 gap-1.5 text-xs text-muted-foreground sm:flex sm:flex-wrap sm:gap-x-3">
+              <span className="flex min-w-0 items-center gap-1.5"><Mail className="h-3.5 w-3.5 shrink-0" /><span className="min-w-0 break-all">{membership.email}</span></span>
+              {membership.phone && <span className="flex min-w-0 items-center gap-1.5"><Phone className="h-3.5 w-3.5 shrink-0" /><span className="break-all">{membership.phone}</span></span>}
+              <span className="flex min-w-0 items-center gap-1.5"><Building2 className="h-3.5 w-3.5 shrink-0" /><span className="min-w-0 break-words">{branchName}</span></span>
               {membership.last_login_at && (
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
+                <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
+                  <Clock className="h-3.5 w-3.5 shrink-0" />
                   {format(new Date(membership.last_login_at), 'MMM d, HH:mm')}
                 </span>
               )}
@@ -242,10 +242,10 @@ function UserCard({ membership, branches, onRoleChange, onStatusChange, onPermis
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div data-testid="role-user-actions" className="flex w-full min-w-0 flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 sm:w-auto sm:shrink-0 sm:flex-nowrap sm:border-0 sm:pt-0">
             {/* Role selector */}
             <Select value={membership.role} onValueChange={(v) => onRoleChange(membership.id, v)}>
-              <SelectTrigger className="h-7 text-xs w-36">
+              <SelectTrigger aria-label="User role" className="h-10 min-w-[7.5rem] flex-1 text-xs sm:w-32 sm:flex-none">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -261,7 +261,7 @@ function UserCard({ membership, branches, onRoleChange, onStatusChange, onPermis
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-10 w-10 shrink-0"
               title={membership.status === 'approved' ? 'Deactivate' : 'Activate'}
               onClick={() => onStatusChange(membership.id, membership.status === 'approved' ? 'suspended' : 'approved')}
             >
@@ -286,7 +286,7 @@ function UserCard({ membership, branches, onRoleChange, onStatusChange, onPermis
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-destructive hover:text-destructive"
+              className="h-10 w-10 shrink-0 text-destructive hover:text-destructive"
               title="Remove user"
               onClick={() => onRemove(membership)}
             >
@@ -309,9 +309,9 @@ function UserCard({ membership, branches, onRoleChange, onStatusChange, onPermis
         {expanded && (
           <div className="mt-4 pt-4 border-t border-border">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="h-8 text-xs">
-                <TabsTrigger value="permissions" className="text-xs h-7">Module Permissions</TabsTrigger>
-                <TabsTrigger value="scope" className="text-xs h-7">Data Scope</TabsTrigger>
+              <TabsList className="grid h-auto w-full grid-cols-2 text-xs sm:w-auto">
+                <TabsTrigger value="permissions" className="min-h-10 min-w-0 px-2 text-xs">Module Permissions</TabsTrigger>
+                <TabsTrigger value="scope" className="min-h-10 min-w-0 px-2 text-xs">Data Scope</TabsTrigger>
               </TabsList>
 
               <TabsContent value="permissions" className="mt-3">
@@ -750,7 +750,7 @@ export default function RolePermissionCenter() {
   }
 
   return (
-    <div className="space-y-6">
+    <div data-testid="role-permission-center" className="min-w-0 space-y-4 pb-8 sm:space-y-6">
       <PageHeader
         title="Role & Permission Center"
         subtitle="Owner-controlled access management. All permissions come from the database."
@@ -774,28 +774,28 @@ export default function RolePermissionCenter() {
         ))}
       </div>
 
-      <Tabs defaultValue="users">
-        <TabsList>
-          <TabsTrigger value="users"><Users className="w-3.5 h-3.5 mr-1.5" />Users</TabsTrigger>
-          <TabsTrigger value="templates"><Star className="w-3.5 h-3.5 mr-1.5" />Role Templates</TabsTrigger>
-          <TabsTrigger value="audit"><History className="w-3.5 h-3.5 mr-1.5" />Audit Log</TabsTrigger>
+      <Tabs defaultValue="users" className="min-w-0">
+        <TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-xl p-1 sm:w-fit">
+          <TabsTrigger value="users" className="min-h-10 min-w-0 gap-1 px-1.5 text-[11px] sm:px-3 sm:text-sm"><Users className="h-3.5 w-3.5 shrink-0" />Users</TabsTrigger>
+          <TabsTrigger value="templates" className="min-h-10 min-w-0 gap-1 px-1 text-[11px] sm:px-3 sm:text-sm"><Star className="hidden h-3.5 w-3.5 shrink-0 sm:block" /><span className="min-w-0 truncate">Role Templates</span></TabsTrigger>
+          <TabsTrigger value="audit" className="min-h-10 min-w-0 gap-1 px-1 text-[11px] sm:px-3 sm:text-sm"><History className="hidden h-3.5 w-3.5 shrink-0 sm:block" />Audit Log</TabsTrigger>
         </TabsList>
 
         {/* Users tab */}
         <TabsContent value="users" className="mt-4 space-y-4">
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1">
+          <div data-testid="role-user-filters" className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_9rem]">
+            <div className="relative col-span-2 min-w-0 sm:col-span-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search by name or email..."
-                className="pl-9 h-9 text-sm"
+                className="h-10 min-w-0 pl-9 text-sm"
               />
             </div>
             <Select value={filterRole} onValueChange={setFilterRole}>
-              <SelectTrigger className="w-36 h-9 text-sm">
+              <SelectTrigger className="h-10 w-full min-w-0 text-sm">
                 <SelectValue placeholder="All roles" />
               </SelectTrigger>
               <SelectContent>
@@ -806,7 +806,7 @@ export default function RolePermissionCenter() {
               </SelectContent>
             </Select>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-32 h-9 text-sm">
+              <SelectTrigger className="h-10 w-full min-w-0 text-sm">
                 <SelectValue placeholder="All status" />
               </SelectTrigger>
               <SelectContent>
