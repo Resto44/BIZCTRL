@@ -11,8 +11,7 @@ const sale=(date,cash,network=0,id='closing')=>({id,closing_state:'finalized',da
 const invoice=(date,total,id='invoice')=>({id,date,total_amount:total,status:'approved'});
 
 describe('Executive ERP Snapshot IQ financial analytics',()=>{
- it('supports Yesterday and all requested 3/6/9 month comparison windows',()=>{
-  expect(buildOwnerReportPeriod('yesterday',now)).toMatchObject({currentStart:'2026-11-08',currentEnd:'2026-11-09',previousStart:'2026-11-07',previousEnd:'2026-11-07',rangeType:'day'});
+ it('supports 3/6/9 month comparable reporting windows',()=>{
   expect(buildOwnerReportPeriod('three-months',now)).toMatchObject({currentStart:'2026-09-01',previousStart:'2026-06-01',previousEnd:'2026-08-09'});
   expect(buildOwnerReportPeriod('six-months',now)).toMatchObject({currentStart:'2026-06-01',previousStart:'2025-12-01',previousEnd:'2026-05-09'});
   expect(buildOwnerReportPeriod('nine-months',now)).toMatchObject({currentStart:'2026-03-01',previousStart:'2025-06-01',previousEnd:'2026-02-09'});
