@@ -798,7 +798,7 @@ export default function Reports() {
       <Section title={t('generate_pdf_report')} icon={FileText}>
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            {lang==='fa'?'گزارش دوصفحه‌ای: صفحه اول فروشات و روند فروش؛ صفحه دوم خرید، مصارف و تحلیل هزینه':lang==='ar'?'تقرير من صفحتين: المبيعات واتجاهاتها؛ المشتريات والمصروفات وتحليل التكاليف':'Two-page report: sales and sales trends; purchases, expenses and cost analysis'}
+            {lang==='fa'?'گزارش ۳ صفحه‌ای: دو صفحه مالی؛ صفحه سوم تحلیل شبکه و فروش راننده‌ها':lang==='ar'?'تقرير من ٣ صفحات: صفحتان ماليتان؛ الصفحة الثالثة للشبكة ومبيعات السائقين':'Three-page report: two finance pages and Network + Driver Sales analytics on page three'}
           </p>
           {/* Recommendations preview */}
           {recommendations.length > 0 && (
