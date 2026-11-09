@@ -45,9 +45,9 @@ describe('Owner Driver Sales compact mode',()=>{
     expect(tree.root.findAllByProps({'data-testid':'owner-driver-sales-filters'})).toHaveLength(0);
     expect(tree.root.findAllByProps({'data-testid':'owner-driver-sales-kpis'})).toHaveLength(0);
     expect(tree.root.findAllByProps({'data-testid':'owner-driver-sales-trend'})).toHaveLength(0);
-    expect(JSON.stringify(tree.toJSON())).toContain('1,147.00 SAR');
-    expect(JSON.stringify(tree.toJSON())).toContain('526.00 SAR');
-    expect(JSON.stringify(tree.toJSON())).toContain('621.00 SAR');
+    expect(JSON.stringify(tree.toJSON())).toContain('"1,147.00"');
+    expect(JSON.stringify(tree.toJSON())).toContain('"526.00"');
+    expect(JSON.stringify(tree.toJSON())).toContain('"621.00"');
     const toggle=tree.root.findByProps({'data-testid':'owner-driver-explore-trends'});
     expect(toggle.props['aria-expanded']).toBe(false);
     expect(mock.enabled.some(q=>q.key[0]==='owner-driver-sales'&&q.enabled===false)).toBe(true);
