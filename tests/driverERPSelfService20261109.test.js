@@ -7,6 +7,8 @@ const login=read('../src/pages/ERPLogin.jsx');
 const invite=read('../src/components/owner/OwnerStaffProvisioning.jsx');
 const ui=read('../src/pages/DriverDashboardERP.jsx');
 const mgr=read('../src/components/drivers/DriverDailyReportsReview.jsx');
+const bottom=read('../src/components/layout/BottomNav.jsx');
+const tour=read('../src/lib/newUserWelcomeTour.js');
 const management=read('../src/pages/DriverManagement.jsx');
 const schema=read('../supabase/migrations/20261109150000_driver_role_and_invitation_restore.sql');
 const reports=read('../supabase/migrations/20261109150500_driver_daily_nonposting_reports.sql');
@@ -21,6 +23,12 @@ describe('Driver ERP account and secure login',()=>{
   expect(app).toContain('<DriverDashboardERP />');
   expect(schema).toContain("CHECK (role IN ('manager','employee','supplier','driver'))");
   expect(schema).toContain("CHECK (role IN ('owner','manager','employee','supplier','driver'))");
+ });
+ it('does not show owner dashboard navigation to Driver, and onboarding stays in driver scope',()=>{
+  expect(bottom).toContain("if (role === ROLES.DRIVER) return { visibleNav:");
+  expect(bottom).toContain("path: '/driver-dashboard', icon: Truck");
+  expect(tour).toContain("driver ? '/driver-dashboard'");
+  expect(tour).toContain("driver ? [{ key: 'driverPortal', path: '/driver-dashboard', role: 'driver' }]");
  });
  it('driver has minimal role defaults and must be linked to own branch before login',()=>{
   expect(schema).toContain('when \'driver\' then');
