@@ -515,8 +515,6 @@ function OwnerDashboardContent() {
         {hasQueryError ? <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{copy.unable}</div> : null}
       </header>
 
-      <OwnerUniversalPOS restaurant={activeRestaurant} branchId={isAllBranches ? null : selectedBranchId} lang={lang} />
-
       <nav data-testid="owner-report-nav" aria-label={copy.title} className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border/80 bg-card p-1 shadow-sm sm:p-1.5">
         <div className="grid min-w-0 grid-cols-2 gap-1 sm:grid-cols-4">
           {REPORT_PAGES.map((page) => {
@@ -527,6 +525,10 @@ function OwnerDashboardContent() {
         </div>
       </nav>
 
+      <OwnerReportCenter activePage={activePage} model={model} copy={copy} />
+
+      <OwnerUniversalPOS restaurant={activeRestaurant} branchId={isAllBranches ? null : selectedBranchId} lang={lang} />
+
       {role === 'owner' && activePage === 'executive' && (
         <React.Suspense fallback={<div role="status" className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">Driver Sales Analytics…</div>}>
           <OwnerDriverSalesCard key={String(activeRestaurant?.id)+'-'+String(isAllBranches?'all':selectedBranchId)}
@@ -535,7 +537,6 @@ function OwnerDashboardContent() {
             lang={lang} currency={currency}/>
         </React.Suspense>
       )}
-      <OwnerReportCenter activePage={activePage} model={model} copy={copy} />
       <QuickAddBranchDialog open={isQuickAddBranchOpen} onOpenChange={setQuickAddBranchOpen} />
       {isCopilotOpen && role === 'owner' && activeRestaurant?.id && user?.id && (
         <React.Suspense fallback={<div role="status" className="p-3 text-sm">{copilotLabel}…</div>}>
