@@ -39,19 +39,19 @@ export default function SupplierPortalERP() {
   const [activeTab, setActiveTab] = useState('home');
   const [search, setSearch] = useState('');
 
-  // ── Supplier profile (canonical linked entity from ERP membership) ────────
+  // ── Own linked Supplier identity, never a tenant-wide suppliers read ─────
+  // Supplier memberships intentionally do NOT have viewSuppliers (management).
+  // The server RPC validates authenticated user, approved supplier role, exact
+  // membership-linked supplier and tenant/branch, including legacy null branch.
   const { data: supplierProfile, isError: supplierProfileError, refetch: retrySupplierProfile, isLoading: supplierProfileLoading } = useQuery({
-    queryKey: ['supplier-profile', user?.id, user?.linked_entity_id, user?.restaurant_id, user?.branch_id],
+    queryKey: ['supplier-self-profile', user?.id, user?.restaurant_id, user?.branch_id, user?.linked_entity_id],
     queryFn: async () => {
-      let query = supabase.from('suppliers').select('*').eq('restaurant_id', user?.restaurant_id);
-      query = user?.linked_entity_id
-        ? query.eq('id', user.linked_entity_id)
-        : query.eq('email', user?.email).eq('branch_id', user?.branch_id);
-      const { data, error } = await query.maybeSingle();
-      if (error) throw error;
-      return data;
+      const {data,error}=await supabase.rpc('erp_supplier_self_profile');
+      if(error) throw error;
+      return data || null;
     },
-    enabled: !!user?.restaurant_id && (!!user?.linked_entity_id || !!user?.email),
+    enabled: Boolean(user?.id && user?.restaurant_id && user?.branch_id && user?.role==='supplier'),
+    staleTime:15000,
   });
 
   // ── Purchase orders for this supplier ─────────────────────────────────────
@@ -115,7 +115,15 @@ export default function SupplierPortalERP() {
   // Supplier identity is the access boundary; history and invoice lists are
   // independent widgets and should not hold the entire portal behind a spinner.
   if (supplierProfileLoading) return <PortalDataState loading/>;
-  if (!supplierProfile || !user?.branch_id) return <PortalDataState missing onRetry={retrySupplierProfile}/>;
+  if (!supplierProfile || !user?.branch_id) return (
+    <div className="mx-auto max-w-xl px-4 py-6">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-slate-900 dark:border-amber-900 dark:bg-slate-900 dark:text-white">
+        <h2 className="text-base font-bold">Supplier access needs review</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">Your approved account could not be matched to an active supplier record in its assigned branch. Ask the Owner to check the Supplier link and branch assignment. No invoices were changed.</p>
+        <Button variant="outline" className="mt-4 min-h-11" onClick={()=>retrySupplierProfile()}>Retry supplier profile</Button>
+      </div>
+    </div>
+  );
 
   const filteredPOs = purchaseOrders.filter(po =>
     !search ||
