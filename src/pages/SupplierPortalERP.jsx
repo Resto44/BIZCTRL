@@ -1,5 +1,6 @@
 import HelpLink from '@/components/help/HelpLink';
 import {supplierInvoiceCurrencyTotals,readAllPortalRows} from '@/lib/portalReliability';
+import {supplierInvoicePaymentEvidence,supplierInvoiceProgress} from '@/lib/supplierInvoicePaymentEvidence';
 import PortalDataState from '@/components/shared/PortalDataState';
 import React, { useState } from 'react';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -13,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import {
   Package, FileText, CheckCircle2, Clock, LogOut,
   RefreshCw, Search, Calendar, Building2, Home,
-  ShoppingCart, History, Truck, ArrowRight, ShieldCheck
+  ShoppingCart, History, Truck, ArrowRight, ShieldCheck, ChevronDown, Wallet, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -91,10 +92,40 @@ const SUPPLIER_COPY = {
   },
 };
 
+const SUPPLIER_PAYMENT_COPY={
+ en:{detail:'Invoice details',itemsTitle:'Invoice items',paymentsTitle:'Payment history',paid:'Paid',remaining:'Remaining',
+    paidInvoices:'Paid invoices',partialInvoices:'Partially paid',recentPayments:'Recent payments',
+    noPayments:'No payment recorded for this invoice.',noPaymentFeed:'Payment history is temporarily unavailable. Refresh to confirm payments.',
+    paymentHistoryLoading:'Refreshing payment history…',paymentMethod:'Method',subtotal:'Subtotal',tax:'Tax',discount:'Discount',
+    additionalCosts:'Additional costs',notes:'Notes',paymentBalance:'Payment progress',
+    historyGap:'The invoice records a paid amount, but individual historical payment transactions are not available.',
+    historyMismatch:'Invoice paid amount and recorded payment transactions differ. Ask the Owner to reconcile.',
+    viewDetails:'View invoice details',hideDetails:'Hide invoice details',paidInFull:'Paid in full',recorded:'Recorded payment',
+    cash:'Cash',network:'Network',bank_transfer:'Bank transfer'},
+ ar:{detail:'تفاصيل الفاتورة',itemsTitle:'أصناف الفاتورة',paymentsTitle:'سجل الدفعات',paid:'المدفوع',remaining:'المتبقي',
+    paidInvoices:'فواتير مدفوعة',partialInvoices:'مدفوعة جزئياً',recentPayments:'آخر الدفعات',
+    noPayments:'لم تسجل دفعة لهذه الفاتورة.',noPaymentFeed:'تعذر تحميل سجل الدفعات. حدّث الصفحة للتأكد.',
+    paymentHistoryLoading:'جار تحديث سجل الدفعات…',paymentMethod:'طريقة الدفع',subtotal:'المجموع الفرعي',tax:'الضريبة',discount:'الخصم',
+    additionalCosts:'تكاليف إضافية',notes:'ملاحظات',paymentBalance:'تقدم السداد',
+    historyGap:'الفاتورة تسجل مبلغاً مدفوعاً لكن تفاصيل الدفعات التاريخية غير متوفرة.',
+    historyMismatch:'مجموع الدفعات يختلف عن المدفوع المسجل بالفاتورة. راجع مالك المؤسسة.',
+    viewDetails:'عرض تفاصيل الفاتورة',hideDetails:'إخفاء التفاصيل',paidInFull:'مدفوع بالكامل',recorded:'دفعة مسجلة',
+    cash:'نقدي',network:'شبكة',bank_transfer:'تحويل بنكي'},
+ fa:{detail:'جزئیات فاکتور',itemsTitle:'اقلام فاکتور',paymentsTitle:'تاریخچهٔ پرداخت',paid:'پرداخت‌شده',remaining:'باقی‌مانده',
+    paidInvoices:'فاکتورهای پرداخت‌شده',partialInvoices:'پرداخت جزئی',recentPayments:'آخرین پرداخت‌ها',
+    noPayments:'برای این فاکتور هنوز پرداختی ثبت نشده است.',noPaymentFeed:'تاریخچهٔ پرداخت در دسترس نیست. برای تأیید، تازه‌سازی کن.',
+    paymentHistoryLoading:'تاریخچهٔ پرداخت تازه می‌شود…',paymentMethod:'روش پرداخت',subtotal:'جمع قبل از هزینه‌ها',tax:'مالیات',discount:'تخفیف',
+    additionalCosts:'هزینه‌های اضافی',notes:'یادداشت',paymentBalance:'پیشرفت پرداخت',
+    historyGap:'فاکتور مبلغ پرداخت‌شده دارد، اما جزئیات تراکنش‌های قبلی موجود نیست.',
+    historyMismatch:'جمع تراکنش‌ها با مبلغ ثبت‌شدهٔ فاکتور مطابقت ندارد. از مالک درخواست بررسی کن.',
+    viewDetails:'بازکردن جزئیات فاکتور',hideDetails:'بستن جزئیات',paidInFull:'تسویهٔ کامل',recorded:'پرداخت ثبت‌شده',
+    cash:'نقد',network:'شبکه',bank_transfer:'انتقال بانکی'},
+};
+
 export default function SupplierPortalERP() {
   const { user, logout } = useAuth();
   const { lang='en', isRTL=false } = useLanguage() || {};
-  const copy = SUPPLIER_COPY[lang] || SUPPLIER_COPY.en;
+  const copy = {...(SUPPLIER_COPY[lang] || SUPPLIER_COPY.en), ...(SUPPLIER_PAYMENT_COPY[lang] || SUPPLIER_PAYMENT_COPY.en)};
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState('home');
   const [search, setSearch] = useState('');
@@ -147,7 +178,24 @@ export default function SupplierPortalERP() {
         .order('id', { ascending: true }));
     },
     enabled: !!supplierProfile?.id && !!user?.restaurant_id && !!user?.branch_id,
-    refetchInterval: 30000,
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
+
+  // Actual payment transactions posted by Owner/Manager are read-only here.
+  // The RLS policy now limits Supplier to their membership-linked supplier ID.
+  const {data: payments=[], isLoading: paymentsLoading, isError: paymentsError,
+    refetch: refetchPayments} = useQuery({
+    queryKey:['supplier-payments-portal',supplierProfile?.id,user?.restaurant_id,user?.branch_id],
+    queryFn:()=>readAllPortalRows(()=>supabase.from('supplier_payments')
+      .select('id,invoice_id,amount,date,payment_method,created_date')
+      .eq('restaurant_id',user.restaurant_id)
+      .eq('branch_id',user.branch_id)
+      .eq('supplier_id',supplierProfile.id)
+      .order('created_date',{ascending:false})
+      .order('id',{ascending:false})),
+    enabled:Boolean(supplierProfile?.id&&user?.restaurant_id&&user?.branch_id),
+    refetchInterval:12000,refetchOnWindowFocus:true,
   });
 
   const confirmShipmentMutation = useMutation({
@@ -201,6 +249,16 @@ export default function SupplierPortalERP() {
   const shippedCount = purchaseOrders.filter(po => po.status === 'shipped').length;
   const receivedCount = purchaseOrders.filter(po => po.status === 'received').length;
 
+  const invoiceProgress=supplierInvoiceProgress(invoices);
+  const paymentsByInvoice=new Map();
+  const availableInvoiceIds=new Set(invoices.map(inv=>String(inv.id)));
+  for(const payment of payments){
+    if(!availableInvoiceIds.has(String(payment.invoice_id)))continue;
+    const key=String(payment.invoice_id);
+    paymentsByInvoice.set(key,[...(paymentsByInvoice.get(key)||[]),payment]);
+  }
+  const recentPayments=payments.filter(p=>availableInvoiceIds.has(String(p.invoice_id)))
+    .slice(0,5).map(p=>({payment:p,invoice:invoices.find(i=>String(i.id)===String(p.invoice_id))}));
   const currencyTotals = supplierInvoiceCurrencyTotals(invoices);
   const showTotal = field => currencyTotals.length ? currencyTotals.map(row => `${row.currency} ${row[field].toLocaleString()}`).join(' · ') : '—';
 
@@ -232,7 +290,7 @@ export default function SupplierPortalERP() {
                 <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true"/>{copy.verified}
               </span>
               <Button type="button" variant="ghost" size="icon" aria-label={copy.refresh} title={copy.refresh}
-                onClick={()=>{retrySupplierProfile();refetch();refetchInvoices();}}
+                onClick={()=>{retrySupplierProfile();refetch();refetchInvoices();refetchPayments();}}
                 className="h-10 w-10 rounded-xl text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
                 <RefreshCw className="h-4 w-4" aria-hidden="true"/>
               </Button>
@@ -314,14 +372,14 @@ export default function SupplierPortalERP() {
               </div>
             </section>}
 
-            {(isLoading||invoicesLoading) && <p role="status" className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-300"><RefreshCw className="h-4 w-4 animate-spin"/>{copy.loading}</p>}
+            {(isLoading||invoicesLoading||paymentsLoading) && <p role="status" className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-300"><RefreshCw className="h-4 w-4 animate-spin"/>{copy.loading}</p>}
             {!invoicesLoading && invoices.length > 0 && <section className="space-y-2">
               <div className="flex items-center justify-between gap-2 px-0.5">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">{copy.recent}</h3>
                 <button type="button" className="min-h-10 text-xs font-bold text-blue-700 hover:underline dark:text-blue-300" onClick={()=>setActiveTab('invoices')}>{copy.viewAll} →</button>
               </div>
               <div className="grid gap-2.5 lg:grid-cols-2">
-                {invoices.slice(0,3).map(inv=><InvoiceCard key={inv.id} inv={inv} copy={copy}/>)}
+                {invoices.slice(0,3).map(inv=><InvoiceCard key={inv.id} inv={inv} copy={copy} payments={paymentsByInvoice.get(String(inv.id))||[]} paymentsLoading={paymentsLoading} paymentsError={paymentsError}/>)}
               </div>
             </section>}
             {!isLoading && pending.length>0 && <section className="space-y-2">
@@ -367,7 +425,7 @@ export default function SupplierPortalERP() {
               filteredInvoices.length===0?<div className="rounded-2xl border border-slate-200 bg-white p-5 text-center dark:border-slate-800 dark:bg-slate-900">
                 <FileText className="mx-auto mb-2 h-6 w-6 text-slate-400"/><p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{copy.noInvoices}</p>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{copy.noInvoicesHint}</p>
-              </div>:<div className="grid gap-2.5 lg:grid-cols-2">{filteredInvoices.map(inv=><InvoiceCard key={inv.id} inv={inv} copy={copy}/>)}</div>}
+              </div>:<div className="grid gap-2.5 lg:grid-cols-2">{filteredInvoices.map(inv=><InvoiceCard key={inv.id} inv={inv} copy={copy} payments={paymentsByInvoice.get(String(inv.id))||[]} paymentsLoading={paymentsLoading} paymentsError={paymentsError}/>)}</div>}
           </section>}
 
           {activeTab==='orders' && <section data-testid="supplier-order-tab" className="space-y-3">
