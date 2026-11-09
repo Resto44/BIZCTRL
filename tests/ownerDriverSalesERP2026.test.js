@@ -50,6 +50,8 @@ describe('Owner Driver Sales ERP analytics',()=>{
   expect(sql).toContain('SUM(cash_amount)');
   expect(sql).toContain('SUM(network_amount)');
   expect(sql).toContain("p_bucket NOT IN ('day','week','month')");
+  expect(sql).toContain('generate_series(');
+  expect(sql).toContain('LEFT JOIN time_totals t ON t.bucket=calendar.bucket');
   expect(sql).toContain('REVOKE ALL ON FUNCTION');
   expect(sql).toContain('TO authenticated,service_role');
   expect(sql).not.toMatch(/\b(INSERT INTO|DELETE FROM|UPDATE public\.|TRUNCATE)\b/i);
