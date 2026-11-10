@@ -35,6 +35,7 @@ create or replace function restaurant_pos_private.kitchen_screen_language(
 language plpgsql security definer set search_path='' as $$
 declare
  v_changed boolean:=false;
+ v_rows bigint:=0;
  signal_row record;
 begin
  perform restaurant_pos_private.guard(p_restaurant_id,p_branch_id,'viewOrders');
@@ -53,7 +54,8 @@ begin
    language=excluded.language,changed_by=excluded.changed_by,
    updated_at=excluded.updated_at
  where restaurant_pos_private.kitchen_screen_preferences.language is distinct from excluded.language;
- get diagnostics v_changed=row_count;
+ get diagnostics v_rows=row_count;
+ v_changed:=v_rows>0;
  if v_changed then
    -- Content-free signal; every viewer independently fetches its own scoped data.
    for signal_row in
