@@ -16,7 +16,7 @@ export const customerPortalText = {
 };
 export function customerPortalErrorMessage(error, t) {
  const message = String(error?.message || error?.code || '').toUpperCase();
- if (message.includes('CUSTOMER_PORTAL_VERIFIED_EMAIL_REQUIRED') || message.includes('EMAIL_NOT_CONFIRMED'))
+ if (message.includes('CUSTOMER_PORTAL_VERIFIED_EMAIL_REQUIRED') || (message.includes('EMAIL_NOT_CONFIRMED') || message.includes('EMAIL NOT CONFIRMED')))
   return t.emailNotVerified;
  if (message.includes('CUSTOMER_PORTAL_INVITATION_INVALID') || message.includes('INVALID_INVITATION'))
   return t.inviteInvalid;
