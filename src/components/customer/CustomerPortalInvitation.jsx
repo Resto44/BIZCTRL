@@ -13,7 +13,7 @@ export default function CustomerPortalInvitation({ customer }) {
    if(revoke)setMessage(t.saved);else setLink(`${window.location.origin}/customer-portal#invite=${encodeURIComponent(data.token)}`);
   }catch {setMessage(t.failed);}finally{setBusy(false);}
  }
- return <section className="my-4 space-y-3 rounded-xl border bg-white p-4">
+ return <section data-i18n-skip="true" className="my-4 space-y-3 rounded-xl border bg-white p-4">
   <h3 className="font-bold">{t.title}</h3>
   <form onSubmit={e=>{e.preventDefault();run(false);}} className="flex flex-wrap gap-2">
    <Input aria-label={t.email} type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder={t.email} className="min-w-0 flex-1"/>

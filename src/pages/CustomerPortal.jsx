@@ -41,7 +41,7 @@ export default function CustomerPortal() {
   const result=signup?await supabase.auth.signUp({...credentials,options:{emailRedirectTo:window.location.origin+'/customer-portal',data:{people_portal_registration:true}}}):await supabase.auth.signInWithPassword(credentials);
   if(result.error)throw result.error;if(result.data.session)setSession(result.data.session);else setNotice(t.verify);
  });}
- return <main dir={lang==='en'?'ltr':'rtl'} className="min-h-screen bg-slate-50 text-slate-900">
+ return <main data-i18n-skip="true" dir={lang==='en'?'ltr':'rtl'} className="min-h-screen bg-slate-50 text-slate-900">
   <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
    <header className="flex flex-wrap items-center justify-between gap-4 border-b pb-5">
     <div><p className="text-sm font-bold text-teal-700">BizControl</p><h1 className="text-2xl font-black">{t.title}</h1><p className="text-sm text-slate-600">{t.subtitle}</p></div>
