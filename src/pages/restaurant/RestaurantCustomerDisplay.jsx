@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {useLocation} from 'react-router-dom';
 import {createClient} from '@supabase/supabase-js';
-import {ChefHat,UtensilsCrossed,Clock3,CheckCircle2,Wifi,WifiOff,Monitor,ReceiptText,PackageCheck} from 'lucide-react';
+import {ChefHat,UtensilsCrossed,Clock3,CheckCircle2,Wifi,RefreshCw,Monitor,ReceiptText,PackageCheck} from 'lucide-react';
 import {SUPABASE_URL,SUPABASE_ANON_KEY} from '@/api/supabaseClient';
 import {restaurantRpc,restaurantProductName} from '@/lib/restaurantPOS';
 import {money} from '@/lib/retailCashier';
@@ -17,7 +17,7 @@ const COPY={
   progress:'Kitchen progress',received:'Received',cooking:'Preparing',finished:'Ready',
   service:'Type',dine_in:'Dine in',takeaway:'Takeaway',delivery:'Delivery',table:'Table / pickup',
   amount:'Order total',subtotal:'Before tax',tax:'Included tax',paid:'Payment received',unpaid:'Payment pending',
-  fresh:'Live',stale:'Connection lost · refreshing',invalid:'This display has expired or was re-paired. Ask the cashier to pair it again.',
+  fresh:'Live',stale:'Updating quietly · last checked below',connecting:'Preparing the display…',invalid:'This display has expired or was re-paired. Ask the cashier to pair it again.',
   noData:'Checking your order…',updated:'Last updated',privacy:'Your order only · No other customer information',
   thanksTitle:'Thank you for your patience!',thanksBody:'Your order is being prepared in our kitchen. We appreciate your patience.',
   thanksIdle:'Thank you for visiting! Your next order will appear here automatically.',
@@ -33,7 +33,7 @@ const COPY={
   progress:'وضعیت مطبخ',received:'دریافت شد',cooking:'آماده‌سازی',finished:'آماده',
   service:'نوع سفارش',dine_in:'حضوری',takeaway:'بیرون‌بر',delivery:'دلیوری',table:'میز / تحویل',
   amount:'مجموع سفارش',subtotal:'قبل از مالیات',tax:'مالیات شامل',paid:'پرداخت دریافت شد',unpaid:'پرداخت باقی است',
-  fresh:'زنده',stale:'ارتباط قطع است · در حال تازه‌سازی',invalid:'لینک نمایشگر منقضی یا دوباره وصل شده؛ از کاشیر لینک تازه بگیرید.',
+  fresh:'زنده',stale:'تازه‌سازی آرام در پس‌زمینه',connecting:'آماده‌سازی نمایشگر…',invalid:'لینک نمایشگر منقضی یا دوباره وصل شده؛ از کاشیر لینک تازه بگیرید.',
   noData:'در حال بررسی سفارش…',updated:'آخرین تازه‌سازی',privacy:'فقط سفارش شما · بدون معلومات مشتریان دیگر',
   thanksTitle:'تشکر از صبر و حوصلهٔ شما!',thanksBody:'سفارش شما در مطبخ آماده می‌شود. از شکیبایی شما سپاسگزاریم.',
   thanksIdle:'تشکر از تشریف‌آوری شما! سفارش بعدی همین‌جا خودکار نشان داده می‌شود.',
@@ -49,7 +49,7 @@ const COPY={
   progress:'حالة الطلب في المطبخ',received:'تم الاستلام',cooking:'التحضير',finished:'جاهز',
   service:'نوع الطلب',dine_in:'محلي',takeaway:'سفري',delivery:'توصيل',table:'الطاولة / الاستلام',
   amount:'إجمالي الطلب',subtotal:'قبل الضريبة',tax:'الضريبة المشمولة',paid:'تم استلام الدفع',unpaid:'بانتظار الدفع',
-  fresh:'مباشر',stale:'الاتصال منقطع · إعادة التحديث',invalid:'انتهت صلاحية الرابط أو أعيد إقران الشاشة. اطلب رابطاً جديداً من الكاشير.',
+  fresh:'مباشر',stale:'تحديث هادئ في الخلفية',connecting:'جارٍ تجهيز الشاشة…',invalid:'انتهت صلاحية الرابط أو أعيد إقران الشاشة. اطلب رابطاً جديداً من الكاشير.',
   noData:'جارٍ التحقق من طلبك…',updated:'آخر تحديث',privacy:'طلبك فقط · دون بيانات العملاء الآخرين',
   thanksTitle:'شكرًا على صبركم!',thanksBody:'طلبكم قيد التجهيز في المطبخ. نقدّر انتظاركم.',
   thanksIdle:'شكرًا لزيارتكم! سيظهر الطلب التالي هنا تلقائيًا.',
@@ -75,6 +75,10 @@ export const restaurantWaitClock=seconds=>{
   const m=Math.floor(seconds/60),s=Math.floor(seconds%60);
   return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
 };
+// A short, bounded grace window prevents a failed fetch from blanking a TV,
+// without exposing old customer totals indefinitely during a long outage.
+export const customerSnapshotVisible=(lastSync,now,ttlMs=120000)=>
+ Boolean(lastSync>0&&now>=lastSync&&now-lastSync<=ttlMs);
 const validToken=token=>/^[a-f0-9]{64}$/.test(token);
 
 export default function RestaurantCustomerDisplay(){
@@ -96,7 +100,8 @@ export default function RestaurantCustomerDisplay(){
  const refreshRef=useRef(null);
  const isOnline=typeof navigator==='undefined'||navigator.onLine!==false;
  const fresh=Boolean(valid&&!invalid&&isOnline&&lastSync&&now-lastSync<14000);
- const active=restaurantCustomerHasOrder(data);
+ const snapshotVisible=Boolean(!invalid&&customerSnapshotVisible(lastSync,now));
+ const active=snapshotVisible&&restaurantCustomerHasOrder(data);
  const stage=restaurantCustomerStage(data?.kitchen_status);
  const currency=data?.currency||'SAR';
  const lines=Array.isArray(data?.lines)?data.lines:[];
@@ -120,14 +125,16 @@ export default function RestaurantCustomerDisplay(){
    }catch(err){
     if(stopped)return;
     if(err?.code==='42501'){setInvalid(true);setData(null);}
-    setLastSync(0);
+    // Keep last successful snapshot and timestamp on transient network errors.
+    // Expired/revoked tokens above still discard data immediately.
+    setNow(Date.now());
    }finally{busy=false;}
   };
   refreshRef.current=refresh;void refresh();
   const polling=setInterval(()=>void refresh(),5000);
   const clock=setInterval(()=>setNow(Date.now()),1000);
   const reconnect=()=>void refresh();
-  const offline=()=>setLastSync(0);
+  const offline=()=>setNow(Date.now());
   const visible=()=>{if(document.visibilityState==='visible')void refresh();};
   window.addEventListener('online',reconnect);
   window.addEventListener('offline',offline);
@@ -164,15 +171,13 @@ export default function RestaurantCustomerDisplay(){
      </div>
     </div>
     <div data-testid="restaurant-display-status" role="status"
-      className={'inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold '+(fresh?'bg-emerald-100 text-emerald-800':'bg-amber-100 text-amber-900')}>
-      {fresh?<Wifi size={18}/>:<WifiOff size={18}/>}
-      {fresh?c.fresh:c.stale}
+      className={'inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold sm:text-sm '+(fresh?'bg-emerald-100 text-emerald-800':'bg-slate-100 text-slate-600')}>
+      {fresh?<Wifi size={17}/>:<RefreshCw size={15} className="motion-safe:animate-spin motion-reduce:animate-none"/>}
+      <span>{fresh?c.fresh:lastSync?c.stale:c.connecting}</span>
     </div>
    </header>
    {(!valid||invalid)?<section role="alert" className="rounded-3xl border border-rose-200 bg-white p-12 text-center text-xl font-bold text-rose-700">
     <Monitor className="mx-auto mb-4 text-rose-400" size={46}/>{c.invalid}
-   </section>:!fresh?<section role="status" className="rounded-3xl border bg-white px-5 py-16 text-center text-xl font-bold text-amber-800">
-    <WifiOff className="mx-auto mb-4" size={48}/>{c.stale}
    </section>:<>
     <section className="mb-5 grid gap-3 rounded-3xl bg-gradient-to-r from-[#0e234b] to-[#174e9d] px-4 py-5 text-white shadow-lg sm:grid-cols-[auto_1fr] sm:gap-6 sm:px-7">
      <div className="rounded-2xl bg-white/10 px-5 py-3 text-center sm:min-w-52 sm:py-5">
@@ -244,7 +249,7 @@ export default function RestaurantCustomerDisplay(){
    </>}
    <footer className="mt-5 flex flex-wrap justify-between gap-2 px-2 text-xs font-semibold text-slate-500">
     <span>{c.privacy}</span>
-    {fresh&&<span>{c.updated}: {new Date(lastSync).toLocaleTimeString(lang==='fa'?'fa-AF':lang==='ar'?'ar-SA':'en-US')}</span>}
+    {lastSync>0&&<span>{c.updated}: {new Date(lastSync).toLocaleTimeString(lang==='fa'?'fa-AF':lang==='ar'?'ar-SA':'en-US')}</span>}
    </footer>
   </div>
  </main>;
