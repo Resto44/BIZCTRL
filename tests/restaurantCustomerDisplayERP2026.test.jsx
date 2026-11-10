@@ -145,12 +145,47 @@ describe('Restaurant-only customer display ERP',()=>{
   expect(host.textContent).not.toContain('SAR 44.00');
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
  });
- it('hides old totals when network stops responding',async()=>{
+ it('keeps last successful order visible through background fetch failures, without disruptive offline view',async()=>{
+  await render();
+  mocks.rpc.mockRejectedValue(new Error('Temporary network failure'));
+  await act(async()=>{await vi.advanceTimersByTimeAsync(16000);});
+  expect(host.textContent).toContain('#170');
+  expect(host.textContent).toContain('SAR 44.00');
+  expect(host.textContent).toContain('Updating quietly');
+  expect(host.querySelector('[data-testid="restaurant-display-status"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="restaurant-order-total"]')).not.toBeNull();
+  expect(host.textContent).not.toContain('Connection lost');
+  expect(host.textContent).not.toContain('Connection interrupted');
+ });
+ it('recovers automatically on the next background poll without refreshing the page',async()=>{
+  await render();
+  mocks.rpc.mockRejectedValue(new Error('Temporary connection issue'));
+  await act(async()=>{await vi.advanceTimersByTimeAsync(18000);});
+  expect(host.textContent).toContain('#170');
+  mocks.rpc.mockResolvedValue({...fixture,number:171,kitchen_status:'ready',status:'paid',net_total:55});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(5000);});
+  expect(host.textContent).toContain('#171');
+  expect(host.textContent).toContain('Ready for pickup');
+  expect(host.textContent).toContain('SAR 55.00');
+  expect(host.querySelector('[data-testid="restaurant-display-status"]').textContent).toContain('Live');
+ });
+ it('stops showing old customer totals after a bounded two-minute outage but never shows a disruptive error',async()=>{
   await render();
   mocks.rpc.mockRejectedValue(new Error('Offline'));
-  await act(async()=>{await vi.advanceTimersByTimeAsync(16000);});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(125000);});
   expect(host.textContent).not.toContain('SAR 44.00');
-  expect(host.textContent).toContain('Connection lost');
+  expect(host.textContent).not.toContain('#170');
+  expect(host.textContent).toContain('Thank you for visiting!');
+  expect(host.textContent).not.toContain('Connection lost');
+  expect(host.querySelector('[data-testid="restaurant-waiting-clock"]')).toBeNull();
+ });
+ it('keeps a neutral welcome screen before first successful fetch instead of a big offline error',async()=>{
+  mocks.rpc.mockRejectedValue(new Error('Initial network error'));
+  await render();
+  expect(host.textContent).toContain('Thank you for visiting!');
+  expect(host.textContent).toContain('Preparing the display');
+  expect(host.textContent).not.toContain('Connection lost');
+  expect(host.textContent).not.toContain('SAR 0.00');
  });
  it('maps canonical stages and validates row identity',()=>{
   expect(restaurantCustomerStage('draft')).toBe(-1);
