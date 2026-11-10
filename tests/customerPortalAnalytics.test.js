@@ -26,7 +26,8 @@ describe('Customer ERP analytics / isolation and responsive dashboard',()=>{
   expect(c).toContain("grid grid-cols-1 gap-3 sm:grid-cols-3");
   expect(c).toContain('min-w-0 max-w-full');
   expect(c).toContain("lang==='ar'");
-  expect(c).toContain('rtl');
+  expect(c).toContain('تحليلات حساب العميل');
+  expect(c).toContain('آنالیز حساب مشتری');
   expect(c).not.toContain('Math.random');
   expect(c).not.toContain('mockData');
  });
