@@ -178,7 +178,9 @@ export default function CustomerTrackingDisplay(){
       <Monitor className="mx-auto mb-5 h-12 w-12"/>{t.invalid}
     </div>:<>
       <p className="mb-5 text-center text-lg font-bold text-cyan-200 sm:text-2xl">{t.title}</p>
-      <div className="grid gap-4 lg:grid-cols-3 lg:gap-5">
+      {!showSnapshot?<div data-testid="customer-tracking-initializing" className="rounded-3xl border border-white/10 bg-slate-900 px-6 py-10 text-center text-lg font-semibold text-slate-300">
+        {t.connecting}
+      </div>:<div className="grid gap-4 lg:grid-cols-3 lg:gap-5">
         {STAGES.map(stage=><section key={stage} data-testid={'customer-tracking-'+stage}
           className={'min-w-0 rounded-3xl border p-4 sm:p-5 '+stageTheme[stage].border}>
           <div className="mb-5 flex items-center justify-between gap-3">
@@ -194,8 +196,8 @@ export default function CustomerTrackingDisplay(){
           </div>
           {!grouped[stage].length&&<p className="py-10 text-center text-sm text-slate-400">{t.noOrders}</p>}
         </section>)}
-      </div>
-      {total===0&&<p className="mt-5 text-center text-lg font-bold text-slate-300">{showSnapshot?t.wait:t.connecting}</p>}
+      </div>}
+      {showSnapshot&&total===0&&<p className="mt-5 text-center text-lg font-bold text-slate-300">{t.wait}</p>}
       {Number(visibleData?.overflow)>0&&<p role="status" className="mt-5 rounded-xl border border-amber-500/30 bg-amber-950/40 px-4 py-3 text-center text-amber-100">{t.more}: {visibleData.overflow}</p>}
     </>}
     <footer className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-xs font-semibold text-slate-400">
