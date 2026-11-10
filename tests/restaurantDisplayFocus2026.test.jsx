@@ -87,7 +87,7 @@ describe('Cashier Customer Screen kitchen-order focus',()=>{
   expect(sql).toContain("x.device_id=d.id and x.shift_id=s.id");
   expect(sql).toContain("x.kitchen_status in ('queued','preparing','ready')");
   expect(sql).toContain("p_action='pin'");
-  expect(sql).toContain("p_action='cart'");
+  expect(sql).toContain("p_action in ('list','pin','cart')");
   expect(sql).toContain("new.token_hash is distinct from old.token_hash");
   expect(sql).toContain("ds.order_id=new.id or ds.pinned_order_id=new.id");
   expect(sql).toContain("restaurant_pos_private.guard(d.restaurant_id,d.branch_id,'uploadSales')");
