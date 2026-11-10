@@ -93,7 +93,7 @@ export default function CustomerPortal() {
     {invite&&<><Button type="button" variant="outline" disabled={busy||!email.includes('@')} className="w-full" onClick={resendConfirmation}>{t.resendConfirmation}</Button><p className="text-xs text-slate-500">{t.confirmEmailHelp}</p></>}
     <p className="text-sm text-slate-500">{emailPending?t.emailNotVerified:invite?t.verify:t.empty}</p>
    </form>:<>
-    {invite&&<p className="text-sm text-slate-600">{t.email}: <span dir="ltr">{session.user.email}</span> · {t.inviteHelp}</p>}
+    {invite&&<p className="text-sm text-slate-600">{t.email}: <span dir="ltr">{session.user.email}</span> · {t.customerInviteHelp}</p>}
     {invite&&<><p className="text-sm text-amber-900">{t.accountMismatchHelp}</p>
      <div className="flex flex-wrap gap-2">
       <Button disabled={busy} onClick={()=>run(async()=>{const accepted=await customerPortalRpc('erp_customer_portal_accept',{p_token:invite});setInvite('');sessionStorage.removeItem('customer:invite');window.history.replaceState(null,'',window.location.pathname);setSelected(accepted.customer_id);await accounts.refetch();})}>{t.activate}</Button>
