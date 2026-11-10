@@ -15,7 +15,7 @@ const L={
     title:'Follow your order',subtitle:'Live updates from our kitchen',
     queued:'Order received',preparing:'Being prepared',ready:'Ready for pickup',
     noOrders:'No orders in this stage',invalid:'This display link has expired or been replaced. Ask staff to pair the customer TV again.',
-    offline:'Connection interrupted · waiting for an update',sync:'Live from Kitchen',stale:'Updating connection',
+    offline:'Connection interrupted · waiting for an update',sync:'Live from Kitchen',stale:'Updating in background',connecting:'Preparing the display…',
     updated:'Updated',more:'More orders are being prepared',number:'ORDER',screen:'Customer order tracking',
     tv:'Full screen',leave:'Exit full screen',privacy:'Only order numbers are shown. Customer and payment information stays private.',
     wait:'Waiting for new orders',refresh:'Refresh',expires:'This link expires automatically after 8 hours',
@@ -24,7 +24,7 @@ const L={
     title:'سفارش خود را تعقیب کنید',subtitle:'وضعیت زنده از داخل مطبخ',
     queued:'سفارش دریافت شد',preparing:'در حال آماده‌سازی',ready:'آمادهٔ تحویل',
     noOrders:'در این مرحله سفارشی نیست',invalid:'لینک تلویزیون منقضی یا تبدیل شده؛ از مسئول شعبه لینک تازه بگیرید.',
-    offline:'ارتباط قطع است · در انتظار تازه‌سازی',sync:'وصل به مطبخ',stale:'در حال تازه‌سازی',
+    offline:'ارتباط قطع است · در انتظار تازه‌سازی',sync:'وصل به مطبخ',stale:'تازه‌سازی آرام در پس‌زمینه',connecting:'آماده‌سازی نمایشگر…',
     updated:'آخرین آپدیت',more:'سفارش‌های بیشتر هم موجود است',number:'سفارش نمبر',screen:'تعقیب سفارش مشتری',
     tv:'تمام صفحه',leave:'خروج از تمام صفحه',privacy:'فقط نمبر سفارش دیده می‌شود؛ معلومات مشتری و پرداخت خصوصی می‌ماند.',
     wait:'در انتظار سفارش جدید',refresh:'تازه‌سازی',expires:'لینک بعد از ۸ ساعت خودکار منقضی می‌شود',
@@ -33,7 +33,7 @@ const L={
     title:'تابع طلبك',subtitle:'تحديثات مباشرة من المطبخ',
     queued:'تم استلام الطلب',preparing:'جاري التحضير',ready:'جاهز للاستلام',
     noOrders:'لا توجد طلبات في هذه المرحلة',invalid:'انتهت صلاحية رابط الشاشة أو تم تغييره. اطلب رابطاً جديداً من مسؤول الفرع.',
-    offline:'انقطع الاتصال · بانتظار التحديث',sync:'متصل بالمطبخ',stale:'جارٍ إعادة الاتصال',
+    offline:'انقطع الاتصال · بانتظار التحديث',sync:'متصل بالمطبخ',stale:'تحديث هادئ في الخلفية',connecting:'جارٍ تجهيز الشاشة…',
     updated:'آخر تحديث',more:'توجد طلبات أخرى قيد التجهيز',number:'رقم الطلب',screen:'متابعة طلبات العملاء',
     tv:'ملء الشاشة',leave:'الخروج من ملء الشاشة',privacy:'تظهر أرقام الطلبات فقط. بيانات العملاء والدفع تبقى خاصة.',
     wait:'بانتظار الطلبات الجديدة',refresh:'تحديث',expires:'تنتهي صلاحية الرابط تلقائياً بعد ٨ ساعات',
@@ -76,8 +76,12 @@ export default function CustomerTrackingDisplay(){
   const refreshRef=useRef(null);
   const online=typeof navigator==='undefined'||navigator.onLine!==false;
   const fresh=Boolean(valid&&!forbidden&&online&&lastSync&&now-lastSync<14000);
-  const grouped=useMemo(()=>trackingGroup(data?.orders),[data?.orders]);
-  const knownCounts=data?.counts||{};
+  // A transient fetch failure must not replace the entire public TV board.
+  // After two minutes without a successful read, remove old ticket numbers.
+  const showSnapshot=Boolean(!forbidden&&lastSync>0&&now>=lastSync&&now-lastSync<=120000);
+  const visibleData=showSnapshot?data:null;
+  const grouped=useMemo(()=>trackingGroup(visibleData?.orders),[visibleData?.orders]);
+  const knownCounts=visibleData?.counts||{};
   const total=STAGES.reduce((sum,stage)=>sum+Number(knownCounts[stage]||0),0);
 
   useEffect(()=>{
@@ -97,7 +101,7 @@ export default function CustomerTrackingDisplay(){
         if(closed)return;
         if(e?.code==='42501'){
           setData(null);setForbidden(true);setLastSync(0);
-        }else setLastSync(0); // Never display stale numbers as live.
+        }else setNow(Date.now()); // Keep bounded last-known board; never mark stale as Live.
       }finally{inFlight=false;if(!closed)setBusy(false);}
     };
     refreshRef.current=refresh;
@@ -105,7 +109,7 @@ export default function CustomerTrackingDisplay(){
     const timer=setInterval(()=>void refresh(),5000);
     const tick=setInterval(()=>setNow(Date.now()),1000);
     const onlineFn=()=>void refresh();
-    const offlineFn=()=>setLastSync(0);
+    const offlineFn=()=>setNow(Date.now());
     const visibleFn=()=>{if(document.visibilityState==='visible')void refresh();};
     window.addEventListener('online',onlineFn);
     window.addEventListener('offline',offlineFn);
@@ -160,7 +164,7 @@ export default function CustomerTrackingDisplay(){
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <span data-testid="customer-tracking-live" className={'inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold '+(fresh?'bg-emerald-900 text-emerald-100':'bg-amber-950 text-amber-100')}>
-          {fresh?<Wifi className="h-5 w-5"/>:<WifiOff className="h-5 w-5"/>}{fresh?t.sync:t.stale}
+          {fresh?<Wifi className="h-5 w-5"/>:<RefreshCw className="h-4 w-4 motion-safe:animate-spin motion-reduce:animate-none"/>}{fresh?t.sync:lastSync?t.stale:t.connecting}
         </span>
         <button type="button" disabled={!valid||forbidden} aria-label={t.refresh}
           onClick={()=>void refreshRef.current?.()} className="flex min-h-11 items-center gap-2 rounded-xl border border-white/30 px-3 text-sm font-bold disabled:opacity-40">
@@ -172,11 +176,11 @@ export default function CustomerTrackingDisplay(){
     </header>
     {(!valid||forbidden)?<div role="alert" className="rounded-3xl border border-rose-500/50 bg-rose-900/30 px-6 py-16 text-center text-xl font-bold text-rose-100">
       <Monitor className="mx-auto mb-5 h-12 w-12"/>{t.invalid}
-    </div>:!fresh?<div role="status" className="rounded-3xl border border-amber-400/40 bg-amber-950/30 px-6 py-16 text-center text-2xl font-bold text-amber-100">
-      <WifiOff className="mx-auto mb-4 h-12 w-12"/>{t.offline}
     </div>:<>
       <p className="mb-5 text-center text-lg font-bold text-cyan-200 sm:text-2xl">{t.title}</p>
-      <div className="grid gap-4 lg:grid-cols-3 lg:gap-5">
+      {!showSnapshot?<div data-testid="customer-tracking-initializing" className="rounded-3xl border border-white/10 bg-slate-900 px-6 py-10 text-center text-lg font-semibold text-slate-300">
+        {t.connecting}
+      </div>:<div className="grid gap-4 lg:grid-cols-3 lg:gap-5">
         {STAGES.map(stage=><section key={stage} data-testid={'customer-tracking-'+stage}
           className={'min-w-0 rounded-3xl border p-4 sm:p-5 '+stageTheme[stage].border}>
           <div className="mb-5 flex items-center justify-between gap-3">
@@ -192,14 +196,14 @@ export default function CustomerTrackingDisplay(){
           </div>
           {!grouped[stage].length&&<p className="py-10 text-center text-sm text-slate-400">{t.noOrders}</p>}
         </section>)}
-      </div>
-      {total===0&&<p className="mt-5 text-center text-lg font-bold text-slate-300">{t.wait}</p>}
-      {Number(data?.overflow)>0&&<p role="status" className="mt-5 rounded-xl border border-amber-500/30 bg-amber-950/40 px-4 py-3 text-center text-amber-100">{t.more}: {data.overflow}</p>}
+      </div>}
+      {showSnapshot&&total===0&&<p className="mt-5 text-center text-lg font-bold text-slate-300">{t.wait}</p>}
+      {Number(visibleData?.overflow)>0&&<p role="status" className="mt-5 rounded-xl border border-amber-500/30 bg-amber-950/40 px-4 py-3 text-center text-amber-100">{t.more}: {visibleData.overflow}</p>}
     </>}
     <footer className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-xs font-semibold text-slate-400">
       <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4"/>{t.privacy}</span>
       <span>{t.expires}</span>
-      {fresh&&<span>{t.updated}: {new Date(lastSync).toLocaleTimeString(lang==='fa'?'fa-AF':lang==='ar'?'ar-SA':'en-US')}</span>}
+      {lastSync>0&&<span>{t.updated}: {new Date(lastSync).toLocaleTimeString(lang==='fa'?'fa-AF':lang==='ar'?'ar-SA':'en-US')}</span>}
     </footer>
   </main>;
 }

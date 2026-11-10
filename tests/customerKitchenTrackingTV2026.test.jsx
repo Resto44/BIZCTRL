@@ -76,6 +76,46 @@ describe('Customer Tracking KDS TV',()=>{
      expect(JSON.stringify(tree.toJSON())).toContain('تم استلام الطلب');
    }finally{await close();}
  });
+ it('keeps the last valid tracking board on transient failures, then restores newer orders automatically',async()=>{
+   const clock=vi.spyOn(Date,'now');
+   let current=Date.now();
+   clock.mockImplementation(()=>current);
+   const {tree,close}=await render();
+   try{
+     expect(tree.root.findAllByProps({'data-testid':'customer-tracking-ticket'})).toHaveLength(3);
+     const refresh=tree.root.findAllByType('button').find(b=>b.props['aria-label']==='Refresh');
+     expect(refresh).toBeTruthy();
+     mocks.rpc.mockRejectedValue(new Error('Temporary network interruption'));
+     current+=20000;
+     await act(async()=>{refresh.props.onClick();await new Promise(resolve=>setTimeout(resolve,25));});
+     expect(tree.root.findAllByProps({'data-testid':'customer-tracking-ticket'})).toHaveLength(3);
+     expect(tree.root.findByProps({'data-testid':'customer-tracking-live'}).children.join('')).not.toContain('Live from Kitchen');
+     expect(JSON.stringify(tree.toJSON())).not.toContain('Connection interrupted');
+     mocks.rpc.mockResolvedValue({...data,orders:[{number:115,stage:'ready',submitted_at:'2026-11-10T07:30:00Z'}],
+       counts:{queued:0,preparing:0,ready:1}});
+     await act(async()=>{refresh.props.onClick();await new Promise(resolve=>setTimeout(resolve,25));});
+     const displayedTicketNumbers=tree.root.findAllByProps({'data-testid':'customer-tracking-ticket'})
+       .map(ticket=>ticket.findAllByType('p').at(-1).children.join(''));
+     expect(displayedTicketNumbers).toEqual(['#115']);
+     expect(displayedTicketNumbers).not.toContain('#110');
+     expect(tree.root.findByProps({'data-testid':'customer-tracking-live'}).children.join('')).toContain('Live from Kitchen');
+   }finally{await close();clock.mockRestore();}
+ });
+ it('removes tickets after two minutes without verified contact, but never shows a blocking disconnect banner',async()=>{
+   const clock=vi.spyOn(Date,'now');
+   let current=Date.now();
+   clock.mockImplementation(()=>current);
+   const {tree,close}=await render();
+   try{
+     mocks.rpc.mockRejectedValue(new Error('Outage'));
+     current+=121000;
+     const refresh=tree.root.findAllByType('button').find(b=>b.props['aria-label']==='Refresh');
+     await act(async()=>{refresh.props.onClick();await new Promise(resolve=>setTimeout(resolve,25));});
+     expect(tree.root.findAllByProps({'data-testid':'customer-tracking-ticket'})).toHaveLength(0);
+     expect(tree.root.findAllByProps({'data-testid':'customer-tracking-initializing'})).toHaveLength(1);
+     expect(JSON.stringify(tree.toJSON())).not.toContain('Connection interrupted');
+   }finally{await close();clock.mockRestore();}
+ });
  it('rejects malformed links before any RPC call',async()=>{
    const {tree,close}=await render('#not-a-token');
    try{
