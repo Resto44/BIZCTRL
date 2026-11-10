@@ -51,6 +51,7 @@ export default function CustomerPortalInvitation({ customer }) {
    <Button type="button" variant="outline" disabled={busy||sending} onClick={()=>run(true)}>{t.revoke}</Button>
   </form>
   {link&&<>
+   <p className="text-sm font-semibold">{t.inviteRecipientLabel}: <span dir="ltr">{email.trim().toLowerCase()}</span></p>
    <p className="text-sm">{t.inviteHelp}</p>
    <Input aria-label={t.invite} readOnly value={link} dir="ltr" onFocus={e=>e.target.select()}/>
    <div className="flex flex-wrap gap-2">

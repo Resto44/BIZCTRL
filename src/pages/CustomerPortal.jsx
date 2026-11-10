@@ -4,13 +4,14 @@ import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { withPortalReadDeadline } from '@/lib/portalReadDeadline';
 import { customerPortalRpc, customerPortalText, customerPortalErrorMessage, portalStatus } from '@/lib/customerPortal';
+import { customerInviteTokenFromHash, resolveCustomerInviteToken } from '@/lib/customerInviteLink';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 function inviteToken() {
- const token = new URLSearchParams(window.location.hash.slice(1)).get('invite');
- if(token)sessionStorage.setItem('customer:invite',token);
- return token || sessionStorage.getItem('customer:invite') || '';
+ const token = customerInviteTokenFromHash(window.location.hash);
+ if (token) sessionStorage.setItem('customer:invite', token);
+ return resolveCustomerInviteToken(window.location.hash, sessionStorage.getItem('customer:invite'));
 }
 export default function CustomerPortal() {
  const {lang,setLang}=useLanguage(), t=customerPortalText[lang]||customerPortalText.en, client=useQueryClient();
@@ -26,6 +27,24 @@ export default function CustomerPortal() {
   return()=>{live=false;subscription.unsubscribe();};
  },[]);
  useEffect(()=>{setSelected('');setPage(0);},[session?.user?.id]);
+ // Safari may keep this React page mounted when a newer email link changes only the URL hash.
+ // Update the active invitation immediately; never keep using a superseded sessionStorage token.
+ useEffect(()=>{
+  const syncInvitationFromUrl = () => {
+   const newest = customerInviteTokenFromHash(window.location.hash);
+   if (!newest) return;
+   sessionStorage.setItem('customer:invite', newest);
+   setInvite(previous => previous === newest ? previous : newest);
+   setError('');
+   setNotice('');
+  };
+  window.addEventListener('hashchange', syncInvitationFromUrl);
+  window.addEventListener('pageshow', syncInvitationFromUrl);
+  return () => {
+   window.removeEventListener('hashchange', syncInvitationFromUrl);
+   window.removeEventListener('pageshow', syncInvitationFromUrl);
+  };
+ },[]);
  const accounts=useQuery({queryKey:['customer-portal','accounts',session?.user?.id],enabled:!!session?.user?.id,
   queryFn:()=>customerPortalRpc('erp_customer_portal_accounts'),refetchInterval:20000,retry:1});
  const account=accounts.isError?null:accounts.data?.find(a=>a.id===selected)||accounts.data?.[0];
@@ -41,6 +60,16 @@ export default function CustomerPortal() {
   const result=signup?await supabase.auth.signUp({...credentials,options:{emailRedirectTo:window.location.origin+'/customer-portal',data:{people_portal_registration:true}}}):await supabase.auth.signInWithPassword(credentials);
   if(result.error)throw result.error;if(result.data.session){setSession(result.data.session);setEmailPending(false);}else{setEmailPending(true);setNotice(t.verify);}
  });}
+ function signOutForInvitation(){return run(async()=>{
+  const {error}=await supabase.auth.signOut();
+  if(error)throw error;
+  setSession(null);
+  setEmail('');
+  setPassword('');
+  setEmailPending(false);
+  client.removeQueries({queryKey:['customer-portal']});
+  if(invite)setNotice(t.signoutSwitchHelp);
+ });}
  function resendConfirmation(){return run(async()=>{
   if(!email.trim())throw Error('EMAIL_REQUIRED');
   const {error}=await supabase.auth.resend({type:'signup',email:email.trim(),options:{emailRedirectTo:window.location.origin+'/customer-portal'}});
@@ -52,7 +81,7 @@ export default function CustomerPortal() {
    <header className="flex flex-wrap items-center justify-between gap-4 border-b pb-5">
     <div><p className="text-sm font-bold text-teal-700">BizControl</p><h1 className="text-2xl font-black">{t.title}</h1><p className="text-sm text-slate-600">{t.subtitle}</p></div>
     <div className="flex flex-wrap gap-2 print:hidden"><select aria-label="Language" className="rounded-lg border bg-white p-2" value={lang} onChange={e=>setLang(e.target.value)}><option value="fa">فارسی</option><option value="ar">العربية</option><option value="en">English</option></select>
-    {session&&<Button variant="outline" disabled={busy} onClick={()=>run(async()=>{const {error}=await supabase.auth.signOut();if(error)throw error;setSession(null);client.removeQueries({queryKey:['customer-portal']});})}>{t.signout}</Button>}</div>
+    {session&&<Button variant="outline" disabled={busy} onClick={signOutForInvitation}>{t.signout}</Button>}</div>
    </header>
    {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{error}</p>}
    {notice&&<p role="status" className="rounded-lg bg-teal-50 p-3">{notice}</p>}
@@ -64,8 +93,13 @@ export default function CustomerPortal() {
     {invite&&<><Button type="button" variant="outline" disabled={busy||!email.includes('@')} className="w-full" onClick={resendConfirmation}>{t.resendConfirmation}</Button><p className="text-xs text-slate-500">{t.confirmEmailHelp}</p></>}
     <p className="text-sm text-slate-500">{emailPending?t.emailNotVerified:invite?t.verify:t.empty}</p>
    </form>:<>
-    {invite&&<p className="text-sm text-slate-600">{t.email}: <span dir="ltr">{session.user.email}</span> · {t.inviteHelp}</p>}
-    {invite&&<Button disabled={busy} onClick={()=>run(async()=>{const accepted=await customerPortalRpc('erp_customer_portal_accept',{p_token:invite});setInvite('');sessionStorage.removeItem('customer:invite');window.history.replaceState(null,'',window.location.pathname);setSelected(accepted.customer_id);await accounts.refetch();})}>{t.activate}</Button>}
+    {invite&&<p className="text-sm text-slate-600">{t.email}: <span dir="ltr">{session.user.email}</span> · {t.customerInviteHelp}</p>}
+    {invite&&<><p className="text-sm text-amber-900">{t.accountMismatchHelp}</p>
+     <div className="flex flex-wrap gap-2">
+      <Button disabled={busy} onClick={()=>run(async()=>{const accepted=await customerPortalRpc('erp_customer_portal_accept',{p_token:invite});setInvite('');sessionStorage.removeItem('customer:invite');window.history.replaceState(null,'',window.location.pathname);setSelected(accepted.customer_id);await accounts.refetch();})}>{t.activate}</Button>
+      <Button variant="outline" disabled={busy} onClick={signOutForInvitation}>{t.switchAccount}</Button>
+     </div>
+    </>}
     {accounts.isPending?<p role="status">{t.loading}</p>:accounts.isError?<div role="alert">{t.error} <Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></div>:!account?<p>{t.empty}</p>:<>
      <section className="flex flex-wrap items-center justify-between gap-3">
       <label className="min-w-0">{t.account}<select className="mx-2 max-w-full rounded-lg border bg-white p-3" value={account.id} onChange={e=>{setSelected(e.target.value);setPage(0);}}>{accounts.data.map(a=><option key={a.id} value={a.id}>{a.business} · {a.name} · {a.branch}</option>)}</select></label>
