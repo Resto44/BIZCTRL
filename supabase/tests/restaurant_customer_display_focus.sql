@@ -73,7 +73,7 @@ begin
   reset role;
 
   -- Exact real-world regression: cashier opens new blank order, updating order_id.
-  update restaurant_pos_private.displays set order_id=draft_id where device_id=device_id;
+  update restaurant_pos_private.displays ds set order_id=draft_id where ds.device_id=(select o.device_id from restaurant_pos_private.orders o where o.id=kitchen_id);
   set local role anon;
   result:=public.erp_restaurant_customer_display(tok);
   if (result->>'number')::bigint<>kitchen_num then
@@ -102,7 +102,7 @@ begin
   reset role;
   update restaurant_pos_private.displays
     set token_hash=encode(extensions.digest(tok2,'sha256'),'hex')
-    where device_id=device_id;
+    where device_id=(select o.device_id from restaurant_pos_private.orders o where o.id=kitchen_id);
   set local role anon;
   result:=public.erp_restaurant_customer_display(tok2);
   if (result->>'number')::bigint<>draft_num then
