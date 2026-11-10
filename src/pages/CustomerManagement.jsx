@@ -48,6 +48,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import BranchSelect from '@/components/shared/BranchSelect';
+import CustomerPortalInvitation from '@/components/customer/CustomerPortalInvitation';
 import PageHeader from '@/components/shared/PageHeader';
 
 // Icons
@@ -825,6 +826,7 @@ export default function CustomerManagement() {
               </Badge>
             </div>
 
+            {role === 'owner' && <CustomerPortalInvitation key={selectedCustomer.id} customer={selectedCustomer} />}
             <div className="grid grid-cols-3 gap-2 mb-4">
               <Card className="border-0 shadow-sm"><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">{t('total_credit_sales')}</p><p className="text-sm font-bold text-blue-600">{fmt(selectedCustomer.total_credit_sales, currency)}</p></CardContent></Card>
               <Card className="border-0 shadow-sm"><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">{t('total_collected')}</p><p className="text-sm font-bold text-emerald-600">{fmt(selectedCustomer.total_collected, currency)}</p></CardContent></Card>

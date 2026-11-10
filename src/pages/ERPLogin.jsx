@@ -219,6 +219,9 @@ export default function ERPLogin() {
               <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-500/20"><Wallet className="size-6"/></span>
               <span className="min-w-0"><strong className="block text-base font-black">{lang==='fa'?'ورود به مرکز بانکداری والت':lang==='ar'?'دخول المحفظة البنكية':'Wallet Banking Login'}</strong><span className="mt-1 block text-xs leading-5 text-blue-100/80">{partnerLabels.accountHelp}</span></span>
             </button>
+            <button type="button" className="flex min-h-24 items-center rounded-2xl border border-teal-400/60 bg-teal-900/30 p-4 text-start font-bold text-teal-100" onClick={()=>navigate('/customer-portal')}>
+              {lang==='fa'?'پورتل مشتری · خریدها و حساب من':lang==='ar'?'بوابة العميل · مشترياتي وحسابي':'Customer portal · My purchases and account'}
+            </button>
             {ROLE_CONFIG.map((rc) => {
               const Icon = rc.icon;
               return (

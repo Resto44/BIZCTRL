@@ -1,7 +1,7 @@
 {
   "headers": [
     {
-      "source": "/(partner-portal|wallet-portal)",
+      "source": "/(partner-portal|wallet-portal|customer-portal)",
       "headers": [
         {
           "key": "Cache-Control",
