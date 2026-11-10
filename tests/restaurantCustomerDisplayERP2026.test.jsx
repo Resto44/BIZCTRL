@@ -82,6 +82,19 @@ describe('Restaurant-only customer display ERP',()=>{
   expect(host.textContent).toContain('الوجبات المطلوبة');
   expect(host.textContent).not.toContain('Your shopping');
  });
+ it('follows Kitchen Display language even when customer TV browser is set to English',async()=>{
+  mocks.lang='en';
+  mocks.rpc.mockResolvedValue({...fixture,kitchen_language:'ar'});
+  await render();
+  expect(host.textContent).toContain('الوجبات المطلوبة');
+  expect(host.textContent).toContain('دجاج');
+  expect(host.querySelector('[data-testid="restaurant-customer-display"]').getAttribute('dir')).toBe('rtl');
+  mocks.rpc.mockResolvedValue({...fixture,kitchen_language:'fa',kitchen_status:'preparing'});
+  await act(async()=>{mocks.notify.listener('changed');await vi.advanceTimersByTimeAsync(150);});
+  expect(host.textContent).toContain('غذاهای سفارش‌شده');
+  expect(host.textContent).toContain('مرغ');
+  expect(host.textContent).toContain('در حال آماده‌سازی');
+ });
  it('blocks invalid tokens and expired links; no stale order details',async()=>{
   await render('/restaurant/customer-display#not-valid');
   expect(mocks.rpc).not.toHaveBeenCalled();
