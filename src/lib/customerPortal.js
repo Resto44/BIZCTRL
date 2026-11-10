@@ -3,7 +3,7 @@ import { withPortalReadDeadline } from '@/lib/portalReadDeadline';
 
 export async function customerPortalRpc(name, args = {}) {
   const request = supabase.rpc(name, args);
-  const read = ['erp_customer_portal_accounts', 'erp_customer_portal_statement'].includes(name);
+  const read = ['erp_customer_portal_accounts', 'erp_customer_portal_statement', 'erp_customer_portal_analytics'].includes(name);
   const { data, error } = await (read ? withPortalReadDeadline(request, 12000, 'CUSTOMER_PORTAL_TIMEOUT') : request);
   if (error) throw error;
   if (data == null) throw new Error('CUSTOMER_PORTAL_INVALID_RESPONSE');
