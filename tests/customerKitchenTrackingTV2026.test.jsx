@@ -68,6 +68,14 @@ describe('Customer Tracking KDS TV',()=>{
      expect(text).toContain('Test Restaurant');
    }finally{await close();}
  });
+ it('uses the branch Kitchen Display language for the public order-number TV',async()=>{
+   mocks.rpc.mockResolvedValue({...data,kitchen_language:'ar'});
+   const {tree,close}=await render();
+   try{
+     expect(tree.root.findByProps({'data-testid':'customer-tracking-tv'}).props.dir).toBe('rtl');
+     expect(JSON.stringify(tree.toJSON())).toContain('تم استلام الطلب');
+   }finally{await close();}
+ });
  it('rejects malformed links before any RPC call',async()=>{
    const {tree,close}=await render('#not-a-token');
    try{
