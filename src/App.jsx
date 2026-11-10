@@ -100,6 +100,7 @@ const EmployeeAttendance  = lazy(() => import('@/pages/EmployeeAttendance'));
 const Payroll             = lazy(() => import('@/pages/Payroll'));
 
 const Treasury            = lazy(() => import('@/pages/Treasury'));
+const CustomerPortal = lazy(() => import('@/pages/CustomerPortal'));
 const PartnerPortal = lazy(() => import('@/pages/PartnerPortal'));
 const SponsorTreasury     = lazy(() => import('@/pages/SponsorTreasury'));
 const DebtManagement      = lazy(() => import('@/pages/DebtManagement'));
@@ -719,6 +720,7 @@ function App() {
               <Routes>
               {/* ── NEW ERP Unified Auth (primary entry points) ── */}
               <Route path="/sponsor-dashboard" element={<Navigate to="/partner-portal" replace />} />
+              <Route path="/customer-portal" element={<Suspense fallback={<PageLoader />}><CustomerPortal /></Suspense>} />
               <Route path="/wallet-portal" element={<Suspense fallback={<PageLoader />}><PartnerPortal /></Suspense>} />
               <Route path="/partner-portal" element={<Suspense fallback={<PageLoader />}><PartnerPortal /></Suspense>} />
               <Route path="/erp-login" element={<ERPLogin />} />
