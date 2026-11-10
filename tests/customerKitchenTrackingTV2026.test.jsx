@@ -58,8 +58,10 @@ describe('Customer Tracking KDS TV',()=>{
      expect(tree.root.findAllByProps({'data-testid':'customer-tracking-ticket'})).toHaveLength(3);
      expect(tree.root.findAllByProps({'data-testid':'customer-tracking-ready'})).toHaveLength(1);
      const text=JSON.stringify(tree.toJSON());
-     expect(text).toContain('#110');
-     expect(text).toContain('#112');
+     const ticketLabels=tree.root.findAllByProps({'data-testid':'customer-tracking-ticket'})
+       .map(ticket=>ticket.findAllByType('p').at(-1).children.join(''));
+     expect(ticketLabels).toContain('#110');
+     expect(ticketLabels).toContain('#112');
      expect(text).not.toContain('private@example.com');
      expect(text).not.toContain('+966123');
      expect(text).not.toContain('40000');
