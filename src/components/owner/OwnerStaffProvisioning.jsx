@@ -404,7 +404,7 @@ export default function OwnerStaffProvisioning() {
             <Button type="button" size="icon" variant="outline" aria-label="Refresh invitations" onClick={refresh} disabled={loading} className="h-10 w-10 shrink-0 rounded-xl bg-white dark:bg-slate-900"><RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} /></Button>
           </div>
 
-          <form onSubmit={createInvitation} className="space-y-5">
+          <form onSubmit={(event) => form.role === 'wallet' ? event.preventDefault() : createInvitation(event)} className="space-y-5">
             <div className="grid min-w-0 gap-2 sm:grid-cols-2">
               <ScopeField icon={Building2} label="Store">
                 <select aria-label="Select invitation store" disabled={submitting || !!actionInvitationId} value={selectedOrganizationId} onChange={(event) => changeOrganization(event.target.value)} className="mt-0.5 h-7 w-full min-w-0 bg-transparent text-sm font-black text-slate-900 outline-none dark:text-white" required>
