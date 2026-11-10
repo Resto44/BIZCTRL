@@ -52,14 +52,15 @@ export default function RestaurantCustomerDisplay(){
  const {hash}=useLocation();
  const token=hash.slice(1);
  const valid=validToken(token);
- const {lang}=useLanguage();
+ const {lang:localLang}=useLanguage();
+ const [data,setData]=useState(null);
+ const lang=['en','ar','fa'].includes(data?.kitchen_language)?data.kitchen_language:localLang;
  const c=COPY[lang]||COPY.en;
  // Public screen deliberately NEVER inherits the cashier/Owner's auth session.
  const client=useMemo(()=>createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
   auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,
    storageKey:'bizctrl-restaurant-single-order-display'}
  }),[]);
- const [data,setData]=useState(null);
  const [invalid,setInvalid]=useState(false);
  const [lastSync,setLastSync]=useState(0);
  const [now,setNow]=useState(Date.now());
