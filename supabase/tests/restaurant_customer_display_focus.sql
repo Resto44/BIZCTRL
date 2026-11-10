@@ -100,9 +100,9 @@ begin
   set local role authenticated;
   perform public.erp_restaurant_pos_display_focus(device_id,'pin',kitchen_id);
   reset role;
-  update restaurant_pos_private.displays
+  update restaurant_pos_private.displays ds
     set token_hash=encode(extensions.digest(tok2,'sha256'),'hex')
-    where device_id=(select o.device_id from restaurant_pos_private.orders o where o.id=kitchen_id);
+    where ds.device_id=(select o.device_id from restaurant_pos_private.orders o where o.id=kitchen_id);
   set local role anon;
   result:=public.erp_restaurant_customer_display(tok2);
   if (result->>'number')::bigint<>draft_num then
