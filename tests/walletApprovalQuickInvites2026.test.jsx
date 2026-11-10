@@ -27,9 +27,11 @@ const mount=async()=>{
  });
  return {tree,close:async()=>{await act(async()=>tree.unmount());}};
 };
+const textContent=node=>typeof node==='string'?node:
+  Array.isArray(node?.children)?node.children.map(textContent).join(''):'';
 const clickText=async(tree,text)=>{
  const button=tree.root.findAllByType('button').find(node=>
-   JSON.stringify(node.children).includes(text));
+   textContent(node).includes(text));
  if(!button)throw Error('Missing button with text '+text);
  await act(async()=>{button.props.onClick();await Promise.resolve();});
 };
@@ -96,7 +98,8 @@ describe('Owner Approval Center Wallet invitation',()=>{
   expect(wallet).toContain('hideLinkControls');
   expect(people).toContain("erp_review_person_join");
   expect(people).toContain("hideLinkControls=false");
-  expect(partner).toContain("erp_request_person_account");
+  expect(people).toContain("erp_request_person_account");
+  expect(partner).toContain("/wallet-portal");
   expect(wallet).not.toContain('erp_save_person_account');
   expect(wallet).not.toContain('erp_bank_wallet_request');
   expect(wallet).not.toContain('create_erp_invitation');
