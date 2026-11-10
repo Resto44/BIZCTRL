@@ -7,16 +7,19 @@ const COPY={
  en:{
   title:'Show an order on Customer Screen',hint:'Follow one active kitchen order, even after opening another cashier order. Only this cashier device and shift are available.',
   cart:'Current cashier order (automatic)',choose:'Kitchen order',apply:'Show selected order',active:'Now showing',paired:'Pair the customer screen first.',kitchen:'Kitchen',
+  queued:'Received',preparing:'Preparing',ready:'Ready',paid:'Paid',held:'On hold',open:'Open',
   saved:'Customer screen updated',error:'Could not change the selected order. Refresh and try again.',pending:'Applying...',returned:'Return to cashier order',none:'No sent kitchen orders on this cashier shift.',
  },
  fa:{
   title:'انتخاب سفارش برای نمایشگر مشتری',hint:'سفارش فعال مطبخ را انتخاب کنید؛ بازشدن سفارش جدید کاشیر آن را عوض نمی‌کند. فقط سفارش‌های همین دستگاه و شیفت موجود اند.',
   cart:'سفارش جاری کاشیر (خودکار)',choose:'سفارش مطبخ',apply:'نمایش سفارش انتخاب‌شده',active:'در حال نمایش',paired:'اول نمایشگر مشتری را وصل کنید.',kitchen:'مطبخ',
+  queued:'دریافت‌شده',preparing:'آماده‌سازی',ready:'آماده',paid:'پرداخت‌شده',held:'نگهداری',open:'باز',
   saved:'نمایشگر مشتری آپدیت شد',error:'تغییر سفارش نمایشگر ناموفق شد؛ تازه‌سازی و دوباره کوشش کنید.',pending:'در حال تغییر...',returned:'برگشت به سفارش کاشیر',none:'سفارش ارسال‌شده‌ای از همین شیفت نیست.',
  },
  ar:{
   title:'تحديد الطلب على شاشة العميل',hint:'اختر طلب المطبخ ليبقى ظاهراً حتى عند فتح طلب كاشير جديد. الخيارات تخص نفس الجهاز والوردية فقط.',
   cart:'طلب الكاشير الحالي (تلقائي)',choose:'طلب المطبخ',apply:'عرض الطلب المحدد',active:'يعرض الآن',paired:'اربط شاشة العميل أولاً.',kitchen:'المطبخ',
+  queued:'تم الاستلام',preparing:'قيد التحضير',ready:'جاهز',paid:'مدفوع',held:'معلّق',open:'مفتوح',
   saved:'تم تحديث شاشة العميل',error:'تعذر تغيير الطلب. حدث الصفحة وحاول مجدداً.',pending:'جارٍ التحديث...',returned:'العودة لطلب الكاشير',none:'لا توجد طلبات مرسلة من هذه الوردية.',
  }
 };
@@ -65,7 +68,7 @@ export default function RestaurantDisplayFocus({deviceId,allowed,linked=false,la
          className="mt-1 h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 disabled:opacity-50">
          <option value="">{c.cart}</option>
          {(q.data?.orders||[]).map(row=><option key={row.id} value={row.id}>
-           #{row.number} · {c.kitchen}: {row.kitchen_status} · {row.status}
+           #{row.number} · {c.kitchen}: {c[row.kitchen_status]||row.kitchen_status} · {c[row.status]||row.status}
          </option>)}
          {q.data?.pinned_order_id&&!q.data?.orders?.some(o=>o.id===q.data.pinned_order_id)&&
           <option value={q.data.pinned_order_id}>#{q.data?.pinned_order_number||'—'} · {c.active}</option>}
