@@ -42,10 +42,10 @@ const POSTerminalAccount = lazy(() => loadRetailControl().then(module => ({ defa
 const POSAuditCenter = lazy(() => loadRetailControl().then(module => ({ default: module.POSAuditCenter })));
 const RetailCashier = lazy(() => import('@/pages/retail/pos/RetailCashier'));
 const CustomerDisplay = lazy(() => import('@/pages/retail/pos/CustomerDisplay'));
+const RestaurantCustomerDisplay = lazy(() => import('@/pages/restaurant/RestaurantCustomerDisplay'));
 const RestaurantPOS = lazy(() => import('@/pages/restaurant/RestaurantPOS'));
 const KitchenDisplayERP = lazy(() => import('@/pages/restaurant/KitchenDisplayERP'));
 const CustomerTrackingDisplay = lazy(() => import('@/pages/restaurant/CustomerTrackingDisplay'));
-import { restaurantRpc } from '@/lib/restaurantPOS';
 import RetailPOSPortalGuard from '@/components/retail-pos/RetailPOSPortalGuard';
 import UniversalTouchPOSRoute from '@/components/pos-touch/UniversalTouchPOSRoute';
 
@@ -747,7 +747,7 @@ function App() {
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/help" element={<Suspense fallback={<PageLoader />}><Help /></Suspense>} />
               <Route path="/retail/customer-display" element={<CustomerDisplay />} />
-              <Route path="/restaurant/customer-display" element={<CustomerDisplay rpc={restaurantRpc} brand="RESTAURANT" />} />
+              <Route path="/restaurant/customer-display" element={<RestaurantCustomerDisplay />} />
               <Route path="/restaurant/customer-tracking" element={<CustomerTrackingDisplay />} />
               {/* All authenticated routes */}
               <Route path="*" element={<AuthenticatedApp />} />
