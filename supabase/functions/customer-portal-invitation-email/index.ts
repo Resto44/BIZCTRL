@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.106.1';
+import { renderCustomerInvitationEmail } from './emailTemplate.ts';
 
 // Sends an existing owner-issued customer invitation; this is NOT the Auth confirmation email.
 const cors = {
@@ -79,23 +80,11 @@ Deno.serve(async (req: Request) => {
   if (!apiKey || !from) return fail('INVITATION_EMAIL_NOT_CONFIGURED', 503);
 
   const link = 'https://mybizctrl.site/customer-portal#invite=' + encodeURIComponent(input.token);
-  const body = [
-    'BizControl — Customer portal invitation',
-    '',
-    'Hello ' + (customer.name || 'customer') + ',',
-    'Your business has invited you to view your purchases, payments, and statement in BizControl.',
-    'Open your secure invitation link:',
-    link,
-    '',
-    'The link is single-use and expires on ' + new Date(invitation.expires_at).toISOString() + '.',
-    'Sign in or create an account with the email address this invitation was sent to.',
-    'If you create an account, verify your email using the SEPARATE confirmation email before activating.',
-    'After verifying, reopen this invitation link and press Activate invitation.',
-    'Do not forward this link. If you did not expect it, ignore this message.',
-    '',
-    'دعوت مشتری بیزکنترول: لینک بالا را باز کنید و با همین ایمیل حساب بسازید یا وارد شوید. تأیید ایمیل جداگانه ارسال می‌شود.',
-    'دعوة العميل من BizControl: افتح الرابط وسجّل بنفس البريد الإلكتروني. رسالة تأكيد البريد تصل بشكل منفصل.',
-  ].join('\n');
+  const { html, text, subject } = renderCustomerInvitationEmail({
+    customerName: customer.name || 'customer',
+    invitationUrl: link,
+    expiresAt: invitation.expires_at,
+  });
 
   try {
     const response = await fetch('https://api.resend.com/emails', {
@@ -103,11 +92,10 @@ Deno.serve(async (req: Request) => {
       headers: {
         Authorization: 'Bearer ' + apiKey,
         'Content-Type': 'application/json',
-        'Idempotency-Key': 'customer-invite-' + digest.slice(0, 40),
+        'Idempotency-Key': 'customer-invite-html-v2-' + digest.slice(0, 40),
       },
       body: JSON.stringify({
-        from, to: [invitation.invited_email], subject: 'BizControl — Customer portal invitation',
-        text: body,
+        from, to: [invitation.invited_email], subject, html, text,
       }),
     });
     const data = await response.json().catch(() => ({}));
