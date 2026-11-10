@@ -94,9 +94,10 @@ describe('Customer Tracking KDS TV',()=>{
      mocks.rpc.mockResolvedValue({...data,orders:[{number:115,stage:'ready',submitted_at:'2026-11-10T07:30:00Z'}],
        counts:{queued:0,preparing:0,ready:1}});
      await act(async()=>{refresh.props.onClick();await new Promise(resolve=>setTimeout(resolve,25));});
-     const text=JSON.stringify(tree.toJSON());
-     expect(text).toContain('#115');
-     expect(text).not.toContain('#110');
+     const displayedTicketNumbers=tree.root.findAllByProps({'data-testid':'customer-tracking-ticket'})
+       .map(ticket=>ticket.findAllByType('p').at(-1).children.join(''));
+     expect(displayedTicketNumbers).toEqual(['#115']);
+     expect(displayedTicketNumbers).not.toContain('#110');
      expect(tree.root.findByProps({'data-testid':'customer-tracking-live'}).children.join('')).toContain('Live from Kitchen');
    }finally{await close();clock.mockRestore();}
  });
