@@ -2,7 +2,7 @@
 do $regression$
 declare
   owner_id uuid:=gen_random_uuid();
-  tenant_id uuid; branch_id uuid; cashier_device uuid; other_device uuid;
+  tenant_id uuid; v_branch uuid; cashier_device uuid; other_device uuid;
   shift_id uuid; other_shift uuid; kitchen_order uuid; blank_cart uuid; foreign_order uuid;
   first_number bigint; blank_number bigint; active_token text:=repeat('e',64);
   queue_token text:=repeat('f',64); response jsonb;
@@ -11,17 +11,17 @@ begin
  insert into auth.users(id,email,raw_user_meta_data)
   values(owner_id,'kitchen-auto-regression-'||owner_id||'@example.invalid',
    '{"role":"owner","business_type":"restaurant","full_name":"Auto KDS QA","company_name":"Auto Kitchen Test","branch_name":"Test Branch"}'::jsonb);
- select restaurant_id,branch_id into tenant_id,branch_id
-   from public.erp_memberships where user_id=owner_id;
- if tenant_id is null or branch_id is null then raise exception 'FIXTURE_OWNER_NOT_CREATED';end if;
+ select m.restaurant_id,m.branch_id into tenant_id,v_branch
+   from public.erp_memberships m where m.user_id=owner_id;
+ if tenant_id is null or v_branch is null then raise exception 'FIXTURE_OWNER_NOT_CREATED';end if;
  insert into public.subscriptions(restaurant_id,subscription_status,plan,trial_end)
  values(tenant_id,'TRIAL','growth_40',current_date+7)
  on conflict(restaurant_id) where restaurant_id is not null
  do update set subscription_status='TRIAL',plan='growth_40',trial_end=current_date+7;
  insert into restaurant_pos_private.terminals(restaurant_id,branch_id,code)
- values(tenant_id,branch_id,'AUTO-KDS-TEST-1') returning id into cashier_device;
+ values(tenant_id,v_branch,'AUTO-KDS-TEST-1') returning id into cashier_device;
  insert into restaurant_pos_private.terminals(restaurant_id,branch_id,code)
- values(tenant_id,branch_id,'AUTO-KDS-TEST-2') returning id into other_device;
+ values(tenant_id,v_branch,'AUTO-KDS-TEST-2') returning id into other_device;
  insert into restaurant_pos_private.shifts(device_id,cashier_id,cashier_name,opening_cash)
  values(cashier_device,owner_id,'Test A',0) returning id into shift_id;
  insert into restaurant_pos_private.shifts(device_id,cashier_id,cashier_name,opening_cash)
@@ -43,7 +43,7 @@ begin
    gen_random_uuid(),now()+interval '8 hours',blank_cart);
  insert into restaurant_pos_private.customer_tracking_displays(
   restaurant_id,branch_id,token_hash,topic,expires_at)
- values(tenant_id,branch_id,encode(extensions.digest(queue_token,'sha256'),'hex'),gen_random_uuid(),now()+interval '8 hours');
+ values(tenant_id,v_branch,encode(extensions.digest(queue_token,'sha256'),'hex'),gen_random_uuid(),now()+interval '8 hours');
 
  set local role anon;
  response:=public.erp_restaurant_customer_display(active_token);
@@ -59,7 +59,7 @@ begin
  perform set_config('request.jwt.claims',
   jsonb_build_object('sub',owner_id,'role','authenticated')::text,true);
  set local role authenticated;
- response:=public.erp_restaurant_kitchen_screen_language(tenant_id,branch_id,'ar');
+ response:=public.erp_restaurant_kitchen_screen_language(tenant_id,v_branch,'ar');
  if response->>'language'<>'ar' then raise exception 'KITCHEN_LANGUAGE_WRITE_FAILED'; end if;
  reset role;
 
@@ -74,7 +74,7 @@ begin
  end if;
  denied:=false;
  begin
-   perform public.erp_restaurant_kitchen_screen_language(tenant_id,branch_id,'fa');
+   perform public.erp_restaurant_kitchen_screen_language(tenant_id,v_branch,'fa');
  exception when insufficient_privilege then denied:=true;end;
  if not denied then raise exception 'ANONYMOUS_CHANGED_KITCHEN_LANGUAGE';end if;
  reset role;
