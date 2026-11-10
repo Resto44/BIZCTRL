@@ -59,8 +59,16 @@ begin
  perform set_config('request.jwt.claims',
   jsonb_build_object('sub',owner_id,'role','authenticated')::text,true);
  set local role authenticated;
+ response:=public.erp_restaurant_kitchen_screen_language_get(tenant_id,v_branch);
+ if response->>'configured'<>'false' or response->>'language' is not null then
+   raise exception 'UNCONFIGURED_BRANCH_GET_MUST_NOT_WRITE_OR_GUESS';
+ end if;
  response:=public.erp_restaurant_kitchen_screen_language(tenant_id,v_branch,'ar');
  if response->>'language'<>'ar' then raise exception 'KITCHEN_LANGUAGE_WRITE_FAILED'; end if;
+ response:=public.erp_restaurant_kitchen_screen_language_get(tenant_id,v_branch);
+ if response->>'language'<>'ar' or response->>'configured'<>'true' then
+   raise exception 'KITCHEN_LANGUAGE_READ_DOES_NOT_FOLLOW_SAVED_PREF';
+ end if;
  reset role;
 
  set local role anon;
@@ -72,6 +80,11 @@ begin
  if response->>'kitchen_language'<>'ar' then
    raise exception 'BRANCH_QUEUE_SCREEN_DID_NOT_FOLLOW_LANGUAGE';
  end if;
+ denied:=false;
+ begin
+   perform public.erp_restaurant_kitchen_screen_language_get(tenant_id,v_branch);
+ exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'ANONYMOUS_READS_INTERNAL_KITCHEN_LANGUAGE';end if;
  denied:=false;
  begin
    perform public.erp_restaurant_kitchen_screen_language(tenant_id,v_branch,'fa');
