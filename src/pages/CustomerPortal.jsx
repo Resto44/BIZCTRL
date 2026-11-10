@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { withPortalReadDeadline } from '@/lib/portalReadDeadline';
-import { customerPortalRpc, customerPortalText, portalStatus } from '@/lib/customerPortal';
+import { customerPortalRpc, customerPortalText, customerPortalErrorMessage, portalStatus } from '@/lib/customerPortal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -15,7 +15,7 @@ function inviteToken() {
 export default function CustomerPortal() {
  const {lang,setLang}=useLanguage(), t=customerPortalText[lang]||customerPortalText.en, client=useQueryClient();
  const [session,setSession]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState('');
- const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[invite,setInvite]=useState(inviteToken);
+ const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[invite,setInvite]=useState(inviteToken),[emailPending,setEmailPending]=useState(false);
  const [selected,setSelected]=useState(''),[kind,setKind]=useState('invoices'),[page,setPage]=useState(0),[from,setFrom]=useState(''),[to,setTo]=useState(''),[dates,setDates]=useState({from:'',to:''});
  useEffect(()=>{
   let live=true,authEvent=false;
@@ -33,13 +33,19 @@ export default function CustomerPortal() {
   queryFn:()=>customerPortalRpc('erp_customer_portal_statement',{p_customer_id:account.id,p_kind:kind,p_from:dates.from||null,p_to:dates.to||null,p_page:page}),refetchInterval:20000,retry:1});
  const data=statement.isError?null:statement.data;
  const money=value=>`${Number(value||0).toLocaleString(lang==='en'?'en-US':lang==='ar'?'ar-SA':'fa-AF',{minimumFractionDigits:2,maximumFractionDigits:2})} ${account?.currency||''}`;
- async function run(action){if(busy)return;setBusy(true);setError('');setNotice('');try{await action();}catch{setError(t.failed);}finally{setBusy(false);}}
+ async function run(action){if(busy)return;setBusy(true);setError('');setNotice('');try{await action();}catch(err){setError(customerPortalErrorMessage(err,t));if(/email[_ ]not[_ ]confirmed/i.test(String(err?.message||err?.code||'')))setEmailPending(true);}finally{setBusy(false);}}
  function authenticate(signup){return run(async()=>{
   const credentials={email:email.trim(),password};
   if(signup&&(!invite||password.length<10))throw Error('INVALID_SIGNUP');
   // The existing identity-only registration path grants no staff role or data access.
   const result=signup?await supabase.auth.signUp({...credentials,options:{emailRedirectTo:window.location.origin+'/customer-portal',data:{people_portal_registration:true}}}):await supabase.auth.signInWithPassword(credentials);
-  if(result.error)throw result.error;if(result.data.session)setSession(result.data.session);else setNotice(t.verify);
+  if(result.error)throw result.error;if(result.data.session){setSession(result.data.session);setEmailPending(false);}else{setEmailPending(true);setNotice(t.verify);}
+ });}
+ function resendConfirmation(){return run(async()=>{
+  if(!email.trim())throw Error('EMAIL_REQUIRED');
+  const {error}=await supabase.auth.resend({type:'signup',email:email.trim(),options:{emailRedirectTo:window.location.origin+'/customer-portal'}});
+  if(error)throw error;
+  setNotice(t.confirmationRequested);
  });}
  return <main data-i18n-skip="true" dir={lang==='en'?'ltr':'rtl'} className="min-h-screen bg-slate-50 text-slate-900">
   <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
@@ -55,8 +61,10 @@ export default function CustomerPortal() {
     <label className="block">{t.password}<Input type="password" required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label>
     <Button disabled={busy} className="w-full">{t.signin}</Button>
     {invite&&<Button type="button" variant="outline" disabled={busy||password.length<10||!email.includes('@')} className="w-full" onClick={()=>authenticate(true)}>{t.signup}</Button>}
-    <p className="text-sm text-slate-500">{invite?t.verify:t.empty}</p>
+    {invite&&<><Button type="button" variant="outline" disabled={busy||!email.includes('@')} className="w-full" onClick={resendConfirmation}>{t.resendConfirmation}</Button><p className="text-xs text-slate-500">{t.confirmEmailHelp}</p></>}
+    <p className="text-sm text-slate-500">{emailPending?t.emailNotVerified:invite?t.verify:t.empty}</p>
    </form>:<>
+    {invite&&<p className="text-sm text-slate-600">{t.email}: <span dir="ltr">{session.user.email}</span> · {t.inviteHelp}</p>}
     {invite&&<Button disabled={busy} onClick={()=>run(async()=>{const accepted=await customerPortalRpc('erp_customer_portal_accept',{p_token:invite});setInvite('');sessionStorage.removeItem('customer:invite');window.history.replaceState(null,'',window.location.pathname);setSelected(accepted.customer_id);await accounts.refetch();})}>{t.activate}</Button>}
     {accounts.isPending?<p role="status">{t.loading}</p>:accounts.isError?<div role="alert">{t.error} <Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></div>:!account?<p>{t.empty}</p>:<>
      <section className="flex flex-wrap items-center justify-between gap-3">
