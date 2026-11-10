@@ -46,7 +46,6 @@ const RestaurantCustomerDisplay = lazy(() => import('@/pages/restaurant/Restaura
 const RestaurantPOS = lazy(() => import('@/pages/restaurant/RestaurantPOS'));
 const KitchenDisplayERP = lazy(() => import('@/pages/restaurant/KitchenDisplayERP'));
 const CustomerTrackingDisplay = lazy(() => import('@/pages/restaurant/CustomerTrackingDisplay'));
-import { restaurantRpc } from '@/lib/restaurantPOS';
 import RetailPOSPortalGuard from '@/components/retail-pos/RetailPOSPortalGuard';
 import UniversalTouchPOSRoute from '@/components/pos-touch/UniversalTouchPOSRoute';
 
