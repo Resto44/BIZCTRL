@@ -125,10 +125,13 @@ create or replace function restaurant_pos_private.notify_customer_tracking()
 returns trigger language plpgsql security definer set search_path='' as $$
 declare ticket_branch uuid; rec record;
 begin
- if tg_op='UPDATE' and old.kitchen_status is not distinct from new.kitchen_status
-     and old.status is not distinct from new.status
-     and old.submitted_at is not distinct from new.submitted_at
- then return new; end if;
+ if tg_op='UPDATE' then
+   if old.kitchen_status is not distinct from new.kitchen_status
+      and old.status is not distinct from new.status
+      and old.submitted_at is not distinct from new.submitted_at then
+     return new;
+   end if;
+ end if;
  select branch_id into ticket_branch from restaurant_pos_private.terminals
    where id=new.device_id;
  for rec in select topic from restaurant_pos_private.customer_tracking_displays
