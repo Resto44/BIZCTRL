@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
+const CustomerAnalyticsDashboard = lazy(() => import('@/components/customer/CustomerAnalyticsDashboard'));
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -102,15 +103,22 @@ export default function CustomerPortal() {
     </>}
     {accounts.isPending?<p role="status">{t.loading}</p>:accounts.isError?<div role="alert">{t.error} <Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></div>:!account?<p>{t.empty}</p>:<>
      <section className="flex flex-wrap items-center justify-between gap-3">
-      <label className="min-w-0">{t.account}<select className="mx-2 max-w-full rounded-lg border bg-white p-3" value={account.id} onChange={e=>{setSelected(e.target.value);setPage(0);}}>{accounts.data.map(a=><option key={a.id} value={a.id}>{a.business} · {a.name} · {a.branch}</option>)}</select></label>
-      <div className="flex gap-2 print:hidden"><Button variant="outline" onClick={()=>{accounts.refetch();statement.refetch();}}>{t.refresh}</Button><Button disabled={!data} onClick={()=>window.print()}>{t.print}</Button></div>
+      <label className="block w-full min-w-0 text-sm font-semibold sm:max-w-xl">{t.account}<select className="mt-2 block w-full min-w-0 rounded-lg border bg-white p-3 text-base" value={account.id} onChange={e=>{setSelected(e.target.value);setPage(0);}}>{accounts.data.map(a=><option key={a.id} value={a.id}>{a.business} · {a.name} · {a.branch}</option>)}</select></label>
+      <div className="flex flex-wrap gap-2 print:hidden"><Button variant="outline" onClick={()=>{accounts.refetch();statement.refetch();}}>{t.refresh}</Button><Button disabled={!data} onClick={()=>window.print()}>{t.print}</Button></div>
      </section>
+     <Suspense fallback={<p role="status" className="rounded-xl border bg-white p-4 text-sm text-slate-500">{t.loading}</p>}>
+      <CustomerAnalyticsDashboard key={account.id} account={account} lang={lang}/>
+     </Suspense>
      {statement.isError?<p role="alert" className="rounded-lg bg-red-50 p-4">{t.error}</p>:statement.isPending?<p role="status">{t.loading}</p>:data&&<>
       <p className="text-sm text-slate-600">{t.allTime} · {new Date(data.as_of).toLocaleString()}</p>
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">{['total','paid','balance','overdue'].map(key=><article key={key} className="min-w-0 rounded-2xl border bg-white p-4 shadow-sm"><h2 className="text-sm text-slate-600">{t[key]}</h2><p className={`mt-2 break-words text-xl font-black ${key==='overdue'?'text-rose-700':'text-teal-800'}`}>{money(data.totals[key])}</p></article>)}</section>
      </>}
-     <nav className="flex flex-wrap gap-2 print:hidden">{['invoices','payments','orders'].map(k=><Button key={k} variant={kind===k?'default':'outline'} aria-pressed={kind===k} onClick={()=>{setKind(k);setPage(0);}}>{t[k==='orders'?'purchases':k]}</Button>)}</nav>
-     <form className="flex flex-wrap items-end gap-3 print:hidden" onSubmit={e=>{e.preventDefault();setDates({from,to});setPage(0);}}><label>{t.from}<Input type="date" value={from} max={to||undefined} onChange={e=>setFrom(e.target.value)}/></label><label>{t.to}<Input type="date" value={to} min={from||undefined} onChange={e=>setTo(e.target.value)}/></label><Button variant="outline">{t.filter}</Button></form>
+     <nav className="flex gap-2 overflow-x-auto pb-2 print:hidden">{['invoices','payments','orders'].map(k=><Button key={k} variant={kind===k?'default':'outline'} aria-pressed={kind===k} className="shrink-0 whitespace-nowrap" onClick={()=>{setKind(k);setPage(0);}}>{t[k==='orders'?'purchases':k]}</Button>)}</nav>
+     <form className="grid grid-cols-1 items-end gap-3 print:hidden sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={e=>{e.preventDefault();setDates({from,to});setPage(0);}}>
+      <label className="block min-w-0 text-sm font-semibold">{t.from}<Input className="mt-1 w-full min-w-0 max-w-full" type="date" value={from} max={to||undefined} onChange={e=>setFrom(e.target.value)}/></label>
+      <label className="block min-w-0 text-sm font-semibold">{t.to}<Input className="mt-1 w-full min-w-0 max-w-full" type="date" value={to} min={from||undefined} onChange={e=>setTo(e.target.value)}/></label>
+      <Button variant="outline" className="w-full sm:w-auto">{t.filter}</Button>
+     </form>
      {data&&<section className="space-y-3">
       <h2 className="font-bold">{t[kind==='orders'?'purchases':kind]} · {data.count}</h2>
       {(dates.from||dates.to)&&<p>{dates.from||'…'} — {dates.to||'…'}</p>}
