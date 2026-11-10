@@ -166,7 +166,7 @@ begin
    from public.restaurants r join public.branches b on b.restaurant_id=r.id
    where r.id=d.restaurant_id and b.id=d.branch_id;
   return result;
-end $$
+end $;
 
 -- Kitchen-only state changes should also notify screens following a pin.
 create or replace function restaurant_pos_private.notify_order_customer_display()
