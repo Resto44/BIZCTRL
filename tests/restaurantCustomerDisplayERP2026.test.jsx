@@ -17,7 +17,8 @@ vi.mock('@/lib/cashierBroadcast',()=>({subscribeCashierBroadcast:(client,topic,l
  mocks.notify={client,topic,listener};return()=>{mocks.notify=null;};
 }}));
 vi.mock('@/lib/LanguageContext',()=>({useLanguage:()=>({lang:mocks.lang})}));
-import RestaurantCustomerDisplay,{restaurantCustomerStage,restaurantCustomerHasOrder}
+import RestaurantCustomerDisplay,{restaurantCustomerStage,restaurantCustomerHasOrder,
+ restaurantWaitElapsedSeconds,restaurantWaitClock}
  from '../src/pages/restaurant/RestaurantCustomerDisplay.jsx';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
@@ -94,6 +95,42 @@ describe('Restaurant-only customer display ERP',()=>{
   expect(host.textContent).toContain('غذاهای سفارش‌شده');
   expect(host.textContent).toContain('مرغ');
   expect(host.textContent).toContain('در حال آماده‌سازی');
+ });
+ it('displays slow-pulsing real kitchen wait time and a thank-you message in Arabic',async()=>{
+  mocks.lang='en';
+  mocks.rpc.mockResolvedValue({...fixture,kitchen_language:'ar',
+    kitchen_status:'preparing',submitted_at:'2026-11-10T10:00:00Z',
+    server_time:'2026-11-10T10:03:15Z'});
+  await render();
+  expect(host.textContent).toContain('شكرًا على صبركم!');
+  expect(host.textContent).toContain('مدة انتظار طلبكم');
+  const clock=host.querySelector('[data-testid="restaurant-waiting-clock"]');
+  expect(clock).not.toBeNull();
+  expect(clock.textContent).toBe('03:15');
+  expect(clock.className).toContain('motion-reduce:animate-none');
+  expect(clock.getAttribute('aria-live')).toBe('off');
+  await act(async()=>{await vi.advanceTimersByTimeAsync(2000);});
+  expect(host.querySelector('[data-testid="restaurant-waiting-clock"]').textContent).toBe('03:17');
+ });
+ it('never invents waiting time when no order exists, and hides timer when ready',async()=>{
+  mocks.rpc.mockResolvedValue({...fixture,number:null,status:null,lines:[],
+    submitted_at:null,server_time:'2026-11-10T10:05:00Z',kitchen_status:null});
+  await render();
+  expect(host.textContent).toContain('Thank you for visiting!');
+  expect(host.querySelector('[data-testid="restaurant-waiting-panel"]')).toBeNull();
+  mocks.rpc.mockResolvedValue({...fixture,kitchen_status:'ready',
+    server_time:'2026-11-10T10:05:00Z'});
+  await act(async()=>{mocks.notify.listener('changed');await vi.advanceTimersByTimeAsync(150);});
+  expect(host.textContent).toContain('Your order is ready for pickup');
+  expect(host.querySelector('[data-testid="restaurant-waiting-panel"]')).toBeNull();
+ });
+ it('calculates elapsed time from server time rather than an unreliable local TV clock',()=>{
+  expect(restaurantWaitElapsedSeconds('2026-11-10T10:00:00Z','2026-11-10T10:03:15Z',0)).toBe(195);
+  expect(restaurantWaitElapsedSeconds('2026-11-10T10:00:00Z','2026-11-10T10:03:15Z',2000)).toBe(197);
+  expect(restaurantWaitElapsedSeconds('2026-11-10T10:03:15Z','2026-11-10T10:00:00Z',0)).toBe(0);
+  expect(restaurantWaitElapsedSeconds(null,null,0)).toBeNull();
+  expect(restaurantWaitClock(197)).toBe('03:17');
+  expect(restaurantWaitClock(null)).toBeNull();
  });
  it('blocks invalid tokens and expired links; no stale order details',async()=>{
   await render('/restaurant/customer-display#not-valid');

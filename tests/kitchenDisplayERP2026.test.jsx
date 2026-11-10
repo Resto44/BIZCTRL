@@ -9,7 +9,7 @@ import {resolve} from 'node:path';
 const source = path => readFileSync(resolve(process.cwd(),path),'utf8');
 
 const state=vi.hoisted(()=>({
-  portal:'restaurant',can:true,subscribe:vi.fn(),rpc:vi.fn(),branches:[
+  portal:'restaurant',can:true,language:'en',subscribe:vi.fn(),rpc:vi.fn(),branches:[
     {id:'branch-1',name:'Rayan'}
   ],
 }));
@@ -50,10 +50,16 @@ const render=async(path='/restaurant/kitchen')=>{
   return {tree,client,close:async()=>{await act(async()=>tree.unmount());client.clear();}};
 };
 beforeEach(()=>{
-  state.portal='restaurant';state.can=true;state.branches=[{id:'branch-1',name:'Rayan'}];
+  state.portal='restaurant';state.can=true;state.language='en';state.branches=[{id:'branch-1',name:'Rayan'}];
   state.rpc.mockReset();state.subscribe.mockReset();
-  state.rpc.mockImplementation(async name=>{
+  state.rpc.mockImplementation(async (name,args)=>{
     if(name==='erp_restaurant_pos_kitchen_board')return {data:board,error:null};
+    if(name==='erp_restaurant_kitchen_screen_language_get')
+      return {data:{language:state.language,configured:state.language!==null},error:null};
+    if(name==='erp_restaurant_kitchen_screen_language'){
+      state.language=args.p_language;
+      return {data:{language:state.language,changed:true},error:null};
+    }
     return {data:{ok:true},error:null};
   });
 });
@@ -80,9 +86,11 @@ describe('Restaurant Kitchen TV workflow',()=>{
       expect(state.rpc).toHaveBeenCalledWith('erp_restaurant_pos_kitchen_board',{
         p_restaurant_id:'tenant-1',p_branch_id:'branch-1',
       });
-      expect(state.rpc).toHaveBeenCalledWith('erp_restaurant_kitchen_screen_language',{
-        p_restaurant_id:'tenant-1',p_branch_id:'branch-1',p_language:'en',
+      expect(state.rpc).toHaveBeenCalledWith('erp_restaurant_kitchen_screen_language_get',{
+        p_restaurant_id:'tenant-1',p_branch_id:'branch-1',
       });
+      // Loading an existing kitchen language must NOT overwrite it from this TV.
+      expect(state.rpc.mock.calls.filter(([name])=>name==='erp_restaurant_kitchen_screen_language')).toHaveLength(0);
       expect(state.subscribe).toHaveBeenCalledWith(expect.anything(),'restaurant-pos:tenant-1',expect.any(Function));
       expect(tree.root.findAllByProps({'data-testid':'kds-ticket'})).toHaveLength(3);
       expect(tree.root.findByProps({'data-testid':'kds-connection'})).toBeTruthy();
@@ -99,6 +107,24 @@ describe('Restaurant Kitchen TV workflow',()=>{
     }finally{await close();}
   });
 
+  it('uses the stored branch language rather than the browser language and syncs a deliberate change',async()=>{
+    state.language='ar';
+    const {tree,close}=await render();
+    try{
+      const picker=tree.root.findByProps({'data-testid':'kds-screen-language'});
+      expect(picker.props.value).toBe('ar');
+      expect(state.rpc.mock.calls.filter(([name])=>name==='erp_restaurant_kitchen_screen_language')).toHaveLength(0);
+      await act(async()=>{
+        picker.props.onChange({target:{value:'fa'}});
+        await new Promise(resolve=>setTimeout(resolve,30));
+      });
+      expect(state.rpc).toHaveBeenCalledWith('erp_restaurant_kitchen_screen_language',{
+        p_restaurant_id:'tenant-1',p_branch_id:'branch-1',p_language:'fa',
+      });
+      expect(state.language).toBe('fa');
+      expect(tree.root.findByProps({'data-testid':'kds-screen-language'}).props.value).toBe('fa');
+    }finally{await close();}
+  });
   it('fails closed when viewOrders is missing and never requests private orders',async()=>{
     state.can=false;const {tree,close}=await render();
     try{

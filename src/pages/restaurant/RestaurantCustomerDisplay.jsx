@@ -19,6 +19,11 @@ const COPY={
   amount:'Order total',subtotal:'Before tax',tax:'Included tax',paid:'Payment received',unpaid:'Payment pending',
   fresh:'Live',stale:'Connection lost · refreshing',invalid:'This display has expired or was re-paired. Ask the cashier to pair it again.',
   noData:'Checking your order…',updated:'Last updated',privacy:'Your order only · No other customer information',
+  thanksTitle:'Thank you for your patience!',thanksBody:'Your order is being prepared in our kitchen. We appreciate your patience.',
+  thanksIdle:'Thank you for visiting! Your next order will appear here automatically.',
+  thanksReady:'Thank you! Your order is ready for pickup.',
+  waitElapsed:'Time waiting for your order',waitUnits:'minutes : seconds',
+  waitNote:'Time elapsed since the kitchen received your order · not an estimated completion time',
  },
  fa:{
   eyebrow:'BIZCTRL · رستورانت',title:'سفارش شما',subtitle:'سفارش شما، مستقیم از داخل مطبخ',
@@ -30,6 +35,11 @@ const COPY={
   amount:'مجموع سفارش',subtotal:'قبل از مالیات',tax:'مالیات شامل',paid:'پرداخت دریافت شد',unpaid:'پرداخت باقی است',
   fresh:'زنده',stale:'ارتباط قطع است · در حال تازه‌سازی',invalid:'لینک نمایشگر منقضی یا دوباره وصل شده؛ از کاشیر لینک تازه بگیرید.',
   noData:'در حال بررسی سفارش…',updated:'آخرین تازه‌سازی',privacy:'فقط سفارش شما · بدون معلومات مشتریان دیگر',
+  thanksTitle:'تشکر از صبر و حوصلهٔ شما!',thanksBody:'سفارش شما در مطبخ آماده می‌شود. از شکیبایی شما سپاسگزاریم.',
+  thanksIdle:'تشکر از تشریف‌آوری شما! سفارش بعدی همین‌جا خودکار نشان داده می‌شود.',
+  thanksReady:'تشکر! سفارش شما آمادهٔ تحویل است.',
+  waitElapsed:'مدت انتظار سفارش شما',waitUnits:'دقیقه : ثانیه',
+  waitNote:'زمان سپری‌شده از ارسال سفارش به مطبخ؛ نه زمان تخمینی تحویل',
  },
  ar:{
   eyebrow:'BIZCTRL · المطعم',title:'طلبك',subtitle:'طلبك مباشرة من المطبخ',
@@ -41,11 +51,30 @@ const COPY={
   amount:'إجمالي الطلب',subtotal:'قبل الضريبة',tax:'الضريبة المشمولة',paid:'تم استلام الدفع',unpaid:'بانتظار الدفع',
   fresh:'مباشر',stale:'الاتصال منقطع · إعادة التحديث',invalid:'انتهت صلاحية الرابط أو أعيد إقران الشاشة. اطلب رابطاً جديداً من الكاشير.',
   noData:'جارٍ التحقق من طلبك…',updated:'آخر تحديث',privacy:'طلبك فقط · دون بيانات العملاء الآخرين',
+  thanksTitle:'شكرًا على صبركم!',thanksBody:'طلبكم قيد التجهيز في المطبخ. نقدّر انتظاركم.',
+  thanksIdle:'شكرًا لزيارتكم! سيظهر الطلب التالي هنا تلقائيًا.',
+  thanksReady:'شكرًا لكم! طلبكم جاهز للاستلام.',
+  waitElapsed:'مدة انتظار طلبكم',waitUnits:'دقيقة : ثانية',
+  waitNote:'الوقت المنقضي منذ إرسال الطلب للمطبخ وليس موعدًا متوقعًا للتسليم',
  }
 };
 const STAGES=['queued','preparing','ready'];
 export const restaurantCustomerStage=status=>STAGES.indexOf(status)==-1?status==='served'?3:-1:STAGES.indexOf(status);
 export const restaurantCustomerHasOrder=data=>Boolean(data&&data.number!==null&&data.number!==undefined);
+export const restaurantWaitElapsedSeconds=(submittedAt,serverTime,elapsedLocalMs=0)=>{
+  const submitted=Date.parse(submittedAt||'');
+  const server=Date.parse(serverTime||'');
+  if(!Number.isFinite(submitted)||!Number.isFinite(server))return null;
+  // Calculate against the backend clock so a TV's wrong local clock
+  // cannot make the timer jump or go negative.
+  const elapsed=Math.max(0,Number(elapsedLocalMs)||0);
+  return Math.max(0,Math.floor((server-submitted+elapsed)/1000));
+};
+export const restaurantWaitClock=seconds=>{
+  if(!Number.isFinite(seconds)||seconds<0)return null;
+  const m=Math.floor(seconds/60),s=Math.floor(seconds%60);
+  return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+};
 const validToken=token=>/^[a-f0-9]{64}$/.test(token);
 
 export default function RestaurantCustomerDisplay(){
@@ -71,6 +100,9 @@ export default function RestaurantCustomerDisplay(){
  const stage=restaurantCustomerStage(data?.kitchen_status);
  const currency=data?.currency||'SAR';
  const lines=Array.isArray(data?.lines)?data.lines:[];
+ const isWaiting=active&&(data?.kitchen_status==='queued'||data?.kitchen_status==='preparing');
+ const elapsedSeconds=isWaiting?restaurantWaitElapsedSeconds(data?.submitted_at,data?.server_time,now-lastSync):null;
+ const waitingClock=elapsedSeconds===null?null:restaurantWaitClock(elapsedSeconds);
 
  useEffect(()=>{
   setData(null);setInvalid(false);setLastSync(0);
@@ -152,6 +184,20 @@ export default function RestaurantCustomerDisplay(){
       <h2 data-testid="restaurant-kitchen-state" className="mt-1 text-xl font-black sm:text-3xl">{active?stateText:c.waiting}</h2>
       {active&&<p className="mt-2 text-sm text-blue-100">{c[data?.order_type]||''}{data?.table_label?' · '+c.table+': '+data.table_label:''}</p>}
      </div>
+    </section>
+    <section data-testid="restaurant-customer-thank-you"
+      className="mb-5 rounded-3xl border border-sky-200 bg-white px-4 py-6 text-center shadow-sm sm:px-8 sm:py-8">
+      <h2 className="text-2xl font-black text-blue-900 sm:text-4xl">{c.thanksTitle}</h2>
+      <p className="mx-auto mt-2 max-w-2xl text-base font-semibold text-slate-600 sm:text-xl">
+        {!active?c.thanksIdle:stage>=2?c.thanksReady:c.thanksBody}
+      </p>
+      {isWaiting&&waitingClock!==null&&<div data-testid="restaurant-waiting-panel" className="mt-5 rounded-3xl border border-blue-200 bg-gradient-to-br from-[#0e234b] to-[#2254a0] px-4 py-6 text-white sm:px-6">
+        <p className="text-base font-bold text-blue-100 sm:text-2xl">{c.waitElapsed}</p>
+        <p dir="ltr" role="timer" aria-live="off" data-testid="restaurant-waiting-clock"
+          className="mt-2 font-black leading-none tracking-tight tabular-nums text-6xl sm:text-8xl lg:text-9xl motion-safe:animate-pulse motion-reduce:animate-none">{waitingClock}</p>
+        <p className="mt-2 text-sm font-semibold text-blue-100 sm:text-lg">{c.waitUnits}</p>
+        <p className="mt-3 text-xs text-blue-100/80 sm:text-sm">{c.waitNote}</p>
+      </div>}
     </section>
     {active&&<section aria-label={c.progress} data-testid="restaurant-kitchen-progress"
       className="mb-5 grid grid-cols-3 gap-2 rounded-2xl border border-blue-100 bg-white p-3 sm:gap-4 sm:p-5">
