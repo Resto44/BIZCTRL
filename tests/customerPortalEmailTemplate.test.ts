@@ -22,7 +22,7 @@ describe('Customer invitation transactional email', () => {
     expect(html).toContain('support@mybizctrl.site');
     expect(html).toContain('Riyadh, UTC+3');
     expect(text).toContain(url);
-    expect(text).toContain('SEPARATE');
+    expect(text).toContain('separate Supabase Auth confirmation message');
     expect(text).toContain('ابو قلندر');
   });
 
