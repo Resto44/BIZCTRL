@@ -20,10 +20,10 @@ const COPY={
   saved:'تم تحديث شاشة العميل',error:'تعذر تغيير الطلب. حدث الصفحة وحاول مجدداً.',pending:'جارٍ التحديث...',returned:'العودة لطلب الكاشير',none:'لا توجد طلبات مرسلة من هذه الوردية.',
  }
 };
-export default function RestaurantDisplayFocus({deviceId,allowed,lang='en'}){
+export default function RestaurantDisplayFocus({deviceId,allowed,linked=false,lang='en'}){
  const c=COPY[lang]||COPY.en;
  const q=useQuery({
-   queryKey:['restaurant-customer-display-focus',deviceId],
+   queryKey:['restaurant-customer-display-focus',deviceId,linked],
    queryFn:()=>restaurantRpc('pos_display_focus',{
      p_device_id:deviceId,p_action:'list',p_order_id:null,
    }),
