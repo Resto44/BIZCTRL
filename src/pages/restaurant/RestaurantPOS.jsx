@@ -23,6 +23,7 @@ import { money, paymentBreakdown, printCashierReceipt } from '@/lib/retailCashie
 import { isRestaurantPOSPortal, restaurantRpc, restaurantProductName as nameOf, restaurantBusinessDate, kitchenNextState, parseRecipeRows } from '@/lib/restaurantPOS';
 import { restaurantProductCopy } from '@/lib/restaurantProducts';
 import { restaurantCopy } from '@/components/restaurant-pos/copy';
+import RestaurantDisplayFocus from './RestaurantDisplayFocus';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export const panel = 'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-5';
@@ -101,6 +102,7 @@ function Station({device,scope,active,c,lang,menu,page,canSell,onProducts}) {
   held={s?.held||[]} receipts={receipt?[receipt,...(s?.receipts||[]).filter(r=>r.id!==receipt.id)]:s?.receipts||[]} onResume={o=>perform(()=>api.command('resume',{cart_id:o.id,revision:o.revision}))} onReceipt={r=>perform(()=>printCashierReceipt(r,lang,'80mm'))}/>
   {modal&&<ActionDialog touch lang={lang} key={modal} kind={modal} api={api} c={c} currency={currency} close={()=>setModal(null)} onResult={r=>{if(r.receipt)setReceipt(r.receipt);}}/>}</>;
  return <div className="space-y-4">
+  {page==='display'&&<RestaurantDisplayFocus deviceId={device.id} allowed={canSell} lang={lang} linked={Boolean(link)}/>}
   {touch.supported&&page==='sell'&&<button className={primary} onClick={touch.enable}>{fixedCopy(lang).title}</button>}
   <div className={`${panel} flex flex-wrap items-center justify-between gap-3`}><div><strong>{s?.business?.branch_name} · {device.code}</strong><p className="text-sm text-slate-500">{s?.shift?.cashier_name}</p></div><div className="flex flex-wrap gap-2"><Status fresh={fresh} c={c}/><button className={button} aria-label={c.refresh} onClick={()=>void api.refresh()}><RefreshCw size={18}/></button>{canSell&&s&&!s.shift&&<button className={primary} disabled={Boolean(api.pending)||s.device.locked} onClick={()=>setModal('open')}>{c.openShift}</button>}{canSell&&s?.shift&&<><button className={button} disabled={Boolean(api.busy)||Boolean(api.pending)} onClick={()=>setModal('close')}>{c.closeShift}</button>{!cart&&<button className={primary} disabled={Boolean(api.busy)||Boolean(api.pending)||s.device.locked} onClick={()=>void perform(()=>api.command('new_sale'))}><Plus size={18}/>{c.newSale}</button>}</>}</div></div>
   {api.pending&&<div className="rounded-xl bg-amber-50 p-4 text-amber-950" role="alert">{c.pending}<button className={button} onClick={()=>void perform(api.retry)}>{c.retry}</button></div>}
