@@ -90,6 +90,7 @@ begin
  return jsonb_build_object(
    'paired',ds.device_id is not null and ds.expires_at>now(),
    'pinned_order_id',case when ds.expires_at>now() then ds.pinned_order_id else null end,
+   'pinned_order_number',case when ds.expires_at>now() then (select x.number from restaurant_pos_private.orders x where x.id=ds.pinned_order_id and x.device_id=d.id) else null end,
    'current_order_id',case when ds.expires_at>now() then ds.order_id else null end,
    'orders',candidates
  );
