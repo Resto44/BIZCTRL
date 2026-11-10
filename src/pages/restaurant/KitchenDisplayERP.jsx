@@ -33,6 +33,7 @@ const WORDS={
     age:'Elapsed',minutes:'min',orders:'Active tickets',unit:'×',
     error:'Order changed or the connection failed. The kitchen board has been refreshed.',
     stationOnly:'Select All stations to advance an order that has items for several stations.',
+    languageSync:'Customer screens could not sync the Kitchen Display language. Retry by changing the language.',
     customerTv:'Customer Order Tracking TV',customerHelp:'Independent 8-hour pickup screen, showing only ticket numbers and stages. New pairing replaces the previous link; no cashier shift needed.',
     pairTv:'Create customer TV link',revokeTv:'Revoke link',openTv:'Open TV',copyTv:'Copy link',copiedTv:'Copied',
   },
@@ -54,6 +55,7 @@ const WORDS={
     age:'مدت انتظار',minutes:'دقیقه',orders:'سفارش فعال',unit:'×',
     error:'سفارش تغییر کرده یا اتصال قطع شده است؛ فهرست مطبخ تازه‌سازی شد.',
     stationOnly:'این سفارش مربوط چند بخش است؛ برای تغییر وضعیت تمام بخش‌ها را انتخاب کنید.',
+    languageSync:'زبان نمایشگر مشتری با مطبخ همگام نشد؛ لطفاً دوباره زبان را تغییر دهید.',
     customerTv:'تلویزیون تعقیب سفارش مشتری',customerHelp:'لینک مستقل ۸ساعته؛ فقط نمبر و وضعیت سفارش نشان داده می‌شود. ساخت لینک تازه، لینک قبلی را باطل می‌کند؛ به شیفت کاشیر نیاز ندارد.',
     pairTv:'ساخت لینک تلویزیون مشتری',revokeTv:'باطل‌کردن لینک',openTv:'بازکردن تلویزیون',copyTv:'کاپی لینک',copiedTv:'کاپی شد',
   },
@@ -75,6 +77,7 @@ const WORDS={
     age:'مدة الانتظار',minutes:'دقيقة',orders:'طلب نشط',unit:'×',
     error:'تغير الطلب أو انقطع الاتصال؛ تم تحديث لوحة المطبخ.',
     stationOnly:'الطلب يحتوي أصنافاً من عدة محطات؛ اختر كل المحطات لتغيير حالته.',
+    languageSync:'تعذرت مزامنة لغة شاشة العملاء مع المطبخ. غيّر اللغة مرة أخرى.',
     customerTv:'شاشة متابعة طلبات العملاء',customerHelp:'رابط مستقل صالح ٨ ساعات يعرض أرقام الطلبات ومراحلها فقط. إنشاء رابط جديد يبطل القديم ولا يتطلب وردية كاشير.',
     pairTv:'إنشاء رابط شاشة العملاء',revokeTv:'إلغاء الرابط',openTv:'فتح الشاشة',copyTv:'نسخ الرابط',copiedTv:'تم النسخ',
   },
@@ -179,6 +182,18 @@ export default function KitchenDisplayERP(){
   const selected=branches.find(b=>String(b.id)===requested)||branches[0]||null;
   const branchId=selected?.id||null;
   const allowed=Boolean(validPortal&&can.viewOrders);
+  const [languageSyncError,setLanguageSyncError]=useState('');
+  useEffect(()=>{
+    if(!allowed||!id||!branchId||!['en','fa','ar'].includes(lang))return;
+    let alive=true;
+    setLanguageSyncError('');
+    restaurantRpc('kitchen_screen_language',{
+      p_restaurant_id:id,p_branch_id:branchId,p_language:lang,
+    }).catch(()=>{
+      if(alive)setLanguageSyncError('failed');
+    });
+    return()=>{alive=false;};
+  },[allowed,id,branchId,lang]);
   const q=useKitchenLive(id,branchId,allowed);
   const [station,setStation]=useState('');
   const [tv,setTv]=useState(false);
@@ -337,6 +352,7 @@ export default function KitchenDisplayERP(){
         <strong className="text-lg text-white">{data?.total_active??'—'}</strong> {t.orders}
       </div>
     </div>
+    {languageSyncError&&<div role="alert" data-testid="kds-language-sync-error" className="mb-4 rounded-xl border border-amber-500/50 bg-amber-950 px-4 py-3 text-sm text-amber-100">{t.languageSync}</div>}
     {!fresh&&<div data-testid="kds-stale" role="alert" className="mb-4 flex gap-2 rounded-xl border border-rose-600 bg-rose-950 px-4 py-3 text-sm font-bold text-rose-100">
       <AlertTriangle className="h-5 w-5 shrink-0"/>{q.isError?t.failed:t.stale}
     </div>}
