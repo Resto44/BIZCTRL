@@ -3,7 +3,7 @@ import {useSearchParams} from 'react-router-dom';
 import {useQuery} from '@tanstack/react-query';
 import {
   ChefHat, Clock3, Maximize2, Minimize2, RefreshCw, Volume2, VolumeX,
-  Wifi, WifiOff, Check, AlertTriangle, MonitorPlay, UtensilsCrossed,
+  Wifi, WifiOff, Check, AlertTriangle, MonitorPlay, UtensilsCrossed, Link2, Copy, ExternalLink,
 } from 'lucide-react';
 import {useTenant} from '@/lib/TenantContext';
 import {useRole} from '@/lib/RoleContext';
@@ -33,6 +33,8 @@ const WORDS={
     age:'Elapsed',minutes:'min',orders:'Active tickets',unit:'×',
     error:'Order changed or the connection failed. The kitchen board has been refreshed.',
     stationOnly:'Select All stations to advance an order that has items for several stations.',
+    customerTv:'Customer Order Tracking TV',customerHelp:'Independent 8-hour pickup screen, showing only ticket numbers and stages. New pairing replaces the previous link; no cashier shift needed.',
+    pairTv:'Create customer TV link',revokeTv:'Revoke link',openTv:'Open TV',copyTv:'Copy link',copiedTv:'Copied',
   },
   fa:{
     title:'نمایشگر مطبخ',subtitle:'سفارش‌های زنده از POS رستورانت',
@@ -52,6 +54,8 @@ const WORDS={
     age:'مدت انتظار',minutes:'دقیقه',orders:'سفارش فعال',unit:'×',
     error:'سفارش تغییر کرده یا اتصال قطع شده است؛ فهرست مطبخ تازه‌سازی شد.',
     stationOnly:'این سفارش مربوط چند بخش است؛ برای تغییر وضعیت تمام بخش‌ها را انتخاب کنید.',
+    customerTv:'تلویزیون تعقیب سفارش مشتری',customerHelp:'لینک مستقل ۸ساعته؛ فقط نمبر و وضعیت سفارش نشان داده می‌شود. ساخت لینک تازه، لینک قبلی را باطل می‌کند؛ به شیفت کاشیر نیاز ندارد.',
+    pairTv:'ساخت لینک تلویزیون مشتری',revokeTv:'باطل‌کردن لینک',openTv:'بازکردن تلویزیون',copyTv:'کاپی لینک',copiedTv:'کاپی شد',
   },
   ar:{
     title:'شاشة المطبخ',subtitle:'الطلبات المباشرة من كاشير المطعم',
@@ -71,6 +75,8 @@ const WORDS={
     age:'مدة الانتظار',minutes:'دقيقة',orders:'طلب نشط',unit:'×',
     error:'تغير الطلب أو انقطع الاتصال؛ تم تحديث لوحة المطبخ.',
     stationOnly:'الطلب يحتوي أصنافاً من عدة محطات؛ اختر كل المحطات لتغيير حالته.',
+    customerTv:'شاشة متابعة طلبات العملاء',customerHelp:'رابط مستقل صالح ٨ ساعات يعرض أرقام الطلبات ومراحلها فقط. إنشاء رابط جديد يبطل القديم ولا يتطلب وردية كاشير.',
+    pairTv:'إنشاء رابط شاشة العملاء',revokeTv:'إلغاء الرابط',openTv:'فتح الشاشة',copyTv:'نسخ الرابط',copiedTv:'تم النسخ',
   },
 };
 const STAGES=['queued','preparing','ready'];
@@ -163,7 +169,7 @@ function Ticket({order,stage,station,lang,t,now,advance,pending,fresh}){
 
 export default function KitchenDisplayERP(){
   const {activeRestaurant,branches=[]}=useTenant();
-  const {can}=useRole();
+  const {can,role}=useRole();
   const {lang}=useLanguage();
   const t=WORDS[lang]||WORDS.en;
   const [params,setParams]=useSearchParams();
@@ -179,6 +185,10 @@ export default function KitchenDisplayERP(){
   const [sound,setSound]=useState(false);
   const [busy,setBusy]=useState('');
   const [error,setError]=useState('');
+  const [customerTvLink,setCustomerTvLink]=useState('');
+  const [customerTvBusy,setCustomerTvBusy]=useState(false);
+  const [customerTvCopied,setCustomerTvCopied]=useState(false);
+  const canPairCustomerTv=(role==='owner'||role==='manager')&&can.viewOrders;
   const [now,setNow]=useState(Date.now());
   const boardRef=useRef(null);
   const soundRef=useRef(false);
@@ -198,7 +208,7 @@ export default function KitchenDisplayERP(){
   useEffect(()=>{if(!stations.includes(station))setStation('');},[stations,station]);
   useEffect(()=>{
     if(prevScope.current!==currentScope){
-      prevScope.current=currentScope;seenRef.current=null;setError('');setStation('');
+      prevScope.current=currentScope;seenRef.current=null;setError('');setStation('');setCustomerTvLink('');setCustomerTvCopied(false);
     }
   },[currentScope]);
   useEffect(()=>{
@@ -250,6 +260,18 @@ export default function KitchenDisplayERP(){
       pendingRef.current=false;setBusy('');
     }
   };
+  const manageCustomerTv=async(action)=>{
+    if(!canPairCustomerTv||!id||!branchId||customerTvBusy)return;
+    setCustomerTvBusy(true);setError('');
+    try{
+      const result=await restaurantRpc('customer_tracking_manage',{
+        p_restaurant_id:id,p_branch_id:branchId,p_action:action,
+      });
+      setCustomerTvLink(action==='pair'&&result?.token?
+        window.location.origin+'/restaurant/customer-tracking#'+result.token:'');
+      setCustomerTvCopied(false);
+    }catch(e){setError(e?.message||t.failed);}finally{setCustomerTvBusy(false);}
+  };
   if(!validPortal)return <div role="alert" className="rounded-xl bg-amber-50 p-5 text-amber-800">{t.restaurantOnly}</div>;
   if(!can.viewOrders)return <div role="alert" className="rounded-xl bg-red-50 p-5 text-red-800">{t.failed}</div>;
   if(!selected)return <div role="alert" className="rounded-xl bg-amber-50 p-5 text-amber-800">{t.choose}</div>;
@@ -275,6 +297,25 @@ export default function KitchenDisplayERP(){
           {tv?<Minimize2 className="h-4 w-4"/>:<Maximize2 className="h-4 w-4"/>}{tv?t.leave:t.tv}</button>
       </div>
     </header>
+    {canPairCustomerTv&&!tv&&<details data-testid="kds-customer-tv-pair" className="mb-4 rounded-2xl border border-cyan-700/60 bg-cyan-950/30 px-4 py-3">
+      <summary className="cursor-pointer text-sm font-black text-cyan-200 sm:text-base"><MonitorPlay className="me-2 inline h-5 w-5"/>{t.customerTv}</summary>
+      <p className="mt-2 text-xs leading-5 text-slate-300">{t.customerHelp}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" data-testid="kds-pair-customer-tv" disabled={customerTvBusy} onClick={()=>void manageCustomerTv('pair')}
+          className="flex min-h-10 items-center gap-2 rounded-xl bg-cyan-600 px-3 text-xs font-bold text-white disabled:opacity-50"><Link2 className="h-4 w-4"/>{t.pairTv}</button>
+        <button type="button" data-testid="kds-revoke-customer-tv" disabled={customerTvBusy} onClick={()=>void manageCustomerTv('revoke')}
+          className="min-h-10 rounded-xl border border-rose-500/60 px-3 text-xs font-bold text-rose-200 disabled:opacity-50">{t.revokeTv}</button>
+      </div>
+      {customerTvLink&&<div className="mt-3 space-y-2">
+        <input aria-label={t.customerTv} readOnly value={customerTvLink} dir="ltr"
+          className="h-10 w-full rounded-lg border border-cyan-700/40 bg-slate-950 px-3 text-xs text-white"/>
+        <div className="flex flex-wrap gap-2">
+          <a href={customerTvLink} target="_blank" rel="noopener noreferrer" className="flex min-h-10 items-center gap-2 rounded-xl bg-blue-600 px-3 text-xs font-bold text-white"><ExternalLink className="h-4 w-4"/>{t.openTv}</a>
+          <button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(customerTvLink);setCustomerTvCopied(true);}catch(e){setError(e?.message||t.failed);}}}
+            className="flex min-h-10 items-center gap-2 rounded-xl border border-slate-600 px-3 text-xs font-bold"><Copy className="h-4 w-4"/>{customerTvCopied?t.copiedTv:t.copyTv}</button>
+        </div>
+      </div>}
+    </details>}
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm font-bold">{t.branch}
