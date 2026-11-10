@@ -80,6 +80,9 @@ describe('Restaurant Kitchen TV workflow',()=>{
       expect(state.rpc).toHaveBeenCalledWith('erp_restaurant_pos_kitchen_board',{
         p_restaurant_id:'tenant-1',p_branch_id:'branch-1',
       });
+      expect(state.rpc).toHaveBeenCalledWith('erp_restaurant_kitchen_screen_language',{
+        p_restaurant_id:'tenant-1',p_branch_id:'branch-1',p_language:'en',
+      });
       expect(state.subscribe).toHaveBeenCalledWith(expect.anything(),'restaurant-pos:tenant-1',expect.any(Function));
       expect(tree.root.findAllByProps({'data-testid':'kds-ticket'})).toHaveLength(3);
       expect(tree.root.findByProps({'data-testid':'kds-connection'})).toBeTruthy();

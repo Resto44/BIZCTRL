@@ -7,7 +7,7 @@ import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 
 const api=vi.hoisted(()=>({
- rpc:vi.fn(),pinned:null,paired:true,
+ rpc:vi.fn(),pinned:null,mode:'kitchen',paired:true,
  orders:[{id:'order-95',number:95,kitchen_status:'preparing',status:'paid',order_type:'takeaway'}],
 }));
 vi.mock('@/lib/restaurantPOS',()=>({restaurantRpc:(...args)=>api.rpc(...args)}));
@@ -23,26 +23,27 @@ async function mount(props={}){
  return {tree,close:async()=>{await act(async()=>tree.unmount());client.clear();}};
 }
 beforeEach(()=>{
- api.rpc.mockReset();api.pinned=null;api.paired=true;
+ api.rpc.mockReset();api.pinned=null;api.mode='kitchen';api.paired=true;
  api.rpc.mockImplementation(async(name,args)=>{
    if(name!=='pos_display_focus')throw Error('Unexpected ERP RPC');
-   if(args.p_action==='pin')api.pinned=args.p_order_id;
-   if(args.p_action==='cart')api.pinned=null;
-   return {paired:api.paired,pinned_order_id:api.pinned,
+   if(args.p_action==='pin'){api.pinned=args.p_order_id;api.mode='pin';}
+   if(args.p_action==='cart'){api.pinned=null;api.mode='cart';}
+   if(args.p_action==='auto'){api.pinned=null;api.mode='kitchen';}
+   return {paired:api.paired,display_mode:api.mode,pinned_order_id:api.pinned,effective_order_number:api.mode==='kitchen'?95:100,
      pinned_order_number:api.pinned?95:null,current_order_id:'order-100',
      orders:api.orders};
  });
 });
 describe('Cashier Customer Screen kitchen-order focus',()=>{
- it('defaults to current cashier order with explicit pin of #95, and returns to cart on demand',async()=>{
+ it('automatically follows kitchen #95 by default, permits explicit pin, and returns to cashier on request',async()=>{
   const {tree,close}=await mount();
   try{
    const select=tree.root.findByProps({'data-testid':'restaurant-display-order-select'});
-   expect(select.props.value).toBe('');
+   expect(select.props.value).toBe('kitchen');
    expect(tree.root.findByProps({'data-testid':'restaurant-display-selected-mode'})).toBeTruthy();
    const apply=tree.root.findByProps({'data-testid':'restaurant-display-apply-order'});
    expect(apply.props.disabled).toBe(true);
-   await act(async()=>select.props.onChange({target:{value:'order-95'}}));
+   await act(async()=>select.props.onChange({target:{value:'pin:order-95'}}));
    expect(tree.root.findByProps({'data-testid':'restaurant-display-apply-order'}).props.disabled).toBe(false);
    await act(async()=>{
      tree.root.findByProps({'data-testid':'restaurant-display-apply-order'}).props.onClick();
@@ -60,6 +61,17 @@ describe('Cashier Customer Screen kitchen-order focus',()=>{
      p_device_id:'device-1',p_action:'cart',p_order_id:null
    });
    expect(api.pinned).toBeNull();
+   expect(api.mode).toBe('cart');
+   const selectAgain=tree.root.findByProps({'data-testid':'restaurant-display-order-select'});
+   await act(async()=>selectAgain.props.onChange({target:{value:'kitchen'}}));
+   await act(async()=>{
+     tree.root.findByProps({'data-testid':'restaurant-display-apply-order'}).props.onClick();
+     await new Promise(r=>setTimeout(r,25));
+   });
+   expect(api.rpc).toHaveBeenCalledWith('pos_display_focus',{
+     p_device_id:'device-1',p_action:'auto',p_order_id:null
+   });
+   expect(api.mode).toBe('kitchen');
   }finally{await close();}
  });
  it('does not permit switching before a screen is paired',async()=>{
