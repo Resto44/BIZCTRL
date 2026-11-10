@@ -58,14 +58,15 @@ export default function CustomerTrackingDisplay(){
   const {hash}=useLocation();
   const token=hash.slice(1);
   const valid=tokenValid(token);
-  const {lang}=useLanguage();
+  const {lang:localLang}=useLanguage();
+  const [data,setData]=useState(null);
+  const lang=['en','ar','fa'].includes(data?.kitchen_language)?data.kitchen_language:localLang;
   const t=L[lang]||L.en;
   // Crucial: kiosk never uses a customer's or Owner's authenticated session.
   const client=useMemo(()=>createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
     auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,
       storageKey:'bizctrl-restaurant-customer-tracking'}
   }),[]);
-  const [data,setData]=useState(null);
   const [lastSync,setLastSync]=useState(0);
   const [now,setNow]=useState(Date.now());
   const [forbidden,setForbidden]=useState(false);
