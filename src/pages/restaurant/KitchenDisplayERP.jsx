@@ -34,6 +34,7 @@ const WORDS={
     error:'Order changed or the connection failed. The kitchen board has been refreshed.',
     stationOnly:'Select All stations to advance an order that has items for several stations.',
     languageSync:'Customer screens could not sync the Kitchen Display language. Retry by changing the language.',
+    languageLabel:'Kitchen & customer screen language',languageSaving:'Saving language…',
     customerTv:'Customer Order Tracking TV',customerHelp:'Independent 8-hour pickup screen, showing only ticket numbers and stages. New pairing replaces the previous link; no cashier shift needed.',
     pairTv:'Create customer TV link',revokeTv:'Revoke link',openTv:'Open TV',copyTv:'Copy link',copiedTv:'Copied',
   },
@@ -56,6 +57,7 @@ const WORDS={
     error:'سفارش تغییر کرده یا اتصال قطع شده است؛ فهرست مطبخ تازه‌سازی شد.',
     stationOnly:'این سفارش مربوط چند بخش است؛ برای تغییر وضعیت تمام بخش‌ها را انتخاب کنید.',
     languageSync:'زبان نمایشگر مشتری با مطبخ همگام نشد؛ لطفاً دوباره زبان را تغییر دهید.',
+    languageLabel:'زبان مطبخ و نمایشگر مشتری',languageSaving:'ذخیرهٔ زبان…',
     customerTv:'تلویزیون تعقیب سفارش مشتری',customerHelp:'لینک مستقل ۸ساعته؛ فقط نمبر و وضعیت سفارش نشان داده می‌شود. ساخت لینک تازه، لینک قبلی را باطل می‌کند؛ به شیفت کاشیر نیاز ندارد.',
     pairTv:'ساخت لینک تلویزیون مشتری',revokeTv:'باطل‌کردن لینک',openTv:'بازکردن تلویزیون',copyTv:'کاپی لینک',copiedTv:'کاپی شد',
   },
@@ -78,6 +80,7 @@ const WORDS={
     error:'تغير الطلب أو انقطع الاتصال؛ تم تحديث لوحة المطبخ.',
     stationOnly:'الطلب يحتوي أصنافاً من عدة محطات؛ اختر كل المحطات لتغيير حالته.',
     languageSync:'تعذرت مزامنة لغة شاشة العملاء مع المطبخ. غيّر اللغة مرة أخرى.',
+    languageLabel:'لغة المطبخ وشاشة العملاء',languageSaving:'جارٍ حفظ اللغة…',
     customerTv:'شاشة متابعة طلبات العملاء',customerHelp:'رابط مستقل صالح ٨ ساعات يعرض أرقام الطلبات ومراحلها فقط. إنشاء رابط جديد يبطل القديم ولا يتطلب وردية كاشير.',
     pairTv:'إنشاء رابط شاشة العملاء',revokeTv:'إلغاء الرابط',openTv:'فتح الشاشة',copyTv:'نسخ الرابط',copiedTv:'تم النسخ',
   },
@@ -173,8 +176,7 @@ function Ticket({order,stage,station,lang,t,now,advance,pending,fresh}){
 export default function KitchenDisplayERP(){
   const {activeRestaurant,branches=[]}=useTenant();
   const {can,role}=useRole();
-  const {lang}=useLanguage();
-  const t=WORDS[lang]||WORDS.en;
+  const {lang:appLang,setLang}=useLanguage();
   const [params,setParams]=useSearchParams();
   const validPortal=isRestaurantPOSPortal(activeRestaurant);
   const id=activeRestaurant?.id;
@@ -182,18 +184,58 @@ export default function KitchenDisplayERP(){
   const selected=branches.find(b=>String(b.id)===requested)||branches[0]||null;
   const branchId=selected?.id||null;
   const allowed=Boolean(validPortal&&can.viewOrders);
+  const [screenLangOverride,setScreenLangOverride]=useState(null);
   const [languageSyncError,setLanguageSyncError]=useState('');
+  const [languageSaving,setLanguageSaving]=useState(false);
+  const initializingLanguage=useRef(new Set());
+  const lastAppLang=useRef(appLang);
+  const languagePreference=useQuery({
+    queryKey:['restaurant-kds-display-language',id,branchId],
+    queryFn:()=>restaurantRpc('kitchen_screen_language_get',{
+      p_restaurant_id:id,p_branch_id:branchId,
+    }),
+    enabled:Boolean(allowed&&id&&branchId),
+    staleTime:10000,refetchInterval:20000,retry:1,
+  });
+  const languageFromDB=languagePreference.data?.language;
+  const lang=(screenLangOverride?.branchId===branchId?screenLangOverride.lang:null)
+     || (['en','ar','fa'].includes(languageFromDB)?languageFromDB:appLang);
+  const t=WORDS[lang]||WORDS.en;
+  const changeKitchenLanguage=async(next)=>{
+    if(!allowed||!id||!branchId||!['en','ar','fa'].includes(next))return;
+    const previous=lang;
+    setLanguageSyncError('');setLanguageSaving(true);
+    lastAppLang.current=next;
+    setScreenLangOverride({branchId,lang:next});
+    try{
+      await restaurantRpc('kitchen_screen_language',{
+        p_restaurant_id:id,p_branch_id:branchId,p_language:next,
+      });
+      setLang?.(next);
+      await languagePreference.refetch();
+      setScreenLangOverride(current=>current?.branchId===branchId&&current.lang===next?null:current);
+    }catch{
+      setScreenLangOverride({branchId,lang:previous});
+      setLanguageSyncError('failed');
+    }finally{setLanguageSaving(false);}
+  };
+  // Persist a never-configured branch once, without changing other TVs'
+  // saved language on subsequent page openings or refreshes.
   useEffect(()=>{
-    if(!allowed||!id||!branchId||!['en','fa','ar'].includes(lang))return;
-    let alive=true;
-    setLanguageSyncError('');
-    restaurantRpc('kitchen_screen_language',{
-      p_restaurant_id:id,p_branch_id:branchId,p_language:lang,
-    }).catch(()=>{
-      if(alive)setLanguageSyncError('failed');
-    });
-    return()=>{alive=false;};
-  },[allowed,id,branchId,lang]);
+    if(!allowed||!id||!branchId||!languagePreference.isSuccess)return;
+    if(languagePreference.data?.configured)return;
+    const scope=String(id)+':'+String(branchId);
+    if(initializingLanguage.current.has(scope))return;
+    initializingLanguage.current.add(scope);
+    void changeKitchenLanguage(appLang);
+  },[allowed,id,branchId,languagePreference.isSuccess,languagePreference.data?.configured]);
+  // A deliberate header language change while KDS is open also syncs the branch.
+  useEffect(()=>{
+    const changed=lastAppLang.current!==appLang;
+    lastAppLang.current=appLang;
+    if(changed&&allowed&&languagePreference.isSuccess)
+      void changeKitchenLanguage(appLang);
+  },[appLang,allowed,languagePreference.isSuccess,id,branchId]);
   const q=useKitchenLive(id,branchId,allowed);
   const [station,setStation]=useState('');
   const [tv,setTv]=useState(false);
@@ -339,6 +381,16 @@ export default function KitchenDisplayERP(){
           }} className="min-h-11 max-w-52 rounded-xl border border-slate-600 bg-slate-900 px-3 text-white">
             {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
+        </label>
+        <label className="flex flex-wrap items-center gap-2 text-sm font-bold" data-testid="kds-language-control">{t.languageLabel}
+          <select data-testid="kds-screen-language" value={lang} disabled={languageSaving||languagePreference.isLoading}
+            aria-label={t.languageLabel} onChange={e=>void changeKitchenLanguage(e.target.value)}
+            className="min-h-11 max-w-44 rounded-xl border border-cyan-500/60 bg-slate-900 px-3 font-bold text-white disabled:opacity-50">
+            <option value="ar">العربية</option>
+            <option value="fa">فارسی دری</option>
+            <option value="en">English</option>
+          </select>
+          {languageSaving&&<span role="status" className="text-xs text-cyan-300">{t.languageSaving}</span>}
         </label>
         <label className="flex items-center gap-2 text-sm font-bold">{t.station}
           <select value={station} aria-label={t.station} onChange={e=>setStation(e.target.value)}
