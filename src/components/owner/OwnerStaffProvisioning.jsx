@@ -12,9 +12,10 @@ import { toast } from 'sonner';
 import {
   BriefcaseBusiness, Building2, CheckCircle2, Clock3, Copy, Link2, Loader2,
   Mail, MapPin, Phone, RefreshCw, RotateCw, Share2, ShieldCheck, Truck,
-  UserPlus, UserRound, XCircle,
+  UserPlus, UserRound, Wallet, XCircle,
 } from 'lucide-react';
 import InvitationDirectory from './InvitationDirectory';
+import WalletJoinInvitation from './WalletJoinInvitation';
 import { cn } from '@/lib/utils';
 
 const STAFF_ROLES = [
@@ -22,6 +23,7 @@ const STAFF_ROLES = [
   { value: 'employee', label: 'Employee', short: 'Employee', description: 'Daily assigned operations', icon: UserRound, tone: 'violet' },
   { value: 'supplier', label: 'Supplier', short: 'Supplier', description: 'Supplier portal access', icon: Truck, tone: 'emerald' },
   { value: 'driver', label: 'Driver', short: 'Driver', description: 'Own delivery sales and reports', icon: Truck, tone: 'blue' },
+  { value: 'wallet', label: 'Wallet user', short: 'Wallet', description: 'Owner-approved personal wallet portal; not a staff role', icon: Wallet, tone: 'emerald' },
 ];
 
 const ROLE_TONES = {
@@ -118,7 +120,7 @@ export default function OwnerStaffProvisioning() {
 
   const selectedRole = roleMeta(form.role);
   const contact = form.contact.trim();
-  const isFormReady = Boolean(selectedOrganizationId && form.branchId && form.fullName.trim() && contact && form.role);
+  const isFormReady = Boolean(form.role !== 'wallet' && selectedOrganizationId && form.branchId && form.fullName.trim() && contact && form.role);
 
   const loadOrganizations = useCallback(async () => {
     const { data, error } = await supabase.rpc('list_erp_owned_organizations');
@@ -234,6 +236,7 @@ export default function OwnerStaffProvisioning() {
   };
 
   const issueInvitation = async ({ role, branchId, fullName, email, phone }) => {
+    if (role === 'wallet') throw new Error('Use the dedicated Wallet join flow; never create a staff invitation for a wallet account.');
     if (issuanceLock.current) return;
     issuanceLock.current = true;
     try {
@@ -396,7 +399,7 @@ export default function OwnerStaffProvisioning() {
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="flex min-w-0 gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20"><UserPlus className="h-5 w-5" /></span>
-              <div className="min-w-0"><h2 className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Quick user invitation</h2><p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">Choose access, enter one contact, then share the secure link.</p></div>
+              <div className="min-w-0"><h2 className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Quick user invitation</h2><p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">Choose an ERP staff role or Wallet access, then create a secure invitation link.</p></div>
             </div>
             <Button type="button" size="icon" variant="outline" aria-label="Refresh invitations" onClick={refresh} disabled={loading} className="h-10 w-10 shrink-0 rounded-xl bg-white dark:bg-slate-900"><RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} /></Button>
           </div>
@@ -409,12 +412,12 @@ export default function OwnerStaffProvisioning() {
                   {organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
                 </select>
               </ScopeField>
-              <ScopeField icon={MapPin} label="Branch">
+              {form.role !== 'wallet' && <ScopeField icon={MapPin} label="Branch">
                 <select aria-label="Select invitation branch" value={form.branchId} onChange={(event) => updateForm('branchId', event.target.value)} className="mt-0.5 h-7 w-full min-w-0 bg-transparent text-sm font-black text-slate-900 outline-none disabled:opacity-50 dark:text-white" disabled={submitting || !!actionInvitationId || !selectedOrganizationId || branches.length === 0} required>
                   <option value="">Select branch</option>
                   {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name || branch.label || branch.branch_key}</option>)}
                 </select>
-              </ScopeField>
+              </ScopeField>}
             </div>
 
             <fieldset>
@@ -432,6 +435,9 @@ export default function OwnerStaffProvisioning() {
               </div>
             </fieldset>
 
+            {form.role === 'wallet'
+              ? <WalletJoinInvitation key={selectedOrganizationId} restaurantId={selectedOrganizationId} organizationName={selectedOrganization?.name} branches={branches} />
+              : <>
             <InvitationDirectory key={`${selectedOrganizationId}:${form.branchId}:${form.role}`} restaurantId={selectedOrganizationId} branchId={form.branchId} role={form.role} busy={submitting || loading || !!actionInvitationId} onSelect={selectExistingPerson} />
 
             <div>
@@ -456,6 +462,7 @@ export default function OwnerStaffProvisioning() {
                 {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}Create secure link
               </Button>
             </div>
+            </>}
           </form>
         </CardContent>
       </Card>
