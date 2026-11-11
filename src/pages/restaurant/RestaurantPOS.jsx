@@ -20,6 +20,7 @@ import { supabase } from '@/api/supabaseClient';
 import { useRetailCashier } from '@/hooks/useRetailCashier';
 import { subscribeCashierBroadcast } from '@/lib/cashierBroadcast';
 import { money, paymentBreakdown, printCashierReceipt } from '@/lib/retailCashier';
+import POSCreditCustomerPicker from '@/components/restaurant-pos/POSCreditCustomerPicker';
 import { isRestaurantPOSPortal, restaurantRpc, restaurantProductName as nameOf, restaurantBusinessDate, kitchenNextState, parseRecipeRows } from '@/lib/restaurantPOS';
 import { restaurantProductCopy } from '@/lib/restaurantProducts';
 import { restaurantCopy } from '@/components/restaurant-pos/copy';
@@ -74,22 +75,13 @@ export function ActionDialog({kind,api,c,close,currency,onResult,touch=false,lan
  const wizard=touch&&kind!=='payment';const Form=wizard?TouchForm:'form';
  const cart=api.snapshot?.cart;
  const [v,setV]=useState({cashier_name:'',opening_cash:'0',counted_cash:'',reason:'',notes:cart?.notes||'',order_type:cart?.order_type||'takeaway',table_label:cart?.table_label||'',mode:'cash',cash:String(cart?.net_total||0),card:'0',confirmed:false,credit_customer_id:'',credit_confirmed:false});
- const [error,setError]=useState('');const [creditSearch,setCreditSearch]=useState('');
+ const [error,setError]=useState('');const [creditCustomer,setCreditCustomer]=useState(null);
  const set=(k,value)=>setV(s=>({...s,[k]:value}));
  const p=paymentBreakdown(cart?.net_total,v.mode==='credit'?'cash':v.mode,v.cash,v.card);
  const creditMode=v.mode==='credit';
- const customersQuery=useQuery({
-  queryKey:['restaurant-pos-credit-customers',restaurantId,branchId,creditSearch],
-  enabled:kind==='payment'&&creditMode&&Boolean(restaurantId&&branchId),
-  queryFn:()=>supabase.rpc('erp_restaurant_credit_customers',{
-   p_restaurant_id:restaurantId,p_branch_id:branchId,p_search:creditSearch||null,p_limit:100
-  }).then(({data,error})=>{if(error)throw error;return data||[];}),staleTime:0,refetchOnWindowFocus:true,retry:1
- });
- const customers=customersQuery.data||[];
- const chosen=customers.find(x=>x.id===v.credit_customer_id);
- const available=Number(chosen?.available_credit||0);
- const creditReady=Boolean(v.credit_customer_id&&chosen&&v.credit_confirmed&&!customersQuery.isError&&!customersQuery.isFetching&&
-   Number(cart?.net_total)>0&&available>=Number(cart?.net_total));
+ const creditReady=Boolean(v.credit_customer_id&&creditCustomer?.id===v.credit_customer_id&&
+   v.credit_confirmed&&Number(cart?.net_total)>0&&
+   Number(creditCustomer.available_credit)>=Number(cart?.net_total));
  const labels=({en:{credit:'Customer credit',choose:'Select credit customer',search:'Search customer name / phone',balance:'Available credit',confirm:'Confirm this is a credit sale. No cash/card has been received.',noCustomer:'Select an active customer with enough available credit.',noResults:'No matching customer. Check Customer Management.',currency:'Credit amount'},ar:{credit:'بيع آجل للعميل',choose:'اختر العميل',search:'ابحث باسم العميل أو الهاتف',balance:'الرصيد الائتماني المتاح',confirm:'أؤكد أن هذه عملية بيع آجل ولم يُستلم نقد أو بطاقة.',noCustomer:'اختر عميلاً نشطاً برصيد ائتماني كافٍ.',noResults:'لا يوجد عميل مطابق. راجع إدارة العملاء.',currency:'قيمة الآجل'},fa:{credit:'فروش نسیهٔ مشتری',choose:'مشتری نسیه را انتخاب کنید',search:'جستجوی نام یا نمبر مشتری',balance:'اعتبار قابل استفاده',confirm:'تأیید می‌کنم این فروش نسیه است و هیچ پول نقد یا کارت دریافت نشده.',noCustomer:'مشتری فعال با اعتبار کافی انتخاب کنید.',noResults:'مشتری پیدا نشد؛ مدیریت مشتریان را بررسی کنید.',currency:'مبلغ نسیه'}})[lang]||{credit:'Customer credit',choose:'Select customer',search:'Search customer',balance:'Available credit',confirm:'Confirm no payment received',noCustomer:'Choose customer',noResults:'No customer',currency:'Credit amount'};
  const text=(key,label,type='text')=><Field label={label}><input className={input} type={type} min="0" step="0.01" value={v[key]} required={!['table_label','notes'].includes(key)} onChange={e=>set(key,e.target.value)}/></Field>;
  const titles={payment:c.pay,open:c.openShift,close:c.closeShift,cancel:c.cancel,details:c.details};
@@ -103,25 +95,14 @@ export function ActionDialog({kind,api,c,close,currency,onResult,touch=false,lan
     <strong className="text-3xl" dir="ltr">{money(cart?.net_total,currency)}</strong>
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
      {['cash','card','mixed','credit'].map(m=><button className={v.mode===m?primary:button} type="button" key={m}
-      aria-pressed={v.mode===m} onClick={()=>setV(s=>({...s,mode:m,credit_confirmed:false}))}>{m==='credit'?labels.credit:c[m]}</button>)}
+      aria-pressed={v.mode===m} onClick={()=>{setV(s=>({...s,mode:m,credit_confirmed:false,credit_customer_id:''}));setCreditCustomer(null);}}>{m==='credit'?labels.credit:c[m]}</button>)}
     </div>
-    {creditMode ? <section className="min-w-0 space-y-3 rounded-xl border border-blue-200 bg-blue-50/60 p-3" aria-label={labels.credit}>
-      <label className="block text-sm font-semibold">{labels.search}
-       <input className={input} type="search" value={creditSearch} onChange={e=>{setCreditSearch(e.target.value);set('credit_customer_id','');}} autoComplete="off"/>
-      </label>
-      <Field label={labels.choose}><select className={input} value={v.credit_customer_id} disabled={customersQuery.isFetching||customersQuery.isError}
-       onChange={e=>set('credit_customer_id',e.target.value)} required>
-       <option value="">—</option>
-       {customers.map(x=><option key={x.id} value={x.id}>{x.name} · {money(x.available_credit,currency)}</option>)}
-      </select></Field>
-      {customersQuery.isError&&<p role="alert" className="text-sm text-red-700">{customersQuery.error.message}</p>}
-      {customersQuery.isSuccess&&customers.length===0&&<p className="text-sm text-amber-800">{labels.noResults}</p>}
-      {chosen&&<p className="text-sm">{labels.balance}: <strong dir="ltr">{money(available,currency)}</strong></p>}
-      {chosen&&available<Number(cart?.net_total||0)&&<p role="alert" className="text-sm font-semibold text-red-700">{labels.noCustomer}</p>}
-      <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1 size-4" checked={v.credit_confirmed}
-       onChange={e=>set('credit_confirmed',e.target.checked)}/>{labels.confirm}</label>
-      <p className="text-xs font-semibold">{labels.currency}: <span dir="ltr">{money(cart?.net_total,currency)}</span></p>
-     </section>:
+    {creditMode ? <POSCreditCustomerPicker
+      restaurantId={restaurantId} branchId={branchId} currency={currency}
+      total={cart?.net_total} labels={labels} selectedId={v.credit_customer_id} confirmed={v.credit_confirmed}
+      onSelect={customer=>{setCreditCustomer(customer);setV(s=>({...s,credit_customer_id:customer?.id||'',credit_confirmed:false}));}}
+      onConfirmed={checked=>set('credit_confirmed',checked)}
+    />:
      <>{v.mode!=='card'&&text('cash',c.tendered,'number')}{v.mode==='mixed'&&text('card',c.cardAmount,'number')}
       <p>{c.change}: {money(p.change,currency)}</p>
       <label className="flex items-start gap-3 text-sm">{!touch&&<input type="checkbox" required checked={v.confirmed} onChange={e=>set('confirmed',e.target.checked)}/>}
