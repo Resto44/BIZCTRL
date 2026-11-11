@@ -50,11 +50,12 @@ const inWindow=(row,from,to,fields)=>{
  const date=supplierPortalRecordDate(fields.map(f=>row?.[f]).find(Boolean));
  return date>=from&&date<=to;
 };
-export function supplierPortalAnalytics({orders=[],invoices=[],payments=[],period='month',today=riyadhDate(),custom={}}={}) {
+export function supplierPortalAnalytics({orders=[],invoices=[],payments=[],deliveries=[],period='month',today=riyadhDate(),custom={}}={}) {
  const range=supplierPeriodRange(period,today,custom);
  if(!validSupplierPeriod(range))return {invalid:true,range};
  const matchingOrders=orders.filter(o=>inWindow(o,range.from,range.to,['created_date','date']));
  const matchingInvoices=invoices.filter(i=>inWindow(i,range.from,range.to,['date','created_date']));
+ const matchingDeliveries=deliveries.filter(d=>inWindow(d,range.from,range.to,['confirmed_at']));
  const invoiceIds=new Set(invoices.map(i=>String(i.id)));
  const matchingPayments=payments.filter(p=>invoiceIds.has(String(p.invoice_id))&&inWindow(p,range.from,range.to,['date','created_date']));
  const byCurrency=new Map();
@@ -68,7 +69,10 @@ export function supplierPortalAnalytics({orders=[],invoices=[],payments=[],perio
  for(const order of matchingOrders) {
   const {bucket,granularity:group}=bucketFor(supplierPortalRecordDate(order.created_date||order.date));
   granularity=group;bucket.orders++;
-  if(order.status==='received')bucket.completed++;
+ }
+ for(const delivery of matchingDeliveries){
+  const {bucket}=bucketFor(supplierPortalRecordDate(delivery.confirmed_at));
+  bucket.completed++;
  }
  const addCurrency=(currency)=>{const key=String(currency||'SAR').toUpperCase();
   if(!byCurrency.has(key))byCurrency.set(key,{currency:key,invoicedCents:0,paidCents:0,outstandingCents:0,overdueCents:0,trend:new Map()});
@@ -107,7 +111,7 @@ export function supplierPortalAnalytics({orders=[],invoices=[],payments=[],perio
   orders:matchingOrders.length,
   awaitingShipment:matchingOrders.filter(o=>o.status==='approved').length,
   awaitingOwner:matchingOrders.filter(o=>o.status==='shipped').length,
-  received:matchingOrders.filter(o=>o.status==='received').length,
+  received:matchingDeliveries.length,
   cancelled:matchingOrders.filter(o=>o.status==='cancelled').length,
   invoices:matchingInvoices.length,paymentRecords:matchingPayments.length,
   currencies:currencyRows,
