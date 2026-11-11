@@ -110,7 +110,7 @@ export default function PortalPushSettings({role,restaurantId=null,customerId=nu
  }
  if(!ready)return null;
  return <details dir={language==='en'?'ltr':'rtl'} className="group w-full min-w-0 max-w-full rounded-xl border border-teal-100 bg-white text-sm print:hidden" aria-label={t.title}>
-  <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
+  <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
    <BellRing aria-hidden="true" className="size-4 shrink-0 text-teal-700"/>
    <span className="min-w-0 flex-1 font-semibold text-slate-900">{t.title}</span>
    <span className={'shrink-0 rounded-full px-2 py-1 text-xs font-medium '+(enabled?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-600')}>{enabled?t.on:t.off}</span>
