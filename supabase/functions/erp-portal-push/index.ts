@@ -1,6 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.106.1';
 import webpush from 'npm:web-push@3.6.7';
-import { validSubscription } from '../owner-push/policy.ts';
+import { validSubscription } from './policy.ts';
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{
  auth:{persistSession:false,autoRefreshToken:false}
