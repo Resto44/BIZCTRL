@@ -23,8 +23,19 @@ CREATE OR REPLACE FUNCTION customer_portal_private.store_credit_invoice_lines(
 DECLARE debt public.debt_records; v_item jsonb; v_clean jsonb:='[]'::jsonb;
  v_name text; v_quantity numeric; v_price numeric; v_total numeric; v_sum numeric:=0;
 BEGIN
- IF auth.uid() IS NULL OR NOT public.erp_can_write_scope(p_restaurant_id,p_branch_id) THEN
+ IF auth.uid() IS NULL THEN
    RAISE EXCEPTION 'CUSTOMER_CREDIT_DETAILS_FORBIDDEN' USING ERRCODE='42501';
+ END IF;
+ IF p_source_type='restaurant_pos' THEN
+   -- Verified cashier device role; do NOT give cashiers the broad owner/manager debt RPC.
+   PERFORM restaurant_pos_private.guard(p_restaurant_id,p_branch_id,'uploadSales');
+   PERFORM restaurant_pos_private.guard(p_restaurant_id,p_branch_id,'viewSales');
+ ELSIF p_source_type='sales_closing' THEN
+   IF NOT public.erp_can_write_scope(p_restaurant_id,p_branch_id) THEN
+     RAISE EXCEPTION 'CUSTOMER_CREDIT_DETAILS_FORBIDDEN' USING ERRCODE='42501';
+   END IF;
+ ELSE
+   RAISE EXCEPTION 'CUSTOMER_CREDIT_DETAILS_SOURCE_INVALID' USING ERRCODE='23514';
  END IF;
  SELECT * INTO debt FROM public.debt_records
  WHERE id=p_debt_id AND restaurant_id=p_restaurant_id AND branch_id=p_branch_id
