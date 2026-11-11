@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 
 import { normalizeCreditAmount, validCreditAmount } from '@/lib/customerCreditSources';
+import CustomerCreditInvoiceItems, { isItemizedCustomerCreditValid } from '@/components/sales/CustomerCreditInvoiceItems';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -113,6 +114,8 @@ export default function CustomerCreditSalesSource({
     ? TRANSACTION_TYPES.DEBT_PAYMENT
     : TRANSACTION_TYPES.CREDIT_SALE;
   const isPayment = transactionType === TRANSACTION_TYPES.DEBT_PAYMENT;
+  const hasItemizedLines = Array.isArray(entry.items) && entry.items.length>0;
+  const lineItemsValid = isItemizedCustomerCreditValid(entry.items,entry.amount);
   const rawAmount = isPayment ? entry.payment_amount : entry.amount;
   const invalidAmount = Boolean(rawAmount) && !validCreditAmount(rawAmount);
   const transactionAmount = amount(rawAmount);
@@ -324,7 +327,7 @@ export default function CustomerCreditSalesSource({
               <Label className="mb-2 block text-xs font-bold text-slate-600 sm:text-sm">{isPayment ? closingTr('Payment Amount') : closingTr('Credit Sale Amount')}</Label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500" dir="ltr">{currency}</span>
-                <Input value={isPayment ? entry.payment_amount ?? '' : entry.amount ?? ''} onChange={(event) => updateAmount(event.target.value)} className="h-16 w-full rounded-2xl border-slate-400 pl-16 text-2xl font-medium tabular-nums shadow-none focus-visible:ring-blue-500" inputMode="decimal" type="text" placeholder={closingTr("0.00")} disabled={disabled || isRecordingPayment || (!isPayment && creditPosted)} aria-invalid={invalidAmount} dir="ltr" aria-label={isPayment ? closingTr('Debt payment amount') : closingTr('Credit sale amount')} />
+                <Input value={isPayment ? entry.payment_amount ?? '' : entry.amount ?? ''} onChange={(event) => updateAmount(event.target.value)} className="h-16 w-full rounded-2xl border-slate-400 pl-16 text-2xl font-medium tabular-nums shadow-none focus-visible:ring-blue-500" inputMode="decimal" type="text" placeholder={closingTr("0.00")} disabled={disabled || isRecordingPayment || (!isPayment && (creditPosted || hasItemizedLines))} aria-invalid={invalidAmount||!lineItemsValid} dir="ltr" aria-label={isPayment ? closingTr('Debt payment amount') : closingTr('Credit sale amount')} />
               </div>
               <div className="mt-3 flex items-start gap-2.5 rounded-2xl bg-blue-50 px-3.5 py-3 text-blue-900">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
@@ -344,6 +347,7 @@ export default function CustomerCreditSalesSource({
               )}
             </div>
 
+            {!isPayment && <CustomerCreditInvoiceItems entry={entry} onUpdate={onUpdate} disabled={disabled||creditPosted} currency={currency} lang={lang}/>}
             {isPayment ? (
               <div className="space-y-3">
                 <div>
@@ -359,7 +363,7 @@ export default function CustomerCreditSalesSource({
               </div>
             ) : (
               <div className="space-y-2">
-                <Button type="button" className="min-h-14 w-full rounded-2xl bg-blue-600 text-sm font-black hover:bg-blue-700" disabled={disabled || isRecordingPayment || invalidAmount || transactionAmount <= 0 || saleExceedsLimit || !onReviewCreditSale} onClick={() => onReviewCreditSale(entry)}>
+                <Button type="button" className="min-h-14 w-full rounded-2xl bg-blue-600 text-sm font-black hover:bg-blue-700" disabled={disabled || isRecordingPayment || invalidAmount || !lineItemsValid || transactionAmount <= 0 || saleExceedsLimit || !onReviewCreditSale} onClick={() => onReviewCreditSale(entry)}>
                   <ClipboardCheck className="h-5 w-5" />{closingTr("Review & Save with Closing")}</Button>
                 <p className="text-center text-xs text-slate-600" aria-live="polite">{closingTr("Credit Sale Saves with Sales Closing. Finalize Closing to record the debt.")}</p>
               </div>
