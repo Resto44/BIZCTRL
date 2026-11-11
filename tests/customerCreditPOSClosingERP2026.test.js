@@ -105,7 +105,7 @@ describe('Customer credit cross-channel ERP invoice continuity',()=>{
   expect(file).toContain("mode:'cash'");
   expect(file).toContain("'cash','card','mixed','credit'");
   expect(file).toContain("payment_method:'credit',customer_id:v.credit_customer_id,credit_confirmed:v.credit_confirmed");
-  expect(file).toContain('available>=Number(cart?.net_total)');
+  expect(file).toContain('Number(creditCustomer.available_credit)>=Number(cart?.net_total)');
   expect(file).toContain('v.credit_confirmed');
   expect(file).toContain('credit_customer_id');
   expect(file).not.toContain('supabase.from(\'debt_records\').insert');
