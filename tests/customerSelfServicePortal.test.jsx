@@ -8,7 +8,7 @@ vi.mock('@/api/supabaseClient',()=>({supabase:{rpc:(...a)=>mock.rpc(...a),auth:{
 vi.mock('@/lib/LanguageContext',()=>({useLanguage:()=>({lang:mock.lang,setLang:vi.fn()})}));
 import CustomerPortal from '../src/pages/CustomerPortal';
 import CustomerPortalInvitation from '../src/components/customer/CustomerPortalInvitation';
-const accounts=[{id:'customer-a',name:'Alice',business:'Shop A',currency:'SAR'},{id:'customer-b',name:'Bob',business:'Shop B',currency:'USD'}];
+const accounts=[{id:'customer-a',name:'Alice',business:'Shop A',branch_name:'Central branch',currency:'SAR'},{id:'customer-b',name:'Bob',business:'Shop B',branch_name:'Rayan branch',currency:'USD'}];
 let tree,client;
 const pause=()=>new Promise(resolve=>setTimeout(resolve,30));
 async function mount(element=<CustomerPortal/>){client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});await act(async()=>{tree=TestRenderer.create(<QueryClientProvider client={client}>{element}</QueryClientProvider>);await pause();});for(let i=0;i<4;i++)await act(pause);return tree;}
@@ -17,6 +17,40 @@ const button=label=>tree.root.findAllByType('button').find(x=>x.children.join(''
 beforeEach(()=>{vi.clearAllMocks();mock.lang='en';sessionStorage.clear();window.history.replaceState(null,'','/customer-portal');mock.getSession.mockResolvedValue({data:{session:{user:{id:'user-a'}}}});mock.signout.mockResolvedValue({});mock.rpc.mockImplementation(async(name,args)=>({data:name==='erp_customer_portal_accounts'?accounts:{totals:{total:100,paid:30,balance:70,overdue:70},rows:[{id:'debt-a',reference:args?.p_customer_id==='customer-b'?'BOB-INVOICE':'ALICE-INVOICE',amount:100,paid_amount:30,remaining_amount:70}],count:1,as_of:'2026-11-10T10:00:00Z'},error:null}));});
 afterEach(async()=>{if(tree)await act(async()=>tree.unmount());client?.clear();});
 describe('Customer self-service',()=>{
+ it('displays the authenticated customer name prominently while the selector keeps just restaurant and human branch',async()=>{
+  await mount();
+  expect(text()).toContain('Customer name');
+  expect(text()).toContain('Alice');
+  expect(text()).toContain('Shop A');
+  expect(text()).toContain('Central branch');
+  const select=tree.root.findAllByType('select').find(x=>x.props.value==='customer-a');
+  const labels=select.findAllByType('option').map(o=>o.children.join(''));
+  expect(labels).toContain('Shop A · Central branch');
+  expect(labels.every(label=>!label.includes('Alice')&&!label.includes('Bob')&&!label.includes('main-'))).toBe(true);
+  await act(async()=>{select.props.onChange({target:{value:'customer-b'}});await pause();});
+  await act(pause);
+  expect(tree.root.findAllByProps({'data-testid':'customer-display-name'}).map(x=>x.children.join(''))).toContain('Bob');
+  expect(text()).toContain('Rayan branch');
+ });
+ it('shows a compact, dismissible old invitation hint for an already activated customer account',async()=>{
+  const token='b'.repeat(64);
+  sessionStorage.setItem('customer:invite',token);
+  await mount();
+  expect(text()).toContain('Another invitation link was detected');
+  expect(text()).not.toContain('The invitation must match the signed-in email.');
+  await act(async()=>{button('Dismiss invitation').props.onClick();await pause();});
+  expect(sessionStorage.getItem('customer:invite')).toBeNull();
+  expect(text()).not.toContain('Another invitation link was detected');
+  expect(text()).toContain('Alice');
+ });
+ it('refreshes account summary, detailed statement and current-period analytics together',async()=>{
+  await mount();
+  const spy=vi.spyOn(client,'invalidateQueries');
+  await act(async()=>{button('Refresh').props.onClick();await pause();});
+  expect(spy).toHaveBeenCalledWith({queryKey:['customer-portal','analytics','customer-a']});
+  expect(mock.rpc).toHaveBeenCalledWith('erp_customer_portal_accounts');
+  expect(mock.rpc).toHaveBeenCalledWith('erp_customer_portal_statement',expect.objectContaining({p_customer_id:'customer-a'}));
+ });
  it('loads only server-authorized account data and sends the selected customer scope',async()=>{await mount();expect(text()).toContain('ALICE-INVOICE');expect(mock.rpc).toHaveBeenCalledWith('erp_customer_portal_statement',expect.objectContaining({p_customer_id:'customer-a',p_kind:'invoices',p_page:0}));
  const select=tree.root.findAllByType('select').find(x=>x.props.value==='customer-a');await act(async()=>{select.props.onChange({target:{value:'customer-b'}});await pause();});await act(pause);
  expect(text()).toContain('BOB-INVOICE');expect(text()).not.toContain('ALICE-INVOICE');});
