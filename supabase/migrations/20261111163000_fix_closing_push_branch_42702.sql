@@ -124,5 +124,4 @@ BEGIN
     'payment',TG_TABLE_NAME,NEW.id,'received'); END LOOP;
  END IF;
  RETURN NEW;
-END $function$
-
+END $function$;
