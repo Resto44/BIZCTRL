@@ -28,7 +28,7 @@ export default function CustomerCreditInvoiceItems({
   if(!scoped)return undefined;
   let mounted=true;
   setLoading(true);setError('');setCatalog([]);
-  import('@/lib/restaurantPOS').then(({restaurantRpc})=>restaurantRpc('customer_credit_pos_items',{
+  import('@/lib/restaurantPOS').then(({customerCreditPOSMenuRpc})=>customerCreditPOSMenuRpc({
     p_restaurant_id:restaurantId,p_branch_id:branchId,p_search:''
   })).then(result=>{
     if(!mounted)return;
@@ -89,7 +89,7 @@ export default function CustomerCreditInvoiceItems({
       aria-label={t.choose} data-testid="customer-credit-pos-product-dropdown"
       value="" disabled={disabled||loading||Boolean(error)||!catalog.length||items.length>=30}
       onChange={e=>choose(e.target.value)}>
-     <option value="">{loading?t.loading:!catalog.length?t.empty:t.choose}</option>
+     <option value="">{loading?t.loading:error?t.error:!catalog.length?t.empty:t.choose}</option>
      {groups.map(([group,options])=><optgroup key={group} label={group}>
       {options.map(m=><option key={m.id} value={m.id}>
        {creditPOSMenuLabel(m,lang)} · {currency} {money(m.price)}
@@ -98,7 +98,7 @@ export default function CustomerCreditInvoiceItems({
     </select>
    </label>
    {loading&&<p role="status" className="text-xs text-slate-500">{t.loading}</p>}
-   {!loading&&!error&&!catalog.length&&<p role="status" className="text-xs text-amber-800">{t.empty}</p>}
+   {!loading&&!error&&scoped&&!catalog.length&&<p role="status" className="text-xs text-amber-800">{t.empty}</p>}
    {error&&<div role="alert" className="flex flex-wrap items-center gap-2">
     <p className="text-xs text-red-700">{t.error}</p>
     <Button type="button" variant="outline" size="sm" onClick={()=>setRefresh(n=>n+1)}>{t.retry}</Button>
