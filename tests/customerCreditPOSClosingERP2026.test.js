@@ -94,8 +94,12 @@ describe('Customer credit cross-channel ERP invoice continuity',()=>{
  });
  it('POS has a scoped customer picker, available-limit preview and explicit confirmation',async()=>{
   const file=await read('../src/pages/restaurant/RestaurantPOS.jsx');
-  expect(file).toContain('loadCanonicalActiveCustomers');
-  expect(file).toContain('restaurantId,branchId,search:creditSearch');
+  expect(file).toContain("supabase.rpc('erp_restaurant_credit_customers'");
+  expect(file).toContain('p_restaurant_id:restaurantId,p_branch_id:branchId,p_search:creditSearch||null');
+  const picker=await read('../supabase/migrations/20261111204200_restaurant_pos_credit_customer_picker.sql');
+  expect(picker).toContain("restaurant_pos_private.guard(p_restaurant_id,p_branch_id,'uploadSales')");
+  expect(picker).toContain('d.restaurant_id=p_restaurant_id');
+  expect(picker).toContain('REVOKE ALL ON FUNCTION public.erp_restaurant_credit_customers');
   expect(file).toContain("mode:'cash'");
   expect(file).toContain("'cash','card','mixed','credit'");
   expect(file).toContain("payment_method:'credit',customer_id:v.credit_customer_id,credit_confirmed:v.credit_confirmed");
