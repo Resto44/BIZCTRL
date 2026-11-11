@@ -20,7 +20,6 @@ import { supabase } from '@/api/supabaseClient';
 import { useRetailCashier } from '@/hooks/useRetailCashier';
 import { subscribeCashierBroadcast } from '@/lib/cashierBroadcast';
 import { money, paymentBreakdown, printCashierReceipt } from '@/lib/retailCashier';
-import { loadCanonicalActiveCustomers } from '@/lib/closing/CanonicalCustomerLoader';
 import { isRestaurantPOSPortal, restaurantRpc, restaurantProductName as nameOf, restaurantBusinessDate, kitchenNextState, parseRecipeRows } from '@/lib/restaurantPOS';
 import { restaurantProductCopy } from '@/lib/restaurantProducts';
 import { restaurantCopy } from '@/components/restaurant-pos/copy';
@@ -82,9 +81,9 @@ export function ActionDialog({kind,api,c,close,currency,onResult,touch=false,lan
  const customersQuery=useQuery({
   queryKey:['restaurant-pos-credit-customers',restaurantId,branchId,creditSearch],
   enabled:kind==='payment'&&creditMode&&Boolean(restaurantId&&branchId),
-  queryFn:()=>loadCanonicalActiveCustomers({
-   client:supabase,restaurantId,branchId,search:creditSearch,limit:100
-  }),staleTime:0,refetchOnWindowFocus:true,retry:1
+  queryFn:()=>supabase.rpc('erp_restaurant_credit_customers',{
+   p_restaurant_id:restaurantId,p_branch_id:branchId,p_search:creditSearch||null,p_limit:100
+  }).then(({data,error})=>{if(error)throw error;return data||[];}),staleTime:0,refetchOnWindowFocus:true,retry:1
  });
  const customers=customersQuery.data||[];
  const chosen=customers.find(x=>x.id===v.credit_customer_id);
