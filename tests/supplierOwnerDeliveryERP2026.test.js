@@ -55,6 +55,12 @@ describe('Supplier Owner verified order completion and responsive dashboard',()=
   expect(form).toContain("supabase.rpc('erp_owner_confirm_supplier_delivery'");
   expect(form).toContain('p_received_items:items.map');
   expect(sql).toContain("m.status='approved' AND m.role='owner'");
+  expect(sql).toContain('erp_owner_approve_supplier_order');
+  expect(sql).toContain("status='approved',approval_status='approved'");
+  expect(page).toContain("supabase.rpc('erp_owner_approve_supplier_order',{p_order_id:orderId})");
+  expect(page).toContain("['draft','sent','pending'].includes(order.status)");
+  expect(page).toContain(".order('created_date',{ascending:false})");
+  expect(page).not.toContain("PurchaseOrder.list('-date'");
   expect(sql).toContain("received_qty IS DISTINCT FROM ordered_qty");
   expect(sql).toContain("UPDATE public.purchase_orders SET status='received'");
   expect(sql).toContain('supplier_order_delivery_confirmations');
