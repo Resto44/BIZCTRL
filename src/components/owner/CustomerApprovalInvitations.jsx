@@ -152,11 +152,11 @@ export default function CustomerApprovalInvitations({restaurantId,branchId,organ
    <h3 className="flex items-center gap-2 font-black"><ShieldCheck className="size-5 text-teal-700"/>{t.title}</h3>
    <p className="mt-2 leading-relaxed text-slate-600 dark:text-slate-300">{t.help} {t.instruction}</p>
   </div>
-  <form className="flex min-w-0 flex-wrap gap-2" onSubmit={e=>{e.preventDefault();setApplied(search.trim());setSelectedId('');setLink('');}}>
-   <Input aria-label={t.search} className="min-w-0 flex-1 basis-44" placeholder={t.search} value={search} onChange={e=>setSearch(e.target.value)} maxLength={120}/>
-   <Button type="submit" variant="outline" disabled={!enabled}><Search className="me-1 size-4"/>{t.find}</Button>
+  <div className="flex min-w-0 flex-wrap gap-2">
+   <Input aria-label={t.search} className="min-w-0 flex-1 basis-44" placeholder={t.search} value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();setApplied(search.trim());setSelectedId('');setLink('');}}} maxLength={120}/>
+   <Button type="button" variant="outline" disabled={!enabled} onClick={()=>{setApplied(search.trim());setSelectedId('');setLink('');}}><Search className="me-1 size-4"/>{t.find}</Button>
    <Button type="button" variant="outline" aria-label={t.refresh} disabled={directory.isFetching||!enabled} onClick={()=>directory.refetch()}><RefreshCw className="size-4"/></Button>
-  </form>
+  </div>
   <div className="space-y-2 rounded-2xl border bg-white p-3 dark:bg-slate-950">
    <p className="text-sm font-bold">{t.list} · {directory.data?.total??'—'} {t.count}</p>
    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
