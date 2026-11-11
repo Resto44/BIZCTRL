@@ -8,7 +8,12 @@
  *   - Notification popups
  *   - PWA install banner
  */
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
+import { useRole } from '@/lib/RoleContext';
+import { useTenant } from '@/lib/TenantContext';
+import { useLanguage } from '@/lib/LanguageContext';
+const PortalPushSettings = lazy(() => import('@/components/notifications/PortalPushSettings'));
+
 
 import ERPLayout from './ERPLayout';
 import OwnerWorkspaceTabs from './OwnerWorkspaceTabs';
@@ -29,6 +34,9 @@ function RouteEnforcer() {
 
 export default function AppLayout() {
   const { user } = useAuth();
+  const { role } = useRole();
+  const { activeRestaurant } = useTenant();
+  const { lang } = useLanguage();
   const [tourOpen, setTourOpen] = useState(false);
 
   useEffect(() => {
@@ -40,6 +48,9 @@ export default function AppLayout() {
       <RouteEnforcer />
       <div className="mx-auto w-full min-w-0 max-w-[1600px] px-4 py-2 sm:py-4 lg:px-6">
         <SubscriptionStatusBanner />
+        {user?.id && activeRestaurant?.id && <Suspense fallback={null}>
+          <PortalPushSettings role={role} restaurantId={activeRestaurant.id} language={lang} />
+        </Suspense>}
         <NotificationRecordLink><OwnerWorkspaceTabs /></NotificationRecordLink>
       </div>
       <NotificationPopups />
