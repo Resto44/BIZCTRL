@@ -58,6 +58,15 @@ describe('Customer ERP analytics / isolation and responsive dashboard',()=>{
   const page=await readFile(pagePath,'utf8');
   expect(page).toContain('grid grid-cols-1 items-end gap-3');
   expect(page).toContain('mt-1 w-full min-w-0 max-w-full');
-  expect(page).toContain('overflow-x-auto pb-2');
+  expect(page).toContain('grid min-w-0 grid-cols-1 gap-2 print:hidden');
+  expect(page).toContain('max-w-full truncate rounded-lg');
+  expect(page).toContain('overflow-x-clip');
+  expect(page).not.toContain('overflow-x-auto');
+  const analytics = await readFile(componentPath,'utf8');
+  expect(analytics).toContain('grid min-w-0 grid-cols-2 gap-2');
+  expect(analytics).toContain('sm:flex sm:flex-wrap');
+  expect(analytics).toContain('minWidth={0}');
+  expect(analytics).toContain('max-w-full overflow-hidden');
+  expect(analytics).not.toContain('overflow-x-auto');
  });
 });
