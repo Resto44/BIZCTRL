@@ -20,7 +20,7 @@ const COPY = {
   retryEmail:'Retry email',success:'Customer invitation created. The previous pending link (if any) is replaced.',
   revokedSuccess:'Customer portal access revoked. No financial records were changed.',failed:'Request failed. Check your owner access, email and customer scope.',
   loadError:'Could not load customer access statuses. Retry.',refresh:'Refresh customers',missingEmail:'Enter a valid customer email first.',
-  showLimited:'Only the first 100 matching customers are shown. Search to locate others.',branch:'Branch',businessWide:'All branches',
+  showLimited:'Only the first 100 matching customers are shown. Search to locate others.',branch:'Branch',businessWide:'All branches',chooseBranch:'Choose a branch above to manage customer access.',
   instruction:'Owner approval is separate from email verification. An invitation does not immediately activate a portal.',
   awaiting:'Pending activation',active:'Activated'
  },
@@ -36,7 +36,7 @@ const COPY = {
   retryEmail:'إعادة إرسال البريد',success:'تم إنشاء دعوة العميل. الرابط المعلّق السابق، إن وجد، لم يعد صالحاً.',
   revokedSuccess:'أُلغي دخول العميل دون تغيير أي سجل مالي.',failed:'فشل الطلب. تحقق من صلاحية المالك والبريد ونطاق العميل.',
   loadError:'تعذر تحميل حالة العملاء. أعد المحاولة.',refresh:'تحديث العملاء',missingEmail:'أدخل بريداً صحيحاً أولاً.',
-  showLimited:'يظهر أول ١٠٠ عميل مطابق فقط. استخدم البحث للعثور على البقية.',branch:'الفرع',businessWide:'جميع الفروع',
+  showLimited:'يظهر أول ١٠٠ عميل مطابق فقط. استخدم البحث للعثور على البقية.',branch:'الفرع',businessWide:'جميع الفروع',chooseBranch:'اختر الفرع أولاً لإدارة وصول العملاء.',
   instruction:'اعتماد المالك منفصل عن تأكيد البريد. الدعوة لا تفعّل الحساب مباشرة.',
   awaiting:'بانتظار التفعيل',active:'مفعّل'
  },
@@ -52,7 +52,7 @@ const COPY = {
   retryEmail:'ارسال دوبارهٔ ایمیل',success:'دعوت‌نامهٔ مشتری ساخته شد. لینک قبلیِ در انتظار باطل شد.',
   revokedSuccess:'دسترسی پورتل مشتری لغو شد؛ اطلاعات مالی تغییر نکرد.',failed:'درخواست ناموفق بود. صلاحیت اونر، ایمیل و شعبه را بررسی کنید.',
   loadError:'بارگذاری وضعیت مشتریان ناموفق بود. دوباره امتحان کنید.',refresh:'تازه‌سازی مشتریان',missingEmail:'اول یک ایمیل درست وارد کنید.',
-  showLimited:'فقط ۱۰۰ مشتری اول نشان داده شده‌اند. برای بقیه جستجو کنید.',branch:'شعبه',businessWide:'همهٔ شعبه‌ها',
+  showLimited:'فقط ۱۰۰ مشتری اول نشان داده شده‌اند. برای بقیه جستجو کنید.',branch:'شعبه',businessWide:'همهٔ شعبه‌ها',chooseBranch:'اول شعبه را از بالا انتخاب کنید.',
   instruction:'تأیید اونر و تأیید ایمیل دو مرحلهٔ جدا است. دعوت‌نامه فوراً حساب را فعال نمی‌کند.',
   awaiting:'در انتظار فعال‌سازی',active:'فعال'
  }
@@ -162,7 +162,7 @@ export default function CustomerApprovalInvitations({restaurantId,branchId,organ
    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
     {filters.map(key=><Button type="button" key={key} size="sm" className="min-w-0 whitespace-normal" variant={filter===key?'default':'outline'} aria-pressed={filter===key} onClick={()=>setFilter(key)}>{t[key]}</Button>)}
    </div>
-   {directory.isPending?<p role="status" className="p-3 text-sm">{'…'}</p>:
+   {!enabled?<p role="status" className="p-3 text-sm">{t.chooseBranch}</p>:directory.isPending?<p role="status" className="p-3 text-sm">{'…'}</p>:
     directory.isError?<div role="alert" className="text-sm text-red-700">{t.loadError}<Button type="button" variant="outline" onClick={()=>directory.refetch()}>{t.refresh}</Button></div>:
     <div className="max-h-72 space-y-2 overflow-y-auto">
      {visible.length===0&&<p className="text-sm text-slate-500">{t.none}</p>}
