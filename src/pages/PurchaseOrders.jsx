@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useAuth } from '@/lib/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,22 +12,27 @@ import PurchaseOrderForm from '@/components/purchase-orders/PurchaseOrderForm';
 import PurchaseOrderDetail from '@/components/purchase-orders/PurchaseOrderDetail';
 import ReceiveOrderDialog from '@/components/purchase-orders/ReceiveOrderDialog';
 import GenerateFromLowStock from '@/components/purchase-orders/GenerateFromLowStock';
+import SupplierOrderOwnerVerification from '@/components/purchase-orders/SupplierOrderOwnerVerification';
 
 const statusColors = {
   draft: 'bg-muted text-muted-foreground',
   sent: 'bg-blue-100 text-blue-700',
   partial: 'bg-amber-100 text-amber-700',
   received: 'bg-emerald-100 text-emerald-700',
+  approved: 'bg-blue-100 text-blue-700',
+  shipped: 'bg-violet-100 text-violet-700',
   cancelled: 'bg-red-100 text-red-700',
 };
 
 export default function PurchaseOrders() {
   const { t, currency } = useLanguage();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
   const [viewingOrder, setViewingOrder] = useState(null);
   const [receivingOrder, setReceivingOrder] = useState(null);
+  const [verifyingOrderId,setVerifyingOrderId]=useState(null);
   const [showLowStock, setShowLowStock] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(null);
 
@@ -166,6 +172,14 @@ export default function PurchaseOrders() {
                     </Button>
                   )}
 
+                  {/* Supplier marked shipment: only Owner can verify every delivered product. */}
+                  {order.status==='shipped' && order.supplier_id && user?.role==='owner' && (
+                    <Button type="button" size="sm" variant="outline"
+                      className="min-h-11 border-emerald-300 text-emerald-800"
+                      onClick={()=>setVerifyingOrderId(v=>v===order.id?null:order.id)}>
+                      <PackageCheck className="me-1 size-4"/>Verify delivered products
+                    </Button>
+                  )}
                   {/* Receive — opens partial receipt dialog */}
                   {canReceive && (
                     <Button
@@ -182,6 +196,9 @@ export default function PurchaseOrders() {
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
+                {verifyingOrderId===order.id && user?.role==='owner' &&
+                  <SupplierOrderOwnerVerification order={order} onCancel={()=>setVerifyingOrderId(null)}
+                    onConfirmed={()=>{setVerifyingOrderId(null);queryClient.invalidateQueries({queryKey:['purchase_orders']});}}/>}
               </Card>
             );
           })}
