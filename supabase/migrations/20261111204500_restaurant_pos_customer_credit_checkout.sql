@@ -129,10 +129,10 @@ begin
      RAISE EXCEPTION 'CUSTOMER_CREDIT_POS_RECEIVABLE_MISSING';
     END IF;
     SELECT coalesce(jsonb_agg(jsonb_build_object(
-     'product_id',line->>'product_id','name',line->>'name','name_ar',line->>'name_ar',
-     'name_fa',line->>'name_fa','quantity',(line->>'quantity')::numeric,
-     'unit_price',(line->>'unit_price')::numeric,'total_price',(line->>'line_total')::numeric
-    )),'[]'::jsonb) INTO v_invoice_items FROM jsonb_array_elements(o.lines) line;
+     'product_id',item_line->>'product_id','name',item_line->>'name','name_ar',item_line->>'name_ar',
+     'name_fa',item_line->>'name_fa','quantity',(item_line->>'quantity')::numeric,
+     'unit_price',(item_line->>'unit_price')::numeric,'total_price',(item_line->>'line_total')::numeric
+    )),'[]'::jsonb) INTO v_invoice_items FROM jsonb_array_elements(o.lines) item_line;
     PERFORM customer_portal_private.store_credit_invoice_lines(
      (v_credit_result->'debt'->>'id')::uuid,d.restaurant_id,d.branch_id,
      v_credit_customer.id,'restaurant_pos',o.id,v_invoice_items);
