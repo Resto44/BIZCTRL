@@ -17,7 +17,8 @@ describe('Sales Closing POS credit product catalog RPC',()=>{
   const rows=[{id:'menu-a',name:'Food',price:24,product_id:'product-a'}];
   mock.rpc.mockResolvedValueOnce({data:rows,error:null});
   await expect(customerCreditPOSMenuRpc(args)).resolves.toEqual(rows);
-  expect(mock.rpc).toHaveBeenCalledExactlyOnceWith('erp_customer_credit_pos_items',args);
+  expect(mock.rpc).toHaveBeenCalledTimes(1);
+  expect(mock.rpc).toHaveBeenCalledWith('erp_customer_credit_pos_items',args);
   expect(mock.rpc).not.toHaveBeenCalledWith('erp_restaurant_customer_credit_pos_items',expect.anything());
  });
  it('retains the existing restaurant cashier prefix for normal POS commands',async()=>{
