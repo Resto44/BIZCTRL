@@ -126,15 +126,18 @@ BEGIN
    WHERE m.restaurant_id=tenant AND m.status='approved'
      AND m.role IN ('owner','manager','employee','supplier','driver')
      AND (role_target='all' OR m.role=role_target)
-     AND (branch IS NULL OR m.role='owner' OR m.branch_id IS NULL OR
-       m.branch_id=branch OR branch=ANY(coalesce(m.selected_branch_ids,ARRAY[]::uuid[])))
+     AND (branch IS NULL OR m.role='owner' OR m.branch_id=branch
+       OR branch=ANY(coalesce(m.selected_branch_ids,ARRAY[]::uuid[]))
+       OR (m.branch_id IS NULL AND cardinality(coalesce(m.selected_branch_ids,ARRAY[]::uuid[]))=0))
   LOOP
    PERFORM push_private.portal_enqueue(tenant,target_user.user_id,target_user.role,NULL,branch,
       'notice',TG_TABLE_NAME,NEW.id,'created');
   END LOOP;
 
  ELSIF TG_TABLE_NAME='orders' THEN
-  IF TG_OP='UPDATE' AND OLD.status IS NOT DISTINCT FROM NEW.status THEN RETURN NEW; END IF;
+  IF TG_OP='UPDATE' THEN
+    IF OLD.status IS NOT DISTINCT FROM NEW.status THEN RETURN NEW; END IF;
+   END IF;
   IF NEW.customer_id IS NOT NULL THEN
    FOR target_user IN SELECT a.user_id,a.customer_id FROM public.customer_portal_access a
     JOIN public.customers c ON c.id=a.customer_id
@@ -153,13 +156,16 @@ BEGIN
   END IF;
   FOR target_user IN SELECT m.user_id FROM public.erp_memberships m
    WHERE m.restaurant_id=tenant AND m.status='approved' AND m.role='manager'
-    AND (branch IS NULL OR m.branch_id IS NULL OR m.branch_id=branch
-      OR branch=ANY(coalesce(m.selected_branch_ids,ARRAY[]::uuid[])))
+    AND (branch IS NULL OR m.branch_id=branch
+      OR branch=ANY(coalesce(m.selected_branch_ids,ARRAY[]::uuid[]))
+      OR (m.branch_id IS NULL AND cardinality(coalesce(m.selected_branch_ids,ARRAY[]::uuid[]))=0))
   LOOP PERFORM push_private.portal_enqueue(tenant,target_user.user_id,'manager',NULL,branch,
       'order',TG_TABLE_NAME,NEW.id,source_state); END LOOP;
 
  ELSIF TG_TABLE_NAME='supplier_invoices' THEN
-  IF TG_OP='UPDATE' AND OLD.status IS NOT DISTINCT FROM NEW.status THEN RETURN NEW; END IF;
+  IF TG_OP='UPDATE' THEN
+    IF OLD.status IS NOT DISTINCT FROM NEW.status THEN RETURN NEW; END IF;
+   END IF;
   FOR target_user IN SELECT m.user_id FROM public.erp_memberships m
    WHERE m.restaurant_id=tenant AND m.status='approved' AND m.role='supplier'
      AND m.linked_entity_id=NEW.supplier_id
@@ -167,9 +173,11 @@ BEGIN
      'invoice',TG_TABLE_NAME,NEW.id,source_state); END LOOP;
 
  ELSIF TG_TABLE_NAME='attendance_shift_sessions' THEN
-  IF TG_OP='UPDATE' AND OLD.checked_in_at IS NOT DISTINCT FROM NEW.checked_in_at
-   AND OLD.checked_out_at IS NOT DISTINCT FROM NEW.checked_out_at
-   AND OLD.shift_start IS NOT DISTINCT FROM NEW.shift_start THEN RETURN NEW; END IF;
+  IF TG_OP='UPDATE' THEN
+   IF OLD.checked_in_at IS NOT DISTINCT FROM NEW.checked_in_at
+    AND OLD.checked_out_at IS NOT DISTINCT FROM NEW.checked_out_at
+    AND OLD.shift_start IS NOT DISTINCT FROM NEW.shift_start THEN RETURN NEW; END IF;
+  END IF;
   source_state:=CASE WHEN NEW.checked_out_at IS NOT NULL THEN 'checkout'
     WHEN NEW.checked_in_at IS NOT NULL THEN 'checkin' ELSE 'assigned' END;
   FOR target_user IN SELECT m.user_id FROM public.erp_memberships m
@@ -179,7 +187,9 @@ BEGIN
      'shift',TG_TABLE_NAME,NEW.id,source_state); END LOOP;
 
  ELSIF TG_TABLE_NAME='driver_requests' THEN
-  IF TG_OP='UPDATE' AND OLD.status IS NOT DISTINCT FROM NEW.status THEN RETURN NEW; END IF;
+  IF TG_OP='UPDATE' THEN
+    IF OLD.status IS NOT DISTINCT FROM NEW.status THEN RETURN NEW; END IF;
+   END IF;
   FOR target_user IN SELECT m.user_id FROM public.erp_memberships m
    WHERE m.restaurant_id=tenant AND m.status='approved' AND m.role='driver'
     AND m.linked_entity_id=NEW.driver_id
@@ -188,7 +198,9 @@ BEGIN
 
  ELSIF TG_TABLE_NAME='debt_records' THEN
   IF NEW.customer_id IS NULL OR NEW.type<>'receivable' OR NEW.party_type<>'customer' THEN RETURN NEW; END IF;
-  IF TG_OP='UPDATE' AND OLD.status IS NOT DISTINCT FROM NEW.status THEN RETURN NEW; END IF;
+  IF TG_OP='UPDATE' THEN
+    IF OLD.status IS NOT DISTINCT FROM NEW.status THEN RETURN NEW; END IF;
+   END IF;
   FOR target_user IN SELECT a.user_id,a.customer_id FROM public.customer_portal_access a
    JOIN public.customers c ON c.id=a.customer_id
    WHERE a.active AND a.user_id IS NOT NULL AND c.is_active AND c.id=NEW.customer_id
