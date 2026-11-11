@@ -107,10 +107,10 @@ export default function CustomerPortal() {
   {timeZone:'Asia/Riyadh',year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}
  ) : '—';
  return <main data-i18n-skip="true" dir={lang==='en'?'ltr':'rtl'} className="min-h-screen w-full max-w-full min-w-0 overflow-x-clip bg-slate-50 text-slate-900">
-  <div className="mx-auto w-full min-w-0 max-w-6xl space-y-5 overflow-x-clip p-3 sm:p-6">
-   <header className="flex min-w-0 flex-wrap items-center justify-between gap-4 border-b pb-5">
-    <div className="min-w-0 max-w-full break-words"><p className="text-sm font-bold text-teal-700">BizControl</p><h1 className="text-2xl font-black">{t.title}</h1><p className="text-sm text-slate-600">{t.subtitle}</p></div>
-    <div className="flex flex-wrap gap-2 print:hidden"><select aria-label="Language" className="rounded-lg border bg-white p-2" value={lang} onChange={e=>setLang(e.target.value)}><option value="fa">فارسی</option><option value="ar">العربية</option><option value="en">English</option></select>
+  <div className="mx-auto w-full min-w-0 max-w-6xl space-y-3 overflow-x-clip px-3 pb-4 pt-1 sm:space-y-5 sm:p-6">
+   <header className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b pb-3 sm:gap-4 sm:pb-5">
+    <div className="min-w-0 max-w-full break-words"><p className="text-sm font-bold text-teal-700">BizControl</p><h1 className="text-2xl font-black leading-tight">{t.title}</h1><p className="text-sm leading-snug text-slate-600">{t.subtitle}</p></div>
+    <div className="flex flex-wrap items-center gap-2 print:hidden"><select aria-label="Language" className="min-h-11 rounded-lg border bg-white px-2 py-1" value={lang} onChange={e=>setLang(e.target.value)}><option value="fa">فارسی</option><option value="ar">العربية</option><option value="en">English</option></select>
     {session&&<Button variant="outline" disabled={busy} onClick={signOutForInvitation}>{t.signout}</Button>}</div>
    </header>
    {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{error}</p>}
@@ -140,8 +140,8 @@ export default function CustomerPortal() {
      </div>
     </>}
     {accounts.isPending?<p role="status">{t.loading}</p>:accounts.isError?<div role="alert">{t.error} <Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></div>:!account?<p>{t.empty}</p>:<>
-     <section className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
-      <label className="block w-full min-w-0 max-w-full text-sm font-semibold sm:max-w-xl">{t.account}<select aria-label={t.account} title={customerAccountDisplayLabel(account)} className="mt-2 block box-border w-full min-w-0 max-w-full truncate rounded-lg border bg-white p-3 text-base" value={account.id} onChange={e=>{setSelected(e.target.value);setPage(0);}}>{accounts.data.map(a=><option key={a.id} value={a.id}>{customerAccountDisplayLabel(a)}</option>)}</select></label>
+     <section className="flex w-full min-w-0 flex-wrap items-center justify-between gap-2">
+      <label className="block w-full min-w-0 max-w-full text-sm font-semibold sm:max-w-xl">{t.account}<select aria-label={t.account} title={customerAccountDisplayLabel(account)} className="mt-1 block box-border min-h-11 w-full min-w-0 max-w-full truncate rounded-lg border bg-white px-3 py-2 text-base" value={account.id} onChange={e=>{setSelected(e.target.value);setPage(0);}}>{accounts.data.map(a=><option key={a.id} value={a.id}>{customerAccountDisplayLabel(a)}</option>)}</select></label>
       <div className="flex w-full min-w-0 flex-wrap gap-2 print:hidden sm:w-auto"><Button variant="outline" onClick={refreshDashboard}>{t.refresh}</Button><Button disabled={!data} onClick={()=>window.print()}>{t.print}</Button></div>
      </section>
      <CustomerIdentityCard key={account.id} account={account} lang={lang}/>
