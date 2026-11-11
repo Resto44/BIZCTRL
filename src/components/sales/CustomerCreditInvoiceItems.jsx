@@ -11,7 +11,7 @@ export const isItemizedCustomerCreditValid = (items, amount) => {
   const qty=Number(line.quantity),unit=Number(line.unit_price);
   if (!String(line.name||'').trim()||String(line.name).length>160||!Number.isFinite(qty)||
       !Number.isFinite(unit)||qty<=0||qty>1000||unit<0||unit>1000000||
-      Math.round(unit*100)!==unit*100) return false;
+      Math.abs(Math.round(unit*100)-unit*100)>1e-6) return false;
   const cents=Math.round(qty*unit*100);
   if (!Number.isSafeInteger(cents)||cents<0) return false;
   totalCents+=cents;
