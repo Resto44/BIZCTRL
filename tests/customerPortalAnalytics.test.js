@@ -23,7 +23,7 @@ describe('Customer ERP analytics / isolation and responsive dashboard',()=>{
   for(const name of ['AreaChart','BarChart','PieChart','paymentMethods','noData','fail','coverage','history'])expect(c).toContain(name);
   expect(c).toContain('records===0');
   expect(c).toContain("query.isError");
-  expect(c).toContain("grid grid-cols-1 gap-3 sm:grid-cols-3");
+  expect(c).toContain("grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3");
   expect(c).toContain('min-w-0 max-w-full');
   expect(c).toContain("lang==='ar'");
   expect(c).toContain('تحليلات حساب العميل');
@@ -56,8 +56,17 @@ describe('Customer ERP analytics / isolation and responsive dashboard',()=>{
  });
  it('does not overlap iPhone date filters',async()=>{
   const page=await readFile(pagePath,'utf8');
-  expect(page).toContain('grid grid-cols-1 items-end gap-3');
+  expect(page).toContain('grid min-w-0 grid-cols-1 items-end gap-3');
   expect(page).toContain('mt-1 w-full min-w-0 max-w-full');
-  expect(page).toContain('overflow-x-auto pb-2');
+  expect(page).toContain('grid min-w-0 grid-cols-1 gap-2 print:hidden');
+  expect(page).toContain('max-w-full truncate rounded-lg');
+  expect(page).toContain('overflow-x-clip');
+  expect(page).not.toContain('overflow-x-auto');
+  const analytics = await readFile(componentPath,'utf8');
+  expect(analytics).toContain('grid min-w-0 grid-cols-2 gap-2');
+  expect(analytics).toContain('sm:flex sm:flex-wrap');
+  expect(analytics).toContain('minWidth={0}');
+  expect(analytics).toContain('max-w-full overflow-hidden');
+  expect(analytics).not.toContain('overflow-x-auto');
  });
 });

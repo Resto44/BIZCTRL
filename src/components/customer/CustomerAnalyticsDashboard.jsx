@@ -57,12 +57,12 @@ const amount = (value,lang) => Number(value||0).toLocaleString(localeFor(lang),{
 const shortDate = date => String(date||'').slice(5,10).replace('-','/');
 
 const StatCard = ({ title, value, count, currency, Icon, lang, color }) =>
- <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm min-w-0 sm:p-5">
-  <div className="flex items-center justify-between gap-2">
-   <span className="text-xs font-semibold leading-5 text-slate-500 sm:text-sm">{title}</span>
+ <article className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+   <span className="min-w-0 break-words text-xs font-semibold leading-5 text-slate-500 sm:text-sm">{title}</span>
    <span className="rounded-xl bg-slate-100 p-2"><Icon size={18} color={color} aria-hidden="true"/></span>
   </div>
-  <p className="mt-3 break-words text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl" dir="ltr">
+  <p className="mt-3 max-w-full break-all text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl" dir="ltr">
    {amount(value,lang)} <span className="text-xs font-semibold text-slate-500">{currency}</span>
   </p>
   <p className="mt-1 text-xs text-slate-500">{count} {WORDS[lang]?.count||WORDS.en.count}</p>
@@ -111,20 +111,20 @@ export default function CustomerAnalyticsDashboard({ account, lang='en' }) {
   setDateError('');
   setApplied(custom);
  };
- return <section data-i18n-skip="true" aria-label={t.heading} className="space-y-4 rounded-3xl border border-slate-200 bg-slate-100/80 p-3 sm:p-5">
-  <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-   <div>
-    <div className="flex items-center gap-2"><Activity className="text-teal-700" size={20} aria-hidden="true"/><h2 className="text-xl font-black text-slate-950">{t.heading}</h2></div>
+ return <section data-i18n-skip="true" aria-label={t.heading} className="w-full min-w-0 max-w-full space-y-4 overflow-x-clip rounded-3xl border border-slate-200 bg-slate-100/80 p-3 sm:p-5">
+  <div className="flex min-w-0 flex-col justify-between gap-2 sm:flex-row sm:items-center">
+   <div className="min-w-0 max-w-full">
+    <div className="flex min-w-0 items-center gap-2"><Activity className="text-teal-700" size={20} aria-hidden="true"/><h2 className="min-w-0 break-words text-xl font-black text-slate-950">{t.heading}</h2></div>
     <p className="mt-1 text-sm text-slate-500">{t.subheading}</p>
    </div>
-   <p className="inline-flex items-center gap-1 self-start rounded-full bg-white px-3 py-1 text-xs text-slate-600"><CalendarDays size={14} aria-hidden="true"/>{t.scope}</p>
+   <p className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-1 self-start rounded-full bg-white px-3 py-1 text-xs text-slate-600"><CalendarDays size={14} aria-hidden="true"/>{t.scope}</p>
   </div>
-  <div className="flex gap-2 overflow-x-auto pb-2 print:hidden" role="group" aria-label={t.period}>
+  <div className="grid min-w-0 grid-cols-2 gap-2 min-[440px]:grid-cols-3 sm:flex sm:flex-wrap print:hidden" role="group" aria-label={t.period}>
    {PERIODS.map(key=><Button key={key} type="button" size="sm" variant={effectivePeriod===key?'default':'outline'}
-    aria-pressed={effectivePeriod===key} onClick={()=>updatePeriod(key)} className="shrink-0 whitespace-nowrap rounded-xl">
+    aria-pressed={effectivePeriod===key} onClick={()=>updatePeriod(key)} className="h-auto min-h-9 w-full min-w-0 whitespace-normal break-words rounded-xl px-2 py-2 leading-tight sm:w-auto">
     {t[key]}</Button>)}
   </div>
-  {effectivePeriod==='custom'&&<form onSubmit={applyCustom} className="grid grid-cols-1 gap-3 rounded-xl border bg-white p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end print:hidden">
+  {effectivePeriod==='custom'&&<form onSubmit={applyCustom} className="grid min-w-0 grid-cols-1 gap-3 rounded-xl border bg-white p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end print:hidden">
     <label className="block min-w-0 text-sm font-semibold">{t.from}
      <Input aria-label={t.from} type="date" className="mt-1 w-full min-w-0 max-w-full" max={custom.to||maxDate} value={custom.from} onChange={e=>setCustom(s=>({...s,from:e.target.value}))} required/>
     </label>
@@ -140,22 +140,22 @@ export default function CustomerAnalyticsDashboard({ account, lang='en' }) {
     <p className="text-sm text-red-800">{t.fail}</p>
     <Button className="mt-2" variant="outline" onClick={()=>query.refetch()}>{t.refresh}</Button>
    </div>:
-   result&&<div className="space-y-4">
+   result&&<div className="min-w-0 max-w-full space-y-4">
      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
       <span>{result.start} — {result.end}</span>
       <span>{t.granularity}: {result.grain==='month'?t.monthGrain:t.dayGrain}</span>
      </div>
-     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+     <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
       <StatCard title={t.invoices} value={totals?.invoices} count={totals?.invoice_count||0} currency={currency} Icon={FileText} lang={lang} color="#0f766e"/>
       <StatCard title={t.receipts} value={totals?.payments} count={totals?.payment_count||0} currency={currency} Icon={CreditCard} lang={lang} color="#2563eb"/>
       <StatCard title={t.orders} value={totals?.orders} count={totals?.order_count||0} currency={currency} Icon={ShoppingBag} lang={lang} color="#7c3aed"/>
      </div>
      {records===0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">{t.noData}</div> :
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-       <article className="min-w-0 rounded-2xl border bg-white p-3 sm:p-5">
+      <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
+       <article className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-3 sm:p-5">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold"><TrendingUp size={17} aria-hidden="true"/>{t.trend}</h3>
-        <div className="h-60 w-full min-w-0 sm:h-72" role="img" aria-label={t.trend}>
-         <ResponsiveContainer width="100%" height="100%">
+        <div className="h-60 w-full min-w-0 max-w-full overflow-hidden sm:h-72" role="img" aria-label={t.trend}>
+         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <AreaChart data={series} margin={{top:8,right:12,left:-18,bottom:2}}>
            <defs><linearGradient id="customerInvoiceArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#0f766e" stopOpacity={.22}/><stop offset="100%" stopColor="#0f766e" stopOpacity={0}/></linearGradient></defs>
            <CartesianGrid vertical={false} strokeDasharray="3 4" stroke="#e2e8f0"/>
@@ -170,10 +170,10 @@ export default function CustomerAnalyticsDashboard({ account, lang='en' }) {
          </ResponsiveContainer>
         </div>
        </article>
-       <article className="min-w-0 rounded-2xl border bg-white p-3 sm:p-5">
+       <article className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-3 sm:p-5">
         <h3 className="mb-3 text-sm font-bold">{t.compare}</h3>
-        <div className="h-60 w-full min-w-0 sm:h-72" role="img" aria-label={t.compare}>
-         <ResponsiveContainer width="100%" height="100%">
+        <div className="h-60 w-full min-w-0 max-w-full overflow-hidden sm:h-72" role="img" aria-label={t.compare}>
+         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart data={series} margin={{top:8,right:12,left:-18,bottom:2}}>
            <CartesianGrid vertical={false} strokeDasharray="3 4" stroke="#e2e8f0"/>
            <XAxis dataKey="label" tick={{fontSize:10}} minTickGap={15} axisLine={false} tickLine={false}/>
@@ -187,12 +187,12 @@ export default function CustomerAnalyticsDashboard({ account, lang='en' }) {
         </div>
        </article>
       </div>}
-     <article className="rounded-2xl border bg-white p-4 sm:p-5">
+     <article className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
       <h3 className="text-sm font-bold">{t.paymentMethods}</h3>
       {methods.length===0 ? <p className="mt-3 text-sm text-slate-500">{t.notAvailable}</p>:
-       <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,190px)_1fr] sm:items-center">
-        <div className="h-36 w-full" role="img" aria-label={t.paymentMethods}>
-         <ResponsiveContainer width="100%" height="100%">
+       <div className="mt-3 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,190px)_minmax(0,1fr)] sm:items-center">
+        <div className="h-36 w-full min-w-0 max-w-full overflow-hidden" role="img" aria-label={t.paymentMethods}>
+         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <PieChart><Pie data={methods} cx="50%" cy="50%" innerRadius={38} outerRadius={62} dataKey="value" nameKey="name" isAnimationActive={false}>
            {methods.map((m,i)=><Cell key={m.name} fill={COLORS[i%COLORS.length]}/>)}
           </Pie><Tooltip formatter={v=>amount(v,lang)+' '+currency}/></PieChart>
@@ -203,7 +203,7 @@ export default function CustomerAnalyticsDashboard({ account, lang='en' }) {
           const total=methods.reduce((s,x)=>s+x.value,0);
           const pct=total>0?Math.max(0,Math.min(100,m.value/total*100)):0;
           return <div key={m.name} className="space-y-1 text-xs">
-           <div className="flex items-center justify-between gap-2"><span className="break-all font-semibold text-slate-700">{m.name} · {m.count} {t.count}</span><span className="shrink-0 font-semibold tabular-nums">{amount(m.value,lang)} {currency}</span></div>
+           <div className="flex min-w-0 flex-wrap items-center justify-between gap-2"><span className="break-all font-semibold text-slate-700">{m.name} · {m.count} {t.count}</span><span className="max-w-full break-all font-semibold tabular-nums">{amount(m.value,lang)} {currency}</span></div>
            <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full" style={{width:pct+'%',backgroundColor:COLORS[i%COLORS.length]}}/></div>
           </div>;
          })}

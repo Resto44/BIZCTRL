@@ -77,10 +77,10 @@ export default function CustomerPortal() {
   if(error)throw error;
   setNotice(t.confirmationRequested);
  });}
- return <main data-i18n-skip="true" dir={lang==='en'?'ltr':'rtl'} className="min-h-screen bg-slate-50 text-slate-900">
-  <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
-   <header className="flex flex-wrap items-center justify-between gap-4 border-b pb-5">
-    <div><p className="text-sm font-bold text-teal-700">BizControl</p><h1 className="text-2xl font-black">{t.title}</h1><p className="text-sm text-slate-600">{t.subtitle}</p></div>
+ return <main data-i18n-skip="true" dir={lang==='en'?'ltr':'rtl'} className="min-h-screen w-full max-w-full min-w-0 overflow-x-clip bg-slate-50 text-slate-900">
+  <div className="mx-auto w-full min-w-0 max-w-6xl space-y-5 overflow-x-clip p-3 sm:p-6">
+   <header className="flex min-w-0 flex-wrap items-center justify-between gap-4 border-b pb-5">
+    <div className="min-w-0 max-w-full break-words"><p className="text-sm font-bold text-teal-700">BizControl</p><h1 className="text-2xl font-black">{t.title}</h1><p className="text-sm text-slate-600">{t.subtitle}</p></div>
     <div className="flex flex-wrap gap-2 print:hidden"><select aria-label="Language" className="rounded-lg border bg-white p-2" value={lang} onChange={e=>setLang(e.target.value)}><option value="fa">فارسی</option><option value="ar">العربية</option><option value="en">English</option></select>
     {session&&<Button variant="outline" disabled={busy} onClick={signOutForInvitation}>{t.signout}</Button>}</div>
    </header>
@@ -102,19 +102,19 @@ export default function CustomerPortal() {
      </div>
     </>}
     {accounts.isPending?<p role="status">{t.loading}</p>:accounts.isError?<div role="alert">{t.error} <Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></div>:!account?<p>{t.empty}</p>:<>
-     <section className="flex flex-wrap items-center justify-between gap-3">
-      <label className="block w-full min-w-0 text-sm font-semibold sm:max-w-xl">{t.account}<select className="mt-2 block w-full min-w-0 rounded-lg border bg-white p-3 text-base" value={account.id} onChange={e=>{setSelected(e.target.value);setPage(0);}}>{accounts.data.map(a=><option key={a.id} value={a.id}>{a.business} · {a.name} · {a.branch}</option>)}</select></label>
-      <div className="flex flex-wrap gap-2 print:hidden"><Button variant="outline" onClick={()=>{accounts.refetch();statement.refetch();}}>{t.refresh}</Button><Button disabled={!data} onClick={()=>window.print()}>{t.print}</Button></div>
+     <section className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
+      <label className="block w-full min-w-0 max-w-full text-sm font-semibold sm:max-w-xl">{t.account}<select aria-label={t.account} title={`${account.business} · ${account.name} · ${account.branch||""}`} className="mt-2 block box-border w-full min-w-0 max-w-full truncate rounded-lg border bg-white p-3 text-base" value={account.id} onChange={e=>{setSelected(e.target.value);setPage(0);}}>{accounts.data.map(a=><option key={a.id} value={a.id}>{a.business} · {a.name} · {a.branch}</option>)}</select></label>
+      <div className="flex w-full min-w-0 flex-wrap gap-2 print:hidden sm:w-auto"><Button variant="outline" onClick={()=>{accounts.refetch();statement.refetch();}}>{t.refresh}</Button><Button disabled={!data} onClick={()=>window.print()}>{t.print}</Button></div>
      </section>
      <Suspense fallback={<p role="status" className="rounded-xl border bg-white p-4 text-sm text-slate-500">{t.loading}</p>}>
       <CustomerAnalyticsDashboard key={account.id} account={account} lang={lang}/>
      </Suspense>
      {statement.isError?<p role="alert" className="rounded-lg bg-red-50 p-4">{t.error}</p>:statement.isPending?<p role="status">{t.loading}</p>:data&&<>
       <p className="text-sm text-slate-600">{t.allTime} · {new Date(data.as_of).toLocaleString()}</p>
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">{['total','paid','balance','overdue'].map(key=><article key={key} className="min-w-0 rounded-2xl border bg-white p-4 shadow-sm"><h2 className="text-sm text-slate-600">{t[key]}</h2><p className={`mt-2 break-words text-xl font-black ${key==='overdue'?'text-rose-700':'text-teal-800'}`}>{money(data.totals[key])}</p></article>)}</section>
+      <section className="grid min-w-0 grid-cols-1 gap-3 min-[380px]:grid-cols-2 lg:grid-cols-4">{['total','paid','balance','overdue'].map(key=><article key={key} className="min-w-0 rounded-2xl border bg-white p-4 shadow-sm"><h2 className="text-sm text-slate-600">{t[key]}</h2><p className={`mt-2 break-words text-xl font-black ${key==='overdue'?'text-rose-700':'text-teal-800'}`}>{money(data.totals[key])}</p></article>)}</section>
      </>}
-     <nav className="flex gap-2 overflow-x-auto pb-2 print:hidden">{['invoices','payments','orders'].map(k=><Button key={k} variant={kind===k?'default':'outline'} aria-pressed={kind===k} className="shrink-0 whitespace-nowrap" onClick={()=>{setKind(k);setPage(0);}}>{t[k==='orders'?'purchases':k]}</Button>)}</nav>
-     <form className="grid grid-cols-1 items-end gap-3 print:hidden sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={e=>{e.preventDefault();setDates({from,to});setPage(0);}}>
+     <nav className="grid min-w-0 grid-cols-1 gap-2 print:hidden min-[390px]:grid-cols-2 sm:flex sm:flex-wrap">{['invoices','payments','orders'].map(k=><Button key={k} variant={kind===k?'default':'outline'} aria-pressed={kind===k} className="min-w-0 w-full whitespace-normal text-center sm:w-auto" onClick={()=>{setKind(k);setPage(0);}}>{t[k==='orders'?'purchases':k]}</Button>)}</nav>
+     <form className="grid min-w-0 grid-cols-1 items-end gap-3 print:hidden sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={e=>{e.preventDefault();setDates({from,to});setPage(0);}}>
       <label className="block min-w-0 text-sm font-semibold">{t.from}<Input className="mt-1 w-full min-w-0 max-w-full" type="date" value={from} max={to||undefined} onChange={e=>setFrom(e.target.value)}/></label>
       <label className="block min-w-0 text-sm font-semibold">{t.to}<Input className="mt-1 w-full min-w-0 max-w-full" type="date" value={to} min={from||undefined} onChange={e=>setTo(e.target.value)}/></label>
       <Button variant="outline" className="w-full sm:w-auto">{t.filter}</Button>
@@ -123,15 +123,15 @@ export default function CustomerPortal() {
       <h2 className="font-bold">{t[kind==='orders'?'purchases':kind]} · {data.count}</h2>
       {(dates.from||dates.to)&&<p>{dates.from||'…'} — {dates.to||'…'}</p>}
       {!data.rows.length&&<p className="rounded-xl border bg-white p-6">{t.noRecords}</p>}
-      {data.rows.map(row=><article key={row.id} className="rounded-xl border bg-white p-4 shadow-sm break-inside-avoid">
-       <div className="flex flex-wrap justify-between gap-3"><div><strong>{t.reference}: {row.reference||'—'}</strong><p className="text-sm text-slate-500">{String(row.date||'').slice(0,10)}</p></div><strong className="text-lg">{money(row.amount)}</strong></div>
+      {data.rows.map(row=><article key={row.id} className="min-w-0 max-w-full rounded-xl border bg-white p-4 shadow-sm break-inside-avoid">
+       <div className="flex min-w-0 flex-wrap justify-between gap-3"><div className="min-w-0 max-w-full break-words"><strong className="break-all">{t.reference}: {row.reference||'—'}</strong><p className="text-sm text-slate-500">{String(row.date||'').slice(0,10)}</p></div><strong className="text-lg">{money(row.amount)}</strong></div>
        <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-teal-700">{t.details}</summary><dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
         {kind==='invoices'?<><div><dt>{t.paid}</dt><dd>{money(row.paid_amount)}</dd></div><div><dt>{t.remaining}</dt><dd>{money(row.remaining_amount)}</dd></div><div><dt>{t.due}</dt><dd>{row.due_date||'—'}</dd></div></>:null}
         {kind==='payments'?<><div><dt>{t.method}</dt><dd>{portalStatus(row.payment_method,lang)}</dd></div><div><dt>{t.reference}</dt><dd>{row.invoice_number||'—'}</dd></div></>:<div><dt>{t.status}</dt><dd>{portalStatus(row.status,lang)}</dd></div>}
         </dl>{row.items?.map((item,index)=><p className="mt-2 rounded-lg bg-slate-50 p-2 text-sm" key={item.id}>{index+1}. {item['name_'+lang]||item.name||'—'} · {t.quantity}: {item.quantity} · {t.price}: {money(item.unit_price)} · {money(item.total_price)}</p>)}
        </details>
       </article>)}
-      <div className="flex items-center justify-center gap-3 print:hidden"><Button variant="outline" disabled={page===0} onClick={()=>setPage(p=>p-1)}>{t.previous}</Button><span>{page+1} / {Math.max(1,Math.ceil(data.count/25))}</span><Button variant="outline" disabled={(page+1)*25>=data.count} onClick={()=>setPage(p=>p+1)}>{t.next}</Button></div>
+      <div className="flex min-w-0 flex-wrap items-center justify-center gap-3 print:hidden"><Button variant="outline" disabled={page===0} onClick={()=>setPage(p=>p-1)}>{t.previous}</Button><span>{page+1} / {Math.max(1,Math.ceil(data.count/25))}</span><Button variant="outline" disabled={(page+1)*25>=data.count} onClick={()=>setPage(p=>p+1)}>{t.next}</Button></div>
       <p className="text-xs text-slate-500">{t.notice}</p>
      </section>}
     </>}
