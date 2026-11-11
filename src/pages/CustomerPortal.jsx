@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
+import { customerAccountDisplayLabel } from '@/lib/customerAccountDisplay';
 const CustomerAnalyticsDashboard = lazy(() => import('@/components/customer/CustomerAnalyticsDashboard'));
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
@@ -103,7 +104,7 @@ export default function CustomerPortal() {
     </>}
     {accounts.isPending?<p role="status">{t.loading}</p>:accounts.isError?<div role="alert">{t.error} <Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></div>:!account?<p>{t.empty}</p>:<>
      <section className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
-      <label className="block w-full min-w-0 max-w-full text-sm font-semibold sm:max-w-xl">{t.account}<select aria-label={t.account} title={`${account.business} · ${account.name} · ${account.branch||""}`} className="mt-2 block box-border w-full min-w-0 max-w-full truncate rounded-lg border bg-white p-3 text-base" value={account.id} onChange={e=>{setSelected(e.target.value);setPage(0);}}>{accounts.data.map(a=><option key={a.id} value={a.id}>{a.business} · {a.name} · {a.branch}</option>)}</select></label>
+      <label className="block w-full min-w-0 max-w-full text-sm font-semibold sm:max-w-xl">{t.account}<select aria-label={t.account} title={customerAccountDisplayLabel(account)} className="mt-2 block box-border w-full min-w-0 max-w-full truncate rounded-lg border bg-white p-3 text-base" value={account.id} onChange={e=>{setSelected(e.target.value);setPage(0);}}>{accounts.data.map(a=><option key={a.id} value={a.id}>{customerAccountDisplayLabel(a)}</option>)}</select></label>
       <div className="flex w-full min-w-0 flex-wrap gap-2 print:hidden sm:w-auto"><Button variant="outline" onClick={()=>{accounts.refetch();statement.refetch();}}>{t.refresh}</Button><Button disabled={!data} onClick={()=>window.print()}>{t.print}</Button></div>
      </section>
      <Suspense fallback={<p role="status" className="rounded-xl border bg-white p-4 text-sm text-slate-500">{t.loading}</p>}>
