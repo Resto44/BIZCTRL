@@ -122,12 +122,9 @@ begin
    values(d.restaurant_id::text,d.restaurant_id::text,d.branch_id,b.branch_key,(now() at time zone 'Asia/Riyadh')::date,(now() at time zone 'Asia/Riyadh')::date,cash,card,cash,card,CASE WHEN v_credit_mode THEN o.net_total ELSE 0 END,CASE WHEN v_credit_mode THEN v_credit_customer.id ELSE NULL END,
     actor_name,s.cashier_name,'POS:'||s.id,'restaurant-pos:'||o.id,true,'finalized','Restaurant POS #'||o.number||' · '||d.code) returning id into sale_id;
    IF v_credit_mode THEN
-    v_credit_result:=public.erp_create_customer_receivable(jsonb_build_object(
-     'customer_id',v_credit_customer.id,'branch_id',d.branch_id,'branch',b.branch_key,
-     'total_amount',o.net_total,'paid_amount',0,'date',(now() at time zone 'Asia/Riyadh')::date,
-     'invoice_number','R-'||o.number,'description','Restaurant POS customer credit order #'||o.number,
-     'request_id',o.id
-    ));
+    v_credit_result:=jsonb_build_object('debt',jsonb_build_object('id',
+      restaurant_pos_private.post_customer_credit_receivable(
+        d.id,o.id,v_credit_customer.id,o.net_total)));
     IF v_credit_result->'debt'->>'id' IS NULL THEN
      RAISE EXCEPTION 'CUSTOMER_CREDIT_POS_RECEIVABLE_MISSING';
     END IF;
