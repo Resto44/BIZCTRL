@@ -48,7 +48,7 @@ describe('Customer self-service',()=>{
   const spy=vi.spyOn(client,'invalidateQueries');
   await act(async()=>{button('Refresh').props.onClick();await pause();});
   expect(spy).toHaveBeenCalledWith({queryKey:['customer-portal','analytics','customer-a']});
-  expect(mock.rpc).toHaveBeenCalledWith('erp_customer_portal_accounts');
+  expect(mock.rpc).toHaveBeenCalledWith('erp_customer_portal_accounts',{});
   expect(mock.rpc).toHaveBeenCalledWith('erp_customer_portal_statement',expect.objectContaining({p_customer_id:'customer-a'}));
  });
  it('loads only server-authorized account data and sends the selected customer scope',async()=>{await mount();expect(text()).toContain('ALICE-INVOICE');expect(mock.rpc).toHaveBeenCalledWith('erp_customer_portal_statement',expect.objectContaining({p_customer_id:'customer-a',p_kind:'invoices',p_page:0}));
