@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import InvitationDirectory from './InvitationDirectory';
 import WalletJoinInvitation from './WalletJoinInvitation';
+import CustomerApprovalInvitations from './CustomerApprovalInvitations';
 import { cn } from '@/lib/utils';
 
 const STAFF_ROLES = [
@@ -24,6 +25,7 @@ const STAFF_ROLES = [
   { value: 'supplier', label: 'Supplier', short: 'Supplier', description: 'Supplier portal access', icon: Truck, tone: 'emerald' },
   { value: 'driver', label: 'Driver', short: 'Driver', description: 'Own delivery sales and reports', icon: Truck, tone: 'blue' },
   { value: 'wallet', label: 'Wallet user', short: 'Wallet', description: 'Owner-approved personal wallet portal; not a staff role', icon: Wallet, tone: 'emerald' },
+  { value: 'customer', label: 'Customer', short: 'Customer', description: 'Approve customer portal invitation; not an ERP role', icon: UserRound, tone: 'emerald' },
 ];
 
 const ROLE_TONES = {
@@ -120,7 +122,7 @@ export default function OwnerStaffProvisioning() {
 
   const selectedRole = roleMeta(form.role);
   const contact = form.contact.trim();
-  const isFormReady = Boolean(form.role !== 'wallet' && selectedOrganizationId && form.branchId && form.fullName.trim() && contact && form.role);
+  const isFormReady = Boolean(!['wallet','customer'].includes(form.role) && selectedOrganizationId && form.branchId && form.fullName.trim() && contact && form.role);
 
   const loadOrganizations = useCallback(async () => {
     const { data, error } = await supabase.rpc('list_erp_owned_organizations');
@@ -237,6 +239,7 @@ export default function OwnerStaffProvisioning() {
 
   const issueInvitation = async ({ role, branchId, fullName, email, phone }) => {
     if (role === 'wallet') throw new Error('Use the dedicated Wallet join flow; never create a staff invitation for a wallet account.');
+    if (role === 'customer') throw new Error('Use the dedicated Customer portal approval flow; never create a staff invitation for a customer.');
     if (issuanceLock.current) return;
     issuanceLock.current = true;
     try {
@@ -399,12 +402,12 @@ export default function OwnerStaffProvisioning() {
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="flex min-w-0 gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20"><UserPlus className="h-5 w-5" /></span>
-              <div className="min-w-0"><h2 className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Quick user invitation</h2><p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">Choose an ERP staff role or Wallet access, then create a secure invitation link.</p></div>
+              <div className="min-w-0"><h2 className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Quick user invitation</h2><p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">Choose an ERP staff role, Customer access or Wallet, then create a secure invitation link.</p></div>
             </div>
             <Button type="button" size="icon" variant="outline" aria-label="Refresh invitations" onClick={refresh} disabled={loading} className="h-10 w-10 shrink-0 rounded-xl bg-white dark:bg-slate-900"><RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} /></Button>
           </div>
 
-          <form onSubmit={(event) => form.role === 'wallet' ? event.preventDefault() : createInvitation(event)} className="space-y-5">
+          <form onSubmit={(event) => ['wallet','customer'].includes(form.role) ? event.preventDefault() : createInvitation(event)} className="space-y-5">
             <div className="grid min-w-0 gap-2 sm:grid-cols-2">
               <ScopeField icon={Building2} label="Store">
                 <select aria-label="Select invitation store" disabled={submitting || !!actionInvitationId} value={selectedOrganizationId} onChange={(event) => changeOrganization(event.target.value)} className="mt-0.5 h-7 w-full min-w-0 bg-transparent text-sm font-black text-slate-900 outline-none dark:text-white" required>
@@ -437,7 +440,9 @@ export default function OwnerStaffProvisioning() {
 
             {form.role === 'wallet'
               ? <WalletJoinInvitation key={selectedOrganizationId} restaurantId={selectedOrganizationId} organizationName={selectedOrganization?.name} branches={branches} />
-              : <>
+              : form.role === 'customer'
+                ? <CustomerApprovalInvitations key={selectedOrganizationId + ':' + form.branchId} restaurantId={selectedOrganizationId} branchId={form.branchId} organizationName={selectedOrganization?.name} />
+                : <>
             <InvitationDirectory key={`${selectedOrganizationId}:${form.branchId}:${form.role}`} restaurantId={selectedOrganizationId} branchId={form.branchId} role={form.role} busy={submitting || loading || !!actionInvitationId} onSelect={selectExistingPerson} />
 
             <div>
