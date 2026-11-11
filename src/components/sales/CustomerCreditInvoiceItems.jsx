@@ -1,23 +1,8 @@
 import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
+import { isItemizedCustomerCreditValid } from '@/lib/customerCreditInvoiceMath';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-
-export const isItemizedCustomerCreditValid = (items, amount) => {
- if (!Array.isArray(items) || !items.length) return true; // Legacy amount-only entry: clearly labeled as a summary invoice.
- if (items.length > 30) return false;
- let totalCents=0;
- for (const line of items) {
-  const qty=Number(line.quantity),unit=Number(line.unit_price);
-  if (!String(line.name||'').trim()||String(line.name).length>160||!Number.isFinite(qty)||
-      !Number.isFinite(unit)||qty<=0||qty>1000||unit<0||unit>1000000||
-      Math.abs(Math.round(unit*100)-unit*100)>1e-6) return false;
-  const cents=Math.round(qty*unit*100);
-  if (!Number.isSafeInteger(cents)||cents<0) return false;
-  totalCents+=cents;
- }
- return totalCents===Math.round(Number(amount)*100);
-};
 
 export default function CustomerCreditInvoiceItems({entry, onUpdate, disabled=false, currency='SAR',lang='en'}) {
  const t={
@@ -38,7 +23,7 @@ export default function CustomerCreditInvoiceItems({entry, onUpdate, disabled=fa
    <h3 className="text-sm font-bold">{c.title}</h3>
    <Button type="button" variant="outline" size="sm" disabled={disabled||items.length>=30}
     onClick={()=>update([...items,{name:'',quantity:1,unit_price:items.length?0:Number(entry.amount||0),total_price:items.length?0:Number(entry.amount||0)}])}>
-    <Plus className="me-1 size-4"/>{c.add}
+    <span className="me-1 text-lg" aria-hidden="true">＋</span>{c.add}
    </Button>
   </div>
   <p className="text-xs leading-5 text-slate-600">{c.hint}</p>
