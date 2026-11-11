@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
+import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -62,6 +63,17 @@ export default function PurchaseOrders() {
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }) => base44.entities.PurchaseOrder.update(id, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['purchase_orders'] }),
+  });
+
+  const ownerApproveMutation = useMutation({
+    mutationFn: async orderId => {
+      const {data,error}=await supabase.rpc('erp_owner_approve_supplier_order',{p_order_id:orderId});
+      if(error)throw error;
+      if(data?.status!=='approved')throw new Error('Purchase order was not approved');
+      return data;
+    },
+    onSuccess:()=>{toast.success('Purchase order approved for Supplier');queryClient.invalidateQueries({queryKey:['purchase_orders']});},
+    onError:e=>toast.error(e.message||'Owner approval failed'),
   });
 
   const handleSendEmail = async (order) => {
@@ -189,6 +201,16 @@ export default function PurchaseOrders() {
                     </Button>
                   )}
 
+                  {/* Owner approves the original draft/sent PO before Supplier may ship. */}
+                  {user?.role==='owner' && order.supplier_id && order.branch_id &&
+                    ['draft','sent','pending'].includes(order.status) && (
+                    <Button type="button" size="sm" variant="outline"
+                      className="min-h-11 border-blue-300 text-blue-800"
+                      disabled={ownerApproveMutation.isPending}
+                      onClick={()=>ownerApproveMutation.mutate(order.id)}>
+                      <PackageCheck className="me-1 size-4"/>Approve for supplier shipment
+                    </Button>
+                  )}
                   {/* Supplier marked shipment: only Owner can verify every delivered product. */}
                   {order.status==='shipped' && order.supplier_id && user?.role==='owner' && (
                     <Button type="button" size="sm" variant="outline"
