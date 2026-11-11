@@ -20,6 +20,7 @@ import { supabase } from '@/api/supabaseClient';
 import { useRetailCashier } from '@/hooks/useRetailCashier';
 import { subscribeCashierBroadcast } from '@/lib/cashierBroadcast';
 import { money, paymentBreakdown, printCashierReceipt } from '@/lib/retailCashier';
+import POSCreditCustomerPicker from '@/components/restaurant-pos/POSCreditCustomerPicker';
 import { isRestaurantPOSPortal, restaurantRpc, restaurantProductName as nameOf, restaurantBusinessDate, kitchenNextState, parseRecipeRows } from '@/lib/restaurantPOS';
 import { restaurantProductCopy } from '@/lib/restaurantProducts';
 import { restaurantCopy } from '@/components/restaurant-pos/copy';
@@ -69,26 +70,49 @@ export function Setup({tenant,branch,c,close,refresh,initial=null,menuOnly=false
  </DialogContent></Dialog>;
 }
 
-export function ActionDialog({kind,api,c,close,currency,onResult,touch=false,lang='en'}) {
+export function ActionDialog({kind,api,c,close,currency,onResult,touch=false,lang='en',restaurantId=null,branchId=null}) {
  const submitting=useRef(false);
  const wizard=touch&&kind!=='payment';const Form=wizard?TouchForm:'form';
  const cart=api.snapshot?.cart;
- const [v,setV]=useState({cashier_name:'',opening_cash:'0',counted_cash:'',reason:'',notes:cart?.notes||'',order_type:cart?.order_type||'takeaway',table_label:cart?.table_label||'',mode:'cash',cash:String(cart?.net_total||0),card:'0',confirmed:false});
- const [error,setError]=useState('');const set=(k,value)=>setV(s=>({...s,[k]:value}));const p=paymentBreakdown(cart?.net_total,v.mode,v.cash,v.card);
+ const [v,setV]=useState({cashier_name:'',opening_cash:'0',counted_cash:'',reason:'',notes:cart?.notes||'',order_type:cart?.order_type||'takeaway',table_label:cart?.table_label||'',mode:'cash',cash:String(cart?.net_total||0),card:'0',confirmed:false,credit_customer_id:'',credit_confirmed:false});
+ const [error,setError]=useState('');const [creditCustomer,setCreditCustomer]=useState(null);
+ const set=(k,value)=>setV(s=>({...s,[k]:value}));
+ const p=paymentBreakdown(cart?.net_total,v.mode==='credit'?'cash':v.mode,v.cash,v.card);
+ const creditMode=v.mode==='credit';
+ const creditReady=Boolean(v.credit_customer_id&&creditCustomer?.id===v.credit_customer_id&&
+   v.credit_confirmed&&Number(cart?.net_total)>0&&
+   Number(creditCustomer.available_credit)>=Number(cart?.net_total));
+ const labels=({en:{credit:'Customer credit',choose:'Select credit customer',search:'Search customer name / phone',balance:'Available credit',confirm:'Confirm this is a credit sale. No cash/card has been received.',noCustomer:'Select an active customer with enough available credit.',noResults:'No matching customer. Check Customer Management.',currency:'Credit amount'},ar:{credit:'بيع آجل للعميل',choose:'اختر العميل',search:'ابحث باسم العميل أو الهاتف',balance:'الرصيد الائتماني المتاح',confirm:'أؤكد أن هذه عملية بيع آجل ولم يُستلم نقد أو بطاقة.',noCustomer:'اختر عميلاً نشطاً برصيد ائتماني كافٍ.',noResults:'لا يوجد عميل مطابق. راجع إدارة العملاء.',currency:'قيمة الآجل'},fa:{credit:'فروش نسیهٔ مشتری',choose:'مشتری نسیه را انتخاب کنید',search:'جستجوی نام یا نمبر مشتری',balance:'اعتبار قابل استفاده',confirm:'تأیید می‌کنم این فروش نسیه است و هیچ پول نقد یا کارت دریافت نشده.',noCustomer:'مشتری فعال با اعتبار کافی انتخاب کنید.',noResults:'مشتری پیدا نشد؛ مدیریت مشتریان را بررسی کنید.',currency:'مبلغ نسیه'}})[lang]||{credit:'Customer credit',choose:'Select customer',search:'Search customer',balance:'Available credit',confirm:'Confirm no payment received',noCustomer:'Choose customer',noResults:'No customer',currency:'Credit amount'};
  const text=(key,label,type='text')=><Field label={label}><input className={input} type={type} min="0" step="0.01" value={v[key]} required={!['table_label','notes'].includes(key)} onChange={e=>set(key,e.target.value)}/></Field>;
  const titles={payment:c.pay,open:c.openShift,close:c.closeShift,cancel:c.cancel,details:c.details};
- const submit=async e=>{e.preventDefault();if(submitting.current||api.busy||api.pending||(kind==='payment'&&((!touch&&!v.confirmed)||!p.valid)))return;submitting.current=true;setError('');try{const payload=kind==='payment'?{payment_confirmed:touch||v.confirmed,payments:p.payments}:kind==='open'?{cashier_name:v.cashier_name,opening_cash:Number(v.opening_cash)}:kind==='close'?{counted_cash:Number(v.counted_cash),notes:v.notes}:kind==='cancel'?{reason:v.reason}:{order_type:v.order_type,table_label:v.table_label,notes:v.notes};const r=await api.command({payment:'checkout',open:'open_shift',close:'close_shift',cancel:'cancel',details:'details'}[kind],payload);onResult(r);close();}catch(e){setError(e.message);}finally{submitting.current=false;}};
+ const submit=async e=>{e.preventDefault();if(submitting.current||api.busy||api.pending||(kind==='payment'&&(creditMode?!creditReady:(!touch&&!v.confirmed)||!p.valid)))return;submitting.current=true;setError('');try{const payload=kind==='payment'?(creditMode?{payment_method:'credit',customer_id:v.credit_customer_id,credit_confirmed:v.credit_confirmed}:{payment_confirmed:touch||v.confirmed,payments:p.payments}):kind==='open'?{cashier_name:v.cashier_name,opening_cash:Number(v.opening_cash)}:kind==='close'?{counted_cash:Number(v.counted_cash),notes:v.notes}:kind==='cancel'?{reason:v.reason}:{order_type:v.order_type,table_label:v.table_label,notes:v.notes};const r=await api.command({payment:'checkout',open:'open_shift',close:'close_shift',cancel:'cancel',details:'details'}[kind],payload);onResult(r);close();}catch(e){setError(e.message);}finally{submitting.current=false;}};
  return <Dialog open onOpenChange={v=>{if(!v&&!api.busy)close();}}><DialogContent className={touch?"touch-dialog sm:max-w-xl":"max-h-[90dvh] overflow-y-auto"}><DialogHeader><DialogTitle>{titles[kind]}</DialogTitle><DialogDescription>{kind==='close'?c.closeHint:kind==='cancel'?c.cancelHint:c.stockHint}</DialogDescription></DialogHeader><Form {...(wizard?{lang}:{})} onSubmit={submit} className={touch&&kind==='payment'?"touch-quick-payment":"grid gap-4"}>
   {kind==='open'&&<>{text('cashier_name',c.cashier)}{text('opening_cash',c.opening,'number')}</>}
   {kind==='close'&&<><strong>{c.expected}: {money(api.snapshot?.expected_cash,currency)}</strong>{text('counted_cash',c.counted,'number')}{text('notes',c.notes)}</>}
   {kind==='cancel'&&text('reason',c.reason)}
   {kind==='details'&&<><Field label={c.details}><select className={input} value={v.order_type} onChange={e=>set('order_type',e.target.value)}>{['dine_in','takeaway','delivery'].map(t=><option key={t} value={t}>{c[t]}</option>)}</select></Field>{text('table_label',c.table)}{text('notes',c.notes)}</>}
-  {kind==='payment'&&<><strong className="text-3xl" dir="ltr">{money(cart?.net_total,currency)}</strong><div className="grid grid-cols-3 gap-2">{['cash','card','mixed'].map(m=><button className={v.mode===m?primary:button} type="button" key={m} onClick={()=>set('mode',m)}>{c[m]}</button>)}</div>{v.mode!=='card'&&text('cash',c.tendered,'number')}{v.mode==='mixed'&&text('card',c.cardAmount,'number')}<p>{c.change}: {money(p.change,currency)}</p><label className="flex items-start gap-3 text-sm">{!touch&&<input type="checkbox" required checked={v.confirmed} onChange={e=>set('confirmed',e.target.checked)}/>}{c.confirmed}</label></>}
-  {error&&<p className="text-red-600" role="alert">{error}</p>}<button className={primary} disabled={Boolean(api.busy)||(kind==='payment'&&!p.valid)}>{titles[kind]}</button>
+  {kind==='payment'&&<>
+    <strong className="text-3xl" dir="ltr">{money(cart?.net_total,currency)}</strong>
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+     {['cash','card','mixed','credit'].map(m=><button className={v.mode===m?primary:button} type="button" key={m}
+      aria-pressed={v.mode===m} onClick={()=>{setV(s=>({...s,mode:m,credit_confirmed:false,credit_customer_id:''}));setCreditCustomer(null);}}>{m==='credit'?labels.credit:c[m]}</button>)}
+    </div>
+    {creditMode ? <POSCreditCustomerPicker
+      restaurantId={restaurantId} branchId={branchId} currency={currency}
+      total={cart?.net_total} labels={labels} selectedId={v.credit_customer_id} confirmed={v.credit_confirmed}
+      onSelect={customer=>{setCreditCustomer(customer);setV(s=>({...s,credit_customer_id:customer?.id||'',credit_confirmed:false}));}}
+      onConfirmed={checked=>set('credit_confirmed',checked)}
+    />:
+     <>{v.mode!=='card'&&text('cash',c.tendered,'number')}{v.mode==='mixed'&&text('card',c.cardAmount,'number')}
+      <p>{c.change}: {money(p.change,currency)}</p>
+      <label className="flex items-start gap-3 text-sm">{!touch&&<input type="checkbox" required checked={v.confirmed} onChange={e=>set('confirmed',e.target.checked)}/>}
+       {c.confirmed}</label></>}
+   </>}
+  {error&&<p className="text-red-600" role="alert">{error}</p>}<button className={primary} disabled={Boolean(api.busy)||(kind==='payment'&&(creditMode?!creditReady:!p.valid))}>{titles[kind]}</button>
  </Form></DialogContent></Dialog>;
 }
 
-function Station({device,scope,active,c,lang,menu,page,canSell,onProducts}) {
+function Station({device,scope,active,c,lang,menu,page,canSell,onProducts,restaurantId}) {
  const touch=useTouchMode();
  const api=useRetailCashier(device.id,scope,active,restaurantRpc,touch.enabled&&page==='sell');const s=api.snapshot;const cart=s?.cart;const currency=s?.business?.currency||'SAR';
  const [modal,setModal]=useState(null);const [error,setError]=useState('');const [search,setSearch]=useState('');const [category,setCategory]=useState('');const [link,setLink]=useState('');const [copied,setCopied]=useState(false);const [receipt,setReceipt]=useState(null);
@@ -100,7 +124,7 @@ function Station({device,scope,active,c,lang,menu,page,canSell,onProducts}) {
   actions={[{id:'open',label:c.openShift,disabled:!canSell||!s||Boolean(s.shift)||s?.device.locked},{id:'close',label:c.closeShift,disabled:!canSell||!s?.shift||Boolean(api.busy)||Boolean(api.pending)},{id:'details',label:c.details,disabled:!editable},{id:'send_kitchen',label:c.send,disabled:!editable||!cart?.lines?.length},{id:'hold',label:c.hold,disabled:!canSell||!cart||Boolean(api.busy)||Boolean(api.pending)},{id:'cancel',label:c.cancel,disabled:!canSell||!cart||Boolean(api.busy)||Boolean(api.pending)}]}
   onAction={key=>{if(['open','close','details','cancel','payment'].includes(key))setModal(key);else void perform(key==='retry'?api.retry:()=>api.command(key));}}
   held={s?.held||[]} receipts={receipt?[receipt,...(s?.receipts||[]).filter(r=>r.id!==receipt.id)]:s?.receipts||[]} onResume={o=>perform(()=>api.command('resume',{cart_id:o.id,revision:o.revision}))} onReceipt={r=>perform(()=>printCashierReceipt(r,lang,'80mm'))}/>
-  {modal&&<ActionDialog touch lang={lang} key={modal} kind={modal} api={api} c={c} currency={currency} close={()=>setModal(null)} onResult={r=>{if(r.receipt)setReceipt(r.receipt);}}/>}</>;
+  {modal&&<ActionDialog touch lang={lang} key={modal} kind={modal} api={api} c={c} currency={currency} restaurantId={restaurantId} branchId={device.branch_id} close={()=>setModal(null)} onResult={r=>{if(r.receipt)setReceipt(r.receipt);}}/>}</>;
  return <div className="space-y-4">
   {page==='display'&&<RestaurantDisplayFocus deviceId={device.id} allowed={canSell} lang={lang} linked={Boolean(link)}/>}
   {touch.supported&&page==='sell'&&<button className={primary} onClick={touch.enable}>{fixedCopy(lang).title}</button>}
@@ -122,7 +146,7 @@ function Station({device,scope,active,c,lang,menu,page,canSell,onProducts}) {
    <section className={`${panel} space-y-3`}><h2 className="font-black">{c.hold}</h2>{s?.held?.map(o=><div key={o.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"><span>#{o.number} · {c[o.order_type]} · {money(o.net_total,currency)}</span><button className={button} disabled={!canSell||Boolean(cart)||Boolean(api.busy)||Boolean(api.pending)} onClick={()=>void perform(()=>api.command('resume',{cart_id:o.id,revision:o.revision}))}>{c.resume}</button></div>)}</section>
    <section className={`${panel} space-y-3`}><h2 className="font-black">{c.receipts}</h2>{(receipt?[receipt,...(s?.receipts||[]).filter(r=>r.id!==receipt.id)]:s?.receipts||[]).map(r=><div key={r.id} className="flex items-center justify-between gap-3 rounded-xl border p-3"><span>{r.receipt_number} · {money(r.net_total,currency)}</span><button className={button} onClick={()=>void perform(()=>printCashierReceipt(r,lang,'80mm'))}><Printer size={18}/>{c.print}</button></div>)}<p className="text-xs text-slate-500">{c.noHardware}</p></section>
   </>}
-  {modal&&<ActionDialog key={modal} kind={modal} api={api} c={c} currency={currency} close={()=>setModal(null)} onResult={r=>{if(r.receipt)setReceipt(r.receipt);}}/>}
+  {modal&&<ActionDialog key={modal} kind={modal} api={api} c={c} currency={currency} restaurantId={restaurantId} branchId={device.branch_id} close={()=>setModal(null)} onResult={r=>{if(r.receipt)setReceipt(r.receipt);}}/>}
  </div>;
 }
 
@@ -161,7 +185,7 @@ export default function RestaurantPOS() {
   </section>}
   {(error||q.error)&&<p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{error||q.error.message}</p>}
   {q.isLoading&&<p className={panel}>…</p>}
-  {!q.isLoading&&!q.isError&&['sell','display'].includes(page)&&(device?<Station key={`${tenant}:${user?.id}:${device.id}`} device={device} scope={`${tenant}:${user?.id}`} active={active} c={c} lang={lang} menu={data?.menu||[]} page={page} canSell={can.uploadSales} onProducts={data?.can_manage?()=>setProductsOpen(true):undefined}/>:<section className={panel+' space-y-3 text-center'}><Monitor className="mx-auto text-blue-500" size={40}/><h2 className="text-xl font-bold">{customizationCopy(lang).emptyPOS}</h2><p className="text-slate-500">{customizationCopy(lang).emptyHint}</p>{data?.can_manage&&<button className={primary} onClick={()=>setDeviceSetup('add')}><Plus size={18}/>{customizationCopy(lang).addPOS}</button>}</section>)}
+  {!q.isLoading&&!q.isError&&['sell','display'].includes(page)&&(device?<Station key={`${tenant}:${user?.id}:${device.id}`} device={device} restaurantId={tenant} scope={`${tenant}:${user?.id}`} active={active} c={c} lang={lang} menu={data?.menu||[]} page={page} canSell={can.uploadSales} onProducts={data?.can_manage?()=>setProductsOpen(true):undefined}/>:<section className={panel+' space-y-3 text-center'}><Monitor className="mx-auto text-blue-500" size={40}/><h2 className="text-xl font-bold">{customizationCopy(lang).emptyPOS}</h2><p className="text-slate-500">{customizationCopy(lang).emptyHint}</p>{data?.can_manage&&<button className={primary} onClick={()=>setDeviceSetup('add')}><Plus size={18}/>{customizationCopy(lang).addPOS}</button>}</section>)}
   {page==='kitchen'&&<><div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-900"><span>{lang==='fa'?'نمایشگر مخصوص مطبخ و تلویزیون':lang==='ar'?'شاشة مستقلة للمطبخ والتلفزيون':'Dedicated Kitchen Display & TV'}</span><Link to={'/restaurant/kitchen?branch='+encodeURIComponent(branch||'')} className="rounded-lg bg-blue-600 px-4 py-2 font-black text-white">{lang==='fa'?'بازکردن نمایشگر مطبخ':lang==='ar'?'فتح شاشة المطبخ':'Open Kitchen Display'}</Link></div><Kitchen orders={data?.orders||[]} c={c} lang={lang} refresh={q.refetch} canKitchen={can.viewOrders&&fresh}/></>}
   {page==='control'&&data?.can_manage&&<><div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{[['paid_sales',c.paidSales],['unpaid_orders',c.unpaidOrders],['purchases',c.purchases],['expenses',c.expenses]].map(([key,label])=><section key={key} className={panel}><p className="text-sm text-slate-500">{label}</p><p className="mt-3 break-words text-2xl font-black text-blue-700" dir="ltr">{data[key]===null?'—':money(data[key],activeRestaurant.currency||'SAR')}</p></section>)}</div><div className="flex flex-wrap gap-3">{can.viewExpenses&&<Link className={primary} to="/expenses">{c.expense}</Link>}<Link className={button} to="/owner-command-center">{c.reports}</Link></div><section className={`${panel} space-y-3`}><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-black">{c.device}</h2><button className={button} onClick={()=>setDeviceSetup('manage')}>{customizationCopy(lang).managePOS}</button></div>{devices.map(d=><div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3" key={d.id}><span>{branches.find(b=>b.id===d.branch_id)?.name} · {d.code} · {d.locked?c.lock:new Date(d.last_seen_at||0).getTime()>now-90000?c.live:c.offline}</span><button className={button} onClick={async()=>{try{setError('');await restaurantRpc('pos_setup',{p_restaurant_id:tenant,p_branch_id:d.branch_id,p_command:'lock',p_payload:{device_id:d.id,locked:!d.locked}});void q.refetch();}catch(e){setError(e.message);}}}>{d.locked?c.unlock:c.lock}</button></div>)}</section><section className={`${panel} space-y-3`}><h2 className="font-black">{c.audit}</h2>{data.events?.map((e,i)=><div className="flex flex-wrap justify-between gap-2 border-b py-3 text-sm" key={`${e.occurred_at}:${i}`}><span>{e.code} · {e.action}</span><time>{new Date(e.occurred_at).toLocaleString()}</time></div>)}</section></>}
   {deviceSetup&&data?.can_manage&&<RestaurantDevices startNew={deviceSetup==='add'} tenant={tenant} branch={branch} branches={queryBranch?branches.filter(b=>b.id===branch):branches} devices={data?.devices||[]} lang={lang} close={()=>setDeviceSetup(false)} refresh={q.refetch} onSelect={(id,b)=>{setBranchChoice(b);setParams(prev=>{const p=new URLSearchParams(prev);p.set('device',id);return p;});}}/>}
