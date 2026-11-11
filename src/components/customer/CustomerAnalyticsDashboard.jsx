@@ -111,7 +111,7 @@ export default function CustomerAnalyticsDashboard({ account, lang='en' }) {
   setDateError('');
   setApplied(custom);
  };
- return <section data-i18n-skip="true" aria-label={t.heading} className="w-full min-w-0 max-w-full space-y-4 overflow-x-clip rounded-3xl border border-slate-200 bg-slate-100/80 p-3 sm:p-5">
+ return <section data-i18n-skip="true" aria-label={t.heading} className="w-full min-w-0 max-w-full space-y-3 overflow-x-clip rounded-3xl border border-slate-200 bg-slate-100/80 p-3 sm:space-y-4 sm:p-5">
   <div className="flex min-w-0 flex-col justify-between gap-2 sm:flex-row sm:items-center">
    <div className="min-w-0 max-w-full">
     <div className="flex min-w-0 items-center gap-2"><Activity className="text-teal-700" size={20} aria-hidden="true"/><h2 className="min-w-0 break-words text-xl font-black text-slate-950">{t.heading}</h2></div>
