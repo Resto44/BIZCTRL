@@ -19,11 +19,11 @@ const WORDS={
 const n=(v,dec=0)=>Number(v||0).toLocaleString(undefined,{minimumFractionDigits:dec,maximumFractionDigits:dec});
 const periods=['today','7d','month','3m','6m','12m','custom'];
 
-export default function SupplierPortalAnalytics({orders=[],invoices=[],payments=[],lang='en',loading=false,onOpenOrders,onOpenInvoices}){
+export default function SupplierPortalAnalytics({orders=[],invoices=[],payments=[],deliveries=[],lang='en',loading=false,onOpenOrders,onOpenInvoices}){
  const t=WORDS[lang]||WORDS.en;
  const [period,setPeriod]=useState('month');
  const [custom,setCustom]=useState(()=>supplierPeriodRange('7d',riyadhDate()));
- const data=useMemo(()=>supplierPortalAnalytics({orders,invoices,payments,period,custom}),[orders,invoices,payments,period,custom]);
+ const data=useMemo(()=>supplierPortalAnalytics({orders,invoices,payments,deliveries,period,custom}),[orders,invoices,payments,deliveries,period,custom]);
  const kpi=[
   {key:'orders',value:data.orders,icon:FileText,run:onOpenOrders},
   {key:'shipped',value:data.awaitingOwner,icon:Clock3,run:onOpenOrders},
