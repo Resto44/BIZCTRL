@@ -1,6 +1,6 @@
 import { describe,it,expect } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { isItemizedCustomerCreditValid } from '../src/components/sales/CustomerCreditInvoiceItems.jsx';
+import { isItemizedCustomerCreditValid } from '../src/lib/customerCreditInvoiceMath.js';
 
 const read=file=>readFile(new URL(file,import.meta.url),'utf8');
 
