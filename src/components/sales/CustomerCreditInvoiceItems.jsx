@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { isItemizedCustomerCreditValid } from '@/lib/customerCreditInvoiceMath';
-import { restaurantRpc } from '@/lib/restaurantPOS';
 import { creditPOSMenuLabel,creditPOSMenuChoices,creditPOSInvoiceItem,creditPOSInvoiceTotal } from '@/lib/closingCreditPOSCatalog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -29,9 +28,9 @@ export default function CustomerCreditInvoiceItems({
   if(!scoped)return undefined;
   let mounted=true;
   setLoading(true);setError('');setCatalog([]);
-  restaurantRpc('customer_credit_pos_items',{
+  import('@/lib/restaurantPOS').then(({restaurantRpc})=>restaurantRpc('customer_credit_pos_items',{
     p_restaurant_id:restaurantId,p_branch_id:branchId,p_search:''
-  }).then(result=>{
+  })).then(result=>{
     if(!mounted)return;
     setCatalog(creditPOSMenuChoices(result));
   }).catch(e=>{
