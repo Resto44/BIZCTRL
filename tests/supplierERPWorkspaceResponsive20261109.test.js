@@ -51,8 +51,10 @@ describe('Supplier Portal mobile-first ERP workspace',()=>{
   expect(source).toContain(".eq('restaurant_id', user.restaurant_id)");
   expect(source).toContain(".eq('branch_id', user.branch_id)");
   expect(source).toContain(".eq('supplier_id', supplierProfile.id)");
-  expect(source).toContain(".eq('status', 'approved')");
-  expect(source).toContain("if (!data?.length) throw new Error");
+  expect(source).toContain("supabase.rpc('erp_supplier_mark_order_shipped',{p_order_id:poId})");
+  expect(source).toContain("supabase.rpc('erp_supplier_verified_deliveries')");
+  expect(source).toContain("if(data?.status!=='shipped')throw new Error");
+  expect(source).toContain('ownerVerification={deliveryByOrder.get(String(po.id))}');
   expect(source).toContain('PortalDataState onRetry');
   expect(source).not.toContain("supabase.from('suppliers')");
  });
