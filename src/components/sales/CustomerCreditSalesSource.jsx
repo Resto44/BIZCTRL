@@ -172,7 +172,7 @@ export default function CustomerCreditSalesSource({
     onUpdate(entry.id, {
       customer_id: '', customer_name_snapshot: '', customer_phone: '',
       previous_outstanding_debt: 0, credit_limit: 0, available_credit: 0,
-      transaction_type: TRANSACTION_TYPES.CREDIT_SALE, amount: '', payment_amount: '',
+      transaction_type: TRANSACTION_TYPES.CREDIT_SALE, amount: '', payment_amount: '', items: [],
     });
   };
 
@@ -189,6 +189,7 @@ export default function CustomerCreditSalesSource({
       transaction_type: TRANSACTION_TYPES.CREDIT_SALE,
       amount: '',
       payment_amount: '',
+      items: [],
     });
     setLocalSearch('');
     setSearchOpen(false);
