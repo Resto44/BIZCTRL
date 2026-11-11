@@ -339,7 +339,7 @@ export default function SupplierPortalERP() {
               <h2 className="text-base font-extrabold text-slate-900 dark:text-white sm:text-lg">{copy.home}</h2>
               <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">{copy.subhead}</p>
             </div>
-            <SupplierPortalAnalytics orders={purchaseOrders} invoices={invoices} payments={payments}
+            <SupplierPortalAnalytics orders={purchaseOrders} invoices={invoices} payments={payments} deliveries={verifiedDeliveries}
               lang={lang} loading={isLoading||invoicesLoading||paymentsLoading}
               onOpenOrders={()=>setActiveTab('orders')} onOpenInvoices={()=>setActiveTab('invoices')}/>
             <div data-testid="supplier-erp-kpis" className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
