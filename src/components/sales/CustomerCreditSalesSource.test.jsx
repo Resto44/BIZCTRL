@@ -141,6 +141,7 @@ describe('CustomerCreditSalesSource', () => {
       transaction_type: 'credit_sale',
       amount: '',
       payment_amount: '',
+      items: [],
     });
     expect(onCustomerSearch).toHaveBeenLastCalledWith('');
     expect(onSelectCustomer).toHaveBeenCalledOnce();
