@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 
 import { normalizeCreditAmount, validCreditAmount } from '@/lib/customerCreditSources';
-import CustomerCreditInvoiceItems, { isItemizedCustomerCreditValid } from '@/components/sales/CustomerCreditInvoiceItems';
+import CustomerCreditInvoiceItems from '@/components/sales/CustomerCreditInvoiceItems';
+import { isItemizedCustomerCreditValid } from '@/lib/customerCreditInvoiceMath';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
