@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { customerAccountDisplayLabel } from '@/lib/customerAccountDisplay';
 const CustomerAnalyticsDashboard = lazy(() => import('@/components/customer/CustomerAnalyticsDashboard'));
+const PortalPushSettings = lazy(() => import('@/components/notifications/PortalPushSettings'));
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -108,6 +109,7 @@ export default function CustomerPortal() {
       <div className="flex w-full min-w-0 flex-wrap gap-2 print:hidden sm:w-auto"><Button variant="outline" onClick={()=>{accounts.refetch();statement.refetch();}}>{t.refresh}</Button><Button disabled={!data} onClick={()=>window.print()}>{t.print}</Button></div>
      </section>
      <Suspense fallback={<p role="status" className="rounded-xl border bg-white p-4 text-sm text-slate-500">{t.loading}</p>}>
+      <PortalPushSettings key={'push-'+account.id} role="customer" customerId={account.id} language={lang}/>
       <CustomerAnalyticsDashboard key={account.id} account={account} lang={lang}/>
      </Suspense>
      {statement.isError?<p role="alert" className="rounded-lg bg-red-50 p-4">{t.error}</p>:statement.isPending?<p role="status">{t.loading}</p>:data&&<>
