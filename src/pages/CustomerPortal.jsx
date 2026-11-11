@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { customerAccountDisplayLabel } from '@/lib/customerAccountDisplay';
+import CustomerIdentityCard from '@/components/customer/CustomerIdentityCard';
 const CustomerAnalyticsDashboard = lazy(() => import('@/components/customer/CustomerAnalyticsDashboard'));
 const PortalPushSettings = lazy(() => import('@/components/notifications/PortalPushSettings'));
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -79,6 +80,32 @@ export default function CustomerPortal() {
   if(error)throw error;
   setNotice(t.confirmationRequested);
  });}
+ // An active customer account may have an obsolete invite saved in Safari sessionStorage.
+ // Never silently discard a second legitimate invitation; let the customer dismiss it.
+ function dismissInvitation() {
+  setInvite('');
+  setError('');
+  sessionStorage.removeItem('customer:invite');
+  if (customerInviteTokenFromHash(window.location.hash)) {
+   window.history.replaceState(null,'',window.location.pathname+window.location.search);
+  }
+ }
+ function activateInvitation(){return run(async()=>{
+  const accepted=await customerPortalRpc('erp_customer_portal_accept',{p_token:invite});
+  dismissInvitation();
+  setSelected(accepted.customer_id);
+  setPage(0);
+  await accounts.refetch();
+ });}
+ function refreshDashboard(){
+  accounts.refetch();
+  statement.refetch();
+  client.invalidateQueries({queryKey:['customer-portal','analytics',account?.id]});
+ }
+ const statementAsOf=data?.as_of ? new Date(data.as_of).toLocaleString(
+  lang==='ar'?'ar-SA':lang==='fa'?'fa-AF':'en-US',
+  {timeZone:'Asia/Riyadh',year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}
+ ) : '—';
  return <main data-i18n-skip="true" dir={lang==='en'?'ltr':'rtl'} className="min-h-screen w-full max-w-full min-w-0 overflow-x-clip bg-slate-50 text-slate-900">
   <div className="mx-auto w-full min-w-0 max-w-6xl space-y-5 overflow-x-clip p-3 sm:p-6">
    <header className="flex min-w-0 flex-wrap items-center justify-between gap-4 border-b pb-5">
@@ -96,24 +123,34 @@ export default function CustomerPortal() {
     {invite&&<><Button type="button" variant="outline" disabled={busy||!email.includes('@')} className="w-full" onClick={resendConfirmation}>{t.resendConfirmation}</Button><p className="text-xs text-slate-500">{t.confirmEmailHelp}</p></>}
     <p className="text-sm text-slate-500">{emailPending?t.emailNotVerified:invite?t.verify:t.empty}</p>
    </form>:<>
-    {invite&&<p className="text-sm text-slate-600">{t.email}: <span dir="ltr">{session.user.email}</span> · {t.customerInviteHelp}</p>}
-    {invite&&<><p className="text-sm text-amber-900">{t.accountMismatchHelp}</p>
+    {invite && !accounts.isPending && !accounts.isError && account ? <aside className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm print:hidden">
+     <p className="min-w-0 flex-1 leading-relaxed text-amber-950">{t.additionalInviteHint}</p>
      <div className="flex flex-wrap gap-2">
-      <Button disabled={busy} onClick={()=>run(async()=>{const accepted=await customerPortalRpc('erp_customer_portal_accept',{p_token:invite});setInvite('');sessionStorage.removeItem('customer:invite');window.history.replaceState(null,'',window.location.pathname);setSelected(accepted.customer_id);await accounts.refetch();})}>{t.activate}</Button>
+      <Button disabled={busy} onClick={activateInvitation}>{t.activate}</Button>
+      <Button variant="outline" disabled={busy} onClick={dismissInvitation}>{t.dismissInvite}</Button>
+     </div>
+    </aside> : null}
+    {invite && !accounts.isPending && !accounts.isError && !account && <>
+     <p className="break-words text-sm text-slate-600">{t.email}: <span dir="ltr" className="break-all">{session.user.email}</span> · {t.customerInviteHelp}</p>
+     <p className="text-sm leading-relaxed text-amber-900">{t.accountMismatchHelp}</p>
+     <div className="flex flex-wrap gap-2">
+      <Button disabled={busy} onClick={activateInvitation}>{t.activate}</Button>
       <Button variant="outline" disabled={busy} onClick={signOutForInvitation}>{t.switchAccount}</Button>
+      <Button variant="ghost" disabled={busy} onClick={dismissInvitation}>{t.dismissInvite}</Button>
      </div>
     </>}
     {accounts.isPending?<p role="status">{t.loading}</p>:accounts.isError?<div role="alert">{t.error} <Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></div>:!account?<p>{t.empty}</p>:<>
      <section className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
       <label className="block w-full min-w-0 max-w-full text-sm font-semibold sm:max-w-xl">{t.account}<select aria-label={t.account} title={customerAccountDisplayLabel(account)} className="mt-2 block box-border w-full min-w-0 max-w-full truncate rounded-lg border bg-white p-3 text-base" value={account.id} onChange={e=>{setSelected(e.target.value);setPage(0);}}>{accounts.data.map(a=><option key={a.id} value={a.id}>{customerAccountDisplayLabel(a)}</option>)}</select></label>
-      <div className="flex w-full min-w-0 flex-wrap gap-2 print:hidden sm:w-auto"><Button variant="outline" onClick={()=>{accounts.refetch();statement.refetch();}}>{t.refresh}</Button><Button disabled={!data} onClick={()=>window.print()}>{t.print}</Button></div>
+      <div className="flex w-full min-w-0 flex-wrap gap-2 print:hidden sm:w-auto"><Button variant="outline" onClick={refreshDashboard}>{t.refresh}</Button><Button disabled={!data} onClick={()=>window.print()}>{t.print}</Button></div>
      </section>
+     <CustomerIdentityCard key={account.id} account={account} lang={lang}/>
      <Suspense fallback={<p role="status" className="rounded-xl border bg-white p-4 text-sm text-slate-500">{t.loading}</p>}>
       <PortalPushSettings key={'push-'+account.id} role="customer" customerId={account.id} language={lang}/>
       <CustomerAnalyticsDashboard key={account.id} account={account} lang={lang}/>
      </Suspense>
      {statement.isError?<p role="alert" className="rounded-lg bg-red-50 p-4">{t.error}</p>:statement.isPending?<p role="status">{t.loading}</p>:data&&<>
-      <p className="text-sm text-slate-600">{t.allTime} · {new Date(data.as_of).toLocaleString()}</p>
+      <p className="text-sm text-slate-600">{t.allTime} · {statementAsOf} · {t.timezoneSaudi}</p>
       <section className="grid min-w-0 grid-cols-1 gap-3 min-[380px]:grid-cols-2 lg:grid-cols-4">{['total','paid','balance','overdue'].map(key=><article key={key} className="min-w-0 rounded-2xl border bg-white p-4 shadow-sm"><h2 className="text-sm text-slate-600">{t[key]}</h2><p className={`mt-2 break-words text-xl font-black ${key==='overdue'?'text-rose-700':'text-teal-800'}`}>{money(data.totals[key])}</p></article>)}</section>
      </>}
      <nav className="grid min-w-0 grid-cols-1 gap-2 print:hidden min-[390px]:grid-cols-2 sm:flex sm:flex-wrap">{['invoices','payments','orders'].map(k=><Button key={k} variant={kind===k?'default':'outline'} aria-pressed={kind===k} className="min-w-0 w-full whitespace-normal text-center sm:w-auto" onClick={()=>{setKind(k);setPage(0);}}>{t[k==='orders'?'purchases':k]}</Button>)}</nav>
