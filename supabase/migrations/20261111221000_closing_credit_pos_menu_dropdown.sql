@@ -30,8 +30,8 @@ END $menu$;
 REVOKE ALL ON FUNCTION public.erp_customer_credit_pos_items(uuid,uuid,text) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.erp_customer_credit_pos_items(uuid,uuid,text) TO authenticated;
 
--- Server checks branch, menu-id, actual price and product-id for new selected items.
--- Existing amount-only and legacy manual closings remain backward compatible.
+-- Server checks branch, menu-id, actual price and product-id for newly selected items.
+-- Existing amount-only closings and prior manual draft items stay backward compatible.
 CREATE OR REPLACE FUNCTION customer_portal_private.store_credit_invoice_lines(p_debt_id uuid, p_restaurant_id uuid, p_branch_id uuid, p_customer_id uuid, p_source_type text, p_source_order_id uuid, p_items jsonb)
  RETURNS void
  LANGUAGE plpgsql
@@ -85,7 +85,20 @@ BEGIN
     RAISE EXCEPTION 'CUSTOMER_CREDIT_DETAILS_AMOUNT_MISMATCH';
   END IF;
   IF p_source_type='sales_closing' AND nullif(v_item->>'menu_id','') IS NOT NULL THEN
-   IF (v_item->>'menu_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
+   IF (v_item->>'menu_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+     RAISE EXCEPTION 'CUSTOMER_CREDIT_POS_MENU_INVALID' USING ERRCODE='23514';
+   END IF;
+   SELECT m.* INTO v_pos_menu FROM restaurant_pos_private.menu m
+   JOIN public.products p ON p.id=m.product_id AND p.restaurant_id=p_restaurant_id
+     AND p.restaurant_product_type='menu_item' AND coalesce(p.is_active,true)
+   WHERE m.id=(v_item->>'menu_id')::uuid AND m.restaurant_id=p_restaurant_id
+     AND m.branch_id=p_branch_id AND m.active IS TRUE AND m.price>0;
+   IF NOT FOUND OR v_price IS DISTINCT FROM v_pos_menu.price
+     OR v_item->>'product_id' IS DISTINCT FROM v_pos_menu.product_id::text THEN
+     RAISE EXCEPTION 'CUSTOMER_CREDIT_POS_MENU_PRICE_CHANGED' USING ERRCODE='23514';
+   END IF;
+  END IF;
+  v_sum:=v_sum+v_total;
   v_clean:=v_clean||jsonb_build_array(jsonb_build_object(
     'name',v_name,'name_ar',left(coalesce(v_item->>'name_ar',v_name),160),
     'name_fa',left(coalesce(v_item->>'name_fa',v_name),160),
@@ -113,47 +126,4 @@ BEGIN
   WHERE d.debt_id=p_debt_id AND d.restaurant_id=p_restaurant_id AND d.customer_id=p_customer_id
   AND d.items=v_clean
  ) THEN RAISE EXCEPTION 'CUSTOMER_CREDIT_DETAILS_ALREADY_POSTED_DIFFERENTLY'; END IF;
-END $function$
- THEN
-     RAISE EXCEPTION 'CUSTOMER_CREDIT_POS_MENU_INVALID' USING ERRCODE='23514';
-   END IF;
-   SELECT m.* INTO v_pos_menu
-   FROM restaurant_pos_private.menu m
-   JOIN public.products p ON p.id=m.product_id AND p.restaurant_id=p_restaurant_id
-     AND p.restaurant_product_type='menu_item' AND coalesce(p.is_active,true)
-   WHERE m.id=(v_item->>'menu_id')::uuid AND m.restaurant_id=p_restaurant_id
-     AND m.branch_id=p_branch_id AND m.active IS TRUE AND m.price>0;
-   IF NOT FOUND OR v_price IS DISTINCT FROM v_pos_menu.price
-     OR v_item->>'product_id' IS DISTINCT FROM v_pos_menu.product_id::text THEN
-     RAISE EXCEPTION 'CUSTOMER_CREDIT_POS_MENU_PRICE_CHANGED' USING ERRCODE='23514';
-   END IF;
-  END IF;
-  v_sum:=v_sum+v_total;
-  v_clean:=v_clean||jsonb_build_array(jsonb_build_object(
-    'name',v_name,'name_ar',left(coalesce(v_item->>'name_ar',v_name),160),
-    'name_fa',left(coalesce(v_item->>'name_fa',v_name),160),
-    'quantity',v_quantity,'unit_price',v_price,'total_price',v_total,
-    'product_id',CASE WHEN coalesce(v_item->>'product_id','') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN v_item->>'product_id' ELSE NULL END
-   ));
- END LOOP;
- IF jsonb_array_length(v_clean)=0 THEN
-  -- Closing amount without an itemized list is transparently labeled as a summary.
-  IF p_source_type='restaurant_pos' THEN RAISE EXCEPTION 'CUSTOMER_CREDIT_DETAILS_MISSING_ITEMS'; END IF;
-  v_sum:=debt.total_amount;
-  v_clean:=jsonb_build_array(jsonb_build_object(
-   'name','Credit sale from Sales Closing','name_ar','بيع آجل من إقفال المبيعات',
-   'name_fa','فروش نسیه از کلوزینگ','quantity',1,'unit_price',v_sum,'total_price',v_sum,
-   'summary_only',true));
- END IF;
- IF v_sum<>debt.total_amount THEN RAISE EXCEPTION 'CUSTOMER_CREDIT_DETAILS_AMOUNT_MISMATCH'; END IF;
- INSERT INTO public.customer_credit_invoice_lines
- (debt_id,restaurant_id,branch_id,customer_id,source_type,source_order_id,items)
- VALUES(p_debt_id,p_restaurant_id,p_branch_id,p_customer_id,p_source_type,p_source_order_id,v_clean)
- ON CONFLICT(debt_id) DO NOTHING;
- IF NOT FOUND AND NOT EXISTS(
-  SELECT 1 FROM public.customer_credit_invoice_lines d
-  WHERE d.debt_id=p_debt_id AND d.restaurant_id=p_restaurant_id AND d.customer_id=p_customer_id
-  AND d.items=v_clean
- ) THEN RAISE EXCEPTION 'CUSTOMER_CREDIT_DETAILS_ALREADY_POSTED_DIFFERENTLY'; END IF;
 END $function$;
-
