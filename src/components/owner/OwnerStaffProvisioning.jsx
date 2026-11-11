@@ -238,7 +238,8 @@ export default function OwnerStaffProvisioning() {
   };
 
   const issueInvitation = async ({ role, branchId, fullName, email, phone }) => {
-    if (role === 'wallet' || role === 'customer') throw new Error('Use the dedicated Wallet/Customer portal flow; never create an ERP staff invitation.');
+    if (role === 'wallet') throw new Error('Use the dedicated Wallet join flow; never create a staff invitation for a wallet account.');
+    if (role === 'customer') throw new Error('Use the dedicated Customer portal approval flow; never create a staff invitation for a customer.');
     if (issuanceLock.current) return;
     issuanceLock.current = true;
     try {
