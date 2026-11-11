@@ -66,7 +66,7 @@ self.addEventListener('fetch', (event) => {
 
 
 // Only known ERP routes on this application's origin may be opened by a push.
-const PUSH_ROUTES = new Set(['/wallet-portal','/notifications','/sales','/sales/invoices','/sales-sources','/purchases','/purchase-orders','/supplier-ledger','/suppliers','/expenses','/product-management','/inventory','/network-management','/driver-management','/debt-management','/customer-management','/treasury','/sponsor-treasury','/payroll','/employee-attendance','/employees','/branch-management','/brand','/approval-policy','/role-permissions','/erp-approval-center','/billing','/settings','/tasks','/support','/scheduled-reports','/alerts','/promotions','/retail/pos-control','/restaurant/pos','/activity-logs']);
+const PUSH_ROUTES = new Set(['/customer-portal','/manager-dashboard','/employee-dashboard','/supplier-portal','/driver-dashboard','/owner-command-center','/wallet-portal','/notifications','/sales','/sales/invoices','/sales-sources','/purchases','/purchase-orders','/supplier-ledger','/suppliers','/expenses','/product-management','/inventory','/network-management','/driver-management','/debt-management','/customer-management','/treasury','/sponsor-treasury','/payroll','/employee-attendance','/employees','/branch-management','/brand','/approval-policy','/role-permissions','/erp-approval-center','/billing','/settings','/tasks','/support','/scheduled-reports','/alerts','/promotions','/retail/pos-control','/restaurant/pos','/activity-logs']);
 function pushTarget(value, eventId) {
   const validId = typeof eventId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId);
   const fallback = '/notifications' + (validId ? `?notification=${encodeURIComponent(eventId)}` : '');
