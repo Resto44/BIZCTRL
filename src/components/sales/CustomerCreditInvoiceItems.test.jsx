@@ -76,7 +76,7 @@ describe('Sales Closing customer credit item dropdown from Cashier POS',()=>{
   const tree=TestRenderer.create(<CustomerCreditInvoiceItems
    lang="en" entry={{id:'legacy',amount:'50.00',items:[{name:'Existing invoice',quantity:1,unit_price:50,total_price:50}]}}
    onUpdate={vi.fn()}/>);
-  expect(dropdown(tree).props.disabled).toBe(true);
+  expect(tree.root.findAllByProps({'data-testid':'customer-credit-pos-product-dropdown'})).toHaveLength(0);
   expect(textOf(tree.root)).toContain('Existing invoice');
   expect(textOf(tree.root)).toContain('Select the restaurant and branch');
   expect(mocked.catalog).not.toHaveBeenCalled();
