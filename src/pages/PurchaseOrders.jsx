@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -36,9 +37,21 @@ export default function PurchaseOrders() {
   const [showLowStock, setShowLowStock] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(null);
 
-  const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['purchase_orders'],
-    queryFn: () => base44.entities.PurchaseOrder.list('-date', 200),
+  // The canonical purchase_orders table has created_date, not date.
+  // Keep the Owner's read strictly tenant-scoped so shipped supplier orders
+  // remain visible for verification. RLS still enforces the caller's scope.
+  const { data: orders = [], isLoading, isError:ordersError, refetch:refetchOrders } = useQuery({
+    queryKey: ['purchase_orders',user?.restaurant_id],
+    enabled: Boolean(user?.restaurant_id),
+    queryFn: async () => {
+      const {data,error}=await supabase.from('purchase_orders').select('*')
+        .eq('restaurant_id',user.restaurant_id)
+        .order('created_date',{ascending:false}).limit(500);
+      if(error)throw error;
+      return data||[];
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
   });
 
   const deleteMutation = useMutation({
@@ -109,9 +122,13 @@ export default function PurchaseOrders() {
         }
       />
 
+      {ordersError && <div role="alert" className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        Could not load purchase orders. <Button type="button" variant="outline" size="sm"
+          className="ms-2 min-h-10" onClick={()=>refetchOrders()}>Retry</Button>
+      </div>}
       {isLoading ? (
         <div className="text-center text-muted-foreground py-10">Loading...</div>
-      ) : orders.length === 0 ? (
+      ) : ordersError ? null : orders.length === 0 ? (
         <div className="text-center text-muted-foreground py-16">
           <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p>No purchase orders yet</p>
