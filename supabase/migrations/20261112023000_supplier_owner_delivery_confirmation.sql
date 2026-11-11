@@ -16,6 +16,49 @@ ALTER TABLE public.supplier_order_delivery_confirmations ENABLE ROW LEVEL SECURI
 REVOKE ALL ON public.supplier_order_delivery_confirmations FROM PUBLIC,anon,authenticated;
 GRANT ALL ON public.supplier_order_delivery_confirmations TO service_role;
 
+-- From legacy Owner Purchase Orders a draft/sent order must be explicitly approved
+-- before the Supplier can mark it shipped. This does not post inventory or invoices.
+CREATE OR REPLACE FUNCTION public.erp_owner_approve_supplier_order(p_order_id uuid)
+ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
+DECLARE po public.purchase_orders; items jsonb;
+BEGIN
+ IF (SELECT auth.uid()) IS NULL OR p_order_id IS NULL THEN
+  RAISE EXCEPTION 'SUPPLIER_ORDER_OWNER_APPROVAL_REQUIRED' USING ERRCODE='42501';
+ END IF;
+ SELECT * INTO po FROM public.purchase_orders WHERE id=p_order_id FOR UPDATE;
+ IF NOT FOUND OR po.restaurant_id IS NULL OR po.branch_id IS NULL OR po.supplier_id IS NULL
+   OR NOT public.erp_subscription_has_erp_access(po.restaurant_id)
+   OR NOT EXISTS(SELECT 1 FROM public.erp_memberships m WHERE m.user_id=(SELECT auth.uid())
+     AND m.restaurant_id=po.restaurant_id AND m.status='approved' AND m.role='owner') THEN
+  RAISE EXCEPTION 'SUPPLIER_ORDER_OWNER_APPROVAL_REQUIRED' USING ERRCODE='42501';
+ END IF;
+ IF po.status='approved' THEN
+  RETURN jsonb_build_object('id',po.id,'status','approved','already_approved',true);
+ END IF;
+ IF po.status NOT IN ('draft','sent','pending') THEN
+  RAISE EXCEPTION 'SUPPLIER_ORDER_APPROVAL_BAD_STATE' USING ERRCODE='23514';
+ END IF;
+ BEGIN
+  items:=CASE WHEN jsonb_typeof(po.items)='array' THEN po.items
+   WHEN jsonb_typeof(po.items)='string' THEN (po.items#>>'{}')::jsonb
+   ELSE '[]'::jsonb END;
+ EXCEPTION WHEN OTHERS THEN
+  RAISE EXCEPTION 'SUPPLIER_ORDER_ITEMS_REQUIRED' USING ERRCODE='23514';
+ END;
+ IF jsonb_typeof(items)<>'array' OR jsonb_array_length(items) NOT BETWEEN 1 AND 100
+  OR EXISTS(SELECT 1 FROM jsonb_array_elements(items) x WHERE
+    jsonb_typeof(x)<>'object'
+    OR coalesce(nullif(x->>'product_name',''),nullif(x->>'name','')) IS NULL) THEN
+  RAISE EXCEPTION 'SUPPLIER_ORDER_ITEMS_REQUIRED' USING ERRCODE='23514';
+ END IF;
+ UPDATE public.purchase_orders SET status='approved',approval_status='approved',updated_date=now()
+ WHERE id=po.id AND status IN ('draft','sent','pending');
+ IF NOT FOUND THEN RAISE EXCEPTION 'SUPPLIER_ORDER_APPROVAL_CONCURRENT_CHANGE' USING ERRCODE='40001'; END IF;
+ RETURN jsonb_build_object('id',po.id,'status','approved','already_approved',false);
+END $fn$;
+REVOKE ALL ON FUNCTION public.erp_owner_approve_supplier_order(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.erp_owner_approve_supplier_order(uuid) TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.erp_supplier_mark_order_shipped(p_order_id uuid)
  RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
 DECLARE po public.purchase_orders; supplier_id uuid;
