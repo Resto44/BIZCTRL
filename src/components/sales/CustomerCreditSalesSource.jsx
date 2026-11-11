@@ -347,7 +347,12 @@ export default function CustomerCreditSalesSource({
               )}
             </div>
 
-            {!isPayment && <CustomerCreditInvoiceItems entry={entry} onUpdate={onUpdate} disabled={disabled||creditPosted} currency={currency} lang={lang}/>}
+            {!isPayment && <>
+             <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+              {lang==='ar'?'مهم: إذا سُجّل البيع الآجل بالفعل من كاشير POS، لا تُدخله مرة ثانية في إقفال المبيعات.':lang==='fa'?'مهم: اگر این فروش نسیه قبلاً از Cashier POS ثبت شده، دوباره در کلوزینگ وارد نکنید.':'Important: If this credit sale was already posted by POS, do not record it again in Sales Closing.'}
+             </p>
+             <CustomerCreditInvoiceItems entry={entry} onUpdate={onUpdate} disabled={disabled||creditPosted} currency={currency} lang={lang}/>
+            </>}
             {isPayment ? (
               <div className="space-y-3">
                 <div>
