@@ -6,7 +6,7 @@ const db = createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SER
  auth:{persistSession:false,autoRefreshToken:false}
 });
 const cors = {
- 'Access-Control-Allow-Origin':'https://mybizctrl.site',
+ 'Access-Control-Allow-Origin':'*',
  'Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info',
  'Access-Control-Allow-Methods':'GET,POST,OPTIONS'
 };
@@ -73,7 +73,7 @@ async function identity(userId:string,body:Record<string,unknown>){
  const {data:m,error}=await db.from('erp_memberships')
   .select('id,restaurant_id,branch_id,role,status,selected_branch_ids')
   .eq('user_id',userId).eq('restaurant_id',body.restaurantId)
-  .eq('role',role).eq('status','approved').maybeSingle();
+  .eq('role',role).eq('status','approved').limit(1).maybeSingle();
  if(error||!m||!await allowed(userId,m.restaurant_id,role,null))return null;
  const multi=Array.isArray(m.selected_branch_ids)&&m.selected_branch_ids.length>1;
  return {restaurantId:m.restaurant_id,role,customerId:null,branchId:role==='owner'||multi?null:m.branch_id||null};
@@ -108,10 +108,12 @@ async function stillAuthorized(device:any,event:any){
   .eq('restaurant_id',event.restaurant_id).eq('role',device.role)
   .eq('status','approved').maybeSingle();
  if(error||!m)return false;
- return !event.branch_id||device.role==='owner'||
-   (!device.branch_id||device.branch_id===event.branch_id)&&
-   (!m.branch_id||m.branch_id===event.branch_id||
-     (Array.isArray(m.selected_branch_ids)&&m.selected_branch_ids.includes(event.branch_id)));
+ return !event.branch_id||device.role==='owner'||(
+   (!device.branch_id||device.branch_id===event.branch_id) && (
+     m.branch_id===event.branch_id ||
+     (Array.isArray(m.selected_branch_ids)&&m.selected_branch_ids.includes(event.branch_id)) ||
+     (!m.branch_id&&(!Array.isArray(m.selected_branch_ids)||m.selected_branch_ids.length===0))
+   ));
 }
 async function dispatch(keys:any){
  const {data:jobs,error}=await db.rpc('erp_portal_push_claim');
