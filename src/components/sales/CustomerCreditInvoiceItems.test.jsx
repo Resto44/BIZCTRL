@@ -5,7 +5,7 @@ import CustomerCreditInvoiceItems from './CustomerCreditInvoiceItems';
 import { creditPOSInvoiceItem,creditPOSMenuLabel,creditPOSMenuChoices,creditPOSInvoiceTotal } from '@/lib/closingCreditPOSCatalog';
 
 const mocked=vi.hoisted(()=>({catalog:vi.fn()}));
-vi.mock('@/lib/restaurantPOS',()=>({restaurantRpc:mocked.catalog}));
+vi.mock('@/lib/restaurantPOS',()=>({customerCreditPOSMenuRpc:mocked.catalog}));
 vi.mock('lucide-react',()=>({Trash2:()=>null}));
 vi.mock('@/components/ui/input',()=>({Input:React.forwardRef((props,ref)=>React.createElement('input',{...props,ref}))}));
 vi.mock('@/components/ui/button',()=>({Button:({children,...props})=>React.createElement('button',props,children)}));
@@ -39,7 +39,7 @@ describe('Sales Closing customer credit item dropdown from Cashier POS',()=>{
     entry={{id:'sale-a',items:[],amount:''}} onUpdate={edits}/>);
    await Promise.resolve();
   });
-  expect(mocked.catalog).toHaveBeenCalledWith('customer_credit_pos_items',{
+  expect(mocked.catalog).toHaveBeenCalledWith({
    p_restaurant_id:'rest-a',p_branch_id:'branch-a',p_search:''
   });
   expect(dropdown(tree).props.disabled).toBe(false);
@@ -88,5 +88,6 @@ describe('Sales Closing customer credit item dropdown from Cashier POS',()=>{
    entry={{id:'sale-a',items:[],amount:''}} onUpdate={vi.fn()}/>);await Promise.resolve();});
   expect(dropdown(tree).props.disabled).toBe(true);
   expect(tree.root.findAllByProps({role:'alert'}).length).toBeGreaterThan(0);
+  expect(textOf(tree.root)).not.toContain('No active POS items available in this branch.');
  });
 });
