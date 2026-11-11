@@ -2,6 +2,7 @@ import HelpLink from '@/components/help/HelpLink';
 import {supplierInvoiceCurrencyTotals,readAllPortalRows} from '@/lib/portalReliability';
 import {supplierInvoicePaymentEvidence,supplierInvoiceProgress} from '@/lib/supplierInvoicePaymentEvidence';
 import PortalDataState from '@/components/shared/PortalDataState';
+import SupplierPortalAnalytics from '@/components/suppliers/SupplierPortalAnalytics';
 import React, { useState } from 'react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -53,6 +54,7 @@ const SUPPLIER_COPY = {
     orderProgress:'Order progress',progressHint:'Status of your assigned orders',shipped:'Shipped',received:'Received',
     total:'Total',invoiced:'Invoiced',due:'Due',branch:'Branch',unknownBranch:'Assigned branch',
     allClear:'No actions are required right now.',invoice:'Invoice',purchaseOrder:'Purchase order',
+    waitingOwner:'Awaiting Owner verification',ownerApproved:'Owner-verified delivery',verifiedItems:'Verified products',
     status:{pending:'Pending',approved:'Approved',shipped:'Shipped',received:'Received',cancelled:'Cancelled',
       paid:'Paid',rejected:'Rejected',overdue:'Overdue',partial:'Part paid'},
   },
@@ -70,6 +72,7 @@ const SUPPLIER_COPY = {
     orderProgress:'مراحل الطلبات',progressHint:'حالة أوامر الشراء المسندة لك',shipped:'تم الشحن',received:'تم الاستلام',
     total:'المجموع',invoiced:'قيمة الفواتير',due:'يستحق',branch:'الفرع',unknownBranch:'الفرع المعيّن',
     allClear:'لا توجد إجراءات مطلوبة حالياً.',invoice:'فاتورة',purchaseOrder:'أمر شراء',
+    waitingOwner:'بانتظار تأكيد استلام المالك',ownerApproved:'تم تأكيد الاستلام من المالك',verifiedItems:'الأصناف والكميات المؤكدة',
     status:{pending:'معلّق',approved:'معتمد',shipped:'تم الشحن',received:'تم الاستلام',cancelled:'ملغى',
       paid:'مدفوع',rejected:'مرفوض',overdue:'متأخر',partial:'دفع جزئي'},
   },
@@ -87,6 +90,7 @@ const SUPPLIER_COPY = {
     orderProgress:'مراحل سفارش',progressHint:'وضعیت سفارش‌های مربوط به شما',shipped:'ارسال‌شده',received:'دریافت‌شده',
     total:'مجموع',invoiced:'مبلغ فاکتورها',due:'سررسید',branch:'شعبه',unknownBranch:'شعبهٔ تعیین‌شده',
     allClear:'در حال حاضر اقدام جدیدی لازم نیست.',invoice:'فاکتور',purchaseOrder:'سفارش خرید',
+    waitingOwner:'در انتظار تأیید دریافت از طرف اونر',ownerApproved:'تحویل به تأیید اونر رسید',verifiedItems:'محصولات و مقدار تأییدشده',
     status:{pending:'در انتظار',approved:'تأییدشده',shipped:'ارسال‌شده',received:'دریافت‌شده',cancelled:'لغوشده',
       paid:'پرداخت‌شده',rejected:'ردشده',overdue:'سررسید گذشته',partial:'پرداخت جزئی'},
   },
@@ -160,7 +164,7 @@ export default function SupplierPortalERP() {
         .order('id', { ascending: true }));
     },
     enabled: !!supplierProfile?.id && !!user?.restaurant_id && !!user?.branch_id,
-    refetchInterval: 60000,
+    refetchInterval: 12000,refetchOnWindowFocus:true,
   });
 
   // ── Supplier invoices — canonical supplier id plus tenant and branch ────────
@@ -198,23 +202,28 @@ export default function SupplierPortalERP() {
     refetchInterval:12000,refetchOnWindowFocus:true,
   });
 
+  // Owner confirmation snapshots are scoped to the signed-in supplier by server RPC.
+  const {data:verifiedDeliveries=[],refetch:refetchDeliveries}=useQuery({
+    queryKey:['supplier-verified-deliveries',supplierProfile?.id,user?.branch_id],
+    queryFn:async()=>{
+      const {data,error}=await supabase.rpc('erp_supplier_verified_deliveries');
+      if(error)throw error;
+      return Array.isArray(data)?data:[];
+    },
+    enabled:Boolean(supplierProfile?.id&&user?.restaurant_id&&user?.branch_id),
+    refetchInterval:12000,refetchOnWindowFocus:true,retry:1,
+  });
+
   const confirmShipmentMutation = useMutation({
     mutationFn: async (poId) => {
-      const { data, error } = await supabase
-        .from('purchase_orders')
-        .update({ status: 'shipped' })
-        .eq('id', poId)
-        .eq('restaurant_id', user.restaurant_id)
-        .eq('branch_id', user.branch_id)
-        .eq('supplier_id', supplierProfile.id)
-        .eq('status', 'approved')
-        .select('id');
-      if (error) throw error;
-      if (!data?.length) throw new Error('Order changed or shipment permission is unavailable. Refresh and retry.');
+      const {data,error}=await supabase.rpc('erp_supplier_mark_order_shipped',{p_order_id:poId});
+      if(error)throw error;
+      if(data?.status!=='shipped')throw new Error('Shipment was not confirmed. Refresh and retry.');
     },
     onSuccess: () => {
       toast.success('Shipment confirmed!');
       qc.invalidateQueries({ queryKey: ['supplier-pos'] });
+      qc.invalidateQueries({ queryKey: ['supplier-verified-deliveries'] });
     },
     onError: (err) => toast.error(err.message),
   });
@@ -245,6 +254,7 @@ export default function SupplierPortalERP() {
     inv.supplier_name?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const deliveryByOrder=new Map(verifiedDeliveries.map(row=>[String(row.order_id),row]));
   const pending = purchaseOrders.filter(po => po.status === 'approved');
   const shippedCount = purchaseOrders.filter(po => po.status === 'shipped').length;
   const receivedCount = purchaseOrders.filter(po => po.status === 'received').length;
@@ -274,23 +284,23 @@ export default function SupplierPortalERP() {
       className="min-w-0 bg-slate-50/80 px-3 pb-8 pt-3 text-slate-900 dark:bg-slate-950 dark:text-slate-50 sm:px-5 sm:pt-5">
       <div className="mx-auto w-full max-w-6xl space-y-3.5 sm:space-y-4">
         <header data-testid="supplier-erp-header" className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            <div className="flex w-full min-w-0 items-start gap-3 sm:w-auto sm:flex-1 sm:items-center">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                 <Package className="h-5 w-5" aria-hidden="true"/>
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">{copy.workspace}</p>
-                <h1 className="truncate text-base font-extrabold text-slate-950 dark:text-white sm:text-lg">{supplierProfile?.name || copy.workspace}</h1>
-                <p className="min-w-0 break-all text-xs text-slate-500 dark:text-slate-400">{user?.email}</p>
+                <h1 data-testid="supplier-full-name" className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-lg font-extrabold leading-6 text-slate-950 dark:text-white sm:text-xl">{supplierProfile?.name || copy.workspace}</h1>
+                <p data-testid="supplier-account-email" className="mt-1 min-w-0 break-all text-xs leading-5 text-slate-500 dark:text-slate-400">{user?.email}</p>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex shrink-0 items-center justify-end gap-1.5 self-end sm:self-auto">
               <span className="hidden items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 sm:inline-flex">
                 <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true"/>{copy.verified}
               </span>
               <Button type="button" variant="ghost" size="icon" aria-label={copy.refresh} title={copy.refresh}
-                onClick={()=>{retrySupplierProfile();refetch();refetchInvoices();refetchPayments();}}
+                onClick={()=>{retrySupplierProfile();refetch();refetchInvoices();refetchPayments();refetchDeliveries();}}
                 className="h-10 w-10 rounded-xl text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
                 <RefreshCw className="h-4 w-4" aria-hidden="true"/>
               </Button>
@@ -329,6 +339,9 @@ export default function SupplierPortalERP() {
               <h2 className="text-base font-extrabold text-slate-900 dark:text-white sm:text-lg">{copy.home}</h2>
               <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">{copy.subhead}</p>
             </div>
+            <SupplierPortalAnalytics orders={purchaseOrders} invoices={invoices} payments={payments} deliveries={verifiedDeliveries}
+              lang={lang} loading={isLoading||invoicesLoading||paymentsLoading}
+              onOpenOrders={()=>setActiveTab('orders')} onOpenInvoices={()=>setActiveTab('invoices')}/>
             <div data-testid="supplier-erp-kpis" className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               <button type="button" onClick={()=>setActiveTab('orders')}
                 className="min-w-0 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-start shadow-sm transition-colors hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-amber-600 dark:border-amber-900 dark:bg-amber-950 dark:hover:bg-amber-900">
@@ -422,7 +435,7 @@ export default function SupplierPortalERP() {
             {!isLoading && pending.length>0 && <section className="space-y-2">
               <h3 className="px-0.5 text-sm font-bold text-slate-900 dark:text-white">{copy.pendingShipments} · {pending.length}</h3>
               <div className="grid gap-2.5 lg:grid-cols-2">
-                {pending.map(po=><POCard key={po.id} po={po} copy={copy} onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)} loading={confirmShipmentMutation.isPending}/>)}
+                {pending.map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)} loading={confirmShipmentMutation.isPending}/>)}
               </div>
             </section>}
             {!isLoading && !invoicesLoading && pending.length === 0 && invoices.length === 0 &&
@@ -476,7 +489,7 @@ export default function SupplierPortalERP() {
             </div>
             {isLoading?<p role="status" className="p-4 text-xs text-slate-600">{copy.loading}</p>:
               filteredPOs.length===0?<div className="rounded-2xl border border-slate-200 bg-white p-5 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{copy.noOrders}</div>:
-              <div className="grid gap-2.5 lg:grid-cols-2">{filteredPOs.map(po=><POCard key={po.id} po={po} copy={copy} onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)} loading={confirmShipmentMutation.isPending}/>)}</div>}
+              <div className="grid gap-2.5 lg:grid-cols-2">{filteredPOs.map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)} loading={confirmShipmentMutation.isPending}/>)}</div>}
           </section>}
 
           {activeTab==='history' && <section data-testid="supplier-history-tab" className="space-y-3">
@@ -486,7 +499,7 @@ export default function SupplierPortalERP() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{copy.noHistory}</div>:
                 <div className="grid gap-2.5 lg:grid-cols-2">
                   {purchaseOrders.filter(po=>['received','cancelled'].includes(po.status))
-                    .map(po=><POCard key={po.id} po={po} copy={copy} loading={false} onConfirmShipment={()=>{}}/>)}
+                    .map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} loading={false} onConfirmShipment={()=>{}}/>)}
                 </div>}
           </section>}
         </main>
@@ -603,7 +616,7 @@ function InvoiceCard({inv,copy,payments=[],paymentsLoading=false,paymentsError=f
 }
 
 // ── Purchase order card: unchanged branch-scoped confirmShipment mutation ────
-function POCard({ po, onConfirmShipment, loading, copy }) {
+function POCard({ po, onConfirmShipment, loading, copy, ownerVerification=null }) {
   const statusConf = PO_STATUS[po.status] || PO_STATUS.pending;
   const [expanded,setExpanded]=useState(false);
   return <Card data-testid="supplier-purchase-order-card" className="min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -617,6 +630,8 @@ function POCard({ po, onConfirmShipment, loading, copy }) {
           </div>
         </div>
         <Badge className={'shrink-0 rounded-full border px-2.5 py-1 text-[11px] '+statusConf.color}>{copy.status[po.status]||statusConf.label}</Badge>
+        {po.status==='shipped'&&<p data-testid="supplier-awaiting-owner-status" className="mt-1 text-end text-[11px] font-bold text-amber-700 dark:text-amber-300">{copy.waitingOwner}</p>}
+        {po.status==='received'&&ownerVerification&&<p data-testid="supplier-owner-verified-badge" className="mt-1 text-end text-[11px] font-bold text-emerald-700 dark:text-emerald-300">{copy.ownerApproved}</p>}
       </div>
       <div className="flex min-w-0 items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
         <span className="text-xs text-slate-500 dark:text-slate-400">{copy.total}</span>
@@ -634,6 +649,14 @@ function POCard({ po, onConfirmShipment, loading, copy }) {
           </div>)}
         </div>}
       </>}
+      {po.status==='received'&&ownerVerification&&<div data-testid="supplier-verified-order-items"
+        className="mt-2 space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs dark:border-emerald-900 dark:bg-emerald-950">
+        <p className="font-bold text-emerald-900 dark:text-emerald-100">{copy.verifiedItems} · {dateLabel(ownerVerification.confirmed_at)}</p>
+        {(ownerVerification.verified_items||[]).map((item,i)=><div key={i} className="flex min-w-0 justify-between gap-2">
+          <span className="min-w-0 break-words">{item.product_name||item.name||'—'}</span>
+          <strong className="shrink-0 tabular-nums">×{item.received_quantity}</strong>
+        </div>)}
+      </div>}
       {po.status==='approved' && <Button type="button" disabled={loading} onClick={onConfirmShipment}
         className="mt-1 min-h-11 w-full rounded-xl bg-blue-600 font-bold text-white hover:bg-blue-700">
         <Truck className="me-2 h-4 w-4" aria-hidden="true"/>{copy.confirmShip}

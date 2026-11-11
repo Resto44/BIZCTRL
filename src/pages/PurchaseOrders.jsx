@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useAuth } from '@/lib/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,28 +14,45 @@ import PurchaseOrderForm from '@/components/purchase-orders/PurchaseOrderForm';
 import PurchaseOrderDetail from '@/components/purchase-orders/PurchaseOrderDetail';
 import ReceiveOrderDialog from '@/components/purchase-orders/ReceiveOrderDialog';
 import GenerateFromLowStock from '@/components/purchase-orders/GenerateFromLowStock';
+import SupplierOrderOwnerVerification from '@/components/purchase-orders/SupplierOrderOwnerVerification';
 
 const statusColors = {
   draft: 'bg-muted text-muted-foreground',
   sent: 'bg-blue-100 text-blue-700',
   partial: 'bg-amber-100 text-amber-700',
   received: 'bg-emerald-100 text-emerald-700',
+  approved: 'bg-blue-100 text-blue-700',
+  shipped: 'bg-violet-100 text-violet-700',
   cancelled: 'bg-red-100 text-red-700',
 };
 
 export default function PurchaseOrders() {
   const { t, currency } = useLanguage();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
   const [viewingOrder, setViewingOrder] = useState(null);
   const [receivingOrder, setReceivingOrder] = useState(null);
+  const [verifyingOrderId,setVerifyingOrderId]=useState(null);
   const [showLowStock, setShowLowStock] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(null);
 
-  const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['purchase_orders'],
-    queryFn: () => base44.entities.PurchaseOrder.list('-date', 200),
+  // The canonical purchase_orders table has created_date, not date.
+  // Keep the Owner's read strictly tenant-scoped so shipped supplier orders
+  // remain visible for verification. RLS still enforces the caller's scope.
+  const { data: orders = [], isLoading, isError:ordersError, refetch:refetchOrders } = useQuery({
+    queryKey: ['purchase_orders',user?.restaurant_id],
+    enabled: Boolean(user?.restaurant_id),
+    queryFn: async () => {
+      const {data,error}=await supabase.from('purchase_orders').select('*')
+        .eq('restaurant_id',user.restaurant_id)
+        .order('created_date',{ascending:false}).limit(500);
+      if(error)throw error;
+      return data||[];
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
   });
 
   const deleteMutation = useMutation({
@@ -43,6 +63,17 @@ export default function PurchaseOrders() {
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }) => base44.entities.PurchaseOrder.update(id, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['purchase_orders'] }),
+  });
+
+  const ownerApproveMutation = useMutation({
+    mutationFn: async orderId => {
+      const {data,error}=await supabase.rpc('erp_owner_approve_supplier_order',{p_order_id:orderId});
+      if(error)throw error;
+      if(data?.status!=='approved')throw new Error('Purchase order was not approved');
+      return data;
+    },
+    onSuccess:()=>{toast.success('Purchase order approved for Supplier');queryClient.invalidateQueries({queryKey:['purchase_orders']});},
+    onError:e=>toast.error(e.message||'Owner approval failed'),
   });
 
   const handleSendEmail = async (order) => {
@@ -103,9 +134,13 @@ export default function PurchaseOrders() {
         }
       />
 
+      {ordersError && <div role="alert" className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        Could not load purchase orders. <Button type="button" variant="outline" size="sm"
+          className="ms-2 min-h-10" onClick={()=>refetchOrders()}>Retry</Button>
+      </div>}
       {isLoading ? (
         <div className="text-center text-muted-foreground py-10">Loading...</div>
-      ) : orders.length === 0 ? (
+      ) : ordersError ? null : orders.length === 0 ? (
         <div className="text-center text-muted-foreground py-16">
           <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p>No purchase orders yet</p>
@@ -166,6 +201,24 @@ export default function PurchaseOrders() {
                     </Button>
                   )}
 
+                  {/* Owner approves the original draft/sent PO before Supplier may ship. */}
+                  {user?.role==='owner' && order.supplier_id && order.branch_id &&
+                    ['draft','sent','pending'].includes(order.status) && (
+                    <Button type="button" size="sm" variant="outline"
+                      className="min-h-11 border-blue-300 text-blue-800"
+                      disabled={ownerApproveMutation.isPending}
+                      onClick={()=>ownerApproveMutation.mutate(order.id)}>
+                      <PackageCheck className="me-1 size-4"/>Approve for supplier shipment
+                    </Button>
+                  )}
+                  {/* Supplier marked shipment: only Owner can verify every delivered product. */}
+                  {order.status==='shipped' && order.supplier_id && user?.role==='owner' && (
+                    <Button type="button" size="sm" variant="outline"
+                      className="min-h-11 border-emerald-300 text-emerald-800"
+                      onClick={()=>setVerifyingOrderId(v=>v===order.id?null:order.id)}>
+                      <PackageCheck className="me-1 size-4"/>Verify delivered products
+                    </Button>
+                  )}
                   {/* Receive — opens partial receipt dialog */}
                   {canReceive && (
                     <Button
@@ -182,6 +235,9 @@ export default function PurchaseOrders() {
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
+                {verifyingOrderId===order.id && user?.role==='owner' &&
+                  <SupplierOrderOwnerVerification order={order} onCancel={()=>setVerifyingOrderId(null)}
+                    onConfirmed={()=>{setVerifyingOrderId(null);queryClient.invalidateQueries({queryKey:['purchase_orders']});}}/>}
               </Card>
             );
           })}
