@@ -95,6 +95,7 @@ const newCustomerCreditEntry = (sourceId = '') => ({
   amount: '',
   payment_amount: '',
   payment_method: 'cash',
+  items: [],
   notes: '',
 });
 const parseSalesSourceEntries = (record) => {
@@ -1736,6 +1737,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               credit_limit: creditLimit,
               available_credit: Math.max(0, creditLimit - outstandingDebt),
               amount,
+              items: Array.isArray(rest.items)?rest.items:[],
               notes: rest.notes || '',
             };
           }),
