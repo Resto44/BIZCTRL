@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import {branchManagerState} from '@/lib/branchManagerState';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
@@ -20,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  GitBranch, Plus, Pencil, Trash2, Users, TrendingUp, DollarSign,
+  GitBranch, Plus, UserPlus, Pencil, Trash2, Users, TrendingUp, DollarSign,
   ShoppingCart, Receipt, MapPin, Phone, Clock, UserCheck, UserX,
   BarChart3, AlertTriangle, CheckCircle2, Building2, Mail,
   Shield, ShieldCheck, ShieldOff, Key, RefreshCw, Copy,
@@ -80,6 +82,13 @@ const UI = {
     title: 'Branch Management & Role Control Center',
     subtitle: 'Manage branches, users, roles, and permissions from one place',
     add_branch: 'Add Branch',
+    add_manager: 'Add Manager',
+    active_manager: 'Verified manager',
+    inactive_manager: 'Manager suspended',
+    manager_lookup_error: 'Manager records unavailable. Retry before changing access.',
+    manager_lookup_pending: 'Checking manager assignment…',
+    manager_contact_only: 'Legacy manager contact only — not a verified account.',
+    manager_form_hint: 'Manager name and email are contact notes only. Use Add Manager to grant secure ERP access.',
     edit_branch: 'Edit Branch',
     delete_branch: 'Delete Branch',
     branch_name: 'Branch Name',
@@ -161,6 +170,13 @@ const UI = {
     title: 'مركز إدارة الفروع والصلاحيات',
     subtitle: 'إدارة الفروع والمستخدمين والأدوار والصلاحيات من مكان واحد',
     add_branch: 'إضافة فرع',
+    add_manager: 'إضافة مدير',
+    active_manager: 'مدير معتمد',
+    inactive_manager: 'حساب المدير موقوف',
+    manager_lookup_error: 'تعذر تحميل حسابات المديرين. أعد المحاولة قبل تغيير الصلاحيات.',
+    manager_lookup_pending: 'جارٍ التحقق من تعيين المدير…',
+    manager_contact_only: 'بيانات مدير قديمة فقط — ليست حساباً معتمداً.',
+    manager_form_hint: 'الاسم والبريد هنا بيانات اتصال فقط. استخدم إضافة مدير لتفعيل وصول ERP الآمن.',
     edit_branch: 'تعديل الفرع',
     delete_branch: 'حذف الفرع',
     branch_name: 'اسم الفرع',
@@ -242,6 +258,13 @@ const UI = {
     title: 'مرکز مدیریت شعب و کنترل نقش',
     subtitle: 'مدیریت شعب، کاربران، نقش‌ها و مجوزها از یک مکان',
     add_branch: 'افزودن شعبه',
+    add_manager: 'افزودن مدیر',
+    active_manager: 'مدیر تأییدشده',
+    inactive_manager: 'حساب مدیر تعلیق است',
+    manager_lookup_error: 'فهرست مدیران بار نشد. پیش از تغییر دسترسی دوباره تلاش کن.',
+    manager_lookup_pending: 'در حال بررسی مدیر شعبه…',
+    manager_contact_only: 'تنها تماس قدیمی مدیر ثبت است؛ حساب ERP تأیید نشده.',
+    manager_form_hint: 'نام و ایمیل اینجا فقط معلومات تماس است. برای دسترسی واقعی مدیر از افزودن مدیر استفاده کن.',
     edit_branch: 'ویرایش شعبه',
     delete_branch: 'حذف شعبه',
     branch_name: 'نام شعبه',
@@ -359,6 +382,7 @@ function BranchForm({ initial, onSubmit, onCancel, u, saving }) {
       <div>
         <Label><UserCheck className="w-3 h-3 inline mr-1" />{u.manager_name}</Label>
         <Input value={form.manager_name || ''} onChange={e => set('manager_name', e.target.value)} />
+        <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{u.manager_form_hint}</p>
       </div>
       <div className="flex items-center gap-2">
         <Switch checked={form.is_active !== false} onCheckedChange={v => set('is_active', v)} />
@@ -691,6 +715,7 @@ function AuditLogTab({ restaurantId, u }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function BranchManagement() {
+  const navigate = useNavigate();
   const { lang, currency } = useLanguage();
   const u = UI[lang] || UI.en;
   const { role } = useRole();
@@ -759,7 +784,7 @@ export default function BranchManagement() {
   });
 
   // Fetch all users (erp_memberships) for this restaurant
-  const { data: memberships = [], refetch: refetchMembers } = useQuery({
+  const { data: memberships = [], isPending: membersLoading, isError: membersError, refetch: refetchMembers } = useQuery({
     queryKey: ['bm_memberships', activeRestaurantId],
     queryFn: async () => {
       if (!activeRestaurantId) return [];
@@ -769,28 +794,52 @@ export default function BranchManagement() {
         .eq('restaurant_id', activeRestaurantId)
         .order('created_at', { ascending: false })
         .limit(500);
-      if (error) { console.error('[BM] memberships load error', error); return []; }
+      if (error) throw error; // Never present a failed authorization read as 'no manager'.
       return data || [];
     },
     enabled: !!activeRestaurantId,
     staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 
   // Fetch branches from DB (with UUIDs)
-  const { data: dbBranches = [] } = useQuery({
+  const { data: dbBranches = [], isPending: branchesLoading, isError: branchesError, refetch: refetchBranches } = useQuery({
     queryKey: ['bm_db_branches', activeRestaurantId],
     queryFn: async () => {
       if (!activeRestaurantId) return [];
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('branches')
-        .select('id, name, location, is_active')
+        .select('id, name, branch_key, location, is_active')
         .eq('restaurant_id', activeRestaurantId)
         .order('name');
+      if(error) throw error;
       return data || [];
     },
     enabled: !!activeRestaurantId,
     staleTime: 60000,
   });
+
+  // A branch's legacy manager_name/email fields are contact notes, NOT ERP access.
+  // Resolve verified manager memberships against the canonical, tenant-scoped UUID.
+  const resolveManagerState = useCallback(branch => branchManagerState({
+    branch, dbBranches, memberships,
+    loading: branchesLoading || membersLoading,
+    error: branchesError || membersError,
+  }),[dbBranches,memberships,branchesLoading,membersLoading,branchesError,membersError]);
+
+  const openManagerInvite = useCallback(branch => {
+    if(!activeRestaurantId)return;
+    const canonical = dbBranches.find(row => branch && (
+      String(row.id)===String(branch.id) ||
+      (row.branch_key && String(row.branch_key)===String(branch.key || branch.branch_key))
+    ));
+    // Router context is just a prefill hint, never authorization. The Owner invite
+    // page independently verifies organization and branch through owner-scoped RPCs.
+    navigate('/staff-invitations', {state:{managerInvitation:{
+      restaurantId:String(activeRestaurantId),
+      branchId:canonical?.id || '',
+    }}});
+  },[activeRestaurantId,dbBranches,navigate]);
 
   // ── Computed stats ─────────────────────────────────────────────────────────
   const recentSales = sales.filter(s => s.date >= thirtyDaysAgo);
@@ -1003,11 +1052,15 @@ export default function BranchManagement() {
     <div>
       <PageHeader
         title={u.title}
-        action={
-          <Button size="sm" onClick={() => { setEditing(null); setShowForm(true); }}>
-            <Plus className="w-4 h-4 mr-1" /> {u.add_branch}
+        action={<div className="flex max-w-full flex-wrap items-center gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={()=>openManagerInvite(dbBranches.length===1?dbBranches[0]:null)}
+            disabled={!activeRestaurantId} aria-label={u.add_manager} data-testid="branch-add-manager-header">
+            <UserPlus className="mr-1.5 h-4 w-4"/>{u.add_manager}
           </Button>
-        }
+          <Button type="button" size="sm" onClick={() => { setEditing(null); setShowForm(true); }}>
+            <Plus className="mr-1 h-4 w-4" /> {u.add_branch}
+          </Button>
+        </div>}
       />
       <p className="text-xs text-muted-foreground mb-4">{u.subtitle}</p>
 
@@ -1094,22 +1147,34 @@ export default function BranchManagement() {
                         <p className="text-xs font-bold">{stats.employeeCount}</p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        {b.manager_email ? (
-                          <>
-                            <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <p className="text-xs font-medium truncate">{b.manager_name || b.manager_email}</p>
-                          </>
-                        ) : (
-                          <>
-                            <UserX className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                            <p className="text-xs text-muted-foreground">{u.no_manager}</p>
-                          </>
-                        )}
+                    <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/30 px-3 py-2">
+                      <div className="flex min-w-0 items-center gap-1.5" data-testid="branch-manager-assignment">
+                        {(() => {
+                          const manager=resolveManagerState(b);
+                          if(manager.kind==='loading')return <><RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin"/><span className="text-xs">{u.manager_lookup_pending}</span></>;
+                          if(manager.kind==='error'||manager.kind==='unresolved')return <>
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600"/>
+                            <span className="text-xs text-amber-700 dark:text-amber-300">{u.manager_lookup_error}</span>
+                            <button type="button" className="text-xs underline" onClick={()=>{refetchMembers();refetchBranches();}}>{u.refresh||'Retry'}</button>
+                          </>;
+                          if(manager.kind==='approved'||manager.kind==='suspended')return <>
+                            <UserCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600"/>
+                            <span className="min-w-0 break-words text-xs font-semibold">{manager.members.map(m=>m.full_name||m.email||'Manager').join(', ')}</span>
+                            <span className="shrink-0 text-[10px] text-muted-foreground">({manager.kind==='approved'?u.active_manager:u.inactive_manager})</span>
+                          </>;
+                          return <>
+                            <UserX className="h-3.5 w-3.5 shrink-0 text-muted-foreground"/>
+                            <span className="text-xs text-muted-foreground">{u.no_manager}</span>
+                            {manager.kind==='legacy'&&<span className="text-[10px] text-amber-700 dark:text-amber-300">{u.manager_contact_only}</span>}
+                          </>;
+                        })()}
                       </div>
                       <Switch checked={b.is_active !== false} onCheckedChange={() => handleToggle(b.key)} />
                     </div>
+                    <Button type="button" variant="outline" size="sm" className="mt-2 min-h-10 w-full gap-2 rounded-xl"
+                      aria-label={u.add_manager} data-testid="branch-add-manager-action" onClick={()=>openManagerInvite(b)}>
+                      <UserPlus className="h-4 w-4"/>{u.add_manager}
+                    </Button>
                     {(b.phone || b.working_hours) && (
                       <div className="flex gap-3 mt-2 text-[10px] text-muted-foreground">
                         {b.phone && <span className="flex items-center gap-0.5"><Phone className="w-2.5 h-2.5" /> {b.phone}</span>}
