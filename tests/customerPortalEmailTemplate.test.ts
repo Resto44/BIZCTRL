@@ -13,7 +13,7 @@ describe('Customer invitation transactional email', () => {
     });
     expect(subject).toContain('BizControl');
     expect(html).toContain('href="' + url + '"');
-    expect(html).toContain('Open invitation & register');
+    expect(html).toContain('Open invitation &amp; register');
     expect(html).toContain('target="_blank"');
     expect(html).toContain('<table role="presentation"');
     expect(html).toContain('width:100%;max-width:600px');
@@ -53,7 +53,7 @@ describe('Customer invitation transactional email', () => {
     });
     expect(html).toContain('separate verification message');
     expect(html).toContain('The invitation button does not replace the separate email verification step');
-    expect(text).toContain('Reopen this invitation');
+    expect(text).toContain('reopen this invitation');
   });
 
   it('sends HTML and plain text from the same verified owner-only edge handler', async () => {
