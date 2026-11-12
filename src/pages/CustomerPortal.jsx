@@ -62,7 +62,9 @@ export default function CustomerPortal() {
   if(signup&&(!invite||password.length<10))throw Error('INVALID_SIGNUP');
   // The existing identity-only registration path grants no staff role or data access.
   const result=signup?await supabase.auth.signUp({...credentials,options:{emailRedirectTo:window.location.origin+'/customer-portal',data:{people_portal_registration:true}}}):await supabase.auth.signInWithPassword(credentials);
-  if(result.error)throw result.error;if(result.data.session){setSession(result.data.session);setEmailPending(false);}else{setEmailPending(true);setNotice(t.verify);}
+  if(result.error)throw result.error;
+  if(result.data.session){setSession(result.data.session);setEmailPending(false);}
+  else {setEmailPending(true);setNotice(signup?t.registrationRequested:t.verify);}
  });}
  function signOutForInvitation(){return run(async()=>{
   const {error}=await supabase.auth.signOut();
@@ -115,13 +117,25 @@ export default function CustomerPortal() {
    </header>
    {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{error}</p>}
    {notice&&<p role="status" className="rounded-lg bg-teal-50 p-3">{notice}</p>}
-   {loading?<p role="status">{t.loading}</p>:!session?<form className="mx-auto max-w-md space-y-4 rounded-2xl border bg-white p-6 shadow-sm" onSubmit={e=>{e.preventDefault();authenticate(false);}}>
-    <label className="block">{t.email}<Input type="email" required autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} /></label>
-    <label className="block">{t.password}<Input type="password" required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label>
-    <Button disabled={busy} className="w-full">{t.signin}</Button>
-    {invite&&<Button type="button" variant="outline" disabled={busy||password.length<10||!email.includes('@')} className="w-full" onClick={()=>authenticate(true)}>{t.signup}</Button>}
-    {invite&&<><Button type="button" variant="outline" disabled={busy||!email.includes('@')} className="w-full" onClick={resendConfirmation}>{t.resendConfirmation}</Button><p className="text-xs text-slate-500">{t.confirmEmailHelp}</p></>}
-    <p className="text-sm text-slate-500">{emailPending?t.emailNotVerified:invite?t.verify:t.empty}</p>
+   {loading?<p role="status">{t.loading}</p>:!session?<form className="mx-auto max-w-md space-y-4 rounded-2xl border bg-white p-6 shadow-sm" onSubmit={e=>{e.preventDefault();authenticate(Boolean(invite&&!emailPending));}}>
+    {invite&&<section data-testid="customer-verification-steps" className="space-y-2 rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm text-teal-950">
+      <strong className="block font-black">{t.signupTitle}</strong>
+      <ol className="space-y-1.5 text-xs leading-5"><li>{t.signupStep1}</li><li>{t.signupStep2}</li><li>{t.signupStep3}</li></ol>
+     </section>}
+     {emailPending&&<section data-testid="customer-verification-pending" role="status" className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+      <strong className="block font-black">{t.verificationPendingTitle}</strong>
+      <p className="text-xs leading-5">{t.verificationPendingHelp}</p>
+     </section>}
+     <label className="block">{t.email}<Input type="email" required autoComplete="email" inputMode="email" spellCheck={false} value={email} onChange={e=>{setEmail(e.target.value);setEmailPending(false);}} /></label>
+    <label className="block">{t.password}<Input type="password" required minLength={invite&&!emailPending?10:undefined}
+      autoComplete={invite&&!emailPending?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)}/></label>
+    {invite&&!emailPending?<>
+      <Button type="button" data-testid="customer-create-account" disabled={busy||password.length<10||!email.includes('@')} className="min-h-11 w-full" onClick={()=>authenticate(true)}>{t.signup}</Button>
+      <Button type="button" data-testid="customer-existing-sign-in" variant="outline" disabled={busy||!email.includes('@')||!password} className="min-h-11 w-full" onClick={()=>authenticate(false)}>{t.signupInstead}</Button>
+     </>:<Button type="submit" disabled={busy||!email.includes('@')||!password} className="min-h-11 w-full">{t.signin}</Button>}
+     {emailPending&&<Button type="button" data-testid="customer-resend-verification" variant="outline" disabled={busy||!email.includes('@')} className="min-h-11 w-full" onClick={resendConfirmation}>{t.resendConfirmation}</Button>}
+     {invite&&<p className="text-xs leading-5 text-slate-500">{t.confirmEmailHelp}</p>}
+     <p className="text-sm text-slate-500">{emailPending?t.emailNotVerified:invite?t.verify:t.empty}</p>
    </form>:<>
     {invite && !accounts.isPending && !accounts.isError && account ? <aside className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm print:hidden">
      <p className="min-w-0 flex-1 leading-relaxed text-amber-950">{t.additionalInviteHint}</p>
