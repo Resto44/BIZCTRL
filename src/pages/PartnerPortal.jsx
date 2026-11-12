@@ -1,4 +1,4 @@
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {withPortalReadDeadline} from '@/lib/portalReadDeadline';
 import {supabase} from '@/api/supabaseClient';
@@ -12,6 +12,7 @@ import WalletPushSettings from '@/components/wallet-banking/WalletPushSettings';
 import {walletRequestId,walletPushRecord} from '@/lib/walletPushLink';
 import {disableDevicePush} from '@/lib/ownerPush';
 import {Input} from '@/components/ui/input';
+import {resolveWalletEnrollmentIntent} from '@/lib/walletEnrollmentIntent';
 
 const tr={
  en:{error:'Account identity conflict. Contact the business owner.',choose:'Choose wallet account',loading:'Loading verified wallet…',signup:'Create account',signin:'Sign in',verify:'Check email for confirmation before requesting account access.',empty:'No owner-approved wallet account yet. Submit a membership request.',invalid:'Enter a valid email and password (at least 10 characters for registration).',failed:'Could not complete the request.',signout:'Sign out',access:'Wallet Banking Center',refresh:'Refresh'},
@@ -28,7 +29,14 @@ export default function PartnerPortal(){
  const t=tr[lang]||tr.en,people=peopleText(lang),client=useQueryClient();
  const [session,setSession]=useState(null),[authLoading,setAuthLoading]=useState(true);
  const [email,setEmail]=useState(''),[password,setPassword]=useState('');
- const [invite,setInvite]=useState(()=>fromAddress('invite')),[join,setJoin]=useState(()=>fromAddress('join')),[personal,setPersonal]=useState(()=>fromAddress('personal'));
+ const initialIntent=useMemo(()=>resolveWalletEnrollmentIntent({
+  hash:window.location.hash,search:window.location.search,
+  savedPersonal:sessionStorage.getItem('people:personal')||'',
+  savedJoin:sessionStorage.getItem('people:join')||'',
+ }),[]);
+ const [invite,setInvite]=useState(()=>initialIntent.explicit&&initialIntent.kind!=='partner'?'':fromAddress('invite'));
+ const [join,setJoin]=useState(initialIntent.join),[personal,setPersonal]=useState(initialIntent.personal);
+ const [invalidInvite,setInvalidInvite]=useState(initialIntent.invalid);
  const [selected,setSelected]=useState(''),[busy,setBusy]=useState(false);
  const [error,setError]=useState(''),[notice,setNotice]=useState('');
  const lock=useRef(false);
@@ -43,6 +51,32 @@ export default function PartnerPortal(){
   return()=>{live=false;subscription.unsubscribe();};
  },[]);
  useEffect(()=>{setSelected('');},[session?.user?.id]);
+ // The most recently opened URL is authoritative. Older sessionStorage
+ // join tokens are cleared rather than silently sent to the wrong RPC.
+ useEffect(()=>{
+  if(initialIntent.explicit){
+   sessionStorage.removeItem('people:join');
+   sessionStorage.removeItem('people:personal');
+   if(initialIntent.kind!=='partner')sessionStorage.removeItem('partner:invite');
+  }
+  const sync=()=>{
+   const intent=resolveWalletEnrollmentIntent({
+    hash:window.location.hash,search:window.location.search,
+    savedPersonal:sessionStorage.getItem('people:personal')||'',
+    savedJoin:sessionStorage.getItem('people:join')||'',
+   });
+   if(!intent.explicit)return;
+   setJoin(intent.join);setPersonal(intent.personal);setInvalidInvite(intent.invalid);
+   setInvite(intent.kind==='partner'?fromAddress('invite'):'');
+   sessionStorage.removeItem('people:join');sessionStorage.removeItem('people:personal');
+   if(intent.kind!=='partner')sessionStorage.removeItem('partner:invite');
+   if(intent.join)sessionStorage.setItem('people:join',intent.join);
+   if(intent.personal)sessionStorage.setItem('people:personal',intent.personal);
+  };
+  window.addEventListener('hashchange',sync);
+  window.addEventListener('popstate',sync);
+  return()=>{window.removeEventListener('hashchange',sync);window.removeEventListener('popstate',sync);};
+ },[]);
  useEffect(()=>{if(invite)sessionStorage.setItem('partner:invite',invite);if(join)sessionStorage.setItem('people:join',join);if(personal)sessionStorage.setItem('people:personal',personal);},[invite,join,personal]);
  const accounts=useQuery({
   queryKey:['partner-portal-accounts',session?.user?.id],
@@ -111,7 +145,23 @@ export default function PartnerPortal(){
    </div>:
    <>
     {invite&&<div className="rounded-xl border bg-white p-3 text-sm"><p>{session.user.email}</p><Button className="mt-2" disabled={busy} onClick={activate}>{people.accept}</Button></div>}
-    {(!accounts.isLoading&&!accounts.isError&&(!verified.length||join||personal))&&<PeopleMemberships userId={session.user.id} t={people} joinToken={personal||join} personalJoin={!!personal} onJoined={()=>{setJoin('');setPersonal('');sessionStorage.removeItem('people:join');sessionStorage.removeItem('people:personal');setNotice(people.joinSent);accounts.refetch();}}/>}
+    {invalidInvite&&<p role="alert" data-testid="wallet-invitation-stale" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{people.walletInviteNeeded}</p>}
+    {(!accounts.isLoading&&!accounts.isError&&(!verified.length||join||personal))&&<PeopleMemberships
+     userId={session.user.id} signedInEmail={session.user.email||''} t={people}
+     joinToken={personal||join} personalJoin={!!personal} onSwitchAccount={signOut}
+     onJoined={()=>{
+      setJoin('');setPersonal('');setInvalidInvite(false);
+      sessionStorage.removeItem('people:join');sessionStorage.removeItem('people:personal');
+      // Remove consumed bearer tokens from visible URL so reload cannot
+      // accidentally resubmit one-time invitations from address bar.
+      const url=new URL(window.location.href);
+      const fragment=new URLSearchParams(url.hash.slice(1));
+      fragment.delete('join');fragment.delete('personal');
+      url.hash=fragment.toString();
+      url.searchParams.delete('join');url.searchParams.delete('personal');
+      window.history.replaceState(window.history.state,'',url.pathname+url.search+url.hash);
+      setNotice(people.joinSent);accounts.refetch();
+     }}/>} 
     {accounts.isPending?<p role="status">{t.loading}</p>:
      accounts.isError?<p role="alert" className="rounded-xl border bg-rose-50 p-3">{t.failed}<Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></p>:
      conflict?<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4">{t.error}</p>:
