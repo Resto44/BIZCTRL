@@ -59,6 +59,11 @@ export async function buildAutomaticReportPdf({db,job,context}) {
   range,revenueSources});
  const fullAnalytics=buildFullSalesAnalyticsReport({...data,snapshot,previousSnapshot:previous,
   operationsReport:report,range,revenueSources,branches:reportBranches,lang,historyAvailable:true});
+ // The email renderer must NEVER silently omit the Owner's Driver Sales chart.
+ // A successfully sent three-page PDF that lacks this section is incomplete,
+ // even when network analytics and the finance pages are present.
+ if (!fullAnalytics?.driverSales?.available)
+  throw new Error('REPORT_DRIVER_APPENDIX_MISSING');
  // Automatic email MUST use the same network appendix as the manual Reports PDF.
  // Never silently attach the old two-page template: no verified appendix means
  // retry with a visible error instead of marking an incomplete report accepted.
