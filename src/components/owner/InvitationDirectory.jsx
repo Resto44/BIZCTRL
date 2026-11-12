@@ -54,7 +54,7 @@ export default function InvitationDirectory({ restaurantId, branchId, role, bran
                 : needle ? t('No matching users.') : t('No matching users. Enter new user details below.')}
             </p>}
             {visible.map(person => {
-              const selectable = person.canCreateInvitation && (person.email || person.phone) && !!branchId && !busy;
+              const selectable = person.canCreateInvitation && !!branchId && !busy;
               const details = <>
                 <span className="block min-w-0 break-words text-sm font-semibold text-slate-900 dark:text-white">{person.full_name}</span>
                 <span className="block break-all text-xs text-slate-600 dark:text-slate-400">{person.email || person.phone || t('Add an email or phone below')}</span>
