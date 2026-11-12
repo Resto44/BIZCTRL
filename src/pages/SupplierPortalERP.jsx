@@ -546,7 +546,7 @@ export default function SupplierPortalERP() {
                 <div className="space-y-3">
                   <div className="grid gap-2.5 lg:grid-cols-2">{filteredGoods.slice(0,visibleGoodsCount).map(entry=><InvoiceGoodsCard key={entry.invoice.id} entry={entry} copy={copy}/>)}</div>
                   {filteredGoods.length>visibleGoodsCount&&<Button type="button" variant="outline" className="min-h-11 w-full" onClick={()=>setVisibleGoodsCount(n=>n+20)}>{copy.moreGoods} · {filteredGoods.length-visibleGoodsCount}</Button>}
-                </div>
+                </div>}
             </section>
           </section>}
 
