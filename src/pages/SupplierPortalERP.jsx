@@ -522,22 +522,25 @@ export default function SupplierPortalERP() {
 
           {activeTab==='orders' && <section data-testid="supplier-order-tab" className="space-y-3">
             <div className="flex items-center justify-between gap-2 px-0.5">
-              <h2 className="text-base font-extrabold text-slate-900 dark:text-white">{copy.ordersTitle}</h2>
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">{isLoading?'…':purchaseOrders.length}</span>
+              <h2 className="text-base font-extrabold text-slate-900 dark:text-white">{copy.orders}</h2>
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">{(isLoading||invoicesLoading)?'…':purchaseOrders.length+invoices.length}</span>
             </div>
             <div className="relative"><Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden="true"/>
               <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder={copy.orderSearch} aria-label={copy.orderSearch}
                 className="h-11 rounded-xl border-slate-200 bg-white ps-10 text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"/>
             </div>
             {isLoading?<p role="status" className="p-4 text-xs text-slate-600">{copy.loading}</p>:
-              filteredPOs.length===0?<div className="rounded-2xl border border-slate-200 bg-white p-5 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{copy.noOrders}</div>:
-              <div className="grid gap-2.5 lg:grid-cols-2">{filteredPOs.map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)} loading={confirmShipmentMutation.isPending}/>)}</div>}
+              filteredPOs.length>0&&<section className="space-y-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">{copy.ordersTitle} · {filteredPOs.length}</h3>
+                <div className="grid gap-2.5 lg:grid-cols-2">{filteredPOs.map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)} loading={confirmShipmentMutation.isPending}/>)}</div>
+              </section>}
             <section data-testid="supplier-invoice-goods-orders" className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">{copy.goodsOrdersTitle}</h3>
               {invoiceDeliveryError&&<div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                 <span>{copy.goodsHistoryError}</span><Button variant="outline" size="sm" onClick={()=>refetchInvoiceDeliveries()}>{copy.retry}</Button>
               </div>}
               {(invoicesLoading||invoiceDeliveryLoading)?<p role="status" className="p-3 text-xs text-slate-600">{copy.loading}</p>:
+                invoiceDeliveryError?null:
                 filteredGoods.length===0?<p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">{copy.goodsEmpty}</p>:
                 <div className="grid gap-2.5 lg:grid-cols-2">{filteredGoods.map(entry=><InvoiceGoodsCard key={entry.invoice.id} entry={entry} copy={copy}/>)}</div>}
             </section>
