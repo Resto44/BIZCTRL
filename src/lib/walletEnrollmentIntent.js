@@ -13,6 +13,10 @@ export function resolveWalletEnrollmentIntent({
  const query=new URLSearchParams(String(search||'').replace(/^\?/,''));
  const explicit=(type)=>fragment.has(type)||query.has(type);
  const token=(type)=>fragment.get(type)||query.get(type)||'';
+ // Explicit partner-account invitations also override old stored wallet join
+ // tokens. A stale membership invitation must not shadow a different flow.
+ if(explicit('invite'))
+  return {kind:'partner',personal:'',join:'',explicit:true,invalid:false};
  if(explicit('personal')){
   const candidate=token('personal');
   return {kind:'personal',personal:walletTokenValid(candidate)?candidate:'',join:'',explicit:true,invalid:!walletTokenValid(candidate)};
