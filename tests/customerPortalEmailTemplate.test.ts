@@ -22,7 +22,7 @@ describe('Customer invitation transactional email', () => {
     expect(html).toContain('support@mybizctrl.site');
     expect(html).toContain('Riyadh, UTC+3');
     expect(text).toContain(url);
-    expect(text).toContain('separate Supabase Auth confirmation message');
+    expect(text).toContain('separate verification message');
     expect(text).toContain('ابو قلندر');
   });
 
@@ -58,7 +58,7 @@ describe('Customer invitation transactional email', () => {
     expect(code).toContain("import { renderCustomerInvitationEmail } from './emailTemplate.ts'");
     expect(code).toContain('renderCustomerInvitationEmail({');
     expect(code).toContain('subject, html, text');
-    expect(code).toContain("'Idempotency-Key': 'customer-invite-html-v2-'");
+    expect(code).toContain("'Idempotency-Key': 'customer-invite-html-v3-'");
     expect(code).toContain("if (digest !== invitation.token_hash)");
     expect(code).toContain('delivery_confirmed: false');
   });
