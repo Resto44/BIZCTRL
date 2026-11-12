@@ -102,7 +102,9 @@ describe('ERP wallet invite directory — all five roles, tenant-scoped',()=>{
   expect(sql).toContain('ON CONFLICT(restaurant_id,source_type,source_id) DO UPDATE');
   expect(sql).toContain('INSERT INTO public.people_join_requests');
   expect(sql).not.toMatch(/(INSERT INTO|UPDATE)\s+public\.(wallet_transactions|business_partners)/);
-  expect(portal).toContain("fromAddress('personal')");
+  expect(portal).toContain('resolveWalletEnrollmentIntent');
+  expect(portal).toContain('savedPersonal:');
+  expect(portal).toContain('setPersonal(intent.personal)');
   expect(portal).toContain('personalJoin={!!personal}');
   expect(members).toContain("'erp_request_person_named_account'");
   expect(wallet).toContain('<WalletApplicantDirectory');
