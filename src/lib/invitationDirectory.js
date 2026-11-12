@@ -5,11 +5,21 @@ export function invitationCandidates({ employees = [], suppliers = [], drivers =
     ...invitations.filter(r => r.role === role).map(r => ({ ...r, source: 'invitation' })),
   ];
   const seen = new Set();
-  return rows.filter(r => !r.branch_id || r.branch_id === branchId).filter(r => {
-    const key = r.email?.trim().toLowerCase() || r.phone?.replace(/\D/g, '') || `${r.source}:${r.id}`;
+  // Managers belong to the selected ORGANIZATION, not only the branch chosen
+  // for creating a new invitation. Every query is already scoped by restaurant_id.
+  // Keep every distinct manager assignment across branches; never mix organizations.
+  return rows.filter(r => role === 'manager' || !r.branch_id || String(r.branch_id) === String(branchId)).filter(r => {
+    const identity = r.email?.trim().toLowerCase() || r.phone?.replace(/\D/g, '') || `${r.source}:${r.id}`;
+    const key = role === 'manager' ? identity + ':branch:' + String(r.branch_id || 'organization') : identity;
     if (seen.has(key)) return false;
     seen.add(key); return true;
-  }).map(r => ({ ...r, key: `${r.source}:${r.id}`, full_name: r.full_name || r.email || r.phone || '—' }));
+  }).map(r => ({
+    ...r, key: `${r.source}:${r.id}`,
+    full_name: r.full_name || r.email || r.phone || '—',
+    // Activated memberships and existing invitations are NOT new prospects.
+    // Re-inviting an existing ERP identity is disallowed by the backend.
+    canCreateInvitation: r.source === 'record',
+  }));
 }
 
 export async function loadInvitationDirectory(client, restaurantId) {
