@@ -17,6 +17,7 @@ import { approveInvoice } from '@/lib/procurementEngine';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { useRole, ROLES } from '@/lib/RoleContext';
+import { approvedPurchaseForDelivery } from '@/lib/supplierInvoiceGoodsReceipt';
 
 const STATUS_CONFIG = {
   draft:     { label: 'Draft',    cls: 'bg-gray-100 text-gray-700 border-gray-200', Icon: Clock },
@@ -37,7 +38,7 @@ const OVERDUE_COLORS = {
 const isMutableDraft = (invoice) =>
   invoice?.status === 'draft' && !['approved', 'auto_approved'].includes(invoice?.approval_status);
 
-export default function PurchaseInvoiceList({ invoices = [], branches = [], onEdit, onDelete, onBulkDelete, onView, onDownloadPDF, onSharePDF, onPayInvoice }) {
+export default function PurchaseInvoiceList({ invoices = [], branches = [], onEdit, onDelete, onBulkDelete, onView, onDownloadPDF, onSharePDF, onPayInvoice, onConfirmDelivery, receiptByInvoice=new Map(), deliveryReceiptsLoading=false }) {
   const { currency,lang } = useLanguage();
   const labels=({
     en:{pdf:'Download purchase PDF',share:'Share purchase PDF on WhatsApp'},
@@ -120,6 +121,7 @@ export default function PurchaseInvoiceList({ invoices = [], branches = [], onEd
         const statusCfg = STATUS_CONFIG[inv.status] || STATUS_CONFIG.draft;
         const StatusIcon = statusCfg.Icon;
         const remaining = supplierOutstandingAmount(inv);
+        const deliveryReceipt=receiptByInvoice.get(String(inv.id));
         const branchDisplayName = treasuryBranchDisplayName(inv, branches, lang);
 
         return (
@@ -144,6 +146,11 @@ export default function PurchaseInvoiceList({ invoices = [], branches = [], onEd
                       Needs Approval
                     </Badge>
                   )}
+                  {deliveryReceipt&&<Badge data-testid="supplier-invoice-goods-received-badge"
+                     className="border border-emerald-200 bg-emerald-50 text-[10px] text-emerald-800">
+                     <CheckCircle2 className="me-1 size-3"/>
+                     {lang==='ar'?'تم استلام المنتجات':lang==='fa'?'محصولات دریافت شد':'Products received'}
+                   </Badge>}
                   {isOverdue && (
                     <Badge className={`text-[10px] ${color === 'red' ? 'bg-red-100 text-red-700 border-red-200' : color === 'orange' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'} border`}>
                       {daysOverdue}d overdue
@@ -227,6 +234,17 @@ export default function PurchaseInvoiceList({ invoices = [], branches = [], onEd
                 )}
               </div>
             </div>
+            {onConfirmDelivery && !deliveryReceipt && approvedPurchaseForDelivery(inv) && (
+              <div className="mt-3 border-t pt-3">
+                <Button type="button" variant="outline" data-testid="owner-confirm-purchase-delivery"
+                  disabled={deliveryReceiptsLoading}
+                  className="min-h-11 w-full gap-2 border-emerald-300 bg-emerald-50 font-bold text-emerald-800 hover:bg-emerald-100 sm:w-auto"
+                  onClick={()=>onConfirmDelivery(inv)}>
+                  <CheckCircle2 className="size-4"/>
+                  {lang==='ar'?'تأكيد استلام المنتجات':lang==='fa'?'تأیید دریافت کالا':'Confirm goods received'}
+                </Button>
+              </div>
+            )}
           </Card>
         );
       })}

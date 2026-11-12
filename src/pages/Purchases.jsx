@@ -16,6 +16,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import BranchSelect from '@/components/shared/BranchSelect';
 import PurchaseInvoiceForm from '@/components/purchases/PurchaseInvoiceForm';
 import PurchaseInvoiceList from '@/components/purchases/PurchaseInvoiceList';
+import OwnerPurchaseGoodsReceipt from '@/components/purchases/OwnerPurchaseGoodsReceipt';
 import SupplierWorkspacePayment from '@/components/suppliers/SupplierWorkspacePayment';
 import { supplierOutstandingAmount, isOpenSupplierPayable } from '@/lib/supplierOpenPayables';
 import { readAllPortalRows } from '@/lib/portalReliability';
@@ -69,6 +70,7 @@ export default function Purchases() {
   const [showForm, setShowForm] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState(null);
   const [payingInvoice, setPayingInvoice] = useState(null);
+  const [receivingInvoice, setReceivingInvoice] = useState(null);
   const [shareFallback, setShareFallback] = useState(null);
   const [pdfError, setPdfError] = useState('');
   const [editing, setEditing] = useState(null);
@@ -126,6 +128,22 @@ export default function Purchases() {
     staleTime: 120000,
     enabled: Boolean(activeRestaurant?.id),
   });
+
+  const {data:deliveryReceipts=[],isLoading:deliveryReceiptsLoading,
+    isError:deliveryReceiptsError,refetch:refetchDeliveryReceipts}=useQuery({
+    queryKey:['supplier-invoice-delivery-receipts',activeRestaurant?.id],
+    enabled:Boolean(isOwner&&activeRestaurant?.id),
+    queryFn:async()=>{
+      const {data,error}=await supabase.rpc('erp_supplier_invoice_delivery_receipts',{
+        p_restaurant_id:activeRestaurant.id
+      });
+      if(error)throw error;
+      if(!Array.isArray(data))throw new Error('SUPPLIER_INVOICE_RECEIPTS_INVALID_RESPONSE');
+      return data;
+    },
+    refetchInterval:12000,refetchOnWindowFocus:true,retry:1,
+  });
+  const receiptByInvoice=useMemo(()=>new Map(deliveryReceipts.map(row=>[String(row.invoice_id),row])),[deliveryReceipts]);
 
   const { data: businessBrand = null } = useQuery({
     queryKey: ['brand_settings', activeRestaurant?.id],
@@ -400,9 +418,29 @@ export default function Purchases() {
           onDownloadPDF={downloadPDF}
           onSharePDF={sharePDF}
           onPayInvoice={can?.createPurchases ? invoice => setPayingInvoice(invoice) : undefined}
+          receiptByInvoice={receiptByInvoice}
+          deliveryReceiptsLoading={isOwner&&(deliveryReceiptsLoading||deliveryReceiptsError)}
+          onConfirmDelivery={isOwner&&!deliveryReceiptsError ? inv=>setReceivingInvoice(inv) : undefined}
         />
       )}
 
+      {isOwner&&deliveryReceiptsError&&<div role="alert"
+        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <span>{lang==='ar'?'تعذر التحقق من إثبات استلام المنتجات. أعد المحاولة قبل التأكيد.':lang==='fa'?'بررسی رسیدهای دریافت کالا ناموفق بود. قبل از تأیید دوباره تلاش کنید.':'Could not verify existing goods receipts. Retry before confirming delivery.'}</span>
+        <Button type="button" size="sm" variant="outline" onClick={()=>refetchDeliveryReceipts()}>{lang==='ar'?'إعادة المحاولة':lang==='fa'?'تلاش دوباره':'Retry'}</Button>
+      </div>}
+      <Dialog open={Boolean(receivingInvoice)} onOpenChange={open=>{if(!open)setReceivingInvoice(null);}}>
+       <DialogContent className="max-h-[92dvh] max-w-xl overflow-y-auto rounded-2xl p-4 sm:p-6">
+        <DialogHeader><DialogTitle>{lang==='ar'?'تأكيد استلام المنتجات':lang==='fa'?'تأیید دریافت محصولات':'Confirm products received'}</DialogTitle></DialogHeader>
+        {receivingInvoice&&<OwnerPurchaseGoodsReceipt key={receivingInvoice.id}
+          invoice={receivingInvoice} lang={lang} onClose={()=>setReceivingInvoice(null)}
+          onSaved={()=>{
+           qc.invalidateQueries({queryKey:['supplier-invoice-delivery-receipts']});
+           qc.invalidateQueries({queryKey:['supplier-invoices-portal']});
+           setReceivingInvoice(null);
+          }}/>}
+       </DialogContent>
+      </Dialog>
       {/* One canonical, idempotent supplier payment RPC for both Owner and Supplier workspace. */}
       <Dialog open={Boolean(payingInvoice)} onOpenChange={open=>{if(!open)setPayingInvoice(null);}}>
         <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto rounded-2xl">
