@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/api/supabaseClient';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useTenant } from '@/lib/TenantContext';
 import { subscriptionLimitErrorMessage } from '@/lib/subscriptionLimits';
@@ -83,6 +84,10 @@ const inviteErrorMessage = error => {
 };
 
 export default function OwnerStaffProvisioning() {
+  const location = useLocation();
+  // Navigation hints are never authorization. Only owner-scoped server RPC
+  // results may select the organization/branch; invalid hints are ignored.
+  const managerPrefill = useRef(location.state?.managerInvitation || null);
   const { user } = useAuth();
   const { activeRestaurant, setActiveRestaurant } = useTenant();
   const issuanceLock = useRef(false);
@@ -128,9 +133,11 @@ export default function OwnerStaffProvisioning() {
     const { data, error } = await supabase.rpc('list_erp_owned_organizations');
     if (error) throw error;
     const owned = data || [];
-    const preferredId = owned.some((organization) => String(organization.id) === String(activeRestaurant?.id))
-      ? String(activeRestaurant.id)
-      : String(owned[0]?.id || '');
+    const requestedStore = managerPrefill.current?.restaurantId;
+    const preferredId = requestedStore && owned.some(organization => String(organization.id) === String(requestedStore))
+      ? String(requestedStore)
+      : owned.some(organization => String(organization.id) === String(activeRestaurant?.id))
+        ? String(activeRestaurant.id) : String(owned[0]?.id || '');
     setOrganizations(owned);
     setSelectedOrganizationId((current) => owned.some((organization) => String(organization.id) === String(current)) ? current : preferredId);
     return owned;
@@ -145,10 +152,22 @@ export default function OwnerStaffProvisioning() {
     if (error) throw error;
     const activeBranches = data || [];
     setBranches(activeBranches);
+    const requested = managerPrefill.current;
+    const verifiedIntent = requested?.restaurantId && String(requested.restaurantId) === String(organizationId);
+    const requestedBranch = verifiedIntent
+      ? activeBranches.find(branch => requested.branchId && String(branch.id) === String(requested.branchId))
+      : null;
     setForm((current) => ({
       ...current,
-      branchId: activeBranches.some((branch) => String(branch.id) === String(current.branchId)) ? current.branchId : String(activeBranches[0]?.id || ''),
+      // Preset Manager only after the org and branch have been verified by
+      // list_erp_owned_organizations/list_erp_owned_branches RPCs.
+      role: verifiedIntent ? 'manager' : current.role,
+      branchId: requestedBranch?.id
+        ? String(requestedBranch.id)
+        : activeBranches.some(branch => String(branch.id) === String(current.branchId))
+          ? current.branchId : String(activeBranches[0]?.id || ''),
     }));
+    if(verifiedIntent)managerPrefill.current=null;
   }, []);
 
   const loadInvitations = useCallback(async (organizationId) => {
