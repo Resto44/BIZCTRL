@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 const source='supabase/functions/automatic-report-email/report-bundle.js';
 const target='tmp/automatic-email-edge-build';
 const code=readFileSync(source,'utf8');
-for(const term of ['REPORT_NETWORK_APPENDIX_MISSING','Network Management','Finalized network operations']){
+for(const term of ['REPORT_NETWORK_APPENDIX_MISSING','REPORT_DRIVER_APPENDIX_MISSING','Network Management','Finalized network operations','Driver Sales','Driver sales trend']){
  if(!code.includes(term))throw new Error('AUTOMATIC_REPORT_BUNDLE_MISSING_'+term);
 }
 if(code.length<50000||Buffer.byteLength(code,'utf8')>5500000)throw new Error('AUTOMATIC_REPORT_BUNDLE_SIZE_INVALID');

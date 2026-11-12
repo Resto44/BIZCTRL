@@ -6,7 +6,7 @@ import {generateSalesAnalyticsPDF} from '../src/lib/salesAnalyticsPdf.js';
 vi.mock('../src/lib/scheduledERPReportData.js',()=>({
  fetchScheduledERPReportData:vi.fn(async()=>({
   sales:[],purchases:[],expenses:[],inventory:[],inventoryTransactions:[],
-  customerDebts:[],expenseCategories:[],walletTransactions:[]
+  customerDebts:[],expenseCategories:[],walletTransactions:[],driverSalesEntries:[],drivers:[]
  }))
 }));
 vi.mock('../src/lib/salesReportPeriod.js',()=>({
@@ -15,7 +15,7 @@ vi.mock('../src/lib/salesReportPeriod.js',()=>({
  salesReportGrowth:vi.fn(()=>null)
 }));
 vi.mock('../src/lib/operationsPdfReport.js',()=>({buildOperationsPdfReport:vi.fn(()=>({}))}));
-vi.mock('../src/lib/fullSalesAnalyticsReport.js',()=>({buildFullSalesAnalyticsReport:vi.fn(()=>({networkBranches:{available:true,branches:[]}}))}));
+vi.mock('../src/lib/fullSalesAnalyticsReport.js',()=>({buildFullSalesAnalyticsReport:vi.fn(()=>({networkBranches:{available:true,branches:[]},driverSales:{available:true,current:{sales:0},previous:{sales:0}}}))}));
 vi.mock('../src/lib/salesAnalyticsPdf.js',()=>({
  generateSalesAnalyticsPDF:vi.fn(async()=>({getNumberOfPages:()=>3,output:()=> 'data:application/pdf;base64,JVBERi0xLjQK'}))
 }));
@@ -53,16 +53,23 @@ describe('owner report delivery scope and localization',()=>{
  });
  it('refuses missing verified network analytics instead of treating this as a complete report',async()=>{
   const {buildFullSalesAnalyticsReport}=await import('../src/lib/fullSalesAnalyticsReport.js');
-  buildFullSalesAnalyticsReport.mockReturnValueOnce({networkBranches:null});
+  buildFullSalesAnalyticsReport.mockReturnValueOnce({networkBranches:null,driverSales:{available:true}});
   await expect(buildAutomaticReportPdf({db:dbWith(),job,context}))
     .rejects.toThrow('REPORT_NETWORK_APPENDIX_MISSING');
+  expect(generateSalesAnalyticsPDF).not.toHaveBeenCalled();
+ });
+ it('refuses a missing Driver Sales analytics source without sending a misleading zero',async()=>{
+  const {buildFullSalesAnalyticsReport}=await import('../src/lib/fullSalesAnalyticsReport.js');
+  buildFullSalesAnalyticsReport.mockReturnValueOnce({networkBranches:{available:true},driverSales:{available:false,reason:'DRIVER_SOURCE_NOT_LOADED'}});
+  await expect(buildAutomaticReportPdf({db:dbWith(),job,context}))
+    .rejects.toThrow('REPORT_DRIVER_APPENDIX_MISSING');
   expect(generateSalesAnalyticsPDF).not.toHaveBeenCalled();
  });
  it('does not require extra pages for more than eight reporting branches',async()=>{
   const {buildFullSalesAnalyticsReport}=await import('../src/lib/fullSalesAnalyticsReport.js');
   buildFullSalesAnalyticsReport.mockReturnValueOnce({networkBranches:{
     available:true,branches:Array.from({length:15},(_,i)=>({id:'b'+i}))
-  }});
+  },driverSales:{available:true}});
   generateSalesAnalyticsPDF.mockResolvedValueOnce({getNumberOfPages:()=>3,output:()=> 'data:application/pdf;base64,JVBERi0xLjQK'});
   await expect(buildAutomaticReportPdf({db:dbWith(),job,context})).resolves.toBe('JVBERi0xLjQK');
  });

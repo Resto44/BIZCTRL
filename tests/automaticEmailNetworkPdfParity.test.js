@@ -42,6 +42,10 @@ describe('automatic emailed PDF must match manual Network Management appendix',(
     name:'BizCTRL Demo',inventoryTransactions:[]},
   });
   expect(pageCount(b64)).toBe(3);
+  // The mocked dataset includes a 50 SAR finalized driver sale in the current
+  // period and 30 SAR in the prior period. The shared renderer must be used.
+  const pdfSource=await import('../src/lib/salesAnalyticsPdf.js');
+  expect(typeof pdfSource.generateSalesAnalyticsPDF).toBe('function');
   expect(fetchScheduledERPReportData).toHaveBeenCalledWith(expect.objectContaining({
    restaurantId:'org-1',allBranches:true,range:expect.objectContaining({
     from:'2026-11-07',to:'2026-11-07',previousFrom:'2026-11-06',
@@ -53,6 +57,8 @@ describe('automatic emailed PDF must match manual Network Management appendix',(
   const src=readFileSync(new URL('../src/lib/automaticReportPdf.js',import.meta.url),'utf8');
   expect(src).toContain("import {generateSalesAnalyticsPDF} from './salesAnalyticsPdf'");
   expect(src).toContain('REPORT_NETWORK_APPENDIX_MISSING');
+  expect(src).toContain('REPORT_DRIVER_APPENDIX_MISSING');
+  expect(src).toContain('fullAnalytics?.driverSales?.available');
   expect(src).toContain('doc.getNumberOfPages() !== requiredPages');
  });
 });
