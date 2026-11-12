@@ -148,7 +148,7 @@ export default function PartnerPortal(){
     {invalidInvite&&<p role="alert" data-testid="wallet-invitation-stale" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{people.walletInviteNeeded}</p>}
     {(!accounts.isLoading&&!accounts.isError&&(!verified.length||join||personal))&&<PeopleMemberships
      userId={session.user.id} signedInEmail={session.user.email||''} t={people}
-     joinToken={personal||join} personalJoin={!!personal}
+     joinToken={personal||join} personalJoin={!!personal} onSwitchAccount={signOut}
      onJoined={()=>{
       setJoin('');setPersonal('');setInvalidInvite(false);
       sessionStorage.removeItem('people:join');sessionStorage.removeItem('people:personal');
