@@ -3,6 +3,7 @@ import React from 'react';
 import TestRenderer,{act} from 'react-test-renderer';
 import {beforeEach,describe,it,expect,vi} from 'vitest';
 import {readFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
 const mock=vi.hoisted(()=>({rpc:vi.fn()}));
 vi.mock('@/api/supabaseClient',()=>({supabase:{rpc:(...args)=>mock.rpc(...args)}}));
 import WalletApplicantDirectory,{eligibleWalletCandidate} from '../src/components/owner/WalletApplicantDirectory.jsx';
@@ -89,10 +90,10 @@ describe('ERP wallet invite directory — all five roles, tenant-scoped',()=>{
  });
  it('keeps payment permissions and legacy shared link isolated from per-person enrollment',async()=>{
   const [sql,portal,members,wallet]=await Promise.all([
-   readFile(new URL('../supabase/migrations/20261112194500_wallet_personal_enrollment.sql',import.meta.url),'utf8'),
-   readFile(new URL('../src/pages/PartnerPortal.jsx',import.meta.url),'utf8'),
-   readFile(new URL('../src/components/settlement/PeopleMemberships.jsx',import.meta.url),'utf8'),
-   readFile(new URL('../src/components/owner/WalletJoinInvitation.jsx',import.meta.url),'utf8'),
+   readFile(resolve(process.cwd(),'supabase/migrations/20261112194500_wallet_personal_enrollment.sql'),'utf8'),
+   readFile(resolve(process.cwd(),'src/pages/PartnerPortal.jsx'),'utf8'),
+   readFile(resolve(process.cwd(),'src/components/settlement/PeopleMemberships.jsx'),'utf8'),
+   readFile(resolve(process.cwd(),'src/components/owner/WalletJoinInvitation.jsx'),'utf8'),
   ]);
   expect(sql).toContain('REVOKE ALL ON TABLE public.people_personal_enrollment_links FROM PUBLIC,anon,authenticated');
   expect(sql).toContain("lower(trim(v_user.email))<>lower(trim(v_link.invited_email))");
