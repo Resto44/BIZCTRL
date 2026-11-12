@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.106.1';
+import { renderBizctrlTransactionalEmail } from '../_shared/bizctrlEmailTemplate.ts';
 
 // An owner-approved ERP invitation is not a Supabase signup confirmation.
 // This function only delivers the original, expiring invitation URL by email.
@@ -73,33 +74,31 @@ Deno.serve(async (req: Request) => {
   const from=Deno.env.get('INVITATION_EMAIL_FROM')||Deno.env.get('REPORT_EMAIL_FROM')||'';
   if (!resend||!from) return reject('INVITATION_EMAIL_NOT_CONFIGURED',503);
 
+  // Resolve branding from the verified invitation tenant and branch, never request body.
+  const {data:business,error:businessError}=await admin.from('restaurants')
+    .select('id,name,business_type').eq('id',invite.restaurant_id).maybeSingle();
+  if(businessError||!business)return reject('BUSINESS_CONTEXT_UNAVAILABLE',503);
+  let branchName='';
+  if(invite.branch_id){
+    const {data:branch,error:branchError}=await admin.from('branches')
+      .select('name').eq('id',invite.branch_id).eq('restaurant_id',invite.restaurant_id).maybeSingle();
+    if(branchError||!branch)return reject('BRANCH_CONTEXT_UNAVAILABLE',503);
+    branchName=branch.name||'';
+  }
   const activationUrl='https://mybizctrl.site/erp-register?token='+encodeURIComponent(token);
-  const roleName=String(invite.role||'staff').replace(/_/g,' ');
-  const bodyText=[
-    'BizCTRL — Secure ERP invitation',
-    '',
-    'Hello '+String(invite.full_name||'team member')+',',
-    'You have been invited to join BizCTRL as '+roleName+'.',
-    '',
-    'Activate your account here:',
-    activationUrl,
-    '',
-    'This link is single-use and expires on '+new Date(invite.expires_at).toISOString()+'.',
-    'After opening it, create your account and verify your email address to sign in.',
-    'Do not forward this invitation. If you did not expect it, ignore this message.',
-    '',
-    'دعوت‌نامهٔ بیزکنترول: لینک بالا را باز کنید، ثبت‌نام کنید و ایمیل خود را تأیید نمایید.',
-    'دعوة BizCTRL: افتح الرابط، أنشئ حسابك، ثم أكّد بريدك الإلكتروني.',
-  ].join('\n');
+  const {subject,html,text}=renderBizctrlTransactionalEmail({
+    kind:'staff',name:invite.full_name||'team member',role:invite.role,
+    businessName:business.name,businessType:business.business_type,branchName,
+    url:activationUrl,expiresAt:invite.expires_at,
+  });
 
   try {
     const response=await fetch('https://api.resend.com/emails',{
       method:'POST',redirect:'error',signal:AbortSignal.timeout(18000),
       headers:{Authorization:'Bearer '+resend,'Content-Type':'application/json',
-        'Idempotency-Key':'erp-invitation-'+invite.id},
+        'Idempotency-Key':'erp-invitation-'+invite.id+'-html-v2'},
       body:JSON.stringify({
-        from,to:[invite.email],subject:'BizCTRL — '+roleName+' invitation',
-        text:bodyText,
+        from,to:[invite.email],subject,html,text,
       }),
     });
     const result=await response.json().catch(()=>({}));

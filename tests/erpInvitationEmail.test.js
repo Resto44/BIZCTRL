@@ -21,6 +21,10 @@ describe('ERP invitation email security', () => {
     expect(s).toContain("Idempotency-Key':'erp-invitation-'+invite.id");
     expect(s).toContain("Deno.env.get('RESEND_API_KEY')");
     expect(s).toContain("Deno.env.get('REPORT_EMAIL_FROM')");
+    expect(s).toContain('renderBizctrlTransactionalEmail({');
+    expect(s).toContain('businessType:business.business_type');
+    expect(s).toContain('subject,html,text');
+    expect(s).toContain(".eq('id',invite.restaurant_id)");
     expect(s).not.toContain('body.email');
     expect(s).not.toContain('body.activation_url');
     expect(s).not.toContain('body.redirect_url');

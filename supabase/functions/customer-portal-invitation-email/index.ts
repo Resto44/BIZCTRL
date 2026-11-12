@@ -79,11 +79,16 @@ Deno.serve(async (req: Request) => {
   const from = Deno.env.get('INVITATION_EMAIL_FROM') || Deno.env.get('REPORT_EMAIL_FROM') || '';
   if (!apiKey || !from) return fail('INVITATION_EMAIL_NOT_CONFIGURED', 503);
 
+  const {data:business,error:businessError}=await admin.from('restaurants')
+    .select('id,name,business_type').eq('id',customer.restaurant_id).maybeSingle();
+  if(businessError||!business)return fail('BUSINESS_CONTEXT_UNAVAILABLE',503);
+
   const link = 'https://mybizctrl.site/customer-portal#invite=' + encodeURIComponent(input.token);
   const { html, text, subject } = renderCustomerInvitationEmail({
     customerName: customer.name || 'customer',
     invitationUrl: link,
     expiresAt: invitation.expires_at,
+    businessName: business.name, businessType: business.business_type,
   });
 
   try {
@@ -92,7 +97,7 @@ Deno.serve(async (req: Request) => {
       headers: {
         Authorization: 'Bearer ' + apiKey,
         'Content-Type': 'application/json',
-        'Idempotency-Key': 'customer-invite-html-v2-' + digest.slice(0, 40),
+        'Idempotency-Key': 'customer-invite-html-v3-' + digest.slice(0, 40),
       },
       body: JSON.stringify({
         from, to: [invitation.invited_email], subject, html, text,

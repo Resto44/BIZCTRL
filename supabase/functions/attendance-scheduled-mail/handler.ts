@@ -1,3 +1,4 @@
+import { renderBizctrlTransactionalEmail } from '../_shared/bizctrlEmailTemplate.ts';
 const equalSecret=(a,b)=>{if(!a||!b||a.length!==b.length)return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0;};
 const reply=(status,body)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
 export function createAttendanceMailHandler({db,env,fetchImpl=fetch}) {
@@ -18,12 +19,29 @@ export function createAttendanceMailHandler({db,env,fetchImpl=fetch}) {
    if(!job)break;
    let ok=false;
    try{
-    const kind=job.action==='in'?'Check In / ورود / الدخول':'Check Out / خروج / الخروج';
+    // Claimed OTP remains server-scoped. Resolve identity from its leased challenge.
+    const {data:challenge,error:challengeError}=await db.from('attendance_email_codes')
+      .select('restaurant_id,branch_id,employee_id').eq('id',job.id).maybeSingle();
+    if(challengeError||!challenge)throw new Error('ATTENDANCE_CONTEXT_UNAVAILABLE');
+    const [{data:employee,error:employeeError},{data:business,error:businessError},{data:branch,error:branchError}]=await Promise.all([
+      db.from('employees').select('full_name').eq('id',challenge.employee_id)
+        .eq('restaurant_id',challenge.restaurant_id).maybeSingle(),
+      db.from('restaurants').select('name,business_type').eq('id',challenge.restaurant_id).maybeSingle(),
+      db.from('branches').select('name').eq('id',challenge.branch_id)
+        .eq('restaurant_id',challenge.restaurant_id).maybeSingle(),
+    ]);
+    if(employeeError||businessError||branchError||!employee||!business||!branch)
+      throw new Error('ATTENDANCE_CONTEXT_UNAVAILABLE');
+    const {subject,html,text}=renderBizctrlTransactionalEmail({
+      kind:'attendance',name:employee.full_name,role:'employee',
+      businessName:business.name,businessType:business.business_type,branchName:branch.name,
+      url:'https://mybizctrl.site/erp-login',expiresAt:job.expires_at,
+      code:job.code,phase:job.action,
+    });
     const response=await fetchImpl('https://api.resend.com/emails',{
      method:'POST',redirect:'error',signal:AbortSignal.timeout(4000),
      headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json','Idempotency-Key':`attendance-scheduled-${job.id}`},
-     body:JSON.stringify({from,to:[job.recipient],subject:`BizCTRL — ${kind}`,
-      text:`BizCTRL\n${kind}\n\n${job.code}\n\nValid until / اعتبار تا / صالح حتى: ${job.expires_at} (UTC).\nSingle use, 30 minutes from issue. / یک‌بار مصرف، اعتبار ۳۰ دقیقه از صدور. / يستخدم مرة واحدة، صالح ٣٠ دقيقة من الإصدار.\nOpen your employee dashboard and enable precise location at your assigned branch.\nhttps://mybizctrl.site/erp-login\nDo not forward this code.`}),
+     body:JSON.stringify({from,to:[job.recipient],subject,html,text}),
     });
     const result=await response.json();ok=response.ok&&!!result.id;
    }catch{ok=false;}
