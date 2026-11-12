@@ -49,7 +49,7 @@ export function createAutomaticReportHandler({db,env,buildPdf,fetchImpl=fetch}) 
   } catch(error){
    const denied=error.message==='REPORT_DELIVERY_DENIED'||error.message==='REPORT_FREQUENCY_REVOKED';
    // Never log provider bodies, recipient addresses, keys or financial payloads.
-   const code=['REPORT_DELIVERY_DENIED','REPORT_FREQUENCY_REVOKED','EMAIL_PROVIDER_REJECTED','INVALID_PDF','REPORT_NETWORK_APPENDIX_MISSING','DELIVERY_SAVE_FAILED'].includes(error.message)?error.message:'REPORT_BUILD_OR_NETWORK_FAILED';
+   const code=['REPORT_DELIVERY_DENIED','REPORT_FREQUENCY_REVOKED','EMAIL_PROVIDER_REJECTED','INVALID_PDF','REPORT_NETWORK_APPENDIX_MISSING','REPORT_DRIVER_APPENDIX_MISSING','DELIVERY_SAVE_FAILED'].includes(error.message)?error.message:'REPORT_BUILD_OR_NETWORK_FAILED';
    try {await save({state:denied?'cancelled':'pending',last_error:code,available_at:new Date(Date.now()+10*60*1000).toISOString(),...(denied?{payload:null}:{})});}catch{/* lease recovery retries with the same persisted payload/key */}
    return reply(503,{error:code});
   }
