@@ -92,7 +92,7 @@ BEGIN
  IF NOT FOUND THEN RAISE EXCEPTION 'WALLET_INVITEE_NOT_FOUND' USING ERRCODE='42501'; END IF;
  IF v_email IS NULL OR v_email !~* '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
  THEN RAISE EXCEPTION 'WALLET_INVITEE_EMAIL_REQUIRED'; END IF;
- IF (p_source_type='manager' AND v_status<>'approved') OR v_status='inactive'
+ IF (p_source_type='manager' AND v_status IS DISTINCT FROM 'approved') OR v_status='inactive'
  THEN RAISE EXCEPTION 'WALLET_INVITEE_NOT_ACTIVE' USING ERRCODE='42501'; END IF;
  IF EXISTS (SELECT 1 FROM public.business_partners b WHERE b.restaurant_id=p_restaurant_id
        AND b.user_id IS NOT NULL AND lower(trim(b.email))=v_email)
