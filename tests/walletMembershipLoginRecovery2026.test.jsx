@@ -58,9 +58,14 @@ describe('Wallet link identity and stale-token recovery',()=>{
   stub.rpc.mockImplementation(async name=>name==='erp_request_person_named_account'
    ?{data:null,error:{message:'WALLET_INVITEE_EMAIL_MISMATCH'}}:{data:[],error:null});
   let tree;
+  const onSwitchAccount=vi.fn();
   await act(async()=>{tree=TestRenderer.create(<PeopleMemberships
    userId="user-1" signedInEmail="wrong@example.test" joinToken={personal}
-   personalJoin t={t}/>);});
+   personalJoin onSwitchAccount={onSwitchAccount} t={t}/>);});
+  const switchButton=tree.root.findAllByType('button').find(b=>b.props.children==='Switch account');
+  expect(switchButton).toBeDefined();
+  await act(async()=>{switchButton.props.onClick();});
+  expect(onSwitchAccount).toHaveBeenCalledTimes(1);
   const s=tree.root.findAllByType('input');
   await act(async()=>{s.find(x=>x.props.maxLength===120).props.onChange({target:{value:'Ahmad'}});});
   const button=tree.root.findAllByType('button').find(x=>x.props.type==='submit');
