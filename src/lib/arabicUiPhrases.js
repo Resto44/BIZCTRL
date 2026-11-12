@@ -1,5 +1,17 @@
 // Additional Arabic interface copy. Existing ERP catalog takes precedence.
 export default {
+  "Managers in this business": "المديرون في هذا النشاط",
+  "All branches": "جميع الفروع",
+  "Organization-wide": "على مستوى المؤسسة",
+  "All existing managers of this store, across its branches. Existing accounts are not invited again.": "جميع مديري هذا المتجر عبر فروعه. لا تُرسل دعوة جديدة لحساب موجود.",
+  "No managers registered or invited for this store yet. Create the first manager below.": "لا يوجد مدير مسجل أو مدعو لهذا المتجر بعد. يمكنك إضافة المدير الأول أدناه.",
+  "No matching users.": "لا يوجد مستخدم مطابق.",
+  "Invitation already exists — use Invitation activity to renew.": "الدعوة موجودة بالفعل؛ استخدم سجل الدعوات لتجديدها.",
+  "Active account — access is already assigned.": "الحساب نشط والصلاحية محددة مسبقاً.",
+  "Suspended account — manage access in Role & Permission Center.": "الحساب موقوف؛ يمكنك إدارة الصلاحية في مركز الأدوار والصلاحيات.",
+  "Existing account — manage access instead of re-inviting.": "حساب موجود؛ قم بإدارة الصلاحيات بدلاً من إرسال دعوة جديدة.",
+  "Available for a new invitation": "متاح لإنشاء دعوة جديدة",
+  "Branch": "الفرع",
   "Select an existing user": "اختر مستخدمًا موجودًا",
   "Select a person to create their invitation link.": "اختر الشخص لإنشاء رابط دعوته.",
   "Search users": "البحث عن المستخدمين",
