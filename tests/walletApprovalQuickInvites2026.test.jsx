@@ -38,7 +38,7 @@ const clickText=async(tree,text)=>{
 beforeEach(()=>{
  mocks.rpc.mockReset();
  mocks.lang='fa';
- mocks.rpc.mockResolvedValue({data:token,error:null});
+ mocks.rpc.mockImplementation(async(name)=>({data:name==='erp_wallet_candidate_directory'?[]:token,error:null}));
 });
 
 describe('Owner Approval Center Wallet invitation',()=>{
@@ -65,7 +65,8 @@ describe('Owner Approval Center Wallet invitation',()=>{
    expect(input?.props.value).toBe(window.location.origin+'/wallet-portal#join='+token);
    expect(JSON.stringify(tree.toJSON())).toContain('تأیید Owner');
    expect(tree.root.findByProps({'data-testid':'wallet-people-approvals'}).props['data-hide-controls']).toBe('true');
-   expect(mocks.rpc.mock.calls.every(([name])=>name==='erp_people_enrollment_link')).toBe(true);
+   expect(mocks.rpc.mock.calls.every(([name])=>['erp_wallet_candidate_directory','erp_people_enrollment_link'].includes(name))).toBe(true);
+   expect(mocks.rpc.mock.calls.some(([name])=>name==='erp_wallet_candidate_directory')).toBe(true);
   }finally{await close();}
  });
  it('revokes the shared wallet enrollment link through owner-only RPC without changing existing accounts',async()=>{
