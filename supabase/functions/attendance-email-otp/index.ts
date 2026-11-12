@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.106.1';
+import { renderBizctrlTransactionalEmail } from '../_shared/bizctrlEmailTemplate.ts';
 
 const cors={
   'Access-Control-Allow-Origin':'*',
@@ -79,26 +80,30 @@ Deno.serve(async req=>{
     });
     return !error;
   };
-  const kind=issue.action==='in'?'Check In':'Check Out';
-  const subject='BizCTRL · '+kind+' verification code';
-  const message=[
-    'BizCTRL — Attendance verification / رمز تأیید حضور / رمز التحقق من الحضور',
-    '',
-    'Your six-digit '+kind+' code: '+code,
-    'رمز شش‌رقمی ورود/خروج: '+code,
-    'رمز الدخول / الخروج: '+code,
-    '',
-    'Expires in 30 minutes. Single use. Do not forward.',
-    'اعتبار: ۳۰ دقیقه، فقط یک‌بار. / صالح لمدة ٣٠ دقيقة ولمرة واحدة.',
-    'You must also be physically at the assigned branch with accurate GPS.',
-    'If you did not request this, ignore it.',
-  ].join('\n');
+  const {data:employee,error:employeeError}=await admin.from('employees')
+    .select('full_name,restaurant_id,branch_id').eq('id',employeeId).maybeSingle();
+  if(employeeError||!employee){await mark(false);return respondError('BUSINESS_CONTEXT_UNAVAILABLE',503);}
+  const [{data:business,error:businessError},{data:branch,error:branchError}]=await Promise.all([
+    admin.from('restaurants').select('name,business_type').eq('id',employee.restaurant_id).maybeSingle(),
+    admin.from('branches').select('name').eq('id',employee.branch_id)
+      .eq('restaurant_id',employee.restaurant_id).maybeSingle(),
+  ]);
+  if(businessError||branchError||!business||!branch){
+    await mark(false);return respondError('BUSINESS_CONTEXT_UNAVAILABLE',503);
+  }
+  const {subject,html,text}=renderBizctrlTransactionalEmail({
+    kind:'attendance',name:employee.full_name||'employee',role:'employee',
+    businessName:business.name,businessType:business.business_type,branchName:branch.name,
+    url:'https://mybizctrl.site/erp-login',expiresAt:issue.expires_at,
+    code,phase:issue.action,
+  });
+
   try{
     const response=await fetch('https://api.resend.com/emails',{
       method:'POST',redirect:'error',signal:AbortSignal.timeout(18000),
       headers:{'Authorization':'Bearer '+resend,'Content-Type':'application/json',
         'Idempotency-Key':'attendance-'+challenge},
-      body:JSON.stringify({from,to:[issue.recipient],subject,text:message}),
+      body:JSON.stringify({from,to:[issue.recipient],subject,html,text}),
     });
     const result=await response.json().catch(()=>({}));
     if(!response.ok||!result.id){
