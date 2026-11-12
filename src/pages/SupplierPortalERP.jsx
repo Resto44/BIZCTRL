@@ -3,6 +3,7 @@ import {supplierInvoiceCurrencyTotals,readAllPortalRows} from '@/lib/portalRelia
 import {supplierInvoicePaymentEvidence,supplierInvoiceProgress} from '@/lib/supplierInvoicePaymentEvidence';
 import PortalDataState from '@/components/shared/PortalDataState';
 import SupplierPortalAnalytics from '@/components/suppliers/SupplierPortalAnalytics';
+import {buildSupplierGoodsTimeline,completedSupplierGoodsHistory} from '@/lib/supplierGoodsTimeline';
 import React, { useState } from 'react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -50,6 +51,12 @@ const SUPPLIER_COPY = {
     noInvoicesHint:'The Owner’s invoices assigned to this supplier and branch will appear here.',
     ordersTitle:'Purchase orders',orderSearch:'Search purchase orders…',noOrders:'No purchase orders recorded yet.',
     historyTitle:'Completed order history',noHistory:'No completed or cancelled orders yet.',
+    goodsOrdersTitle:'Invoice goods delivery progress',goodsHistoryTitle:'Owner-confirmed invoice deliveries',
+    goodsRecord:'Invoice goods',goodsRecorded:'Invoice recorded',goodsPendingApproval:'Awaiting invoice approval',
+    goodsAwaitingOwner:'Awaiting Owner physical receipt verification',goodsReceived:'Goods received and verified',
+    goodsVerifiedAt:'Owner confirmed',goodsEmpty:'No supplier invoices are assigned to this branch.',
+    goodsHistoryError:'Goods receipt history is temporarily unavailable. Refresh to retry.',
+    goodsStatusHint:'Invoice payment and physical goods delivery are separate.',moreGoods:'Show more invoice goods',retry:'Retry',
     open:'Open',show:'Show',hide:'Hide',items:'items',loading:'Loading records…',retry:'Refresh records',
     orderProgress:'Order progress',progressHint:'Status of your assigned orders',shipped:'Shipped',received:'Received',
     total:'Total',invoiced:'Invoiced',due:'Due',branch:'Branch',unknownBranch:'Assigned branch',
@@ -68,6 +75,12 @@ const SUPPLIER_COPY = {
     noInvoicesHint:'ستظهر هنا فواتير المالك المسندة إلى هذا المورّد والفرع.',
     ordersTitle:'أوامر الشراء',orderSearch:'ابحث في أوامر الشراء…',noOrders:'لا توجد أوامر شراء بعد.',
     historyTitle:'سجل الطلبات المكتملة',noHistory:'لا توجد طلبات مكتملة أو ملغاة بعد.',
+    goodsOrdersTitle:'مراحل تسليم بضائع الفواتير',goodsHistoryTitle:'تسليمات الفواتير المؤكدة من المالك',
+    goodsRecord:'بضائع الفاتورة',goodsRecorded:'تم تسجيل الفاتورة',goodsPendingApproval:'بانتظار اعتماد الفاتورة',
+    goodsAwaitingOwner:'بانتظار تحقق المالك من الاستلام الفعلي',goodsReceived:'تم استلام البضاعة والتحقق منها',
+    goodsVerifiedAt:'تأكيد المالك',goodsEmpty:'لا توجد فواتير مورّد مسندة لهذا الفرع.',
+    goodsHistoryError:'تعذر تحميل سجل استلام البضائع. حدّث البيانات للمحاولة مجدداً.',
+    goodsStatusHint:'سداد الفاتورة منفصل عن استلام البضاعة فعلياً.',moreGoods:'عرض المزيد من بضائع الفواتير',retry:'إعادة المحاولة',
     open:'مفتوح',show:'عرض',hide:'إخفاء',items:'أصناف',loading:'جارٍ تحميل السجلات…',retry:'تحديث السجلات',
     orderProgress:'مراحل الطلبات',progressHint:'حالة أوامر الشراء المسندة لك',shipped:'تم الشحن',received:'تم الاستلام',
     total:'المجموع',invoiced:'قيمة الفواتير',due:'يستحق',branch:'الفرع',unknownBranch:'الفرع المعيّن',
@@ -86,6 +99,12 @@ const SUPPLIER_COPY = {
     noInvoicesHint:'فاکتورهای مربوط به همین تأمین‌کننده و شعبه اینجا ظاهر می‌شوند.',
     ordersTitle:'سفارش‌های خرید',orderSearch:'جستجوی سفارش…',noOrders:'هنوز سفارشی ثبت نشده است.',
     historyTitle:'تاریخچهٔ سفارش‌های تکمیل‌شده',noHistory:'سفارش تکمیل‌شده یا لغوشده موجود نیست.',
+    goodsOrdersTitle:'مراحل تحویل محصولات فاکتور',goodsHistoryTitle:'تحویل‌های تأییدشده توسط اونر',
+    goodsRecord:'محصولات فاکتور',goodsRecorded:'فاکتور ثبت شده',goodsPendingApproval:'در انتظار تأیید فاکتور',
+    goodsAwaitingOwner:'در انتظار بررسی و تأیید دریافت فیزیکی توسط اونر',goodsReceived:'محصول دریافت و تأیید شد',
+    goodsVerifiedAt:'تأیید اونر',goodsEmpty:'فاکتور سپلایر برای این شعبه ثبت نشده است.',
+    goodsHistoryError:'تاریخچهٔ تحویل محصول در دسترس نیست. دوباره تازه‌سازی کن.',
+    goodsStatusHint:'پرداخت فاکتور با تحویل فیزیکی محصول فرق دارد.',moreGoods:'نمایش محصولات بیشتر',retry:'تلاش دوباره',
     open:'باز',show:'نمایش',hide:'پنهان',items:'قلم',loading:'دریافت سوابق…',retry:'تازه‌سازی اطلاعات',
     orderProgress:'مراحل سفارش',progressHint:'وضعیت سفارش‌های مربوط به شما',shipped:'ارسال‌شده',received:'دریافت‌شده',
     total:'مجموع',invoiced:'مبلغ فاکتورها',due:'سررسید',branch:'شعبه',unknownBranch:'شعبهٔ تعیین‌شده',
@@ -133,6 +152,7 @@ export default function SupplierPortalERP() {
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState('home');
   const [search, setSearch] = useState('');
+  const [visibleGoodsCount,setVisibleGoodsCount]=useState(20);
 
   // ── Own linked Supplier identity, never a tenant-wide suppliers read ─────
   // Supplier memberships intentionally do NOT have viewSuppliers (management).
@@ -203,7 +223,7 @@ export default function SupplierPortalERP() {
   });
 
   // Owner confirmation snapshots are scoped to the signed-in supplier by server RPC.
-  const {data:verifiedDeliveries=[],refetch:refetchDeliveries}=useQuery({
+  const {data:verifiedDeliveries=[],isError:verifiedDeliveriesError,refetch:refetchDeliveries}=useQuery({
     queryKey:['supplier-verified-deliveries',supplierProfile?.id,user?.branch_id],
     queryFn:async()=>{
       const {data,error}=await supabase.rpc('erp_supplier_verified_deliveries');
@@ -214,7 +234,7 @@ export default function SupplierPortalERP() {
     refetchInterval:12000,refetchOnWindowFocus:true,retry:1,
   });
 
-  const {data:invoiceDeliveries=[],isError:invoiceDeliveryError,refetch:refetchInvoiceDeliveries}=useQuery({
+  const {data:invoiceDeliveries=[],isLoading:invoiceDeliveryLoading,isError:invoiceDeliveryError,refetch:refetchInvoiceDeliveries}=useQuery({
     queryKey:['supplier-invoice-deliveries-portal',supplierProfile?.id,user?.restaurant_id,user?.branch_id],
     enabled:Boolean(supplierProfile?.id&&user?.restaurant_id&&user?.branch_id),
     queryFn:async()=>{
@@ -270,6 +290,14 @@ export default function SupplierPortalERP() {
 
   const deliveryByOrder=new Map(verifiedDeliveries.map(row=>[String(row.order_id),row]));
   const invoiceDeliveryById=new Map(invoiceDeliveries.map(row=>[String(row.invoice_id),row]));
+  // Invoice goods and purchase-order shipment are independent procurement flows.
+  // A paid/approved invoice is never treated as physically received without Owner evidence.
+  const goodsTimeline=buildSupplierGoodsTimeline(invoices,invoiceDeliveries);
+  const completedGoods=completedSupplierGoodsHistory(goodsTimeline);
+  const completedPOHistory=purchaseOrders.filter(po=>['received','cancelled'].includes(po.status));
+  const filteredGoods=goodsTimeline.filter(({invoice})=>!search
+    || String(invoice.id||'').toLowerCase().includes(search.toLowerCase())
+    || String(invoice.invoice_number||'').toLowerCase().includes(search.toLowerCase()));
   const pending = purchaseOrders.filter(po => po.status === 'approved');
   const shippedCount = purchaseOrders.filter(po => po.status === 'shipped').length;
   const receivedCount = purchaseOrders.filter(po => po.status === 'received').length;
@@ -334,7 +362,7 @@ export default function SupplierPortalERP() {
             const Icon=tab.icon;
             return <button key={tab.id} type="button"
               aria-current={activeTab===tab.id?'page':undefined}
-              onClick={()=>{setActiveTab(tab.id);setSearch('');}}
+              onClick={()=>{setActiveTab(tab.id);setSearch('');setVisibleGoodsCount(20);}}
               className={'flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-center text-[11px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 sm:min-h-11 sm:flex-row sm:gap-2 sm:text-sm '+
                 (activeTab===tab.id?'bg-blue-600 text-white shadow-sm dark:bg-blue-500':'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800')}>
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true"/>
@@ -495,27 +523,52 @@ export default function SupplierPortalERP() {
 
           {activeTab==='orders' && <section data-testid="supplier-order-tab" className="space-y-3">
             <div className="flex items-center justify-between gap-2 px-0.5">
-              <h2 className="text-base font-extrabold text-slate-900 dark:text-white">{copy.ordersTitle}</h2>
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">{isLoading?'…':purchaseOrders.length}</span>
+              <h2 className="text-base font-extrabold text-slate-900 dark:text-white">{copy.orders}</h2>
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">{(isLoading||invoicesLoading)?'…':purchaseOrders.length+invoices.length}</span>
             </div>
             <div className="relative"><Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden="true"/>
-              <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder={copy.orderSearch} aria-label={copy.orderSearch}
+              <Input value={search} onChange={e=>{setSearch(e.target.value);setVisibleGoodsCount(20);}} placeholder={copy.orderSearch} aria-label={copy.orderSearch}
                 className="h-11 rounded-xl border-slate-200 bg-white ps-10 text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"/>
             </div>
             {isLoading?<p role="status" className="p-4 text-xs text-slate-600">{copy.loading}</p>:
-              filteredPOs.length===0?<div className="rounded-2xl border border-slate-200 bg-white p-5 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{copy.noOrders}</div>:
-              <div className="grid gap-2.5 lg:grid-cols-2">{filteredPOs.map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)} loading={confirmShipmentMutation.isPending}/>)}</div>}
+              filteredPOs.length>0&&<section className="space-y-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">{copy.ordersTitle} · {filteredPOs.length}</h3>
+                <div className="grid gap-2.5 lg:grid-cols-2">{filteredPOs.map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)} loading={confirmShipmentMutation.isPending}/>)}</div>
+              </section>}
+            <section data-testid="supplier-invoice-goods-orders" className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">{copy.goodsOrdersTitle}</h3>
+              {invoiceDeliveryError&&<div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <span>{copy.goodsHistoryError}</span><Button variant="outline" size="sm" onClick={()=>refetchInvoiceDeliveries()}>{copy.retry}</Button>
+              </div>}
+              {(invoicesLoading||invoiceDeliveryLoading)?<p role="status" className="p-3 text-xs text-slate-600">{copy.loading}</p>:
+                invoiceDeliveryError?null:
+                filteredGoods.length===0?<p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">{copy.goodsEmpty}</p>:
+                <div className="space-y-3">
+                  <div className="grid gap-2.5 lg:grid-cols-2">{filteredGoods.slice(0,visibleGoodsCount).map(entry=><InvoiceGoodsCard key={entry.invoice.id} entry={entry} copy={copy}/>)}</div>
+                  {filteredGoods.length>visibleGoodsCount&&<Button type="button" variant="outline" className="min-h-11 w-full" onClick={()=>setVisibleGoodsCount(n=>n+20)}>{copy.moreGoods} · {filteredGoods.length-visibleGoodsCount}</Button>}
+                </div>}
+            </section>
           </section>}
 
           {activeTab==='history' && <section data-testid="supplier-history-tab" className="space-y-3">
             <h2 className="px-0.5 text-base font-extrabold text-slate-900 dark:text-white">{copy.historyTitle}</h2>
-            {isLoading?<p role="status" className="p-4 text-xs text-slate-600">{copy.loading}</p>:
-              purchaseOrders.filter(po=>['received','cancelled'].includes(po.status)).length===0?
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{copy.noHistory}</div>:
-                <div className="grid gap-2.5 lg:grid-cols-2">
-                  {purchaseOrders.filter(po=>['received','cancelled'].includes(po.status))
-                    .map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} loading={false} onConfirmShipment={()=>{}}/>)}
-                </div>}
+            {(invoiceDeliveryError||verifiedDeliveriesError)&&<div role="alert"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              <span>{copy.goodsHistoryError}</span>
+              <Button variant="outline" size="sm" onClick={()=>{refetchInvoiceDeliveries();refetchDeliveries();}}>{copy.retry}</Button>
+            </div>}
+            {(isLoading||invoicesLoading||invoiceDeliveryLoading)?<p role="status" className="p-4 text-xs text-slate-600">{copy.loading}</p>:<>
+              {completedGoods.length>0&&<section data-testid="supplier-goods-delivery-history" className="space-y-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">{copy.goodsHistoryTitle} · {completedGoods.length}</h3>
+                <div className="grid gap-2.5 lg:grid-cols-2">{completedGoods.map(entry=><InvoiceGoodsCard key={entry.invoice.id} entry={entry} copy={copy}/>)}</div>
+              </section>}
+              {completedPOHistory.length>0&&<section className="space-y-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">{copy.ordersTitle} · {completedPOHistory.length}</h3>
+                <div className="grid gap-2.5 lg:grid-cols-2">{completedPOHistory.map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} loading={false} onConfirmShipment={()=>{}}/>)}</div>
+              </section>}
+              {completedPOHistory.length===0&&completedGoods.length===0&&!invoiceDeliveryError&&
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{copy.noHistory}</div>}
+            </>}
           </section>}
         </main>
       </div>
@@ -636,6 +689,56 @@ function InvoiceCard({inv,copy,deliveryReceipt=null,payments=[],paymentsLoading=
           </div>
         </section>
       </div>}
+    </CardContent>
+  </Card>;
+}
+
+
+function InvoiceGoodsCard({entry,copy}){
+  const {invoice,receipt,stage}=entry;
+  const [expanded,setExpanded]=useState(false);
+  const verified=stage==='received'&&Boolean(receipt);
+  const stageLabel=verified?copy.goodsReceived:stage==='awaiting_owner'?copy.goodsAwaitingOwner:copy.goodsPendingApproval;
+  const lines=verified&&Array.isArray(receipt.verified_items)?receipt.verified_items:[];
+  const draftLines=Array.isArray(invoice.items)?invoice.items:[];
+  return <Card data-testid="supplier-invoice-goods-card" className="min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <CardContent className="min-w-0 space-y-3 p-3.5 sm:p-4">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="break-all text-sm font-extrabold">{copy.goodsRecord} #{invoice.invoice_number||String(invoice.id).slice(0,8)}</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{dateLabel(invoice.date||invoice.created_date)}</p>
+        </div>
+        <Badge className={'max-w-full whitespace-normal rounded-full border px-2.5 py-1 text-[11px] '+
+          (verified?PO_STATUS.received.color:stage==='awaiting_owner'?PO_STATUS.shipped.color:PO_STATUS.pending.color)}>{stageLabel}</Badge>
+      </div>
+      <div data-testid="supplier-goods-progress" className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-semibold">
+        <span className="rounded-lg bg-slate-100 px-2 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-200">{copy.goodsRecorded}</span>
+        <ArrowRight aria-hidden="true" className="h-3 w-3 shrink-0 text-slate-400"/>
+        <span className={'min-w-0 rounded-lg px-2 py-1 '+(verified?'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200':'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200')}>{stageLabel}</span>
+      </div>
+      {verified?<div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
+        <p className="flex items-center gap-1.5 font-bold"><CheckCircle2 className="h-4 w-4 shrink-0"/>{copy.goodsVerifiedAt} · {dateLabel(receipt.confirmed_at)}</p>
+        <div className="divide-y divide-emerald-200/60 dark:divide-emerald-800">
+          {lines.map((item,i)=><div key={i} data-testid="supplier-verified-goods-line" className="flex min-w-0 items-start justify-between gap-2 py-1.5">
+            <span className="min-w-0 flex-1 break-words">{item.product_name||item.name||'—'}</span>
+            <strong className="shrink-0 tabular-nums">{item.received_quantity} {item.unit||''}</strong>
+          </div>)}
+        </div>
+      </div>:<>
+        <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">{copy.goodsStatusHint}</p>
+        {draftLines.length>0&&<>
+          <button type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}
+            className="min-h-10 rounded-lg px-2 text-xs font-bold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950">
+            {expanded?copy.hide:copy.show} · {draftLines.length} {copy.items}
+          </button>
+          {expanded&&<div className="space-y-1.5 rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-800">
+            {draftLines.map((item,i)=><div key={i} className="flex min-w-0 justify-between gap-2">
+              <span className="min-w-0 break-words">{item.product_name||item.name||'—'}</span>
+              <strong className="shrink-0 tabular-nums">×{item.quantity??item.qty??'—'}</strong>
+            </div>)}
+          </div>}
+        </>}
+      </>}
     </CardContent>
   </Card>;
 }
