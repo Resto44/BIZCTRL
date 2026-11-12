@@ -29,9 +29,10 @@ describe('unified secure BizCTRL transactional email design',()=>{
  it('customer portal retains its own single use link and separate auth verification step',()=>{
   const email=renderBizctrlTransactionalEmail({kind:'customer',name:'امان',
    businessName:'My Supermarket',businessType:'supermarket',url:customerUrl,expiresAt});
-  expect(email.html).toContain('Activate customer invitation');
+  expect(email.html).toContain('Open invitation &amp; register');
   expect(email.html).toContain('My Supermarket');
-  expect(email.text).toContain('Reopen this invitation');
+  expect(email.text).toContain('reopen this invitation');
+  expect(email.text).toContain('verification email is requested only after you register');
  });
  it('keeps employee OTP leading zeros and does not pretend it activates a new account',()=>{
   const email=renderBizctrlTransactionalEmail({kind:'attendance',name:'Employee',

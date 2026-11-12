@@ -37,14 +37,14 @@ export function renderBizctrlTransactionalEmail(input:BizctrlEmailArgs){
  }
  const isCode=kind==='attendance';
  if(isCode&&!/^\d{6}$/.test(input.code||''))throw new Error('INVALID_ATTENDANCE_CODE');
- const action=kind==='staff'?'Activate ERP account':kind==='customer'?'Activate customer invitation':
+ const action=kind==='staff'?'Activate ERP account':kind==='customer'?'Open invitation & register':
   kind==='attendance'?'Open employee dashboard':'Open report center';
  const headline=kind==='staff'?'Your ERP invitation is ready':
-  kind==='customer'?'Your customer portal is ready':
+  kind==='customer'?'Complete your customer portal registration':
   kind==='attendance'?'Your '+(input.phase==='out'?'Check Out':'Check In')+' code':
   'Your BizCTRL report is ready';
  const message=kind==='staff'?'You have been invited to join this business with '+role+' access.':
-  kind==='customer'?'You are invited to view your purchases, payments and account statements.':
+  kind==='customer'?'To access your customer portal: open this invitation, create an account using the same invited email and a password, and then confirm your email using a SECOND message sent by BizCTRL Auth. The verification email is requested only after you register. Existing verified users should sign in instead.':
   kind==='attendance'?'Enter this one-time code in your employee dashboard while physically at your assigned branch.':
   'Your requested ERP report is attached to this email.';
  const subject=kind==='staff'?'BizCTRL — '+role+' account invitation':
@@ -55,11 +55,11 @@ export function renderBizctrlTransactionalEmail(input:BizctrlEmailArgs){
  const safety=verification?'This invitation works once. New accounts must verify their email through a separate verification message before they can sign in.':
   isCode?'Single use. The code expires at the time shown. Never forward this code.':'This report is private. Do not forward it to unauthorized people.';
  const ar=kind==='staff'?'دعوة آمنة لتفعيل حسابك في بیزكنترول. افتح الرابط وأنشئ حسابك ثم أكّد بريدك من رسالة التحقق المنفصلة.':
-  kind==='customer'?'دعوة بوابة العميل: افتح الرابط وسجّل بنفس البريد الإلكتروني، وأكّد بريدك برسالة منفصلة إذا كان حسابك جديداً.':
+  kind==='customer'?'دعوة بوابة العميل ليست رسالة تأكيد البريد. افتح الرابط وأنشئ حساباً باستخدام نفس البريد وكلمة مرور. بعد الضغط على «إنشاء حساب» تُطلب رسالة تأكيد منفصلة. إذا كان لديك حساب مؤكد، سجّل الدخول ثم فعّل الدعوة.':
   kind==='attendance'?'رمز الدخول أو الخروج لمرة واحدة. افتح بوابة الموظف واستعمل الرمز قبل انتهاء صلاحيته، ولا تشاركه.':
   'تقرير بیزكنترول مرفق بهذه الرسالة. افتح مركز التقارير للحصول على التفاصيل.';
  const fa=kind==='staff'?'دعوت امن بیزکنترول: لینک را باز کنید، حساب بسازید و ایمیل خود را از پیام جداگانه تأیید نمایید.':
-  kind==='customer'?'دعوت پورتل مشتری: با همین ایمیل وارد شوید. اگر حساب تازه است، اول ایمیل را از پیام جداگانه تأیید کنید و دوباره دعوت را فعال نمایید.':
+  kind==='customer'?'این ایمیل فقط دعوت مشتری است، نه تأیید ایمیل. لینک را باز کنید و با همین آدرس ایمیل و رمز عبور حساب بسازید. بعد از ثبت‌نام، پیام تأیید جدا درخواست می‌شود. اگر قبلاً حساب تأییدشده دارید، وارد شوید و دعوت را فعال کنید.':
   kind==='attendance'?'کد یک‌بارمصرف ورود یا خروج کارمند است. پیش از انقضا در داشبورد کارمند استفاده کنید و با کسی شریک نسازید.':
   'گزارش بیزکنترول به این ایمیل ضمیمه شده است. جزئیات بیشتر در مرکز گزارش‌ها است.';
  const tag=kind==='staff'?role.toUpperCase()+' ACCESS':kind==='customer'?'CUSTOMER ACCESS':
@@ -74,7 +74,7 @@ export function renderBizctrlTransactionalEmail(input:BizctrlEmailArgs){
  ...(isCode?['Your six-digit code: '+input.code]:[]),
  '',action+': '+link,...(expiry?['Expires: '+expiry]:[]),
  safety,
- ...(kind==='customer'?['Sign in or register with the SAME EMAIL. Reopen this invitation after verification.']:[]),
+ ...(kind==='customer'?['STEP 1: Open the invitation and select Create account (or Sign in if already registered).','STEP 2: After creating your account, check Inbox and Spam for the separate Verify Email message.','STEP 3: After verification, sign in with the same invited email and reopen this invitation to activate customer access.']:[]),
  '', 'العربية: '+ar,'فارسی دری: '+fa,'','Need help? support@mybizctrl.site'
  ].join('\n');
  const html=`<!doctype html>
