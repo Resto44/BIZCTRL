@@ -214,6 +214,20 @@ export default function SupplierPortalERP() {
     refetchInterval:12000,refetchOnWindowFocus:true,retry:1,
   });
 
+  const {data:invoiceDeliveries=[],isError:invoiceDeliveryError,refetch:refetchInvoiceDeliveries}=useQuery({
+    queryKey:['supplier-invoice-deliveries-portal',supplierProfile?.id,user?.restaurant_id,user?.branch_id],
+    enabled:Boolean(supplierProfile?.id&&user?.restaurant_id&&user?.branch_id),
+    queryFn:async()=>{
+      const {data,error}=await supabase.rpc('erp_supplier_invoice_delivery_receipts',{
+        p_restaurant_id:user.restaurant_id
+      });
+      if(error)throw error;
+      if(!Array.isArray(data))throw new Error('SUPPLIER_INVOICE_RECEIPTS_INVALID_RESPONSE');
+      return data;
+    },
+    refetchInterval:12000,refetchOnWindowFocus:true,retry:1,
+  });
+
   const confirmShipmentMutation = useMutation({
     mutationFn: async (poId) => {
       const {data,error}=await supabase.rpc('erp_supplier_mark_order_shipped',{p_order_id:poId});
@@ -255,6 +269,7 @@ export default function SupplierPortalERP() {
   );
 
   const deliveryByOrder=new Map(verifiedDeliveries.map(row=>[String(row.order_id),row]));
+  const invoiceDeliveryById=new Map(invoiceDeliveries.map(row=>[String(row.invoice_id),row]));
   const pending = purchaseOrders.filter(po => po.status === 'approved');
   const shippedCount = purchaseOrders.filter(po => po.status === 'shipped').length;
   const receivedCount = purchaseOrders.filter(po => po.status === 'received').length;
@@ -300,7 +315,7 @@ export default function SupplierPortalERP() {
                 <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true"/>{copy.verified}
               </span>
               <Button type="button" variant="ghost" size="icon" aria-label={copy.refresh} title={copy.refresh}
-                onClick={()=>{retrySupplierProfile();refetch();refetchInvoices();refetchPayments();refetchDeliveries();}}
+                onClick={()=>{retrySupplierProfile();refetch();refetchInvoices();refetchPayments();refetchDeliveries();refetchInvoiceDeliveries();}}
                 className="h-10 w-10 rounded-xl text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
                 <RefreshCw className="h-4 w-4" aria-hidden="true"/>
               </Button>
@@ -429,7 +444,7 @@ export default function SupplierPortalERP() {
                 <button type="button" className="min-h-10 text-xs font-bold text-blue-700 hover:underline dark:text-blue-300" onClick={()=>setActiveTab('invoices')}>{copy.viewAll} →</button>
               </div>
               <div className="grid gap-2.5 lg:grid-cols-2">
-                {invoices.slice(0,3).map(inv=><InvoiceCard key={inv.id} inv={inv} copy={copy} payments={paymentsByInvoice.get(String(inv.id))||[]} paymentsLoading={paymentsLoading} paymentsError={paymentsError}/>)}
+                {invoices.slice(0,3).map(inv=><InvoiceCard key={inv.id} inv={inv} copy={copy} deliveryReceipt={invoiceDeliveryById.get(String(inv.id))} payments={paymentsByInvoice.get(String(inv.id))||[]} paymentsLoading={paymentsLoading} paymentsError={paymentsError}/>)}
               </div>
             </section>}
             {!isLoading && pending.length>0 && <section className="space-y-2">
@@ -475,7 +490,7 @@ export default function SupplierPortalERP() {
               filteredInvoices.length===0?<div className="rounded-2xl border border-slate-200 bg-white p-5 text-center dark:border-slate-800 dark:bg-slate-900">
                 <FileText className="mx-auto mb-2 h-6 w-6 text-slate-400"/><p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{copy.noInvoices}</p>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{copy.noInvoicesHint}</p>
-              </div>:<div className="grid gap-2.5 lg:grid-cols-2">{filteredInvoices.map(inv=><InvoiceCard key={inv.id} inv={inv} copy={copy} payments={paymentsByInvoice.get(String(inv.id))||[]} paymentsLoading={paymentsLoading} paymentsError={paymentsError}/>)}</div>}
+              </div>:<div className="grid gap-2.5 lg:grid-cols-2">{filteredInvoices.map(inv=><InvoiceCard key={inv.id} inv={inv} copy={copy} deliveryReceipt={invoiceDeliveryById.get(String(inv.id))} payments={paymentsByInvoice.get(String(inv.id))||[]} paymentsLoading={paymentsLoading} paymentsError={paymentsError}/>)}</div>}
           </section>}
 
           {activeTab==='orders' && <section data-testid="supplier-order-tab" className="space-y-3">
@@ -509,7 +524,7 @@ export default function SupplierPortalERP() {
 }
 
 // ── Invoice card: accessible financial detail, no duplicate totals ──────────
-function InvoiceCard({inv,copy,payments=[],paymentsLoading=false,paymentsError=false}){
+function InvoiceCard({inv,copy,deliveryReceipt=null,payments=[],paymentsLoading=false,paymentsError=false}){
   const [expanded,setExpanded]=useState(false);
   const statusConf=INV_STATUS[inv.status]||INV_STATUS.pending;
   const evidence=supplierInvoicePaymentEvidence(inv,payments,!paymentsLoading&&!paymentsError);
@@ -534,6 +549,16 @@ function InvoiceCard({inv,copy,payments=[],paymentsLoading=false,paymentsError=f
           {copy.status[inv.status]||statusConf.label}
         </Badge>
       </div>
+      {deliveryReceipt&&<div data-testid="supplier-invoice-goods-delivered"
+         className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+        <p>{copy.ownerApproved} · {dateLabel(deliveryReceipt.confirmed_at)}</p>
+        <div className="mt-2 space-y-1">
+          {(deliveryReceipt.verified_items||[]).map((item,i)=><div key={i} className="flex min-w-0 justify-between gap-3">
+            <span className="min-w-0 break-words">{item.product_name||item.name||'—'}</span>
+            <strong className="shrink-0 tabular-nums">{item.received_quantity} {item.unit||''}</strong>
+          </div>)}
+        </div>
+       </div>}
       <div className="grid grid-cols-3 gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
         <div className="min-w-0">
           <p className="text-[11px] text-slate-500 dark:text-slate-400">{copy.total}</p>
