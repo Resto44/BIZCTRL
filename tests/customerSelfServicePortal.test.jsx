@@ -64,6 +64,46 @@ describe('Customer self-service',()=>{
  expect(text()).toContain('verification email should be sent');
  expect(text()).toContain('customer-verification-pending');
  expect(text()).toContain('Resend confirmation email');});
+ it('does not request an Auth confirmation until the invited customer actually creates an account',async()=>{
+  mock.getSession.mockResolvedValue({data:{session:null}});
+  const token='c'.repeat(64);window.history.replaceState(null,'','/customer-portal#invite='+token);
+  await mount();
+  expect(text()).toContain('Customer account setup — 3 steps');
+  expect(text()).toContain('Only AFTER registration');
+  expect(tree.root.findAllByProps({'data-testid':'customer-create-account'})).toHaveLength(1);
+  expect(mock.signup).not.toHaveBeenCalled();
+  expect(mock.resend).not.toHaveBeenCalled();
+  expect(tree.root.findAllByProps({'data-testid':'customer-resend-verification'})).toHaveLength(0);
+  expect(button('Create account').props.disabled).toBe(true);
+ });
+ it('requests Verify Email after invited signup, then supports explicit resend without re-registering',async()=>{
+  mock.getSession.mockResolvedValue({data:{session:null}});
+  mock.signup.mockResolvedValue({data:{user:{id:'new'},session:null},error:null});
+  mock.resend.mockResolvedValue({error:null});
+  const token='d'.repeat(64);window.history.replaceState(null,'','/customer-portal#invite='+token);
+  await mount();
+  const inputs=tree.root.findAllByType('input');
+  await act(async()=>{inputs[0].props.onChange({target:{value:'pending@example.test'}});inputs[1].props.onChange({target:{value:'validpassword123'}});});
+  await act(async()=>{button('Create account').props.onClick();await pause();});
+  expect(mock.signup).toHaveBeenCalledTimes(1);
+  expect(text()).toContain('Account registration requested');
+  expect(tree.root.findAllByProps({'data-testid':'customer-verification-pending'})).toHaveLength(1);
+  await act(async()=>{button('Resend confirmation email').props.onClick();await pause();});
+  expect(mock.resend).toHaveBeenCalledWith({type:'signup',email:'pending@example.test',options:{emailRedirectTo:window.location.origin+'/customer-portal'}});
+  expect(mock.signup).toHaveBeenCalledTimes(1);
+  expect(sessionStorage.getItem('customer:invite')).toBe(token);
+ });
+ it('lets existing verified customers sign in without creating a duplicate identity',async()=>{
+  mock.getSession.mockResolvedValue({data:{session:null}});
+  mock.signin.mockResolvedValue({data:{session:{user:{id:'existing'}}},error:null});
+  const token='e'.repeat(64);window.history.replaceState(null,'','/customer-portal#invite='+token);
+  await mount();
+  const inputs=tree.root.findAllByType('input');
+  await act(async()=>{inputs[0].props.onChange({target:{value:'existing@example.test'}});inputs[1].props.onChange({target:{value:'validpassword123'}});});
+  await act(async()=>{button('Already registered? Sign in').props.onClick();await pause();});
+  expect(mock.signin).toHaveBeenCalledTimes(1);
+  expect(mock.signup).not.toHaveBeenCalled();
+ });
  it('creates and revokes an invitation for the exact owner-selected customer',async()=>{mock.rpc.mockResolvedValue({data:{token:'secure-token'},error:null});await mount(<CustomerPortalInvitation customer={{id:'customer-a',email:'customer@example.com'}}/>);
  await act(async()=>{tree.root.findByType('form').props.onSubmit({preventDefault(){}});await pause();});expect(mock.rpc).toHaveBeenCalledWith('erp_customer_portal_invite',{p_customer_id:'customer-a',p_email:'customer@example.com',p_revoke:false});expect(text()).toContain('/customer-portal#invite=secure-token');
  await act(async()=>{button('Revoke portal access').props.onClick();await pause();});expect(mock.rpc).toHaveBeenLastCalledWith('erp_customer_portal_invite',{p_customer_id:'customer-a',p_email:'customer@example.com',p_revoke:true});expect(text()).not.toContain('#invite=');});
