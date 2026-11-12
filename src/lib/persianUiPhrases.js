@@ -1,5 +1,17 @@
 // Reviewed Persian interface copy. Source values and user-entered records remain unchanged.
 export default {
+  "Managers in this business": "مدیران این بیزنس",
+  "All branches": "تمام شعبه‌ها",
+  "Organization-wide": "سطح سازمان",
+  "All existing managers of this store, across its branches. Existing accounts are not invited again.": "تمام مدیران ثبت‌شدهٔ این فروشگاه در همهٔ شعبه‌ها. برای حساب موجود دوباره دعوت‌نامه ساخته نمی‌شود.",
+  "No managers registered or invited for this store yet. Create the first manager below.": "هنوز هیچ مدیری در این فروشگاه ثبت یا دعوت نشده است. مدیر اول را در پایین اضافه کن.",
+  "No matching users.": "کاربر مطابق جستجو پیدا نشد.",
+  "Invitation already exists — use Invitation activity to renew.": "دعوت‌نامه از قبل وجود دارد؛ برای تمدید از تاریخچهٔ دعوت‌نامه‌ها استفاده کن.",
+  "Active account — access is already assigned.": "حساب فعال است و دسترسی آن تعیین شده.",
+  "Suspended account — manage access in Role & Permission Center.": "حساب تعلیق است؛ دسترسی را از مرکز نقش‌ها و مجوزها مدیریت کن.",
+  "Existing account — manage access instead of re-inviting.": "این حساب از قبل وجود دارد؛ به‌جای دعوت دوباره، مجوزها را مدیریت کن.",
+  "Available for a new invitation": "آمادهٔ ساخت دعوت‌نامهٔ جدید",
+  "Branch": "شعبه",
   "Select an existing user": "انتخاب کاربر موجود",
   "Select a person to create their invitation link.": "شخص را انتخاب کن تا لینک دعوتش ساخته شود.",
   "Search users": "جستجوی کاربران",
