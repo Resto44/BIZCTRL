@@ -13,7 +13,7 @@ describe('Customer invitation transactional email', () => {
     });
     expect(subject).toContain('BizControl');
     expect(html).toContain('href="' + url + '"');
-    expect(html).toContain('Activate customer invitation');
+    expect(html).toContain('Open invitation & register');
     expect(html).toContain('target="_blank"');
     expect(html).toContain('<table role="presentation"');
     expect(html).toContain('width:100%;max-width:600px');
@@ -23,6 +23,9 @@ describe('Customer invitation transactional email', () => {
     expect(html).toContain('Riyadh, UTC+3');
     expect(text).toContain(url);
     expect(text).toContain('separate verification message');
+    expect(text).toContain('STEP 1: Open the invitation');
+    expect(text).toContain('STEP 2: After creating your account');
+    expect(text).toContain('STEP 3: After verification');
     expect(text).toContain('ابو قلندر');
   });
 
