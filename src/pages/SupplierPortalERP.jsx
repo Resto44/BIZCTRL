@@ -56,7 +56,7 @@ const SUPPLIER_COPY = {
     goodsAwaitingOwner:'Awaiting Owner physical receipt verification',goodsReceived:'Goods received and verified',
     goodsVerifiedAt:'Owner confirmed',goodsEmpty:'No supplier invoices are assigned to this branch.',
     goodsHistoryError:'Goods receipt history is temporarily unavailable. Refresh to retry.',
-    goodsStatusHint:'Invoice payment and physical goods delivery are separate.',retry:'Retry',
+    goodsStatusHint:'Invoice payment and physical goods delivery are separate.',moreGoods:'Show more invoice goods',retry:'Retry',
     open:'Open',show:'Show',hide:'Hide',items:'items',loading:'Loading records…',retry:'Refresh records',
     orderProgress:'Order progress',progressHint:'Status of your assigned orders',shipped:'Shipped',received:'Received',
     total:'Total',invoiced:'Invoiced',due:'Due',branch:'Branch',unknownBranch:'Assigned branch',
@@ -80,7 +80,7 @@ const SUPPLIER_COPY = {
     goodsAwaitingOwner:'بانتظار تحقق المالك من الاستلام الفعلي',goodsReceived:'تم استلام البضاعة والتحقق منها',
     goodsVerifiedAt:'تأكيد المالك',goodsEmpty:'لا توجد فواتير مورّد مسندة لهذا الفرع.',
     goodsHistoryError:'تعذر تحميل سجل استلام البضائع. حدّث البيانات للمحاولة مجدداً.',
-    goodsStatusHint:'سداد الفاتورة منفصل عن استلام البضاعة فعلياً.',retry:'إعادة المحاولة',
+    goodsStatusHint:'سداد الفاتورة منفصل عن استلام البضاعة فعلياً.',moreGoods:'عرض المزيد من بضائع الفواتير',retry:'إعادة المحاولة',
     open:'مفتوح',show:'عرض',hide:'إخفاء',items:'أصناف',loading:'جارٍ تحميل السجلات…',retry:'تحديث السجلات',
     orderProgress:'مراحل الطلبات',progressHint:'حالة أوامر الشراء المسندة لك',shipped:'تم الشحن',received:'تم الاستلام',
     total:'المجموع',invoiced:'قيمة الفواتير',due:'يستحق',branch:'الفرع',unknownBranch:'الفرع المعيّن',
@@ -104,7 +104,7 @@ const SUPPLIER_COPY = {
     goodsAwaitingOwner:'در انتظار بررسی و تأیید دریافت فیزیکی توسط اونر',goodsReceived:'محصول دریافت و تأیید شد',
     goodsVerifiedAt:'تأیید اونر',goodsEmpty:'فاکتور سپلایر برای این شعبه ثبت نشده است.',
     goodsHistoryError:'تاریخچهٔ تحویل محصول در دسترس نیست. دوباره تازه‌سازی کن.',
-    goodsStatusHint:'پرداخت فاکتور با تحویل فیزیکی محصول فرق دارد.',retry:'تلاش دوباره',
+    goodsStatusHint:'پرداخت فاکتور با تحویل فیزیکی محصول فرق دارد.',moreGoods:'نمایش محصولات بیشتر',retry:'تلاش دوباره',
     open:'باز',show:'نمایش',hide:'پنهان',items:'قلم',loading:'دریافت سوابق…',retry:'تازه‌سازی اطلاعات',
     orderProgress:'مراحل سفارش',progressHint:'وضعیت سفارش‌های مربوط به شما',shipped:'ارسال‌شده',received:'دریافت‌شده',
     total:'مجموع',invoiced:'مبلغ فاکتورها',due:'سررسید',branch:'شعبه',unknownBranch:'شعبهٔ تعیین‌شده',
@@ -152,6 +152,7 @@ export default function SupplierPortalERP() {
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState('home');
   const [search, setSearch] = useState('');
+  const [visibleGoodsCount,setVisibleGoodsCount]=useState(20);
 
   // ── Own linked Supplier identity, never a tenant-wide suppliers read ─────
   // Supplier memberships intentionally do NOT have viewSuppliers (management).
@@ -361,7 +362,7 @@ export default function SupplierPortalERP() {
             const Icon=tab.icon;
             return <button key={tab.id} type="button"
               aria-current={activeTab===tab.id?'page':undefined}
-              onClick={()=>{setActiveTab(tab.id);setSearch('');}}
+              onClick={()=>{setActiveTab(tab.id);setSearch('');setVisibleGoodsCount(20);}}
               className={'flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-center text-[11px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 sm:min-h-11 sm:flex-row sm:gap-2 sm:text-sm '+
                 (activeTab===tab.id?'bg-blue-600 text-white shadow-sm dark:bg-blue-500':'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800')}>
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true"/>
@@ -526,7 +527,7 @@ export default function SupplierPortalERP() {
               <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">{(isLoading||invoicesLoading)?'…':purchaseOrders.length+invoices.length}</span>
             </div>
             <div className="relative"><Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden="true"/>
-              <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder={copy.orderSearch} aria-label={copy.orderSearch}
+              <Input value={search} onChange={e=>{setSearch(e.target.value);setVisibleGoodsCount(20);}} placeholder={copy.orderSearch} aria-label={copy.orderSearch}
                 className="h-11 rounded-xl border-slate-200 bg-white ps-10 text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"/>
             </div>
             {isLoading?<p role="status" className="p-4 text-xs text-slate-600">{copy.loading}</p>:
@@ -542,7 +543,10 @@ export default function SupplierPortalERP() {
               {(invoicesLoading||invoiceDeliveryLoading)?<p role="status" className="p-3 text-xs text-slate-600">{copy.loading}</p>:
                 invoiceDeliveryError?null:
                 filteredGoods.length===0?<p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">{copy.goodsEmpty}</p>:
-                <div className="grid gap-2.5 lg:grid-cols-2">{filteredGoods.map(entry=><InvoiceGoodsCard key={entry.invoice.id} entry={entry} copy={copy}/>)}</div>}
+                <div className="space-y-3">
+                  <div className="grid gap-2.5 lg:grid-cols-2">{filteredGoods.slice(0,visibleGoodsCount).map(entry=><InvoiceGoodsCard key={entry.invoice.id} entry={entry} copy={copy}/>)}</div>
+                  {filteredGoods.length>visibleGoodsCount&&<Button type="button" variant="outline" className="min-h-11 w-full" onClick={()=>setVisibleGoodsCount(n=>n+20)}>{copy.moreGoods} · {filteredGoods.length-visibleGoodsCount}</Button>}
+                </div>
             </section>
           </section>}
 
