@@ -62,7 +62,7 @@ export default function WalletERPOverview({restaurantId,businessName='',partners
     return <article key={p.id} className="py-2.5">
      <button type="button" aria-expanded={open} onClick={()=>{setExpanded(open?'':p.id);onSelect(p.id);}} className="flex min-h-14 w-full min-w-0 items-center gap-2.5 text-start">
       <span className="grid size-10 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600"><UserRound className="size-5"/></span>
-      <span className="min-w-0 flex-1"><strong className="block truncate text-sm text-slate-950">{p.name}</strong><span className="mt-0.5 block truncate text-xs text-slate-500">{p.account_role==='partner'?m.partners:['supplier','customer'].includes(p.account_role)?p.account_role:m.staff} · <span className={p.is_active?'text-emerald-700':'text-slate-500'}>{p.is_active?m.active:m.inactive}</span> · {p.user_id?m.login:m.unlinked}</span></span>
+      <span className="min-w-0 flex-1"><strong className="block truncate text-sm text-slate-950">{p.name}</strong><span className="mt-0.5 block truncate text-xs text-slate-500">{p.account_role==='partner'?m.partners:['supplier','customer','driver'].includes(p.account_role)?m.peopleRole?.[p.account_role]||p.account_role:m.staff} · <span className={p.is_active?'text-emerald-700':'text-slate-500'}>{p.is_active?m.active:m.inactive}</span> · {p.user_id?m.login:m.unlinked}</span></span>
       <ChevronRight className={`size-4 shrink-0 text-slate-400 transition-transform ${open?'rotate-90':''}`}/>
      </button>
      {open&&<div className="space-y-3 rounded-xl bg-slate-50 p-3">
