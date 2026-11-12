@@ -443,7 +443,7 @@ export default function OwnerStaffProvisioning() {
               : form.role === 'customer'
                 ? <CustomerApprovalInvitations key={selectedOrganizationId + ':' + form.branchId} restaurantId={selectedOrganizationId} branchId={form.branchId} organizationName={selectedOrganization?.name} />
                 : <>
-            <InvitationDirectory key={`${selectedOrganizationId}:${form.branchId}:${form.role}`} restaurantId={selectedOrganizationId} branchId={form.branchId} role={form.role} busy={submitting || loading || !!actionInvitationId} onSelect={selectExistingPerson} />
+            <InvitationDirectory key={`${selectedOrganizationId}:${form.branchId}:${form.role}`} restaurantId={selectedOrganizationId} branchId={form.branchId} branches={branches} role={form.role} busy={submitting || loading || !!actionInvitationId} onSelect={selectExistingPerson} />
 
             <div>
               <p className="mb-2 text-xs font-black text-slate-700 dark:text-slate-200">2. Enter user details</p>

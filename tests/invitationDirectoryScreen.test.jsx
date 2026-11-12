@@ -18,10 +18,13 @@ describe('role directory interaction',()=>{
   act(()=>view.update(<InvitationDirectory restaurantId="r" branchId="b" role="manager" busy onSelect={select}/>));
   expect(JSON.stringify(view.toJSON())).toContain('Manager B');
   expect(JSON.stringify(view.toJSON())).not.toContain('Employee A');
-  expect(view.root.findByType('button').props.disabled).toBe(true);
+  // A registered manager is a read-only directory record, never a new-invitation button.
+  expect(view.root.findAllByProps({'data-testid':'existing-role-member'})).toHaveLength(1);
+  expect(view.root.findAllByType('button')).toHaveLength(0);
+  expect(select).toHaveBeenCalledTimes(1);
   act(()=>view.update(<InvitationDirectory restaurantId="r" branchId="b" role="driver" onSelect={select}/>));
   const driverView=JSON.stringify(view.toJSON());
-  expect(view.root.findAllByType('p')[0].children.join('')).toBe('Select an existing user · 3');
+  expect(view.root.findAllByType('h3')[0].children.join('')).toBe('Select an existing user · 3');
   expect(driverView).toContain('Driver 1');
   expect(driverView).toContain('Driver 2');
   expect(driverView).toContain('Driver 3');
