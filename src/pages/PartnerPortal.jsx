@@ -21,14 +21,14 @@ const tr={
 const fromAddress=key=>{
  const hash=new URLSearchParams(window.location.hash.slice(1));
  const query=new URLSearchParams(window.location.search);
- return hash.get(key)||query.get(key)||sessionStorage.getItem(key==='invite'?'partner:invite':'people:join')||'';
+ return hash.get(key)||query.get(key)||sessionStorage.getItem(key==='invite'?'partner:invite':key==='personal'?'people:personal':'people:join')||'';
 };
 export default function PartnerPortal(){
  const {lang,setLang}=useLanguage();
  const t=tr[lang]||tr.en,people=peopleText(lang),client=useQueryClient();
  const [session,setSession]=useState(null),[authLoading,setAuthLoading]=useState(true);
  const [email,setEmail]=useState(''),[password,setPassword]=useState('');
- const [invite,setInvite]=useState(()=>fromAddress('invite')),[join,setJoin]=useState(()=>fromAddress('join'));
+ const [invite,setInvite]=useState(()=>fromAddress('invite')),[join,setJoin]=useState(()=>fromAddress('join')),[personal,setPersonal]=useState(()=>fromAddress('personal'));
  const [selected,setSelected]=useState(''),[busy,setBusy]=useState(false);
  const [error,setError]=useState(''),[notice,setNotice]=useState('');
  const lock=useRef(false);
@@ -43,7 +43,7 @@ export default function PartnerPortal(){
   return()=>{live=false;subscription.unsubscribe();};
  },[]);
  useEffect(()=>{setSelected('');},[session?.user?.id]);
- useEffect(()=>{if(invite)sessionStorage.setItem('partner:invite',invite);if(join)sessionStorage.setItem('people:join',join);},[invite,join]);
+ useEffect(()=>{if(invite)sessionStorage.setItem('partner:invite',invite);if(join)sessionStorage.setItem('people:join',join);if(personal)sessionStorage.setItem('people:personal',personal);},[invite,join,personal]);
  const accounts=useQuery({
   queryKey:['partner-portal-accounts',session?.user?.id],
   enabled:!!session?.user?.id,
@@ -67,7 +67,7 @@ export default function PartnerPortal(){
  const authenticate=signup=>run(async()=>{
   if(!email.trim()||!password||(signup&&password.length<10))throw Error(t.invalid);
   const credentials={email:email.trim().toLowerCase(),password};
-  const callback=invite?'invite='+encodeURIComponent(invite):join?'join='+encodeURIComponent(join):'';
+  const callback=invite?'invite='+encodeURIComponent(invite):personal?'personal='+encodeURIComponent(personal):join?'join='+encodeURIComponent(join):'';
   const result=signup?await supabase.auth.signUp({...credentials,options:{
     emailRedirectTo:window.location.origin+'/wallet-portal'+(callback?'?'+callback:''),
     data:invite?{partner_invitation_token:invite}:{people_portal_registration:true}
@@ -111,7 +111,7 @@ export default function PartnerPortal(){
    </div>:
    <>
     {invite&&<div className="rounded-xl border bg-white p-3 text-sm"><p>{session.user.email}</p><Button className="mt-2" disabled={busy} onClick={activate}>{people.accept}</Button></div>}
-    {(!accounts.isLoading&&!accounts.isError&&(!verified.length||join))&&<PeopleMemberships userId={session.user.id} t={people} joinToken={join} onJoined={()=>{setJoin('');sessionStorage.removeItem('people:join');setNotice(people.joinSent);accounts.refetch();}}/>}
+    {(!accounts.isLoading&&!accounts.isError&&(!verified.length||join||personal))&&<PeopleMemberships userId={session.user.id} t={people} joinToken={personal||join} personalJoin={!!personal} onJoined={()=>{setJoin('');setPersonal('');sessionStorage.removeItem('people:join');sessionStorage.removeItem('people:personal');setNotice(people.joinSent);accounts.refetch();}}/>}
     {accounts.isPending?<p role="status">{t.loading}</p>:
      accounts.isError?<p role="alert" className="rounded-xl border bg-rose-50 p-3">{t.failed}<Button onClick={()=>accounts.refetch()}>{t.refresh}</Button></p>:
      conflict?<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4">{t.error}</p>:
