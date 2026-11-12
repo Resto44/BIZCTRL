@@ -6,6 +6,7 @@ import {supabase} from '@/api/supabaseClient';
 import {useLanguage} from '@/lib/LanguageContext';
 import {peopleText} from '@/lib/peopleAccounts';
 import PeopleMemberships from '@/components/settlement/PeopleMemberships';
+import WalletApplicantDirectory from './WalletApplicantDirectory';
 import {Copy,ExternalLink,Link2,Loader2,Share2,ShieldCheck,Wallet,XCircle} from 'lucide-react';
 
 const COPY={
@@ -94,6 +95,7 @@ export default function WalletJoinInvitation({restaurantId,organizationName,bran
     </div>
     <p className="rounded-xl border border-cyan-200 bg-white p-3 text-xs leading-5 text-slate-700 dark:border-cyan-900 dark:bg-slate-900 dark:text-slate-200"><ShieldCheck className="me-2 inline size-4 align-middle text-cyan-700"/>{t.info}</p>
     <p className="text-xs text-slate-600 dark:text-slate-300">{t.scope}</p>
+    <WalletApplicantDirectory restaurantId={restaurantId} organizationName={organizationName} branches={branches} lang={lang}/>
     <div className="flex flex-wrap gap-2">
       <Button type="button" onClick={()=>issue(true)} disabled={busy||!isReady} className="min-h-11 min-w-0 rounded-xl bg-blue-600 text-white hover:bg-blue-700">
         {busy?<Loader2 className="me-2 size-4 animate-spin"/>:<Link2 className="me-2 size-4"/>}{link?t.renew:t.create}
