@@ -70,10 +70,10 @@ describe('Customer self-service',()=>{
   await mount();
   expect(text()).toContain('Customer account setup — 3 steps');
   expect(text()).toContain('Only AFTER registration');
-  expect(tree.root.findAllByProps({'data-testid':'customer-create-account'})).toHaveLength(1);
+  expect(tree.root.findAllByType('button').filter(x=>x.props['data-testid']==='customer-create-account')).toHaveLength(1);
   expect(mock.signup).not.toHaveBeenCalled();
   expect(mock.resend).not.toHaveBeenCalled();
-  expect(tree.root.findAllByProps({'data-testid':'customer-resend-verification'})).toHaveLength(0);
+  expect(tree.root.findAllByType('button').filter(x=>x.props['data-testid']==='customer-resend-verification')).toHaveLength(0);
   expect(button('Create account').props.disabled).toBe(true);
  });
  it('requests Verify Email after invited signup, then supports explicit resend without re-registering',async()=>{
@@ -87,7 +87,7 @@ describe('Customer self-service',()=>{
   await act(async()=>{button('Create account').props.onClick();await pause();});
   expect(mock.signup).toHaveBeenCalledTimes(1);
   expect(text()).toContain('Account registration requested');
-  expect(tree.root.findAllByProps({'data-testid':'customer-verification-pending'})).toHaveLength(1);
+  expect(tree.root.findAllByType('section').filter(x=>x.props['data-testid']==='customer-verification-pending')).toHaveLength(1);
   await act(async()=>{button('Resend confirmation email').props.onClick();await pause();});
   expect(mock.resend).toHaveBeenCalledWith({type:'signup',email:'pending@example.test',options:{emailRedirectTo:window.location.origin+'/customer-portal'}});
   expect(mock.signup).toHaveBeenCalledTimes(1);
