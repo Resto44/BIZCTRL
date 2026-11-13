@@ -1,4 +1,5 @@
 import React from 'react';
+import {purchaseOrderSupplierMessage} from '@/lib/purchaseOrderSupplierMessage';
 import { useLanguage } from '@/lib/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,10 +18,7 @@ export default function PurchaseOrderDetail({ order, onBack }) {
   const { currency } = useLanguage();
   const items = (() => { try { return JSON.parse(order.items || '[]'); } catch { return []; } })();
 
-  const getMessage = () => {
-    const lines = items.map(i => `- ${i.product_name}: ${i.qty} ${i.unit} @ ${currency}${i.unit_price || 0}`).join('\n');
-    return `Purchase Order #${order.order_number || order.id.slice(-6).toUpperCase()}\nDate: ${order.date}\nExpected Delivery: ${order.expected_delivery || 'TBD'}\nBranch: ${order.branch}\n\nItems:\n${lines}\n\nTotal: ${currency}${order.total_amount || 0}\n\nNotes: ${order.notes || '-'}`;
-  };
+  const getMessage = () => purchaseOrderSupplierMessage(order,currency);
 
   return (
     <div>

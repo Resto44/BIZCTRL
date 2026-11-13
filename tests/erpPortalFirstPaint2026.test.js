@@ -38,7 +38,7 @@ describe('Enterprise portal first paint without prematurely granting access',()=
     expect(supplier).toContain('if (supplierProfileLoading) return <PortalDataState loading/>;');
     expect(supplier).toContain("invoicesLoading ? '…' : showTotal('outstanding')");
     expect(supplier).toContain("!invoicesLoading && invoices.length > 0");
-    expect(supplier).toContain("!isLoading && !invoicesLoading && pending.length === 0 && invoices.length === 0");
+    expect(supplier).toContain("!isLoading && !invoicesLoading && pending.length === 0 && newPurchaseOrders.length === 0 && invoices.length === 0");
   });
   it('preserves wallet auth routing and owner approval instead of granting access from signup metadata',()=>{
     expect(wallet).toContain("<PeopleMemberships");

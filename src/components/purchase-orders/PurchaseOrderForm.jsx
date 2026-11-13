@@ -1,5 +1,5 @@
 import { restaurantMaterialFilter } from '@/lib/restaurantProducts';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -17,7 +17,13 @@ import PageHeader from '@/components/shared/PageHeader';
 const emptyItem = { product_id: '', product_name: '', qty: 1, unit: '', unit_price: 0 };
 
 export default function PurchaseOrderForm({ order, supplier = null, onClose, onSaved }) {
-  const { currency } = useLanguage();
+  const { currency, lang='en' } = useLanguage();
+  const copy={
+    en:{privacy:'Hide prices from supplier',privacyHelp:'Optional. The supplier will see products, quantities and order status, but NOT unit prices or total. Owner keeps prices for accounting.',flow:'The new order appears in the supplier dashboard immediately. The supplier can ship only after Owner approval.',create:'Create purchase order',saving:'Saving…'},
+    ar:{privacy:'إخفاء الأسعار عن المورّد',privacyHelp:'اختياري. يرى المورّد المنتجات والكميات وحالة الطلب دون سعر الوحدة أو المجموع. يحتفظ المالك بالأسعار للمحاسبة.',flow:'يظهر الطلب فور تسجيله في لوحة المورّد، ولا يمكن شحنه إلا بعد موافقة المالك.',create:'إنشاء أمر شراء',saving:'جارٍ الحفظ…'},
+    fa:{privacy:'پنهان‌کردن قیمت از سپلایر',privacyHelp:'اختیاری است. سپلایر محصول، مقدار و وضعیت سفارش را می‌بیند، نه قیمت فی واحد یا مبلغ مجموع. قیمت برای حسابداری اونر محفوظ می‌ماند.',flow:'سفارش جدید فوراً در داشبورد سپلایر ظاهر می‌شود؛ ارسال محصول فقط بعد از تأیید اونر ممکن است.',create:'ایجاد سفارش خرید',saving:'در حال ذخیره…'}
+  }[lang]||null;
+  const labels=copy||{privacy:'Hide prices from supplier',privacyHelp:'Supplier sees quantities but no prices when enabled.',flow:'New orders appear for supplier immediately; shipment requires Owner approval.',create:'Create purchase order',saving:'Saving…'};
   const { activeRestaurantId, activeRestaurant, branches } = useTenant();
   const [form, setForm] = useState({
     supplier_id: order?.supplier_id || supplier?.id || '',
@@ -25,16 +31,23 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
     supplier_email: order?.supplier_email || '',
     supplier_phone: order?.supplier_phone || '',
     branch: order?.branch || '',
-    date: order?.date || format(new Date(), 'yyyy-MM-dd'),
+    date: order?.date || (order?.created_date ? String(order.created_date).slice(0,10) : format(new Date(), 'yyyy-MM-dd')),
     expected_delivery: order?.expected_date || '',
     notes: order?.notes || '',
     status: order?.status || 'draft',
+    hide_prices_from_supplier: Boolean(order?.hide_prices_from_supplier),
   });
+  const [validationError,setValidationError]=useState('');
+  useEffect(()=>{if(branches.length===1&&!form.branch)setForm(v=>({...v,branch:branches[0].key||branches[0].branch_key||''}));},[branches,form.branch]);
   const [items, setItems] = useState(() => {
     try { return order?.items ? (Array.isArray(order.items) ? order.items : JSON.parse(order.items)) : [{...emptyItem}]; } catch { return [{ ...emptyItem }]; }
   });
 
-  const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: () => base44.entities.Supplier.list('name', 200) });
+  const { data: suppliers = [], isError:suppliersError } = useQuery({
+    queryKey:['suppliers',activeRestaurantId,'po-form'],
+    enabled:!!activeRestaurantId,
+    queryFn:()=>base44.entities.Supplier.filter({restaurant_id:activeRestaurantId},'name',500),
+  });
   const { data: products = [] } = useQuery({ queryKey: ['products', activeRestaurantId, 'purchase-materials'], queryFn: () => base44.entities.Product.filter({ restaurant_id: activeRestaurantId, ...restaurantMaterialFilter(activeRestaurant) }, 'name', 500), enabled: Boolean(activeRestaurantId) });
 
   const saveMutation = useMutation({
@@ -55,7 +68,19 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
   const total = items.reduce((s, it) => s + ((it.qty || 0) * (it.unit_price || 0)), 0);
 
   const handleSave = () => {
-    if (!form.supplier_id || !branches.some(b=>(b.key===form.branch || b.branch_key===form.branch)&&b.id) || !items.length || items.some(i=>!i.product_id || Number(i.qty)<=0 || !Number.isFinite(Number(i.unit_price)) || Number(i.unit_price)<0)) return;
+    setValidationError('');
+    const branch=branches.find(b=>(b.key===form.branch || b.branch_key===form.branch)&&b.id);
+    const selectedSupplier=suppliers.find(s=>s.id===form.supplier_id);
+    if(!selectedSupplier||!branch){setValidationError('Select an available supplier and branch of this business.');return;}
+    if(selectedSupplier.branch_id && String(selectedSupplier.branch_id)!==String(branch.id)){
+      setValidationError('Supplier is linked to a different branch. Select the matching branch.');return;
+    }
+    if(form.expected_delivery&&form.expected_delivery<form.date){
+      setValidationError('Expected delivery cannot be before the order date.');return;
+    }
+    if(!items.length||items.some(i=>!i.product_id||Number(i.qty)<=0||!Number.isFinite(Number(i.qty))||!Number.isFinite(Number(i.unit_price))||Number(i.unit_price)<0)){
+      setValidationError('Add at least one product with a valid quantity and price.');return;
+    }
     
     // Sanitize UUID: ensure "" becomes null for UUID column
     const supplierId = form.supplier_id && form.supplier_id.trim() !== '' ? form.supplier_id : null;
@@ -66,8 +91,9 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
       branch: form.branch,
       supplier_id: supplierId,
       supplier_name: form.supplier_name,
-      branch_id: branches.find(b=>b.key===form.branch || b.branch_key===form.branch)?.id,
-      expected_date: form.expected_delivery,
+      branch_id: branch.id,
+      expected_date: form.expected_delivery || null,
+      hide_prices_from_supplier: Boolean(form.hide_prices_from_supplier),
       status: form.status,
       items: JSON.stringify(items), 
       total_amount: total, 
@@ -83,7 +109,9 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
         action={<Button variant="ghost" size="sm" onClick={onClose}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>}
       />
 
-      {saveMutation.isError && <p role="alert">{saveMutation.error.message}</p>}
+      {saveMutation.isError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{saveMutation.error.message}</p>}
+      {validationError && <p role="alert" data-testid="purchase-order-validation-error" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{validationError}</p>}
+      {suppliersError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">Could not load suppliers. Refresh and retry.</p>}
       <div className="space-y-4">
         <Card className="p-4 space-y-3">
           <h3 className="font-semibold text-sm">Supplier & Branch</h3>
@@ -96,16 +124,30 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
           </div>
           {form.supplier_email && <p className="text-xs text-muted-foreground">Email: {form.supplier_email}</p>}
           {form.supplier_phone && <p className="text-xs text-muted-foreground">Phone/WhatsApp: {form.supplier_phone}</p>}
-          <div><Label>Branch</Label><BranchSelect value={form.branch} onChange={v => setForm(f => ({ ...f, branch: v }))} /></div>
-          <div className="grid grid-cols-2 gap-2">
-            <div><Label>Order Date</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
-            <div><Label>Expected Delivery</Label><Input type="date" value={form.expected_delivery} onChange={e => setForm(f => ({ ...f, expected_delivery: e.target.value }))} /></div>
+          <div><Label>Branch</Label><BranchSelect value={form.branch} onChange={v => {setValidationError('');setForm(f => ({ ...f, branch: v }));}} /></div>
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2" data-testid="purchase-order-mobile-dates">
+            <div className="min-w-0 space-y-1"><Label htmlFor="purchase-order-date">Order Date</Label>
+              <Input id="purchase-order-date" className="w-full min-w-0 max-w-full text-sm" type="date" value={form.date} readOnly aria-readonly="true" />
+            </div>
+            <div className="min-w-0 space-y-1"><Label htmlFor="purchase-order-expected">Expected Delivery</Label>
+              <Input id="purchase-order-expected" className="w-full min-w-0 max-w-full text-sm" type="date" min={form.date} value={form.expected_delivery} onChange={e => setForm(f => ({ ...f, expected_delivery: e.target.value }))} />
+            </div>
           </div>
           <div><Label>Notes</Label><Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
         </Card>
 
+        <Card className="p-4 space-y-2" data-testid="purchase-order-supplier-privacy">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-blue-600" checked={form.hide_prices_from_supplier}
+              onChange={e => setForm(f=>({...f,hide_prices_from_supplier:e.target.checked}))} />
+            <span className="min-w-0"><strong className="block text-sm">{labels.privacy}</strong>
+              <span className="block text-xs leading-5 text-muted-foreground">{labels.privacyHelp}</span></span>
+          </label>
+          <p className="text-xs font-medium text-blue-700">{labels.flow}</p>
+        </Card>
+
         <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h3 className="font-semibold text-sm">Order Items</h3>
             <Button size="sm" variant="outline" onClick={() => setItems(i => [...i, { ...emptyItem }])}>
               <Plus className="w-3 h-3 mr-1" /> Add Item
@@ -125,10 +167,10 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
                   <div><Label className="text-xs">Qty</Label><Input className="h-8 text-xs" type="number" value={item.qty} onChange={e => setItems(i => i.map((it, j) => j === idx ? { ...it, qty: parseFloat(e.target.value) || 0 } : it))} /></div>
                   <div><Label className="text-xs">Unit</Label><Input className="h-8 text-xs" value={item.unit} onChange={e => setItems(i => i.map((it, j) => j === idx ? { ...it, unit: e.target.value } : it))} /></div>
-                  <div><Label className="text-xs">Unit Price</Label><Input className="h-8 text-xs" type="number" value={item.unit_price} onChange={e => setItems(i => i.map((it, j) => j === idx ? { ...it, unit_price: parseFloat(e.target.value) || 0 } : it))} /></div>
+                  <div><Label className="text-xs">Unit Price</Label><Input className="h-9 w-full min-w-0 text-xs" type="number" min="0" step="0.01" value={item.unit_price} onChange={e => setItems(i => i.map((it, j) => j === idx ? { ...it, unit_price: parseFloat(e.target.value) || 0 } : it))} /></div>
                 </div>
                 <p className="text-xs text-right font-medium">Subtotal: {currency}{((item.qty || 0) * (item.unit_price || 0)).toFixed(2)}</p>
               </div>
@@ -141,7 +183,7 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
         </Card>
 
         <div className="flex gap-2 pb-4">
-          <Button className="flex-1" onClick={handleSave} disabled={saveMutation.isPending}>Save as Draft</Button>
+          <Button className="min-h-11 flex-1" onClick={handleSave} disabled={saveMutation.isPending}>{saveMutation.isPending?labels.saving:order?'Save changes':labels.create}</Button>
           <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
         </div>
       </div>

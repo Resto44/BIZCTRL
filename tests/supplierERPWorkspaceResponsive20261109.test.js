@@ -41,16 +41,17 @@ describe('Supplier Portal mobile-first ERP workspace',()=>{
   for(const label of ['بوابة المورّد','پورتال تأمین‌کننده','Supplier workspace','در انتظار ارسال','بانتظار الشحن'])
    expect(source).toContain(label);
   expect(source).toContain('copy.emptyDesc');
-  expect(source).toContain('!isLoading && !invoicesLoading && pending.length === 0 && invoices.length === 0');
+  expect(source).toContain('!isLoading && !invoicesLoading && pending.length === 0 && newPurchaseOrders.length === 0 && invoices.length === 0');
  });
  it('keeps signed-in tenant-branch-supplier scoped read, mutation and failures',()=>{
   expect(source).toContain("supabase.rpc('erp_supplier_self_profile')");
   expect(source).toContain("user?.role==='supplier'");
   expect(source).toContain("from('supplier_invoices')");
-  expect(source).toContain("from('purchase_orders')");
+  expect(source).toContain("supabase.rpc('erp_supplier_visible_purchase_orders')");
+  expect(source).not.toContain(".from('purchase_orders')");
   expect(source).toContain(".eq('restaurant_id', user.restaurant_id)");
   expect(source).toContain(".eq('branch_id', user.branch_id)");
-  expect(source).toContain(".eq('supplier_id', supplierProfile.id)");
+  expect(source).toContain("erp_supplier_visible_purchase_orders");
   expect(source).toContain("supabase.rpc('erp_supplier_mark_order_shipped',{p_order_id:poId})");
   expect(source).toContain("supabase.rpc('erp_supplier_verified_deliveries')");
   expect(source).toContain("if(data?.status!=='shipped')throw new Error");

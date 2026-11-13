@@ -1,3 +1,4 @@
+import { purchaseOrderSupplierMessage } from '@/lib/purchaseOrderSupplierMessage';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -77,9 +78,7 @@ export default function PurchaseOrders() {
   });
 
   const handleSendEmail = async (order) => {
-    const items = (() => { try { return JSON.parse(order.items || '[]'); } catch { return []; } })();
-    const itemLines = items.map(i => `- ${i.product_name}: ${i.qty} ${i.unit} @ ${currency}${i.unit_price || 0}`).join('\n');
-    const body = `Purchase Order #${order.order_number || order.id.slice(-6).toUpperCase()}\nDate: ${order.date}\nExpected Delivery: ${order.expected_delivery || 'TBD'}\nBranch: ${order.branch}\n\nItems:\n${itemLines}\n\nTotal: ${currency}${order.total_amount || 0}\n\nNotes: ${order.notes || '-'}`;
+    const body = purchaseOrderSupplierMessage(order,currency);
 
     setSendingEmail(order.id);
     await base44.integrations.Core.SendEmail({
@@ -92,9 +91,7 @@ export default function PurchaseOrders() {
   };
 
   const handleWhatsApp = (order) => {
-    const items = (() => { try { return JSON.parse(order.items || '[]'); } catch { return []; } })();
-    const itemLines = items.map(i => `- ${i.product_name}: ${i.qty} ${i.unit} @ ${currency}${i.unit_price || 0}`).join('\n');
-    const message = `Purchase Order #${order.order_number || order.id.slice(-6).toUpperCase()}\nDate: ${order.date}\nExpected Delivery: ${order.expected_delivery || 'TBD'}\nBranch: ${order.branch}\n\nItems:\n${itemLines}\n\nTotal: ${currency}${order.total_amount || 0}\n\nNotes: ${order.notes || '-'}`;
+    const message = purchaseOrderSupplierMessage(order,currency);
     const phone = (order.supplier_phone || '').replace(/\D/g, '');
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
     updateStatusMutation.mutate({ id: order.id, status: 'sent' });
