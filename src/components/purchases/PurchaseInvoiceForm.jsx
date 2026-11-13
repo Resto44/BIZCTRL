@@ -663,6 +663,18 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
           const saved = await createPurchaseInvoice({
             invoiceData, items: cleanItems, additionalCosts: [], createdBy: user?.email, mode,
           });
+          // Read back the canonical supplier boundary and DB-recalculated
+          // amount before considering this group complete. Do not silently
+          // attribute another supplier's payable or mismatched tax/total.
+          if (!saved?.id ||
+            String(saved.supplier_id) !== String(group.supplierId) ||
+            String(saved.restaurant_id) !== String(restaurantId) ||
+            String(saved.branch_id) !== String(branch.id) ||
+            !Number.isFinite(Number(saved.total_amount)) ||
+            Math.abs(Number(saved.total_amount) - group.totals.grandTotal) > 0.005) {
+            progress.blocked = true;
+            throw new Error(`Supplier attribution or posted amount mismatch for ${invoiceNumber}. Review saved invoice before continuing.`);
+          }
           progress.completed.set(group.supplierId, saved);
         } catch (writeError) {
           // An insert may succeed before an inventory/debt callback fails.
