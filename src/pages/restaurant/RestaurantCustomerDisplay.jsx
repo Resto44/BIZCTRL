@@ -263,41 +263,60 @@ export default function RestaurantCustomerDisplay(){
     className="grid min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-1.5 overflow-hidden sm:gap-3">
 
     <section data-testid="restaurant-ticket-hero"
-     className="relative grid min-w-0 grid-cols-[minmax(105px,0.39fr)_minmax(0,1fr)] items-stretch gap-2 overflow-hidden rounded-[22px] border border-cyan-300/70 bg-gradient-to-r from-[#102957] via-[#144ca5] to-[#0c2865] p-2.5 text-white shadow-[0_3px_20px_rgba(0,122,255,0.35)] sm:gap-5 sm:rounded-3xl sm:p-5">
-     <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_100%,rgba(20,198,255,0.23),transparent_55%)]"/>
-     <div className="relative grid min-w-0 place-content-center rounded-2xl border border-blue-300/40 bg-white/10 px-1 py-2 text-center shadow-inner sm:rounded-3xl sm:px-4">
-      <p className="text-[11px] font-bold text-blue-100 sm:text-lg">{c.ticket}</p>
-      <p dir="ltr" data-testid="restaurant-order-number"
-       className="truncate text-[clamp(2.1rem,6.6vmin,6.3rem)] font-black leading-tight tabular-nums tracking-tight text-white drop-shadow-[0_0_12px_rgba(92,204,255,0.9)]">
-       {active?'#'+data.number:'—'}
-      </p>
+     className="relative grid min-w-0 grid-rows-[auto_auto] gap-1.5 overflow-visible rounded-[20px] border border-cyan-400/60 bg-gradient-to-r from-[#092753] via-[#12458c] to-[#0b3271] p-2 text-white shadow-[0_2px_14px_rgba(0,146,255,0.28)] sm:gap-3 sm:rounded-3xl sm:p-4">
+     <div dir="ltr" className="grid min-w-0 grid-cols-2 items-stretch gap-2 sm:gap-4">
+
+      {isWaiting?<div dir={lang==='en'?'ltr':'rtl'} data-testid="restaurant-waiting-panel"
+       className="grid min-w-0 content-center justify-items-center rounded-2xl border-2 border-cyan-300 bg-[#073678] px-1.5 py-2 text-center shadow-[0_0_15px_rgba(34,211,238,0.4)] sm:rounded-3xl sm:px-4 sm:py-4">
+       <p className="text-[11px] font-extrabold text-blue-50 sm:text-lg">{c.waitElapsed}</p>
+       <p dir="ltr" role="timer" aria-live="off" data-testid="restaurant-waiting-clock"
+        className="min-w-0 whitespace-nowrap text-[clamp(2rem,8.2vw,5.8rem)] font-black leading-[1.05] tabular-nums tracking-[-0.035em] text-white drop-shadow-[0_0_12px_rgba(125,211,252,0.78)] motion-reduce:animate-none">
+        {waitingClock??'—:—'}
+       </p>
+       <p className="text-[10px] font-bold text-cyan-100 sm:text-sm">{c.waitUnits}</p>
+       <span className="sr-only">{c.waitNote}</span>
+      </div>:
+      <div dir={lang==='en'?'ltr':'rtl'} data-testid="restaurant-waiting-summary"
+       className="grid min-w-0 content-center justify-items-center rounded-2xl border border-cyan-400/70 bg-[#073678] px-2 py-2 text-center sm:rounded-3xl sm:p-4">
+       <p className="text-[11px] font-extrabold text-blue-100 sm:text-lg">{c.waitElapsed}</p>
+       <p className="text-[clamp(1.25rem,4.5vmin,3.5rem)] font-black text-white">
+        {active&&stage>=2?c.finished:'—'}
+       </p>
+      </div>}
+
+      <div dir={lang==='en'?'ltr':'rtl'} data-testid="restaurant-ticket-attention"
+       className={'bizctrl-customer-ticket-attention relative grid min-w-0 content-center justify-items-center rounded-2xl border-2 border-cyan-300 bg-gradient-to-b from-[#0b4e9e] to-[#062f70] px-1.5 py-2 text-center sm:rounded-3xl sm:px-4 sm:py-4'}>
+       <p className="text-[11px] font-extrabold text-blue-50 sm:text-lg">{c.ticket}</p>
+       <p dir="ltr" data-testid="restaurant-order-number"
+        className={'min-w-0 max-w-full whitespace-nowrap font-black leading-[1.05] tabular-nums tracking-[-0.03em] text-white drop-shadow-[0_0_12px_rgba(125,211,252,0.95)] '+(longTicket?'text-[clamp(1.5rem,5.6vw,4.5rem)]':'text-[clamp(2.15rem,9.4vw,6.4rem)]')}>
+        {ticketLabel}
+       </p>
+      </div>
      </div>
-     <div className="relative flex min-w-0 items-center justify-between gap-2">
+
+     <div className="relative flex min-w-0 items-center justify-between gap-2 rounded-xl border border-white/15 bg-blue-950/30 px-3 py-1.5 sm:rounded-2xl sm:px-5 sm:py-3">
       <div className="min-w-0 flex-1">
-       <p className="text-[11px] font-bold text-blue-100 sm:text-base">{c.progress}</p>
-       <h2 data-testid="restaurant-kitchen-state" className="line-clamp-2 text-[clamp(1.15rem,3.2vmin,3.1rem)] font-black leading-tight text-white">
+       <p className="text-[10px] font-bold text-blue-200 sm:text-base">{c.progress}</p>
+       <h2 data-testid="restaurant-kitchen-state" className="line-clamp-2 text-[clamp(1rem,2.5vmin,2.4rem)] font-black leading-tight text-white">
         {active?stateText:c.waiting}
        </h2>
-       {active&&<p className="mt-0.5 truncate text-[11px] font-semibold text-blue-100 sm:text-base">
+       {active&&<p className="truncate text-[10px] font-semibold text-blue-100 sm:text-sm">
         {c[data?.order_type]||''}{data?.table_label?' · '+c.table+': '+data.table_label:''}
        </p>}
       </div>
-      <ConciergeBell aria-hidden="true" className="hidden h-12 w-12 shrink-0 text-blue-100/90 drop-shadow-[0_0_12px_rgba(132,202,255,0.65)] sm:block lg:h-24 lg:w-24"/>
+      <ConciergeBell aria-hidden="true" className="h-7 w-7 shrink-0 text-blue-100/90 sm:h-14 sm:w-14"/>
      </div>
     </section>
 
-    <section data-testid="restaurant-customer-thank-you" className="flex min-w-0 items-center justify-between gap-2 rounded-[20px] border border-blue-100 bg-gradient-to-b from-white to-[#e9f2ff] px-3 py-2 text-center shadow-md sm:rounded-3xl sm:px-6 sm:py-4">
+    <section data-testid="restaurant-customer-thank-you"
+     className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-blue-100 bg-gradient-to-b from-white to-[#e9f2ff] px-3 py-1.5 text-center shadow-sm sm:rounded-3xl sm:px-6 sm:py-3">
      <div className="min-w-0 flex-1">
-      <h2 className="line-clamp-2 text-[clamp(1rem,2.7vmin,2.5rem)] font-black leading-tight text-[#1145a4]">{c.thanksTitle}</h2>
-      <p className="mt-0.5 line-clamp-2 text-[clamp(0.68rem,1.5vmin,1.3rem)] font-semibold leading-snug text-slate-600">
+      <h2 className="line-clamp-2 text-[clamp(.95rem,2.1vmin,2.3rem)] font-black leading-tight text-[#1145a4]">{c.thanksTitle}</h2>
+      <p className="mt-0.5 line-clamp-2 text-[clamp(.65rem,1.2vmin,1.1rem)] font-semibold leading-snug text-slate-600">
        {!active?c.thanksIdle:stage>=2?c.thanksReady:c.thanksBody}
       </p>
      </div>
-     {isWaiting&&waitingClock!==null?<div data-testid="restaurant-waiting-panel" className="shrink-0 rounded-xl bg-[#0e2a5e] px-2 py-1.5 text-center text-white sm:rounded-2xl sm:px-4 sm:py-3">
-      <p className="max-w-24 text-[9px] font-bold text-blue-100 sm:max-w-40 sm:text-sm">{c.waitElapsed}</p>
-      <p dir="ltr" role="timer" aria-live="off" data-testid="restaurant-waiting-clock" className="text-[clamp(1.15rem,3.3vmin,3rem)] font-black leading-tight tabular-nums motion-reduce:animate-none">{waitingClock}</p>
-      <span className="sr-only">{c.waitNote}</span>
-     </div>:<CheckCircle2 aria-hidden="true" className="h-7 w-7 shrink-0 text-emerald-500 sm:h-11 sm:w-11"/>}
+     <CheckCircle2 aria-hidden="true" className="h-6 w-6 shrink-0 text-blue-600 sm:h-10 sm:w-10"/>
     </section>
 
     {active?<section aria-label={c.progress} data-testid="restaurant-kitchen-progress"
