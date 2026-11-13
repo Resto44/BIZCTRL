@@ -158,98 +158,160 @@ export default function RestaurantCustomerDisplay(){
   return()=>{clearTimeout(timer);off();};
  },[client,data?.topic,valid]);
 
+ // The public TV is a fixed viewport, not a vertically scrolling document.
+ // Large orders rotate a bounded number of lines; the customer never needs
+ // a touch/scroll gesture to read their order.
+ const [visibleSlots,setVisibleSlots]=useState(3);
+ const [itemPage,setItemPage]=useState(0);
+ useEffect(()=>{
+  const recalc=()=>{
+   const height=window.innerHeight||700,width=window.innerWidth||400;
+   setVisibleSlots(height<620?2:width>=1200?7:width>=768?5:height<850?3:4);
+  };
+  recalc();window.addEventListener('resize',recalc);
+  return()=>window.removeEventListener('resize',recalc);
+ },[]);
+ const itemPages=Math.max(1,Math.ceil(lines.length/visibleSlots));
+ useEffect(()=>{setItemPage(0);},[data?.number,lines.length,visibleSlots]);
+ useEffect(()=>{
+  if(itemPages<=1)return;
+  const id=setInterval(()=>setItemPage(previous=>(previous+1)%itemPages),6000);
+  return()=>clearInterval(id);
+ },[itemPages]);
+ const currentItemPage=Math.min(itemPage,itemPages-1);
+ const visibleLines=lines.slice(currentItemPage*visibleSlots,(currentItemPage+1)*visibleSlots);
  const stateText=stage===3?c.served:stage>=0?c[STAGES[stage]]:c.draft;
+
  return <main dir={lang==='en'?'ltr':'rtl'} data-testid="restaurant-customer-display"
-  className="min-h-dvh bg-[#f3f7fd] px-3 py-5 text-slate-950 sm:px-6 sm:py-8 xl:px-12">
-  <div className="mx-auto max-w-[1500px]">
-   <header className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-blue-100 bg-white px-4 py-4 shadow-sm sm:px-6">
-    <div className="flex items-center gap-3">
-     <span className="rounded-2xl bg-blue-600 p-3 text-white"><ChefHat size={30}/></span>
-     <div><p className="text-[11px] font-black tracking-wide text-blue-600 sm:text-sm">{c.eyebrow}</p>
-      <h1 className="text-xl font-black sm:text-3xl">{data?.business_name||c.title}</h1>
-      <p className="text-xs font-semibold text-slate-500 sm:text-base">{data?.branch_name||c.subtitle}{data?.device_code?' · '+data.device_code:''}</p>
+  className="fixed inset-0 z-[120] h-[100dvh] w-screen overflow-hidden overscroll-none bg-[#f3f7fd] text-slate-950">
+  <div data-testid="restaurant-customer-tv-viewport"
+   className="mx-auto grid h-full min-h-0 w-full max-w-[1800px] grid-rows-[auto_minmax(0,1fr)_auto] gap-2 overflow-hidden p-2 sm:gap-3 sm:p-4 lg:p-5">
+
+   <header className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-blue-100 bg-white px-3 py-2 shadow-sm sm:rounded-3xl sm:px-5 sm:py-3">
+    <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+     <span className="shrink-0 rounded-xl bg-blue-600 p-2 text-white sm:rounded-2xl sm:p-3">
+      <ChefHat className="h-5 w-5 sm:h-7 sm:w-7"/>
+     </span>
+     <div className="min-w-0 flex-1">
+      <p className="truncate text-[10px] font-black tracking-wide text-blue-600 sm:text-xs">{c.eyebrow}</p>
+      <h1 className="truncate text-base font-black sm:text-2xl lg:text-3xl">{data?.business_name||c.title}</h1>
+      <p className="truncate text-[11px] font-semibold text-slate-500 sm:text-sm">
+       {data?.branch_name||c.subtitle}{data?.device_code?' · '+data.device_code:''}
+      </p>
      </div>
     </div>
     <div data-testid="restaurant-display-status" role="status"
-      className={'inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold sm:text-sm '+(fresh?'bg-emerald-100 text-emerald-800':'bg-slate-100 text-slate-600')}>
-      {fresh?<Wifi size={17}/>:<RefreshCw size={15} className="motion-safe:animate-spin motion-reduce:animate-none"/>}
-      <span>{fresh?c.fresh:lastSync?c.stale:c.connecting}</span>
+     className={'flex max-w-[35%] shrink-0 items-center gap-1.5 rounded-xl px-2 py-1.5 text-[11px] font-semibold sm:px-3 sm:py-2 sm:text-sm '+(fresh?'bg-emerald-100 text-emerald-800':'bg-slate-100 text-slate-600')}>
+     {fresh?<Wifi className="h-4 w-4 shrink-0"/>:<RefreshCw className="h-4 w-4 shrink-0 motion-safe:animate-spin motion-reduce:animate-none"/>}
+     <span className="min-w-0 truncate">{fresh?c.fresh:lastSync?c.stale:c.connecting}</span>
     </div>
    </header>
-   {(!valid||invalid)?<section role="alert" className="rounded-3xl border border-rose-200 bg-white p-12 text-center text-xl font-bold text-rose-700">
-    <Monitor className="mx-auto mb-4 text-rose-400" size={46}/>{c.invalid}
-   </section>:<>
-    <section className="mb-5 grid gap-3 rounded-3xl bg-gradient-to-r from-[#0e234b] to-[#174e9d] px-4 py-5 text-white shadow-lg sm:grid-cols-[auto_1fr] sm:gap-6 sm:px-7">
-     <div className="rounded-2xl bg-white/10 px-5 py-3 text-center sm:min-w-52 sm:py-5">
-      <p className="text-sm font-bold text-blue-100">{c.ticket}</p>
-      <p dir="ltr" data-testid="restaurant-order-number" className="mt-1 text-4xl font-black tracking-tight sm:text-6xl">{active?'#'+data.number:'—'}</p>
+
+   {(!valid||invalid)?<section role="alert" className="grid min-h-0 place-content-center gap-3 rounded-2xl border border-rose-200 bg-white p-4 text-center text-base font-bold text-rose-700 sm:text-xl">
+    <Monitor className="mx-auto text-rose-400" size={42}/>{c.invalid}
+   </section>:
+   <div data-testid="restaurant-customer-tv-content" className="grid min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)] gap-2 overflow-hidden sm:gap-3">
+    <section className="grid min-w-0 grid-cols-[minmax(110px,0.37fr)_minmax(0,1fr)] items-stretch gap-2 rounded-2xl bg-gradient-to-r from-[#0e234b] to-[#174e9d] p-2 text-white shadow-lg sm:gap-4 sm:rounded-3xl sm:p-3 lg:p-4">
+     <div className="grid min-w-0 place-content-center rounded-xl bg-white/10 px-2 py-2 text-center sm:rounded-2xl sm:px-4 sm:py-3">
+      <p className="text-[11px] font-bold text-blue-100 sm:text-base">{c.ticket}</p>
+      <p dir="ltr" data-testid="restaurant-order-number"
+       className="mt-0.5 truncate text-[clamp(1.7rem,4.7vmin,5rem)] font-black leading-tight tracking-tight">
+       {active?'#'+data.number:'—'}
+      </p>
      </div>
-     <div className="flex min-w-0 flex-col justify-center">
-      <p className="text-xs font-semibold text-blue-200">{c.progress}</p>
-      <h2 data-testid="restaurant-kitchen-state" className="mt-1 text-xl font-black sm:text-3xl">{active?stateText:c.waiting}</h2>
-      {active&&<p className="mt-2 text-sm text-blue-100">{c[data?.order_type]||''}{data?.table_label?' · '+c.table+': '+data.table_label:''}</p>}
+     <div className="flex min-w-0 flex-col justify-center gap-1 px-1 sm:px-3">
+      <p className="text-[11px] font-semibold text-blue-200 sm:text-sm">{c.progress}</p>
+      <h2 data-testid="restaurant-kitchen-state" className="line-clamp-2 text-[clamp(1rem,2.5vmin,2rem)] font-black leading-tight">
+       {active?stateText:c.waiting}
+      </h2>
+      {active&&<p className="truncate text-[11px] text-blue-100 sm:text-sm">
+       {c[data?.order_type]||''}{data?.table_label?' · '+c.table+': '+data.table_label:''}
+      </p>}
      </div>
     </section>
-    <section data-testid="restaurant-customer-thank-you"
-      className="mb-5 rounded-3xl border border-sky-200 bg-white px-4 py-6 text-center shadow-sm sm:px-8 sm:py-8">
-      <h2 className="text-2xl font-black text-blue-900 sm:text-4xl">{c.thanksTitle}</h2>
-      <p className="mx-auto mt-2 max-w-2xl text-base font-semibold text-slate-600 sm:text-xl">
-        {!active?c.thanksIdle:stage>=2?c.thanksReady:c.thanksBody}
+
+    <section data-testid="restaurant-customer-thank-you" className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border border-sky-200 bg-white px-3 py-2 text-center shadow-sm sm:rounded-3xl sm:px-5 sm:py-3">
+     <div className="min-w-0">
+      <h2 className="line-clamp-2 text-[clamp(1rem,2.4vmin,2.4rem)] font-black leading-tight text-blue-900">{c.thanksTitle}</h2>
+      <p className="mt-1 line-clamp-2 text-[clamp(0.7rem,1.35vmin,1.15rem)] font-semibold leading-snug text-slate-600">
+       {!active?c.thanksIdle:stage>=2?c.thanksReady:c.thanksBody}
       </p>
-      {isWaiting&&waitingClock!==null&&<div data-testid="restaurant-waiting-panel" className="mt-5 rounded-3xl border border-blue-200 bg-gradient-to-br from-[#0e234b] to-[#2254a0] px-4 py-6 text-white sm:px-6">
-        <p className="text-base font-bold text-blue-100 sm:text-2xl">{c.waitElapsed}</p>
-        <p dir="ltr" role="timer" aria-live="off" data-testid="restaurant-waiting-clock"
-          className="mt-2 font-black leading-none tracking-tight tabular-nums text-6xl sm:text-8xl lg:text-9xl motion-safe:animate-pulse motion-reduce:animate-none">{waitingClock}</p>
-        <p className="mt-2 text-sm font-semibold text-blue-100 sm:text-lg">{c.waitUnits}</p>
-        <p className="mt-3 text-xs text-blue-100/80 sm:text-sm">{c.waitNote}</p>
+     </div>
+     {isWaiting&&waitingClock!==null&&<div data-testid="restaurant-waiting-panel"
+       className="shrink-0 rounded-xl bg-gradient-to-br from-[#0e234b] to-[#2254a0] px-2 py-2 text-center text-white sm:px-4">
+       <p className="max-w-36 text-[10px] font-bold text-blue-100 sm:max-w-none sm:text-sm">{c.waitElapsed}</p>
+       <p dir="ltr" role="timer" aria-live="off" data-testid="restaurant-waiting-clock"
+        className="mt-1 whitespace-nowrap text-[clamp(1.5rem,4vmin,4rem)] font-black leading-none tabular-nums motion-safe:animate-pulse motion-reduce:animate-none">
+        {waitingClock}
+       </p>
+       <p className="mt-0.5 text-[9px] text-blue-100 sm:text-xs">{c.waitUnits}</p>
+       <p className="sr-only">{c.waitNote}</p>
       </div>}
     </section>
-    {active&&<section aria-label={c.progress} data-testid="restaurant-kitchen-progress"
-      className="mb-5 grid grid-cols-3 gap-2 rounded-2xl border border-blue-100 bg-white p-3 sm:gap-4 sm:p-5">
-     {STAGES.map((value,index)=><div key={value} className={'flex min-w-0 items-center gap-2 rounded-xl px-2 py-3 sm:px-4 '+(stage>=index?'bg-emerald-50 text-emerald-800':'bg-slate-50 text-slate-400')}>
-      {stage>=index?<CheckCircle2 className="h-5 w-5 shrink-0 sm:h-7 sm:w-7"/>:<Clock3 className="h-5 w-5 shrink-0 sm:h-7 sm:w-7"/>}
-      <span className="text-xs font-black sm:text-lg">{index===0?c.received:index===1?c.cooking:c.finished}</span>
+
+    {active?<section aria-label={c.progress} data-testid="restaurant-kitchen-progress"
+     className="grid min-w-0 grid-cols-3 gap-1.5 rounded-xl border border-blue-100 bg-white p-1.5 sm:gap-3 sm:rounded-2xl sm:p-2">
+     {STAGES.map((value,index)=><div key={value}
+      className={'flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-1.5 sm:gap-2 sm:py-2 '+(stage>=index?'bg-emerald-50 text-emerald-800':'bg-slate-50 text-slate-400')}>
+      {stage>=index?<CheckCircle2 className="h-4 w-4 shrink-0 sm:h-6 sm:w-6"/>:<Clock3 className="h-4 w-4 shrink-0 sm:h-6 sm:w-6"/>}
+      <span className="truncate text-[11px] font-black sm:text-base">{index===0?c.received:index===1?c.cooking:c.finished}</span>
      </div>)}
-    </section>}
-    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-5">
-       <h2 className="flex items-center gap-2 text-xl font-black sm:text-2xl"><UtensilsCrossed size={23} className="text-blue-600"/>{c.items}</h2>
-       {active&&<span className="rounded-xl bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700">{data.units??0} {c.qty}</span>}
+    </section>:<div className="hidden" aria-hidden="true"/>}
+
+    <div data-testid="restaurant-customer-tv-bottom"
+     className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-2 overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(180px,0.34fr)] md:grid-rows-1 sm:gap-3">
+     <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:rounded-3xl">
+      <div className="flex min-w-0 items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 sm:px-5 sm:py-3">
+       <h2 className="flex min-w-0 items-center gap-2 truncate text-base font-black sm:text-2xl">
+        <UtensilsCrossed className="h-5 w-5 shrink-0 text-blue-600"/>{c.items}
+       </h2>
+       <div className="flex shrink-0 items-center gap-2 text-xs font-bold text-blue-700 sm:text-base">
+        {active&&<span>{data.units??0} {c.qty}</span>}
+        {itemPages>1&&<span dir="ltr" data-testid="restaurant-items-pagination" className="rounded-lg bg-blue-50 px-2 py-1 tabular-nums">
+         {currentItemPage+1}/{itemPages}
+        </span>}
+       </div>
       </div>
-      {(!active||!lines.length)?<div className="px-6 py-16 text-center">
-        <ChefHat size={56} className="mx-auto text-blue-200"/>
-        <h3 className="mt-4 text-lg font-black text-slate-600">{c.waiting}</h3>
-        <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">{c.waitingHint}</p>
-       </div>:<div aria-live="polite" className="divide-y divide-slate-100 px-4 sm:px-6">
-        {lines.map((line,i)=><div key={i} className="flex items-center gap-3 py-4 sm:gap-4 sm:py-5">
-         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-xl font-black text-blue-700">{line.quantity}×</span>
-         <strong className="min-w-0 flex-1 break-words text-base sm:text-xl">{restaurantProductName(line,lang)||'—'}</strong>
-         <span className="shrink-0 text-sm font-black tabular-nums sm:text-lg" dir="ltr">{money(line.line_total,currency)}</span>
-        </div>)}
-       </div>}
+      {!active||!lines.length?<div className="grid min-h-0 place-content-center gap-1 px-3 text-center">
+       <ChefHat className="mx-auto h-8 w-8 text-blue-200 sm:h-12 sm:w-12"/>
+       <h3 className="text-sm font-black text-slate-600 sm:text-lg">{c.waiting}</h3>
+       <p className="line-clamp-2 text-[11px] text-slate-500 sm:text-sm">{c.waitingHint}</p>
+      </div>:<div data-testid="restaurant-visible-item-lines" aria-live="off"
+       className="grid min-h-0 content-start auto-rows-min gap-1 overflow-hidden px-2 py-1 sm:gap-2 sm:px-4 sm:py-2">
+       {visibleLines.map((line,i)=><div key={currentItemPage+':'+i}
+        className="flex min-w-0 items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5 sm:gap-3 sm:py-2">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-sm font-black text-blue-700 sm:h-10 sm:w-10 sm:text-lg">
+         {line.quantity}×
+        </span>
+        <strong className="min-w-0 flex-1 truncate text-sm sm:text-lg">{restaurantProductName(line,lang)||'—'}</strong>
+        <span className="shrink-0 whitespace-nowrap text-xs font-black tabular-nums sm:text-base" dir="ltr">{money(line.line_total,currency)}</span>
+       </div>)}
+      </div>}
      </section>
-     <aside className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-      <div className="bg-[#0e234b] p-5 text-white sm:p-7">
-       <p className="text-sm font-semibold text-blue-200">{c.amount}</p>
-       <p dir="ltr" data-testid="restaurant-order-total" className="mt-2 text-4xl font-black tabular-nums sm:text-5xl">
+
+     <aside className="flex min-h-0 min-w-0 items-center justify-between gap-3 overflow-hidden rounded-2xl bg-[#0e234b] px-3 py-2 text-white shadow-sm md:flex-col md:items-stretch md:justify-between md:rounded-3xl md:p-5">
+      <div className="min-w-0">
+       <p className="text-[11px] font-semibold text-blue-200 sm:text-sm">{c.amount}</p>
+       <p dir="ltr" data-testid="restaurant-order-total"
+        className="truncate text-[clamp(1.2rem,3vmin,3rem)] font-black tabular-nums">
         {active?money(data.net_total,currency):'—'}
        </p>
-       {active&&<div className="mt-5 space-y-2 border-t border-white/20 pt-4 text-sm text-slate-200">
-        <div className="flex justify-between gap-3"><span>{c.subtotal}</span><span dir="ltr">{money(data.subtotal,currency)}</span></div>
-        <div className="flex justify-between gap-3"><span>{c.tax}</span><span dir="ltr">{money(data.tax_total,currency)}</span></div>
+       {active&&<div className="hidden gap-2 border-t border-white/20 pt-3 text-sm text-blue-100 lg:grid">
+        <div className="flex justify-between gap-2"><span>{c.subtotal}</span><span dir="ltr">{money(data.subtotal,currency)}</span></div>
+        <div className="flex justify-between gap-2"><span>{c.tax}</span><span dir="ltr">{money(data.tax_total,currency)}</span></div>
        </div>}
       </div>
-      <div className={'flex items-center gap-2 px-5 py-5 font-black '+(data?.status==='paid'?'bg-emerald-100 text-emerald-800':'bg-amber-50 text-amber-900')}>
-       {data?.status==='paid'?<PackageCheck size={24}/>:<ReceiptText size={24}/>}
-       {active?(data?.status==='paid'?c.paid:c.unpaid):c.waiting}
+      <div className={'flex max-w-[52%] shrink-0 items-center gap-2 rounded-xl px-2 py-1.5 text-xs font-black md:max-w-none md:px-3 md:py-2 md:text-base '+(data?.status==='paid'?'bg-emerald-700 text-white':'bg-amber-100 text-amber-950')}>
+       {data?.status==='paid'?<PackageCheck className="h-5 w-5 shrink-0"/>:<ReceiptText className="h-5 w-5 shrink-0"/>}
+       <span className="line-clamp-2">{active?(data?.status==='paid'?c.paid:c.unpaid):c.waiting}</span>
       </div>
      </aside>
     </div>
-   </>}
-   <footer className="mt-5 flex flex-wrap justify-between gap-2 px-2 text-xs font-semibold text-slate-500">
-    <span>{c.privacy}</span>
-    {lastSync>0&&<span>{c.updated}: {new Date(lastSync).toLocaleTimeString(lang==='fa'?'fa-AF':lang==='ar'?'ar-SA':'en-US')}</span>}
+   </div>}
+
+   <footer className="flex min-w-0 items-center justify-between gap-2 overflow-hidden px-1 text-[10px] font-semibold text-slate-500 sm:text-xs">
+    <span className="min-w-0 truncate">{c.privacy}</span>
+    {lastSync>0&&<span className="shrink-0 whitespace-nowrap">{c.updated}: {new Date(lastSync).toLocaleTimeString(lang==='fa'?'fa-AF':lang==='ar'?'ar-SA':'en-US')}</span>}
    </footer>
   </div>
  </main>;
