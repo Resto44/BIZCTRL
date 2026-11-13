@@ -47,7 +47,7 @@ const SUPPLIER_COPY = {
     workspace:'Supplier workspace',verified:'Verified supplier',subhead:'Purchase orders, invoices and payment tracking in one place.',
     home:'Overview',invoices:'Invoices',orders:'Orders',history:'History',refresh:'Refresh',logout:'Sign out',
     awaiting:'Awaiting shipment',outstanding:'Outstanding',recent:'Recent invoices',viewAll:'View all',
-    pendingShipments:'Orders to ship',newOrders:'New purchase orders · awaiting Owner approval',priceHidden:'Prices hidden by Owner',confirmShip:'Confirm shipment',emptyTitle:'No outstanding activity',
+    pendingShipments:'Orders to ship',newOrders:'New purchase orders · ready to ship',priceHidden:'Prices hidden by Owner',confirmShip:'Confirm shipment',emptyTitle:'No outstanding activity',
     emptyDesc:'Your assigned purchase orders and invoices will appear here when the organization records them.',
     allInvoices:'Invoice history',invoiceSearch:'Search invoices…',noInvoices:'No invoices recorded yet.',
     noInvoicesHint:'The Owner’s invoices assigned to this supplier and branch will appear here.',
@@ -64,14 +64,14 @@ const SUPPLIER_COPY = {
     total:'Total',invoiced:'Invoiced',due:'Due',branch:'Branch',unknownBranch:'Assigned branch',
     allClear:'No actions are required right now.',invoice:'Invoice',purchaseOrder:'Purchase order',
     waitingOwner:'Awaiting Owner verification',ownerApproved:'Owner-verified delivery',verifiedItems:'Verified products',
-    status:{draft:'Awaiting Owner',sent:'Sent · awaiting Owner',pending:'Pending',approved:'Approved',shipped:'Shipped',received:'Received',cancelled:'Cancelled',
+    status:{draft:'New order',sent:'New order',pending:'Pending',approved:'Approved',shipped:'Shipped',received:'Received',cancelled:'Cancelled',
       paid:'Paid',rejected:'Rejected',overdue:'Overdue',partial:'Part paid'},
   },
   ar: {
     workspace:'بوابة المورّد',verified:'مورّد موثّق',subhead:'أوامر الشراء والفواتير والمستحقات في مكان واحد.',
     home:'نظرة عامة',invoices:'الفواتير',orders:'الطلبات',history:'السجل',refresh:'تحديث',logout:'تسجيل الخروج',
     awaiting:'بانتظار الشحن',outstanding:'المستحقات',recent:'أحدث الفواتير',viewAll:'عرض الكل',
-    pendingShipments:'طلبات تحتاج شحناً',newOrders:'أوامر الشراء الجديدة · بانتظار موافقة المالك',priceHidden:'الأسعار مخفية من المالك',confirmShip:'تأكيد الشحن',emptyTitle:'لا توجد أعمال معلّقة',
+    pendingShipments:'طلبات تحتاج شحناً',newOrders:'أوامر شراء جديدة · جاهزة للشحن',priceHidden:'الأسعار مخفية من المالك',confirmShip:'تأكيد الشحن',emptyTitle:'لا توجد أعمال معلّقة',
     emptyDesc:'ستظهر أوامر الشراء والفواتير المسندة لك عندما تسجلها المؤسسة.',
     allInvoices:'سجل الفواتير',invoiceSearch:'ابحث في الفواتير…',noInvoices:'لا توجد فواتير مسجلة بعد.',
     noInvoicesHint:'ستظهر هنا فواتير المالك المسندة إلى هذا المورّد والفرع.',
@@ -88,14 +88,14 @@ const SUPPLIER_COPY = {
     total:'المجموع',invoiced:'قيمة الفواتير',due:'يستحق',branch:'الفرع',unknownBranch:'الفرع المعيّن',
     allClear:'لا توجد إجراءات مطلوبة حالياً.',invoice:'فاتورة',purchaseOrder:'أمر شراء',
     waitingOwner:'بانتظار تأكيد استلام المالك',ownerApproved:'تم تأكيد الاستلام من المالك',verifiedItems:'الأصناف والكميات المؤكدة',
-    status:{draft:'بانتظار المالك',sent:'مرسل · بانتظار المالك',pending:'معلّق',approved:'معتمد',shipped:'تم الشحن',received:'تم الاستلام',cancelled:'ملغى',
+    status:{draft:'طلب جديد',sent:'طلب جديد',pending:'معلّق',approved:'معتمد',shipped:'تم الشحن',received:'تم الاستلام',cancelled:'ملغى',
       paid:'مدفوع',rejected:'مرفوض',overdue:'متأخر',partial:'دفع جزئي'},
   },
   fa: {
     workspace:'پورتال تأمین‌کننده',verified:'تأمین‌کنندهٔ تأییدشده',subhead:'سفارش‌های خرید، فاکتورها و مطالبات در یک جا.',
     home:'نمای کلی',invoices:'فاکتورها',orders:'سفارش‌ها',history:'تاریخچه',refresh:'تازه‌سازی',logout:'خروج',
     awaiting:'در انتظار ارسال',outstanding:'مطالبات',recent:'آخرین فاکتورها',viewAll:'نمایش همه',
-    pendingShipments:'سفارش‌های آمادهٔ ارسال',newOrders:'سفارش‌های جدید · در انتظار تأیید اونر',priceHidden:'قیمت توسط اونر پنهان شده',confirmShip:'تأیید ارسال',emptyTitle:'کار معوقی وجود ندارد',
+    pendingShipments:'سفارش‌های آمادهٔ ارسال',newOrders:'سفارش‌های جدید · آمادهٔ ارسال',priceHidden:'قیمت توسط اونر پنهان شده',confirmShip:'تأیید ارسال',emptyTitle:'کار معوقی وجود ندارد',
     emptyDesc:'سفارش‌ها و فاکتورهای مربوط به این تأمین‌کننده و شعبه پس از ثبت نمایش داده می‌شوند.',
     allInvoices:'تاریخچهٔ فاکتورها',invoiceSearch:'جستجوی فاکتور…',noInvoices:'هنوز فاکتوری ثبت نشده است.',
     noInvoicesHint:'فاکتورهای مربوط به همین تأمین‌کننده و شعبه اینجا ظاهر می‌شوند.',
@@ -112,7 +112,7 @@ const SUPPLIER_COPY = {
     total:'مجموع',invoiced:'مبلغ فاکتورها',due:'سررسید',branch:'شعبه',unknownBranch:'شعبهٔ تعیین‌شده',
     allClear:'در حال حاضر اقدام جدیدی لازم نیست.',invoice:'فاکتور',purchaseOrder:'سفارش خرید',
     waitingOwner:'در انتظار تأیید دریافت از طرف اونر',ownerApproved:'تحویل به تأیید اونر رسید',verifiedItems:'محصولات و مقدار تأییدشده',
-    status:{draft:'در انتظار اونر',sent:'فرستاده‌شده · در انتظار اونر',pending:'در انتظار',approved:'تأییدشده',shipped:'ارسال‌شده',received:'دریافت‌شده',cancelled:'لغوشده',
+    status:{draft:'سفارش جدید',sent:'سفارش جدید',pending:'در انتظار',approved:'تأییدشده',shipped:'ارسال‌شده',received:'دریافت‌شده',cancelled:'لغوشده',
       paid:'پرداخت‌شده',rejected:'ردشده',overdue:'سررسید گذشته',partial:'پرداخت جزئی'},
   },
 };
@@ -300,6 +300,7 @@ export default function SupplierPortalERP() {
     || String(invoice.invoice_number||'').toLowerCase().includes(search.toLowerCase()));
   const newPurchaseOrders = purchaseOrders.filter(po => ['draft','sent','pending'].includes(po.status));
   const pending = purchaseOrders.filter(po => po.status === 'approved');
+  const actionableCount = newPurchaseOrders.length + pending.length;
   const shippedCount = purchaseOrders.filter(po => po.status === 'shipped').length;
   const receivedCount = purchaseOrders.filter(po => po.status === 'received').length;
 
@@ -392,7 +393,7 @@ export default function SupplierPortalERP() {
                 <div className="mb-2 flex items-center justify-between text-amber-700 dark:text-amber-300">
                   <Truck className="h-5 w-5"/><ArrowRight className="h-4 w-4"/>
                 </div>
-                <p className="text-2xl font-black tabular-nums text-slate-950 dark:text-white">{isLoading?'…':pending.length}</p>
+                <p className="text-2xl font-black tabular-nums text-slate-950 dark:text-white">{isLoading?'…':actionableCount}</p>
                 <p className="mt-1 text-xs font-semibold leading-4 text-slate-700 dark:text-slate-200">{copy.awaiting}</p>
               </button>
               <button type="button" onClick={()=>setActiveTab('invoices')}
@@ -452,7 +453,7 @@ export default function SupplierPortalERP() {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  {label:copy.awaiting,value:pending.length,color:'bg-amber-500'},
+                  {label:copy.awaiting,value:actionableCount,color:'bg-amber-500'},
                   {label:copy.shipped,value:shippedCount,color:'bg-blue-500'},
                   {label:copy.received,value:receivedCount,color:'bg-emerald-500'},
                 ].map(item=><div key={item.label} className="min-w-0 space-y-1.5">
@@ -482,7 +483,7 @@ export default function SupplierPortalERP() {
                 <button type="button" className="min-h-10 text-xs font-bold text-blue-700" onClick={()=>setActiveTab('orders')}>{copy.viewAll}</button>
               </div>
               <div className="grid gap-2.5 lg:grid-cols-2">
-                {newPurchaseOrders.map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} loading={false} onConfirmShipment={()=>{}}/>)}
+                {newPurchaseOrders.map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} loading={false} onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)}/>)}
               </div>
             </section>}
             {!isLoading && pending.length>0 && <section className="space-y-2">
@@ -795,7 +796,7 @@ function POCard({ po, onConfirmShipment, loading, copy, ownerVerification=null }
           <strong className="shrink-0 tabular-nums">×{item.received_quantity}</strong>
         </div>)}
       </div>}
-      {po.status==='approved' && <Button type="button" disabled={loading} onClick={onConfirmShipment}
+      {['draft','sent','pending','approved'].includes(po.status) && <Button type="button" disabled={loading} onClick={onConfirmShipment}
         className="mt-1 min-h-11 w-full rounded-xl bg-blue-600 font-bold text-white hover:bg-blue-700">
         <Truck className="me-2 h-4 w-4" aria-hidden="true"/>{copy.confirmShip}
       </Button>}

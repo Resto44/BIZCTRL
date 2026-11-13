@@ -54,10 +54,10 @@ describe('Private Supplier PO and instant draft view',()=>{
   expect(migration).toContain("'qty',coalesce(item->'qty',item->'quantity')");
   expect(migration).not.toMatch(/GRANT SELECT ON public\.purchase_orders TO supplier/i);
  });
- it('supplier sees freshly created draft immediately and cannot confirm shipment before Owner approval',()=>{
+ it('supplier sees newly submitted orders and can ship without owner pre-approval',()=>{
   expect(supplier).toContain('data-testid="supplier-new-purchase-orders"');
   expect(supplier).toContain("['draft','sent','pending'].includes(po.status)");
-  expect(supplier).toContain("po.status==='approved' && <Button");
+  expect(supplier).toContain("['draft','sent','pending','approved'].includes(po.status) && <Button");
   expect(supplier).toContain("{po.price_hidden?copy.priceHidden");
   expect(supplier).toContain("po.price_hidden?'':' · '+moneyLabel(item.unit_price)");
   expect(supplier).toContain("['received','cancelled'].includes(po.status)");
