@@ -17,7 +17,13 @@ import PageHeader from '@/components/shared/PageHeader';
 const emptyItem = { product_id: '', product_name: '', qty: 1, unit: '', unit_price: 0 };
 
 export default function PurchaseOrderForm({ order, supplier = null, onClose, onSaved }) {
-  const { currency } = useLanguage();
+  const { currency, lang='en' } = useLanguage();
+  const copy={
+    en:{privacy:'Hide prices from supplier',privacyHelp:'Optional. The supplier will see products, quantities and order status, but NOT unit prices or total. Owner keeps prices for accounting.',flow:'The new order appears in the supplier dashboard immediately. The supplier can ship only after Owner approval.',create:'Create purchase order',saving:'Saving…'},
+    ar:{privacy:'إخفاء الأسعار عن المورّد',privacyHelp:'اختياري. يرى المورّد المنتجات والكميات وحالة الطلب دون سعر الوحدة أو المجموع. يحتفظ المالك بالأسعار للمحاسبة.',flow:'يظهر الطلب فور تسجيله في لوحة المورّد، ولا يمكن شحنه إلا بعد موافقة المالك.',create:'إنشاء أمر شراء',saving:'جارٍ الحفظ…'},
+    fa:{privacy:'پنهان‌کردن قیمت از سپلایر',privacyHelp:'اختیاری است. سپلایر محصول، مقدار و وضعیت سفارش را می‌بیند، نه قیمت فی واحد یا مبلغ مجموع. قیمت برای حسابداری اونر محفوظ می‌ماند.',flow:'سفارش جدید فوراً در داشبورد سپلایر ظاهر می‌شود؛ ارسال محصول فقط بعد از تأیید اونر ممکن است.',create:'ایجاد سفارش خرید',saving:'در حال ذخیره…'}
+  }[lang]||null;
+  const labels=copy||{privacy:'Hide prices from supplier',privacyHelp:'Supplier sees quantities but no prices when enabled.',flow:'New orders appear for supplier immediately; shipment requires Owner approval.',create:'Create purchase order',saving:'Saving…'};
   const { activeRestaurantId, activeRestaurant, branches } = useTenant();
   const [form, setForm] = useState({
     supplier_id: order?.supplier_id || supplier?.id || '',
@@ -29,6 +35,7 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
     expected_delivery: order?.expected_date || '',
     notes: order?.notes || '',
     status: order?.status || 'draft',
+    hide_prices_from_supplier: Boolean(order?.hide_prices_from_supplier),
   });
   const [items, setItems] = useState(() => {
     try { return order?.items ? (Array.isArray(order.items) ? order.items : JSON.parse(order.items)) : [{...emptyItem}]; } catch { return [{ ...emptyItem }]; }
@@ -67,7 +74,8 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
       supplier_id: supplierId,
       supplier_name: form.supplier_name,
       branch_id: branches.find(b=>b.key===form.branch || b.branch_key===form.branch)?.id,
-      expected_date: form.expected_delivery,
+      expected_date: form.expected_delivery || null,
+      hide_prices_from_supplier: Boolean(form.hide_prices_from_supplier),
       status: form.status,
       items: JSON.stringify(items), 
       total_amount: total, 
@@ -97,15 +105,29 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
           {form.supplier_email && <p className="text-xs text-muted-foreground">Email: {form.supplier_email}</p>}
           {form.supplier_phone && <p className="text-xs text-muted-foreground">Phone/WhatsApp: {form.supplier_phone}</p>}
           <div><Label>Branch</Label><BranchSelect value={form.branch} onChange={v => setForm(f => ({ ...f, branch: v }))} /></div>
-          <div className="grid grid-cols-2 gap-2">
-            <div><Label>Order Date</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
-            <div><Label>Expected Delivery</Label><Input type="date" value={form.expected_delivery} onChange={e => setForm(f => ({ ...f, expected_delivery: e.target.value }))} /></div>
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2" data-testid="purchase-order-mobile-dates">
+            <div className="min-w-0 space-y-1"><Label htmlFor="purchase-order-date">Order Date</Label>
+              <Input id="purchase-order-date" className="w-full min-w-0 max-w-full text-sm" type="date" value={form.date} readOnly aria-readonly="true" />
+            </div>
+            <div className="min-w-0 space-y-1"><Label htmlFor="purchase-order-expected">Expected Delivery</Label>
+              <Input id="purchase-order-expected" className="w-full min-w-0 max-w-full text-sm" type="date" min={form.date} value={form.expected_delivery} onChange={e => setForm(f => ({ ...f, expected_delivery: e.target.value }))} />
+            </div>
           </div>
           <div><Label>Notes</Label><Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
         </Card>
 
+        <Card className="p-4 space-y-2" data-testid="purchase-order-supplier-privacy">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-blue-600" checked={form.hide_prices_from_supplier}
+              onChange={e => setForm(f=>({...f,hide_prices_from_supplier:e.target.checked}))} />
+            <span className="min-w-0"><strong className="block text-sm">{labels.privacy}</strong>
+              <span className="block text-xs leading-5 text-muted-foreground">{labels.privacyHelp}</span></span>
+          </label>
+          <p className="text-xs font-medium text-blue-700">{labels.flow}</p>
+        </Card>
+
         <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h3 className="font-semibold text-sm">Order Items</h3>
             <Button size="sm" variant="outline" onClick={() => setItems(i => [...i, { ...emptyItem }])}>
               <Plus className="w-3 h-3 mr-1" /> Add Item
@@ -125,10 +147,10 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
                   <div><Label className="text-xs">Qty</Label><Input className="h-8 text-xs" type="number" value={item.qty} onChange={e => setItems(i => i.map((it, j) => j === idx ? { ...it, qty: parseFloat(e.target.value) || 0 } : it))} /></div>
                   <div><Label className="text-xs">Unit</Label><Input className="h-8 text-xs" value={item.unit} onChange={e => setItems(i => i.map((it, j) => j === idx ? { ...it, unit: e.target.value } : it))} /></div>
-                  <div><Label className="text-xs">Unit Price</Label><Input className="h-8 text-xs" type="number" value={item.unit_price} onChange={e => setItems(i => i.map((it, j) => j === idx ? { ...it, unit_price: parseFloat(e.target.value) || 0 } : it))} /></div>
+                  <div><Label className="text-xs">Unit Price</Label><Input className="h-9 w-full min-w-0 text-xs" type="number" min="0" step="0.01" value={item.unit_price} onChange={e => setItems(i => i.map((it, j) => j === idx ? { ...it, unit_price: parseFloat(e.target.value) || 0 } : it))} /></div>
                 </div>
                 <p className="text-xs text-right font-medium">Subtotal: {currency}{((item.qty || 0) * (item.unit_price || 0)).toFixed(2)}</p>
               </div>
@@ -141,7 +163,7 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
         </Card>
 
         <div className="flex gap-2 pb-4">
-          <Button className="flex-1" onClick={handleSave} disabled={saveMutation.isPending}>Save as Draft</Button>
+          <Button className="min-h-11 flex-1" onClick={handleSave} disabled={saveMutation.isPending}>{saveMutation.isPending?labels.saving:order?'Save changes':labels.create}</Button>
           <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
         </div>
       </div>
