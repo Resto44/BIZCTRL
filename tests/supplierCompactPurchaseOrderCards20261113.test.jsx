@@ -38,7 +38,7 @@ describe('Supplier ERP compact expandable purchase order cards',()=>{
  it('is compact by default: only ID, status, branch, date, count, total and verification summary',async()=>{
   await mount();
   const rendered=dump(tree);
-  expect(tree.root.findAllByProps({'data-testid':'supplier-purchase-order-card'})).toHaveLength(1);
+  expect(tree.root.findAllByProps({'data-testid':'supplier-purchase-order-card'}).filter(x=>typeof x.type==='string')).toHaveLength(1);
   expect(toggle(tree).props['aria-expanded']).toBe(false);
   expect(toggle(tree).props['aria-controls']).toBeTruthy();
   expect(rendered).toContain('c4bbd5d5');
