@@ -69,6 +69,51 @@ BEGIN
   EXECUTE def;
 END $migration$;
 
+-- A surviving pairing must also remain readable when the cashier shift
+-- closes. Legacy 8-hour links still require an active shift. On durable
+-- links, a closed shift produces a neutral WAITING screen (no old orders).
+DO $display$
+DECLARE
+ def text;
+ old_gate text := $oldgate$if ds.device_id is null or not exists(
+    select 1 from restaurant_pos_private.shifts s
+    where s.device_id=ds.device_id and s.closed_at is null
+  ) then
+    raise exception 'Display expired or disconnected.' using errcode='42501';
+  end if;$oldgate$;
+ new_gate text := $newgate$if ds.device_id is null then
+    raise exception 'Display expired or disconnected.' using errcode='42501';
+  end if;
+  if ds.link_duration='8h' and not exists(
+    select 1 from restaurant_pos_private.shifts s
+    where s.device_id=ds.device_id and s.closed_at is null
+  ) then
+    raise exception 'Display expired or disconnected.' using errcode='42501';
+  end if;$newgate$;
+ old_pin text := $oldpin$where x.id=ds.pinned_order_id and x.device_id=d.id
+        and x.status in ('open','held','paid');$oldpin$;
+ new_pin text := $newpin$where x.id=ds.pinned_order_id and x.device_id=d.id
+        and x.status in ('open','held','paid')
+        and exists(select 1 from restaurant_pos_private.shifts s
+          where s.id=x.shift_id and s.device_id=d.id and s.closed_at is null);$newpin$;
+ old_cart text := $oldcart$where x.id=ds.order_id and x.device_id=d.id
+        and x.status in ('open','held','paid');$oldcart$;
+ new_cart text := $newcart$where x.id=ds.order_id and x.device_id=d.id
+        and x.status in ('open','held','paid')
+        and exists(select 1 from restaurant_pos_private.shifts s
+          where s.id=x.shift_id and s.device_id=d.id and s.closed_at is null);$newcart$;
+BEGIN
+ SELECT pg_get_functiondef('restaurant_pos_private.display(text)'::regprocedure) INTO def;
+ IF def IS NULL OR position(old_gate IN def)=0 OR position(old_pin IN def)=0
+  OR position(old_cart IN def)=0 THEN
+  RAISE EXCEPTION 'CUSTOMER_DISPLAY_READER_SOURCE_CHANGED_ABORT';
+ END IF;
+ def:=replace(def,old_gate,new_gate);
+ def:=replace(def,old_pin,new_pin);
+ def:=replace(def,old_cart,new_cart);
+ EXECUTE def;
+END $display$;
+
 COMMENT ON COLUMN restaurant_pos_private.displays.link_duration IS
  'Restaurant POS customer TV pairing policy. 8h is legacy; perpetual links use infinity, can be revoked/unpaired or rotated, and survive shift closure.';
 NOTIFY pgrst,'reload schema';
