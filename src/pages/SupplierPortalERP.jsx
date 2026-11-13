@@ -755,7 +755,7 @@ function InvoiceGoodsCard({entry,copy}){
 }
 
 // ── Purchase order card: unchanged branch-scoped confirmShipment mutation ────
-function POCard({ po, onConfirmShipment, loading, copy, ownerVerification=null }) {
+export function POCard({ po, onConfirmShipment, loading, copy, ownerVerification=null }) {
   const statusConf = PO_STATUS[po.status] || PO_STATUS.pending;
   const [expanded,setExpanded]=useState(false);
   const detailsId = React.useId();
