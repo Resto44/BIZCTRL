@@ -142,6 +142,7 @@
     line-height: 1.12;
     font-weight: 900;
     letter-spacing: 0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .5);
   }
   [data-testid="restaurant-visible-item"] > div:last-child > span {
     background: #e6f4ff;
