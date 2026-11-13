@@ -16,13 +16,17 @@ DO $migration$
 DECLARE
   def text;
   old_shift_gate text := $oldgate$elsif s.id is null then raise exception 'Open a shift first.' using errcode='23514';$oldgate$;
-  new_shift_gate text := $newgate$elsif s.id is null and p_command<>'unpair_display' then raise exception 'Open a shift first.' using errcode='23514';$newgate$;
+  new_shift_gate text := $newgate$elsif s.id is null and p_command NOT IN ('unpair_display','pair_display') then raise exception 'Open a shift first.' using errcode='23514';$newgate$;
   old_pair text := $oldpair$elsif p_command='pair_display' then
   tok:=encode(extensions.gen_random_bytes(32),'hex');
   insert into restaurant_pos_private.displays(device_id,token_hash,expires_at,order_id) values(d.id,encode(extensions.digest(tok,'sha256'),'hex'),now()+interval '8 hours',(select id from restaurant_pos_private.orders where device_id=d.id and status='open'))
   on conflict(device_id) do update set token_hash=excluded.token_hash,topic=gen_random_uuid(),expires_at=excluded.expires_at,order_id=excluded.order_id;
   result:=jsonb_build_object('token',tok);$oldpair$;
   new_pair text := $newpair$elsif p_command='pair_display' then
+  -- Managers/Owners may pair a fixed TV outside cashier shift hours.
+  if s.id is null then
+    perform restaurant_pos_private.guard(d.restaurant_id,d.branch_id,'viewOrders',true);
+  end if;
   if coalesce(p_payload->>'display_duration','8h') NOT IN ('8h','24h','7d','1m','1y','permanent') then
     raise exception 'INVALID_CUSTOMER_DISPLAY_DURATION' using errcode='22023';
   end if;
