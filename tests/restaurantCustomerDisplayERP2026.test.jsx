@@ -37,7 +37,7 @@ beforeEach(()=>{
  mocks.create.mockReturnValue({rpc:vi.fn()});
  host=document.createElement('div');document.body.appendChild(host);root=createRoot(host);
 });
-afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.useRealTimers();});
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.useRealTimers();vi.unstubAllGlobals();});
 async function render(url='/restaurant/customer-display#'+token){
  await act(async()=>root.render(<MemoryRouter initialEntries={[url]}><RestaurantCustomerDisplay/></MemoryRouter>));
 }
@@ -219,6 +219,9 @@ describe('Restaurant-only customer display ERP',()=>{
  });
  it('renders five long Arabic food names in one mobile column without truncation',async()=>{
   mocks.lang='ar';
+  // jsdom defaults to a 1024px landscape TV, not a narrow phone.
+  vi.stubGlobal('innerWidth',390);
+  vi.stubGlobal('innerHeight',800);
   const names=[
    'الرز البخاري بالدجاج',
    'الرز الأبيض بالسمن',
