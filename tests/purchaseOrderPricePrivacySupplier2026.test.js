@@ -43,7 +43,7 @@ describe('Private Supplier PO and instant draft view',()=>{
  it('supplier reads ONLY the secure server-masked RPC, never all purchase order columns',()=>{
   expect(supplier).toContain("supabase.rpc('erp_supplier_visible_purchase_orders')");
   expect(supplier).not.toContain(".from('purchase_orders')");
-  expect(supplier).not.toContain("select('*')\n        .eq('restaurant_id', user.restaurant_id)");
+  expect(supplier).toContain("if(!Array.isArray(data))throw Error('SUPPLIER_PURCHASE_ORDER_RESPONSE_INVALID')");
   expect(migration).toContain('ALTER POLICY erp_permission_select ON public.purchase_orders');
   expect(migration).toContain("coalesce(public.erp_current_role(),'') <> 'supplier'");
   expect(migration).toContain('REVOKE ALL ON FUNCTION public.erp_supplier_visible_purchase_orders() FROM PUBLIC,anon');
