@@ -231,6 +231,10 @@ describe('Restaurant-only customer display ERP',()=>{
   }))});
   expect(restaurantCustomerItemColumns(5,390,800)).toBe(1);
   expect(restaurantCustomerItemColumns(5,320,620)).toBe(1);
+  // 16:9 TVs keep every meal visible in fewer, taller rows.
+  expect(restaurantCustomerItemColumns(4,1280,720)).toBe(1);
+  expect(restaurantCustomerItemColumns(7,1280,720)).toBe(2);
+  expect(restaurantCustomerItemColumns(12,1280,720)).toBe(3);
   await render();
   const grid=host.querySelector('[data-testid="restaurant-visible-item-lines"]');
   expect(grid.style.gridTemplateColumns).toBe('repeat(1,minmax(0,1fr))');
