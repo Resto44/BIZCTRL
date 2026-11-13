@@ -483,7 +483,7 @@ export default function SupplierPortalERP() {
                 <button type="button" className="min-h-10 text-xs font-bold text-blue-700" onClick={()=>setActiveTab('orders')}>{copy.viewAll}</button>
               </div>
               <div className="grid gap-2.5 lg:grid-cols-2">
-                {newPurchaseOrders.map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} loading={false} onConfirmShipment={()=>{}}/>)}
+                {newPurchaseOrders.map(po=><POCard key={po.id} po={po} copy={copy} ownerVerification={deliveryByOrder.get(String(po.id))} loading={false} onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)}/>)}
               </div>
             </section>}
             {!isLoading && pending.length>0 && <section className="space-y-2">
