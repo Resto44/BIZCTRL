@@ -262,9 +262,11 @@ describe('Restaurant-only customer display ERP',()=>{
   expect(number.className).toContain('text-[clamp(2.15rem,9.4vw,6.4rem)]');
   expect(number.className).not.toContain('animate-pulse');
   expect(number.className).not.toContain('truncate');
-  await act(async()=>{await vi.advanceTimersByTimeAsync(5000);});
+  // Check the local 1-second clock without the test fixture's static
+  // server_time being re-fetched on the 5-second network poll.
+  await act(async()=>{await vi.advanceTimersByTimeAsync(2000);});
   expect(host.querySelector('[data-testid="restaurant-order-number"]').textContent).toBe('#170');
-  expect(host.querySelector('[data-testid="restaurant-waiting-clock"]').textContent).toBe('01:46');
+  expect(host.querySelector('[data-testid="restaurant-waiting-clock"]').textContent).toBe('01:43');
  });
  it('flashes the ticket border, never food names, wait digits or whole-screen opacity',()=>{
   const css=readFileSync(resolve('src/pages/restaurant/customerTicketGlow.css'),'utf8');
