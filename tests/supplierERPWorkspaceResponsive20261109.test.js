@@ -60,7 +60,7 @@ describe('Supplier Portal mobile-first ERP workspace',()=>{
   expect(source).not.toContain("supabase.from('suppliers')");
  });
  it('maintains 44px confirmation and no submission for already shipped/cancelled orders',()=>{
-  expect(source).toContain("po.status==='approved' && <Button");
+  expect(source).toContain("['draft','sent','pending','approved'].includes(po.status) && <Button");
   expect(source).toContain('disabled={loading} onClick={onConfirmShipment}');
   expect(source).toContain('min-h-11 w-full');
   expect(source).toContain("onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)}");
