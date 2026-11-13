@@ -138,6 +138,40 @@ function assertValidInvoiceLines(items = [], additionalCosts = []) {
   }
 }
 
+/**
+ * Group one receiving session into legal, single-supplier purchase invoices.
+ * Never write a multi-supplier invoice to supplier_invoices: supplier_id is the
+ * ledger, payable, inventory provenance and payment authority boundary.
+ * Caller must persist each group as its own canonical supplier invoice.
+ */
+export function groupPurchaseLinesBySupplier(items = [], suppliers = [], maximumSuppliers = 20) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error('Add at least one purchase item.');
+  }
+  const registered = new Map(
+    (Array.isArray(suppliers) ? suppliers : [])
+      .filter(supplier => supplier?.id && supplier?.name)
+      .map(supplier => [String(supplier.id), supplier]),
+  );
+  const groups = new Map();
+  items.forEach((item, index) => {
+    const supplierId = String(item?.supplier_id || '').trim();
+    const supplier = registered.get(supplierId);
+    if (!supplier) throw new Error(`Line ${index + 1}: select a registered supplier for this item.`);
+    const normalized = normalizePurchaseLine(item);
+    if (!groups.has(supplierId)) groups.set(supplierId, {
+      supplierId, supplierName: supplier.name, supplierEmail: supplier.email || null, items: [],
+    });
+    groups.get(supplierId).items.push(normalized);
+    if (groups.size > maximumSuppliers) {
+      throw new Error(`A single purchase batch supports at most ${maximumSuppliers} suppliers.`);
+    }
+  });
+  return Array.from(groups.values()).map(group => ({
+    ...group, totals: calcInvoiceTotals(group.items, []),
+  }));
+}
+
 // ── Create Purchase Invoice ────────────────────────────────────────────────
 export async function createPurchaseInvoice({
   invoiceData,
