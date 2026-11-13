@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {useLocation} from 'react-router-dom';
 import {createClient} from '@supabase/supabase-js';
-import {ChefHat,UtensilsCrossed,Clock3,CheckCircle2,Wifi,RefreshCw,Monitor,ReceiptText,PackageCheck} from 'lucide-react';
+import {ChefHat,UtensilsCrossed,Clock3,CheckCircle2,Wifi,RefreshCw,Monitor,ReceiptText,PackageCheck,ConciergeBell,ShieldCheck} from 'lucide-react';
 import {SUPABASE_URL,SUPABASE_ANON_KEY} from '@/api/supabaseClient';
 import {restaurantRpc,restaurantProductName} from '@/lib/restaurantPOS';
 import {money} from '@/lib/retailCashier';
@@ -81,6 +81,23 @@ export const customerSnapshotVisible=(lastSync,now,ttlMs=120000)=>
  Boolean(lastSync>0&&now>=lastSync&&now-lastSync<=ttlMs);
 const validToken=token=>/^[a-f0-9]{64}$/.test(token);
 
+// All items remain mounted and visible: adapt the grid instead of cycling
+// through pages (which previously caused food lines to appear/disappear).
+export const restaurantCustomerItemColumns=(count,width=390,height=800)=>{
+ if(count<=4)return 1;
+ if(width>=1100)return Math.min(4,Math.max(2,Math.ceil(count/5)));
+ if(width>=650)return Math.min(3,Math.max(2,Math.ceil(count/6)));
+ return Math.min(3,Math.max(2,Math.ceil(count/(height<700?5:6))));
+};
+export const restaurantDishGlyph=name=>{
+ const text=String(name||'').toLowerCase();
+ if(/رز|برنج|rice|برياني|بریانی|كبسة|كبسه|كابلي|kabuli|biryani|كبسة/.test(text))return '🍛';
+ if(/سلطة|سلطه|سالاد|salad|فتوش|تبوله/.test(text))return '🥗';
+ if(/دجاج|مرغ|chicken|شواية|shawaya/.test(text))return '🍗';
+ if(/شوربة|سوپ|شوربا|soup|مسقعة|مسقعه|مُسقعه/.test(text))return '🍲';
+ return '🍽️';
+};
+
 export default function RestaurantCustomerDisplay(){
  const {hash}=useLocation();
  const token=hash.slice(1);
@@ -98,6 +115,8 @@ export default function RestaurantCustomerDisplay(){
  const [lastSync,setLastSync]=useState(0);
  const [now,setNow]=useState(Date.now());
  const refreshRef=useRef(null);
+ const lastOrderRef=useRef(false);
+ const pendingEmptyRef=useRef({count:0,firstAt:0});
  const isOnline=typeof navigator==='undefined'||navigator.onLine!==false;
  const fresh=Boolean(valid&&!invalid&&isOnline&&lastSync&&now-lastSync<14000);
  const snapshotVisible=Boolean(!invalid&&customerSnapshotVisible(lastSync,now));
@@ -111,6 +130,7 @@ export default function RestaurantCustomerDisplay(){
 
  useEffect(()=>{
   setData(null);setInvalid(false);setLastSync(0);
+  lastOrderRef.current=false;pendingEmptyRef.current={count:0,firstAt:0};
   if(!valid)return;
   let stopped=false,busy=false;
   const refresh=async()=>{
@@ -121,10 +141,27 @@ export default function RestaurantCustomerDisplay(){
     if(stopped)return;
     if(!result||!Array.isArray(result.lines)||typeof result.topic!=='string')
       throw new Error('Invalid restaurant display response');
-    setData(result);setInvalid(false);setLastSync(Date.now());setNow(Date.now());
+    const receivedAt=Date.now();
+    if(!restaurantCustomerHasOrder(result)&&lastOrderRef.current){
+     // A single empty snapshot can be a temporary server transition.
+     // Require two separated, verified empty reads before clearing the
+     // current ticket, never stale customer data for the next shift.
+     const pending=pendingEmptyRef.current;
+     pendingEmptyRef.current={
+       count:pending.count+1,
+       firstAt:pending.firstAt||receivedAt,
+     };
+     if(pendingEmptyRef.current.count<2||receivedAt-pendingEmptyRef.current.firstAt<2500){
+       setNow(receivedAt);
+       return;
+     }
+    }
+    pendingEmptyRef.current={count:0,firstAt:0};
+    lastOrderRef.current=restaurantCustomerHasOrder(result);
+    setData(result);setInvalid(false);setLastSync(receivedAt);setNow(receivedAt);
    }catch(err){
     if(stopped)return;
-    if(err?.code==='42501'){setInvalid(true);setData(null);}
+    if(err?.code==='42501'){setInvalid(true);setData(null);lastOrderRef.current=false;pendingEmptyRef.current={count:0,firstAt:0};}
     // Keep last successful snapshot and timestamp on transient network errors.
     // Expired/revoked tokens above still discard data immediately.
     setNow(Date.now());
