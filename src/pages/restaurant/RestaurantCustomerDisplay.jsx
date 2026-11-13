@@ -218,6 +218,7 @@ export default function RestaurantCustomerDisplay(){
   window.addEventListener('resize',measure);
   return()=>window.removeEventListener('resize',measure);
  },[]);
+ // Keep high-contrast TV styles in React: older kiosk CSS or viewport media rules can fail.
  const tvMode=viewport.width>=700&&viewport.width>viewport.height;
  const itemColumns=restaurantCustomerItemColumns(lines.length,viewport.width,viewport.height);
  const itemRows=Math.ceil(lines.length/itemColumns);
