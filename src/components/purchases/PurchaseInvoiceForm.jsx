@@ -36,7 +36,7 @@ import { format } from 'date-fns';
 import {
   calcLineTotal, calcInvoiceTotals, normalizePurchaseLine,
   createPurchaseInvoice, updatePurchaseInvoice, addInvoicePayment,
-  groupPurchaseLinesBySupplier
+  groupPurchaseLinesBySupplier, computeApprovalStatus
 } from '@/lib/procurementEngine';
 import OcrScanDialog from './OcrScanDialog';
 import PurchaseExpenseOptions from './PurchaseExpenseOptions';
@@ -598,6 +598,14 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
       }
     } catch (validationError) {
       setError(validationError.message);
+      return;
+    }
+    const batchGrandTotal = Math.round(groups.reduce((sum, group) => sum +
+      Math.round(group.totals.grandTotal * 100), 0)) / 100;
+    // A 20-party purchase must not evade the standard Owner approval threshold
+    // merely by splitting a large session into small supplier invoices.
+    if (mode !== 'draft' && computeApprovalStatus(batchGrandTotal) === 'pending') {
+      setError('This combined purchase exceeds the approval threshold. Save separate supplier drafts for Owner review before posting.');
       return;
     }
     const fingerprint = JSON.stringify({
