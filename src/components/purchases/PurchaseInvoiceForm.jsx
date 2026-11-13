@@ -546,6 +546,145 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
     }
   };
 
+  // A receiving session is NOT a ledger invoice. Each supplier gets its own
+  // canonical invoice, independent payable and independently recorded payments.
+  // Keep successful writes in memory so a partial request failure cannot create
+  // the same supplier invoice twice on a user retry.
+  const handleSupplierBatchSubmit = async (mode) => {
+    if (savingRef.current) return;
+    setError('');
+    if (isEdit || supplier) {
+      setError('Multi-supplier entry is available only for a new purchase session.');
+      return;
+    }
+    const branch = branches.find(b => b.key === form.branch || b.branch_key === form.branch);
+    if (!restaurantId || !branch?.id) {
+      setError('Select an authorized receiving branch before saving supplier invoices.');
+      return;
+    }
+    const baseNumber = String(form.invoice_number || '').trim();
+    if (!baseNumber) {
+      setError('An invoice batch number is required before splitting supplier invoices.');
+      return;
+    }
+    // A combined payment, expense reference or overhead has no unambiguous
+    // supplier allocation. Refuse it rather than mis-posting another party's debt.
+    if (payFullAmount || payments.some(p => Number(p.amount) > 0) ||
+      additionalCosts.some(cost => Number(cost.amount) !== 0) ||
+      expenseLink.expense_id || expenseLink.expense_category_id) {
+      setError('For multiple suppliers, record payments, additional costs and expense references separately on each supplier invoice.');
+      return;
+    }
+    let groups;
+    try {
+      groups = groupPurchaseLinesBySupplier(items, suppliers);
+      if (groups.length < 2) throw new Error('Select at least two different suppliers, or use Single supplier mode.');
+      // Validate every supplier before the first write, avoiding a partial
+      // batch because a later product/quantity is invalid.
+      if (mode !== 'draft') {
+        for (const group of groups) {
+          for (const line of group.items) {
+            const quantity = Number(line.quantity), cost = Number(line.unit_cost);
+            const discount = Number(line.discount || 0), tax = Number(line.tax || 0);
+            if ((!line.product_id && !String(line.product_name || '').trim()) ||
+              !Number.isFinite(quantity) || quantity <= 0 ||
+              !Number.isFinite(cost) || cost < 0 ||
+              !Number.isFinite(discount) || discount < 0 || discount > quantity * cost ||
+              !Number.isFinite(tax) || tax < 0 || tax > 100) {
+              throw new Error(`Review all product names, quantities, costs, discounts and tax for ${group.supplierName}.`);
+            }
+          }
+        }
+      }
+    } catch (validationError) {
+      setError(validationError.message);
+      return;
+    }
+    const fingerprint = JSON.stringify({
+      restaurantId, branchId: branch.id, baseNumber, mode, date: form.date, currency: form.currency,
+      groups: groups.map(g => [g.supplierId, g.items, g.totals.grandTotal]),
+    });
+    const progress = batchRef.current;
+    if (progress.blocked) {
+      setError('A supplier invoice may have been saved but its posting is incomplete. Review Purchase History and Supplier Ledger before continuing.');
+      return;
+    }
+    if (progress.completed.size && (progress.mode !== mode || progress.fingerprint !== fingerprint)) {
+      setError('Part of this batch was saved. Do not change its products or mode; retry remaining suppliers, or inspect the already saved invoices.');
+      return;
+    }
+    progress.mode = mode;
+    progress.fingerprint = fingerprint;
+    savingRef.current = true;
+    setSaving(true);
+    setSubmitMode(mode);
+    try {
+      for (let index = 0; index < groups.length; index += 1) {
+        const group = groups[index];
+        if (progress.completed.has(group.supplierId)) continue;
+        const invoiceNumber = `${baseNumber}-S${String(index + 1).padStart(2, '0')}`;
+        const { data: duplicates, error: duplicateError } = await supabase
+          .from('supplier_invoices')
+          .select('id, invoice_number')
+          .eq('restaurant_id', restaurantId)
+          .eq('branch_id', branch.id)
+          .eq('supplier_id', group.supplierId)
+          .eq('invoice_number', invoiceNumber)
+          .limit(1);
+        if (duplicateError) throw new Error('Cannot verify duplicate purchase invoices. No further suppliers have been saved.');
+        if (duplicates?.length) {
+          progress.blocked = true;
+          throw new Error(`Invoice ${invoiceNumber} exists for ${group.supplierName}. Review the supplier account before continuing; no duplicate was created.`);
+        }
+        const cleanItems = group.items.map(({ _id, _ocr_confidence, ...line }) => normalizePurchaseLine(line));
+        const invoiceData = {
+          ...form,
+          invoice_number: invoiceNumber,
+          supplier_id: group.supplierId,
+          supplier_name: group.supplierName,
+          supplier_email: group.supplierEmail,
+          restaurant_id: restaurantId,
+          branch_id: branch.id,
+          paid_amount: 0,
+          expense_id: null,
+          expense_category_id: null,
+          attachment_urls: attachments,
+          notes: [form.notes, `Purchase batch ${baseNumber} · Supplier ${index + 1}/${groups.length}`].filter(Boolean).join('\n'),
+        };
+        try {
+          const saved = await createPurchaseInvoice({
+            invoiceData, items: cleanItems, additionalCosts: [], createdBy: user?.email, mode,
+          });
+          progress.completed.set(group.supplierId, saved);
+        } catch (writeError) {
+          // An insert may succeed before an inventory/debt callback fails.
+          // Do not assume it rolled back, and NEVER insert the same invoice again.
+          const { data: found, error: verificationError } = await supabase
+            .from('supplier_invoices').select('id,invoice_number')
+            .eq('restaurant_id',restaurantId).eq('branch_id',branch.id)
+            .eq('supplier_id',group.supplierId).eq('invoice_number',invoiceNumber).limit(1);
+          if (verificationError || found?.length) {
+            progress.blocked = true;
+            throw new Error(`The status of ${invoiceNumber} needs manual verification in Purchase History. Do not retry it automatically. ${writeError.message || ''}`);
+          }
+          throw writeError;
+        }
+      }
+      for (const key of ['supplier_invoices','supplier_invoices_dash','inventory',
+        'debt_records','purchases','supplier_payments','supplier-ledger',
+        'suppliers','dashboard_metrics','procurement_kpis']) {
+        qc.invalidateQueries({queryKey:[key]});
+      }
+      onSuccess?.([...progress.completed.values()]);
+    } catch (saveError) {
+      setError(`${progress.completed.size}/${groups.length} supplier invoices saved. ${saveError.message || 'Batch incomplete.'} Retry only the remaining suppliers; existing invoices will not be duplicated.`);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+      setSubmitMode(null);
+    }
+  };
+
   // ── Submit ─────────────────────────────────────────────────────────────
   const handleSubmit = async (e, mode = 'post') => {
     e.preventDefault();
