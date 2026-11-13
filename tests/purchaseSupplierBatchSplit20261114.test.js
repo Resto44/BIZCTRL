@@ -56,6 +56,8 @@ describe('ERP purchase session: separate supplier invoice and payable per party'
   expect(source).toContain("progress.blocked = true");
   expect(source).toContain("invoice_number: invoiceNumber");
   expect(source).toContain("Post separate invoices");
+  expect(source).toContain("computeApprovalStatus(batchGrandTotal) === 'pending'");
+  expect(source).toContain("Save separate supplier drafts for Owner review");
   expect(source).toContain("Purchase batch");
   expect(source).toContain("data-testid=\"purchase-line-supplier\"");
  });
