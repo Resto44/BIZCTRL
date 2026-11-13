@@ -299,7 +299,8 @@ export default function SupplierPortalERP() {
     || String(invoice.id||'').toLowerCase().includes(search.toLowerCase())
     || String(invoice.invoice_number||'').toLowerCase().includes(search.toLowerCase()));
   const newPurchaseOrders = purchaseOrders.filter(po => ['draft','sent','pending'].includes(po.status));
-  const pending = purchaseOrders.filter(po => ['draft','sent','pending','approved'].includes(po.status));
+  const pending = purchaseOrders.filter(po => po.status === 'approved');
+  const actionableCount = newPurchaseOrders.length + pending.length;
   const shippedCount = purchaseOrders.filter(po => po.status === 'shipped').length;
   const receivedCount = purchaseOrders.filter(po => po.status === 'received').length;
 
@@ -392,7 +393,7 @@ export default function SupplierPortalERP() {
                 <div className="mb-2 flex items-center justify-between text-amber-700 dark:text-amber-300">
                   <Truck className="h-5 w-5"/><ArrowRight className="h-4 w-4"/>
                 </div>
-                <p className="text-2xl font-black tabular-nums text-slate-950 dark:text-white">{isLoading?'…':pending.length}</p>
+                <p className="text-2xl font-black tabular-nums text-slate-950 dark:text-white">{isLoading?'…':actionableCount}</p>
                 <p className="mt-1 text-xs font-semibold leading-4 text-slate-700 dark:text-slate-200">{copy.awaiting}</p>
               </button>
               <button type="button" onClick={()=>setActiveTab('invoices')}
@@ -452,7 +453,7 @@ export default function SupplierPortalERP() {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  {label:copy.awaiting,value:pending.length,color:'bg-amber-500'},
+                  {label:copy.awaiting,value:actionableCount,color:'bg-amber-500'},
                   {label:copy.shipped,value:shippedCount,color:'bg-blue-500'},
                   {label:copy.received,value:receivedCount,color:'bg-emerald-500'},
                 ].map(item=><div key={item.label} className="min-w-0 space-y-1.5">
