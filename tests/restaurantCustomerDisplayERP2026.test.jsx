@@ -18,7 +18,7 @@ vi.mock('@/lib/cashierBroadcast',()=>({subscribeCashierBroadcast:(client,topic,l
 }}));
 vi.mock('@/lib/LanguageContext',()=>({useLanguage:()=>({lang:mocks.lang})}));
 import RestaurantCustomerDisplay,{restaurantCustomerStage,restaurantCustomerHasOrder,
- restaurantWaitElapsedSeconds,restaurantWaitClock}
+ restaurantWaitElapsedSeconds,restaurantWaitClock,restaurantCustomerItemColumns}
  from '../src/pages/restaurant/RestaurantCustomerDisplay.jsx';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
@@ -216,6 +216,63 @@ describe('Restaurant-only customer display ERP',()=>{
   const after=host.querySelector('[data-testid="restaurant-visible-item-lines"]');
   expect(host.querySelectorAll('[data-testid="restaurant-visible-item"]')).toHaveLength(12);
   for(let n=1;n<=12;n++)expect(after.textContent).toContain('Dish-'+String(n).padStart(2,'0'));
+ });
+ it('renders five long Arabic food names in one mobile column without truncation',async()=>{
+  mocks.lang='ar';
+  const names=[
+   'الرز البخاري بالدجاج',
+   'الرز الأبيض بالسمن',
+   'ربيان مقلي مقرمش',
+   'حاشي مندي بالرز',
+   'سلطة عربية مشكلة',
+  ];
+  mocks.rpc.mockResolvedValue({...fixture,kitchen_language:'ar',lines:names.map((name,i)=>({
+   name_ar:name,name,quantity:1,line_total:6+i,
+  }))});
+  expect(restaurantCustomerItemColumns(5,390,800)).toBe(1);
+  expect(restaurantCustomerItemColumns(5,320,620)).toBe(1);
+  await render();
+  const grid=host.querySelector('[data-testid="restaurant-visible-item-lines"]');
+  expect(grid.style.gridTemplateColumns).toBe('repeat(1,minmax(0,1fr))');
+  const labels=[...host.querySelectorAll('[data-testid="restaurant-food-full-name"]')];
+  expect(labels).toHaveLength(5);
+  names.forEach((name,i)=>{
+   expect(labels[i].textContent).toContain(name);
+   expect(labels[i].className).toContain('whitespace-normal');
+   expect(labels[i].className).toContain('break-words');
+   expect(labels[i].className).not.toContain('truncate');
+   expect(labels[i].className).not.toContain('line-clamp');
+  });
+  expect(host.querySelectorAll('[data-testid="restaurant-visible-item"]')).toHaveLength(5);
+ });
+ it('puts large wait timer and attention-getting order number in separate always legible cards',async()=>{
+  mocks.lang='fa';
+  mocks.rpc.mockResolvedValue({...fixture,kitchen_language:'fa',
+   submitted_at:'2026-11-10T10:00:00Z',server_time:'2026-11-10T10:01:41Z'});
+  await render();
+  const timer=host.querySelector('[data-testid="restaurant-waiting-clock"]');
+  expect(timer.textContent).toBe('01:41');
+  expect(timer.className).toContain('text-[clamp(2rem,8.2vw,5.8rem)]');
+  expect(host.querySelector('[data-testid="restaurant-waiting-panel"]')).not.toBeNull();
+  const ticket=host.querySelector('[data-testid="restaurant-ticket-attention"]');
+  expect(ticket).not.toBeNull();
+  expect(ticket.className).toContain('bizctrl-customer-ticket-attention');
+  const number=host.querySelector('[data-testid="restaurant-order-number"]');
+  expect(number.textContent).toBe('#170');
+  expect(number.className).toContain('text-[clamp(2.15rem,9.4vw,6.4rem)]');
+  expect(number.className).not.toContain('animate-pulse');
+  expect(number.className).not.toContain('truncate');
+  await act(async()=>{await vi.advanceTimersByTimeAsync(5000);});
+  expect(host.querySelector('[data-testid="restaurant-order-number"]').textContent).toBe('#170');
+  expect(host.querySelector('[data-testid="restaurant-waiting-clock"]').textContent).toBe('01:46');
+ });
+ it('flashes the ticket border, never food names, wait digits or whole-screen opacity',()=>{
+  const css=readFileSync(resolve('src/pages/restaurant/customerTicketGlow.css'),'utf8');
+  expect(css).toContain('@keyframes bizctrl-customer-ticket-glow');
+  expect(css).toContain('box-shadow:');
+  expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+  expect(css).not.toMatch(/opacity:\\s*0/);
+  expect(css).not.toMatch(/display:\\s*none/);
  });
  it('ignores a one-off empty poll without clearing the current order, but clears confirmed empty snapshots',async()=>{
   await render();
