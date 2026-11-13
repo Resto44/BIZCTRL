@@ -64,7 +64,7 @@ REVOKE ALL ON FUNCTION public.erp_supplier_order_status_guard() FROM PUBLIC,anon
 -- Enforce supplier product ownership at the database boundary as well as in Add Item.
 CREATE OR REPLACE FUNCTION public.erp_purchase_order_supplier_product_guard()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
-DECLARE v_items jsonb; v_item jsonb; v_product text;
+DECLARE v_items jsonb; v_item jsonb; v_product text; v_old_items jsonb; v_old_count integer; v_new_count integer;
 BEGIN
  IF NEW.supplier_id IS NULL THEN RETURN NEW; END IF;
  IF NEW.restaurant_id IS NULL OR NEW.branch_id IS NULL
@@ -91,6 +91,25 @@ BEGIN
       AND p.supplier_id=NEW.supplier_id AND p.product_id=v_product
       AND coalesce(p.is_active,true)
   ) THEN
+   -- Historical orders may contain products that were entered before
+   -- supplier assignments existed. Preserve their existing lines during
+   -- quantity/price corrections, but NEVER permit adding new unmatched
+   -- product lines or moving them to a different supplier/branch/tenant.
+   IF TG_OP='UPDATE' AND NEW.restaurant_id IS NOT DISTINCT FROM OLD.restaurant_id
+     AND NEW.branch_id IS NOT DISTINCT FROM OLD.branch_id
+     AND NEW.supplier_id IS NOT DISTINCT FROM OLD.supplier_id THEN
+     BEGIN
+      v_old_items:=CASE WHEN jsonb_typeof(OLD.items)='array' THEN OLD.items
+       WHEN jsonb_typeof(OLD.items)='string' THEN (OLD.items#>>'{}')::jsonb
+       ELSE '[]'::jsonb END;
+     EXCEPTION WHEN others THEN v_old_items:='[]'::jsonb;
+     END;
+     SELECT count(*) INTO v_old_count FROM jsonb_array_elements(v_old_items) x
+        WHERE x->>'product_id'=v_product;
+     SELECT count(*) INTO v_new_count FROM jsonb_array_elements(v_items) x
+        WHERE x->>'product_id'=v_product;
+     IF v_old_count>=v_new_count AND v_old_count>0 THEN CONTINUE; END IF;
+   END IF;
    RAISE EXCEPTION 'PURCHASE_ORDER_PRODUCT_NOT_ASSIGNED_TO_SUPPLIER' USING ERRCODE='23514';
   END IF;
  END LOOP;
