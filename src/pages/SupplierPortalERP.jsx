@@ -184,7 +184,7 @@ export default function SupplierPortalERP() {
       return data;
     },
     enabled: !!supplierProfile?.id && !!user?.restaurant_id && !!user?.branch_id,
-    refetchInterval: 12000,refetchOnWindowFocus:true,
+    refetchInterval: 5000,refetchOnWindowFocus:true,
   });
 
   // ── Supplier invoices — canonical supplier id plus tenant and branch ────────
