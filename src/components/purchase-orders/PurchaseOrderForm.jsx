@@ -31,7 +31,7 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
     supplier_email: order?.supplier_email || '',
     supplier_phone: order?.supplier_phone || '',
     branch: order?.branch || '',
-    date: order?.date || format(new Date(), 'yyyy-MM-dd'),
+    date: order?.date || (order?.created_date ? String(order.created_date).slice(0,10) : format(new Date(), 'yyyy-MM-dd')),
     expected_delivery: order?.expected_date || '',
     notes: order?.notes || '',
     status: order?.status || 'draft',
