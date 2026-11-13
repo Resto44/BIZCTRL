@@ -7,6 +7,7 @@ import {restaurantRpc,restaurantProductName} from '@/lib/restaurantPOS';
 import {money} from '@/lib/retailCashier';
 import {subscribeCashierBroadcast} from '@/lib/cashierBroadcast';
 import {useLanguage} from '@/lib/LanguageContext';
+import './customerTicketGlow.css';
 
 const COPY={
  en:{
@@ -84,10 +85,12 @@ const validToken=token=>/^[a-f0-9]{64}$/.test(token);
 // All items remain mounted and visible: adapt the grid instead of cycling
 // through pages (which previously caused food lines to appear/disappear).
 export const restaurantCustomerItemColumns=(count,width=390,height=800)=>{
- if(count<=4)return 1;
- if(width>=1100)return Math.min(4,Math.max(2,Math.ceil(count/5)));
- if(width>=650)return Math.min(3,Math.max(2,Math.ceil(count/6)));
- return Math.min(3,Math.max(2,Math.ceil(count/(height<700?5:6))));
+ // Full menu names are the priority: one readable row per item for the
+ // common 1–6 item customer order, even on narrow mobile screens.
+ // Larger orders use additional columns without hiding or paging items.
+ if(width<650)return count<=6?1:Math.min(3,Math.max(2,Math.ceil(count/(height<700?7:9))));
+ if(width<1100)return count<=8?1:Math.min(3,Math.ceil(count/9));
+ return count<=10?1:Math.min(4,Math.ceil(count/10));
 };
 export const restaurantDishGlyph=name=>{
  const text=String(name||'').toLowerCase();
@@ -210,8 +213,10 @@ export default function RestaurantCustomerDisplay(){
  },[]);
  const itemColumns=restaurantCustomerItemColumns(lines.length,viewport.width,viewport.height);
  const itemRows=Math.ceil(lines.length/itemColumns);
- const compactItems=itemRows>6;
- const denseItems=itemRows>9;
+ const compactItems=itemRows>7;
+ const denseItems=itemRows>11;
+ const ticketLabel=active?'#'+String(data.number):'—';
+ const longTicket=String(data?.number??'').length>5;
  const stateText=stage===3?c.served:stage>=0?c[STAGES[stage]]:c.draft;
 
  return <main dir={lang==='en'?'ltr':'rtl'} data-testid="restaurant-customer-display"
