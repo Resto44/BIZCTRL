@@ -822,7 +822,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
         </Button>
       </header>
 
-      <div inert={submissionRef.current.invoice ? '' : undefined} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4">
+      <div inert={submissionRef.current.invoice || (multiSupplierMode && batchRef.current.completed.size) ? '' : undefined} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4">
         <div className="mx-auto max-w-3xl space-y-3.5 pb-4">
           {error && (
             <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700" role="alert">
@@ -837,6 +837,61 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
             <div className="min-w-0 px-2 text-center sm:px-4"><p className="text-[11px] text-slate-500 sm:text-sm">Total</p><p className="mt-1 truncate text-sm font-black text-blue-700 sm:text-xl"><span className="me-1 text-[10px] font-medium text-slate-500 sm:text-sm">{form.currency}</span>{totals.grandTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
           </Card>
 
+          <Card data-testid="purchase-supplier-mode" className="border-blue-200 bg-white p-3 sm:p-4">
+            <label className="flex items-center gap-3 text-sm font-bold text-slate-900">
+              <input type="checkbox" className="h-5 w-5 accent-blue-600" checked={multiSupplierMode}
+                disabled={isEdit || !!supplier || saving || !!submissionRef.current.invoice || batchRef.current.completed.size > 0}
+                onChange={e => {
+                  const enabled = e.target.checked;
+                  setMultiSupplierMode(enabled);
+                  if (enabled && form.supplier_id) {
+                    setItems(previous => previous.map(item => ({
+                      ...item, supplier_id: item.supplier_id || form.supplier_id,
+                    })));
+                  }
+                  setError('');
+                }}/>
+              Purchase from multiple suppliers (up to 20)
+            </label>
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+              Choose the supplier for each product. Every supplier gets its own invoice and payable,
+              never one shared debt.
+            </p>
+          </Card>
+          {multiSupplierMode && <Card data-testid="purchase-supplier-batch-summary" className="space-y-3 border-blue-200 bg-blue-50/60 p-3 sm:p-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="mb-1 block text-xs font-semibold">Purchase batch reference *</Label>
+                <Input aria-label="Purchase batch reference" value={form.invoice_number}
+                  onChange={e => setForm(current => ({...current,invoice_number:e.target.value}))}
+                  className="bg-white"/></div>
+              <div><Label className="mb-1 block text-xs font-semibold">Currency</Label>
+                <Select value={form.currency} onValueChange={value => setForm(current => ({...current,currency:value}))}>
+                  <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+                  <SelectContent>{CURRENCIES.map(code => <SelectItem key={code} value={code}>{code}</SelectItem>)}</SelectContent>
+                </Select></div>
+              <div><Label className="mb-1 block text-xs font-semibold">Purchase date</Label>
+                <Input type="date" value={form.date}
+                  onChange={e => setForm(current => ({...current,date:e.target.value}))} className="bg-white"/></div>
+              <div className="flex flex-col justify-end rounded-lg border border-blue-100 bg-white p-2 text-xs font-bold">
+                <span className="text-slate-600">Suppliers / purchase total</span>
+                <span className="text-base text-blue-800">{batchGroups.length} · {form.currency} {batchTotal.toFixed(2)}</span>
+              </div>
+            </div>
+            <p className="text-xs font-semibold text-amber-800">
+              Combined payments and extra expenses cannot be allocated automatically.
+              Add them separately to each supplier invoice.
+            </p>
+            {batchGroups.map(group => <div key={group.supplierId}
+              className="flex items-center justify-between gap-3 rounded-lg border border-blue-100 bg-white px-3 py-2 text-xs font-semibold"
+              data-testid="purchase-batch-supplier-total">
+              <span className="min-w-0 truncate">{group.supplierName} · {group.items.length} item(s)</span>
+              <span className="shrink-0 font-black tabular-nums">{form.currency} {group.totals.grandTotal.toFixed(2)}</span>
+            </div>)}
+            {batchRef.current.completed.size > 0 && <p className="text-xs font-bold text-emerald-800">
+              {batchRef.current.completed.size} supplier invoice(s) saved. Retry only remaining suppliers.
+            </p>}
+          </Card>}
+
           <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
             <button type="button" onClick={() => setShowLineItems(value => !value)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left sm:px-5" aria-expanded={showLineItems}>
               <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-blue-600 text-white"><Package className="h-5 w-5" /></span>
@@ -847,7 +902,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
               <div className="hidden grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] border-t border-slate-200 bg-slate-50 px-5 py-2.5 text-[11px] font-medium text-slate-500 sm:grid">
                 <span>Item</span><span>Unit</span><span>Qty</span><span>Unit Cost</span><span className="text-right">Total</span><span />
               </div>
-              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} categories={categories} categoriesTree={categoriesTree} />)}</div>
+              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} categories={categories} categoriesTree={categoriesTree} />)}</div>
               <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 sm:px-5">
                 <Button type="button" variant="ghost" onClick={addItem} className="h-9 gap-2 px-0 font-bold text-blue-700 hover:bg-transparent"><Plus className="h-5 w-5 rounded-full border border-blue-600 p-0.5" /> Add Item</Button>
                 <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{items.length} item{items.length === 1 ? '' : 's'}</span>
@@ -855,13 +910,13 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
             </>}
           </Card>
 
-          <InvoiceAccordion title="Supplier" subtitle={selectedSupplier?.name || form.supplier_name} icon={UserRound} verified={Boolean(form.supplier_id || form.supplier_name.trim())} open={openSection === 'supplier'} onToggle={() => setOpenSection(current => current === 'supplier' ? null : 'supplier')}>
+          {!multiSupplierMode && <InvoiceAccordion title="Supplier" subtitle={selectedSupplier?.name || form.supplier_name} icon={UserRound} verified={Boolean(form.supplier_id || form.supplier_name.trim())} open={openSection === 'supplier'} onToggle={() => setOpenSection(current => current === 'supplier' ? null : 'supplier')}>
             <div className="space-y-3">
               <div><Label className="text-xs text-slate-600">Supplier *</Label><Select disabled={Boolean(supplier)} value={form.supplier_id} onValueChange={value => { const supplier = suppliers.find(item => item.id === value); setForm(current => ({ ...current, supplier_id: value, supplier_name: supplier?.name || '', supplier_email: supplier?.email || '' })); setPaymentTerms(supplier?.payment_terms || ''); setVatNumber(supplier?.vat_number || supplier?.tax_number || ''); }}><SelectTrigger className="mt-1 h-11 rounded-xl bg-white"><SelectValue placeholder="Select supplier..." /></SelectTrigger><SelectContent>{suppliers.map(supplier => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent></Select>{!form.supplier_id && <Input value={form.supplier_name} onChange={event => setForm(current => ({ ...current, supplier_name: event.target.value }))} placeholder="Or type supplier name" className="mt-2 h-11 rounded-xl bg-white" />}</div>
               <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs text-slate-600">Invoice number</Label><Input value={form.invoice_number} onChange={event => setForm(current => ({ ...current, invoice_number: event.target.value }))} className="mt-1 h-10 bg-white" /></div><div><Label className="text-xs text-slate-600">Currency</Label><Select value={form.currency} onValueChange={value => setForm(current => ({ ...current, currency: value }))}><SelectTrigger className="mt-1 h-10 bg-white"><SelectValue /></SelectTrigger><SelectContent>{CURRENCIES.map(currency => <SelectItem key={currency} value={currency}>{currency}</SelectItem>)}</SelectContent></Select></div></div>
               <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs text-slate-600">Invoice date</Label><Input type="date" value={form.date} onChange={event => setForm(current => ({ ...current, date: event.target.value }))} className="mt-1 h-10 bg-white" /></div><div><Label className="text-xs text-slate-600">VAT number</Label><Input value={resolvedVatNumber} onChange={event => setVatNumber(event.target.value)} inputMode="numeric" className="mt-1 h-10 bg-white" placeholder="VAT number" /></div></div>
             </div>
-          </InvoiceAccordion>
+          </InvoiceAccordion>}
 
           <InvoiceAccordion title="Branch" subtitle={selectedBranchName} icon={Store} verified={Boolean(form.branch)} open={openSection === 'branch'} onToggle={() => setOpenSection(current => current === 'branch' ? null : 'branch')}>
             <div><Label className="mb-1.5 block text-xs text-slate-600">Receiving branch *</Label><BranchSelect value={form.branch}
@@ -871,7 +926,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
               }} /></div>
           </InvoiceAccordion>
 
-          <InvoiceAccordion title="Payment" subtitle={paymentMethodLabel} icon={WalletCards} open={openSection === 'payment'} onToggle={() => setOpenSection(current => current === 'payment' ? null : 'payment')} trailing={form.due_date ? <span className="hidden flex-none items-center gap-1 text-xs font-bold text-orange-600 sm:inline-flex"><span className="h-2 w-2 rounded-full bg-orange-500" />Due {form.due_date}</span> : null}>
+          {!multiSupplierMode ? <InvoiceAccordion title="Payment" subtitle={paymentMethodLabel} icon={WalletCards} open={openSection === 'payment'} onToggle={() => setOpenSection(current => current === 'payment' ? null : 'payment')} trailing={form.due_date ? <span className="hidden flex-none items-center gap-1 text-xs font-bold text-orange-600 sm:inline-flex"><span className="h-2 w-2 rounded-full bg-orange-500" />Due {form.due_date}</span> : null}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs text-slate-600">Payment terms</Label><Input value={paymentTerms} onChange={event => setPaymentTerms(event.target.value)} placeholder="e.g. Credit / Net 30" className="mt-1 h-10 bg-white" /></div><div><Label className="text-xs text-slate-600">Due date</Label><Input type="date" value={form.due_date} onChange={event => setForm(current => ({ ...current, due_date: event.target.value }))} className="mt-1 h-10 bg-white" /></div></div>
               <label className="flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs font-bold text-blue-950"><input id="pay-full-amount" type="checkbox" checked={payFullAmount} onChange={event => handlePayFullAmount(event.target.checked)} className="h-4 w-4 accent-blue-600" /> Pay full invoice amount</label>
@@ -880,16 +935,18 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
               <div className="border-t border-slate-200 pt-3"><div className="mb-2 flex items-center justify-between"><div className="flex items-center gap-2"><Truck className="h-4 w-4 text-blue-600" /><span className="text-xs font-bold text-slate-800">Additional costs</span></div><span className="text-xs font-bold text-slate-500">{form.currency} {totals.additionalTotal.toFixed(2)}</span></div>{additionalCosts.map(cost => <div key={cost._id} className="mb-2 grid grid-cols-[1fr_1fr_auto] gap-2 rounded-xl bg-white p-2"><Select value={cost.type} onValueChange={value => updateAdditionalCost(cost._id, 'type', value)}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent>{ADDITIONAL_COST_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent></Select><Input type="number" min="0" step="0.01" value={cost.amount} onChange={event => updateAdditionalCost(cost._id, 'amount', Number(event.target.value || 0))} className="h-9" placeholder="Amount" /><Button type="button" variant="ghost" size="icon" onClick={() => removeAdditionalCost(cost._id)} className="h-9 w-9 text-red-600"><Trash2 className="h-4 w-4" /></Button><Input value={cost.description} onChange={event => updateAdditionalCost(cost._id, 'description', event.target.value)} className="col-span-3 h-9" placeholder="Description" /></div>)}<Button type="button" variant="ghost" size="sm" onClick={addAdditionalCost} className="h-8 gap-1 px-0 text-xs font-bold text-blue-700"><Plus className="h-3.5 w-3.5" /> Add cost</Button></div>
               <div className="flex justify-between rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold"><span>Remaining balance</span><span>{form.currency} {Math.max(0, remaining).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
             </div>
-          </InvoiceAccordion>
+          </InvoiceAccordion> : <Card className="border-blue-200 bg-white p-3 text-xs font-semibold text-blue-900">
+            Supplier-specific payment amounts, additional costs and due dates belong on each supplier invoice.
+          </Card>}
 
-          <InvoiceAccordion title="Options · Expense reference" subtitle={expenseLink.expense_id?'Existing expense linked':expenseLink.expense_category_id?'Expense type selected':'Optional · No extra posting'} icon={ClipboardCheck}
+          {!multiSupplierMode && <InvoiceAccordion title="Options · Expense reference" subtitle={expenseLink.expense_id?'Existing expense linked':expenseLink.expense_category_id?'Expense type selected':'Optional · No extra posting'} icon={ClipboardCheck}
             open={openSection==='expenseOptions'}
             onToggle={()=>setOpenSection(current=>current==='expenseOptions'?null:'expenseOptions')}>
             <PurchaseExpenseOptions restaurantId={restaurantId}
               branchId={selectedBranch?.id||null}
               branchKey={form.branch}
               value={expenseLink} onChange={setExpenseLink} disabled={saving||Boolean(submissionRef.current.invoice)}/>
-          </InvoiceAccordion>
+          </InvoiceAccordion>}
 
           <InvoiceAccordion title="Attachments" subtitle={attachments.length ? `${attachments.length} invoice ${attachments.length === 1 ? 'file' : 'files'}` : 'No invoice file'} icon={Paperclip} open={openSection === 'attachments'} onToggle={() => setOpenSection(current => current === 'attachments' ? null : 'attachments')} trailing={attachments.length ? <span className="hidden h-9 w-9 flex-none items-center justify-center rounded-lg bg-blue-50 text-blue-700 sm:flex"><FileText className="h-4 w-4" /></span> : null}>
             <div className="space-y-2">{attachments.map((url, index) => <div key={`${url}-${index}`} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"><FileText className="h-3.5 w-3.5 text-blue-600" /><a href={url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-blue-700">{url.split('/').pop()}</a><Button type="button" variant="ghost" size="icon" onClick={() => setAttachments(current => current.filter((_, itemIndex) => itemIndex !== index))} className="h-7 w-7 text-red-600"><Trash2 className="h-3.5 w-3.5" /></Button></div>)}<label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-blue-300 bg-blue-50/50 text-xs font-bold text-blue-700"><Paperclip className="h-4 w-4" />Upload invoice<input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleFileUpload} /></label><Textarea value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} rows={2} placeholder="Internal procurement notes" className="resize-none rounded-xl bg-white" /></div>
@@ -899,10 +956,10 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
 
       <footer className="grid flex-none grid-cols-2 gap-3 border-t border-slate-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.06)] sm:px-5">
         <Button type="button" variant="outline" disabled={saving || !!submissionRef.current.invoice} onClick={e => handleSubmit(e, 'draft')} className="h-12 gap-2 rounded-xl border-blue-300 font-bold text-blue-700">
-          <Save className="h-4 w-4" />{saving && submitMode === 'draft' ? 'Saving...' : 'Save Draft'}
+          <Save className="h-4 w-4" />{saving && submitMode === 'draft' ? 'Saving...' : multiSupplierMode ? 'Save supplier drafts' : 'Save Draft'}
         </Button>
         <Button type="submit" disabled={saving} className="h-12 gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-blue-600 font-bold shadow-lg shadow-blue-200 hover:from-blue-800 hover:to-blue-700">
-          <ClipboardCheck className="h-4 w-4" />{saving && submitMode === 'post' ? 'Posting...' : submissionRef.current.invoice ? 'Retry remaining payments' : isEdit ? 'Review & Update' : 'Review & Post'}
+          <ClipboardCheck className="h-4 w-4" />{saving && submitMode === 'post' ? 'Posting...' : multiSupplierMode ? 'Post separate invoices' : submissionRef.current.invoice ? 'Retry remaining payments' : isEdit ? 'Review & Update' : 'Review & Post'}
         </Button>
       </footer>
 
