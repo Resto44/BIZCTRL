@@ -1,0 +1,25 @@
+/* Restaurant Customer TV: highlight only the order panel. Keep the
+ * order digits permanently opaque/legible; never blink the content. */
+@keyframes bizctrl-customer-ticket-glow {
+  0%, 100% {
+    border-color: rgba(34, 211, 238, 0.85);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.35),
+                inset 0 0 12px rgba(59, 130, 246, 0.15);
+  }
+  50% {
+    border-color: rgba(186, 230, 253, 1);
+    box-shadow: 0 0 23px rgba(34, 211, 238, 0.9),
+                0 0 42px rgba(59, 130, 246, 0.5),
+                inset 0 0 17px rgba(34, 211, 238, 0.3);
+  }
+}
+.bizctrl-customer-ticket-attention {
+  animation: bizctrl-customer-ticket-glow 1.7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bizctrl-customer-ticket-attention {
+    animation: none;
+    border-color: rgba(103, 232, 249, 1);
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);
+  }
+}
