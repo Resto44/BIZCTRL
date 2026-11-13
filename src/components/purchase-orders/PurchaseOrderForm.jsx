@@ -1,5 +1,5 @@
 import { restaurantMaterialFilter } from '@/lib/restaurantProducts';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -37,11 +37,17 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
     status: order?.status || 'draft',
     hide_prices_from_supplier: Boolean(order?.hide_prices_from_supplier),
   });
+  const [validationError,setValidationError]=useState('');
+  useEffect(()=>{if(branches.length===1&&!form.branch)setForm(v=>({...v,branch:branches[0].key||branches[0].branch_key||''}));},[branches,form.branch]);
   const [items, setItems] = useState(() => {
     try { return order?.items ? (Array.isArray(order.items) ? order.items : JSON.parse(order.items)) : [{...emptyItem}]; } catch { return [{ ...emptyItem }]; }
   });
 
-  const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: () => base44.entities.Supplier.list('name', 200) });
+  const { data: suppliers = [], isError:suppliersError } = useQuery({
+    queryKey:['suppliers',activeRestaurantId,'po-form'],
+    enabled:!!activeRestaurantId,
+    queryFn:()=>base44.entities.Supplier.filter({restaurant_id:activeRestaurantId},'name',500),
+  });
   const { data: products = [] } = useQuery({ queryKey: ['products', activeRestaurantId, 'purchase-materials'], queryFn: () => base44.entities.Product.filter({ restaurant_id: activeRestaurantId, ...restaurantMaterialFilter(activeRestaurant) }, 'name', 500), enabled: Boolean(activeRestaurantId) });
 
   const saveMutation = useMutation({
@@ -62,7 +68,19 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
   const total = items.reduce((s, it) => s + ((it.qty || 0) * (it.unit_price || 0)), 0);
 
   const handleSave = () => {
-    if (!form.supplier_id || !branches.some(b=>(b.key===form.branch || b.branch_key===form.branch)&&b.id) || !items.length || items.some(i=>!i.product_id || Number(i.qty)<=0 || !Number.isFinite(Number(i.unit_price)) || Number(i.unit_price)<0)) return;
+    setValidationError('');
+    const branch=branches.find(b=>(b.key===form.branch || b.branch_key===form.branch)&&b.id);
+    const selectedSupplier=suppliers.find(s=>s.id===form.supplier_id);
+    if(!selectedSupplier||!branch){setValidationError('Select an available supplier and branch of this business.');return;}
+    if(selectedSupplier.branch_id && String(selectedSupplier.branch_id)!==String(branch.id)){
+      setValidationError('Supplier is linked to a different branch. Select the matching branch.');return;
+    }
+    if(form.expected_delivery&&form.expected_delivery<form.date){
+      setValidationError('Expected delivery cannot be before the order date.');return;
+    }
+    if(!items.length||items.some(i=>!i.product_id||Number(i.qty)<=0||!Number.isFinite(Number(i.qty))||!Number.isFinite(Number(i.unit_price))||Number(i.unit_price)<0)){
+      setValidationError('Add at least one product with a valid quantity and price.');return;
+    }
     
     // Sanitize UUID: ensure "" becomes null for UUID column
     const supplierId = form.supplier_id && form.supplier_id.trim() !== '' ? form.supplier_id : null;
@@ -73,7 +91,7 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
       branch: form.branch,
       supplier_id: supplierId,
       supplier_name: form.supplier_name,
-      branch_id: branches.find(b=>b.key===form.branch || b.branch_key===form.branch)?.id,
+      branch_id: branch.id,
       expected_date: form.expected_delivery || null,
       hide_prices_from_supplier: Boolean(form.hide_prices_from_supplier),
       status: form.status,
@@ -91,7 +109,9 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
         action={<Button variant="ghost" size="sm" onClick={onClose}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>}
       />
 
-      {saveMutation.isError && <p role="alert">{saveMutation.error.message}</p>}
+      {saveMutation.isError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{saveMutation.error.message}</p>}
+      {validationError && <p role="alert" data-testid="purchase-order-validation-error" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{validationError}</p>}
+      {suppliersError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">Could not load suppliers. Refresh and retry.</p>}
       <div className="space-y-4">
         <Card className="p-4 space-y-3">
           <h3 className="font-semibold text-sm">Supplier & Branch</h3>
@@ -104,7 +124,7 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
           </div>
           {form.supplier_email && <p className="text-xs text-muted-foreground">Email: {form.supplier_email}</p>}
           {form.supplier_phone && <p className="text-xs text-muted-foreground">Phone/WhatsApp: {form.supplier_phone}</p>}
-          <div><Label>Branch</Label><BranchSelect value={form.branch} onChange={v => setForm(f => ({ ...f, branch: v }))} /></div>
+          <div><Label>Branch</Label><BranchSelect value={form.branch} onChange={v => {setValidationError('');setForm(f => ({ ...f, branch: v }));}} /></div>
           <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2" data-testid="purchase-order-mobile-dates">
             <div className="min-w-0 space-y-1"><Label htmlFor="purchase-order-date">Order Date</Label>
               <Input id="purchase-order-date" className="w-full min-w-0 max-w-full text-sm" type="date" value={form.date} readOnly aria-readonly="true" />
