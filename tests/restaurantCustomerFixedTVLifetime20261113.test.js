@@ -23,12 +23,14 @@ describe('Restaurant customer screen fixed viewport and secure selectable link l
   expect(pos).toContain("api.command('pair_display',{display_duration:displayDuration})");
   expect(pos).toContain('CUSTOMER_DISPLAY_DURATIONS.map');
   expect(pos).toContain('data-testid="restaurant-display-revoke"');
+  expect(pos).toContain("canPairWithoutShift={(role==='owner'||role==='manager')&&can.viewOrders}");
   expect(pos).toContain("api.command('unpair_display')");
  });
  it('requires Owner/Manager for yearly and permanent bearer links and rejects invalid modes',()=>{
   expect(sql).toContain("NOT IN ('8h','24h','7d','1m','1y','permanent')");
   expect(sql).toContain("in ('1y','permanent')");
   expect(sql).toContain("restaurant_pos_private.guard(d.restaurant_id,d.branch_id,'viewOrders',true)");
+  expect(sql).toContain('if s.id is null then');
   expect(sql).toContain('encode(extensions.gen_random_bytes(32)');
   expect(sql).toContain("encode(extensions.digest(tok,'sha256'),'hex')");
   expect(sql).toContain("when 'permanent' then 'infinity'::timestamptz");
@@ -37,7 +39,7 @@ describe('Restaurant customer screen fixed viewport and secure selectable link l
  it('keeps legacy 8-hour shift close and retains chosen durations across shifts',()=>{
   expect(sql).toContain("ADD COLUMN IF NOT EXISTS link_duration text NOT NULL DEFAULT '8h'");
   expect(sql).toContain("where device_id=d.id AND link_duration='8h'");
-  expect(sql).toContain("p_command<>'unpair_display'");
+  expect(sql).toContain("p_command NOT IN ('unpair_display','pair_display')");
   expect(sql).toContain("ds.link_duration='8h' and not exists");
   expect(sql).toContain("where s.id=x.shift_id and s.device_id=d.id and s.closed_at is null");
   expect(sql).toContain('CUSTOMER_DISPLAY_READER_SOURCE_CHANGED_ABORT');
