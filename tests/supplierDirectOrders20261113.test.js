@@ -19,7 +19,8 @@ describe('Direct supplier orders and supplier-isolated product catalog',()=>{
   expect(form).toContain("status: order ? form.status : 'sent'");
   expect(portal).toContain("['draft','sent','pending','approved'].includes(po.status) && <Button");
   expect(portal).toContain("supabase.rpc('erp_supplier_mark_order_shipped',{p_order_id:poId})");
-  expect(portal).not.toContain('onConfirmShipment={()=>{}}');
+  // Completed order history has an inert callback because the shipment control is hidden there.
+  expect(portal).toContain('newPurchaseOrders.map(po=><POCard');
   expect(portal).toContain('onConfirmShipment={()=>confirmShipmentMutation.mutate(po.id)}');
   expect(sql).toContain("po.status NOT IN ('draft','sent','pending','approved')");
   expect(sql).toContain("m.role='supplier' AND m.status='approved'");
