@@ -15,6 +15,8 @@ ALTER TABLE restaurant_pos_private.displays
 DO $migration$
 DECLARE
   def text;
+  old_shift_gate text := $oldgate$elsif s.id is null then raise exception 'Open a shift first.' using errcode='23514';$oldgate$;
+  new_shift_gate text := $newgate$elsif s.id is null and p_command<>'unpair_display' then raise exception 'Open a shift first.' using errcode='23514';$newgate$;
   old_pair text := $oldpair$elsif p_command='pair_display' then
   tok:=encode(extensions.gen_random_bytes(32),'hex');
   insert into restaurant_pos_private.displays(device_id,token_hash,expires_at,order_id) values(d.id,encode(extensions.digest(tok,'sha256'),'hex'),now()+interval '8 hours',(select id from restaurant_pos_private.orders where device_id=d.id and status='open'))
@@ -57,10 +59,11 @@ DECLARE
  elsif p_command='new_sale' then$newclose$;
 BEGIN
   SELECT pg_get_functiondef('restaurant_pos_private.command(uuid,text,jsonb,uuid)'::regprocedure) INTO def;
-  IF def IS NULL OR position(old_pair IN def)=0 OR position(old_close IN def)=0
+  IF def IS NULL OR position(old_pair IN def)=0 OR position(old_close IN def)=0 OR position(old_shift_gate IN def)=0
      OR position(new_pair IN def)>0 THEN
     RAISE EXCEPTION 'CUSTOMER_DISPLAY_PAIR_SOURCE_CHANGED_ABORT';
   END IF;
+  def:=replace(def,old_shift_gate,new_shift_gate);
   def:=replace(def,old_pair,new_pair);
   def:=replace(def,old_close,new_close);
   EXECUTE def;
