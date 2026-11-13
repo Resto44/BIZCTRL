@@ -54,17 +54,22 @@ describe('Restaurant customer screen fixed viewport and secure selectable link l
   expect(sql).not.toContain('UPDATE public.inventory');
   expect(sql).toContain('CUSTOMER_DISPLAY_PAIR_SOURCE_CHANGED_ABORT');
  });
- it('enforces a fixed fullscreen viewport and paged order items without document scrolling',()=>{
+ it('enforces fixed fullscreen and continuous order item visibility without document scrolling',()=>{
   expect(tv).toContain('data-testid="restaurant-customer-tv-viewport"');
   expect(tv).toContain('data-testid="restaurant-customer-tv-content"');
   expect(tv).toContain('data-testid="restaurant-customer-tv-bottom"');
   expect(tv).toContain('fixed inset-0');
   expect(tv).toContain('h-[100dvh] w-screen overflow-hidden');
   expect(tv).toContain('grid-rows-[auto_minmax(0,1fr)_auto]');
-  expect(tv).toContain('grid-rows-[auto_auto_auto_minmax(0,1fr)]');
+  expect(tv).toContain('grid-rows-[auto_auto_auto_minmax(0,1fr)_auto]');
   expect(tv).toContain('data-testid="restaurant-visible-item-lines"');
-  expect(tv).toContain('setInterval(()=>setItemPage(previous=>(previous+1)%itemPages),6000)');
+  expect(tv).toContain('data-all-items-visible="true"');
+  expect(tv).toContain('restaurantCustomerItemColumns(lines.length,viewport.width,viewport.height)');
+  expect(tv).not.toContain('setItemPage(');
+  expect(tv).not.toContain('restaurant-items-pagination');
   expect(tv).not.toContain('overflow-y-auto');
   expect(tv).not.toContain('min-h-dvh bg-[#f3f7fd]');
+  expect(tv).toContain('data-testid="restaurant-ticket-hero"');
+  expect(tv).toContain('from-[#0b2a60] via-[#124a9b]');
  });
 });

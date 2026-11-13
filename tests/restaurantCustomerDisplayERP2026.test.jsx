@@ -196,7 +196,7 @@ describe('Restaurant-only customer display ERP',()=>{
   expect(restaurantCustomerHasOrder({number:0})).toBe(true);
   expect(restaurantCustomerHasOrder({number:null})).toBe(false);
  });
- it('keeps the full-screen page fixed and automatically pages long menus instead of scrolling the TV',async()=>{
+ it('shows ALL 12 ordered meals at once without blinking, pagination or document scroll',async()=>{
   mocks.rpc.mockResolvedValue({...fixture,lines:Array.from({length:12},(_,i)=>({
     name:'Dish-'+String(i+1).padStart(2,'0'),quantity:1,unit_price:10,line_total:10
   }))});
@@ -207,13 +207,36 @@ describe('Restaurant-only customer display ERP',()=>{
   expect(screen.className).toContain('overflow-hidden');
   const list=host.querySelector('[data-testid="restaurant-visible-item-lines"]');
   expect(list).not.toBeNull();
-  expect(host.querySelector('[data-testid="restaurant-items-pagination"]')).not.toBeNull();
-  expect(list.textContent).toContain('Dish-01');
-  expect(list.textContent).not.toContain('Dish-12');
-  await act(async()=>{await vi.advanceTimersByTimeAsync(6000);});
-  const next=host.querySelector('[data-testid="restaurant-visible-item-lines"]').textContent;
-  expect(next).not.toContain('Dish-01');
-  expect(next).toContain('Dish-06');
+  expect(list.getAttribute('data-all-items-visible')).toBe('true');
+  expect(list.getAttribute('data-item-count')).toBe('12');
+  expect(host.querySelectorAll('[data-testid="restaurant-visible-item"]')).toHaveLength(12);
+  expect(host.querySelector('[data-testid="restaurant-items-pagination"]')).toBeNull();
+  for(let n=1;n<=12;n++)expect(list.textContent).toContain('Dish-'+String(n).padStart(2,'0'));
+  await act(async()=>{await vi.advanceTimersByTimeAsync(16000);});
+  const after=host.querySelector('[data-testid="restaurant-visible-item-lines"]');
+  expect(host.querySelectorAll('[data-testid="restaurant-visible-item"]')).toHaveLength(12);
+  for(let n=1;n<=12;n++)expect(after.textContent).toContain('Dish-'+String(n).padStart(2,'0'));
+ });
+ it('ignores a one-off empty poll without clearing the current order, but clears confirmed empty snapshots',async()=>{
+  await render();
+  expect(host.textContent).toContain('#170');
+  mocks.rpc.mockResolvedValue({...fixture,number:null,kitchen_status:null,lines:[],net_total:null});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(5000);});
+  expect(host.textContent).toContain('#170');
+  expect(host.textContent).toContain('Chicken');
+  expect(host.textContent).toContain('SAR 44.00');
+  await act(async()=>{await vi.advanceTimersByTimeAsync(5000);});
+  expect(host.textContent).not.toContain('#170');
+  expect(host.textContent).not.toContain('Chicken');
+  expect(host.querySelector('[data-testid="restaurant-order-total"]').textContent).toBe('—');
+ });
+ it('never displays order item count or monetary values from another customer on revoked links',async()=>{
+  await render();
+  expect(host.querySelectorAll('[data-testid="restaurant-visible-item"]')).toHaveLength(1);
+  mocks.rpc.mockRejectedValue({code:'42501'});
+  await act(async()=>{mocks.notify.listener('changed');await vi.advanceTimersByTimeAsync(150);});
+  expect(host.querySelectorAll('[data-testid="restaurant-visible-item"]')).toHaveLength(0);
+  expect(host.textContent).not.toContain('SAR 44.00');
  });
  it('never offers vertical document scroll when the display is waiting for an order',async()=>{
   mocks.rpc.mockResolvedValue({...fixture,number:null,lines:[],kitchen_status:null,net_total:null});
