@@ -147,8 +147,17 @@
   [data-testid="restaurant-visible-item"] > div:last-child > span {
     background: #e6f4ff;
     color: #08265c;
-    font-size: clamp(15px, 2.25vh, 26px);
+    font-size: clamp(18px, 2.7vh, 30px);
     padding: .25vh .45vw;
+  }
+  [data-testid="restaurant-customer-tv-bottom"] > div:not([data-testid="restaurant-visible-item-lines"]) h3 {
+    color: #fff;
+  }
+  [data-testid="restaurant-customer-tv-bottom"] > div:not([data-testid="restaurant-visible-item-lines"]) p {
+    color: #d3e7ff;
+  }
+  [data-testid="restaurant-customer-tv-bottom"] > div:not([data-testid="restaurant-visible-item-lines"]) svg {
+    color: #7dd3fc;
   }
   [data-testid="restaurant-customer-tv-content"] > section:last-child {
     padding: .3vh 1vw;
