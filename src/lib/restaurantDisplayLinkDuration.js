@@ -1,0 +1,9 @@
+export const CUSTOMER_DISPLAY_DURATIONS=['24h','7d','1m','1y','permanent'];
+export const customerDisplayDurationLabel=(lang='en')=>({
+ en:{title:'Customer screen link validity',description:'Choose how long this screen remains paired. Re-pairing replaces the previous link; Disconnect screen revokes it immediately.',permanent:'Permanent · until manually revoked',week:'One week',month:'One month',year:'One year',day:'24 hours',security:'Permanent and annual links require Owner or Manager permissions. Keep screen links private; never share your Owner login.'},
+ ar:{title:'مدة صلاحية رابط شاشة العميل',description:'اختر مدة بقاء الشاشة متصلة. إنشاء رابط جديد يلغي الرابط القديم، وفصل الشاشة يلغي الرابط فوراً.',permanent:'دائم · حتى الإلغاء يدوياً',week:'أسبوع',month:'شهر',year:'سنة',day:'٢٤ ساعة',security:'الرابط الدائم والسنوي للمالك أو المدير فقط. احتفظ بالرابط خاصاً ولا تشارك حساب المالك.'},
+ fa:{title:'مدت اعتبار لینک نمایشگر مشتری',description:'مدت اتصال نمایشگر را انتخاب کن. لینک جدید، لینک قبلی را باطل می‌کند و Disconnect بلافاصله آن را قطع می‌کند.',permanent:'دائمی · تا وقتی دستی قطع شود',week:'یک هفته',month:'یک ماه',year:'یک سال',day:'۲۴ ساعت',security:'لینک دائمی و سالانه فقط برای Owner یا Manager است. لینک نمایشگر را خصوصی نگه‌دار و حساب اونر را شریک نکن.'}
+}[lang]||{
+ title:'Customer screen link validity',description:'Choose how long this screen remains paired. Re-pairing replaces the previous link; Disconnect screen revokes it immediately.',permanent:'Permanent · until manually revoked',week:'One week',month:'One month',year:'One year',day:'24 hours',security:'Permanent and annual links require Owner or Manager permissions. Keep screen links private; never share your Owner login.'
+});
+export const displayDurationCopyKey={ '24h':'day','7d':'week','1m':'month','1y':'year','permanent':'permanent' };
