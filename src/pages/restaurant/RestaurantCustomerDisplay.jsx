@@ -379,10 +379,12 @@ export default function RestaurantCustomerDisplay(){
         </strong>
        </div>
        <div className="flex shrink-0 items-center gap-1">
-        <span dir="ltr" className={'rounded-lg bg-blue-100 px-1.5 py-1 text-center font-black text-blue-700 '+(denseItems?'text-[9px]':'text-xs sm:text-lg')}>
+        <span dir="ltr" className={'rounded-lg bg-blue-100 px-1.5 py-1 text-center font-black text-blue-700 '+(denseItems?'text-[9px]':'text-xs sm:text-lg')}
+         style={tvMode?{background:'#e0f3ff',color:'#06285e',fontSize:'clamp(17px,2.45vh,29px)',padding:'.2vh .5vw'}:undefined}>
          ×{line.quantity}
         </span>
-        <span dir="ltr" className={'whitespace-nowrap rounded-lg bg-blue-50 px-1.5 py-1 text-end font-black tabular-nums text-[#133978] '+(denseItems?'text-[9px]':compactItems?'text-[10px] sm:text-base':'text-[11px] sm:text-lg')}>
+        <span dir="ltr" className={'whitespace-nowrap rounded-lg bg-blue-50 px-1.5 py-1 text-end font-black tabular-nums text-[#133978] '+(denseItems?'text-[9px]':compactItems?'text-[10px] sm:text-base':'text-[11px] sm:text-lg')}
+         style={tvMode?{background:'#e0f3ff',color:'#06285e',fontSize:'clamp(14px,1.85vh,22px)',padding:'.2vh .35vw'}:undefined}>
          {money(line.line_total,currency)}
         </span>
        </div>
@@ -405,6 +407,7 @@ export default function RestaurantCustomerDisplay(){
    </div>}
 
    <footer className="flex min-w-0 items-center justify-between gap-2 overflow-hidden rounded-xl border border-blue-200/40 bg-white/90 px-2 py-1.5 text-[9px] font-semibold text-slate-600 sm:rounded-2xl sm:px-4 sm:py-2 sm:text-sm">
+    <span data-testid="restaurant-tv-version" className="shrink-0 font-black text-blue-950">TV IQ200 · v3</span>
     <span className="flex min-w-0 items-center gap-1 truncate">
      <ShieldCheck aria-hidden="true" className="h-3 w-3 shrink-0 text-blue-600 sm:h-4 sm:w-4"/>
      <span className="truncate">{c.privacy}</span>
