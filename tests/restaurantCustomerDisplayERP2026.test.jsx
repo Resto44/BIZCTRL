@@ -196,6 +196,33 @@ describe('Restaurant-only customer display ERP',()=>{
   expect(restaurantCustomerHasOrder({number:0})).toBe(true);
   expect(restaurantCustomerHasOrder({number:null})).toBe(false);
  });
+ it('keeps the full-screen page fixed and automatically pages long menus instead of scrolling the TV',async()=>{
+  mocks.rpc.mockResolvedValue({...fixture,lines:Array.from({length:12},(_,i)=>({
+    name:'Dish-'+String(i+1).padStart(2,'0'),quantity:1,unit_price:10,line_total:10
+  }))});
+  await render();
+  const screen=host.querySelector('[data-testid="restaurant-customer-display"]');
+  expect(screen.className).toContain('fixed inset-0');
+  expect(screen.className).toContain('h-[100dvh]');
+  expect(screen.className).toContain('overflow-hidden');
+  const list=host.querySelector('[data-testid="restaurant-visible-item-lines"]');
+  expect(list).not.toBeNull();
+  expect(host.querySelector('[data-testid="restaurant-items-pagination"]')).not.toBeNull();
+  expect(list.textContent).toContain('Dish-01');
+  expect(list.textContent).not.toContain('Dish-12');
+  await act(async()=>{await vi.advanceTimersByTimeAsync(6000);});
+  const next=host.querySelector('[data-testid="restaurant-visible-item-lines"]').textContent;
+  expect(next).not.toContain('Dish-01');
+  expect(next).toContain('Dish-06');
+ });
+ it('never offers vertical document scroll when the display is waiting for an order',async()=>{
+  mocks.rpc.mockResolvedValue({...fixture,number:null,lines:[],kitchen_status:null,net_total:null});
+  await render();
+  expect(host.querySelector('[data-testid="restaurant-customer-tv-viewport"]').className).toContain('overflow-hidden');
+  expect(host.querySelector('[data-testid="restaurant-customer-tv-bottom"]').className).toContain('overflow-hidden');
+  expect(host.textContent).toContain('Waiting for your order');
+  expect(host.textContent).not.toContain('SAR 0.00');
+ });
  it('preserves retail CustomerDisplay route and restricts paired restaurant JSON fields',()=>{
   const sql=readFileSync(resolve('supabase/migrations/20261110110000_restaurant_customer_display_erp.sql'),'utf8');
   const app=readFileSync(resolve('src/App.jsx'),'utf8');
