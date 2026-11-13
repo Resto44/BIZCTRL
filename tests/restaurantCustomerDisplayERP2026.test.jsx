@@ -235,7 +235,7 @@ describe('Restaurant-only customer display ERP',()=>{
   expect(restaurantCustomerItemColumns(5,390,800)).toBe(1);
   expect(restaurantCustomerItemColumns(5,320,620)).toBe(1);
   // 16:9 TVs keep every meal visible in fewer, taller rows.
-  expect(restaurantCustomerItemColumns(4,1280,720)).toBe(1);
+  expect(restaurantCustomerItemColumns(4,1280,720)).toBe(2);
   expect(restaurantCustomerItemColumns(7,1280,720)).toBe(2);
   expect(restaurantCustomerItemColumns(12,1280,720)).toBe(3);
   await render();
@@ -251,6 +251,37 @@ describe('Restaurant-only customer display ERP',()=>{
    expect(labels[i].className).not.toContain('line-clamp');
   });
   expect(host.querySelectorAll('[data-testid="restaurant-visible-item"]')).toHaveLength(5);
+ });
+ it('uses inline opaque TV meal colors and reserves space in a 16:9 browser even when CSS media overrides fail',async()=>{
+  vi.stubGlobal('innerWidth',1280);
+  vi.stubGlobal('innerHeight',720);
+  mocks.lang='fa';
+  mocks.rpc.mockResolvedValue({...fixture,kitchen_language:'fa',lines:[
+   {name_fa:'برنج بخاری با مرغ',quantity:1,line_total:44},
+   {name_fa:'برنج سفید تازه',quantity:2,line_total:22},
+   {name_fa:'نیم مرغ کبابی',quantity:1,line_total:26},
+   {name_fa:'نوشابه بزرگ',quantity:1,line_total:9},
+  ]});
+  await render();
+  const rootElement=host.querySelector('[data-testid="restaurant-customer-display"]');
+  const board=host.querySelector('[data-testid="restaurant-customer-tv-bottom"]');
+  const items=host.querySelector('[data-testid="restaurant-visible-item-lines"]');
+  const names=[...host.querySelectorAll('[data-testid="restaurant-food-full-name"]')];
+  expect(rootElement.dataset.tvLayout).toBe('landscape');
+  expect(rootElement.dataset.displayVersion).toBe('tv-iq200-v3');
+  expect(host.querySelector('[data-testid="restaurant-tv-version"]').textContent).toContain('v3');
+  expect(board.style.backgroundImage).toBe('none');
+  expect(board.style.backgroundColor).toBe('rgb(8, 28, 62)');
+  expect(host.querySelector('[data-testid="restaurant-customer-tv-content"]').style.gridTemplateRows).toContain('3.2fr');
+  expect(items.style.gridTemplateColumns).toBe('repeat(2,minmax(0,1fr))');
+  expect(names).toHaveLength(4);
+  expect(names[0].style.color).toBe('rgb(255, 255, 255)');
+  expect(names[0].style.fontSize).toContain('3.5vh');
+  expect(names.map(node=>node.textContent)).toEqual([
+   'برنج بخاری با مرغ','برنج سفید تازه','نیم مرغ کبابی','نوشابه بزرگ'
+  ]);
+  expect(host.querySelectorAll('[data-testid="restaurant-visible-item"]')).toHaveLength(4);
+  expect(host.querySelector('[data-testid="restaurant-visible-item"]').style.backgroundColor).toBe('rgb(18, 52, 100)');
  });
  it('puts large wait timer and attention-getting order number in separate always legible cards',async()=>{
   mocks.lang='fa';
