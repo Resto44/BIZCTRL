@@ -59,7 +59,7 @@ const SUPPLIER_COPY = {
     goodsVerifiedAt:'Owner confirmed',goodsEmpty:'No supplier invoices are assigned to this branch.',
     goodsHistoryError:'Goods receipt history is temporarily unavailable. Refresh to retry.',
     goodsStatusHint:'Invoice payment and physical goods delivery are separate.',moreGoods:'Show more invoice goods',retry:'Retry',
-    open:'Open',show:'Show',hide:'Hide',items:'items',loading:'Loading records…',retry:'Refresh records',
+    open:'Open',show:'Show',hide:'Hide',details:'Details',items:'items',loading:'Loading records…',retry:'Refresh records',
     orderProgress:'Order progress',progressHint:'Status of your assigned orders',shipped:'Shipped',received:'Received',
     total:'Total',invoiced:'Invoiced',due:'Due',branch:'Branch',unknownBranch:'Assigned branch',
     allClear:'No actions are required right now.',invoice:'Invoice',purchaseOrder:'Purchase order',
@@ -83,7 +83,7 @@ const SUPPLIER_COPY = {
     goodsVerifiedAt:'تأكيد المالك',goodsEmpty:'لا توجد فواتير مورّد مسندة لهذا الفرع.',
     goodsHistoryError:'تعذر تحميل سجل استلام البضائع. حدّث البيانات للمحاولة مجدداً.',
     goodsStatusHint:'سداد الفاتورة منفصل عن استلام البضاعة فعلياً.',moreGoods:'عرض المزيد من بضائع الفواتير',retry:'إعادة المحاولة',
-    open:'مفتوح',show:'عرض',hide:'إخفاء',items:'أصناف',loading:'جارٍ تحميل السجلات…',retry:'تحديث السجلات',
+    open:'مفتوح',show:'عرض',hide:'إخفاء',details:'التفاصيل',items:'أصناف',loading:'جارٍ تحميل السجلات…',retry:'تحديث السجلات',
     orderProgress:'مراحل الطلبات',progressHint:'حالة أوامر الشراء المسندة لك',shipped:'تم الشحن',received:'تم الاستلام',
     total:'المجموع',invoiced:'قيمة الفواتير',due:'يستحق',branch:'الفرع',unknownBranch:'الفرع المعيّن',
     allClear:'لا توجد إجراءات مطلوبة حالياً.',invoice:'فاتورة',purchaseOrder:'أمر شراء',
@@ -107,7 +107,7 @@ const SUPPLIER_COPY = {
     goodsVerifiedAt:'تأیید اونر',goodsEmpty:'فاکتور سپلایر برای این شعبه ثبت نشده است.',
     goodsHistoryError:'تاریخچهٔ تحویل محصول در دسترس نیست. دوباره تازه‌سازی کن.',
     goodsStatusHint:'پرداخت فاکتور با تحویل فیزیکی محصول فرق دارد.',moreGoods:'نمایش محصولات بیشتر',retry:'تلاش دوباره',
-    open:'باز',show:'نمایش',hide:'پنهان',items:'قلم',loading:'دریافت سوابق…',retry:'تازه‌سازی اطلاعات',
+    open:'باز',show:'نمایش',hide:'پنهان',details:'جزئیات',items:'قلم',loading:'دریافت سوابق…',retry:'تازه‌سازی اطلاعات',
     orderProgress:'مراحل سفارش',progressHint:'وضعیت سفارش‌های مربوط به شما',shipped:'ارسال‌شده',received:'دریافت‌شده',
     total:'مجموع',invoiced:'مبلغ فاکتورها',due:'سررسید',branch:'شعبه',unknownBranch:'شعبهٔ تعیین‌شده',
     allClear:'در حال حاضر اقدام جدیدی لازم نیست.',invoice:'فاکتور',purchaseOrder:'سفارش خرید',
@@ -755,49 +755,90 @@ function InvoiceGoodsCard({entry,copy}){
 }
 
 // ── Purchase order card: unchanged branch-scoped confirmShipment mutation ────
-function POCard({ po, onConfirmShipment, loading, copy, ownerVerification=null }) {
+export function POCard({ po, onConfirmShipment, loading, copy, ownerVerification=null }) {
   const statusConf = PO_STATUS[po.status] || PO_STATUS.pending;
   const [expanded,setExpanded]=useState(false);
-  return <Card data-testid="supplier-purchase-order-card" className="min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-    <CardContent className="min-w-0 space-y-2.5 p-3.5 sm:p-4">
-      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="break-all text-sm font-extrabold text-slate-900 dark:text-white">{copy.purchaseOrder} #{po.id?.slice(0,8)}</p>
-          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-            <span className="flex min-w-0 items-center gap-1"><Building2 className="h-3.5 w-3.5 shrink-0"/><span className="min-w-0 truncate">{po.branch||copy.unknownBranch}</span></span>
-            <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5 shrink-0"/>{dateLabel(po.created_date)}</span>
-          </div>
-        </div>
-        <Badge className={'shrink-0 rounded-full border px-2.5 py-1 text-[11px] '+statusConf.color}>{copy.status[po.status]||statusConf.label}</Badge>
-        {po.status==='shipped'&&<p data-testid="supplier-awaiting-owner-status" className="mt-1 text-end text-[11px] font-bold text-amber-700 dark:text-amber-300">{copy.waitingOwner}</p>}
-        {po.status==='received'&&ownerVerification&&<p data-testid="supplier-owner-verified-badge" className="mt-1 text-end text-[11px] font-bold text-emerald-700 dark:text-emerald-300">{copy.ownerApproved}</p>}
+  const detailsId = React.useId();
+  const orderLabel = String(po.order_number || po.id?.slice(0,8) || '—');
+  const itemCount = Array.isArray(po.items) ? po.items.length : 0;
+  const verifiedCount = Array.isArray(ownerVerification?.verified_items) ? ownerVerification.verified_items.length : 0;
+  const shippable = ['draft','sent','pending','approved'].includes(po.status);
+
+  return <Card data-testid="supplier-purchase-order-card" data-compact-default="true"
+    className="min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <CardContent className="min-w-0 p-3 sm:p-3.5">
+      {/* Keep number and status on one mobile row; never force a full heading to wrap. */}
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <p className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-extrabold text-slate-900 dark:text-white"
+          title={copy.purchaseOrder+' #'+orderLabel}>
+          <Package className="h-4 w-4 shrink-0 text-blue-600" aria-hidden="true"/>
+          <span className="sr-only">{copy.purchaseOrder}</span>
+          <span dir="ltr" className="min-w-0 truncate text-start">#{orderLabel}</span>
+        </p>
+        <Badge className={'max-w-[45%] shrink-0 truncate rounded-full border px-2.5 py-1 text-[11px] '+statusConf.color}>
+          {copy.status[po.status]||statusConf.label}
+        </Badge>
       </div>
-      <div className="flex min-w-0 items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
-        <span className="text-xs text-slate-500 dark:text-slate-400">{copy.total}</span>
-        <span dir="ltr" className="break-words text-end text-sm font-extrabold tabular-nums text-slate-900 dark:text-white">{po.price_hidden?copy.priceHidden:(po.currency||'')+' '+moneyLabel(po.total_amount)}</span>
+
+      <div className="mt-1.5 flex min-w-0 items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
+        <span className="flex min-w-0 flex-1 items-center gap-1">
+          <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true"/>
+          <span className="min-w-0 truncate">{po.branch||copy.unknownBranch}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1">
+          <Calendar className="h-3.5 w-3.5" aria-hidden="true"/>{dateLabel(po.created_date)}
+        </span>
       </div>
-      {Array.isArray(po.items) && po.items.length>0 && <>
-        <button type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}
-          className="min-h-10 rounded-lg px-2 text-xs font-bold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950">
-          {expanded?copy.hide:copy.show} · {po.items.length} {copy.items}
-        </button>
-        {expanded && <div className="space-y-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
+
+      <div className="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-slate-100 pt-2 dark:border-slate-800">
+        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+          {itemCount} {copy.items}
+          {po.status==='received'&&ownerVerification&&<span data-testid="supplier-owner-verified-badge"
+            className="ms-2 inline-flex max-w-full items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true"/>{copy.ownerApproved}
+          </span>}
+        </span>
+        <strong dir="ltr" className="min-w-0 text-end text-sm font-extrabold tabular-nums text-slate-900 dark:text-white">
+          {po.price_hidden?copy.priceHidden:(po.currency||'')+' '+moneyLabel(po.total_amount)}
+        </strong>
+      </div>
+
+      <button type="button" data-testid="supplier-po-expand-toggle"
+        aria-expanded={expanded} aria-controls={detailsId}
+        aria-label={(expanded?copy.hide:copy.show)+' '+copy.details+' #'+orderLabel}
+        onClick={()=>setExpanded(v=>!v)}
+        className="mt-1.5 flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-blue-700 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-blue-300">
+        <span>{expanded?copy.hide:copy.show} {copy.details}</span>
+        <ChevronDown className={'h-4 w-4 transition-transform '+(expanded?'rotate-180':'')} aria-hidden="true"/>
+      </button>
+
+      {expanded&&<div id={detailsId} data-testid="supplier-po-expanded-details"
+        className="mt-2 space-y-2 rounded-xl bg-slate-50 p-2.5 dark:bg-slate-800">
+        {itemCount>0&&<div className="space-y-1.5" data-testid="supplier-po-item-lines">
+          <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300">{copy.items} · {itemCount}</p>
           {po.items.map((item,i)=><div key={i} className="flex min-w-0 items-start justify-between gap-2 text-xs">
             <span className="min-w-0 flex-1 break-words text-slate-700 dark:text-slate-200">{item.product_name||item.name||'—'}</span>
-            <span dir="ltr" className="shrink-0 whitespace-nowrap font-semibold text-slate-900 dark:text-white">×{item.quantity??item.qty??'—'} {item.unit||''}{po.price_hidden?'':' · '+moneyLabel(item.unit_price)}</span>
+            <span dir="ltr" className="shrink-0 whitespace-nowrap font-semibold text-slate-900 dark:text-white">
+              ×{item.quantity??item.qty??'—'} {item.unit||''}{po.price_hidden?'':' · '+moneyLabel(item.unit_price)}
+            </span>
           </div>)}
         </div>}
-      </>}
-      {po.status==='received'&&ownerVerification&&<div data-testid="supplier-verified-order-items"
-        className="mt-2 space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs dark:border-emerald-900 dark:bg-emerald-950">
-        <p className="font-bold text-emerald-900 dark:text-emerald-100">{copy.verifiedItems} · {dateLabel(ownerVerification.confirmed_at)}</p>
-        {(ownerVerification.verified_items||[]).map((item,i)=><div key={i} className="flex min-w-0 justify-between gap-2">
-          <span className="min-w-0 break-words">{item.product_name||item.name||'—'}</span>
-          <strong className="shrink-0 tabular-nums">×{item.received_quantity}</strong>
-        </div>)}
+        {po.status==='shipped'&&<p data-testid="supplier-awaiting-owner-status"
+          className="text-xs font-semibold text-amber-700 dark:text-amber-300">{copy.waitingOwner}</p>}
+        {po.status==='received'&&ownerVerification&&<div data-testid="supplier-verified-order-items"
+          className="space-y-1.5 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-xs dark:border-emerald-900 dark:bg-emerald-950">
+          <p className="font-bold text-emerald-900 dark:text-emerald-100">
+            {copy.verifiedItems} · {verifiedCount} · {dateLabel(ownerVerification.confirmed_at)}
+          </p>
+          {(ownerVerification.verified_items||[]).map((item,i)=><div key={i} className="flex min-w-0 justify-between gap-2">
+            <span className="min-w-0 break-words">{item.product_name||item.name||'—'}</span>
+            <strong className="shrink-0 tabular-nums">×{item.received_quantity}</strong>
+          </div>)}
+        </div>}
       </div>}
+
       {['draft','sent','pending','approved'].includes(po.status) && <Button type="button" disabled={loading} onClick={onConfirmShipment}
-        className="mt-1 min-h-11 w-full rounded-xl bg-blue-600 font-bold text-white hover:bg-blue-700">
+        className="mt-2 min-h-11 w-full rounded-xl bg-blue-600 font-bold text-white hover:bg-blue-700">
         <Truck className="me-2 h-4 w-4" aria-hidden="true"/>{copy.confirmShip}
       </Button>}
     </CardContent>
