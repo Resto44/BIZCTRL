@@ -349,17 +349,26 @@ export default function RestaurantCustomerDisplay(){
       style={{gridTemplateColumns:'repeat('+itemColumns+',minmax(0,1fr))',
        gridTemplateRows:'repeat('+itemRows+',minmax(0,1fr))'}}>
       {lines.map((line,index)=><div key={String(data?.number)+'-'+index}
-       data-testid="restaurant-visible-item" className={'flex min-h-0 min-w-0 items-center gap-1 overflow-hidden rounded-xl border border-blue-100/60 bg-white/70 shadow-sm sm:gap-2 '+(denseItems?'px-1 py-0':'px-2 py-1 sm:px-3 sm:py-1.5')}>
-       <span className={'shrink-0 rounded-lg bg-blue-100 text-center font-extrabold text-blue-700 '+(denseItems?'px-1 text-[10px]':'px-1.5 py-1 text-xs sm:px-2 sm:text-lg')} dir="ltr">
-        ×{line.quantity}
-       </span>
-       {!denseItems&&<span aria-hidden="true" className="shrink-0 text-base sm:text-2xl">{restaurantDishGlyph(restaurantProductName(line,lang))}</span>}
-       <strong title={restaurantProductName(line,lang)||''} className={'min-w-0 flex-1 truncate font-extrabold text-slate-950 '+(denseItems?'text-[10px] sm:text-sm':compactItems?'text-xs sm:text-base':'text-sm sm:text-xl')}>
-        {restaurantProductName(line,lang)||'—'}
-       </strong>
-       <span dir="ltr" className={'shrink-0 whitespace-nowrap rounded-lg bg-blue-50 px-1.5 py-1 text-end font-black tabular-nums text-blue-900 '+(denseItems?'text-[9px]':'text-[11px] sm:text-lg')}>
-        {money(line.line_total,currency)}
-       </span>
+       data-testid="restaurant-visible-item"
+       className={'grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xl border border-blue-100/70 bg-white/80 shadow-sm sm:gap-x-3 '+(denseItems?'px-1.5 py-0.5':'px-2 py-1 sm:px-4 sm:py-2')}>
+       <div className="flex min-w-0 items-center gap-1.5">
+        {!denseItems&&<span aria-hidden="true" className="shrink-0 text-sm sm:text-2xl">
+         {restaurantDishGlyph(restaurantProductName(line,lang))}
+        </span>}
+        <strong data-testid="restaurant-food-full-name"
+         className={'block min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] font-black leading-[1.2] text-[#0a204d] '+(denseItems?'text-[10px] sm:text-sm':compactItems?'text-[11px] sm:text-base':'text-[clamp(0.78rem,1.7vmin,1.45rem)]')}
+         title={restaurantProductName(line,lang)||''}>
+         {restaurantProductName(line,lang)||'—'}
+        </strong>
+       </div>
+       <div className="flex shrink-0 items-center gap-1">
+        <span dir="ltr" className={'rounded-lg bg-blue-100 px-1.5 py-1 text-center font-black text-blue-700 '+(denseItems?'text-[9px]':'text-xs sm:text-lg')}>
+         ×{line.quantity}
+        </span>
+        <span dir="ltr" className={'whitespace-nowrap rounded-lg bg-blue-50 px-1.5 py-1 text-end font-black tabular-nums text-[#133978] '+(denseItems?'text-[9px]':compactItems?'text-[10px] sm:text-base':'text-[11px] sm:text-lg')}>
+         {money(line.line_total,currency)}
+        </span>
+       </div>
       </div>)}
      </div>}
     </section>
