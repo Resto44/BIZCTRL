@@ -32,7 +32,7 @@ describe('Supplier Owner verified order completion and responsive dashboard',()=
   ]);
   expect(page).toContain("supabase.rpc('erp_supplier_mark_order_shipped',{p_order_id:poId})");
   expect(page).toContain("supabase.rpc('erp_supplier_verified_deliveries')");
-  expect(page).toContain('refetchInterval: 12000');
+  expect(page).toContain('refetchInterval: 5000');
   expect(page).toContain('data-testid="supplier-awaiting-owner-status"');
   expect(page).toContain('data-testid="supplier-owner-verified-badge"');
   expect(page).toContain('data-testid="supplier-verified-order-items"');
@@ -57,8 +57,8 @@ describe('Supplier Owner verified order completion and responsive dashboard',()=
   expect(sql).toContain("m.status='approved' AND m.role='owner'");
   expect(sql).toContain('erp_owner_approve_supplier_order');
   expect(sql).toContain("status='approved',approval_status='approved'");
-  expect(page).toContain("supabase.rpc('erp_owner_approve_supplier_order',{p_order_id:orderId})");
-  expect(page).toContain("['draft','sent','pending'].includes(order.status)");
+  expect(page).not.toContain("supabase.rpc('erp_owner_approve_supplier_order',{p_order_id:orderId})");
+  expect(page).toContain("order.status==='shipped'");
   expect(page).toContain(".order('created_date',{ascending:false})");
   expect(page).not.toContain("PurchaseOrder.list('-date'");
   expect(sql).toContain("received_qty IS DISTINCT FROM ordered_qty");
