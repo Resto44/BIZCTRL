@@ -14,6 +14,9 @@ describe('Direct supplier orders and supplier-isolated product catalog',()=>{
   expect(form).toContain('p.product_id===i.product_id&&p.supplier_id===form.supplier_id');
   expect(sql).toContain('p.supplier_id=NEW.supplier_id AND p.product_id=v_product');
   expect(sql).toContain('PURCHASE_ORDER_PRODUCT_NOT_ASSIGNED_TO_SUPPLIER');
+  expect(sql).toContain('v_old_count>=v_new_count AND v_old_count>0');
+  expect(sql).toContain('NEW.supplier_id IS NOT DISTINCT FROM OLD.supplier_id');
+  expect(sql).toContain('NEW.branch_id IS NOT DISTINCT FROM OLD.branch_id');
  });
  it('creates a submitted order immediately without Owner approval',()=>{
   expect(form).toContain("status: order ? form.status : 'sent'");
