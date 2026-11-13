@@ -90,10 +90,10 @@ export const restaurantCustomerItemColumns=(count,width=390,height=800)=>{
  // Larger orders use additional columns without hiding or paging items.
  // A landscape TV needs fewer rows, not one tiny row for every meal.
  // Split 5+ meals into readable columns, while phones keep full-width names.
- if(width>=900&&width>height&&height<=1200){
-  if(count<=4)return 1;
+ if(width>=700&&width>height){
+  if(count<=2)return 1;
   if(count<=10)return 2;
-  return Math.min(4,Math.ceil(count/5));
+  return Math.min(4,Math.ceil(count/4));
  }
  if(width<650)return count<=6?1:Math.min(3,Math.max(2,Math.ceil(count/(height<700?7:9))));
  if(width<1100)return count<=8?1:Math.min(3,Math.ceil(count/9));
@@ -218,6 +218,7 @@ export default function RestaurantCustomerDisplay(){
   window.addEventListener('resize',measure);
   return()=>window.removeEventListener('resize',measure);
  },[]);
+ const tvMode=viewport.width>=700&&viewport.width>viewport.height;
  const itemColumns=restaurantCustomerItemColumns(lines.length,viewport.width,viewport.height);
  const itemRows=Math.ceil(lines.length/itemColumns);
  const compactItems=itemRows>7;
@@ -227,6 +228,7 @@ export default function RestaurantCustomerDisplay(){
  const stateText=stage===3?c.served:stage>=0?c[STAGES[stage]]:c.draft;
 
  return <main dir={lang==='en'?'ltr':'rtl'} data-testid="restaurant-customer-display"
+  data-tv-layout={tvMode?'landscape':'compact'} data-display-version="tv-iq200-v3"
   className="fixed inset-0 z-[120] h-[100dvh] w-screen overflow-hidden overscroll-none bg-[#061938] text-slate-950">
   <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_85%_5%,#1757a5_0%,transparent_52%)]"/>
   <div data-testid="restaurant-customer-tv-viewport"
@@ -267,10 +269,12 @@ export default function RestaurantCustomerDisplay(){
     <Monitor className="mx-auto text-rose-400" size={42}/>{c.invalid}
    </section>:
    <div data-testid="restaurant-customer-tv-content"
-    className="grid min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-1.5 overflow-hidden sm:gap-3">
+    className="grid min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-1.5 overflow-hidden sm:gap-3"
+    style={tvMode?{gridTemplateRows:'minmax(0,1.18fr) minmax(0,.19fr) minmax(0,.22fr) minmax(0,3.2fr) minmax(0,.55fr)',gap:'clamp(3px,.5vh,8px)'}:undefined}>
 
     <section data-testid="restaurant-ticket-hero"
-     className="relative grid min-w-0 grid-rows-[auto_auto] gap-1.5 overflow-visible rounded-[20px] border border-cyan-400/60 bg-gradient-to-r from-[#092753] via-[#12458c] to-[#0b3271] p-2 text-white shadow-[0_2px_14px_rgba(0,146,255,0.28)] sm:gap-3 sm:rounded-3xl sm:p-4">
+     className="relative grid min-w-0 grid-rows-[auto_auto] gap-1.5 overflow-visible rounded-[20px] border border-cyan-400/60 bg-gradient-to-r from-[#092753] via-[#12458c] to-[#0b3271] p-2 text-white shadow-[0_2px_14px_rgba(0,146,255,0.28)] sm:gap-3 sm:rounded-3xl sm:p-4"
+     style={tvMode?{minHeight:0,padding:'clamp(5px,.7vh,10px)',gap:'clamp(3px,.5vh,8px)'}:undefined}>
      <div dir="ltr" className="grid min-w-0 grid-cols-2 items-stretch gap-2 sm:gap-4">
 
       {isWaiting?<div dir={lang==='en'?'ltr':'rtl'} data-testid="restaurant-waiting-panel"
@@ -335,9 +339,12 @@ export default function RestaurantCustomerDisplay(){
     </section>:<div className="hidden" aria-hidden="true"/>}
 
     <section data-testid="restaurant-customer-tv-bottom"
-     className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[20px] border border-blue-100 bg-gradient-to-b from-white to-[#e9f2ff] shadow-[0_3px_12px_rgba(25,98,180,0.15)] sm:rounded-3xl">
-     <header className="flex min-w-0 items-center justify-between gap-2 border-b border-blue-100 px-3 py-2 sm:px-6 sm:py-4">
-      <h2 className="flex min-w-0 items-center gap-2 truncate text-sm font-black text-[#0b173a] sm:text-2xl">
+     className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[20px] border border-blue-100 bg-gradient-to-b from-white to-[#e9f2ff] shadow-[0_3px_12px_rgba(25,98,180,0.15)] sm:rounded-3xl"
+     style={tvMode?{background:'#081c3e',backgroundImage:'none',border:'2px solid #67c7ff',minHeight:0}:undefined}>
+     <header className="flex min-w-0 items-center justify-between gap-2 border-b border-blue-100 px-3 py-2 sm:px-6 sm:py-4"
+      style={tvMode?{background:'#17427c',backgroundImage:'none',padding:'clamp(5px,.65vh,10px) 1.1vw',borderBottom:'2px solid #4b9bde'}:undefined}>
+      <h2 className="flex min-w-0 items-center gap-2 truncate text-sm font-black text-[#0b173a] sm:text-2xl"
+       style={tvMode?{color:'#fff',fontSize:'clamp(20px,3vh,34px)'}:undefined}>
        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-blue-600 text-white sm:h-10 sm:w-10 sm:rounded-xl"><UtensilsCrossed className="h-4 w-4 sm:h-6 sm:w-6"/></span>
        {c.items}
       </h2>
@@ -347,24 +354,27 @@ export default function RestaurantCustomerDisplay(){
      </header>
      {!active||lines.length===0?<div className="grid min-h-0 place-content-center gap-1 px-3 text-center">
       <ChefHat className="mx-auto h-8 w-8 text-blue-200 sm:h-12 sm:w-12"/>
-      <h3 className="text-sm font-black text-slate-600 sm:text-lg">{c.waiting}</h3>
-      <p className="line-clamp-2 text-[11px] text-slate-500 sm:text-sm">{c.waitingHint}</p>
+      <h3 className="text-sm font-black text-slate-600 sm:text-lg" style={tvMode?{color:'#fff',fontSize:'clamp(20px,3vh,34px)'}:undefined}>{c.waiting}</h3>
+      <p className="line-clamp-2 text-[11px] text-slate-500 sm:text-sm" style={tvMode?{color:'#d8e9ff',fontSize:'clamp(15px,2vh,24px)'}:undefined}>{c.waitingHint}</p>
      </div>:<div data-testid="restaurant-visible-item-lines" aria-live="off"
       data-all-items-visible="true"
       data-item-count={lines.length}
       className="grid min-h-0 gap-1 overflow-hidden p-2 sm:gap-2 sm:p-4"
       style={{gridTemplateColumns:'repeat('+itemColumns+',minmax(0,1fr))',
-       gridTemplateRows:'repeat('+itemRows+',minmax(0,1fr))'}}>
+       gridTemplateRows:'repeat('+itemRows+',minmax(0,1fr))',
+       ...(tvMode?{padding:'clamp(6px,.8vh,12px)',gap:'clamp(5px,.7vh,10px) clamp(7px,.8vw,14px)'}:{})}}>
       {lines.map((line,index)=><div key={String(data?.number)+'-'+index}
        data-testid="restaurant-visible-item"
-       className={'grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xl border border-blue-100/70 bg-white/80 shadow-sm sm:gap-x-3 '+(denseItems?'px-1.5 py-0.5':'px-2 py-1 sm:px-4 sm:py-2')}>
+       className={'grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xl border border-blue-100/70 bg-white/80 shadow-sm sm:gap-x-3 '+(denseItems?'px-1.5 py-0.5':'px-2 py-1 sm:px-4 sm:py-2')}
+       style={tvMode?{background:'#123464',backgroundImage:'none',border:'2px solid #4296df',padding:'clamp(4px,.65vh,10px) .8vw',columnGap:'.7vw',boxShadow:'none'}:undefined}>
        <div className="flex min-w-0 items-center gap-1.5">
         {!denseItems&&<span aria-hidden="true" className="shrink-0 text-sm sm:text-2xl">
          {restaurantDishGlyph(restaurantProductName(line,lang))}
         </span>}
         <strong data-testid="restaurant-food-full-name"
          className={'block min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] font-black leading-[1.2] text-[#0a204d] '+(denseItems?'text-[10px] sm:text-sm':compactItems?'text-[11px] sm:text-base':'text-[clamp(0.78rem,1.7vmin,1.45rem)]')}
-         title={restaurantProductName(line,lang)||''}>
+         title={restaurantProductName(line,lang)||''}
+         style={tvMode?{color:'#fff',fontSize:itemRows>=7?'clamp(18px,2.5vh,30px)':'clamp(24px,3.5vh,42px)',lineHeight:1.18,fontWeight:900,textShadow:'0 1px 2px #051123'}:undefined}>
          {restaurantProductName(line,lang)||'—'}
         </strong>
        </div>
