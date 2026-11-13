@@ -35,7 +35,8 @@ import {
 import { format } from 'date-fns';
 import {
   calcLineTotal, calcInvoiceTotals, normalizePurchaseLine,
-  createPurchaseInvoice, updatePurchaseInvoice, addInvoicePayment
+  createPurchaseInvoice, updatePurchaseInvoice, addInvoicePayment,
+  groupPurchaseLinesBySupplier
 } from '@/lib/procurementEngine';
 import OcrScanDialog from './OcrScanDialog';
 import PurchaseExpenseOptions from './PurchaseExpenseOptions';
@@ -52,6 +53,7 @@ const emptyItem = () => ({
   subcategory_id: '',
   product_id: '',
   product_name: '',
+  supplier_id: '',
   unit: '',
   quantity: 1,
   unit_cost: 0,
@@ -86,14 +88,18 @@ function PurchaseInvoiceItemRow({
   updateItem, 
   removeItem, 
   supplierId,
+  suppliers,
+  multiSupplierMode,
   categories,
   categoriesTree
 }) {
   const subcategories = categories.filter(category => category.parent_id === item.category_id);
+  const itemSupplierId = multiSupplierMode ? item.supplier_id : supplierId;
+  const selectedItemSupplier = multiSupplierMode ? suppliers.find(s => String(s.id) === String(item.supplier_id)) : null;
   const [expanded, setExpanded] = useState(() => !item.product_name && !item.product_id);
   // Fetch products for this item's category/subcategory and supplier
   // Calling hook here is safe because it's the top level of this component
-  const { products: categoryProducts = [] } = usePurchaseProductsByCategory(item.category_id, supplierId, item.subcategory_id);
+  const { products: categoryProducts = [] } = usePurchaseProductsByCategory(item.category_id, itemSupplierId, item.subcategory_id);
 
   // Mobile number keyboards can emit input before change. Use the same canonical
   // state update for both events so quantity, cost, discount, and tax always
@@ -113,7 +119,7 @@ function PurchaseInvoiceItemRow({
       <div className="relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3.5 sm:grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] sm:items-center sm:px-5">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-slate-900">{item.product_name || `New item ${idx + 1}`}</p>
-          <p className="truncate text-[11px] text-slate-500">Per {item.unit || 'unit'}</p>
+          <p className="truncate text-[11px] text-slate-500">{multiSupplierMode ? (selectedItemSupplier?.name || 'Supplier not selected') + ' · ' : ''}Per {item.unit || 'unit'}</p>
         </div>
 
         <div className="hidden truncate text-sm font-medium text-slate-700 sm:block">{item.unit || '—'}</div>
@@ -144,6 +150,14 @@ function PurchaseInvoiceItemRow({
       </div>
 
       {expanded && <div className="space-y-2 border-t border-blue-100 bg-blue-50/40 p-3 sm:p-4">
+
+      {multiSupplierMode && <div className="rounded-lg border border-blue-200 bg-white p-2.5" data-testid="purchase-line-supplier">
+        <Label className="mb-1.5 block text-xs font-bold text-blue-900">Supplier for this product *</Label>
+        <Select value={item.supplier_id || undefined} onValueChange={v => updateItem(item._id, 'supplier_id', v)}>
+          <SelectTrigger className="h-11 w-full bg-white" aria-label="Supplier for this product"><SelectValue placeholder="Choose supplier" /></SelectTrigger>
+          <SelectContent>{suppliers.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="min-w-0">
@@ -201,12 +215,12 @@ function PurchaseInvoiceItemRow({
               updateItem(item._id, 'unit', prod.unit || item.unit);
               updateItem(item._id, 'unit_cost', prod.default_cost || item.unit_cost);
             }
-          }} disabled={!item.category_id && !supplierId}>
-            <SelectTrigger className="h-8 text-xs w-full min-w-0" disabled={!item.category_id && !supplierId}>
-              <SelectValue placeholder={(item.category_id || supplierId) ? (categoryProducts.length === 0 ? 'No matching products.' : 'Select...') : 'Select category or supplier first'} />
+          }} disabled={!item.category_id && !itemSupplierId}>
+            <SelectTrigger className="h-8 text-xs w-full min-w-0" disabled={!item.category_id && !itemSupplierId}>
+              <SelectValue placeholder={(item.category_id || itemSupplierId) ? (categoryProducts.length === 0 ? 'No matching products.' : 'Select...') : 'Select category or supplier first'} />
             </SelectTrigger>
             <SelectContent>
-              {categoryProducts.length === 0 && (item.category_id || supplierId) ? (
+              {categoryProducts.length === 0 && (item.category_id || itemSupplierId) ? (
                 <div className="px-2 py-1.5 text-xs text-muted-foreground">No matching products found.</div>
               ) : (
                 categoryProducts.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)
@@ -345,6 +359,8 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
   const [submitMode, setSubmitMode] = useState(null);
   const savingRef = useRef(false);
   const submissionRef = useRef({ invoice: null, completedPayments: new Set() });
+  const [multiSupplierMode, setMultiSupplierMode] = useState(false);
+  const batchRef = useRef({ mode: null, completed: new Map() });
   // activeRestaurantId already destructured above as restaurantId
 
   // ── Auto-numbering ─────────────────────────────────────────────────────
@@ -396,6 +412,11 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
 
   // ── Totals ─────────────────────────────────────────────────────────────
   const totals = calcInvoiceTotals(items, additionalCosts);
+  const batchGroups = multiSupplierMode ? (() => {
+    try { return groupPurchaseLinesBySupplier(items, suppliers); }
+    catch { return []; }
+  })() : [];
+  const batchTotal = batchGroups.reduce((sum, group) => sum + Math.round(group.totals.grandTotal * 100), 0) / 100;
   const paymentTotal = payFullAmount
     ? totals.grandTotal
     : payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
@@ -437,7 +458,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
         updated.subcategory_id = '';
       }
       // When subcategory changes: clear product selection
-      if (field === 'subcategory_id') {
+      if (field === 'subcategory_id' || field === 'supplier_id') {
         updated.product_id = '';
         updated.product_name = '';
       }
@@ -446,7 +467,9 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
     }));
   }, []);
 
-  const addItem = () => setItems(prev => [...prev, emptyItem()]);
+  const addItem = () => setItems(prev => [...prev, {
+    ...emptyItem(), supplier_id: multiSupplierMode ? (prev[prev.length - 1]?.supplier_id || '') : '',
+  }]);
   const removeItem = (id) => setItems(prev => prev.filter(item => item._id !== id));
 
   // ── Additional cost handlers ───────────────────────────────────────────
@@ -526,6 +549,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
   // ── Submit ─────────────────────────────────────────────────────────────
   const handleSubmit = async (e, mode = 'post') => {
     e.preventDefault();
+    if (multiSupplierMode) return handleSupplierBatchSubmit(mode);
     if (savingRef.current) return;
     setError('');
 
