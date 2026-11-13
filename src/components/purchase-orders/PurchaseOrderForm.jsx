@@ -19,11 +19,11 @@ const emptyItem = { product_id: '', product_name: '', qty: 1, unit: '', unit_pri
 export default function PurchaseOrderForm({ order, supplier = null, onClose, onSaved }) {
   const { currency, lang='en' } = useLanguage();
   const copy={
-    en:{privacy:'Hide prices from supplier',privacyHelp:'Optional. The supplier will see products, quantities and order status, but NOT unit prices or total. Owner keeps prices for accounting.',flow:'The new order appears in the supplier dashboard immediately. The supplier can ship only after Owner approval.',create:'Create purchase order',saving:'Saving…'},
-    ar:{privacy:'إخفاء الأسعار عن المورّد',privacyHelp:'اختياري. يرى المورّد المنتجات والكميات وحالة الطلب دون سعر الوحدة أو المجموع. يحتفظ المالك بالأسعار للمحاسبة.',flow:'يظهر الطلب فور تسجيله في لوحة المورّد، ولا يمكن شحنه إلا بعد موافقة المالك.',create:'إنشاء أمر شراء',saving:'جارٍ الحفظ…'},
-    fa:{privacy:'پنهان‌کردن قیمت از سپلایر',privacyHelp:'اختیاری است. سپلایر محصول، مقدار و وضعیت سفارش را می‌بیند، نه قیمت فی واحد یا مبلغ مجموع. قیمت برای حسابداری اونر محفوظ می‌ماند.',flow:'سفارش جدید فوراً در داشبورد سپلایر ظاهر می‌شود؛ ارسال محصول فقط بعد از تأیید اونر ممکن است.',create:'ایجاد سفارش خرید',saving:'در حال ذخیره…'}
+    en:{privacy:'Hide prices from supplier',privacyHelp:'Optional. The supplier will see products, quantities and order status, but NOT unit prices or total. Owner keeps prices for accounting.',flow:'The new order appears in the supplier dashboard immediately. The supplier can ship without Owner order approval. Physical receipt still requires Owner confirmation.',create:'Create purchase order',saving:'Saving…'},
+    ar:{privacy:'إخفاء الأسعار عن المورّد',privacyHelp:'اختياري. يرى المورّد المنتجات والكميات وحالة الطلب دون سعر الوحدة أو المجموع. يحتفظ المالك بالأسعار للمحاسبة.',flow:'يظهر الطلب فور تسجيله في لوحة المورّد، ويمكن للمورّد شحنه دون موافقة مسبقة من المالك. تأكيد الاستلام الفعلي يبقى للمالك.',create:'إنشاء أمر شراء',saving:'جارٍ الحفظ…'},
+    fa:{privacy:'پنهان‌کردن قیمت از سپلایر',privacyHelp:'اختیاری است. سپلایر محصول، مقدار و وضعیت سفارش را می‌بیند، نه قیمت فی واحد یا مبلغ مجموع. قیمت برای حسابداری اونر محفوظ می‌ماند.',flow:'سفارش جدید فوراً در داشبورد سپلایر ظاهر می‌شود؛ سپلایر بدون تأیید قبلی اونر می‌تواند ارسال کند؛ تأیید دریافت فیزیکی همچنان با اونر است.',create:'ایجاد سفارش خرید',saving:'در حال ذخیره…'}
   }[lang]||null;
-  const labels=copy||{privacy:'Hide prices from supplier',privacyHelp:'Supplier sees quantities but no prices when enabled.',flow:'New orders appear for supplier immediately; shipment requires Owner approval.',create:'Create purchase order',saving:'Saving…'};
+  const labels=copy||{privacy:'Hide prices from supplier',privacyHelp:'Supplier sees quantities but no prices when enabled.',flow:'New orders appear for supplier immediately; shipment does not require Owner approval.',create:'Create purchase order',saving:'Saving…'};
   const { activeRestaurantId, activeRestaurant, branches } = useTenant();
   const [form, setForm] = useState({
     supplier_id: order?.supplier_id || supplier?.id || '',
@@ -48,7 +48,14 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
     enabled:!!activeRestaurantId,
     queryFn:()=>base44.entities.Supplier.filter({restaurant_id:activeRestaurantId},'name',500),
   });
-  const { data: products = [] } = useQuery({ queryKey: ['products', activeRestaurantId, 'purchase-materials'], queryFn: () => base44.entities.Product.filter({ restaurant_id: activeRestaurantId, ...restaurantMaterialFilter(activeRestaurant) }, 'name', 500), enabled: Boolean(activeRestaurantId) });
+  const { data: products = [],isLoading:productsLoading,isError:productsError } = useQuery({
+    queryKey:['products',activeRestaurantId,form.supplier_id,'purchase-materials'],
+    queryFn:()=>base44.entities.Product.filter({
+      restaurant_id:activeRestaurantId,supplier_id:form.supplier_id,
+      ...restaurantMaterialFilter(activeRestaurant)
+    },'name',1000),
+    enabled:Boolean(activeRestaurantId&&form.supplier_id),
+  });
 
   const saveMutation = useMutation({
     mutationFn: (data) => order ? base44.entities.PurchaseOrder.update(order.id, data) : base44.entities.PurchaseOrder.create(data),
@@ -58,10 +65,12 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
   const handleSupplierChange = (supplierId) => {
     const s = suppliers.find(x => x.id === supplierId);
     setForm(f => ({ ...f, supplier_id: supplierId, supplier_name: s?.name || '', supplier_email: s?.email || '', supplier_phone: s?.phone || '' }));
+    setItems([{...emptyItem}]); // Never retain products from a previously selected supplier.
+    setValidationError('');
   };
 
   const handleItemProduct = (idx, productId) => {
-    const p = products.find(x => x.product_id === productId);
+    const p = products.find(x => x.product_id === productId && x.supplier_id === form.supplier_id);
     setItems(items => items.map((it, i) => i === idx ? { ...it, product_id: productId, product_name: p?.name || '', unit: p?.unit || '', unit_price: p?.default_cost || 0 } : it));
   };
 
@@ -78,7 +87,8 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
     if(form.expected_delivery&&form.expected_delivery<form.date){
       setValidationError('Expected delivery cannot be before the order date.');return;
     }
-    if(!items.length||items.some(i=>!i.product_id||Number(i.qty)<=0||!Number.isFinite(Number(i.qty))||!Number.isFinite(Number(i.unit_price))||Number(i.unit_price)<0)){
+    if(productsLoading||productsError){setValidationError('Supplier products are not ready. Retry after loading.');return;}
+    if(!items.length||items.some(i=>!i.product_id||!products.some(p=>p.product_id===i.product_id&&p.supplier_id===form.supplier_id)||Number(i.qty)<=0||!Number.isFinite(Number(i.qty))||!Number.isFinite(Number(i.unit_price))||Number(i.unit_price)<0)){
       setValidationError('Add at least one product with a valid quantity and price.');return;
     }
     
@@ -94,7 +104,7 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
       branch_id: branch.id,
       expected_date: form.expected_delivery || null,
       hide_prices_from_supplier: Boolean(form.hide_prices_from_supplier),
-      status: form.status,
+      status: order ? form.status : 'sent', // New orders are submitted to the linked Supplier immediately.
       items: JSON.stringify(items), 
       total_amount: total, 
       order_number: orderNum,
@@ -111,6 +121,7 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
 
       {saveMutation.isError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{saveMutation.error.message}</p>}
       {validationError && <p role="alert" data-testid="purchase-order-validation-error" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{validationError}</p>}
+      {productsError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">Supplier products could not be loaded. Retry.</p>}
       {suppliersError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">Could not load suppliers. Refresh and retry.</p>}
       <div className="space-y-4">
         <Card className="p-4 space-y-3">
@@ -149,18 +160,20 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
         <Card className="p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h3 className="font-semibold text-sm">Order Items</h3>
-            <Button size="sm" variant="outline" onClick={() => setItems(i => [...i, { ...emptyItem }])}>
+            <Button size="sm" variant="outline" disabled={!form.supplier_id||productsLoading} onClick={() => setItems(i => [...i, { ...emptyItem }])}>
               <Plus className="w-3 h-3 mr-1" /> Add Item
             </Button>
           </div>
+          {!form.supplier_id&&<p className="text-xs text-muted-foreground">Select a supplier first to see only their products.</p>}
+          {form.supplier_id&&!productsLoading&&products.length===0&&<p role="status" className="text-xs text-amber-700">No products are assigned to this supplier. Assign products in Product Master first.</p>}
           <div className="space-y-3">
             {items.map((item, idx) => (
               <div key={idx} className="border rounded-lg p-3 space-y-2">
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <Select value={item.product_id} onValueChange={(v) => handleItemProduct(idx, v)}>
+                    <Select disabled={!form.supplier_id||productsLoading} value={item.product_id} onValueChange={(v) => handleItemProduct(idx, v)}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Product" /></SelectTrigger>
-                      <SelectContent>{products.map(p => <SelectItem key={p.product_id} value={p.product_id}>{p.name}</SelectItem>)}</SelectContent>
+                      <SelectContent>{products.filter(p=>p.supplier_id===form.supplier_id).map(p => <SelectItem key={p.product_id} value={p.product_id}>{p.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <Button size="icon" variant="ghost" className="text-destructive h-8 w-8" onClick={() => setItems(i => i.filter((_, j) => j !== idx))}>
