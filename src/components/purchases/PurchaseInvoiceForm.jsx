@@ -569,7 +569,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
     }
     // A combined payment, expense reference or overhead has no unambiguous
     // supplier allocation. Refuse it rather than mis-posting another party's debt.
-    if (payFullAmount || payments.some(p => Number(p.amount) > 0) ||
+    if (payFullAmount || payments.some(p => Number(p.amount) !== 0 || !Number.isFinite(Number(p.amount))) ||
       additionalCosts.some(cost => Number(cost.amount) !== 0) ||
       expenseLink.expense_id || expenseLink.expense_category_id) {
       setError('For multiple suppliers, record payments, additional costs and expense references separately on each supplier invoice.');
@@ -701,8 +701,13 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
     const supplierName = supplier?.name || (form.supplier_name && form.supplier_name.trim() !== '' ? form.supplier_name : null);
     
     if (!isDraft && !supplierId && !supplierName) {
-      setError('Supplier selection or name is required'); 
-      return; 
+      setError('Supplier selection or name is required');
+      return;
+    }
+    if (items.some(item => item.supplier_id &&
+        (!supplierId || String(item.supplier_id) !== String(supplierId)))) {
+      setError('An item belongs to a different supplier. Switch to multi-supplier mode or select the correct supplier before saving.');
+      return;
     }
 
     if (!isDraft && (items.length === 0 || items.every(i => !i.product_name && !i.product_id))) {
@@ -843,6 +848,18 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
                 disabled={isEdit || !!supplier || saving || !!submissionRef.current.invoice || batchRef.current.completed.size > 0}
                 onChange={e => {
                   const enabled = e.target.checked;
+                  if (!enabled) {
+                    const previousSuppliers = [...new Set(items.map(item => item.supplier_id).filter(Boolean))];
+                    if (previousSuppliers.length > 1) {
+                      setError('Different suppliers are selected. Keep multi-supplier mode or separate these items before switching to a single supplier.');
+                      return;
+                    }
+                    if (previousSuppliers.length === 1) {
+                      const selected = suppliers.find(s => String(s.id) === String(previousSuppliers[0]));
+                      setForm(current => ({...current,supplier_id: previousSuppliers[0],
+                        supplier_name: selected?.name || '',supplier_email: selected?.email || ''}));
+                    }
+                  }
                   setMultiSupplierMode(enabled);
                   if (enabled && form.supplier_id) {
                     setItems(previous => previous.map(item => ({
