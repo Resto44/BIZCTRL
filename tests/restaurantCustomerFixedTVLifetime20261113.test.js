@@ -38,6 +38,9 @@ describe('Restaurant customer screen fixed viewport and secure selectable link l
   expect(sql).toContain("ADD COLUMN IF NOT EXISTS link_duration text NOT NULL DEFAULT '8h'");
   expect(sql).toContain("where device_id=d.id AND link_duration='8h'");
   expect(sql).toContain("p_command<>'unpair_display'");
+  expect(sql).toContain("ds.link_duration='8h' and not exists");
+  expect(sql).toContain("where s.id=x.shift_id and s.device_id=d.id and s.closed_at is null");
+  expect(sql).toContain('CUSTOMER_DISPLAY_READER_SOURCE_CHANGED_ABORT');
   expect(sql).toContain("where device_id=d.id;"); // explicit unpair remains unrestricted
   expect(sql).toContain('link_duration=excluded.link_duration');
   expect(sql).toContain("topic=gen_random_uuid()");
