@@ -88,6 +88,13 @@ export const restaurantCustomerItemColumns=(count,width=390,height=800)=>{
  // Full menu names are the priority: one readable row per item for the
  // common 1–6 item customer order, even on narrow mobile screens.
  // Larger orders use additional columns without hiding or paging items.
+ // A landscape TV needs fewer rows, not one tiny row for every meal.
+ // Split 5+ meals into readable columns, while phones keep full-width names.
+ if(width>=900&&width>height&&height<=1200){
+  if(count<=4)return 1;
+  if(count<=10)return 2;
+  return Math.min(4,Math.ceil(count/5));
+ }
  if(width<650)return count<=6?1:Math.min(3,Math.max(2,Math.ceil(count/(height<700?7:9))));
  if(width<1100)return count<=8?1:Math.min(3,Math.ceil(count/9));
  return count<=10?1:Math.min(4,Math.ceil(count/10));
