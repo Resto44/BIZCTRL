@@ -31,7 +31,7 @@ import {
   PieChart, Target, Layers, ClipboardList, Handshake,
   ArrowLeftRight, ShieldCheck, SlidersHorizontal, Truck, X,
   Search, Plus, CircleAlert, CheckCircle2, LifeBuoy, MapPinned,
-  MonitorSmartphone, ScanLine, FileSearch, ShieldAlert, ChefHat
+  MonitorSmartphone, ScanLine, FileSearch, ShieldAlert, ChefHat, Printer
 } from 'lucide-react';
 import { useERPNavigation } from '@/hooks/useERPNavigation';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
@@ -156,6 +156,7 @@ export const ERP_NAV_GROUPS = [
       { path: '/role-permissions',    label: 'Role & Permissions',   icon: ShieldCheck, permission: 'manageBranches' },
       { path: '/restaurants',        label: 'Restaurants',          icon: Building2, permission: 'viewBrandSettings' },
       { path: '/settings',           label: 'Settings',             icon: Settings,  permission: 'manageSettings' },
+      { path: '/printer-management', label: 'Printer Management', icon: Printer, permission: 'manageSettings' }
       { path: '/erp-approval-center',label: 'Approvals',            icon: ShieldCheck,permission: 'manageSettings' },
       { path: '/notifications',      label: 'Notifications',        icon: Bell,      permission: 'viewAlerts' },
       { path: '/billing',            label: 'Billing & Subscription',icon: CreditCard,permission: 'viewBilling' },
@@ -213,7 +214,7 @@ const MOBILE_NAV_SECTIONS = [
     icon: Users,
     paths: [
       '/employees', '/employee-attendance', '/employee-control', '/driver-management',
-      '/branch-management', '/role-permissions', '/restaurants', '/settings',
+      '/branch-management', '/role-permissions', '/restaurants', '/settings', '/printer-management',
       '/erp-approval-center', '/notifications', '/billing', '/support',
       '/customize-workspace',
     ],
