@@ -3,7 +3,7 @@ import HelpLink from '@/components/help/HelpLink';
 import PortalDataState from '@/components/shared/PortalDataState';
 import EmployeeMobileAttendance from '@/components/attendance/EmployeeMobileAttendance';
 import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useRole } from '@/lib/RoleContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -249,6 +249,7 @@ export default function EmployeeDashboardERP() {
             </section>
           )}
 
+          {activeTab==='home' && <Link to="/portal-order-entry" data-testid="employee-customer-order-entry" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white"><ClipboardList className="h-5 w-5"/>{lang==='ar'?'طلب العميل':lang==='fa'?'ثبت سفارش مشتری':'Customer order intake'}</Link>}
           {activeTab==='home' && (can.viewTasks||announcements.length>0) && (
             <section className="grid gap-3 md:grid-cols-2" aria-label={copy.quickAccess}>
               {can.viewTasks && <Card className="min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
