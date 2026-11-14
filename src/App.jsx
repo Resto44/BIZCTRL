@@ -45,6 +45,7 @@ const CustomerDisplay = lazy(() => import('@/pages/retail/pos/CustomerDisplay'))
 const RestaurantCustomerDisplay = lazy(() => import('@/pages/restaurant/RestaurantCustomerDisplay'));
 const RestaurantPOS = lazy(() => import('@/pages/restaurant/RestaurantPOS'));
 const KitchenDisplayERP = lazy(() => import('@/pages/restaurant/KitchenDisplayERP'));
+const PrinterManagementERP = lazy(() => import('@/pages/PrinterManagementERP'));
 const CustomerTrackingDisplay = lazy(() => import('@/pages/restaurant/CustomerTrackingDisplay'));
 import RetailPOSPortalGuard from '@/components/retail-pos/RetailPOSPortalGuard';
 import UniversalTouchPOSRoute from '@/components/pos-touch/UniversalTouchPOSRoute';
@@ -488,6 +489,7 @@ const SubscribedRoutes = () => {
         <Route path="/retail/cashier" element={<RoleGuard permission="uploadSales"><RetailPOSPortalGuard><RetailCashier /></RetailPOSPortalGuard></RoleGuard>} />
         <Route path="/restaurant/pos" element={<RoleGuard permission="viewSales"><RestaurantPOS /></RoleGuard>} />
         <Route path="/restaurant/kitchen" element={<RoleGuard permission="viewOrders"><KitchenDisplayERP /></RoleGuard>} />
+        <Route path="/printer-management" element={<PrinterManagementERP />} />
 
       </Route>
       <Route path="*" element={<PageNotFound />} />

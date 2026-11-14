@@ -1,5 +1,5 @@
 import React, {useEffect,useMemo,useRef,useState} from 'react';
-import {useSearchParams} from 'react-router-dom';
+import {Link,useSearchParams} from 'react-router-dom';
 import {useQuery} from '@tanstack/react-query';
 import {
   ChefHat, Clock3, Maximize2, Minimize2, RefreshCw, Volume2, VolumeX,
@@ -349,6 +349,7 @@ export default function KitchenDisplayERP(){
         <button type="button" onClick={()=>{setSound(s=>!s);}} className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-600 px-3 text-xs font-bold">
           {sound?<Volume2 className="h-4 w-4"/>:<VolumeX className="h-4 w-4"/>}{sound?t.sound:t.muted}
         </button>
+        {!tv&&<Link data-testid="kds-print-queue-link" to="/printer-management" className="flex min-h-11 items-center rounded-xl border border-cyan-600 px-3 text-xs font-black text-cyan-100">{lang==='ar'?'طباعة المطبخ':lang==='fa'?'صف چاپ مطبخ':'Kitchen printing'}</Link>}
         <button type="button" onClick={()=>void q.refetch()} aria-label={t.refresh} className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-600 px-3 text-sm font-bold">
           <RefreshCw className={'h-4 w-4 '+(q.isFetching?'animate-spin':'')}/>{t.refresh}</button>
         <button type="button" data-testid="kds-tv-toggle" onClick={()=>void toggleTv()} className="flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-3 text-sm font-black">
