@@ -23,7 +23,7 @@ import {
   purchaseBrandOptions, purchaseProductsForBrand, purchaseProductBrand,
   clearPurchaseProductForFilter, selectPurchaseProduct,
 } from '@/lib/purchaseInvoiceBrands';
-import {firstIncompletePurchaseProductLine, uniquePurchaseProductForBrand} from '@/lib/purchaseInvoiceProductSelection';
+import {firstIncompletePurchaseProductLine, uniquePurchaseProductForBrand, autoSelectPurchaseBrandProduct} from '@/lib/purchaseInvoiceProductSelection';
 import { usePurchaseCategoriesHierarchy } from '@/hooks/usePurchaseCategoriesHierarchy';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { Button } from '@/components/ui/button';
@@ -538,15 +538,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
         return normalizePurchaseLine(selectPurchaseProduct(item, value));
       }
       if (field === 'auto_scoped_product') {
-        if (item.product_id || String(item.product_name || '').trim()) return item;
-        const selected = selectPurchaseProduct(item, value);
-        // If the user entered their actual buying price while the catalog was
-        // still loading, don't replace it with the Product Master default.
-        const buyingPrice = Number(item.unit_cost);
-        return normalizePurchaseLine({
-          ...selected,
-          unit_cost: Number.isFinite(buyingPrice) && buyingPrice > 0 ? buyingPrice : selected.unit_cost,
-        });
+        return normalizePurchaseLine(autoSelectPurchaseBrandProduct(item, value));
       }
       if (['category_id', 'subcategory_id', 'supplier_id', 'brand'].includes(field)) {
         return normalizePurchaseLine(clearPurchaseProductForFilter(item, field, value));
