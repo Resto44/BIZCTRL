@@ -45,7 +45,7 @@ begin
     greatest(0,coalesce(p.selling_price,p.default_price,0))::numeric(16,2) as price
     from public.products p
     left join public.product_categories c on c.id=p.category_id
-      and c.restaurant_id=p.restaurant_id and (c.branch_id is null or c.branch_id=p.branch_id)
+      and c.restaurant_id=p.restaurant_id and (c.branch_id is null or c.branch_id=b)
       and coalesce(c.is_active,true)
     where p.restaurant_id=m.restaurant_id
       and (p.branch_id=b or p.branch_id is null) and coalesce(p.is_active,true)
