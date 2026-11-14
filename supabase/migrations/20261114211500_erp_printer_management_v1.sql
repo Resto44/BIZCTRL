@@ -54,6 +54,8 @@ begin
  if m.id is null or m.role not in ('owner','manager','employee','cashier') then
   raise exception 'PRINT_MEMBERSHIP_FORBIDDEN' using errcode='42501';
  end if;
+ if m.role<>'owner' and m.branch_id is null then
+  raise exception 'PRINT_BRANCH_NOT_ASSIGNED' using errcode='42501';end if;
  if p_branch_id is not null and
     not exists(select 1 from public.branches b where b.id=p_branch_id and b.restaurant_id=p_restaurant_id and b.is_active is true)
   then raise exception 'PRINT_BRANCH_INVALID' using errcode='42501';end if;
