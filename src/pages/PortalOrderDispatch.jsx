@@ -9,11 +9,12 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Card,CardContent} from '@/components/ui/card';
 import PortalOrderInbox from '@/components/portal-orders/PortalOrderInbox';
+import {portalOrderCategories, selectedPortalCategory, filterPortalOrderProducts, PORTAL_ORDER_ALL} from '@/lib/portalOrderCategories';
 
 const copy={
- en:{title:'Customer order intake',intro:'Send a customer request to the manager or directly to the kitchen. This does not take payment or post sales.',enabled:'Order intake is disabled for this portal. Your Owner can enable it here.',destination:'Destination',manager:'Manager review',kitchen:'Kitchen directly',items:'Food / Products',search:'Search food',quantity:'Quantity',add:'Add',remove:'Remove',customer:'Customer reference (optional)',notes:'Preparation / delivery notes',submit:'Send order',sending:'Sending…',success:'Order request delivered',history:'Your requests',total:'Menu quote (not paid)',empty:'No products configured for this branch',owner:'Owner configuration · Enable per portal',settings:'Save access',roles:'Portal',failure:'Could not load order intake. No order submitted.',retry:'Retry',notice:'Request only: no sales closing, payment, receipt or inventory movement. Cashier confirms payment in POS.',choose:'Select one or more products.',waiting:'Awaiting manager',disabled:'No enabled destination',stock:'Availability is confirmed by manager/kitchen.',branch:'Branch'},
- ar:{title:'إرسال طلب العميل',intro:'أرسل طلب العميل إلى المدير أو مباشرة إلى المطبخ؛ دون تسجيل بيع أو دفع.',enabled:'إرسال الطلبات غير مفعل لهذه البوابة. يمكن للمالك تفعيله.',destination:'الجهة المستلمة',manager:'موافقة المدير',kitchen:'إلى المطبخ مباشرة',items:'الأصناف',search:'بحث عن صنف',quantity:'الكمية',add:'إضافة',remove:'حذف',customer:'مرجع العميل (اختياري)',notes:'تعليمات الطلب أو التوصيل',submit:'إرسال الطلب',sending:'جار الإرسال…',success:'تم إرسال الطلب',history:'طلباتي',total:'تقدير السعر (غير مدفوع)',empty:'لا توجد أصناف لهذه الفرع',owner:'إعدادات المالك · تفعيل البوابات',settings:'حفظ الصلاحيات',roles:'البوابة',failure:'تعذّر تحميل الخدمة ولم يُرسل طلب.',retry:'إعادة المحاولة',notice:'طلب غير محاسبي؛ الدفع والفاتورة والمخزون عبر الكاشير فقط.',choose:'اختر منتجاً واحداً على الأقل.',waiting:'بانتظار المدير',disabled:'لا توجد جهة مفعّلة',stock:'يؤكد المدير/المطبخ توفر الصنف.',branch:'الفرع'},
- fa:{title:'ثبت سفارش مشتری',intro:'سفارش مشتری را به مدیر یا مستقیم به مطبخ بفرستید؛ بدون ثبت فروش یا پرداخت.',enabled:'سفارش‌فرستی برای این پورتل فعال نیست؛ مالک می‌تواند فعال کند.',destination:'مقصد سفارش',manager:'تأیید مدیر',kitchen:'مستقیم به مطبخ',items:'غذاها / محصولات',search:'جستجوی غذا',quantity:'تعداد',add:'افزودن',remove:'حذف',customer:'مشخصات کوتاه مشتری (اختیاری)',notes:'یادداشت پخت یا تحویل',submit:'ارسال سفارش',sending:'در حال ارسال…',success:'درخواست سفارش ارسال شد',history:'سفارش‌های من',total:'قیمت تقریبی منو (پرداخت نشده)',empty:'غذا/محصول برای این شعبه تنظیم نشده',owner:'تنظیمات مالک · فعال‌سازی هر پورتل',settings:'ذخیره دسترسی',roles:'پورتل',failure:'بارگذاری سفارش‌ها ناموفق؛ هیچ سفارشی ارسال نشده.',retry:'دوباره کوشش',notice:'این درخواست فروش مالی نیست. پرداخت و ثبت موجودی فقط از مسیر صندوق POS انجام می‌شود.',choose:'حداقل یک غذا انتخاب کنید.',waiting:'منتظر مدیر',disabled:'مقصد فعال نیست',stock:'موجودی توسط مدیر/مطبخ بررسی شود.',branch:'شعبه'},
+ en:{title:'Customer order intake',intro:'Send a customer request to the manager or directly to the kitchen. This does not take payment or post sales.',enabled:'Order intake is disabled for this portal. Your Owner can enable it here.',destination:'Destination',manager:'Manager review',kitchen:'Kitchen directly',items:'Food / Products',category:'Food category',allCategories:'All categories',selectedItems:'Selected items',search:'Search food',quantity:'Quantity',add:'Add',remove:'Remove',customer:'Customer reference (optional)',notes:'Preparation / delivery notes',submit:'Send order',sending:'Sending…',success:'Order request delivered',history:'Your requests',total:'Menu quote (not paid)',empty:'No products configured for this branch',noMatches:'No products in this category match your search',owner:'Owner configuration · Enable per portal',settings:'Save access',roles:'Portal',failure:'Could not load order intake. No order submitted.',retry:'Retry',notice:'Request only: no sales closing, payment, receipt or inventory movement. Cashier confirms payment in POS.',choose:'Select one or more products.',waiting:'Awaiting manager',disabled:'No enabled destination',stock:'Availability is confirmed by manager/kitchen.',branch:'Branch'},
+ ar:{title:'إرسال طلب العميل',intro:'أرسل طلب العميل إلى المدير أو مباشرة إلى المطبخ؛ دون تسجيل بيع أو دفع.',enabled:'إرسال الطلبات غير مفعل لهذه البوابة. يمكن للمالك تفعيله.',destination:'الجهة المستلمة',manager:'موافقة المدير',kitchen:'إلى المطبخ مباشرة',items:'الأصناف',category:'تصنيف الأطعمة',allCategories:'جميع التصنيفات',selectedItems:'الأصناف المختارة',search:'بحث عن صنف',quantity:'الكمية',add:'إضافة',remove:'حذف',customer:'مرجع العميل (اختياري)',notes:'تعليمات الطلب أو التوصيل',submit:'إرسال الطلب',sending:'جار الإرسال…',success:'تم إرسال الطلب',history:'طلباتي',total:'تقدير السعر (غير مدفوع)',empty:'لا توجد أصناف لهذا الفرع',noMatches:'لا توجد أصناف مطابقة للبحث في هذا التصنيف',owner:'إعدادات المالك · تفعيل البوابات',settings:'حفظ الصلاحيات',roles:'البوابة',failure:'تعذّر تحميل الخدمة ولم يُرسل طلب.',retry:'إعادة المحاولة',notice:'طلب غير محاسبي؛ الدفع والفاتورة والمخزون عبر الكاشير فقط.',choose:'اختر منتجاً واحداً على الأقل.',waiting:'بانتظار المدير',disabled:'لا توجد جهة مفعّلة',stock:'يؤكد المدير/المطبخ توفر الصنف.',branch:'الفرع'},
+ fa:{title:'ثبت سفارش مشتری',intro:'سفارش مشتری را به مدیر یا مستقیم به مطبخ بفرستید؛ بدون ثبت فروش یا پرداخت.',enabled:'سفارش‌فرستی برای این پورتل فعال نیست؛ مالک می‌تواند فعال کند.',destination:'مقصد سفارش',manager:'تأیید مدیر',kitchen:'مستقیم به مطبخ',items:'غذاها / محصولات',category:'دسته‌بندی غذاها',allCategories:'تمام دسته‌ها',selectedItems:'غذاهای انتخاب‌شده',search:'جستجوی غذا',quantity:'تعداد',add:'افزودن',remove:'حذف',customer:'مشخصات کوتاه مشتری (اختیاری)',notes:'یادداشت پخت یا تحویل',submit:'ارسال سفارش',sending:'در حال ارسال…',success:'درخواست سفارش ارسال شد',history:'سفارش‌های من',total:'قیمت تقریبی منو (پرداخت نشده)',empty:'غذا/محصول برای این شعبه تنظیم نشده',noMatches:'در این دسته محصول مطابق جستجو پیدا نشد',owner:'تنظیمات مالک · فعال‌سازی هر پورتل',settings:'ذخیره دسترسی',roles:'پورتل',failure:'بارگذاری سفارش‌ها ناموفق؛ هیچ سفارشی ارسال نشده.',retry:'دوباره کوشش',notice:'این درخواست فروش مالی نیست. پرداخت و ثبت موجودی فقط از مسیر صندوق POS انجام می‌شود.',choose:'حداقل یک غذا انتخاب کنید.',waiting:'منتظر مدیر',disabled:'مقصد فعال نیست',stock:'موجودی توسط مدیر/مطبخ بررسی شود.',branch:'شعبه'},
 };
 const roleLabels={owner:'Owner',manager:'Manager',employee:'Employee',driver:'Driver',supplier:'Supplier',customer:'Customer'};
 async function rpc(name,args){const {data,error}=await supabase.rpc(name,args);if(error)throw error;return data;}
@@ -65,6 +66,7 @@ export default function PortalOrderDispatch(){
  const [destination,setDestination]=useState('manager');
  const [chosen,setChosen]=useState({});
  const [search,setSearch]=useState('');
+ const [categoryChoice,setCategoryChoice]=useState('');
  const [customer,setCustomer]=useState('');
  const [notes,setNotes]=useState('');
  const [error,setError]=useState('');
@@ -72,7 +74,9 @@ export default function PortalOrderDispatch(){
  const canManager=data?.allow_manager===true, canKitchen=data?.allow_kitchen===true;
  const chosenDestination=destination==='kitchen'&&canKitchen?'kitchen':canManager?'manager':canKitchen?'kitchen':null;
  const catalog=Array.isArray(data?.catalog)?data.catalog:[];
- const visible=catalog.filter(row=>(row['name_'+lang]||row.name||'').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+ const categories=portalOrderCategories(catalog,lang);
+ const activeCategory=selectedPortalCategory(categories,categoryChoice);
+ const visible=filterPortalOrderProducts(catalog,activeCategory,search);
  const lines=Object.entries(chosen).filter(([,n])=>n>0).map(([id,n])=>({id,quantity:n})).filter(row=>catalog.some(p=>p.id===row.id));
  const selected=useMemo(()=>lines.map(line=>{const product=catalog.find(p=>p.id===line.id);return {...line,product};}),[catalog,chosen]);
  const total=selected.reduce((sum,row)=>sum+Number(row.product?.price||0)*row.quantity,0);
@@ -99,7 +103,7 @@ export default function PortalOrderDispatch(){
  return <main dir={isRTL?'rtl':'ltr'} aria-label={t.title} data-testid="portal-order-dispatch" className="mx-auto max-w-6xl space-y-4 pb-28 text-slate-950">
   <header className="rounded-2xl bg-blue-950 p-4 text-white"><h1 className="text-xl font-black">{t.title}</h1><p className="mt-1 text-xs text-blue-100">{t.intro}</p></header>
   {isOwner&&branches.length>1&&<label className="block rounded-xl border bg-white p-3 text-sm font-bold">{t.branch}
-   <select className="ms-2 min-h-11 rounded-lg border px-3" value={ownerBranch?.id||''} onChange={e=>{setBranchChoice(e.target.value);setChosen({});requestId.current=crypto.randomUUID();}}>
+   <select className="ms-2 min-h-11 rounded-lg border px-3" value={ownerBranch?.id||''} onChange={e=>{setBranchChoice(e.target.value);setChosen({});setCategoryChoice('');setSearch('');requestId.current=crypto.randomUUID();}}>
     {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
    </select></label>}
   {context.isPending&&<p role="status" className="rounded-xl bg-white p-5">…</p>}
@@ -117,6 +121,15 @@ export default function PortalOrderDispatch(){
      {canKitchen&&<option value="kitchen">{t.kitchen}</option>}
     </select>
    </label>
+   <label className="block text-sm font-bold" data-testid="portal-order-category-picker">
+    {t.category}
+    <select aria-label={t.category} data-testid="portal-order-category-select"
+      className="mt-1 min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-base text-slate-950"
+      value={activeCategory} onChange={e=>{setCategoryChoice(e.target.value);setSearch('');}}>
+      <option value={PORTAL_ORDER_ALL}>{t.allCategories} ({catalog.length})</option>
+      {categories.map(group=><option value={group.key} key={group.key}>{group.label} ({group.count})</option>)}
+    </select>
+   </label>
    <Input aria-label={t.search} placeholder={t.search} value={search} onChange={e=>setSearch(e.target.value)} className="h-12 text-base"/>
    <div className="grid max-h-[46dvh] grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
     {visible.map(item=><div key={item.id} className="flex min-h-16 items-center justify-between gap-3 rounded-xl border p-3">
@@ -129,6 +142,15 @@ export default function PortalOrderDispatch(){
     </div>)}
    </div>
    {catalog.length===0&&<p className="text-sm text-slate-500">{t.empty}</p>}
+   {catalog.length>0&&visible.length===0&&<p role="status" className="rounded-xl border border-dashed p-4 text-sm text-slate-500">{t.noMatches}</p>}
+   {selected.length>0&&<div data-testid="portal-order-selected-items" className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+     <h3 className="mb-2 text-sm font-black text-blue-950">{t.selectedItems} · {selected.reduce((n,row)=>n+row.quantity,0)}</h3>
+     <div className="flex flex-wrap gap-2">{selected.map(row=><div key={row.id} className="flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 text-xs font-semibold text-slate-900">
+       <span>{row.product?.['name_'+lang]||row.product?.name} ×{row.quantity}</span>
+       <button type="button" aria-label={t.remove+' '+(row.product?.name||'')} onClick={()=>adjust(row.id,-row.quantity)}
+         className="h-9 w-9 rounded-lg border border-rose-200 text-base font-bold text-rose-700">×</button>
+     </div>)}</div>
+   </div>}
    <Input aria-label={t.customer} maxLength={100} placeholder={t.customer} value={customer} onChange={e=>{setCustomer(e.target.value);requestId.current=crypto.randomUUID();}} className="h-12 text-base"/>
    <textarea aria-label={t.notes} maxLength={500} value={notes} onChange={e=>{setNotes(e.target.value);requestId.current=crypto.randomUUID();}}
     placeholder={t.notes} className="min-h-20 w-full rounded-xl border p-3 text-base"/>
