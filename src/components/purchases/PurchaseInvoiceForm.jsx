@@ -138,7 +138,7 @@ function PurchaseInvoiceItemRow({
       <div className="relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3.5 sm:grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] sm:items-center sm:px-5">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-slate-900">{item.product_name || `New item ${idx + 1}`}</p>
-          <p className="truncate text-[11px] text-slate-500">{multiSupplierMode ? (selectedItemSupplier?.name || 'Supplier not selected') + ' · ' : ''}Per {item.unit || 'unit'}</p>
+          <p className="truncate text-[11px] text-slate-500">{multiSupplierMode ? (selectedItemSupplier?.name || 'Supplier not selected') + ' · ' : ''}{selectedBrand ? `Brand: ${selectedBrand} · ` : ''}Per {item.unit || 'unit'}</p>
         </div>
 
         <div className="hidden truncate text-sm font-medium text-slate-700 sm:block">{item.unit || '—'}</div>
