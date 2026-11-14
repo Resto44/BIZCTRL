@@ -96,7 +96,7 @@ export default function PortalOrderDispatch(){
  });};
  const allowed=canManager||canKitchen;
  const manageInbox=(data?.role==='owner'||data?.role==='manager'||(data?.role==='employee'&&can?.viewOrders));
- return <main dir={isRTL?'rtl':'ltr'} data-testid="portal-order-dispatch" className="mx-auto max-w-6xl space-y-4 pb-28 text-slate-950">
+ return <main dir={isRTL?'rtl':'ltr'} aria-label={t.title} data-testid="portal-order-dispatch" className="mx-auto max-w-6xl space-y-4 pb-28 text-slate-950">
   <header className="rounded-2xl bg-blue-950 p-4 text-white"><h1 className="text-xl font-black">{t.title}</h1><p className="mt-1 text-xs text-blue-100">{t.intro}</p></header>
   {isOwner&&branches.length>1&&<label className="block rounded-xl border bg-white p-3 text-sm font-bold">{t.branch}
    <select className="ms-2 min-h-11 rounded-lg border px-3" value={ownerBranch?.id||''} onChange={e=>{setBranchChoice(e.target.value);setChosen({});requestId.current=crypto.randomUUID();}}>
