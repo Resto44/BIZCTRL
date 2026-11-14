@@ -255,7 +255,7 @@ function PurchaseInvoiceItemRow({
             const product = visibleProducts.find(p => String(p.id) === String(v));
             if (product) updateItem(item._id, 'selected_product', product);
           }} disabled={!item.category_id && !itemSupplierId}>
-            <SelectTrigger className="h-11 text-sm w-full min-w-0" aria-label="Select purchase product">
+            <SelectTrigger data-testid="purchase-brand-filtered-product" className="h-11 text-sm w-full min-w-0" aria-label="Select purchase product">
               <SelectValue placeholder={(item.category_id || itemSupplierId) ? (visibleProducts.length === 0 ? 'No matching products.' : 'Select...') : 'Select category or supplier first'} />
             </SelectTrigger>
             <SelectContent>
