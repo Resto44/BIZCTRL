@@ -27,6 +27,9 @@ export default function PortalOrderInbox({restaurantId,branchId,lang='en',dark=f
  const manager=q.data?.manager===true;
  const orders=(Array.isArray(q.data?.orders)?q.data.orders:[]).filter(o=>!kitchenOnly||
   (o.order_kind==='restaurant'&&['queued','preparing','ready'].includes(o.status)));
+ // Avoid taking valuable TV space from the ordinary POS kitchen board when
+ // the optional portal-order feature has no active requests.
+ if(kitchenOnly&&connected&&orders.length===0)return null;
  const actionButton=(o,command,label,outline=false)=><Button type="button" size="sm" variant={outline?'outline':'default'}
   disabled={!connected||action.isPending} onClick={()=>action.mutate({id:o.id,command})}>{label}</Button>;
  return <section dir={lang==='en'?'ltr':'rtl'} data-testid="portal-order-inbox"
