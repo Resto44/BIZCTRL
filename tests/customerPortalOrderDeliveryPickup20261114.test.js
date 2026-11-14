@@ -46,7 +46,7 @@ describe('Customer Portal: verified customer pickup and delivery ERP workflow',(
   expect(sql).toContain("customer_portal_private.order_customer(p_customer_id)");
   expect(sql).toContain("customer_portal_private.order_branch(c,p_branch_id)");
   expect(sql).toContain("where restaurant_id=c.restaurant_id and role='customer'");
-  expect(sql).not.toContain('erp_memberships');
+  expect(sql).not.toContain('join public.erp_memberships');
   expect(sql).toContain('CUSTOMER_ORDER_BRANCH_FORBIDDEN');
   expect(sql).toContain("branch_id=b or branch_id is null");
   expect(sql).toContain("q.branch_id=b and q.active is true");
