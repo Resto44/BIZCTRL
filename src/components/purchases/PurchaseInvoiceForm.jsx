@@ -115,7 +115,10 @@ function PurchaseInvoiceItemRow({
   const brandOptions = purchaseBrandOptions(categoryProducts, selectedBrand, organizationBrands);
   const visibleProducts = purchaseProductsForBrand(categoryProducts, selectedBrand);
   const query = brandSearch.trim().toLocaleLowerCase();
-  const visibleBrands = brandOptions.filter(name => !query || name.toLocaleLowerCase().includes(query));
+  const visibleBrands = brandOptions.filter(name =>
+    !query || name.toLocaleLowerCase().includes(query) || name === selectedBrand,
+  );
+  useEffect(() => { setBrandSearch(''); }, [item.category_id, item.subcategory_id, item.supplier_id]);
 
   // Mobile number keyboards can emit input before change. Use the same canonical
   // state update for both events so quantity, cost, discount, and tax always
