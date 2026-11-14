@@ -1,5 +1,7 @@
-import {describe,it,expect} from 'vitest';
+import {describe,it,expect,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
+// Avoid loading SDK/window globals into this pure utility test.
+vi.mock('@/lib/retailCashier',()=>({receiptHtml:()=>'<html>mock receipt</html>'}));
 import {printerEscape,PRINTER_DOCUMENTS,PRINTER_PAPERS,kitchenTicketHtml} from '../src/lib/erpPrinting.js';
 
 const sql=readFileSync('supabase/migrations/20261114211500_erp_printer_management_v1.sql','utf8');
