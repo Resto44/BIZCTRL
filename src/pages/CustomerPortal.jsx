@@ -23,6 +23,11 @@ export default function CustomerPortal() {
  const [session,setSession]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[invite,setInvite]=useState(inviteToken),[emailPending,setEmailPending]=useState(false);
  const [selected,setSelected]=useState(''),[kind,setKind]=useState('invoices'),[page,setPage]=useState(0),[from,setFrom]=useState(''),[to,setTo]=useState(''),[dates,setDates]=useState({from:'',to:''});
+ // Only account identity and statement are needed at initial render.
+ const [opened,setOpened]=useState({order:false,analytics:false,push:false});
+ const quick=lang==='ar' ? {order:'اطلب الآن',analytics:'عرض التحليلات',push:'إعداد الإشعارات'}
+   : lang==='fa' ? {order:'سفارش جدید',analytics:'دیدن تحلیل‌ها',push:'تنظیم اعلان‌ها'}
+   : {order:'Order now',analytics:'Account analytics',push:'Notifications'};
  useEffect(()=>{
   let live=true,authEvent=false;
   const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,next)=>{authEvent=true;if(live){setSession(next);setLoading(false);}});
@@ -51,10 +56,15 @@ export default function CustomerPortal() {
   };
  },[]);
  const accounts=useQuery({queryKey:['customer-portal','accounts',session?.user?.id],enabled:!!session?.user?.id,
-  queryFn:()=>customerPortalRpc('erp_customer_portal_accounts'),refetchInterval:20000,retry:1});
+  queryFn:()=>customerPortalRpc('erp_customer_portal_accounts'),refetchInterval:45000,refetchIntervalInBackground:false,staleTime:15000,retry:1});
  const account=accounts.isError?null:accounts.data?.find(a=>a.id===selected)||accounts.data?.[0];
+ useEffect(()=>{setOpened({order:false,analytics:false,push:false});},[session?.user?.id,account?.id]);
+ const showSection=(key)=>{
+  if(opened[key]) document.getElementById('customer-panel-'+key)?.scrollIntoView({block:'start',behavior:'smooth'});
+  else setOpened(previous=>({...previous,[key]:true}));
+ };
  const statement=useQuery({queryKey:['customer-portal','statement',session?.user?.id,account?.id,kind,dates,page],enabled:!!session?.user?.id&&!!account,
-  queryFn:()=>customerPortalRpc('erp_customer_portal_statement',{p_customer_id:account.id,p_kind:kind,p_from:dates.from||null,p_to:dates.to||null,p_page:page}),refetchInterval:5000,refetchIntervalInBackground:false,refetchOnWindowFocus:true,retry:1});
+  queryFn:()=>customerPortalRpc('erp_customer_portal_statement',{p_customer_id:account.id,p_kind:kind,p_from:dates.from||null,p_to:dates.to||null,p_page:page}),refetchInterval:60000,refetchIntervalInBackground:false,staleTime:15000,refetchOnWindowFocus:true,retry:1});
  const data=statement.isError?null:statement.data;
  const money=value=>`${Number(value||0).toLocaleString(lang==='en'?'en-US':lang==='ar'?'ar-SA':'fa-AF',{minimumFractionDigits:2,maximumFractionDigits:2})} ${account?.currency||''}`;
  async function run(action){if(busy)return;setBusy(true);setError('');setNotice('');try{await action();}catch(err){setError(customerPortalErrorMessage(err,t));if(/email[_ ]not[_ ]confirmed/i.test(String(err?.message||err?.code||'')))setEmailPending(true);}finally{setBusy(false);}}
@@ -160,17 +170,33 @@ export default function CustomerPortal() {
       <div className="flex w-full min-w-0 flex-wrap gap-2 print:hidden sm:w-auto"><Button variant="outline" onClick={refreshDashboard}>{t.refresh}</Button><Button disabled={!data} onClick={()=>window.print()}>{t.print}</Button></div>
      </section>
      <CustomerIdentityCard key={account.id} account={account} lang={lang}/>
-     <Suspense fallback={<p role="status" className="rounded-xl border bg-white p-4 text-sm text-slate-500">{t.loading}</p>}>
-      <CustomerOrderEntry key={'customer-order-'+account.id} account={account} lang={lang}/>
-     </Suspense>
-     <Suspense fallback={<p role="status" className="rounded-xl border bg-white p-4 text-sm text-slate-500">{t.loading}</p>}>
-      <PortalPushSettings key={'push-'+account.id} role="customer" customerId={account.id} language={lang}/>
-      <CustomerAnalyticsDashboard key={account.id} account={account} lang={lang}/>
-     </Suspense>
-     {statement.isError?<p role="alert" className="rounded-lg bg-red-50 p-4">{t.error}</p>:statement.isPending?<p role="status">{t.loading}</p>:data&&<>
+     <section data-testid="customer-portal-quick-sections" className="grid grid-cols-1 gap-2 print:hidden min-[360px]:grid-cols-2 md:grid-cols-3">
+      <Button data-testid="customer-open-order" type="button" aria-expanded={opened.order}
+       className="min-h-12 w-full bg-teal-700 text-white" onClick={()=>showSection('order')}>{quick.order}</Button>
+      <Button data-testid="customer-open-analytics" type="button" aria-expanded={opened.analytics}
+       variant="outline" className="min-h-12 w-full" onClick={()=>showSection('analytics')}>{quick.analytics}</Button>
+      <Button data-testid="customer-open-push" type="button" aria-expanded={opened.push}
+       variant="outline" className="min-h-12 w-full" onClick={()=>showSection('push')}>{quick.push}</Button>
+     </section>
+     {statement.isError?<p role="alert" className="rounded-lg bg-red-50 p-4">{t.error} <Button type="button" variant="outline" onClick={()=>statement.refetch()}>{t.refresh}</Button></p>:statement.isPending?<p role="status" className="rounded-lg bg-white p-4 text-sm text-slate-600">{t.loading}</p>:data&&<>
       <p className="text-sm text-slate-600">{t.allTime} · {statementAsOf} · {t.timezoneSaudi}</p>
       <section className="grid min-w-0 grid-cols-1 gap-3 min-[380px]:grid-cols-2 lg:grid-cols-4">{['total','paid','balance','overdue'].map(key=><article key={key} className="min-w-0 rounded-2xl border bg-white p-4 shadow-sm"><h2 className="text-sm text-slate-600">{t[key]}</h2><p className={`mt-2 break-words text-xl font-black ${key==='overdue'?'text-rose-700':'text-teal-800'}`}>{money(data.totals[key])}</p></article>)}</section>
      </>}
+     {opened.order&&<section id="customer-panel-order" data-testid="customer-order-lazy-panel">
+      <Suspense fallback={<p role="status" className="rounded-xl border bg-white p-4 text-sm text-slate-500">{t.loading}</p>}>
+       <CustomerOrderEntry key={'customer-order-'+account.id} account={account} lang={lang}/>
+      </Suspense>
+     </section>}
+     {opened.analytics&&<section id="customer-panel-analytics" data-testid="customer-analytics-lazy-panel">
+      <Suspense fallback={<p role="status" className="rounded-xl border bg-white p-4 text-sm text-slate-500">{t.loading}</p>}>
+       <CustomerAnalyticsDashboard key={account.id} account={account} lang={lang}/>
+      </Suspense>
+     </section>}
+     {opened.push&&<section id="customer-panel-push" data-testid="customer-push-lazy-panel">
+      <Suspense fallback={<p role="status" className="rounded-xl border bg-white p-4 text-sm text-slate-500">{t.loading}</p>}>
+       <PortalPushSettings key={'push-'+account.id} role="customer" customerId={account.id} language={lang}/>
+      </Suspense>
+     </section>}
      <nav className="grid min-w-0 grid-cols-1 gap-2 print:hidden min-[390px]:grid-cols-2 sm:flex sm:flex-wrap">{['invoices','payments','orders'].map(k=><Button key={k} variant={kind===k?'default':'outline'} aria-pressed={kind===k} className="min-w-0 w-full whitespace-normal text-center sm:w-auto" onClick={()=>{setKind(k);setPage(0);}}>{t[k==='orders'?'purchases':k]}</Button>)}</nav>
      <form className="grid min-w-0 grid-cols-1 items-end gap-3 print:hidden sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={e=>{e.preventDefault();setDates({from,to});setPage(0);}}>
       <label className="block min-w-0 text-sm font-semibold">{t.from}<Input className="mt-1 w-full min-w-0 max-w-full" type="date" value={from} max={to||undefined} onChange={e=>setFrom(e.target.value)}/></label>
