@@ -19,37 +19,32 @@ export function usePurchaseProductsByCategory(productCategoryId, supplierId, sub
       // If no category or supplier, return empty
       if (!activeRestaurantId || (!productCategoryId && !supplierId)) return [];
 
-      const filter = {
+      // Product Master records a *primary* supplier. A product can legally be
+      // purchased from another supplier, so the invoice supplier must not make
+      // all existing products disappear when their primary supplier is missing.
+      // Always enforce tenant/material/category scope before supplier fallback.
+      const baseFilter = {
         ...restaurantMaterialFilter(activeRestaurant),
-        ...(activeRestaurantId && { restaurant_id: activeRestaurantId }),
-        ...(supplierId && { supplier_id: supplierId }),
+        restaurant_id: activeRestaurantId,
+        ...(productCategoryId && { category_id: productCategoryId }),
       };
-
-      // 1. Try fetching with specific subcategory if provided
-      if (subcategoryId) {
-        const subFilter = { ...filter, subcategory_id: subcategoryId };
-        const subProducts = await base44.entities.Product.filter(subFilter, 'name', 1000);
-        
-        // If products found for subcategory, return them
-        if (subProducts && subProducts.length > 0) {
-          return subProducts;
+      const fetchCatalog = async (filter) => {
+        if (subcategoryId) {
+          const subProducts = await base44.entities.Product.filter(
+            { ...filter, subcategory_id: subcategoryId }, 'name', 1000,
+          );
+          if (subProducts?.length) return subProducts;
+          // Some valid master products lack subcategory_id; keep parent scope.
         }
-        
-        // 2. If no products for subcategory, fallback to parent category
-        // but ONLY if the products actually belong to this parent category.
-        // This prevents the "disappearing products" bug when subcategory_id is NULL.
-        if (productCategoryId) {
-          const catFilter = { ...filter, category_id: productCategoryId };
-          return base44.entities.Product.filter(catFilter, 'name', 1000);
-        }
-      }
+        return base44.entities.Product.filter(filter, 'name', 1000);
+      };
+      if (!supplierId) return fetchCatalog(baseFilter);
 
-      // 3. Standard category-only filtering
-      if (productCategoryId) {
-        filter.category_id = productCategoryId;
-      }
-
-      return base44.entities.Product.filter(filter, 'name', 1000);
+      const supplierProducts = await fetchCatalog({ ...baseFilter, supplier_id: supplierId });
+      if (supplierProducts?.length) return supplierProducts;
+      // Tenant/category-scoped alternative suppliers are allowed; the actual
+      // payable supplier remains the explicit supplier chosen on this invoice.
+      return fetchCatalog(baseFilter);
     },
     enabled: !!activeRestaurantId && !!(productCategoryId || supplierId),
     staleTime: 30000,
