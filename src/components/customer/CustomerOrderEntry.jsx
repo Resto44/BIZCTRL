@@ -3,6 +3,7 @@ import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {customerPortalRpc} from '@/lib/customerPortal';
 import {portalOrderCategories, selectedPortalCategory, filterPortalOrderProducts, PORTAL_ORDER_ALL} from '@/lib/portalOrderCategories';
 import {Button} from '@/components/ui/button';
+import {customerOrderDeliveryValid,customerOrderCart,customerOrderCartTotal} from '@/lib/customerOrderCheckout';
 import {Input} from '@/components/ui/input';
 
 const language={
@@ -59,7 +60,6 @@ const language={
  },
 };
 const uuid=()=>typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function'?crypto.randomUUID():'';
-const phoneValid=phone=>/^[+0-9 ()-]{7,24}$/.test(phone.trim());
 export default function CustomerOrderEntry({account,lang='en'}){
  const t=language[lang]||language.en;
  const qc=useQueryClient();
@@ -88,13 +88,11 @@ export default function CustomerOrderEntry({account,lang='en'}){
  const groups=portalOrderCategories(catalog,lang);
  const activeCategory=selectedPortalCategory(groups,category);
  const displayed=filterPortalOrderProducts(catalog,activeCategory,search);
- const products=useMemo(()=>new Map(catalog.map(x=>[x.id,x])),[catalog]);
- const selected=Object.entries(cart).filter(([id,count])=>products.has(id)&&count>0)
-  .map(([id,quantity])=>({...products.get(id),quantity}));
+ const selected=customerOrderCart(catalog,cart);
  const count=selected.reduce((sum,line)=>sum+line.quantity,0);
- const quote=selected.reduce((sum,line)=>sum+Math.round(Number(line.price||0)*100)*line.quantity,0)/100;
+ const quote=customerOrderCartTotal(selected);
  const enabled=allowed&&(fulfillment==='pickup'||deliveryAllowed);
- const deliveryValid=fulfillment==='pickup'||(address.trim().length>=10&&address.trim().length<=400&&phoneValid(phone));
+ const deliveryValid=customerOrderDeliveryValid(fulfillment,address,phone);
  const canSend=enabled&&selected.length>0&&selected.length<=25&&count<=100&&deliveryValid&&!!requestId.current;
  const mutate=useMutation({
   mutationFn:()=>customerPortalRpc('erp_customer_portal_order_submit',{
