@@ -156,7 +156,7 @@ export const ERP_NAV_GROUPS = [
       { path: '/role-permissions',    label: 'Role & Permissions',   icon: ShieldCheck, permission: 'manageBranches' },
       { path: '/restaurants',        label: 'Restaurants',          icon: Building2, permission: 'viewBrandSettings' },
       { path: '/settings',           label: 'Settings',             icon: Settings,  permission: 'manageSettings' },
-      { path: '/printer-management', label: 'Printer Management', icon: Printer, permission: 'manageSettings' }
+      { path: '/printer-management', label: 'Printer Management', icon: Printer, permission: 'manageSettings' },
       { path: '/erp-approval-center',label: 'Approvals',            icon: ShieldCheck,permission: 'manageSettings' },
       { path: '/notifications',      label: 'Notifications',        icon: Bell,      permission: 'viewAlerts' },
       { path: '/billing',            label: 'Billing & Subscription',icon: CreditCard,permission: 'viewBilling' },
