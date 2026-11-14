@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {describe,it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
-import {firstIncompletePurchaseProductLine,uniquePurchaseProductForBrand} from '../src/lib/purchaseInvoiceProductSelection.js';
+import {firstIncompletePurchaseProductLine,uniquePurchaseProductForBrand,autoSelectPurchaseBrandProduct} from '../src/lib/purchaseInvoiceProductSelection.js';
 import {selectPurchaseProduct,clearPurchaseProductForFilter} from '../src/lib/purchaseInvoiceBrands.js';
 import {normalizePurchaseLine,calcInvoiceTotals} from '../src/lib/procurementEngine.js';
 
@@ -35,6 +35,15 @@ describe('Purchase Invoice cannot post a priced, brand-only empty product line',
    {quantity:1,unit_cost:0,product_id:'',product_name:'',discount:0,tax:0},fixture[0]));
   expect(line).toMatchObject({product_id:'p1',product_name:'أرز هندي 10 كغ',brand:'رز هندي',unit_cost:76,line_total:76});
  });
+ it('does not lose a manually typed cost when the brand matches after an async lookup',()=>{
+  const old={product_id:'',product_name:'',brand:'رز هندي',quantity:1,unit_cost:76};
+  const selected=normalizePurchaseLine(autoSelectPurchaseBrandProduct(old,{...fixture[0],default_cost:60}));
+  expect(selected).toMatchObject({product_id:'p1',product_name:'أرز هندي 10 كغ',unit_cost:76,line_total:76});
+  expect(autoSelectPurchaseBrandProduct({...old,product_name:'Manual item'},fixture[0]).product_id).toBe('');
+  expect(autoSelectPurchaseBrandProduct({...old,product_id:'existing'},fixture[0]).product_id).toBe('existing');
+  expect(form).toContain("if (productsLoading || !selectedBrand || item.product_id");
+  expect(form).toContain("updateItem(item._id, 'auto_scoped_product', soleProduct)");
+ });
  it('changing a category, brand or supplier still clears stale selected product ID and price',()=>{
   const line={product_id:'p1',product_name:'أرز هندي 10 كغ',brand:'رز هندي',category_id:'rice',unit_cost:76};
   expect(clearPurchaseProductForFilter(line,'brand','Other')).toMatchObject({product_id:'',product_name:'',unit_cost:0});
@@ -59,7 +68,7 @@ describe('Purchase Invoice cannot post a priced, brand-only empty product line',
  });
  it('keeps unique auto-select within the existing supplier and category product lookup',()=>{
   expect(form).toContain('const soleProduct = uniquePurchaseProductForBrand(categoryProducts, brand)');
-  expect(form).toContain("if (soleProduct) updateItem(item._id, 'selected_product', soleProduct)");
+  expect(form).toContain("if (soleProduct) updateItem(item._id, 'auto_scoped_product', soleProduct)");
   expect(catalogHook).toContain('restaurant_id: activeRestaurantId');
   expect(catalogHook).toContain('productCategoryId && { category_id: productCategoryId }');
   expect(catalogHook).toContain('return fetchCatalog(baseFilter)');
