@@ -1,4 +1,4 @@
-import {purchaseProductsForBrand} from './purchaseInvoiceBrands.js';
+import {purchaseProductsForBrand,selectPurchaseProduct} from './purchaseInvoiceBrands.js';
 
 /** A brand, price, and category do not uniquely identify a product. */
 export function firstIncompletePurchaseProductLine(items = []) {
@@ -15,4 +15,15 @@ export function firstIncompletePurchaseProductLine(items = []) {
 export function uniquePurchaseProductForBrand(products = [], brand = '') {
  const matches=purchaseProductsForBrand(products,brand);
  return brand && matches.length===1 ? matches[0] : null;
+}
+
+/** Preserve manually entered buying cost when a delayed unique-brand match loads. */
+export function autoSelectPurchaseBrandProduct(item = {}, product) {
+ if (item.product_id || String(item.product_name || '').trim() || !product?.id) return item;
+ const selected=selectPurchaseProduct(item,product);
+ const enteredCost=Number(item.unit_cost);
+ return {
+  ...selected,
+  unit_cost:Number.isFinite(enteredCost)&&enteredCost>0?enteredCost:selected.unit_cost,
+ };
 }
