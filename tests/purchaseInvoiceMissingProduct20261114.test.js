@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import {describe,it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {firstIncompletePurchaseProductLine,uniquePurchaseProductForBrand} from '../src/lib/purchaseInvoiceProductSelection.js';
