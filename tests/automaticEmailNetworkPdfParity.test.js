@@ -52,6 +52,29 @@ describe('automatic emailed PDF must match manual Network Management appendix',(
    }),
   }));
  });
+ it('fails closed instead of emailing a network-only PDF when driver data did not load',async()=>{
+  const baseline=await fetchScheduledERPReportData();
+  fetchScheduledERPReportData.mockResolvedValueOnce({
+   ...baseline,
+   drivers:null,
+   driverSalesEntries:null,
+  });
+  await expect(buildAutomaticReportPdf({
+   db,job:{restaurant_id:'org-1',report_date:'2026-11-07',frequency:'daily'},
+   context:{restaurant_id:'org-1',branch_id:null,language:'fa',currency:'SAR',
+    name:'BizCTRL Demo',inventoryTransactions:[]},
+  })).rejects.toThrow('REPORT_DRIVER_APPENDIX_MISSING');
+ });
+ it('keeps the PDF driver section in the exact third-page Network renderer',async()=>{
+  const {readFileSync}=await import('node:fs');
+  const src=readFileSync(new URL('../src/lib/drawPdfNetworkManagement.js',import.meta.url),'utf8');
+  expect(src).toContain("import {drawPdfDriverSalesSection} from './drawPdfDriverSalesSection'");
+  expect(src).toContain('const driverAvailable=driverSales?.available===true');
+  expect(src).toContain('drawPdfDriverSalesSection(doc,{insights:driverSales,lang,currency})');
+  const packer=readFileSync(new URL('../scripts/pack-automatic-report-edge.mjs',import.meta.url),'utf8');
+  expect(packer).toContain("'REPORT_DRIVER_APPENDIX_MISSING'");
+  expect(packer).toContain("'Driver sales trend'");
+ });
  it('ensures the generator uses the exact shared manual PDF module, never a separate two-page renderer',async()=>{
   const {readFileSync}=await import('node:fs');
   const src=readFileSync(new URL('../src/lib/automaticReportPdf.js',import.meta.url),'utf8');
