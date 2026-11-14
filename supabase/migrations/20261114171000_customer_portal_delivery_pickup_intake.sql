@@ -145,7 +145,138 @@ begin
  phone_text:=nullif(btrim(coalesce(p_contact_phone,'')),'');
  if p_fulfillment='delivery' and
    (address_text is null or char_length(address_text) not between 10 and 400 or
-    phone_text is null or phone_text !~ '^[+0-9 ()-]{7,24}$') then
+    phone_text is null or phone_text !~ '^[+0-9 ()-]{7,24}
+   raise exception 'DELIVERY_ADDRESS_AND_PHONE_REQUIRED' using errcode='22023';
+ end if;
+ if p_fulfillment='pickup' then address_text:=null;phone_text:=null;end if;
+ -- A delivery address must first go to an authorized manager for confirmation.
+ if p_fulfillment='delivery' and not coalesce(routes.allow_manager,false) then
+   raise exception 'DELIVERY_NEEDS_MANAGER_ROUTE' using errcode='42501';
+ end if;
+ recipient:=case when coalesce(routes.allow_manager,false) then 'manager' else 'kitchen' end;
+ digest:=md5(c.id::text||':'||b::text||':'||p_fulfillment||':'||
+   coalesce(address_text,'')||':'||coalesce(phone_text,'')||':'||p_items::text||':'||
+   coalesce(p_notes,''));
+ -- This check precedes price lookup so identical retries are safely idempotent.
+ select * into existing from portal_order_private.intake where id=p_request_id;
+ if found then
+  if existing.customer_id is distinct from c.id or existing.actor_id <> auth.uid()
+    or existing.request_hash <> digest then raise exception 'CUSTOMER_ORDER_ID_REUSED' using errcode='23505';end if;
+  return jsonb_build_object('id',existing.id,'status',existing.status,'replayed',true);
+ end if;
+ -- The initial request is never charged, but a compromised session must not
+ -- generate an unbounded workload for the restaurant.
+ if (select count(*) from portal_order_private.intake
+     where customer_id=c.id and actor_id=auth.uid()
+       and created_at > now()-interval '1 hour') >= 20 then
+   raise exception 'CUSTOMER_ORDER_RATE_LIMIT' using errcode='22023';
+ end if;
+ if (select count(distinct line.value->>'id') from jsonb_array_elements(p_items) as line(value))
+    <> jsonb_array_length(p_items) then
+   raise exception 'CUSTOMER_ORDER_DUPLICATE_LINE' using errcode='22023';
+ end if;
+ for item in select value from jsonb_array_elements(p_items) loop
+  if jsonb_typeof(item)<>'object' or coalesce(item->>'id','') !~* '^[a-f0-9-]{36}$'
+    or coalesce(item->>'quantity','') !~ '^[0-9]{1,3}$' then
+   raise exception 'CUSTOMER_ORDER_INVALID_ITEM' using errcode='22023';
+  end if;
+  qty:=(item->>'quantity')::integer;
+  if qty<1 or qty>20 then raise exception 'CUSTOMER_ORDER_QUANTITY_INVALID' using errcode='22023';end if;
+  units:=units+qty;
+  if units>100 then raise exception 'CUSTOMER_ORDER_TOO_LARGE' using errcode='22023';end if;
+  if is_restaurant then
+   select * into menu from restaurant_pos_private.menu where id=(item->>'id')::uuid
+     and restaurant_id=c.restaurant_id and branch_id=b and active is true;
+   if menu.id is null then raise exception 'CUSTOMER_ORDER_PRODUCT_FORBIDDEN' using errcode='42501';end if;
+   price:=menu.price;
+   lines:=lines||jsonb_build_array(jsonb_build_object(
+     'id',menu.id,'name',menu.name,'name_ar',menu.name_ar,'name_fa',menu.name_fa,
+     'quantity',qty,'unit_price',price,'line_total',round(qty*price,2)));
+  else
+   select * into product from public.products where id=(item->>'id')::uuid
+     and restaurant_id=c.restaurant_id and (branch_id=b or branch_id is null)
+     and coalesce(is_active,true);
+   if product.id is null then raise exception 'CUSTOMER_ORDER_PRODUCT_FORBIDDEN' using errcode='42501';end if;
+   price:=greatest(0,coalesce(product.selling_price,product.default_price,0));
+   lines:=lines||jsonb_build_array(jsonb_build_object(
+     'id',product.id,'name',product.name,'name_ar',product.name_ar,'name_fa',product.name_fa,
+     'quantity',qty,'unit_price',price,'line_total',round(qty*price,2)));
+  end if;
+  quote:=quote+round(qty*price,2);
+ end loop;
+ if quote>1000000 then raise exception 'CUSTOMER_ORDER_QUOTE_TOO_HIGH' using errcode='22023';end if;
+ insert into portal_order_private.intake
+   (id,restaurant_id,branch_id,actor_id,actor_role,customer_id,recipient,status,order_kind,
+    customer_reference,notes,items,total_quote,request_hash,
+    fulfillment_mode,delivery_address,contact_phone,delivery_fee_quote)
+ values(p_request_id,c.restaurant_id,b,auth.uid(),'customer',c.id,recipient,
+   case when recipient='manager' then 'awaiting_manager' else 'queued' end,
+   case when is_restaurant then 'restaurant' else 'other' end,
+   left(c.name,100),coalesce(p_notes,''),lines,quote,digest,
+   p_fulfillment,address_text,phone_text,null)
+ on conflict(id) do nothing returning id into new_id;
+ if new_id is null then
+  select * into existing from portal_order_private.intake where id=p_request_id;
+  if existing.customer_id is distinct from c.id or existing.actor_id <> auth.uid()
+    or existing.request_hash <> digest then raise exception 'CUSTOMER_ORDER_ID_REUSED' using errcode='23505';end if;
+  return jsonb_build_object('id',existing.id,'status',existing.status,'replayed',true);
+ end if;
+ perform realtime.send('{}'::jsonb,'changed','portal-orders:'||c.restaurant_id||':'||b,false);
+ return jsonb_build_object('id',p_request_id,'status',
+   case when recipient='manager' then 'awaiting_manager' else 'queued' end,
+   'fulfillment',p_fulfillment,'total_quote',quote,
+   'delivery_fee_quote',null,'payment_status','NOT_PAID',
+   'posted_to_sales',false,'inventory_debited',false,'replayed',false);
+end $$;
+
+-- The manager can access delivery instructions; kitchen staff never receive the
+-- customer's address or phone. Older driver tickets keep their prior fields.
+create or replace function public.erp_portal_order_inbox(
+ p_restaurant_id uuid,p_branch_id uuid
+) returns jsonb language plpgsql stable security definer set search_path='' as $$
+declare m public.erp_memberships; b uuid; privileged boolean; records jsonb;
+begin
+ m:=portal_order_private.membership(p_restaurant_id);
+ b:=portal_order_private.branch_for(m,p_branch_id);
+ privileged:=m.role in ('owner','manager') and
+  (m.role='owner' or public.erp_has_any_permission(array['viewOrders','manageSettings']));
+ if not privileged and not (m.role='employee' and public.erp_has_any_permission(array['viewOrders'])) then
+  raise exception 'ORDER_INBOX_PERMISSION_REQUIRED' using errcode='42501';
+ end if;
+ select coalesce(jsonb_agg(to_jsonb(v) order by v.created_at),'[]'::jsonb) into records
+ from (select id,restaurant_id,branch_id,actor_role,recipient,status,order_kind,
+     case when privileged then customer_reference else '' end as customer_reference,
+     case when privileged or actor_role <> 'customer' then notes else '' end as notes,
+     fulfillment_mode,
+     case when privileged then delivery_address else null::text end as delivery_address,
+     case when privileged then contact_phone else null::text end as contact_phone,
+     case when privileged then delivery_fee_quote else null::numeric end as delivery_fee_quote,
+     case when privileged then items else
+       (select coalesce(jsonb_agg(x.value-'unit_price'-'line_total'),'[]'::jsonb)
+        from jsonb_array_elements(items) as x(value)) end as items,
+     case when privileged then total_quote else null::numeric end as total_quote,
+     created_at,updated_at
+   from portal_order_private.intake
+   where restaurant_id=m.restaurant_id and branch_id=b
+     and (privileged or status in ('queued','preparing','ready'))
+     and status not in ('completed','cancelled','rejected')
+   order by created_at asc limit 120) v;
+ return jsonb_build_object('orders',records,'manager',privileged,'branch_id',b);
+end $$;
+
+
+-- Explicit allowlist: independent customer uses only customer_portal_access.
+revoke all on function customer_portal_private.order_customer(uuid),
+ customer_portal_private.order_branch(public.customers,uuid)
+ from public,anon,authenticated;
+revoke all on function public.erp_customer_portal_order_context(uuid,uuid),
+ public.erp_customer_portal_order_submit(uuid,uuid,uuid,text,text,text,jsonb,text)
+ from public,anon,authenticated;
+grant execute on function public.erp_customer_portal_order_context(uuid,uuid),
+ public.erp_customer_portal_order_submit(uuid,uuid,uuid,text,text,text,jsonb,text)
+ to authenticated;
+ or
+    length(regexp_replace(phone_text,'[^0-9]','','g')) not between 7 and 15) then
    raise exception 'DELIVERY_ADDRESS_AND_PHONE_REQUIRED' using errcode='22023';
  end if;
  if p_fulfillment='pickup' then address_text:=null;phone_text:=null;end if;
