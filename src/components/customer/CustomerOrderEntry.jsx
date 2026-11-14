@@ -69,6 +69,7 @@ export default function CustomerOrderEntry({account,lang='en'}){
  const [fulfillment,setFulfillment]=useState('pickup');
  const [category,setCategory]=useState('');
  const [search,setSearch]=useState('');
+ const [visibleLimit,setVisibleLimit]=useState(32);
  const [cart,setCart]=useState({});
  const [address,setAddress]=useState('');
  const [phone,setPhone]=useState('');
@@ -81,7 +82,7 @@ export default function CustomerOrderEntry({account,lang='en'}){
   queryFn:()=>customerPortalRpc('erp_customer_portal_order_context',{
    p_customer_id:account.id,p_branch_id:branch||null,
   }),
-  enabled:Boolean(account?.id),retry:1,refetchInterval:12000,refetchOnWindowFocus:true,
+  enabled:Boolean(account?.id),retry:1,refetchInterval:30000,refetchIntervalInBackground:false,staleTime:15000,refetchOnWindowFocus:true,
  });
  const data=q.data;
  const allowed=Boolean(data?.can_manager||data?.can_kitchen);
@@ -114,7 +115,7 @@ export default function CustomerOrderEntry({account,lang='en'}){
  const add=(id,step)=>{if(mutate.isPending)return;modify(()=>setCart(prev=>({...prev,
   [id]:Math.max(0,Math.min(20,(prev[id]||0)+step)),
  })));};
- const changeBranch=id=>modify(()=>{setBranch(id);setCategory('');setSearch('');setCart({});});
+ const changeBranch=id=>modify(()=>{setBranch(id);setCategory('');setSearch('');setVisibleLimit(32);setCart({});});
  const status=order=>{
   const map={awaiting_manager:t.pending,queued:t.pending,preparing:t.pending,
    ready:t.ready,accepted:t.pending,completed:t.completed};
@@ -154,15 +155,15 @@ export default function CustomerOrderEntry({account,lang='en'}){
     {fulfillment==='pickup'&&<p className="rounded-lg bg-teal-50 p-3 text-sm text-teal-900">{t.noFee} · {data.branch_name}</p>}
     <label className="block text-sm font-semibold">{t.category}
      <select aria-label={t.category} data-testid="customer-order-category" value={activeCategory}
-      onChange={e=>{setCategory(e.target.value);setSearch('');}}
+      onChange={e=>{setCategory(e.target.value);setSearch('');setVisibleLimit(32);}}
       className="mt-1 h-12 w-full rounded-xl border bg-white px-3 text-base">
       <option value={PORTAL_ORDER_ALL}>{t.all} ({catalog.length})</option>
       {groups.map(g=><option key={g.key} value={g.key}>{g.label} ({g.count})</option>)}
      </select></label>
     <Input aria-label={t.search} placeholder={t.search} value={search}
-     onChange={e=>setSearch(e.target.value)} className="h-12 text-base"/>
+     onChange={e=>{setSearch(e.target.value);setVisibleLimit(32);}} className="h-12 text-base"/>
     <div data-testid="customer-order-catalog" className="grid max-h-[45dvh] grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
-     {displayed.map(item=><div key={item.id} className="flex min-h-20 items-center justify-between gap-2 rounded-xl border border-slate-200 p-3">
+     {displayed.slice(0,visibleLimit).map(item=><div key={item.id} className="flex min-h-20 items-center justify-between gap-2 rounded-xl border border-slate-200 p-3">
       <div className="min-w-0"><strong className="block break-words text-sm text-slate-900">{item['name_'+lang]||item.name}</strong>
        <span dir="ltr" className="text-xs text-slate-600">{Number(item.price||0).toFixed(2)} {data.currency||''}</span></div>
       <div className="flex shrink-0 items-center gap-2">
@@ -174,6 +175,10 @@ export default function CustomerOrderEntry({account,lang='en'}){
       </div>
      </div>)}
     </div>
+    {displayed.length>visibleLimit&&<Button data-testid="customer-order-more-products" type="button" variant="outline"
+      className="min-h-11 w-full" onClick={()=>setVisibleLimit(value=>value+32)}>
+      {lang==='ar'?'عرض منتجات إضافية':lang==='fa'?'نمایش محصولات بیشتر':'Show more products'} ({Math.min(visibleLimit,displayed.length)}/{displayed.length})
+    </Button>}
     {!catalog.length&&<p role="status" className="text-sm text-slate-500">{t.empty}</p>}
     {!!catalog.length&&!displayed.length&&<p role="status" className="text-sm text-slate-500">{t.noMatch}</p>}
     {selected.length>0&&<div data-testid="customer-order-cart" className="space-y-2 rounded-xl border border-teal-200 bg-teal-50 p-3">
