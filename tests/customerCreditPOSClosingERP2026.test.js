@@ -85,7 +85,11 @@ describe('Customer credit cross-channel ERP invoice continuity',()=>{
   expect(sql).toContain('il.restaurant_id=c.restaurant_id AND il.customer_id=c.id');
   expect(sql).toContain('coalesce(il.items,\'[]\'::jsonb) AS items');
   expect(sql).toContain("d.party_type='customer' AND d.type='receivable'");
-  expect(page).toContain('refetchInterval:5000,refetchIntervalInBackground:false');
+  // Customer Portal remains fresh with explicit Refresh and on-focus reads,
+  // without re-running financial statement queries every 5 seconds on mobile.
+  expect(page).toContain('refetchInterval:60000,refetchIntervalInBackground:false');
+  expect(page).toContain('onClick={refreshDashboard}');
+  expect(page).toContain('refetchOnWindowFocus:true');
   expect(page).toContain('row.items?.map');
   expect(page).toContain("row.invoice_source==='restaurant_pos'");
   expect(page).toContain("row.invoice_source==='sales_closing'");
