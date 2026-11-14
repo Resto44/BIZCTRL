@@ -712,12 +712,23 @@ const AuthenticatedApp = () => {
 };
 
 // ── Root app ──────────────────────────────────────────────────────────────────
+// Customer Portal authenticates against its own verified customer invite.
+// Running the ERP AuthProvider here triggers an unrelated ERP user lookup
+// (and can clear the customer's shared query cache). Other paths retain the
+// original ERP provider and all existing role/tenant guards.
+function StandaloneCustomerAuthBoundary({ children }) {
+  const { pathname } = useLocation();
+  return pathname.replace(/\/+$/, '') === '/customer-portal'
+    ? children
+    : <AuthProvider>{children}</AuthProvider>;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClientInstance}>
       <LanguageProvider>
         <Router>
-          <AuthProvider>
+          <StandaloneCustomerAuthBoundary>
               <PlatformOwnerRecoveryCallbackRouter />
               <Routes>
               {/* ── NEW ERP Unified Auth (primary entry points) ── */}
@@ -757,7 +768,7 @@ function App() {
               <Route path="*" element={<AuthenticatedApp />} />
             </Routes>
             <Toaster />
-          </AuthProvider>
+          </StandaloneCustomerAuthBoundary>
         </Router>
       </LanguageProvider>
     </QueryClientProvider>
