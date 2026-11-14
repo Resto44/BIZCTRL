@@ -72,7 +72,7 @@ create or replace function portal_order_private.branch_for(m public.erp_membersh
 returns uuid language plpgsql stable security definer set search_path='' as $$
 declare b uuid;
 begin
- b:=case when m.role='owner' then
+ b:=case when m.role='owner' or (m.role in ('supplier','customer') and m.branch_id is null) then
     coalesce(p_branch_id,m.branch_id,
       (select id from public.branches where restaurant_id=m.restaurant_id and coalesce(is_active,true) order by name,id limit 1))
    else m.branch_id end;
@@ -251,7 +251,12 @@ begin
  select coalesce(jsonb_agg(to_jsonb(v) order by v.created_at),'[]'::jsonb) into records
  from (select id,restaurant_id,branch_id,actor_role,recipient,status,order_kind,
      case when privileged then customer_reference else '' end as customer_reference,
-     notes,items,total_quote,created_at,updated_at
+     notes,
+     case when privileged then items else
+       (select coalesce(jsonb_agg(x.value-'unit_price'-'line_total'),'[]'::jsonb)
+        from jsonb_array_elements(items) as x(value)) end as items,
+     case when privileged then total_quote else null::numeric end as total_quote,
+     created_at,updated_at
    from portal_order_private.intake
    where restaurant_id=m.restaurant_id and branch_id=b
      and (privileged or status in ('queued','preparing','ready'))
