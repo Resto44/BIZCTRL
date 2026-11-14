@@ -18,6 +18,10 @@ import { supabase } from '@/api/supabaseClient';
 import { useTenant } from '@/lib/TenantContext';
 import { useAuth } from '@/lib/AuthContext';
 import { usePurchaseProductsByCategory } from '@/hooks/usePurchaseProductsByCategory';
+import {
+  purchaseBrandOptions, purchaseProductsForBrand, purchaseProductBrand,
+  clearPurchaseProductForFilter, selectPurchaseProduct,
+} from '@/lib/purchaseInvoiceBrands';
 import { usePurchaseCategoriesHierarchy } from '@/hooks/usePurchaseCategoriesHierarchy';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { Button } from '@/components/ui/button';
@@ -51,6 +55,7 @@ const emptyItem = () => ({
   category: '',
   category_id: '',
   subcategory_id: '',
+  brand: '',
   product_id: '',
   product_name: '',
   supplier_id: '',
@@ -97,9 +102,17 @@ function PurchaseInvoiceItemRow({
   const itemSupplierId = multiSupplierMode ? item.supplier_id : supplierId;
   const selectedItemSupplier = multiSupplierMode ? suppliers.find(s => String(s.id) === String(item.supplier_id)) : null;
   const [expanded, setExpanded] = useState(() => !item.product_name && !item.product_id);
+  const [brandSearch, setBrandSearch] = useState('');
   // Fetch products for this item's category/subcategory and supplier
   // Calling hook here is safe because it's the top level of this component
-  const { products: categoryProducts = [] } = usePurchaseProductsByCategory(item.category_id, itemSupplierId, item.subcategory_id);
+  const { products: categoryProducts = [], isLoading: productsLoading } = usePurchaseProductsByCategory(item.category_id, itemSupplierId, item.subcategory_id);
+  // Brands come from this same tenant-, category-, and supplier-filtered
+  // catalog, not an unrelated company brand or another supplier.
+  const selectedBrand = purchaseProductBrand(categoryProducts, item.product_id, item.brand);
+  const brandOptions = purchaseBrandOptions(categoryProducts, selectedBrand);
+  const visibleProducts = purchaseProductsForBrand(categoryProducts, selectedBrand);
+  const query = brandSearch.trim().toLocaleLowerCase();
+  const visibleBrands = brandOptions.filter(name => !query || name.toLocaleLowerCase().includes(query));
 
   // Mobile number keyboards can emit input before change. Use the same canonical
   // state update for both events so quantity, cost, discount, and tax always
@@ -205,31 +218,50 @@ function PurchaseInvoiceItemRow({
             </SelectContent>
           </Select>
         </div>
-        <div className="col-span-1 sm:col-span-2 min-w-0">
-          <Label className="text-[10px] text-muted-foreground">Product *</Label>
-          <Select value={item.product_id} onValueChange={v => {
-            const prod = categoryProducts.find(p => p.id === v);
-            updateItem(item._id, 'product_id', v);
-            if (prod) {
-              updateItem(item._id, 'product_name', prod.name);
-              updateItem(item._id, 'unit', prod.unit || item.unit);
-              updateItem(item._id, 'unit_cost', prod.default_cost || item.unit_cost);
-            }
+        <div className="min-w-0" data-testid="purchase-line-brand">
+          <Label className="mb-1 block text-xs font-semibold text-slate-700">Brand</Label>
+          {brandOptions.length > 15 && (
+            <Input aria-label="Search purchase product brands" value={brandSearch}
+              onChange={event => setBrandSearch(event.target.value)}
+              placeholder="Search brands..." className="mb-1.5 h-10 w-full bg-white text-sm" />
+          )}
+          <Select value={selectedBrand ? `brand:${selectedBrand}` : '__all__'}
+            onValueChange={value => { setBrandSearch(''); updateItem(item._id, 'brand', value === '__all__' ? '' : value.slice(6)); }}
+            disabled={!item.category_id && !itemSupplierId}>
+            <SelectTrigger className="h-11 w-full min-w-0 bg-white text-sm" aria-label="Select product brand">
+              <SelectValue placeholder="Select brand" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[min(50dvh,360px)]">
+              <SelectItem value="__all__">— All brands —</SelectItem>
+              {visibleBrands.map(brand => (
+                <SelectItem key={brand} value={`brand:${brand}`}>{brand}</SelectItem>
+              ))}
+              {brandOptions.length === 0 && <div className="p-2 text-xs text-slate-500">
+                {productsLoading ? 'Loading brands...' : 'No brand saved for matching products.'}
+              </div>}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="min-w-0">
+          <Label className="mb-1 block text-xs font-semibold text-slate-700">Product *</Label>
+          <Select value={item.product_id || undefined} onValueChange={v => {
+            const product = visibleProducts.find(p => String(p.id) === String(v));
+            if (product) updateItem(item._id, 'selected_product', product);
           }} disabled={!item.category_id && !itemSupplierId}>
-            <SelectTrigger className="h-8 text-xs w-full min-w-0" disabled={!item.category_id && !itemSupplierId}>
-              <SelectValue placeholder={(item.category_id || itemSupplierId) ? (categoryProducts.length === 0 ? 'No matching products.' : 'Select...') : 'Select category or supplier first'} />
+            <SelectTrigger className="h-11 text-sm w-full min-w-0" aria-label="Select purchase product">
+              <SelectValue placeholder={(item.category_id || itemSupplierId) ? (visibleProducts.length === 0 ? 'No matching products.' : 'Select...') : 'Select category or supplier first'} />
             </SelectTrigger>
             <SelectContent>
-              {categoryProducts.length === 0 && (item.category_id || itemSupplierId) ? (
-                <div className="px-2 py-1.5 text-xs text-muted-foreground">No matching products found.</div>
+              {visibleProducts.length === 0 && (item.category_id || itemSupplierId) ? (
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">No product matches this brand, category and supplier.</div>
               ) : (
-                categoryProducts.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)
+                visibleProducts.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)
               )}
             </SelectContent>
           </Select>
           {!item.product_id && (
             <Input value={item.product_name} onChange={e => updateItem(item._id, 'product_name', e.target.value)}
-              placeholder="Or type product name" className="h-8 text-xs mt-1 w-full min-w-0" />
+              placeholder="Or type product name" className="h-10 text-sm mt-1 w-full min-w-0" />
           )}
         </div>
       </div>
@@ -449,21 +481,13 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
   const updateItem = useCallback((id, field, value) => {
     setItems(prev => prev.map(item => {
       if (item._id !== id) return item;
-      const updated = { ...item, [field]: value };
-      
-      // When category changes: clear product selection and subcategory
-      if (field === 'category_id') {
-        updated.product_id = '';
-        updated.product_name = '';
-        updated.subcategory_id = '';
+      if (field === 'selected_product') {
+        return normalizePurchaseLine(selectPurchaseProduct(item, value));
       }
-      // When subcategory changes: clear product selection
-      if (field === 'subcategory_id' || field === 'supplier_id') {
-        updated.product_id = '';
-        updated.product_name = '';
+      if (['category_id', 'subcategory_id', 'supplier_id', 'brand'].includes(field)) {
+        return normalizePurchaseLine(clearPurchaseProductForFilter(item, field, value));
       }
-      
-      return normalizePurchaseLine(updated);
+      return normalizePurchaseLine({ ...item, [field]: value });
     }));
   }, []);
 
