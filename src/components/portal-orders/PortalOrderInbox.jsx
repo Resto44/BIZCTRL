@@ -51,6 +51,16 @@ export default function PortalOrderInbox({restaurantId,branchId,lang='en',dark=f
     </div>
     <p className="text-xs opacity-75">{o.recipient} · {new Date(o.created_at).toLocaleString()}
      {manager&&o.customer_reference?' · '+o.customer_reference:''}</p>
+    {o.fulfillment_mode&&<div className="rounded-xl border border-teal-400/40 p-2 text-sm font-bold"
+       data-testid="portal-order-fulfillment">
+      {o.fulfillment_mode==='delivery'?(lang==='ar'?'توصيل للعميل':lang==='fa'?'ارسال به مشتری':'Customer delivery'):
+        (lang==='ar'?'استلام من المطعم':lang==='fa'?'تحویل از رستوران':'Customer pickup')}
+      {o.fulfillment_mode==='delivery'&&manager&&<div className="mt-2 space-y-1 text-xs font-semibold">
+       <p>{lang==='ar'?'العنوان':lang==='fa'?'نشانی':'Address'}: {o.delivery_address||'—'}</p>
+       <p>{lang==='ar'?'الهاتف':lang==='fa'?'شماره تماس':'Phone'}: <span dir="ltr">{o.contact_phone||'—'}</span></p>
+       <p className="text-amber-600">{lang==='ar'?'رسوم التوصيل غير مؤكدة':lang==='fa'?'هزینه دلیوری هنوز تأیید نشده':'Delivery fee pending manager confirmation'}</p>
+      </div>}
+     </div>}
     {(Array.isArray(o.items)?o.items:[]).map((line,i)=><div key={line.id||i}
      className="flex items-start justify-between gap-2 border-b border-slate-400/20 py-1 text-sm font-bold">
       <span className="min-w-0 break-words">{line['name_'+lang]||line.name}</span>
