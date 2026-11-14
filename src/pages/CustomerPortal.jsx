@@ -128,7 +128,11 @@ export default function CustomerPortal() {
    </header>
    {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{error}</p>}
    {notice&&<p role="status" className="rounded-lg bg-teal-50 p-3">{notice}</p>}
-   {loading?<p role="status">{t.loading}</p>:!session?<form className="mx-auto max-w-md space-y-4 rounded-2xl border bg-white p-6 shadow-sm" onSubmit={e=>{e.preventDefault();authenticate(Boolean(invite&&!emailPending));}}>
+   {loading?<section data-testid="customer-session-skeleton" role="status" aria-live="polite" className="space-y-3 rounded-2xl border bg-white p-4 shadow-sm">
+     <p className="text-sm font-semibold text-teal-800">{t.loading}</p>
+     <div aria-hidden="true" className="h-12 w-full animate-pulse rounded-xl bg-slate-100"/>
+     <div aria-hidden="true" className="h-20 w-full animate-pulse rounded-xl bg-slate-100"/>
+    </section>:!session?<form className="mx-auto max-w-md space-y-4 rounded-2xl border bg-white p-6 shadow-sm" onSubmit={e=>{e.preventDefault();authenticate(Boolean(invite&&!emailPending));}}>
     {invite&&<section data-testid="customer-verification-steps" className="space-y-2 rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm text-teal-950">
       <strong className="block font-black">{t.signupTitle}</strong>
       <ol className="space-y-1.5 text-xs leading-5"><li>{t.signupStep1}</li><li>{t.signupStep2}</li><li>{t.signupStep3}</li></ol>
