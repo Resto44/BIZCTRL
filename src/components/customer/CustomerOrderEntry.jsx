@@ -1,4 +1,4 @@
-import React, {useMemo, useRef, useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {customerPortalRpc} from '@/lib/customerPortal';
 import {portalOrderCategories, selectedPortalCategory, filterPortalOrderProducts, PORTAL_ORDER_ALL} from '@/lib/portalOrderCategories';
