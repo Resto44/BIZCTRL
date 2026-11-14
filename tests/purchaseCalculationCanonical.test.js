@@ -89,7 +89,11 @@ describe('canonical purchase calculation flow', () => {
 
     expect(form).toContain('normalizePurchaseLine(i)');
     expect(form).toContain('{calcLineTotal(item).toLocaleString');
-    expect(form).toContain('return normalizePurchaseLine(updated);');
+    // Both ordinary numeric edits and brand-aware product changes must still
+    // pass through the same monetary normalization function.
+    expect(form).toContain('return normalizePurchaseLine({ ...item, [field]: value });');
+    expect(form).toContain('return normalizePurchaseLine(selectPurchaseProduct(item, value));');
+    expect(form).toContain('return normalizePurchaseLine(clearPurchaseProductForFilter(item, field, value));');
     expect(form).toContain('const cleanItems = items.map(({ _id, _ocr_confidence, ...i }) => normalizePurchaseLine(i));');
     expect(form).toContain("onInput={e => updateNumericItem('quantity', e)}");
     expect(form).toContain("onInput={e => updateNumericItem('unit_cost', e)}");

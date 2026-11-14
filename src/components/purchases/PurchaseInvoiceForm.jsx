@@ -15,9 +15,14 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
+import { fetchProductBrandChoices } from '@/lib/productBrands';
 import { useTenant } from '@/lib/TenantContext';
 import { useAuth } from '@/lib/AuthContext';
 import { usePurchaseProductsByCategory } from '@/hooks/usePurchaseProductsByCategory';
+import {
+  purchaseBrandOptions, purchaseProductsForBrand, purchaseProductBrand,
+  clearPurchaseProductForFilter, selectPurchaseProduct,
+} from '@/lib/purchaseInvoiceBrands';
 import { usePurchaseCategoriesHierarchy } from '@/hooks/usePurchaseCategoriesHierarchy';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { Button } from '@/components/ui/button';
@@ -51,6 +56,7 @@ const emptyItem = () => ({
   category: '',
   category_id: '',
   subcategory_id: '',
+  brand: '',
   product_id: '',
   product_name: '',
   supplier_id: '',
@@ -90,6 +96,8 @@ function PurchaseInvoiceItemRow({
   supplierId,
   suppliers,
   multiSupplierMode,
+  organizationBrands,
+  brandsError,
   categories,
   categoriesTree
 }) {
@@ -97,9 +105,20 @@ function PurchaseInvoiceItemRow({
   const itemSupplierId = multiSupplierMode ? item.supplier_id : supplierId;
   const selectedItemSupplier = multiSupplierMode ? suppliers.find(s => String(s.id) === String(item.supplier_id)) : null;
   const [expanded, setExpanded] = useState(() => !item.product_name && !item.product_id);
+  const [brandSearch, setBrandSearch] = useState('');
   // Fetch products for this item's category/subcategory and supplier
   // Calling hook here is safe because it's the top level of this component
-  const { products: categoryProducts = [] } = usePurchaseProductsByCategory(item.category_id, itemSupplierId, item.subcategory_id);
+  const { products: categoryProducts = [], isLoading: productsLoading } = usePurchaseProductsByCategory(item.category_id, itemSupplierId, item.subcategory_id);
+  // Brands come from this same tenant-, category-, and supplier-filtered
+  // catalog, not an unrelated company brand or another supplier.
+  const selectedBrand = purchaseProductBrand(categoryProducts, item.product_id, item.brand);
+  const brandOptions = purchaseBrandOptions(categoryProducts, selectedBrand, organizationBrands);
+  const visibleProducts = purchaseProductsForBrand(categoryProducts, selectedBrand);
+  const query = brandSearch.trim().toLocaleLowerCase();
+  const visibleBrands = brandOptions.filter(name =>
+    !query || name.toLocaleLowerCase().includes(query) || name === selectedBrand,
+  );
+  useEffect(() => { setBrandSearch(''); }, [item.category_id, item.subcategory_id, item.supplier_id]);
 
   // Mobile number keyboards can emit input before change. Use the same canonical
   // state update for both events so quantity, cost, discount, and tax always
@@ -119,7 +138,7 @@ function PurchaseInvoiceItemRow({
       <div className="relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3.5 sm:grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] sm:items-center sm:px-5">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-slate-900">{item.product_name || `New item ${idx + 1}`}</p>
-          <p className="truncate text-[11px] text-slate-500">{multiSupplierMode ? (selectedItemSupplier?.name || 'Supplier not selected') + ' · ' : ''}Per {item.unit || 'unit'}</p>
+          <p className="truncate text-[11px] text-slate-500">{multiSupplierMode ? (selectedItemSupplier?.name || 'Supplier not selected') + ' · ' : ''}{selectedBrand ? `Brand: ${selectedBrand} · ` : ''}Per {item.unit || 'unit'}</p>
         </div>
 
         <div className="hidden truncate text-sm font-medium text-slate-700 sm:block">{item.unit || '—'}</div>
@@ -205,31 +224,51 @@ function PurchaseInvoiceItemRow({
             </SelectContent>
           </Select>
         </div>
-        <div className="col-span-1 sm:col-span-2 min-w-0">
-          <Label className="text-[10px] text-muted-foreground">Product *</Label>
-          <Select value={item.product_id} onValueChange={v => {
-            const prod = categoryProducts.find(p => p.id === v);
-            updateItem(item._id, 'product_id', v);
-            if (prod) {
-              updateItem(item._id, 'product_name', prod.name);
-              updateItem(item._id, 'unit', prod.unit || item.unit);
-              updateItem(item._id, 'unit_cost', prod.default_cost || item.unit_cost);
-            }
+        <div className="min-w-0" data-testid="purchase-line-brand">
+          <Label className="mb-1 block text-xs font-semibold text-slate-700">Brand</Label>
+          {brandOptions.length > 15 && (
+            <Input aria-label="Search purchase product brands" value={brandSearch}
+              onChange={event => setBrandSearch(event.target.value)}
+              placeholder="Search brands..." className="mb-1.5 h-10 w-full bg-white text-sm" />
+          )}
+          <Select value={selectedBrand ? `brand:${selectedBrand}` : '__all__'}
+            onValueChange={value => { setBrandSearch(''); updateItem(item._id, 'brand', value === '__all__' ? '' : value.slice(6)); }}
+            disabled={!item.category_id && !itemSupplierId}>
+            <SelectTrigger className="h-11 w-full min-w-0 bg-white text-sm" aria-label="Select product brand">
+              <SelectValue placeholder="Select brand" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[min(50dvh,360px)]">
+              <SelectItem value="__all__">— All brands —</SelectItem>
+              {visibleBrands.map(brand => (
+                <SelectItem key={brand} value={`brand:${brand}`}>{brand}</SelectItem>
+              ))}
+              {brandOptions.length === 0 && <div className="p-2 text-xs text-slate-500">
+                {productsLoading ? 'Loading brands...' : 'No brands saved for this business yet. Add them in Product Master.'}
+              </div>}
+            </SelectContent>
+          </Select>
+          {brandsError && <p className="mt-1 text-xs text-amber-700">Could not load all saved brands; available category brands remain selectable.</p>}
+        </div>
+        <div className="min-w-0">
+          <Label className="mb-1 block text-xs font-semibold text-slate-700">Product *</Label>
+          <Select value={item.product_id || undefined} onValueChange={v => {
+            const product = visibleProducts.find(p => String(p.id) === String(v));
+            if (product) updateItem(item._id, 'selected_product', product);
           }} disabled={!item.category_id && !itemSupplierId}>
-            <SelectTrigger className="h-8 text-xs w-full min-w-0" disabled={!item.category_id && !itemSupplierId}>
-              <SelectValue placeholder={(item.category_id || itemSupplierId) ? (categoryProducts.length === 0 ? 'No matching products.' : 'Select...') : 'Select category or supplier first'} />
+            <SelectTrigger data-testid="purchase-brand-filtered-product" className="h-11 text-sm w-full min-w-0" aria-label="Select purchase product">
+              <SelectValue placeholder={(item.category_id || itemSupplierId) ? (visibleProducts.length === 0 ? 'No matching products.' : 'Select...') : 'Select category or supplier first'} />
             </SelectTrigger>
             <SelectContent>
-              {categoryProducts.length === 0 && (item.category_id || itemSupplierId) ? (
-                <div className="px-2 py-1.5 text-xs text-muted-foreground">No matching products found.</div>
+              {visibleProducts.length === 0 && (item.category_id || itemSupplierId) ? (
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">No product matches this brand, category and supplier.</div>
               ) : (
-                categoryProducts.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)
+                visibleProducts.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)
               )}
             </SelectContent>
           </Select>
           {!item.product_id && (
             <Input value={item.product_name} onChange={e => updateItem(item._id, 'product_name', e.target.value)}
-              placeholder="Or type product name" className="h-8 text-xs mt-1 w-full min-w-0" />
+              placeholder="Or type product name" className="h-10 text-sm mt-1 w-full min-w-0" />
           )}
         </div>
       </div>
@@ -403,6 +442,17 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
     enabled: !!restaurantId,
   });
 
+  // Share the same RLS-scoped saved brands as Product Master.
+  // The category/supplier filtered products remain the only source of selectable
+  // Product IDs; brand names alone never authorize a different supplier item.
+  const { data: organizationBrands = [], isError: brandsError } = useQuery({
+    queryKey: ['product-brand-choices', restaurantId],
+    queryFn: () => fetchProductBrandChoices(supabase, restaurantId),
+    enabled: Boolean(restaurantId),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
   // Use hierarchical categories hook
   const { categories, tree: categoriesTree } = usePurchaseCategoriesHierarchy();
 
@@ -449,21 +499,13 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
   const updateItem = useCallback((id, field, value) => {
     setItems(prev => prev.map(item => {
       if (item._id !== id) return item;
-      const updated = { ...item, [field]: value };
-      
-      // When category changes: clear product selection and subcategory
-      if (field === 'category_id') {
-        updated.product_id = '';
-        updated.product_name = '';
-        updated.subcategory_id = '';
+      if (field === 'selected_product') {
+        return normalizePurchaseLine(selectPurchaseProduct(item, value));
       }
-      // When subcategory changes: clear product selection
-      if (field === 'subcategory_id' || field === 'supplier_id') {
-        updated.product_id = '';
-        updated.product_name = '';
+      if (['category_id', 'subcategory_id', 'supplier_id', 'brand'].includes(field)) {
+        return normalizePurchaseLine(clearPurchaseProductForFilter(item, field, value));
       }
-      
-      return normalizePurchaseLine(updated);
+      return normalizePurchaseLine({ ...item, [field]: value });
     }));
   }, []);
 
@@ -939,7 +981,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
               <div className="hidden grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] border-t border-slate-200 bg-slate-50 px-5 py-2.5 text-[11px] font-medium text-slate-500 sm:grid">
                 <span>Item</span><span>Unit</span><span>Qty</span><span>Unit Cost</span><span className="text-right">Total</span><span />
               </div>
-              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} categories={categories} categoriesTree={categoriesTree} />)}</div>
+              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} organizationBrands={organizationBrands} brandsError={brandsError} categories={categories} categoriesTree={categoriesTree} />)}</div>
               <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 sm:px-5">
                 <Button type="button" variant="ghost" onClick={addItem} className="h-9 gap-2 px-0 font-bold text-blue-700 hover:bg-transparent"><Plus className="h-5 w-5 rounded-full border border-blue-600 p-0.5" /> Add Item</Button>
                 <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{items.length} item{items.length === 1 ? '' : 's'}</span>
@@ -949,7 +991,20 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
 
           {!multiSupplierMode && <InvoiceAccordion title="Supplier" subtitle={selectedSupplier?.name || form.supplier_name} icon={UserRound} verified={Boolean(form.supplier_id || form.supplier_name.trim())} open={openSection === 'supplier'} onToggle={() => setOpenSection(current => current === 'supplier' ? null : 'supplier')}>
             <div className="space-y-3">
-              <div><Label className="text-xs text-slate-600">Supplier *</Label><Select disabled={Boolean(supplier)} value={form.supplier_id} onValueChange={value => { const supplier = suppliers.find(item => item.id === value); setForm(current => ({ ...current, supplier_id: value, supplier_name: supplier?.name || '', supplier_email: supplier?.email || '' })); setPaymentTerms(supplier?.payment_terms || ''); setVatNumber(supplier?.vat_number || supplier?.tax_number || ''); }}><SelectTrigger className="mt-1 h-11 rounded-xl bg-white"><SelectValue placeholder="Select supplier..." /></SelectTrigger><SelectContent>{suppliers.map(supplier => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent></Select>{!form.supplier_id && <Input value={form.supplier_name} onChange={event => setForm(current => ({ ...current, supplier_name: event.target.value }))} placeholder="Or type supplier name" className="mt-2 h-11 rounded-xl bg-white" />}</div>
+              <div><Label className="text-xs text-slate-600">Supplier *</Label><Select disabled={Boolean(supplier)} value={form.supplier_id} onValueChange={value => {
+                const selected = suppliers.find(record => record.id === value);
+                // Changing the invoice supplier invalidates the formerly
+                // selected brand/product/cost even if it came from another
+                // supplier's draft. A payable may never silently mix parties.
+                if (String(form.supplier_id || '') !== String(value)) {
+                  setItems(previous => previous.map(line => normalizePurchaseLine(
+                    clearPurchaseProductForFilter(line, 'supplier_id', value),
+                  )));
+                }
+                setForm(current => ({ ...current, supplier_id: value, supplier_name: selected?.name || '', supplier_email: selected?.email || '' }));
+                setPaymentTerms(selected?.payment_terms || '');
+                setVatNumber(selected?.vat_number || selected?.tax_number || '');
+              }}><SelectTrigger className="mt-1 h-11 rounded-xl bg-white"><SelectValue placeholder="Select supplier..." /></SelectTrigger><SelectContent>{suppliers.map(supplier => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent></Select>{!form.supplier_id && <Input value={form.supplier_name} onChange={event => setForm(current => ({ ...current, supplier_name: event.target.value }))} placeholder="Or type supplier name" className="mt-2 h-11 rounded-xl bg-white" />}</div>
               <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs text-slate-600">Invoice number</Label><Input value={form.invoice_number} onChange={event => setForm(current => ({ ...current, invoice_number: event.target.value }))} className="mt-1 h-10 bg-white" /></div><div><Label className="text-xs text-slate-600">Currency</Label><Select value={form.currency} onValueChange={value => setForm(current => ({ ...current, currency: value }))}><SelectTrigger className="mt-1 h-10 bg-white"><SelectValue /></SelectTrigger><SelectContent>{CURRENCIES.map(currency => <SelectItem key={currency} value={currency}>{currency}</SelectItem>)}</SelectContent></Select></div></div>
               <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs text-slate-600">Invoice date</Label><Input type="date" value={form.date} onChange={event => setForm(current => ({ ...current, date: event.target.value }))} className="mt-1 h-10 bg-white" /></div><div><Label className="text-xs text-slate-600">VAT number</Label><Input value={resolvedVatNumber} onChange={event => setVatNumber(event.target.value)} inputMode="numeric" className="mt-1 h-10 bg-white" placeholder="VAT number" /></div></div>
             </div>
