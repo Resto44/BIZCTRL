@@ -5,8 +5,12 @@
  */
 import { cleanProductBrands, normalizeProductBrand } from './productBrands.js';
 
-export function purchaseBrandOptions(products = [], savedBrand = '') {
-  return cleanProductBrands((Array.isArray(products) ? products : []).map(product => product?.brand), savedBrand);
+export function purchaseBrandOptions(products = [], savedBrand = '', organizationBrands = []) {
+  // Combine brands found in the current supplier/category with the verified
+  // organization vocabulary shared with Product Master. Never use global brands.
+  const mapped = (Array.isArray(products) ? products : []).map(product => product?.brand);
+  const shared = Array.isArray(organizationBrands) ? organizationBrands : [];
+  return cleanProductBrands([...mapped, ...shared], savedBrand);
 }
 
 export function purchaseProductsForBrand(products = [], brand = '') {
