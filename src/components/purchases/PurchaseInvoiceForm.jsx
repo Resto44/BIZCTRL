@@ -15,6 +15,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
+import { fetchProductBrandChoices } from '@/lib/productBrands';
 import { useTenant } from '@/lib/TenantContext';
 import { useAuth } from '@/lib/AuthContext';
 import { usePurchaseProductsByCategory } from '@/hooks/usePurchaseProductsByCategory';
@@ -95,6 +96,8 @@ function PurchaseInvoiceItemRow({
   supplierId,
   suppliers,
   multiSupplierMode,
+  organizationBrands,
+  brandsError,
   categories,
   categoriesTree
 }) {
@@ -109,7 +112,7 @@ function PurchaseInvoiceItemRow({
   // Brands come from this same tenant-, category-, and supplier-filtered
   // catalog, not an unrelated company brand or another supplier.
   const selectedBrand = purchaseProductBrand(categoryProducts, item.product_id, item.brand);
-  const brandOptions = purchaseBrandOptions(categoryProducts, selectedBrand);
+  const brandOptions = purchaseBrandOptions(categoryProducts, selectedBrand, organizationBrands);
   const visibleProducts = purchaseProductsForBrand(categoryProducts, selectedBrand);
   const query = brandSearch.trim().toLocaleLowerCase();
   const visibleBrands = brandOptions.filter(name => !query || name.toLocaleLowerCase().includes(query));
@@ -237,10 +240,11 @@ function PurchaseInvoiceItemRow({
                 <SelectItem key={brand} value={`brand:${brand}`}>{brand}</SelectItem>
               ))}
               {brandOptions.length === 0 && <div className="p-2 text-xs text-slate-500">
-                {productsLoading ? 'Loading brands...' : 'No brand saved for matching products.'}
+                {productsLoading ? 'Loading brands...' : 'No brands saved for this business yet. Add them in Product Master.'}
               </div>}
             </SelectContent>
           </Select>
+          {brandsError && <p className="mt-1 text-xs text-amber-700">Could not load all saved brands; available category brands remain selectable.</p>}
         </div>
         <div className="min-w-0">
           <Label className="mb-1 block text-xs font-semibold text-slate-700">Product *</Label>
@@ -433,6 +437,17 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
       return data || [];
     },
     enabled: !!restaurantId,
+  });
+
+  // Share the same RLS-scoped saved brands as Product Master.
+  // The category/supplier filtered products remain the only source of selectable
+  // Product IDs; brand names alone never authorize a different supplier item.
+  const { data: organizationBrands = [], isError: brandsError } = useQuery({
+    queryKey: ['product-brand-choices', restaurantId],
+    queryFn: () => fetchProductBrandChoices(supabase, restaurantId),
+    enabled: Boolean(restaurantId),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
   });
 
   // Use hierarchical categories hook
@@ -963,7 +978,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
               <div className="hidden grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] border-t border-slate-200 bg-slate-50 px-5 py-2.5 text-[11px] font-medium text-slate-500 sm:grid">
                 <span>Item</span><span>Unit</span><span>Qty</span><span>Unit Cost</span><span className="text-right">Total</span><span />
               </div>
-              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} categories={categories} categoriesTree={categoriesTree} />)}</div>
+              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} organizationBrands={organizationBrands} brandsError={brandsError} categories={categories} categoriesTree={categoriesTree} />)}</div>
               <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 sm:px-5">
                 <Button type="button" variant="ghost" onClick={addItem} className="h-9 gap-2 px-0 font-bold text-blue-700 hover:bg-transparent"><Plus className="h-5 w-5 rounded-full border border-blue-600 p-0.5" /> Add Item</Button>
                 <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{items.length} item{items.length === 1 ? '' : 's'}</span>
