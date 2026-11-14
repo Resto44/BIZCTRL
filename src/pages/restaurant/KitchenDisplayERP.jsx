@@ -9,6 +9,7 @@ import {useTenant} from '@/lib/TenantContext';
 import {useRole} from '@/lib/RoleContext';
 import {useLanguage} from '@/lib/LanguageContext';
 import {supabase} from '@/api/supabaseClient';
+import PortalOrderInbox from '@/components/portal-orders/PortalOrderInbox';
 import {subscribeCashierBroadcast} from '@/lib/cashierBroadcast';
 import {
   isRestaurantPOSPortal,restaurantRpc,restaurantProductName,kitchenNextState,
@@ -410,7 +411,8 @@ export default function KitchenDisplayERP(){
     </div>}
     {error&&<div role="alert" className="mb-4 rounded-xl border border-amber-600 bg-amber-950 px-4 py-3 text-sm text-amber-100">{error}</div>}
     {data?.overflow>0&&<div role="alert" className="mb-4 rounded-xl border border-amber-600 bg-amber-950 p-3 text-sm text-amber-100">{t.tooMany} ({data.overflow})</div>}
-    <div className="grid gap-3 lg:grid-cols-3 lg:gap-4">
+    <PortalOrderInbox restaurantId={id} branchId={branchId} lang={lang} dark kitchenOnly/>
+    <div className="mt-4 grid gap-3 lg:grid-cols-3 lg:gap-4">
       {STAGES.map((stage,i)=><section key={stage} data-testid={'kds-stage-'+stage}
         className={'min-w-0 rounded-2xl border p-3 sm:p-4 '+tone[stage].bg}>
         <div className="mb-4 flex items-center justify-between gap-2">
