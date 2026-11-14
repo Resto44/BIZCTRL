@@ -43,6 +43,10 @@ jobs:
           path: reports/i18n-coverage-audit.json
       - run: pnpm run build
       - run: node scripts/build-automatic-report.mjs
+      # Keep the separately deployed Supabase email worker in lock-step with
+      # the Owner PDF. The packer refuses any bundle without Driver/Network
+      # section renderers, source data, and required failure guards.
+      - run: node scripts/pack-automatic-report-edge.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: bizctrl-automatic-email-pdf-bundle
