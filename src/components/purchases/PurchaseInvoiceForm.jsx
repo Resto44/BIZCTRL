@@ -122,6 +122,14 @@ function PurchaseInvoiceItemRow({
     !query || name.toLocaleLowerCase().includes(query) || name === selectedBrand,
   );
   useEffect(() => { setBrandSearch(''); }, [item.category_id, item.subcategory_id, item.supplier_id]);
+  // A slow mobile connection can resolve the category product list after the
+  // brand is chosen. Reconcile that *same scoped catalog* when it arrives,
+  // selecting only a unique product and never replacing a manually typed name.
+  useEffect(() => {
+    if (productsLoading || !selectedBrand || item.product_id || String(item.product_name || '').trim()) return;
+    const soleProduct = uniquePurchaseProductForBrand(categoryProducts, selectedBrand);
+    if (soleProduct) updateItem(item._id, 'auto_scoped_product', soleProduct);
+  }, [productsLoading, selectedBrand, categoryProducts, item._id, item.product_id, item.product_name, updateItem]);
 
   // Mobile number keyboards can emit input before change. Use the same canonical
   // state update for both events so quantity, cost, discount, and tax always
@@ -244,7 +252,7 @@ function PurchaseInvoiceItemRow({
               const brand = value === '__all__' ? '' : value.slice(6);
               updateItem(item._id, 'brand', brand);
               const soleProduct = uniquePurchaseProductForBrand(categoryProducts, brand);
-              if (soleProduct) updateItem(item._id, 'selected_product', soleProduct);
+              if (soleProduct) updateItem(item._id, 'auto_scoped_product', soleProduct);
             }}
             disabled={!item.category_id && !itemSupplierId}>
             <SelectTrigger className="h-11 w-full min-w-0 bg-white text-sm" aria-label="Select product brand">
@@ -520,7 +528,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
 
   // ── Item handlers ──────────────────────────────────────────────────────
   const updateItem = useCallback((id, field, value) => {
-    if (field === 'selected_product' || (field === 'product_name' && String(value || '').trim())) {
+    if (field === 'selected_product' || field === 'auto_scoped_product' || (field === 'product_name' && String(value || '').trim())) {
       setInvalidLineId(previous => previous===id?null:previous);
       setError(previous => previous.startsWith('Line ') ? '' : previous);
     }
@@ -528,6 +536,17 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
       if (item._id !== id) return item;
       if (field === 'selected_product') {
         return normalizePurchaseLine(selectPurchaseProduct(item, value));
+      }
+      if (field === 'auto_scoped_product') {
+        if (item.product_id || String(item.product_name || '').trim()) return item;
+        const selected = selectPurchaseProduct(item, value);
+        // If the user entered their actual buying price while the catalog was
+        // still loading, don't replace it with the Product Master default.
+        const buyingPrice = Number(item.unit_cost);
+        return normalizePurchaseLine({
+          ...selected,
+          unit_cost: Number.isFinite(buyingPrice) && buyingPrice > 0 ? buyingPrice : selected.unit_cost,
+        });
       }
       if (['category_id', 'subcategory_id', 'supplier_id', 'brand'].includes(field)) {
         return normalizePurchaseLine(clearPurchaseProductForFilter(item, field, value));
