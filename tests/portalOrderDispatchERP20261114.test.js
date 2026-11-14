@@ -95,8 +95,8 @@ describe('Driver and multi-portal order routing ERP IQ200',()=>{
   expect(app).toContain('path="/portal-order-entry"');
   expect(nav).toContain("path: '/portal-order-entry'");
   expect(page).toContain("dir={isRTL?'rtl':'ltr'}");
-  expect(page).toContain("lang==='fa'");
-  expect(page).toContain("lang==='ar'");
+  expect(page).toContain("fa:{title:'ثبت سفارش مشتری'");
+  expect(page).toContain("ar:{title:'إرسال طلب العميل'");
   expect(page).toContain('data-testid="portal-order-entry"');
   expect(page).toContain('p_recipient:chosenDestination');
   expect(page).toContain('p_items:lines');
