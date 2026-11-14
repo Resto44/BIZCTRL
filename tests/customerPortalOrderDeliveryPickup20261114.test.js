@@ -15,6 +15,13 @@ const catalog=[
 ];
 
 describe('Customer Portal: verified customer pickup and delivery ERP workflow',()=>{
+ it('keeps a single, executable migration without an orphaned SQL suffix',()=>{
+  expect(sql.trim().endsWith('to authenticated;')).toBe(true);
+  expect((sql.match(/create or replace function public\.erp_customer_portal_order_submit\(/g)||[])).toHaveLength(1);
+  expect((sql.match(/create or replace function public\.erp_portal_order_inbox\(/g)||[])).toHaveLength(1);
+  expect(sql).toContain("length(regexp_replace(phone_text,'[^0-9]','','g')) not between 7 and 15");
+  expect(sql).not.toContain('to authenticated;\n or\n');
+ });
  it('keeps selected products across categories and computes cents without additional delivery fee',()=>{
   const cart={rice:2,chicken:1};
   const selected=customerOrderCart(catalog,cart);
