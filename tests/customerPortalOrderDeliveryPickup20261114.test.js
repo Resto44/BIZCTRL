@@ -48,7 +48,7 @@ describe('Customer Portal: verified customer pickup and delivery ERP workflow',(
   expect(sql).toContain("where restaurant_id=c.restaurant_id and role='customer'");
   expect(sql).not.toContain('erp_memberships');
   expect(sql).toContain('CUSTOMER_ORDER_BRANCH_FORBIDDEN');
-  expect(sql).toContain("p.branch_id=b or p.branch_id is null");
+  expect(sql).toContain("branch_id=b or branch_id is null");
   expect(sql).toContain("q.branch_id=b and q.active is true");
   expect(sql).toContain("public.erp_customer_portal_order_submit");
  });
