@@ -110,7 +110,7 @@ export default function ProductBrandPicker({
       {!adding && matching.length > 120 && <p className="text-xs text-slate-500">{t.more}</p>}
       {adding && <div className="space-y-1.5">
         <Input aria-label={t.new} value={value} maxLength={120}
-          placeholder={t.new} className="h-11 text-base sm:text-sm"
+          dir="auto" autoComplete="off" placeholder={t.new} className="h-11 text-base sm:text-sm"
           onChange={event => onChange(event.target.value)} onBlur={finishNewBrand} />
         <p className="text-xs text-slate-500">{t.newHint}</p>
       </div>}
