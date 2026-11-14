@@ -89,8 +89,8 @@ describe('ERP Product Master brand selector', () => {
   });
 
   it('keeps product master payload and save behavior unchanged; SQL respects caller RLS', async () => {
-    const form = await readFile(new URL('../src/components/products/ProductMasterForm.jsx',import.meta.url),'utf8');
-    const ddl = await readFile(new URL('../supabase/migrations/20261114103000_erp_product_brand_choices.sql',import.meta.url),'utf8');
+    const form = await readFile('src/components/products/ProductMasterForm.jsx','utf8');
+    const ddl = await readFile('supabase/migrations/20261114103000_erp_product_brand_choices.sql','utf8');
     expect(form).toContain('<ProductBrandPicker');
     expect(form).toContain('brands={productBrands}');
     expect(form).toContain("queryKey: ['product-brand-choices', activeRestaurant?.id]");
