@@ -141,7 +141,7 @@ export default function PrinterManagementERP(){
    <h2 className="mb-3 flex items-center gap-2 text-lg font-black"><PlusCircle className="size-5"/>{t.add}</h2>
    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
     <label className="block text-sm font-semibold">{t.name}<input className={input} value={name} maxLength={80} onChange={e=>setName(e.target.value)} placeholder={lang==='en'?'Kitchen 1':'مطبخ ۱'}/></label>
-    <label className="block text-sm font-semibold">{t.kind}<select className={input} value={kind} onChange={e=>{setKind(e.target.value);if(e.target.value==='kitchen_ticket'||e.target.value==='cashier_receipt')setPaper('80mm');else setPaper('A4');}}>
+    <label className="block text-sm font-semibold">{t.kind}<select className={input} value={kind} onChange={e=>{setKind(e.target.value);if(e.target.value!=='kitchen_ticket')setStation('');if(e.target.value==='kitchen_ticket'||e.target.value==='cashier_receipt')setPaper('80mm');else setPaper('A4');}}>
      {PRINTER_DOCUMENTS.map(k=><option value={k} key={k}>{label(k)}</option>)}</select></label>
     <label className="block text-sm font-semibold">{t.paper}<select className={input} value={paper} onChange={e=>setPaper(e.target.value)}>{PRINTER_PAPERS.map(p=><option key={p}>{p}</option>)}</select></label>
     <label className="block text-sm font-semibold">{t.station}<input className={input} value={station} maxLength={60} onChange={e=>setStation(e.target.value)} disabled={kind!=='kitchen_ticket'}/></label>
