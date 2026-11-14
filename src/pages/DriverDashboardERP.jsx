@@ -1,5 +1,6 @@
 import React, {useMemo,useState} from 'react';
 import {useQuery,useMutation,useQueryClient} from '@tanstack/react-query';
+import {Link} from 'react-router-dom';
 import {format,startOfDay,startOfWeek,startOfMonth,startOfYear,subMonths} from 'date-fns';
 import {useAuth} from '@/lib/AuthContext';
 import {useLanguage} from '@/lib/LanguageContext';
@@ -150,6 +151,9 @@ export default function DriverDashboardERP(){
        <Button type="button" variant="ghost" size="icon" aria-label={t.logout} className="h-11 w-11" onClick={logout}><LogOut className="h-5 w-5"/></Button>
      </div>
     </div>
+    <Link to="/portal-order-entry" data-testid="driver-new-customer-order"
+      className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white sm:inline-flex">
+      <ClipboardList className="h-5 w-5"/>{lang==='ar'?'إرسال طلب العميل':lang==='fa'?'ثبت سفارش مشتری':'Send customer order'}</Link>
     {data?.driver&&<div className="mt-3 flex flex-wrap gap-2 border-t pt-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
        <span className="rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">{data.driver.branch_name}</span>
        {data.driver.driver_code&&<span className="rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">{t.id}: {data.driver.driver_code}</span>}

@@ -68,6 +68,7 @@ export const ERP_NAV_GROUPS = [
       { path: '/sales/invoices', label: 'Sales Invoices',           icon: Receipt,      permission: 'viewSales' },
       { path: '/cash-register',  label: 'Cash Register',  icon: Banknote,     permission: 'viewSales' },
       { path: '/purchases',      label: 'Purchases',      icon: Package,      permission: 'viewPurchases' },
+      { path: '/portal-order-entry', label: 'Customer order intake', icon: ClipboardList },
       { path: '/purchase-orders',label: 'Purchase Orders',icon: ClipboardList,permission: 'viewPurchases' },
       { path: '/expenses',       label: 'Expenses',       icon: DollarSign,   permission: 'viewExpenses' },
     ],
@@ -181,7 +182,7 @@ const MOBILE_NAV_SECTIONS = [
     description: 'Sales, customers & closing',
     icon: ShoppingCart,
     paths: [
-      '/restaurant/pos', '/sales', '/sales-sources', '/sales/invoices', '/cash-register',
+      '/restaurant/pos', '/portal-order-entry', '/sales', '/sales-sources', '/sales/invoices', '/cash-register',
       '/customer-management',
     ],
   },

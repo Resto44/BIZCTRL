@@ -735,6 +735,7 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
         <SectionHeader title="Quick Actions" icon={Zap} />
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
           <QuickAction label="New Sale"     icon={ShoppingCart}  path="/sales"       color="bg-primary/10 text-primary" />
+           <QuickAction label="Customer orders" icon={ClipboardListIcon} path="/portal-order-entry" color="bg-blue-500/10 text-blue-600" />
           <QuickAction label="Add Purchase" icon={Package}       path="/purchases"   color="bg-orange-500/10 text-orange-600" />
           <QuickAction label="Add Expense"  icon={DollarSign}    path="/expenses"    color="bg-red-500/10 text-red-600" />
           <QuickAction label="Inventory"    icon={LayersIcon}    path="/inventory"   color="bg-purple-500/10 text-purple-600" />

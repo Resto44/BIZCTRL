@@ -161,6 +161,7 @@ const ManagerDashboardERP   = lazy(() => import('@/pages/ManagerDashboardERP'));
 const EmployeeDashboardERP  = lazy(() => import('@/pages/EmployeeDashboardERP'));
 const SupplierPortalERP     = lazy(() => import('@/pages/SupplierPortalERP'));
 const DriverDashboardERP    = lazy(() => import('@/pages/DriverDashboardERP'));
+const PortalOrderDispatch    = lazy(() => import('@/pages/PortalOrderDispatch'));
 
 // ── Shared page loading fallback ─────────────────────────────────────────────
 const PageLoader = () => {
@@ -442,6 +443,7 @@ const SubscribedRoutes = () => {
         <Route path="/employee-dashboard" element={<ERPRoleGuard allowedRoles={['employee']}><EmployeeDashboardERP /></ERPRoleGuard>} />
         <Route path="/supplier-portal" element={<ERPRoleGuard allowedRoles={['supplier']}><SupplierPortalERP /></ERPRoleGuard>} />
         <Route path="/driver-dashboard" element={<ERPRoleGuard allowedRoles={['driver']}><DriverDashboardERP /></ERPRoleGuard>} />
+        <Route path="/portal-order-entry" element={<PortalOrderDispatch />} />
         <Route path="/erp-approval-center" element={<RoleGuard permission="manageSettings"><OwnerApprovalCenter /></RoleGuard>} />
         {/* ── Legacy role portals — redirect to new ERP dashboards ── */}
         <Route path="/employee-portal" element={<Navigate to="/employee-dashboard" replace />} />
