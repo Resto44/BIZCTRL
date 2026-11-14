@@ -60,7 +60,7 @@ const language={
  },
 };
 // Stable UUID is held across a failed network retry; no duplicate order is created. [preview]
-const uuid=()=>typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function'?crypto.randomUUID():'';
+// Stable request UUID across network retries; changed only on user edits.\nconst uuid=()=>typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function'?crypto.randomUUID():'';
 export default function CustomerOrderEntry({account,lang='en'}){
  const t=language[lang]||language.en;
  const qc=useQueryClient();
