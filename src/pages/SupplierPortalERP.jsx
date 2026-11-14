@@ -5,6 +5,7 @@ import PortalDataState from '@/components/shared/PortalDataState';
 import SupplierPortalAnalytics from '@/components/suppliers/SupplierPortalAnalytics';
 import {buildSupplierGoodsTimeline,completedSupplierGoodsHistory} from '@/lib/supplierGoodsTimeline';
 import React, { useState } from 'react';
+import {Link} from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -358,6 +359,7 @@ export default function SupplierPortalERP() {
           </div>
         </header>
 
+        <Link to="/portal-order-entry" data-testid="supplier-customer-order-entry" className="flex min-h-12 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-black text-white">{lang==='ar'?'إرسال طلب العميل':lang==='fa'?'ثبت سفارش مشتری':'Customer order intake'}</Link>
         <nav data-testid="supplier-erp-tabs" aria-label={copy.workspace}
           className="grid grid-cols-4 gap-1.5 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           {tabs.map(tab=>{
