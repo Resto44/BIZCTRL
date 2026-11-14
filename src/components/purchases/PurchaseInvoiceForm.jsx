@@ -273,7 +273,7 @@ function PurchaseInvoiceItemRow({
             </SelectTrigger>
             <SelectContent>
               {visibleProducts.length === 0 && (item.category_id || itemSupplierId) ? (
-                <div className="px-2 py-1.5 text-xs text-muted-foreground">No product matches this brand, category and supplier.</div>
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">No matching saved product. Try All brands or enter a product name below.</div>
               ) : (
                 visibleProducts.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)
               )}
