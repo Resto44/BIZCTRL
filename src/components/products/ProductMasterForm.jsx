@@ -3,7 +3,7 @@ import { barcodeText } from '@/lib/barcodeCopy';
 import { isSupermarketProductPortal } from '@/lib/productImportAccess';
 import { Link } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, ArrowRight, Barcode, Boxes, Building2, Calculator, Check,
   CheckCircle2, ChevronRight, CircleDollarSign, ClipboardCheck, ImagePlus,
@@ -11,6 +11,9 @@ import {
   Tag, Trash2, TriangleAlert, X,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { existingProductBrand, fetchProductBrandChoices, normalizeProductBrand } from '@/lib/productBrands';
+import ProductBrandPicker from '@/components/products/ProductBrandPicker';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
@@ -131,6 +134,7 @@ function ProductContext({ form, erp, onEdit }) {
 
 export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
   const { activeRestaurant, branches } = useTenant();
+  const queryClient = useQueryClient();
   const retailInventory = isSupermarketProductPortal(activeRestaurant);
   const { t, currency, lang } = useLanguage();
   const barcodeCopy = barcodeText(lang);
@@ -164,6 +168,11 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
     queryKey: ['suppliers', activeRestaurant?.id],
     queryFn: () => base44.entities.Supplier.filter({ restaurant_id: activeRestaurant.id }, 'name', 500),
     enabled: Boolean(activeRestaurant?.id), staleTime: 30000,
+  });
+  const { data: productBrands = [], isPending: brandsLoading, isError: brandsError } = useQuery({
+    queryKey: ['product-brand-choices', activeRestaurant?.id],
+    queryFn: () => fetchProductBrandChoices(supabase, activeRestaurant.id),
+    enabled: Boolean(activeRestaurant?.id), staleTime: 5 * 60 * 1000, retry: 1,
   });
   const { data: units = [] } = useQuery({
     queryKey: ['product_units', activeRestaurant?.id],
@@ -282,6 +291,8 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
     const payload = buildProductMasterPayload({
       form: {
         ...form,
+        // Keep the canonical saved spelling instead of adding case-only duplicates.
+        brand: existingProductBrand(productBrands, form.brand) || normalizeProductBrand(form.brand),
         product_id: productId,
         current_stock: erp.track_inventory ? stockTotal : form.current_stock,
         min_stock: reorderMaximum,
@@ -294,6 +305,7 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
     setIsSubmitting(true);
     try {
       await onSubmit({ ...payload, _inventoryEnabled: erp.track_inventory, _inventoryRows: branchStocks.map((row) => ({ ...row, product_id: productId, product_name: payload.name, unit: payload.unit })) });
+      queryClient.invalidateQueries({ queryKey: ['product-brand-choices', activeRestaurant?.id] });
       const key = draftKey(activeRestaurant?.id);
       if (key) localStorage.removeItem(key);
     } catch {
@@ -323,7 +335,10 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
           {subCategories.length > 0 && <Field label="Sub-category"><Select value={form.subcategory_id || '__none__'} onValueChange={(value) => { set('subcategory_id', value === '__none__' ? '' : value); setErpValue('child_category_id', ''); }}><SelectTrigger><SelectValue placeholder="Select sub-category" /></SelectTrigger><SelectContent><SelectItem value="__none__">— None —</SelectItem>{subCategories.map((category) => <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>)}</SelectContent></Select></Field>}
           {childCategories.length > 0 && <Field label="Child category"><Select value={erp.child_category_id || '__none__'} onValueChange={(value) => setErpValue('child_category_id', value === '__none__' ? '' : value)}><SelectTrigger><SelectValue placeholder="Select child category" /></SelectTrigger><SelectContent><SelectItem value="__none__">— None —</SelectItem>{childCategories.map((category) => <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>)}</SelectContent></Select></Field>}
           <Field label={t('unit')}><Select value={form.unit || '__none__'} onValueChange={(value) => set('unit', value === '__none__' ? '' : value)}><SelectTrigger><SelectValue placeholder={t('select')} /></SelectTrigger><SelectContent><SelectItem value="__none__">— Select —</SelectItem>{units.map((unit) => <SelectItem key={unit.id} value={unit.abbreviation || unit.name || unit.id}>{unit.name}{unit.abbreviation ? ` (${unit.abbreviation})` : ''}</SelectItem>)}</SelectContent></Select></Field>
-          {isProductFieldVisible('brand') && <Field label={t('brand')} required={isProductFieldRequired('brand')}><Input value={form.brand || ''} onChange={(event) => set('brand', event.target.value)} placeholder={t('optional')} /></Field>}
+          {isProductFieldVisible('brand') && <Field label={t('brand')} required={isProductFieldRequired('brand')}>
+            <ProductBrandPicker value={form.brand || ''} onChange={(value) => set('brand', value)}
+              brands={productBrands} loading={brandsLoading} error={brandsError} lang={lang} />
+          </Field>}
           <Field label="Primary supplier"><Select value={form.supplier_id || '__none__'} onValueChange={(value) => set('supplier_id', value === '__none__' ? '' : value)}><SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger><SelectContent><SelectItem value="__none__">— None —</SelectItem>{suppliers.map((supplier) => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent></Select></Field>
           {isProductFieldVisible('status') && <Field label={t('status')} required={isProductFieldRequired('status')}><Select value={form.status || 'active'} onValueChange={(value) => set('status', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">{t('active')}</SelectItem><SelectItem value="inactive">{t('inactive')}</SelectItem><SelectItem value="discontinued">{t('discontinued')}</SelectItem></SelectContent></Select></Field>}
           {isProductFieldVisible('description') && <Field label={t('description')} required={isProductFieldRequired('description')} className="sm:col-span-2"><Textarea value={form.description || ''} onChange={(event) => set('description', event.target.value)} rows={3} placeholder={t('optional')} /></Field>}
