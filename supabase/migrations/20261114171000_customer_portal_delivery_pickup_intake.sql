@@ -164,6 +164,17 @@ begin
     or existing.request_hash <> digest then raise exception 'CUSTOMER_ORDER_ID_REUSED' using errcode='23505';end if;
   return jsonb_build_object('id',existing.id,'status',existing.status,'replayed',true);
  end if;
+ -- The initial request is never charged, but a compromised session must not
+ -- generate an unbounded workload for the restaurant.
+ if (select count(*) from portal_order_private.intake
+     where customer_id=c.id and actor_id=auth.uid()
+       and created_at > now()-interval '1 hour') >= 20 then
+   raise exception 'CUSTOMER_ORDER_RATE_LIMIT' using errcode='22023';
+ end if;
+ if (select count(distinct line.value->>'id') from jsonb_array_elements(p_items) as line(value))
+    <> jsonb_array_length(p_items) then
+   raise exception 'CUSTOMER_ORDER_DUPLICATE_LINE' using errcode='22023';
+ end if;
  for item in select value from jsonb_array_elements(p_items) loop
   if jsonb_typeof(item)<>'object' or coalesce(item->>'id','') !~* '^[a-f0-9-]{36}$'
     or coalesce(item->>'quantity','') !~ '^[0-9]{1,3}$' then
