@@ -94,7 +94,6 @@ describe('Customer Portal: verified customer pickup and delivery ERP workflow',(
  it('embeds checkout inside verified Customer Portal, not the staff ordering page',()=>{
   expect(portal).toContain("lazy(() => import('@/components/customer/CustomerOrderEntry'))");
   expect(portal).toContain("<CustomerOrderEntry key={'customer-order-'+account.id} account={account} lang={lang}/>");
-  expect(orderUI).toContain('data-testid="customer-order-pickup"'.replace('pickup"','\'+"" )); // replaced below
   expect(orderUI).toContain("['pickup','delivery']");
   expect(orderUI).toContain("data-testid={'customer-order-'+mode}");
   expect(orderUI).toContain('data-testid="customer-order-category"');
