@@ -171,11 +171,11 @@ export default function CustomerPortal() {
      </section>
      <CustomerIdentityCard key={account.id} account={account} lang={lang}/>
      <section data-testid="customer-portal-quick-sections" className="grid grid-cols-1 gap-2 print:hidden min-[360px]:grid-cols-2 md:grid-cols-3">
-      <Button data-testid="customer-open-order" type="button" aria-expanded={opened.order}
+      <Button data-testid="customer-open-order" type="button" aria-controls="customer-panel-order" aria-expanded={opened.order}
        className="min-h-12 w-full bg-teal-700 text-white" onClick={()=>showSection('order')}>{quick.order}</Button>
-      <Button data-testid="customer-open-analytics" type="button" aria-expanded={opened.analytics}
+      <Button data-testid="customer-open-analytics" type="button" aria-controls="customer-panel-analytics" aria-expanded={opened.analytics}
        variant="outline" className="min-h-12 w-full" onClick={()=>showSection('analytics')}>{quick.analytics}</Button>
-      <Button data-testid="customer-open-push" type="button" aria-expanded={opened.push}
+      <Button data-testid="customer-open-push" type="button" aria-controls="customer-panel-push" aria-expanded={opened.push}
        variant="outline" className="min-h-12 w-full" onClick={()=>showSection('push')}>{quick.push}</Button>
      </section>
      {statement.isError?<p role="alert" className="rounded-lg bg-red-50 p-4">{t.error} <Button type="button" variant="outline" onClick={()=>statement.refetch()}>{t.refresh}</Button></p>:statement.isPending?<p role="status" className="rounded-lg bg-white p-4 text-sm text-slate-600">{t.loading}</p>:data&&<>
