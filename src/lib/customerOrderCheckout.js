@@ -1,7 +1,7 @@
 // Browser helpers are UX only. Supabase independently validates identity,
 // branch, price, payment status, quantity and delivery address server-side.
 export function customerOrderValidPhone(value) {
-  return typeof value === 'string' && /^[+0-9 ()-]{7,24}$/.test(value.trim());
+  return typeof value === 'string' && /^[+0-9 ()-]{7,24}$/.test(value.trim()) && (value.match(/[0-9]/g)||[]).length >= 7 && (value.match(/[0-9]/g)||[]).length <= 15;
 }
 export function customerOrderDeliveryValid(fulfillment, address, phone) {
   if (fulfillment === 'pickup') return true;
