@@ -115,7 +115,7 @@ export function RoleProvider({ children }) {
     if (role === ROLES.OWNER) return base;
     // Merge: DB permissions override defaults for non-owner roles
     return { ...base, ...dbPerms };
-  }, [role, user?.permissions]);
+  }, [role, user?.permissions, user?.effective_permissions]);
 
   return (
     <RoleContext.Provider value={{ role, can, user, isLoadingAuth }}>

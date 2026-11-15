@@ -350,13 +350,13 @@ const SubscribedRoutes = () => {
       <Route path="/onboarding" element={<Onboarding onComplete={() => window.location.replace('/owner-command-center')} />} />
       <Route element={<AppLayout />}>
         {/* ── Primary owner dashboard (canonical entry point) ── */}
-        <Route path="/owner-command-center" element={<RoleGuard permission="viewDashboard"><OwnerDashboard /></RoleGuard>} />
+        <Route path="/owner-command-center" element={<RoleGuard permission="viewReports"><OwnerDashboard /></RoleGuard>} />
 
         {/* ── Legacy dashboard (manager workspace + first-time owner) ── */}
-        <Route path="/dashboard" element={<RoleGuard permission="viewDashboard"><Dashboard /></RoleGuard>} />
+        <Route path="/dashboard" element={<RoleGuard permission="viewReports"><Dashboard /></RoleGuard>} />
 
         {/* ── Executive analytics view ── */}
-        <Route path="/executive-command-center" element={<RoleGuard permission="viewDashboard"><ExecutiveCommandCenter /></RoleGuard>} />
+        <Route path="/executive-command-center" element={<RoleGuard permission="viewReports"><ExecutiveCommandCenter /></RoleGuard>} />
 
         <Route path="/staff-upload" element={<RoleGuard permission="uploadSales"><StaffUpload /></RoleGuard>} />
         <Route path="/staff-invitations" element={<RoleGuard permission="manageUsers"><StaffInvitations /></RoleGuard>} />
@@ -393,7 +393,7 @@ const SubscribedRoutes = () => {
         <Route path="/oracle-analytics" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="advanced_analytics"><OracleAnalytics /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/balance-sheet" element={<RoleGuard permission="viewReports"><BalanceSheet /></RoleGuard>} />
         <Route path="/branch-analytics" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="advanced_analytics"><BranchAnalytics /></FeatureRouteGuard></RoleGuard>} />
-        <Route path="/ceo-dashboard" element={<RoleGuard permission="viewDashboard"><FeatureRouteGuard feature="advanced_analytics"><CEODashboard /></FeatureRouteGuard></RoleGuard>} />
+        <Route path="/ceo-dashboard" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="advanced_analytics"><CEODashboard /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/price-optimization" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="advanced_analytics"><PriceOptimization /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/activity-logs" element={<RoleGuard permission="viewActivityLogs"><ActivityLogs /></RoleGuard>} />
         <Route path="/scheduled-reports" element={<RoleGuard permission="exportPDF"><FeatureRouteGuard feature="scheduled_reports"><ScheduledReports /></FeatureRouteGuard></RoleGuard>} />
@@ -415,7 +415,7 @@ const SubscribedRoutes = () => {
         {/* Legacy redirects */}
         <Route path="/network-accounts" element={<RoleGuard permission="viewNetworkAccounts"><FeatureRouteGuard feature="network_management"><NetworkManagement /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/network-analytics" element={<RoleGuard permission="viewNetworkAccounts"><FeatureRouteGuard feature="network_management"><NetworkManagement /></FeatureRouteGuard></RoleGuard>} />
-        <Route path="/network-hub" element={<RoleGuard permission="viewDashboard"><FeatureRouteGuard feature="network_management"><NetworkManagement /></FeatureRouteGuard></RoleGuard>} />
+        <Route path="/network-hub" element={<RoleGuard permission="viewNetworkAccounts"><FeatureRouteGuard feature="network_management"><NetworkManagement /></FeatureRouteGuard></RoleGuard>} />
 
         {/* ── Configuration ── */}
         <Route path="/settings" element={<RoleGuard permission="manageSettings"><SettingsPage /></RoleGuard>} />
@@ -460,10 +460,10 @@ const SubscribedRoutes = () => {
         <Route path="/loyalty-v2" element={<RoleGuard permission="viewDebts"><LoyaltyProgramV2 /></RoleGuard>} />
         <Route path="/driver-management" element={<RoleGuard permission="viewEmployees"><FeatureRouteGuard feature="driver_analytics"><DriverManagement /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/customer-management" element={<RoleGuard permission="viewDebts"><CustomerManagement /></RoleGuard>} />
-        <Route path="/branch-command-center" element={<RoleGuard permission="viewDashboard"><BranchCommandCenter /></RoleGuard>} />
+        <Route path="/branch-command-center" element={<RoleGuard permission="viewReports"><BranchCommandCenter /></RoleGuard>} />
         <Route path="/inventory-command-center" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="overview" fallback={<InventoryCommandCenter />} /></RoleGuard>} />
         <Route path="/smart-alerts" element={<Navigate to="/alerts" replace />} />
-        <Route path="/ai-copilot" element={<RoleGuard permission="viewDashboard"><FeatureRouteGuard feature="ai_copilot"><AIBusinessCopilot /></FeatureRouteGuard></RoleGuard>} />
+        <Route path="/ai-copilot" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="ai_copilot"><AIBusinessCopilot /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/bi-center" element={<RoleGuard permission="viewReports"><FeatureRouteGuard feature="advanced_analytics"><BICenter /></FeatureRouteGuard></RoleGuard>} />
         <Route path="/customer-portal" element={<RoleGuard permission="viewDebts"><Navigate to="/customer-management" replace /></RoleGuard>} />
         <Route path="/loyalty-program" element={<RoleGuard permission="viewDebts"><LoyaltyProgram /></RoleGuard>} />
