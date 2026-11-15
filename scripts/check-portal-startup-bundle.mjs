@@ -11,7 +11,7 @@ const active = new Set();
 function visit(file) {
   if (active.has(file)) throw new Error(`Circular startup dependency: ${file}`);
   if (visited.has(file)) return;
-  if (/vendor-(?:pdf|charts)|controlRoutes|RetailCashier|RestaurantPOS|CustomerDisplay/.test(file)) {
+  if (/vendor-(?:pdf|charts)|controlRoutes|RetailCashier|RestaurantPOS|CustomerDisplay|AppLayout|ERPRegister|LandingPage|PublicPages/.test(file)) {
     throw new Error(`Optional portal feature blocks startup: ${file}`);
   }
   active.add(file);

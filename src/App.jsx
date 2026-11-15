@@ -26,8 +26,8 @@ import { useRole, ROLES, ROLE_HOME, NON_OWNER_ROLES } from '@/lib/RoleContext';
 import { Toaster } from 'sonner';
 import { supabase } from '@/api/supabaseClient';
 
-// ── Core layout (always loaded eagerly) ──────────────────────────────────────
-import AppLayout from '@/components/layout/AppLayout';
+// Public/customer entry does not need the authenticated sidebar, tour or alerts.
+const AppLayout = lazy(() => import('@/components/layout/AppLayout'));
 import PaywallScreen from '@/components/subscription/PaywallScreen';
 import FeatureRouteGuard from '@/components/subscription/FeatureRouteGuard';
 import SubscriptionErrorBoundary from '@/components/subscription/SubscriptionErrorBoundary';
@@ -147,12 +147,15 @@ const BatchTracking       = lazy(() => import('@/pages/retail/BatchTracking'));
 const ExpiryTracking      = lazy(() => import('@/pages/retail/ExpiryTracking'));
 const SerialNumbers       = lazy(() => import('@/pages/retail/SerialNumbers'));
 
-// ── Public pages (eager — shown before auth) ─────────────────────────────────
-import LandingPage            from '@/pages/LandingPage';
-import { TermsPage, PrivacyPage, RefundPage, ContactPage } from '@/pages/PublicPages';
+// Load marketing, policies and registration only on their own routes.
+const LandingPage = lazy(() => import('@/pages/LandingPage'));
+const TermsPage = lazy(() => import('@/pages/PublicPages').then(m => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import('@/pages/PublicPages').then(m => ({ default: m.PrivacyPage })));
+const RefundPage = lazy(() => import('@/pages/PublicPages').then(m => ({ default: m.RefundPage })));
+const ContactPage = lazy(() => import('@/pages/PublicPages').then(m => ({ default: m.ContactPage })));
 // AuthPage removed — replaced by ERPLogin
 import ERPLogin               from '@/pages/ERPLogin';
-import ERPRegister            from '@/pages/ERPRegister';
+const ERPRegister = lazy(() => import('@/pages/ERPRegister'));
 const BillingVisualHarness = import.meta.env.DEV ? lazy(() => import('@/pages/dev/BillingVisualHarness')) : null;
 // Legacy invite pages removed — all redirected to ERP portals
 
@@ -732,6 +735,7 @@ function App() {
         <Router>
           <StandaloneCustomerAuthBoundary>
               <PlatformOwnerRecoveryCallbackRouter />
+              <Suspense fallback={<PageLoader />}>
               <Routes>
               {/* ── NEW ERP Unified Auth (primary entry points) ── */}
               <Route path="/sponsor-dashboard" element={<Navigate to="/partner-portal" replace />} />
@@ -769,6 +773,7 @@ function App() {
               {/* All authenticated routes */}
               <Route path="*" element={<AuthenticatedApp />} />
             </Routes>
+            </Suspense>
             <Toaster />
           </StandaloneCustomerAuthBoundary>
         </Router>

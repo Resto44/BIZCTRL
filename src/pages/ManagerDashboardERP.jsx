@@ -52,7 +52,6 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { formatCurrency } from '@/lib/helpers';
 import { useLanguage } from '@/lib/LanguageContext';
 import { latestFinalizedDrawerCash, displayDrawerCash } from '@/lib/managerDrawerCash';
 import { latestInventorySnapshots } from '@/lib/inventorySnapshotView';
@@ -89,7 +88,7 @@ function KPICard({ label, value, sub, icon: Icon, colorClass = 'text-primary', b
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-muted-foreground truncate">{label}</p>
-            <p className="text-xl font-bold text-foreground mt-1 truncate">{value}</p>
+            <p className="text-lg sm:text-xl font-bold text-foreground mt-1 tabular-nums break-words [overflow-wrap:anywhere]">{value}</p>
             {sub && <p className="text-xs text-muted-foreground mt-0.5 truncate">{sub}</p>}
           </div>
           <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', bgClass, colorClass)}>
@@ -164,6 +163,8 @@ function LowStockItem({ item }) {
 
 // ─── Main dashboard content ───────────────────────────────────────────────────
 function ManagerContent({ branchId, branchName, branchKey, restaurantId, businessCurrency }) {
+  // Organization currency is authoritative; never silently label branch money as USD.
+  const formatBranchMoney = value => displayDrawerCash(value, businessCurrency) || '—';
   const { lang } = useLanguage();
   const navigate = useNavigate();
   const today     = format(new Date(), 'yyyy-MM-dd');
@@ -409,12 +410,12 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
       <div>
         <SectionHeader title="Today's Performance" icon={BarChart3} />
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KPICard label="Today's Sales"   value={formatCurrency(kpis.todayTotal)}  icon={TrendingUp}  colorClass="text-primary"     bgClass="bg-primary/10"     trend={kpis.salesTrendPct} loading={salesKpiLoading} />
-          <KPICard label="Cash sales today"    value={formatCurrency(kpis.cashTotal)}   icon={Banknote}    colorClass="text-green-600"   bgClass="bg-green-500/10"   loading={loadingSales} />
-          <KPICard label="Network sales today"     value={formatCurrency(kpis.posTotal)}    icon={CreditCard}  colorClass="text-blue-600"    bgClass="bg-blue-500/10"    loading={loadingSales} />
-          <KPICard label="Credit Sales"    value={formatCurrency(kpis.creditTotal)} icon={Receipt}     colorClass="text-amber-600"   bgClass="bg-amber-500/10"   loading={loadingSales} />
-          <KPICard label="Purchases Today" value={formatCurrency(kpis.purchTotal)}  icon={ShoppingCart} colorClass="text-orange-600" bgClass="bg-orange-500/10"  loading={loadingPurchases} />
-          <KPICard label="Expenses Today"  value={formatCurrency(kpis.expTotal)}    icon={DollarSign}  colorClass="text-red-600"     bgClass="bg-red-500/10"     loading={loadingExpenses} />
+          <KPICard label="Today's Sales"   value={formatBranchMoney(kpis.todayTotal)}  icon={TrendingUp}  colorClass="text-primary"     bgClass="bg-primary/10"     trend={kpis.salesTrendPct} loading={salesKpiLoading} />
+          <KPICard label="Cash sales today"    value={formatBranchMoney(kpis.cashTotal)}   icon={Banknote}    colorClass="text-green-600"   bgClass="bg-green-500/10"   loading={loadingSales} />
+          <KPICard label="Network sales today"     value={formatBranchMoney(kpis.posTotal)}    icon={CreditCard}  colorClass="text-blue-600"    bgClass="bg-blue-500/10"    loading={loadingSales} />
+          <KPICard label="Credit Sales"    value={formatBranchMoney(kpis.creditTotal)} icon={Receipt}     colorClass="text-amber-600"   bgClass="bg-amber-500/10"   loading={loadingSales} />
+          <KPICard label="Purchases Today" value={formatBranchMoney(kpis.purchTotal)}  icon={ShoppingCart} colorClass="text-orange-600" bgClass="bg-orange-500/10"  loading={loadingPurchases} />
+          <KPICard label="Expenses Today"  value={formatBranchMoney(kpis.expTotal)}    icon={DollarSign}  colorClass="text-red-600"     bgClass="bg-red-500/10"     loading={loadingExpenses} />
         </div>
       </div>
 
@@ -458,9 +459,9 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
 
       {/* Profit row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <KPICard label="Sales less purchases"    value={formatCurrency(kpis.grossProfit)} icon={TrendingUp}  colorClass={kpis.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'} bgClass={kpis.grossProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} loading={grossProfitLoading} />
-        <KPICard label="Before payroll and fixed costs"      value={formatCurrency(kpis.netProfit)}   icon={Activity}    colorClass={kpis.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}  bgClass={kpis.netProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}  loading={netProfitLoading} />
-        <KPICard label="Inventory Value" value={formatCurrency(kpis.invValue)}    icon={Package}     colorClass="text-purple-600"  bgClass="bg-purple-500/10" loading={loadingInventory} />
+        <KPICard label="Sales less purchases"    value={formatBranchMoney(kpis.grossProfit)} icon={TrendingUp}  colorClass={kpis.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'} bgClass={kpis.grossProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} loading={grossProfitLoading} />
+        <KPICard label="Before payroll and fixed costs"      value={formatBranchMoney(kpis.netProfit)}   icon={Activity}    colorClass={kpis.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}  bgClass={kpis.netProfit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}  loading={netProfitLoading} />
+        <KPICard label="Inventory Value" value={formatBranchMoney(kpis.invValue)}    icon={Package}     colorClass="text-purple-600"  bgClass="bg-purple-500/10" loading={loadingInventory} />
       </div>
 
       {/* Main grid */}
@@ -488,7 +489,7 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(v) => formatCurrency(v)} />
+                  <Tooltip formatter={(v) => formatBranchMoney(v)} />
                   <Area type="monotone" dataKey="sales" stroke="hsl(217 91% 50%)" fill="url(#salesGrad)" strokeWidth={2} name="Sales" />
                   <Area type="monotone" dataKey="cash"  stroke="hsl(142 71% 45%)" fill="transparent" strokeWidth={1.5} strokeDasharray="4 2" name="Cash" />
                   <Area type="monotone" dataKey="pos"   stroke="hsl(199 89% 48%)" fill="transparent" strokeWidth={1.5} strokeDasharray="4 2" name="POS" />
@@ -528,7 +529,7 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
                           <p className="text-xs text-muted-foreground">{format(new Date(item.time), 'HH:mm')}</p>
                         </div>
                         <span className={cn('text-sm font-semibold shrink-0', cfg.colorClass)}>
-                          {item.type === 'expense' ? '-' : '+'}{formatCurrency(item.amount)}
+                          {item.type === 'expense' ? '-' : '+'}{formatBranchMoney(item.amount)}
                         </span>
                       </div>
                     );
@@ -555,7 +556,7 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
                      <div key={po.id} className="flex items-center justify-between text-sm">
                        <span className="text-foreground truncate">{po.order_number || 'PO'}</span>
                        <div className="flex items-center gap-2 shrink-0">
-                         <span className="text-muted-foreground">{formatCurrency(po.total_amount)}</span>
+                         <span className="text-muted-foreground">{formatBranchMoney(po.total_amount)}</span>
                          <Badge variant="secondary" className="text-[10px] capitalize">{po.status}</Badge>
                        </div>
                      </div>
@@ -588,7 +589,7 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
                          {inv.due_date && <p className="text-xs text-muted-foreground">Due {format(new Date(inv.due_date + 'T12:00:00'), 'MMM d')}</p>}
                        </div>
                        <div className="flex items-center gap-2 shrink-0">
-                         <span className="text-muted-foreground">{formatCurrency(inv.total_amount - (inv.paid_amount || 0))}</span>
+                         <span className="text-muted-foreground">{formatBranchMoney(inv.total_amount - (inv.paid_amount || 0))}</span>
                          <Badge variant="secondary" className="text-[10px] capitalize">{inv.status}</Badge>
                        </div>
                      </div>
@@ -647,17 +648,17 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Inflows</span>
-                    <span className="text-sm font-semibold text-green-600">+{formatCurrency(kpis.treasuryIn)}</span>
+                    <span className="text-sm font-semibold text-green-600">+{formatBranchMoney(kpis.treasuryIn)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Outflows</span>
-                    <span className="text-sm font-semibold text-red-600">-{formatCurrency(kpis.treasuryOut)}</span>
+                    <span className="text-sm font-semibold text-red-600">-{formatBranchMoney(kpis.treasuryOut)}</span>
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-foreground">Net</span>
                     <span className={cn('text-sm font-bold', kpis.treasuryNet >= 0 ? 'text-green-600' : 'text-red-600')}>
-                      {formatCurrency(kpis.treasuryNet)}
+                      {formatBranchMoney(kpis.treasuryNet)}
                     </span>
                   </div>
                   <Button variant="ghost" size="sm" className="w-full text-xs mt-1" onClick={() => navigate('/treasury')}>
