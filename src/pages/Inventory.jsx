@@ -1,3 +1,4 @@
+import { inventoryOpeningPayload } from '@/lib/inventoryOpeningPayload';
 import { restaurantMaterialFilter } from '@/lib/restaurantProducts';
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,7 +18,6 @@ import { format } from 'date-fns';
 import { computeLiveStock, sendWhatsAppAlert, groupLowStockByBranch } from '@/lib/stockEngine';
 import { useTenant } from '@/lib/TenantContext';
 import { useBranchScope } from '@/lib/BranchScopeContext';
-import { useNotify } from '@/lib/useNotify';
 
 
 const ui = {
@@ -34,7 +34,6 @@ export default function Inventory() {
   const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const m = ui[lang] || ui.en;
   const qc = useQueryClient();
-  const notif = useNotify();
   const branchFilter = isAllBranches ? 'all' : (selectedBranchKey || 'all');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -63,7 +62,7 @@ export default function Inventory() {
     return Array.from(new Map([...(canonical.data || []), ...(legacy.data || [])]
       .map((record) => [record.id, record])).values());
   };
-  const { data: items = [] } = useQuery({
+  const { data: items = [], isError: stockError, isLoading: stockLoading, refetch: retryStock } = useQuery({
     queryKey: ['inventory', activeRestaurant?.id, selectedBranchId],
     queryFn: () => fetchScopedRows('inventory'), staleTime: 120000,
     enabled: Boolean(activeRestaurant?.id),
@@ -73,12 +72,12 @@ export default function Inventory() {
     queryFn: () => base44.entities.Product.filter({ restaurant_id: activeRestaurant.id, ...restaurantMaterialFilter(activeRestaurant) }, 'name', 500),
     enabled: Boolean(activeRestaurant?.id),
   });
-  const { data: purchases = [] } = useQuery({
+  const { data: purchases = [], isError: purchasesError, isLoading: purchasesLoading, refetch: retryPurchases } = useQuery({
     queryKey: ['purchases', activeRestaurant?.id, selectedBranchId],
     queryFn: () => fetchScopedRows('purchases'), staleTime: 120000,
     enabled: Boolean(activeRestaurant?.id),
   });
-  const { data: wastage = [] } = useQuery({
+  const { data: wastage = [], isError: wasteError, isLoading: wasteLoading, refetch: retryWaste } = useQuery({
     queryKey: ['inventory_waste', activeRestaurant?.id, selectedBranchId],
     queryFn: () => fetchScopedRows('inventory_waste'), staleTime: 120000,
     enabled: Boolean(activeRestaurant?.id),
@@ -86,27 +85,14 @@ export default function Inventory() {
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
-      if (!data.product_id || !data.branch) {
-        throw new Error('Product and Branch are required');
-      }
-      if (data.opening_stock < 0 || data.low_stock_threshold < 0) {
-        throw new Error('Stock values cannot be negative');
-      }
-      
-      // Live stock rows include computed display-only fields. Never send them
-      // to the inventory table during an opening-balance reconciliation.
-      const { id, restaurant_id, created_at, updated_at, created_date, updated_date,
-        purchasedQty, wastedQty, currentStock, isLow, ...record } = data;
       if (!activeRestaurant?.id) throw new Error('Restaurant is not selected');
-      const branchId = record.branch_id || branches.find(b => (b.key || b.branch_key) === record.branch)?.id || null;
-      if (!branchId) throw new Error('Select a valid branch before saving');
-      const payload = { ...record, branch_id: branchId };
+      const payload = inventoryOpeningPayload(data, branches, editing);
       // Avoid a singular response: a manager's RLS policy may hide the updated row.
       // Check the affected row count explicitly rather than treating zero rows as success.
       // Use the write count, not a returned row that can be hidden by RLS.
       const query = editing
         ? supabase.from('inventory').update(payload, { count: 'exact' })
-            .eq('id', editing.id).eq('restaurant_id', activeRestaurant.id)
+            .eq('id', editing.id).eq('restaurant_id', activeRestaurant.id).eq('branch_id', payload.branch_id)
         : supabase.from('inventory').insert({
             ...payload, restaurant_id: activeRestaurant.id,
           }, { count: 'exact' });
@@ -117,23 +103,6 @@ export default function Inventory() {
       }
       const res = { ...payload, id: editing?.id, restaurant_id: activeRestaurant.id };
 
-      // Check if current stock is low and notify
-      const updatedLiveStock = computeLiveStock([res], [], []);
-      const item = updatedLiveStock[0];
-      if (item && item.currentStock <= item.low_stock_threshold) {
-        // Stock is already committed. A notification failure must not
-        // make the UI report that the database write failed.
-        try {
-          await notif.lowStock({
-            branch: res.branch,
-            productName: res.product_name,
-            currentQty: item.currentStock,
-            unit: res.unit,
-          });
-        } catch (notificationError) {
-          console.warn('[Inventory] Stock saved, low-stock notification failed:', notificationError);
-        }
-      }
       return res;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); qc.invalidateQueries({ queryKey: ['inventory_dashboard'] }); closeForm(); },
@@ -188,14 +157,19 @@ export default function Inventory() {
         />
       </div>
 
-      <InventoryERPInsights
+      {(stockError || purchasesError || wasteError) && <div role="alert" className="rounded-xl border p-4 mb-4">
+        <p>{lang === 'fa' ? 'اطلاعات کامل موجودی بارگذاری نشد. دوباره تلاش کنید.' : lang === 'ar' ? 'تعذّر تحميل بيانات المخزون كاملة. أعد المحاولة.' : 'Could not load complete inventory data. Please retry.'}</p>
+        <Button className="mt-2 min-h-11" onClick={() => { retryStock(); retryPurchases(); retryWaste(); }}>{lang === 'fa' ? 'تلاش دوباره' : lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}</Button>
+      </div>}
+      {(stockLoading || purchasesLoading || wasteLoading) && <p role="status" className="p-4">{lang === 'fa' ? 'بارگذاری موجودی…' : lang === 'ar' ? 'جارٍ تحميل المخزون…' : 'Loading inventory…'}</p>}
+      {!stockError && !purchasesError && !wasteError && !stockLoading && !purchasesLoading && !wasteLoading && <InventoryERPInsights
         lang={lang}
         liveStock={liveStock}
         purchases={purchases}
         wastage={wastage}
         branchLabel={branchLabel}
         onEdit={openEdit}
-      />
+      />}
 
       {/* WhatsApp Alert Setup */}
       <Dialog open={showAlertSetup} onOpenChange={setShowAlertSetup}>
@@ -234,7 +208,7 @@ export default function Inventory() {
           <div className="space-y-3">
             <div>
               <Label className="text-xs">{m.product}</Label>
-              <Select value={form.product_id || '__none__'} onValueChange={v => {
+              <Select disabled={Boolean(editing)} value={form.product_id || '__none__'} onValueChange={v => {
                 const val = v === '__none__' ? '' : v;
                 const p = products.find(x => x.product_id === val);
                 setForm(f => ({ ...f, product_id: val, product_name: p?.name || val, unit: p?.unit || 'kg' }));
@@ -248,11 +222,11 @@ export default function Inventory() {
             </div>
             <div>
               <Label className="text-xs">{m.branch}</Label>
-              <BranchSelect value={form.branch} onChange={v => setForm((current) => ({
+              {editing ? <p className="text-sm">{branchLabel(form.branch)}</p> : <BranchSelect value={form.branch} onChange={v => setForm((current) => ({
                 ...current,
                 branch: v,
                 branch_id: branches.find((branch) => (branch.key || branch.branch_key) === v)?.id || null,
-              }))} />
+              }))} />}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
