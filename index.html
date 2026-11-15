@@ -44,6 +44,7 @@
 
     <!-- Above-the-fold start screen: zero JS, network font, video or animation dependency. -->
     <style id="bizctrl-startup-critical">
+      html,body{margin:0;background:#061539}
       .bzc-startup{position:relative;isolation:isolate;display:grid;place-items:center;overflow:hidden;box-sizing:border-box;color:#f8fbff;background:radial-gradient(ellipse at 18% 22%,rgba(15,102,192,.30),transparent 52%),radial-gradient(ellipse at 92% 78%,rgba(15,178,195,.17),transparent 48%),linear-gradient(145deg,#06102b 0%,#0a2149 57%,#061529 100%);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;text-align:center}
       .bzc-startup--full{min-height:100vh;min-height:100svh;padding:clamp(30px,6vh,70px) 22px;padding-top:max(30px,env(safe-area-inset-top));padding-bottom:max(34px,env(safe-area-inset-bottom))}
       .bzc-startup--inline{min-height:310px;min-height:min(52svh,430px);border-radius:22px;padding:40px 18px}
@@ -57,13 +58,15 @@
       .bzc-startup__halo{position:absolute;inset:17px;border-radius:40px;background:radial-gradient(circle,rgba(20,187,254,.22),rgba(9,83,165,.05) 70%,transparent 75%);filter:blur(5px)}
       .bzc-startup__orbit{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(106,207,255,.16);border-top:2px solid #5ce5ff;border-right:1px solid rgba(33,183,255,.58);animation:bzc-startup-orbit 3.2s linear infinite}
       .bzc-startup__orbit:after{content:"";position:absolute;top:17px;right:13px;width:7px;height:7px;border-radius:50%;background:#6bf5fa;box-shadow:0 0 13px 3px rgba(55,211,246,.40)}
-      .bzc-startup__logo{position:relative;z-index:1;width:84px;height:84px;object-fit:contain;filter:drop-shadow(0 9px 17px rgba(1,9,30,.32))}
+      .bzc-startup__logo{position:relative;z-index:1;width:84px;height:84px;object-fit:contain;mix-blend-mode:screen;filter:drop-shadow(0 9px 17px rgba(1,9,30,.32))}
       .bzc-startup__wordmark{margin:18px 0 0;font-size:clamp(32px,7.4vw,40px);font-weight:850;letter-spacing:-1.5px;line-height:1.1;white-space:nowrap}
       .bzc-startup__wordmark strong{color:#4ce1fb;font-weight:850}
       .bzc-startup__tagline{margin:9px 0 0;color:#afc2dc;font-size:14px;font-weight:500;line-height:1.6}
       .bzc-startup__progress{margin:37px 0 0;width:min(210px,72%);height:3px;overflow:hidden;border-radius:9px;background:rgba(171,206,242,.16)}
       .bzc-startup__progress span{display:block;width:44%;height:100%;border-radius:9px;background:linear-gradient(90deg,transparent,#39dcff,#a1f3fb);animation:bzc-startup-progress 1.75s ease-in-out infinite;transform:translate3d(-140%,0,0)}
       .bzc-startup__status{margin:13px 0 0;color:#b9cee8;font-size:12px;letter-spacing:.035em;line-height:1.6}
+      .bzc-startup__recovery{margin:18px 0 0;font-size:13px;color:#d5e6fa}
+      .bzc-startup__recovery button{margin-top:10px;padding:10px 20px;border:1px solid #5ce5ff;border-radius:10px;background:#123664;color:#fff;font:inherit;cursor:pointer}
       .bzc-startup__dots{display:inline-block;width:15px;overflow:hidden;vertical-align:bottom}
       .bzc-startup__footer{position:absolute;bottom:max(34px,env(safe-area-inset-bottom));left:14px;right:14px;margin:0;color:#7998bc;font-size:11px;letter-spacing:.055em}
       .bzc-startup--inline .bzc-startup__emblem{width:118px;height:118px}
@@ -81,7 +84,7 @@
 
     <!-- Visible immediately on slow connections, replaced by React's first render. -->
     <div id="root">
-      <main class="bzc-startup bzc-startup--full" role="status" aria-label="Opening BizCTRL">
+      <main id="bizctrl-preboot" class="bzc-startup bzc-startup--full" role="status" aria-label="Opening BizCTRL">
         <div class="bzc-startup__ambient bzc-startup__ambient--a" aria-hidden="true"></div>
         <div class="bzc-startup__ambient bzc-startup__ambient--b" aria-hidden="true"></div>
         <div class="bzc-startup__frame" aria-hidden="true"></div>
@@ -95,11 +98,26 @@
           <p class="bzc-startup__tagline">Your business. In control.</p>
           <div class="bzc-startup__progress" aria-hidden="true"><span></span></div>
           <p class="bzc-startup__status">Opening your workspace<span class="bzc-startup__dots" aria-hidden="true">...</span></p>
+          <div id="bizctrl-preboot-recovery" class="bzc-startup__recovery" hidden>
+            <p>Loading is taking longer than expected. Check your connection and try again.</p>
+            <button type="button" id="bizctrl-preboot-retry">Reload app</button>
+          </div>
         </div>
         <p class="bzc-startup__footer">One clear view of your business</p>
       </main>
     </div>
     <noscript><p style="font:16px system-ui;padding:16px;text-align:center">BizCTRL requires JavaScript. Enable JavaScript to sign in.</p></noscript>
+    <script id="bizctrl-preboot-watchdog">
+      (() => {
+        const scene = document.getElementById('bizctrl-preboot');
+        const recovery = document.getElementById('bizctrl-preboot-recovery');
+        document.getElementById('bizctrl-preboot-retry').addEventListener('click', () => window.location.reload());
+        setTimeout(() => {
+          // React replaces this node on first render; never alter its live UI.
+          if (scene.isConnected) recovery.hidden = false;
+        }, 12000);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
