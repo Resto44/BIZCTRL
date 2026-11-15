@@ -46,3 +46,15 @@ export function buildInventoryForecast({ inventory = [], consumption = [], branc
       needsReorder: daysLeft !== null && daysLeft <= 7 };
   }).sort((a, b) => (a.daysLeft ?? Infinity) - (b.daysLeft ?? Infinity));
 }
+
+/** Exact count detects server row caps; never turn read failures into empty stock. */
+export async function readForecastInventory({ db, restaurantId, branchId = null }) {
+  if (!restaurantId) throw new Error('Inventory scope required');
+  let query = db.from('inventory').select('*', { count: 'exact' }).eq('restaurant_id', restaurantId);
+  if (branchId) query = query.eq('branch_id', branchId);
+  const { data, error, count } = await query.order('date', { ascending: false }).limit(2001);
+  if (error) throw error;
+  if (!Array.isArray(data) || !Number.isInteger(count)) throw new Error('Invalid inventory response');
+  if (count > data.length || count > 2000) throw new Error('INVENTORY_ROW_LIMIT');
+  return data;
+}

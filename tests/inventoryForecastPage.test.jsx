@@ -4,7 +4,7 @@ import { create, act } from 'react-test-renderer';
 import { afterEach, it, expect, vi } from 'vitest';
 const state = vi.hoisted(() => ({ query: {}, options: null, inventory: vi.fn(), read: vi.fn(), retry: vi.fn() }));
 vi.mock('@tanstack/react-query', () => ({ useQuery: options => { state.options = options; return { ...state.query, refetch: state.retry }; } }));
-vi.mock('@/api/base44Client', () => ({ base44: { entities: { Inventory: { filter: state.inventory } } } }));
+vi.mock('@/lib/inventoryForecast', async original => ({ ...await original(), readForecastInventory: state.inventory }));
 vi.mock('@/api/supabaseClient', () => ({ supabase: {} }));
 vi.mock('@/lib/reportStockConsumption', () => ({ fetchReportStockConsumption: state.read }));
 vi.mock('@/lib/LanguageContext', () => ({ useLanguage: () => ({ lang: 'en', t: x => x }) }));
@@ -30,6 +30,6 @@ it('requests matching canonical tenant and branch scopes and rejects truncated i
  expect(tree.root.findAllByProps({role:'status'})).toHaveLength(1);
  state.inventory.mockResolvedValue(Array(2001).fill({})); state.read.mockResolvedValue([]);
  await expect(state.options.queryFn()).rejects.toThrow('INVENTORY_ROW_LIMIT');
- expect(state.inventory).toHaveBeenCalledWith({restaurant_id:'tenant',branch_id:'branch'}, '-date', 2001);
+ expect(state.inventory).toHaveBeenCalledWith(expect.objectContaining({restaurantId:'tenant',branchId:'branch'}));
  expect(state.read).toHaveBeenCalledWith(expect.objectContaining({restaurantId:'tenant',branchId:'branch'}));
 });

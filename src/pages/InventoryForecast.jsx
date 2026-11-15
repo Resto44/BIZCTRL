@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { Card } from '@/components/ui/card';
@@ -10,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import PageHeader from '@/components/shared/PageHeader';
 import { supabase } from '@/api/supabaseClient';
 import { fetchReportStockConsumption } from '@/lib/reportStockConsumption';
-import { buildInventoryForecast, forecastWindow } from '@/lib/inventoryForecast';
+import { buildInventoryForecast, forecastWindow, readForecastInventory } from '@/lib/inventoryForecast';
 import { useBranchScope } from '@/lib/BranchScopeContext';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { Button } from '@/components/ui/button';
@@ -38,8 +37,7 @@ export default function InventoryForecast() {
     staleTime: 60_000,
     queryFn: async () => {
       const [inventory, consumption] = await Promise.all([
-        base44.entities.Inventory.filter({ restaurant_id: activeRestaurant.id,
-          ...(branchId ? { branch_id: branchId } : {}) }, '-date', 2001),
+        readForecastInventory({ db: supabase, restaurantId: activeRestaurant.id, branchId }),
         fetchReportStockConsumption({ db: supabase, restaurantId: activeRestaurant.id, branchId, range }),
       ]);
       // Do not publish a partial stock picture as a complete forecast.

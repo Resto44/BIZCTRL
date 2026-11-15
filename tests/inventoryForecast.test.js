@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { buildInventoryForecast, forecastWindow } from '../src/lib/inventoryForecast';
+import { describe, it, expect, vi } from 'vitest';
+import { buildInventoryForecast, forecastWindow, readForecastInventory } from '../src/lib/inventoryForecast';
 const item = { id: 'i', product_id: 'rice', branch_id: 'b', unit: 'kg', quantity: '10', opening_stock: 999, date: '2026-11-15' };
 const movement = { id: 'm', product_id: 'rice', branch_id: 'b', unit: 'kg', quantity: '60', transaction_type: 'recipe_consumption', created_date: '2026-11-15' };
 const forecast = (inventory = [item], consumption = [movement]) => buildInventoryForecast({ inventory, consumption, today: '2026-11-15' });
@@ -28,5 +28,22 @@ describe('verified inventory forecast', () => {
     const result = buildInventoryForecast({ inventory: [{ ...item, date: '2026-10-01', quantity: 999 }, item], consumption: [{ ...movement, branch_id: null, branch: 'branch-key' }], branches: [{ id: 'b', key: 'branch-key', name: 'Branch' }], today: '2026-11-15' });
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ branch: 'Branch', daysLeft: 5 });
+  });
+});
+
+describe('forecast inventory transport', () => {
+  const dbFor = result => { const q = { select: vi.fn(() => q), eq: vi.fn(() => q), order: vi.fn(() => q), limit: vi.fn(async () => result) }; return { from: vi.fn(() => q), q }; };
+  it('throws the actual database error instead of returning empty data', async () => {
+    const error = new Error('offline');
+    await expect(readForecastInventory({ db: dbFor({error}), restaurantId:'tenant' })).rejects.toThrow('offline');
+  });
+  it('detects truncation even when the server caps fewer rows than the requested limit', async () => {
+    await expect(readForecastInventory({ db: dbFor({data:[item],count:2}), restaurantId:'tenant' })).rejects.toThrow('INVENTORY_ROW_LIMIT');
+  });
+  it('enforces scope and permits a verified empty result', async () => {
+    const db = dbFor({data:[],count:0});
+    await expect(readForecastInventory({db,restaurantId:'tenant',branchId:'branch'})).resolves.toEqual([]);
+    expect(db.q.eq.mock.calls).toEqual([['restaurant_id','tenant'],['branch_id','branch']]);
+    await expect(readForecastInventory({db})).rejects.toThrow('scope');
   });
 });
