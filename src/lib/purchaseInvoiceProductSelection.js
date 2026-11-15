@@ -17,7 +17,7 @@ export function uniquePurchaseProductForBrand(products = [], brand = '') {
  return brand && matches.length===1 ? matches[0] : null;
 }
 
-/** Preserve manually entered buying cost when a delayed unique-brand match loads. */
+/** Preserve the cashier's manually entered purchase cost when a delayed, tenant-scoped unique-brand match loads; never infer a product across suppliers/tenants. */
 export function autoSelectPurchaseBrandProduct(item = {}, product) {
  if (item.product_id || String(item.product_name || '').trim() || !product?.id) return item;
  const selected=selectPurchaseProduct(item,product);
