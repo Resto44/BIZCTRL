@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Bell, MessageCircle, Loader2, CheckCircle, Phone } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { useAuth } from '@/lib/AuthContext';
+import { collectionActionPayload } from '@/lib/debtCollection';
+import { useDebtI18n } from '@/lib/debtI18n';
 
 const SETTING_KEY = 'debt_reminder_settings';
 const DEFAULT_SETTINGS = {
@@ -21,6 +23,8 @@ const DEFAULT_SETTINGS = {
 
 export default function ReminderSettings({ debts, onLogAction }) {
   const { user } = useAuth();
+  const d = useDebtI18n();
+  const [logError, setLogError] = useState(false);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -78,22 +82,22 @@ export default function ReminderSettings({ debts, onLogAction }) {
 
   const logSent = async (debt, channel) => {
     setSending(s => ({ ...s, [debt.id]: true }));
-    // Log to CollectionAction
-    await base44.entities.CollectionAction.create({
-      debt_id: debt.id,
-      party_name: debt.party_name,
-      action_type: 'message',
-      date: format(new Date(), 'yyyy-MM-dd'),
-      outcome: `تم إرسال تذكير عبر ${channel === 'whatsapp' ? 'واتساب' : 'SMS'}: ${buildMessage(debt)}`,
-      recorded_by: user?.email,
-    });
-    setSentLog(s => ({ ...s, [debt.id]: channel }));
-    setSending(s => ({ ...s, [debt.id]: false }));
-    onLogAction?.();
+    setLogError(false);
+    try {
+      await base44.entities.CollectionAction.create(collectionActionPayload(debt, {
+        action_type: 'message',
+        outcome: `Reminder opened via ${channel}: ${buildMessage(debt)}`,
+      }, user?.email));
+      setSentLog(s => ({ ...s, [debt.id]: channel }));
+      onLogAction?.();
+    } catch { setLogError(true); }
+    finally { setSending(s => ({ ...s, [debt.id]: false })); }
+
   };
 
   return (
     <div className="space-y-4">
+      {logError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{d.action_error}</p>}
       {/* Settings Card */}
       <Card>
         <CardHeader className="pb-3 pt-4 px-4">

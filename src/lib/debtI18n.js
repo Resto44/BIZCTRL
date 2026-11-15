@@ -4,6 +4,7 @@
  */
 export const DEBT_TRANSLATIONS = {
   en: {
+    history_loading: 'Loading history…', history_error: 'History could not be loaded. Do not treat this as no payments or actions.', action_error: 'The operation could not be completed. Review the history before retrying.', retry: 'Retry',
     title: 'Debts & Receivables',
     subtitle: 'Manage accounts receivable and payable',
     add: 'Add',
@@ -154,6 +155,7 @@ export const DEBT_TRANSLATIONS = {
   },
 
   ar: {
+    history_loading: 'جارٍ تحميل السجل…', history_error: 'تعذر تحميل السجل. لا يعني ذلك عدم وجود دفعات أو إجراءات.', action_error: 'تعذر إكمال العملية. راجع السجل قبل إعادة المحاولة.', retry: 'إعادة المحاولة',
     title: 'الديون والمستحقات',
     subtitle: 'إدارة الذمم المدينة والدائنة',
     add: 'إضافة',
@@ -290,6 +292,7 @@ export const DEBT_TRANSLATIONS = {
   },
 
   fa: {
+    history_loading: 'در حال دریافت سابقه…', history_error: 'سابقه دریافت نشد؛ این به معنی نبود پرداخت یا پیگیری نیست.', action_error: 'عملیات تکمیل نشد. پیش از تلاش دوباره سابقه را بررسی کنید.', retry: 'تلاش دوباره',
     title: 'بدهی‌ها و مطالبات',
     subtitle: 'مدیریت حساب‌های دریافتنی و پرداختنی',
     add: 'افزودن',

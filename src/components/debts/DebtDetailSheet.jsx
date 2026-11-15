@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { readDebtHistory, collectionActionPayload } from '@/lib/debtCollection';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format, parseISO, isPast } from 'date-fns';
+import { parseISO, isPast } from 'date-fns';
 import { useAuth } from '@/lib/AuthContext';
 import { Phone } from 'lucide-react';
 import { useDebtI18n } from '@/lib/debtI18n';
@@ -30,36 +32,44 @@ export default function DebtDetailSheet({ debt, open, onClose, onUpdated }) {
   const [actionForm, setActionForm] = useState({ action_type: 'call', outcome: '', next_follow_up: '', promise_amount: '', promise_date: '' });
   const [saving, setSaving] = useState(false);
 
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [reload, setReload] = useState(0);
+
   useEffect(() => {
+    let live = true;
+    setPayments([]); setActions([]); setLoadError(false); setSaveError(false);
+    setShowActionForm(false);
+    setActionForm({ action_type: 'call', outcome: '', next_follow_up: '', promise_amount: '', promise_date: '' });
     if (!debt || !open) return;
-    Promise.all([
-      base44.entities.DebtPayment.filter({ debt_id: debt.id }, '-date', 20),
-      base44.entities.CollectionAction.filter({ debt_id: debt.id }, '-date', 20),
-    ]).then(([p, a]) => { setPayments(p); setActions(a); });
-  }, [debt, open]);
+    setLoading(true);
+    readDebtHistory(supabase, debt).then(([p, a]) => {
+      if (live) { setPayments(p); setActions(a); }
+    }).catch(() => { if (live) setLoadError(true); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [debt?.id, debt?.restaurant_id, open, reload]);
 
   const submitAction = async (e) => {
     e.preventDefault();
-    setSaving(true);
-    await base44.entities.CollectionAction.create({
-      debt_id: debt.id,
-      party_name: debt.party_name,
-      date: format(new Date(), 'yyyy-MM-dd'),
-      action_type: actionForm.action_type,
-      outcome: actionForm.outcome,
-      next_follow_up: actionForm.next_follow_up || null,
-      promise_amount: parseFloat(actionForm.promise_amount) || 0,
-      promise_date: actionForm.promise_date || null,
-      recorded_by: user?.email,
-    });
-    const updated = await base44.entities.CollectionAction.filter({ debt_id: debt.id }, '-date', 20);
-    setActions(updated);
-    setShowActionForm(false);
-    setSaving(false);
-    if (actionForm.action_type === 'written_off') {
-      await base44.entities.DebtRecord.update(debt.id, { status: 'written_off' });
-      onUpdated?.();
-    }
+    if (saving) return;
+    setSaving(true); setSaveError(false);
+    try {
+      const promiseNote = actionForm.action_type === 'promise'
+        ? d.promise_label(actionForm.promise_amount || '0', actionForm.promise_date || '—') : '';
+      const created = await base44.entities.CollectionAction.create(
+        collectionActionPayload(debt, actionForm, user?.email, promiseNote),
+      );
+      setActions(current => [created, ...current].slice(0, 20));
+      setShowActionForm(false);
+      setActionForm({ action_type: 'call', outcome: '', next_follow_up: '', promise_amount: '', promise_date: '' });
+      if (actionForm.action_type === 'written_off') {
+        await base44.entities.DebtRecord.update(debt.id, { status: 'written_off' });
+        onUpdated?.();
+      }
+    } catch { setSaveError(true); }
+    finally { setSaving(false); }
   };
 
   if (!debt) return null;
@@ -98,10 +108,15 @@ export default function DebtDetailSheet({ debt, open, onClose, onUpdated }) {
           )}
         </div>
 
+        {loading && <p role="status">{d.history_loading}</p>}
+        {loadError && <div role="alert" className="rounded-xl border border-red-300 p-3 text-sm">
+          {d.history_error} <Button type="button" variant="outline" onClick={() => setReload(n => n + 1)}>{d.retry}</Button>
+        </div>}
+        {saveError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{d.action_error}</p>}
         {/* Payment History */}
         <div className="mb-4">
           <h3 className="font-semibold text-sm mb-2">{d.payment_history}</h3>
-          {payments.length === 0 ? (
+          {(loading || loadError) ? null : payments.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-3">{d.no_payments}</p>
           ) : (
             <div className="space-y-2">
@@ -122,7 +137,7 @@ export default function DebtDetailSheet({ debt, open, onClose, onUpdated }) {
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold text-sm">{d.collection_actions}</h3>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowActionForm(v => !v)}>
+            <Button size="sm" variant="outline" className="min-h-11 text-xs" disabled={loading || loadError || saving} onClick={() => setShowActionForm(v => !v)}>
               {d.add_action}
             </Button>
           </div>
@@ -164,7 +179,7 @@ export default function DebtDetailSheet({ debt, open, onClose, onUpdated }) {
             </form>
           )}
 
-          {actions.length === 0 ? (
+          {(loading || loadError) ? null : actions.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-3">{d.no_actions}</p>
           ) : (
             <div className="space-y-2">
@@ -172,11 +187,11 @@ export default function DebtDetailSheet({ debt, open, onClose, onUpdated }) {
                 <div key={a.id} className="bg-slate-50 rounded-lg px-3 py-2">
                   <div className="flex justify-between text-xs">
                     <span className="font-medium">{ACTION_TYPES.find(t => t.value === a.action_type)?.label || a.action_type}</span>
-                    <span className="text-muted-foreground">{a.date}</span>
+                    <span className="text-muted-foreground">{a.created_date?.slice(0, 10)}</span>
                   </div>
-                  {a.outcome && <div className="text-xs text-slate-600 mt-1">{a.outcome}</div>}
+                  {a.notes && <div className="text-xs text-slate-600 mt-1">{a.notes}</div>}
                   {a.promise_date && <div className="text-xs text-amber-600 mt-1">{d.promise_label(a.promise_amount?.toLocaleString(), a.promise_date)}</div>}
-                  {a.next_follow_up && <div className="text-xs text-blue-600 mt-1">{d.followup_label(a.next_follow_up)}</div>}
+                  {a.next_action_date && <div className="text-xs text-blue-600 mt-1">{d.followup_label(a.next_action_date)}</div>}
                 </div>
               ))}
             </div>
