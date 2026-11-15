@@ -80,6 +80,8 @@ export default function ERPLogin() {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  const reportLoginError = message => { setLoginError(message); toast.error(message); };
   const [step, setStep] = useState('role'); // 'role' | 'credentials'
 
   // Pre-select role from URL param (e.g. /erp-login?role=manager)
@@ -110,21 +112,23 @@ export default function ERPLogin() {
   }, [navigate, postAuthenticationDestination]);
 
   const handleRoleSelect = (roleConfig) => {
+    setLoginError('');
     setSelectedRole(roleConfig);
     setStep('credentials');
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setLoginError('');
     if (!email || !password) {
-      toast.error('Please enter your email and password');
+      reportLoginError('Please enter your email and password');
       return;
     }
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        toast.error(error.message);
+        reportLoginError(error.message);
         setLoading(false);
         return;
       }
@@ -144,32 +148,32 @@ export default function ERPLogin() {
           .maybeSingle();
 
         if (mem?.status === 'pending') {
-          toast.info('Your registration is pending approval. Please wait for the Owner to approve your account.');
+          reportLoginError('Your registration is pending approval. Please wait for the Owner to approve your account.');
           await supabase.auth.signOut();
           setLoading(false);
           return;
         }
         if (mem?.status === 'rejected') {
-          toast.error('Your account registration was rejected. Please contact the Owner.');
+          reportLoginError('Your account registration was rejected. Please contact the Owner.');
           await supabase.auth.signOut();
           setLoading(false);
           return;
         }
         if (mem?.status === 'suspended') {
-          toast.error('Your account has been suspended. Please contact the Owner.');
+          reportLoginError('Your account has been suspended. Please contact the Owner.');
           await supabase.auth.signOut();
           setLoading(false);
           return;
         }
         await supabase.auth.signOut();
-        toast.error('This identity is not active yet. Open the secure invitation link issued by your organization owner.');
+        reportLoginError('This identity is not active yet. Open the secure invitation link issued by your organization owner.');
         setLoading(false);
         return;
       }
 
       // Portal selection is a security boundary, including the Owner portal.
       if (!selectedRole || context.role !== selectedRole.role) {
-        toast.error(`This account belongs to the ${context.role} portal. Please select the correct portal.`);
+        reportLoginError(`This account belongs to the ${context.role} portal. Please select the correct portal.`);
         await supabase.auth.signOut();
         setLoading(false);
         return;
@@ -178,7 +182,7 @@ export default function ERPLogin() {
       toast.success(`Welcome back, ${context.full_name || email}!`);
       navigate(postAuthenticationDestination || home, { replace: true });
     } catch {
-      toast.error('Login failed. Please try again.');
+      reportLoginError('Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -259,6 +263,7 @@ export default function ERPLogin() {
                 <Label htmlFor="email" className="text-slate-300 text-sm">Email Address</Label>
                 <Input
                   id="email"
+                  autoComplete="username"
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
@@ -272,6 +277,7 @@ export default function ERPLogin() {
                 <div className="relative mt-1.5">
                   <Input
                     id="password"
+                    autoComplete="current-password"
                     type={showPw ? 'text' : 'password'}
                     value={password}
                     onChange={e => setPassword(e.target.value)}
@@ -288,6 +294,8 @@ export default function ERPLogin() {
                   </button>
                 </div>
               </div>
+
+              {loginError && <p role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm leading-6 text-red-200 break-words">{loginError}</p>}
 
               <Button
                 type="submit"
@@ -317,7 +325,7 @@ export default function ERPLogin() {
 
         {step === 'credentials' && (
           <button
-            onClick={() => { setStep('role'); setSelectedRole(null); setEmail(''); setPassword(''); }}
+            onClick={() => { setLoginError(''); setStep('role'); setSelectedRole(null); setEmail(''); setPassword(''); }}
             className="flex items-center gap-2 text-slate-500 hover:text-slate-300 text-sm mt-4 mx-auto transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
