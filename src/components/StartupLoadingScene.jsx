@@ -4,6 +4,7 @@ import React from 'react';
  * Pure presentation. This component NEVER delays application startup,
  * fetches data, sets a minimum loading duration, or modifies the session.
  * The same structure is first painted from index.html before JS has loaded.
+ * Visual motion is purely compositor-friendly CSS; no minimum splash duration.
  */
 const copy = {
   en: { tagline: 'Your business. In control.', status: 'Opening your workspace', foot: 'One clear view of your business' },
