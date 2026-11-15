@@ -8,10 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import PageHeader from '@/components/shared/PageHeader';
-import { formatDate } from '@/lib/helpers';
+import { supabase } from '@/api/supabaseClient';
+import { fetchReportStockConsumption } from '@/lib/reportStockConsumption';
+import { buildInventoryForecast, forecastWindow } from '@/lib/inventoryForecast';
+import { useBranchScope } from '@/lib/BranchScopeContext';
+import BranchSelect from '@/components/shared/BranchSelect';
+import { Button } from '@/components/ui/button';
 import { AlertTriangle, Package, TrendingDown, List, BarChart3, ShoppingCart } from 'lucide-react';
 import ForecastReorderPanel from '@/components/inventory/ForecastReorderPanel';
-import AIRestockAlerts from '@/components/inventory/AIRestockAlerts';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 function statusBadge(daysLeft, t) {
@@ -23,102 +27,41 @@ function statusBadge(daysLeft, t) {
 
 export default function InventoryForecast() {
   const { lang, t } = useLanguage();
-  const { branches } = useTenant();
-  const [selectedBranch, setSelectedBranch] = useState('all');
+  const { branches, activeRestaurant } = useTenant();
+  const { selectedBranchId, selectedBranchKey, setSelectedBranchId, isAllBranches } = useBranchScope();
   const [lookbackDays, setLookbackDays] = useState(30);
-
-  const { activeRestaurant } = useTenant();
-  const { data: inventory = [] } = useQuery({
-    queryKey: ['inventory', activeRestaurant?.id],
-    queryFn: () => base44.entities.Inventory.filter(
-      activeRestaurant?.id ? { restaurant_id: activeRestaurant.id } : {},
-      '-date', 2000
-    ),
-    enabled: !!activeRestaurant?.id,
-    staleTime: 300000,
+  const range = forecastWindow(lookbackDays);
+  const branchId = isAllBranches ? null : selectedBranchId;
+  const query = useQuery({
+    queryKey: ['inventory-forecast', activeRestaurant?.id, branchId, range.from, range.to],
+    enabled: Boolean(activeRestaurant?.id),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const [inventory, consumption] = await Promise.all([
+        base44.entities.Inventory.filter({ restaurant_id: activeRestaurant.id,
+          ...(branchId ? { branch_id: branchId } : {}) }, '-date', 2001),
+        fetchReportStockConsumption({ db: supabase, restaurantId: activeRestaurant.id, branchId, range }),
+      ]);
+      // Do not publish a partial stock picture as a complete forecast.
+      if (inventory.length > 2000) throw new Error('INVENTORY_ROW_LIMIT');
+      return { inventory, consumption };
+    },
   });
-  const { data: purchases = [] } = useQuery({
-    queryKey: ['purchases', activeRestaurant?.id],
-    queryFn: () => base44.entities.Purchase.filter(
-      activeRestaurant?.id ? { restaurant_id: activeRestaurant.id } : {},
-      '-date', 2000
-    ),
-    enabled: !!activeRestaurant?.id,
-    staleTime: 120000,
-  });
-  const { data: wastes = [] } = useQuery({
-    queryKey: ['inventory_waste', activeRestaurant?.id],
-    queryFn: () => base44.entities.InventoryWaste.filter(
-      activeRestaurant?.id ? { restaurant_id: activeRestaurant.id } : {},
-      '-date', 2000
-    ),
-    enabled: !!activeRestaurant?.id,
-    staleTime: 120000,
-  });
-
-  const cutoffDate = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - lookbackDays);
-    return formatDate(d);
-  }, [lookbackDays]);
-
-  const forecast = useMemo(() => {
-    // Get latest inventory record per product per branch
-    const invMap = {};
-    inventory.forEach(inv => {
-      const key = `${inv.product_id}__${inv.branch}`;
-      if (!invMap[key] || inv.date > invMap[key].date) invMap[key] = inv;
-    });
-
-    // Compute avg daily consumption from purchases in lookback period
-    const today = formatDate(new Date());
-    const periodPurchases = purchases.filter(p => p.date >= cutoffDate && p.date <= today);
-    const periodWastes = wastes.filter(w => w.date >= cutoffDate && w.date <= today);
-
-    // Group purchases by product+branch
-    const consumptionMap = {};
-    periodPurchases.forEach(p => {
-      const key = `${p.product_id}__${p.branch}`;
-      if (!consumptionMap[key]) consumptionMap[key] = { qty: 0, product_name: p.product_name, unit: '' };
-      consumptionMap[key].qty += (p.qty || 0);
-    });
-    // Waste also counts as consumption
-    periodWastes.forEach(w => {
-      const key = `${w.product_id}__${w.branch}`;
-      if (!consumptionMap[key]) consumptionMap[key] = { qty: 0, product_name: w.product_name, unit: w.unit || '' };
-      consumptionMap[key].qty += (w.qty || 0);
-    });
-
-    return Object.entries(consumptionMap).map(([key, cons]) => {
-      const [product_id, branch] = key.split('__');
-      const inv = invMap[key];
-      const avgDaily = cons.qty / lookbackDays;
-      const currentStock = inv ? (inv.opening_stock || 0) : 0;
-      const daysLeft = avgDaily > 0 ? Math.floor(currentStock / avgDaily) : null;
-
-      return {
-        product_id,
-        product_name: cons.product_name || product_id,
-        branch,
-        unit: inv?.unit || cons.unit || '',
-        avgDaily: Math.round(avgDaily * 100) / 100,
-        currentStock,
-        daysLeft,
-        needsReorder: daysLeft !== null && daysLeft <= 7,
-      };
-    }).filter(r => selectedBranch === 'all' || r.branch === selectedBranch)
-      .sort((a, b) => {
-        const da = a.daysLeft ?? 999;
-        const db = b.daysLeft ?? 999;
-        return da - db;
-      });
-  }, [inventory, purchases, wastes, lookbackDays, cutoffDate, selectedBranch]);
+  const copy = {
+    en: { basis: 'Estimates use recorded stock consumption, not purchases. Items without verified usage or a current balance show no forecast. Configure ingredients per portion in the POS menu to record recipe usage.', error: 'Could not load the complete inventory forecast. Retry before using reorder suggestions.', retry: 'Retry', loading: 'Loading inventory and recorded consumption…', stock: 'Current stock', unknown: 'Usage not available' },
+    ar: { basis: 'التقديرات تعتمد على الاستهلاك المسجل وليس المشتريات. لا تُعرض توقعات للأصناف دون استهلاك موثّق أو رصيد حالي. اضبط مكونات الحصة في قائمة نقاط البيع لتسجيل الاستهلاك.', error: 'تعذّر تحميل توقعات المخزون كاملة. أعد المحاولة قبل اعتماد اقتراحات الشراء.', retry: 'إعادة المحاولة', loading: 'جارٍ تحميل المخزون والاستهلاك المسجل…', stock: 'المخزون الحالي', unknown: 'الاستهلاك غير متاح' },
+    fa: { basis: 'پیش‌بینی بر اساس مصرف ثبت‌شده است، نه خرید. برای محصول بدون مصرف معتبر یا موجودی فعلی، پیش‌بینی نشان داده نمی‌شود. مواد و مقدار هر پرس را در منوی POS تنظیم کنید.', error: 'پیش‌بینی کامل موجودی بارگذاری نشد. پیش از استفاده از پیشنهاد خرید، دوباره تلاش کنید.', retry: 'تلاش دوباره', loading: 'بارگذاری موجودی و مصرف ثبت‌شده…', stock: 'موجودی فعلی', unknown: 'مصرف در دسترس نیست' },
+  }[lang] || { basis: 'Estimates use recorded consumption, not purchases.', error: 'Could not load forecast.', retry: 'Retry', loading: 'Loading…', stock: 'Current stock', unknown: 'Usage not available' };
+  const forecast = useMemo(() => query.isError ? [] : buildInventoryForecast({
+    inventory: query.data?.inventory, consumption: query.data?.consumption,
+    branches, days: lookbackDays, today: range.to,
+  }), [query.data, query.isError, branches, lookbackDays, range.to]);
 
   const criticalCount = forecast.filter(r => r.daysLeft !== null && r.daysLeft <= 3).length;
   const lowCount = forecast.filter(r => r.daysLeft !== null && r.daysLeft > 3 && r.daysLeft <= 7).length;
 
   // Chart data: top 10 by days left (lowest first)
-  const chartData = forecast.slice(0, 10).map(r => ({
+  const chartData = forecast.filter(r => r.daysLeft !== null).slice(0, 10).map(r => ({
     name: r.product_name.length > 12 ? r.product_name.slice(0, 12) + '…' : r.product_name,
     days: r.daysLeft ?? 0,
     stock: r.currentStock,
@@ -145,7 +88,7 @@ export default function InventoryForecast() {
           )}
           <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">
             <Package className="w-4 h-4" />
-            <span>{forecast.length - criticalCount - lowCount} {t('active')}</span>
+            <span>{forecast.filter(r => r.daysLeft !== null && r.daysLeft > 7).length} {t('active')}</span>
           </div>
         </div>
       )}
@@ -160,31 +103,25 @@ export default function InventoryForecast() {
             <SelectItem value="90">90 {t('days_of_stock')}</SelectItem>
           </SelectContent>
         </Select>
-        {branches.length > 0 && (
-          <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-            <SelectTrigger className="w-40 h-8 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('all_branches')}</SelectItem>
-              {branches.map(b => <SelectItem key={b.key} value={b.key}>{b.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
+        <div className="w-full sm:w-48"><BranchSelect value={isAllBranches ? 'all' : selectedBranchKey} includeAll
+          onChange={key => setSelectedBranchId(key === 'all' ? 'all' : branches.find(b => (b.key || b.branch_key) === key)?.id)} /></div>
       </div>
 
-      <p className="text-xs text-muted-foreground mb-4">{t('avg_consumption')} — {t('days_of_stock')}</p>
+      <p className="text-sm text-muted-foreground mb-4" role="note">{copy.basis}</p>
+      {query.isLoading && <p role="status">{copy.loading}</p>}
+      {query.isError && <Card className="p-4 mb-4" role="alert"><p>{copy.error}</p><Button onClick={() => query.refetch()} className="mt-3 min-h-11">{copy.retry}</Button></Card>}
 
-      {forecast.length === 0 ? (
+      {query.isLoading || query.isError ? null : forecast.length === 0 ? (
         <Card className="p-8 text-center text-muted-foreground">
           <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
           <p>{t('no_data')}</p>
         </Card>
       ) : (
         <Tabs defaultValue="list">
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 flex h-auto flex-wrap gap-1">
             <TabsTrigger value="list" className="gap-1"><List className="w-3.5 h-3.5" /> {t('table')}</TabsTrigger>
             <TabsTrigger value="chart" className="gap-1"><BarChart3 className="w-3.5 h-3.5" /> {t('chart')}</TabsTrigger>
             <TabsTrigger value="reorder" className="gap-1 text-amber-700"><ShoppingCart className="w-3.5 h-3.5" /> {t('reorder_suggested')}</TabsTrigger>
-            <TabsTrigger value="ai" className="gap-1 text-violet-700"><AlertTriangle className="w-3.5 h-3.5" /> AI Alerts</TabsTrigger>
           </TabsList>
 
           <TabsContent value="list">
@@ -196,7 +133,7 @@ export default function InventoryForecast() {
                       <th className="pb-2 font-semibold">{t('product')}</th>
                       <th className="pb-2 font-semibold">{t('branch')}</th>
                       <th className="pb-2 text-end font-semibold">{t('avg_consumption')}</th>
-                      <th className="pb-2 text-end font-semibold">{t('opening_stock')}</th>
+                      <th className="pb-2 text-end font-semibold">{copy.stock}</th>
                       <th className="pb-2 text-end font-semibold">{t('days_of_stock')}</th>
                       <th className="pb-2 font-semibold">{t('days_of_stock')} bar</th>
                       <th className="pb-2 text-center font-semibold">{t('status')}</th>
@@ -207,8 +144,8 @@ export default function InventoryForecast() {
                       <tr key={i} className={`border-b border-border/40 last:border-0 ${r.needsReorder ? 'bg-red-50/30 dark:bg-red-900/10' : ''}`}>
                         <td className="py-2.5 font-medium">{r.product_name}</td>
                         <td className="py-2.5 text-muted-foreground text-xs">{r.branch}</td>
-                        <td className="py-2.5 text-end">{r.avgDaily} {r.unit}</td>
-                        <td className="py-2.5 text-end">{r.currentStock} {r.unit}</td>
+                        <td className="py-2.5 text-end">{r.avgDaily === null ? '—' : r.avgDaily} {r.unit}</td>
+                        <td className="py-2.5 text-end">{r.currentStock === null ? '—' : r.currentStock} {r.unit}</td>
                         <td className={`py-2.5 text-end font-bold ${r.daysLeft !== null && r.daysLeft <= 3 ? 'text-red-500' : r.daysLeft !== null && r.daysLeft <= 7 ? 'text-amber-600' : 'text-emerald-600'}`}>
                           {r.daysLeft !== null ? r.daysLeft : '—'}
                         </td>
@@ -222,7 +159,7 @@ export default function InventoryForecast() {
                             </div>
                           )}
                         </td>
-                        <td className="py-2.5 text-center">{statusBadge(r.daysLeft, t)}</td>
+                        <td className="py-2.5 text-center">{r.daysLeft === null ? copy.unknown : statusBadge(r.daysLeft, t)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -253,9 +190,7 @@ export default function InventoryForecast() {
             <ForecastReorderPanel forecast={forecast} />
           </TabsContent>
 
-          <TabsContent value="ai">
-            <AIRestockAlerts forecast={forecast} purchases={purchases} branches={branches} />
-          </TabsContent>
+
         </Tabs>
       )}
     </div>
