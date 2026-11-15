@@ -24,7 +24,7 @@ export function latestInventorySnapshots(rows = [], branches = []) {
     const branchRaw = String(row.branch_id || row.branch || row.branch_key || '').trim();
     const branch = branchIds.get(normalize(branchRaw)) || normalize(branchRaw);
     const unit = normalize(row.unit || row.unit_name || '');
-    const key = `${branch}::${product}::${unit}`;
+    const key = `${normalize(row.restaurant_id)}::${branch}::${product}::${unit}`;
     // Business date is primary; updated timestamp disambiguates same-day edits.
     const version = `${String(row.date || '0000-00-00').slice(0, 10)}|${String(
       row.last_updated || row.updated_date || row.created_date || '',

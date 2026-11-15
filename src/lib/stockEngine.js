@@ -1,25 +1,12 @@
-/**
- * Stock Engine — computes live stock levels deducting sales-linked consumption,
- * and sends WhatsApp / email low-stock alerts.
- */
-
-/**
- * For each inventory item, computes:
- *   currentStock = opening_stock + purchasedQty - estimatedSalesUsage
- *
- * "estimatedSalesUsage" requires product-to-sales linkage.
- * Since DailySales records are revenue-level, we estimate deduction via
- * purchase consumption rate: if a product was purchased, sales drive its
- * depletion proportionally. Where no linkage exists, only purchases add stock.
- *
- * This keeps it useful without requiring a recipe/BOM entity.
- */
+import { latestInventorySnapshots } from './inventorySnapshotView';
+/** Stock movements update inventory.quantity in the database. Never replay them over that balance. */
 export function computeLiveStock(inventoryItems, purchases, wastageItems = []) {
   const map = {};
 
-  // Seed from latest inventory snapshot per product+branch
-  inventoryItems.forEach(item => {
-    const key = `${item.product_id}_${item.branch}`;
+  const stockKey = row => JSON.stringify([row.restaurant_id || '', row.product_id, row.branch_id || row.branch, row.unit || '']);
+  // Keep units and tenant/branch identities separate.
+  latestInventorySnapshots(inventoryItems).forEach(item => {
+    const key = stockKey(item);
     if (!map[key] || item.date > map[key].date) {
       map[key] = {
         ...item,
@@ -31,20 +18,23 @@ export function computeLiveStock(inventoryItems, purchases, wastageItems = []) {
 
   // Add purchases
   purchases.forEach(p => {
-    const key = `${p.product_id}_${p.branch}`;
-    if (map[key]) map[key].purchasedQty += (p.qty || 0);
+    const key = stockKey(p);
+    if (map[key]) map[key].purchasedQty += Number(p.qty || 0);
   });
 
   // Subtract waste
   wastageItems.forEach(w => {
-    const key = `${w.product_id}_${w.branch}`;
-    if (map[key]) map[key].wastedQty += (w.qty || 0);
+    const key = stockKey(w);
+    if (map[key]) map[key].wastedQty += Number(w.quantity ?? w.qty ?? 0);
   });
 
   // Compute current stock
   Object.values(map).forEach(item => {
-    item.currentStock = (item.opening_stock || 0) + item.purchasedQty - item.wastedQty;
-    item.isLow = item.currentStock <= (item.low_stock_threshold || 5);
+    const current = item.quantity;
+    item.currentStock = current !== null && current !== undefined && current !== '' && Number.isFinite(Number(current))
+      ? Number(current)
+      : Number(item.opening_stock || 0) + item.purchasedQty - item.wastedQty;
+    item.isLow = item.currentStock <= Number(item.low_stock_threshold ?? 5);
   });
 
   return Object.values(map);
