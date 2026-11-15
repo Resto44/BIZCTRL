@@ -47,6 +47,7 @@ import {
 import OcrScanDialog from './OcrScanDialog';
 import PurchaseExpenseOptions from './PurchaseExpenseOptions';
 import { resumePurchaseSubmission } from '@/lib/purchaseSubmission';
+import {normalizePurchaseInvoiceDates} from '@/lib/purchaseInvoiceDates';
 
 const CURRENCIES = ['SAR', 'USD', 'AED', 'EGP', 'KWD', 'QAR', 'BHD', 'OMR', 'EUR', 'GBP'];
 const PAYMENT_METHODS = ['cash', 'bank', 'pos', 'transfer'];
@@ -642,6 +643,15 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
       setError('Select an authorized receiving branch before saving supplier invoices.');
       return;
     }
+    // Validate every field common to both supplier invoices before the first write.
+    // HTML date inputs send '' for optional due_date; PostgreSQL needs NULL.
+    let normalizedDates;
+    try {
+      normalizedDates = normalizePurchaseInvoiceDates(form);
+    } catch (dateError) {
+      setError(dateError.message);
+      return;
+    }
     const baseNumber = String(form.invoice_number || '').trim();
     if (!baseNumber) {
       setError('An invoice batch number is required before splitting supplier invoices.');
@@ -689,7 +699,8 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
       return;
     }
     const fingerprint = JSON.stringify({
-      restaurantId, branchId: branch.id, baseNumber, mode, date: form.date, currency: form.currency,
+      restaurantId, branchId: branch.id, baseNumber, mode, date: normalizedDates.date,
+      dueDate: normalizedDates.due_date, currency: form.currency,
       groups: groups.map(g => [g.supplierId, g.items, g.totals.grandTotal]),
     });
     const progress = batchRef.current;
@@ -727,6 +738,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
         const cleanItems = group.items.map(({ _id, _ocr_confidence, ...line }) => normalizePurchaseLine(line));
         const invoiceData = {
           ...form,
+          ...normalizedDates,
           invoice_number: invoiceNumber,
           supplier_id: group.supplierId,
           supplier_name: group.supplierName,
@@ -801,6 +813,12 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
       return;
     }
     setInvalidLineId(null);
+    try {
+      normalizePurchaseInvoiceDates(form);
+    } catch (dateError) {
+      setError(dateError.message);
+      return;
+    }
     if (multiSupplierMode) return handleSupplierBatchSubmit(mode);
 
     const isDraft = mode === 'draft';
