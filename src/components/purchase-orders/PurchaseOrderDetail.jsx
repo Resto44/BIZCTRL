@@ -1,6 +1,8 @@
 import React from 'react';
 import {purchaseOrderSupplierMessage} from '@/lib/purchaseOrderSupplierMessage';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useTenant } from '@/lib/TenantContext';
+import { treasuryBranchDisplayName } from '@/lib/treasuryBranchDisplay';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -15,7 +17,11 @@ const statusColors = {
 };
 
 export default function PurchaseOrderDetail({ order, onBack }) {
-  const { currency } = useLanguage();
+  const { currency, lang } = useLanguage();
+  // Include historic/inactive branches so old orders still show their real names.
+  // All metadata is restricted to the active tenant; never rewrite the stored branch key.
+  const { allBranches } = useTenant();
+  const branchName = treasuryBranchDisplayName(order, allBranches, lang);
   const items = (() => { try { return JSON.parse(order.items || '[]'); } catch { return []; } })();
 
   const getMessage = () => purchaseOrderSupplierMessage(order,currency);
@@ -33,7 +39,7 @@ export default function PurchaseOrderDetail({ order, onBack }) {
             <h3 className="font-semibold">{order.supplier_name}</h3>
             <Badge className={statusColors[order.status]}>{order.status}</Badge>
           </div>
-          <p className="text-sm text-muted-foreground">Branch: {order.branch}</p>
+          <p className="text-sm text-muted-foreground">Branch: {branchName}</p>
           <p className="text-sm text-muted-foreground">Date: {order.date}</p>
           {order.expected_delivery && <p className="text-sm text-muted-foreground">Expected: {order.expected_delivery}</p>}
           {order.notes && <p className="text-sm italic text-muted-foreground">"{order.notes}"</p>}
