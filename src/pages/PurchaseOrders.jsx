@@ -5,6 +5,8 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useTenant } from '@/lib/TenantContext';
+import { treasuryBranchDisplayName } from '@/lib/treasuryBranchDisplay';
 import { useAuth } from '@/lib/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -28,7 +30,8 @@ const statusColors = {
 };
 
 export default function PurchaseOrders() {
-  const { t, currency } = useLanguage();
+  const { t, currency, lang } = useLanguage();
+  const { allBranches } = useTenant();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
@@ -146,7 +149,7 @@ export default function PurchaseOrders() {
                   <div>
                     <p className="font-semibold text-sm">#{order.order_number || order.id.slice(-6).toUpperCase()}</p>
                     <p className="text-sm text-muted-foreground">{order.supplier_name}</p>
-                    <p className="text-xs text-muted-foreground">{order.branch} · {order.date}</p>
+                    <p className="text-xs text-muted-foreground">{treasuryBranchDisplayName(order, allBranches, lang)} · {String(order.created_date || '').slice(0, 10)}</p>
                     {order.expected_delivery && (
                       <p className="text-xs text-muted-foreground">Expected: {order.expected_delivery}</p>
                     )}
