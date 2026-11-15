@@ -17,7 +17,7 @@ BEGIN
  INSERT INTO public.attendance(restaurant_id,branch_id,employee_id,employee_name,date,status) VALUES(e.restaurant_id,e.branch_id,e.id,e.full_name,local_now::date,'vacation') RETURNING id INTO aid;
  PERFORM push_private.prepare_missing_attendance();
  IF EXISTS(SELECT 1 FROM public.owner_record_events WHERE context->>'employee_id'=e.id::text AND context->>'attendance_kind'='missing_check_in') THEN RAISE EXCEPTION 'Vacation incorrectly alerted';END IF;
- DELETE FROM public.attendance WHERE id=aid;
+ UPDATE public.attendance SET date=local_now::date-1 WHERE id=aid;
  PERFORM push_private.prepare_missing_attendance();PERFORM push_private.prepare_missing_attendance();
  SELECT count(*) INTO c FROM public.owner_record_events WHERE context->>'employee_id'=e.id::text AND context->>'attendance_kind'='missing_check_in';
  IF c<>1 THEN RAISE EXCEPTION 'Missing alert not idempotent: %',c;END IF;

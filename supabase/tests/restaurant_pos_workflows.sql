@@ -138,7 +138,7 @@ begin
  pair:=public.erp_restaurant_cashier_command(d,'pair_display','{}',gen_random_uuid());
  set local role anon;
  v:=public.erp_restaurant_customer_display(pair->>'token');
- assert (v->>'net_total')::numeric=34.5 and not(v ? 'cashier_id') and not(v::text like '%inventory_id%'),'Customer allowlist failed';
+ assert v->>'display_mode'='kitchen' and jsonb_array_length(v->'lines')=0 and v->>'net_total' is null and not(v ? 'cashier_id') and not(v::text like '%inventory_id%'),'Draft leaked to kitchen-following customer display';
  denied:=false;begin perform public.erp_restaurant_cashier_snapshot(d);exception when insufficient_privilege then denied:=true;end;assert denied,'Anonymous cashier access';
  set local role authenticated;
  pair2:=public.erp_restaurant_cashier_command(d,'pair_display','{}',gen_random_uuid());
@@ -146,6 +146,10 @@ begin
  v:=public.erp_restaurant_cashier_command(d,'send_kitchen',jsonb_build_object('cart_id',c->'id','revision',c->'revision'),gen_random_uuid());c:=v->'cart';
  reset role;
  select quantity into n from public.inventory where id=stock;assert n=9.25,'Recipe consumption failed';
+ set local role anon;
+ v:=public.erp_restaurant_customer_display(pair2->>'token');
+ assert (v->>'net_total')::numeric=34.5 and jsonb_array_length(v->'lines')=1 and not(v ? 'cashier_id') and not(v::text like '%inventory_id%'),'Submitted display amount or allowlist failed';
+ reset role;
  select count(*) into n from public.daily_sales where reference_id='restaurant-pos:'||(c->>'id');assert n=0,'Unpaid order counted as sales';
  set local role authenticated;
  perform public.erp_restaurant_pos_kitchen((c->>'id')::uuid,(c->>'revision')::integer,'preparing');

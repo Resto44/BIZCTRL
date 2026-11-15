@@ -89,9 +89,27 @@ begin
   -- Reorder approval creates a real draft PO, with bounded partial receipts.
   insert into public.suppliers(id,restaurant_id,name) values(supplier,r,'Verification supplier');
   doc:=public.erp_retail_inventory_command(r,'create',jsonb_build_object('kind','reorder','warehouse_id',w1,'supplier_id',supplier,'lines',jsonb_build_array(jsonb_build_object('product_id',p,'quantity',20,'unit_cost',4))),'verify-reorder-001');
+  blocked:=false;
+  begin perform public.erp_retail_inventory_command(r,'approve',jsonb_build_object('document_id',doc->>'id')); exception when check_violation then blocked:=true; end;
+  if not blocked then raise exception 'Reorder accepted product from an unassigned supplier'; end if;
+  update public.products set supplier_id=supplier where id=p and restaurant_id=r;
   v:=public.erp_retail_inventory_command(r,'approve',jsonb_build_object('document_id',doc->>'id'));
   purchase_order:=(v->>'source_purchase_order_id')::uuid;
   if purchase_order is null then raise exception 'Reorder did not create PO'; end if;
+  -- Legacy UI codes remain compatible with canonical inventory UUIDs.
+  insert into public.purchase_orders(restaurant_id,branch_id,supplier_id,items)
+  values(r,b1,supplier,jsonb_build_array(jsonb_build_object('product_id','TEST-'||p,'quantity',1)));
+  -- A legacy code collision must never bypass the canonical product assignment.
+  insert into public.products(restaurant_id,product_id,name,unit,supplier_id,is_active)
+  values(r,p::text,'Collision fixture','pc',supplier,true);
+  update public.products set supplier_id=null where id=p;
+  blocked:=false;
+  begin
+    insert into public.purchase_orders(restaurant_id,branch_id,supplier_id,items)
+    values(r,b1,supplier,jsonb_build_array(jsonb_build_object('product_id',p,'quantity',1)));
+  exception when check_violation then blocked:=true; end;
+  if not blocked then raise exception 'Legacy code collision bypassed canonical supplier assignment'; end if;
+  update public.products set supplier_id=supplier where id=p;
   update public.purchase_orders set status='sent' where id=purchase_order;
   v:=public.erp_retail_inventory_purchase_order(purchase_order);
   if (v->'lines'->0->>'remaining')::numeric is distinct from 20 then raise exception 'PO receiving detail incorrect: %',v; end if;
