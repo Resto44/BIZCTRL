@@ -13,6 +13,7 @@
 
 import { supabase } from '@/api/supabaseClient';
 import { format } from 'date-fns';
+import {normalizePurchaseInvoiceDates} from './purchaseInvoiceDates.js';
 
 // ── Approval Threshold ─────────────────────────────────────────────────────
 const AUTO_APPROVE_THRESHOLD = 5000;
@@ -187,8 +188,11 @@ export async function createPurchaseInvoice({
     ? 'draft'
     : approvalStatus === 'auto_approved' ? 'approved' : 'pending';
 
+  // Validate dates BEFORE any financial write. Empty optional due_date is SQL NULL.
+  const validDates = normalizePurchaseInvoiceDates(invoiceData);
   const payload = {
     ...invoiceData,
+    ...validDates,
     items: items || [],
     additional_costs: additionalCosts || [],
     total_amount: grandTotal,
@@ -250,8 +254,11 @@ export async function updatePurchaseInvoice({
     throw new Error('Finalized purchase invoices cannot be edited. Use the authorized correction workflow.');
   }
 
+  // Validate dates BEFORE any financial write. Empty optional due_date is SQL NULL.
+  const validDates = normalizePurchaseInvoiceDates(invoiceData);
   const payload = {
     ...invoiceData,
+    ...validDates,
     items: items || [],
     additional_costs: additionalCosts || [],
     total_amount: grandTotal,
