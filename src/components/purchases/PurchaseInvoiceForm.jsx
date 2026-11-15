@@ -23,6 +23,7 @@ import {
   purchaseBrandOptions, purchaseProductsForBrand, purchaseProductBrand,
   clearPurchaseProductForFilter, selectPurchaseProduct,
 } from '@/lib/purchaseInvoiceBrands';
+import {firstIncompletePurchaseProductLine, uniquePurchaseProductForBrand, autoSelectPurchaseBrandProduct} from '@/lib/purchaseInvoiceProductSelection';
 import { usePurchaseCategoriesHierarchy } from '@/hooks/usePurchaseCategoriesHierarchy';
 import BranchSelect from '@/components/shared/BranchSelect';
 import { Button } from '@/components/ui/button';
@@ -99,12 +100,14 @@ function PurchaseInvoiceItemRow({
   organizationBrands,
   brandsError,
   categories,
-  categoriesTree
+  categoriesTree,
+  missingProduct = false,
 }) {
   const subcategories = categories.filter(category => category.parent_id === item.category_id);
   const itemSupplierId = multiSupplierMode ? item.supplier_id : supplierId;
   const selectedItemSupplier = multiSupplierMode ? suppliers.find(s => String(s.id) === String(item.supplier_id)) : null;
   const [expanded, setExpanded] = useState(() => !item.product_name && !item.product_id);
+  useEffect(() => { if (missingProduct) setExpanded(true); }, [missingProduct]);
   const [brandSearch, setBrandSearch] = useState('');
   // Fetch products for this item's category/subcategory and supplier
   // Calling hook here is safe because it's the top level of this component
@@ -119,6 +122,14 @@ function PurchaseInvoiceItemRow({
     !query || name.toLocaleLowerCase().includes(query) || name === selectedBrand,
   );
   useEffect(() => { setBrandSearch(''); }, [item.category_id, item.subcategory_id, item.supplier_id]);
+  // A slow mobile connection can resolve the category product list after the
+  // brand is chosen. Reconcile that *same scoped catalog* when it arrives,
+  // selecting only a unique product and never replacing a manually typed name.
+  useEffect(() => {
+    if (productsLoading || !selectedBrand || item.product_id || String(item.product_name || '').trim()) return;
+    const soleProduct = uniquePurchaseProductForBrand(categoryProducts, selectedBrand);
+    if (soleProduct) updateItem(item._id, 'auto_scoped_product', soleProduct);
+  }, [productsLoading, selectedBrand, categoryProducts, item._id, item.product_id, item.product_name, updateItem]);
 
   // Mobile number keyboards can emit input before change. Use the same canonical
   // state update for both events so quantity, cost, discount, and tax always
@@ -134,10 +145,14 @@ function PurchaseInvoiceItemRow({
   };
 
   return (
-    <div className="border-t border-slate-200 bg-white first:border-t-0">
+    <div id={`purchase-item-${item._id}`} data-testid="purchase-invoice-item"
+      className={`scroll-mt-24 border-t bg-white first:border-t-0 ${missingProduct?'border-2 border-red-300':'border-slate-200'}`}>
       <div className="relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3.5 sm:grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] sm:items-center sm:px-5">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-slate-900">{item.product_name || `New item ${idx + 1}`}</p>
+          {missingProduct && <span role="alert" className="inline-block rounded-md bg-red-50 px-2 py-1 text-xs font-bold text-red-700">
+            Choose a product or enter its name to save this item.
+          </span>}
           <p className="truncate text-[11px] text-slate-500">{multiSupplierMode ? (selectedItemSupplier?.name || 'Supplier not selected') + ' · ' : ''}{selectedBrand ? `Brand: ${selectedBrand} · ` : ''}Per {item.unit || 'unit'}</p>
         </div>
 
@@ -232,7 +247,13 @@ function PurchaseInvoiceItemRow({
               placeholder="Search brands..." className="mb-1.5 h-10 w-full bg-white text-sm" />
           )}
           <Select value={selectedBrand ? `brand:${selectedBrand}` : '__all__'}
-            onValueChange={value => { setBrandSearch(''); updateItem(item._id, 'brand', value === '__all__' ? '' : value.slice(6)); }}
+            onValueChange={value => {
+              setBrandSearch('');
+              const brand = value === '__all__' ? '' : value.slice(6);
+              updateItem(item._id, 'brand', brand);
+              const soleProduct = uniquePurchaseProductForBrand(categoryProducts, brand);
+              if (soleProduct) updateItem(item._id, 'auto_scoped_product', soleProduct);
+            }}
             disabled={!item.category_id && !itemSupplierId}>
             <SelectTrigger className="h-11 w-full min-w-0 bg-white text-sm" aria-label="Select product brand">
               <SelectValue placeholder="Select brand" />
@@ -260,15 +281,24 @@ function PurchaseInvoiceItemRow({
             </SelectTrigger>
             <SelectContent>
               {visibleProducts.length === 0 && (item.category_id || itemSupplierId) ? (
-                <div className="px-2 py-1.5 text-xs text-muted-foreground">No product matches this brand, category and supplier.</div>
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">No matching saved product. Try All brands or enter a product name below.</div>
               ) : (
                 visibleProducts.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)
               )}
             </SelectContent>
           </Select>
           {!item.product_id && (
-            <Input value={item.product_name} onChange={e => updateItem(item._id, 'product_name', e.target.value)}
-              placeholder="Or type product name" className="h-10 text-sm mt-1 w-full min-w-0" />
+            <>
+              <p className={`mt-1 text-xs ${missingProduct?'font-bold text-red-700':'text-amber-700'}`}>
+                {productsLoading ? 'Loading available products…' : visibleProducts.length === 0
+                  ? 'No matching saved product. Choose All brands or type a product name below.'
+                  : visibleProducts.length === 1 ? 'Choose the available product above, or enter a new product name.'
+                  : `Select one of the ${visibleProducts.length} products above. Brand alone is not a product.`}
+              </p>
+              <Input data-testid="purchase-product-name-entry" aria-label={`Product name for line ${idx+1}`}
+                value={item.product_name} onChange={e => updateItem(item._id, 'product_name', e.target.value)}
+                placeholder="Or type product name" className={`h-10 text-sm mt-1 w-full min-w-0 ${missingProduct?'border-red-400 ring-1 ring-red-200':''}`}/>
+            </>
           )}
         </div>
       </div>
@@ -394,6 +424,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
   const [openSection, setOpenSection] = useState(null);
   const [showLineItems, setShowLineItems] = useState(true);
   const [error, setError] = useState('');
+  const [invalidLineId, setInvalidLineId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [submitMode, setSubmitMode] = useState(null);
   const savingRef = useRef(false);
@@ -497,10 +528,17 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
 
   // ── Item handlers ──────────────────────────────────────────────────────
   const updateItem = useCallback((id, field, value) => {
+    if (field === 'selected_product' || field === 'auto_scoped_product' || (field === 'product_name' && String(value || '').trim())) {
+      setInvalidLineId(previous => previous===id?null:previous);
+      setError(previous => previous.startsWith('Line ') ? '' : previous);
+    }
     setItems(prev => prev.map(item => {
       if (item._id !== id) return item;
       if (field === 'selected_product') {
         return normalizePurchaseLine(selectPurchaseProduct(item, value));
+      }
+      if (field === 'auto_scoped_product') {
+        return normalizePurchaseLine(autoSelectPurchaseBrandProduct(item, value));
       }
       if (['category_id', 'subcategory_id', 'supplier_id', 'brand'].includes(field)) {
         return normalizePurchaseLine(clearPurchaseProductForFilter(item, field, value));
@@ -750,9 +788,20 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
   // ── Submit ─────────────────────────────────────────────────────────────
   const handleSubmit = async (e, mode = 'post') => {
     e.preventDefault();
-    if (multiSupplierMode) return handleSupplierBatchSubmit(mode);
     if (savingRef.current) return;
     setError('');
+    const invalid = firstIncompletePurchaseProductLine(items);
+    if (invalid) {
+      setInvalidLineId(invalid.item._id);
+      setShowLineItems(true);
+      setError(`Line ${invalid.index + 1} has no product. Select a Product below the Brand field, or enter a product name. No invoice was saved.`);
+      requestAnimationFrame(() => {
+        document.getElementById(`purchase-item-${invalid.item._id}`)?.scrollIntoView({behavior:'smooth',block:'center'});
+      });
+      return;
+    }
+    setInvalidLineId(null);
+    if (multiSupplierMode) return handleSupplierBatchSubmit(mode);
 
     const isDraft = mode === 'draft';
 
@@ -981,7 +1030,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
               <div className="hidden grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] border-t border-slate-200 bg-slate-50 px-5 py-2.5 text-[11px] font-medium text-slate-500 sm:grid">
                 <span>Item</span><span>Unit</span><span>Qty</span><span>Unit Cost</span><span className="text-right">Total</span><span />
               </div>
-              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} organizationBrands={organizationBrands} brandsError={brandsError} categories={categories} categoriesTree={categoriesTree} />)}</div>
+              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} organizationBrands={organizationBrands} brandsError={brandsError} categories={categories} categoriesTree={categoriesTree} missingProduct={invalidLineId===item._id} />)}</div>
               <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 sm:px-5">
                 <Button type="button" variant="ghost" onClick={addItem} className="h-9 gap-2 px-0 font-bold text-blue-700 hover:bg-transparent"><Plus className="h-5 w-5 rounded-full border border-blue-600 p-0.5" /> Add Item</Button>
                 <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{items.length} item{items.length === 1 ? '' : 's'}</span>
