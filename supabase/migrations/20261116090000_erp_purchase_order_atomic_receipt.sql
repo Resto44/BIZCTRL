@@ -38,8 +38,8 @@ BEGIN
  END IF;
  SELECT * INTO po FROM public.purchase_orders WHERE id=p_order_id;
  IF NOT FOUND OR po.restaurant_id IS NULL OR po.branch_id IS NULL
-  OR NOT public.erp_can_access_scope_text(po.restaurant_id::text,po.branch_id::text)
-  OR NOT public.erp_has_any_permission(ARRAY['viewPurchaseOrders','viewPurchases']) THEN
+  OR public.erp_can_access_scope_text(po.restaurant_id::text,po.branch_id::text) IS NOT TRUE
+  OR public.erp_has_any_permission(ARRAY['viewPurchaseOrders','viewPurchases']) IS NOT TRUE THEN
   RAISE EXCEPTION 'PO_RECEIPT_SCOPE_DENIED' USING ERRCODE='42501';
  END IF;
  BEGIN
@@ -108,9 +108,9 @@ BEGIN
  -- Serialize all receipt submissions for one order, including concurrent retries.
  SELECT * INTO po FROM public.purchase_orders WHERE id=p_order_id FOR UPDATE;
  IF NOT FOUND OR po.restaurant_id IS NULL OR po.branch_id IS NULL
-  OR NOT public.erp_subscription_has_erp_access(po.restaurant_id)
-  OR NOT public.erp_can_write_module_scope_text(po.restaurant_id::text,po.branch_id::text,'createPurchases')
-  OR public.erp_current_role() NOT IN ('owner','manager','employee') THEN
+  OR public.erp_subscription_has_erp_access(po.restaurant_id) IS NOT TRUE
+  OR public.erp_can_write_module_scope_text(po.restaurant_id::text,po.branch_id::text,'createPurchases') IS NOT TRUE
+  OR coalesce(public.erp_current_role(),'') NOT IN ('owner','manager','employee') THEN
   RAISE EXCEPTION 'PO_RECEIPT_SCOPE_DENIED' USING ERRCODE='42501';
  END IF;
  -- Idempotent replay: returns previous receipt without inserting purchases again.
