@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import {recoverModuleLoad} from '@/lib/moduleLoadRecovery';
 import {withStartupDeadline} from '@/lib/startupReadDeadline';
+import StartupLoadingScene from '@/components/StartupLoadingScene';
 import {verifiedERPRootHome} from '@/lib/rootEntryDecision';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -168,7 +169,7 @@ const DriverDashboardERP    = lazy(() => import('@/pages/DriverDashboardERP'));
 const PortalOrderDispatch    = lazy(() => import('@/pages/PortalOrderDispatch'));
 
 // ── Shared page loading fallback ─────────────────────────────────────────────
-const PageLoader = () => {
+const PageLoader = ({ full = false }) => {
   const { lang = 'en' } = useLanguage();
   const [stalled, setStalled] = React.useState(false);
   React.useEffect(() => {
@@ -192,10 +193,15 @@ const PageLoader = () => {
       </div>
     </div>;
   }
-  return <div className="flex min-h-[50vh] items-center justify-center" role="status" aria-label="Loading BizCTRL">
-    <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
-  </div>;
+  return <StartupLoadingScene lang={lang} compact={!full} />;
 };
+
+// Reuse the same CSS-only visual for ERP auth / restaurant / subscription reads,
+// without changing any request deadline, permission check or redirect.
+function StartupGateLoader() {
+  const { lang = 'en' } = useLanguage();
+  return <StartupLoadingScene lang={lang} />;
+}
 
 // Never mistake an unavailable authorization read for an empty business or
 // expired subscription. Provide a retry without clearing local user preferences.
@@ -262,9 +268,7 @@ function OnboardingGate({ children }) {
   // Block rendering until both auth AND restaurant data are ready
   if (isLoadingAuth || loadingRestaurants) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
-      </div>
+      <StartupGateLoader />
     );
   }
 
@@ -317,9 +321,7 @@ const SubscribedRoutes = () => {
 
   if (loading || loadingRestaurants) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
-      </div>
+      <StartupGateLoader />
     );
   }
 
@@ -639,7 +641,7 @@ function RootEntryRoute() {
     return () => { cancelled = true; };
   }, [attempt, checkoutPlanId, navigate]);
 
-  if (decision === 'checking') return <PageLoader />;
+  if (decision === 'checking') return <PageLoader full />;
   if (decision === 'authorization-error') {
     return <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-100"><section className="max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 text-center"><h1 className="text-xl font-bold">Authorization check unavailable</h1><p className="mt-3 text-sm leading-6 text-slate-300">Your active session could not be validated for routing. No access has been granted or removed. Retry the server authorization check.</p><button type="button" className="mt-5 min-h-11 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950" onClick={() => setAttempt((value) => value + 1)}>Retry authorization check</button><p className="mt-4 text-xs text-slate-400">ERP users can open the secure login directly, without changing or resetting their account.</p><a href="/erp-login" className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-white">Open ERP login / ورود به ERP</a></section></main>;
   }
@@ -681,9 +683,7 @@ const AuthenticatedApp = () => {
 
   if (isLoadingAuth) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
-      </div>
+      <StartupGateLoader />
     );
   }
 
