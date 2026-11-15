@@ -208,9 +208,13 @@ export default function PurchaseOrders() {
                     </Button>
                   )}
 
-                  <Button size="sm" variant="ghost" className="text-destructive ml-auto" onClick={() => deleteMutation.mutate(order.id)}>
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
+                  {/* Only unsent drafts can be deleted. Received stock and audit records are immutable. */}
+                  {order.status === 'draft' && (
+                    <Button size="sm" variant="ghost" className="text-destructive ml-auto"
+                      disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate(order.id)}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  )}
                 </div>
                 {verifyingOrderId===order.id && user?.role==='owner' &&
                   <SupplierOrderOwnerVerification order={order} onCancel={()=>setVerifyingOrderId(null)}
