@@ -23,7 +23,8 @@ const COPY = {
       detail: 'BizCTRL is a web app. Installation is optional for normal use, but required for push notifications on iPhone. No App Store download is needed.',
       installed: 'Already running from your Home Screen — no installation needed.',
       ios: ['Open mybizctrl.site in Safari.', 'Tap Share (square with upward arrow).', 'Choose Add to Home Screen, then tap Add.'],
-      iosOther: 'Open this site in Safari first. Some in-app browsers cannot add it to your Home Screen.',
+      iosOther: 'iPhone Chrome can also add BizCTRL through Share. Other in-app browsers may require Safari.',
+      iosChrome: ['Open mybizctrl.site in Chrome.', 'Tap Share next to the address bar.', 'Choose Add to Home Screen, then Add.'],
       android: ['Open mybizctrl.site in Chrome.', 'Tap menu (⋮) → Install app or Add to Home screen.', 'Confirm Install / Add.'],
       desktop: 'On desktop, use your browser install option if available; otherwise keep using the website.',
       action: 'Install on this device', manual: 'If no install prompt appears, follow the steps above.',
@@ -74,7 +75,8 @@ const COPY = {
       detail: 'BizCTRL یک برنامه تحت وب است. برای استفاده عادی نصب اختیاری است؛ اما برای پوش نوتیفیکیشن آیفون باید روی صفحه اصلی نصب شود. به App Store ضرورت ندارد.',
       installed: 'برنامه از صفحه اصلی موبایل باز شده؛ نصب دوباره لازم نیست.',
       ios: ['سایت mybizctrl.site را در Safari باز کنید.', 'دکمه Share (مربع با فلش رو به بالا) را بزنید.', 'گزینه Add to Home Screen را انتخاب کنید و بعد Add را بزنید.'],
-      iosOther: 'اول این سایت را در Safari باز کنید؛ بعضی مرورگرهای داخل اپ امکان نصب ندارند.',
+      iosOther: 'در Chrome آیفون هم می‌توانید از Share نصب کنید. اگر مرورگر داخل اپ این گزینه را نداشت، Safari را باز کنید.',
+      iosChrome: ['سایت mybizctrl.site را در Chrome باز کنید.', 'دکمۀ Share کنار آدرس را بزنید.', 'Add to Home Screen و بعد Add را انتخاب کنید.'],
       android: ['سایت mybizctrl.site را در Chrome باز کنید.', 'منوی (⋮) را بزنید و Install app یا Add to Home screen را انتخاب کنید.', 'Install یا Add را تأیید کنید.'],
       desktop: 'در کامپیوتر در صورت وجود گزینه Install در مرورگر، آن را بزنید؛ در غیر آن از خود سایت استفاده کنید.',
       action: 'نصب در این دستگاه', manual: 'اگر پنجره نصب باز نشد، مراحل بالا را انجام دهید.',
@@ -125,7 +127,8 @@ const COPY = {
       detail: 'BizCTRL تطبيق ويب. التثبيت اختياري للاستخدام العادي، لكنه ضروري لإشعارات الآيفون في الخلفية، ولا يحتاج إلى متجر التطبيقات.',
       installed: 'التطبيق يعمل بالفعل من الشاشة الرئيسية؛ لا يلزم تثبيته مرة أخرى.',
       ios: ['افتح mybizctrl.site في Safari.', 'اضغط مشاركة (مربع وسهم للأعلى).', 'اختر إضافة إلى الشاشة الرئيسية ثم اضغط إضافة.'],
-      iosOther: 'افتح الموقع أولاً في Safari؛ قد لا تدعم المتصفحات المدمجة إضافته للشاشة الرئيسية.',
+      iosOther: 'يدعم Chrome على الآيفون الإضافة عبر مشاركة. قد تحتاج المتصفحات المدمجة إلى Safari.',
+      iosChrome: ['افتح mybizctrl.site في Chrome.', 'اضغط مشاركة بجانب شريط العنوان.', 'اختر إضافة إلى الشاشة الرئيسية ثم إضافة.'],
       android: ['افتح mybizctrl.site في Chrome.', 'اضغط القائمة (⋮) ثم تثبيت التطبيق أو إضافة إلى الشاشة الرئيسية.', 'أكّد التثبيت أو الإضافة.'],
       desktop: 'على الكمبيوتر، استخدم خيار التثبيت في المتصفح إذا توفر، أو تابع استخدام الموقع.',
       action: 'تثبيت على هذا الجهاز', manual: 'إذا لم تظهر نافذة التثبيت، اتبع الخطوات أعلاه.',
@@ -199,6 +202,7 @@ export default function NewUserWelcomeTour({ onVisibleChange }) {
   const currentIndex = Math.min(stepIndex, stages.length - 1);
   const current = stages[currentIndex];
   const browserAgent = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+  const isIOSChrome = /CriOS/i.test(browserAgent);
   const isIOSDevice = /iPad|iPhone|iPod/i.test(browserAgent) ||
     (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const device = detectInstallDevice(browserAgent,
@@ -255,8 +259,9 @@ export default function NewUserWelcomeTour({ onVisibleChange }) {
   if (!user?.id || !current) return null;
   const installCopy = copy.install;
   const pushCopy = copy.notifications;
-  const instructions = device === 'ios-safari' || device === 'ios-other'
-    ? installCopy.ios : device === 'android' ? installCopy.android : [];
+  const instructions = device === 'ios-other' && isIOSChrome
+    ? installCopy.iosChrome : device === 'ios-safari' || device === 'ios-other'
+      ? installCopy.ios : device === 'android' ? installCopy.android : [];
   const heading = current.key === 'install' ? installCopy.title : copy[current.key].title;
   const detail = current.key === 'install' ? installCopy.detail : copy[current.key].detail;
 
