@@ -13,7 +13,8 @@
 
     <!-- iOS PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- Transparent iOS Home Screen status bar; draw the dark BizCTRL backdrop under system icons. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="BizCTRL" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180-v3.png" />
 
@@ -45,6 +46,8 @@
     <!-- Above-the-fold start screen: zero JS, network font, video or animation dependency. -->
     <style id="bizctrl-startup-critical">
       html,body{margin:0;background:#061539}
+      /* Native iOS standalone: keep the status-bar safe area navy, never system white. */
+      @supports (-webkit-touch-callout:none){@media (display-mode:standalone){html::before{content:"";position:fixed;inset:0 0 auto 0;height:env(safe-area-inset-top,0px);background:#06102b;pointer-events:none;z-index:9999}}}
       .bzc-startup{position:relative;isolation:isolate;display:grid;place-items:center;overflow:hidden;box-sizing:border-box;color:#f8fbff;background:radial-gradient(ellipse at 18% 22%,rgba(15,102,192,.30),transparent 52%),radial-gradient(ellipse at 92% 78%,rgba(15,178,195,.17),transparent 48%),linear-gradient(145deg,#06102b 0%,#0a2149 57%,#061529 100%);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;text-align:center}
       .bzc-startup--full{min-height:100vh;min-height:100svh;min-height:100dvh;padding:clamp(30px,6vh,70px) 22px;padding-top:max(30px,env(safe-area-inset-top));padding-bottom:max(34px,env(safe-area-inset-bottom))}
       .bzc-startup *{box-sizing:border-box}
