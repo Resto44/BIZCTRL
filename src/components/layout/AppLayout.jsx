@@ -9,6 +9,8 @@
  *   - PWA install banner
  */
 import React, { lazy, Suspense, useEffect, useState } from 'react';
+import RouteLoadingFallback from '@/components/RouteLoadingFallback';
+import { markERPWorkspaceMounted } from '@/lib/erpBootDisplayState';
 import { useRole } from '@/lib/RoleContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -40,6 +42,10 @@ export default function AppLayout() {
   const [tourOpen, setTourOpen] = useState(false);
 
   useEffect(() => {
+    markERPWorkspaceMounted();
+  }, []);
+
+  useEffect(() => {
     if (user) initAuditLogger(user);
   }, [user]);
 
@@ -51,7 +57,10 @@ export default function AppLayout() {
         {user?.id && activeRestaurant?.id && <Suspense fallback={null}>
           <PortalPushSettings role={role} restaurantId={activeRestaurant.id} language={lang} />
         </Suspense>}
-        <NotificationRecordLink><OwnerWorkspaceTabs /></NotificationRecordLink>
+        {/* Keep ERP shell, open tabs and bottom navigation visible while a lazy route loads. */}
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <NotificationRecordLink><OwnerWorkspaceTabs /></NotificationRecordLink>
+        </Suspense>
       </div>
       <NotificationPopups />
       <NewUserWelcomeTour onVisibleChange={setTourOpen} />
