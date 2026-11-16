@@ -1,7 +1,8 @@
 import LanguageSwitcher from '@/components/shared/LanguageSwitcher';
 import BrandLogo from '@/components/BrandLogo';
 import { useLanguage } from '@/lib/LanguageContext';
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
+const PublicPWAInstallBanner = lazy(() => import('@/components/pwa/PWAInstallBanner'));
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -185,6 +186,8 @@ export function PublicLayout({ children }) {
         </div>
         <div className="border-t border-white/10 px-4 py-5 text-center text-xs text-slate-500 sm:px-6">© {new Date().getFullYear()} BizCTRL. {tr('All rights reserved.')}</div>
       </footer>
+      {/* Only display install guidance when the real public page has mounted. */}
+      {!menuOpen && <Suspense fallback={null}><PublicPWAInstallBanner autoOpen /></Suspense>}
     </div>
   );
 }
