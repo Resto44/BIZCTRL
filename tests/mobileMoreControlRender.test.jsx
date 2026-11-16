@@ -166,13 +166,16 @@ describe('mobile More and Control workspace', () => {
     expect(overlay.props.className).toContain('fixed inset-0');
     expect(overlay.props.className).toContain('h-[100dvh]');
     expect(overlay.props.className).toContain('bg-slate-50');
-    expect(overlay.props.className).not.toMatch(/bg-slate-950\\/50|backdrop-blur/);
+    expect(overlay.props.className).not.toContain('bg-slate-950/50');
+    expect(overlay.props.className).not.toContain('backdrop-blur');
 
     const dialog = renderer.root.findByProps({ 'aria-labelledby': 'more-control-title' });
     expect(dialog.props.className).toContain('h-full');
     expect(dialog.props.className).toContain('pt-[env(safe-area-inset-top,0px)]');
     expect(dialog.props.className).toContain('pb-[env(safe-area-inset-bottom,0px)]');
-    expect(dialog.props.className).not.toMatch(/82dvh|bottom-\\[calc|rounded-t/);
+    expect(dialog.props.className).not.toContain('82dvh');
+    expect(dialog.props.className).not.toContain('bottom-[calc');
+    expect(dialog.props.className).not.toContain('rounded-t');
     expect(renderer.root.findAllByProps({ 'aria-label': 'Search ERP modules' })).toHaveLength(1);
 
     const close = renderer.root.findByProps({ 'aria-label': 'Close More and Control' });
