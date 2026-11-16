@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight, BarChart3, Building2, CheckCircle2, ChevronDown, ClipboardList,
   Factory, Landmark, Package, Pill, Receipt, ShoppingBag, Store, Truck, Users,
-  Warehouse, Zap, Wallet, ShieldCheck,
+  Warehouse, Zap, Wallet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PublicPricingCards from '@/components/marketing/PublicPricingCards';
@@ -25,7 +25,6 @@ const WALLET_LOGIN_COPY = {
     wallet:'Wallet Banking Login',
     walletDescription:'Verified people manage an internal wallet, funding requests, returns, statements and owner-approved transfers. Historical loans stay separate.',
     erp:'ERP Login',erpDescription:'Authorized staff access their assigned ERP modules, POS, finance and branch operations.',
-    platform:'Platform Owner',platformDescription:'Restricted to BizCTRL platform administrators; not a business-owner login.',
     view:'Open portal',notice:'Supplier invoices, customer credit and payroll remain in their dedicated ERP ledgers.'
   },
   ar:{
@@ -33,7 +32,6 @@ const WALLET_LOGIN_COPY = {
     wallet:'تسجيل دخول المحفظة البنكية',
     walletDescription:'حساب محفظة داخلي باسم صاحبه لطلبات التمويل والعودة وكشف الحساب بعد موافقة المالك؛ تبقى القروض القديمة منفصلة.',
     erp:'تسجيل دخول ERP',erpDescription:'وصول الموظفين المصرّح لهم إلى وحدات ERP ونقاط البيع والمالية والفروع.',
-    platform:'مالك المنصة',platformDescription:'مخصص لمسؤولي منصة BizCTRL فقط، وليس لمالك المنشأة.',
     view:'فتح البوابة',notice:'تبقى فواتير الموردين وآجل العملاء والرواتب في دفاتر ERP المخصصة.'
   },
   fa:{
@@ -41,7 +39,6 @@ const WALLET_LOGIN_COPY = {
     wallet:'ورود به مرکز بانکداری والت',
     walletDescription:'هر شخص صاحب والت داخلی خود است و درخواست دریافت، برگشت وجه و گردش حساب را با تأیید اونر مدیریت می‌کند؛ قرض قدیمی جدا می‌ماند.',
     erp:'ورود به ERP',erpDescription:'کارمندان مجاز به ماژول‌های تعیین‌شده ERP، صندوق، مالی و شعبه‌ها دسترسی دارند.',
-    platform:'مالک پلتفرم',platformDescription:'تنها برای مدیران کل پلتفرم BizCTRL؛ نه مالک یک کسب‌وکار.',
     view:'بازکردن پورتل',notice:'فاکتور تأمین‌کنندگان، نسیه مشتریان و معاش در دفترهای مخصوص ERP باقی می‌مانند.'
   }
 };
@@ -153,11 +150,10 @@ export default function LandingPage() {
             <p className="text-xs font-extrabold uppercase tracking-widest text-cyan-300">{walletCopy.eyebrow}</p>
             <h2 className="mt-2 text-2xl font-black text-white sm:text-3xl">{walletCopy.title}</h2>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             {[
               {title:walletCopy.wallet,description:walletCopy.walletDescription,path:'/wallet-portal',Icon:Wallet,featured:true},
               {title:walletCopy.erp,description:walletCopy.erpDescription,path:'/erp-login',Icon:Building2},
-              {title:walletCopy.platform,description:walletCopy.platformDescription,path:'/platform-owner/login',Icon:ShieldCheck},
             ].map(({title,description,path,Icon,featured})=><Link key={path} to={path}
               className={'group flex min-w-0 flex-col rounded-3xl border p-5 text-start shadow-sm transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 sm:p-6 '+(featured?'border-blue-400 bg-gradient-to-br from-blue-100 via-white to-blue-50 text-slate-950 shadow-blue-900/20':'border-slate-300/80 bg-white text-slate-950')}>
               <div className="flex items-center justify-between gap-3">
