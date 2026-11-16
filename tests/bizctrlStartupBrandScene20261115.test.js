@@ -51,7 +51,8 @@ describe('BizCTRL launch screen - fast and branded on iOS PWA and desktop',()=>{
   expect(scene).toContain('className="bzc-startup bzc-startup--full"');
   expect(scene).not.toContain('compact');
   expect(app).toContain('function StartupGateLoader()');
-  expect(app).toContain('return <StartupLoadingScene lang={lang} />;');
+  expect(app).toContain('return hasERPWorkspaceMounted()');
+  expect(app).toContain(': <StartupLoadingScene lang={lang} />;');
   expect(app).toContain("if (decision === 'checking') return <PageLoader />;");
   expect(app).toContain('const PageLoader = ()');
   expect(app).toContain('if (isLoadingAuth)');
