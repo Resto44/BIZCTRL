@@ -1,264 +1,111 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Share2, Plus, Check } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Check, Download, Share2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/lib/LanguageContext';
-import { usePWAInstall } from '@/hooks/usePWAInstall';
 
-// ── Translations ─────────────────────────────────────────────────────────────
-const TEXTS = {
+const COPY = {
   en: {
-    title: 'Install the App',
-    subtitle: 'Add to your home screen for a native app experience',
-    ios_steps: [
-      { label: 'Tap the Share button', detail: 'at the bottom of your Safari browser' },
-      { label: 'Scroll and tap "Add to Home Screen"', detail: 'you may need to scroll the menu' },
-      { label: 'Tap "Add"', detail: 'in the top-right corner to confirm' },
-    ],
-    android_steps: [
-      { label: 'Tap the menu (⋮)', detail: 'in the top-right of your Chrome browser' },
-      { label: 'Tap "Add to Home screen"', detail: 'or "Install app"' },
-      { label: 'Tap "Add" to confirm', detail: 'the app will appear on your home screen' },
-    ],
-    install_now: 'Install Now',
-    got_it: 'Got it!',
-    dont_show: "Don't show again",
-    ios_hint: 'Look for the Share icon (□↑) at the bottom of Safari',
-    android_hint: 'Chrome will show a native install dialog',
+    title: 'Install BizCTRL on your phone', subtitle: 'No App Store download is required.',
+    safari: ['In Safari tap Share (or Page Menu → Share).', 'Choose Add to Home Screen.', 'Switch on Open as Web App if shown, then tap Add.'],
+    chrome: ['In Chrome on iPhone, tap the Share icon beside the address bar.', 'Choose Add to Home Screen.', 'Tap Add to create the Home Screen shortcut.'],
+    android: ['Open your browser menu (⋮).', 'Tap Install app or Add to Home screen.', 'Confirm Install or Add.'],
+    desktop: ['Use Install app in the browser menu if it is available.'],
+    iosNote: 'iPhone browsers cannot install a web app from a webpage button. Follow the Share steps above.',
+    native: 'Install now', done: 'Got it', never: "Don't show again", close: 'Close install guide',
   },
   ar: {
-    title: 'تثبيت التطبيق',
-    subtitle: 'أضفه إلى شاشتك الرئيسية للحصول على تجربة تطبيق أصلي',
-    ios_steps: [
-      { label: 'اضغط على زر المشاركة', detail: 'في أسفل متصفح Safari' },
-      { label: 'مرر واضغط على "إضافة إلى الشاشة الرئيسية"', detail: 'قد تحتاج للتمرير في القائمة' },
-      { label: 'اضغط على "إضافة"', detail: 'في الزاوية العلوية اليمنى للتأكيد' },
-    ],
-    android_steps: [
-      { label: 'اضغط على القائمة (⋮)', detail: 'في أعلى يمين متصفح Chrome' },
-      { label: 'اضغط على "إضافة إلى الشاشة الرئيسية"', detail: 'أو "تثبيت التطبيق"' },
-      { label: 'اضغط على "إضافة" للتأكيد', detail: 'سيظهر التطبيق على شاشتك الرئيسية' },
-    ],
-    install_now: 'تثبيت الآن',
-    got_it: 'فهمت!',
-    dont_show: 'لا تظهر مجدداً',
-    ios_hint: 'ابحث عن أيقونة المشاركة (□↑) في أسفل Safari',
-    android_hint: 'سيعرض Chrome مربع تثبيت أصلي',
+    title: 'ثبّت BizCTRL على جوالك', subtitle: 'لا تحتاج إلى التحميل من متجر التطبيقات.',
+    safari: ['في Safari اضغط مشاركة أو قائمة الصفحة ثم مشاركة.', 'اختر إضافة إلى الشاشة الرئيسية.', 'فعّل فتح كتطبيق ويب إن ظهر، ثم اضغط إضافة.'],
+    chrome: ['في Chrome على الآيفون اضغط زر المشاركة بجانب شريط العنوان.', 'اختر إضافة إلى الشاشة الرئيسية.', 'اضغط إضافة لإنشاء اختصار التطبيق.'],
+    android: ['افتح قائمة المتصفح (⋮).', 'اختر تثبيت التطبيق أو إضافة إلى الشاشة الرئيسية.', 'أكد تثبيت أو إضافة.'],
+    desktop: ['اختر تثبيت التطبيق من قائمة المتصفح إن توفر.'],
+    iosNote: 'لا يمكن للآيفون التثبيت مباشرة من زر داخل الصفحة. اتبع خطوات المشاركة أعلاه.',
+    native: 'ثبّت الآن', done: 'فهمت', never: 'لا تظهر مجدداً', close: 'إغلاق دليل التثبيت',
   },
   fa: {
-    title: 'نصب برنامه',
-    subtitle: 'برای تجربه‌ای مثل اپ واقعی، به صفحه اصلی اضافه کنید',
-    ios_steps: [
-      { label: 'دکمه اشتراک‌گذاری را بزنید', detail: 'در پایین مرورگر Safari' },
-      { label: 'اسکرول کرده و "افزودن به صفحه اصلی" را بزنید', detail: 'شاید نیاز باشد در منو اسکرول کنید' },
-      { label: '"افزودن" را بزنید', detail: 'در گوشه بالا راست برای تأیید' },
-    ],
-    android_steps: [
-      { label: 'روی منو (⋮) بزنید', detail: 'در بالا راست مرورگر Chrome' },
-      { label: 'روی "افزودن به صفحه اصلی" بزنید', detail: 'یا "نصب برنامه"' },
-      { label: 'روی "افزودن" بزنید برای تأیید', detail: 'برنامه روی صفحه اصلی ظاهر می‌شود' },
-    ],
-    install_now: 'نصب کن',
-    got_it: 'فهمیدم!',
-    dont_show: 'دیگر نشان نده',
-    ios_hint: 'آیکون اشتراک‌گذاری (□↑) را در پایین Safari پیدا کنید',
-    android_hint: 'Chrome یک دیالوگ نصب واقعی نشان می‌دهد',
+    title: 'BizCTRL را در موبایل نصب کنید', subtitle: 'ضرور نیست از App Store دانلود کنید.',
+    safari: ['در Safari دکمۀ Share یا Page Menu → Share را بزنید.', 'گزینۀ Add to Home Screen را انتخاب کنید.', 'اگر Open as Web App آمد آن را روشن کنید، بعد Add را بزنید.'],
+    chrome: ['در Chrome آیفون، دکمۀ Share کنار آدرس را بزنید.', 'گزینۀ Add to Home Screen را انتخاب کنید.', 'دکمۀ Add را بزنید تا آیکون ساخته شود.'],
+    android: ['منوی مرورگر (⋮) را باز کنید.', 'گزینۀ Install app یا Add to Home Screen را انتخاب کنید.', 'Install یا Add را تأیید کنید.'],
+    desktop: ['اگر در منوی مرورگر Install app وجود دارد، همان را انتخاب کنید.'],
+    iosNote: 'در آیفون دکمۀ داخل سایت نمی‌تواند نصب را خودکار انجام بدهد؛ از Share طبق راهنمای بالا استفاده کنید.',
+    native: 'همین حالا نصب کن', done: 'فهمیدم', never: 'دیگر نشان نده', close: 'بستن راهنمای نصب',
   },
 };
 
-const STEP_ICONS = {
-  ios: [
-    <Share2 key="share" className="w-5 h-5 text-blue-500" />,
-    <Plus key="plus" className="w-5 h-5 text-blue-500" />,
-    <Check key="check" className="w-5 h-5 text-green-500" />,
-  ],
-  android: [
-    <span key="menu" className="text-lg leading-none">⋮</span>,
-    <Plus key="plus" className="w-5 h-5 text-blue-500" />,
-    <Check key="check" className="w-5 h-5 text-green-500" />,
-  ],
-};
-
-export default function PWAInstallModal({ onClose, onNeverShow }) {
-  const { lang: language } = useLanguage();
-  const { isIOS, hasDeferredPrompt, triggerInstall, neverShow } = usePWAInstall();
-  const [activeStep, setActiveStep] = useState(0);
+export default function PWAInstallModal({
+  isIOS = false, isIOSChrome = false, isAndroid = false,
+  hasDeferredPrompt = false, triggerInstall, onClose, onNeverShow,
+}) {
+  const { lang = 'en' } = useLanguage();
+  const t = COPY[lang] || COPY.en;
   const [installing, setInstalling] = useState(false);
-  const overlayRef = useRef(null);
+  const steps = isIOS ? (isIOSChrome ? t.chrome : t.safari)
+    : isAndroid ? t.android : t.desktop;
 
-  const tx = TEXTS[language] || TEXTS.en;
-  const steps = isIOS ? tx.ios_steps : tx.android_steps;
-  const icons = isIOS ? STEP_ICONS.ios : STEP_ICONS.android;
-
-  // Auto-advance steps every 2.5s for iOS
   useEffect(() => {
-    if (!isIOS) return;
-    const timer = setInterval(() => {
-      setActiveStep((s) => (s < steps.length - 1 ? s + 1 : s));
-    }, 2500);
-    return () => clearInterval(timer);
-  }, [isIOS, steps.length]);
-
-  // Lock body scroll when modal open
-  useEffect(() => {
+    const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
-  }, []);
+    const onKey = event => { if (event.key === 'Escape') onClose?.(); };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
 
-  const handleGotIt = () => {
-    if (onClose) onClose();
-  };
-
-  const handleNeverShow = () => {
-    neverShow();
-    if (onNeverShow) onNeverShow();
-    if (onClose) onClose();
-  };
-
-  const handleAndroidInstall = async () => {
+  const install = async () => {
+    if (installing || !hasDeferredPrompt) return;
     setInstalling(true);
-    await triggerInstall();
-    setInstalling(false);
-    if (onClose) onClose();
-  };
-
-  const handleOverlayClick = (e) => {
-    if (e.target === overlayRef.current) handleGotIt();
+    try {
+      if (await triggerInstall?.()) onClose?.();
+    } finally {
+      setInstalling(false);
+    }
   };
 
   return (
-    <div
-      ref={overlayRef}
-      onClick={handleOverlayClick}
-      className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/60"
-      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'none' }}
-    >
-      <div
-        className="bg-card w-full max-w-md rounded-t-3xl shadow-2xl pb-safe"
-        style={{ animation: 'slideUpModal 0.3s cubic-bezier(0.16,1,0.3,1)', maxHeight: '92vh', overflowY: 'auto' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <style>{`
-          @keyframes slideUpModal {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-          }
-          .pb-safe { padding-bottom: max(2rem, env(safe-area-inset-bottom, 2rem)); }
-          .step-active { background: hsl(var(--primary) / 0.12); border-color: hsl(var(--primary) / 0.4); }
-          .step-done { background: hsl(142 71% 45% / 0.1); }
-        `}</style>
-
-        {/* Handle bar */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-3 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0">
-              🍽️
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-foreground leading-tight">{tx.title}</h2>
-              <p className="text-xs text-muted-foreground leading-tight mt-0.5">{tx.subtitle}</p>
-            </div>
+    <div className="fixed inset-0 z-[150] flex items-end justify-center overflow-y-auto bg-slate-950/70 p-0 sm:items-center sm:p-4"
+      onClick={onClose} data-testid="pwa-install-dialog-backdrop">
+      <section role="dialog" aria-modal="true" aria-labelledby="pwa-install-title"
+        data-testid="pwa-install-dialog"
+        className="w-full max-w-lg rounded-t-3xl border border-slate-200 bg-white p-5 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] text-slate-950 shadow-2xl sm:rounded-3xl"
+        onClick={event => event.stopPropagation()}>
+        <div className="flex items-start gap-3">
+          <img src="/icons/bizctrl-icon-192-v3.png" alt="BizCTRL" width="56" height="56"
+            className="h-14 w-14 shrink-0 rounded-xl object-contain" />
+          <div className="min-w-0 flex-1">
+            <h2 id="pwa-install-title" className="text-lg font-black leading-6">{t.title}</h2>
+            <p className="mt-1 text-sm text-slate-600">{t.subtitle}</p>
           </div>
-          <button
-            onClick={handleGotIt}
-            className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0 touch-manipulation"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-            aria-label="Close"
-          >
-            <X className="w-4 h-4 text-muted-foreground" />
+          <button type="button" onClick={onClose} aria-label={t.close}
+            className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-xl bg-slate-100">
+            <X className="h-5 w-5" />
           </button>
         </div>
-
-        {/* Steps */}
-        <div className="px-5 space-y-2 mb-5">
-          {steps.map((step, i) => {
-            const isDone = i < activeStep;
-            const isActive = i === activeStep;
-            return (
-              <button
-                key={i}
-                onClick={() => setActiveStep(i)}
-                className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all duration-300 text-left touch-manipulation ${
-                  isDone ? 'step-done border-green-200 dark:border-green-800' :
-                  isActive ? 'step-active border-primary/30' :
-                  'border-border bg-muted/30'
-                }`}
-                style={{ WebkitTapHighlightColor: 'transparent' }}
-              >
-                {/* Step number bubble */}
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm transition-colors ${
-                  isDone ? 'bg-green-100 text-green-600 dark:bg-green-900/40' :
-                  isActive ? 'bg-primary text-primary-foreground' :
-                  'bg-muted text-muted-foreground'
-                }`}>
-                  {isDone ? <Check className="w-4 h-4" /> : i + 1}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold leading-tight ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
-                    {step.label}
-                  </p>
-                  {isActive && (
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{step.detail}</p>
-                  )}
-                </div>
-
-                {/* Icon */}
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  isDone ? 'bg-green-100 dark:bg-green-900/30' : 'bg-muted'
-                }`}>
-                  {isDone ? <Check className="w-4 h-4 text-green-500" /> : icons[i]}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Hint bar */}
-        <div className="mx-5 mb-5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-3 flex items-start gap-2">
-          <span className="text-blue-500 text-base flex-shrink-0 mt-0.5">💡</span>
-          <p className="text-xs text-blue-700 dark:text-blue-300 leading-snug">
-            {isIOS ? tx.ios_hint : tx.android_hint}
-          </p>
-        </div>
-
-        {/* Action buttons */}
-        <div className="px-5 space-y-2">
-          {/* Android: real native install button */}
+        <ol className="mt-5 space-y-3">
+          {steps.map((step, index) => (
+            <li key={index} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-blue-600 text-sm font-bold text-white">{index + 1}</span>
+              <span className="min-w-0 pt-1 text-sm font-medium leading-6">{step}</span>
+              {index === 0 && isIOS && <Share2 className="mt-1 h-5 w-5 shrink-0 text-blue-600" aria-hidden="true" />}
+              {index === steps.length - 1 && <Check className="mt-1 h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />}
+            </li>
+          ))}
+        </ol>
+        {isIOS && <p className="mt-4 rounded-xl bg-blue-50 p-3 text-xs leading-5 text-blue-900">{t.iosNote}</p>}
+        <div className="mt-5 space-y-2">
           {!isIOS && hasDeferredPrompt && (
-            <Button
-              className="w-full h-12 text-base font-bold"
-              onClick={handleAndroidInstall}
-              disabled={installing}
-            >
-              {installing ? '...' : tx.install_now}
+            <Button type="button" className="min-h-12 w-full gap-2" disabled={installing} onClick={install}>
+              <Download className="h-5 w-5" />{installing ? '…' : t.native}
             </Button>
           )}
-
-          {/* iOS / fallback: Got it button */}
-          <Button
-            className="w-full h-12 text-base font-bold"
-            variant={!isIOS && hasDeferredPrompt ? 'outline' : 'default'}
-            onClick={handleGotIt}
-            style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
-          >
-            {tx.got_it}
-          </Button>
-
-          {/* Don't show again */}
-          <button
-            onClick={handleNeverShow}
-            className="w-full py-2 text-sm text-muted-foreground hover:text-foreground text-center touch-manipulation"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-          >
-            {tx.dont_show}
-          </button>
+          <Button type="button" variant={!isIOS && hasDeferredPrompt ? 'outline' : 'default'}
+            className="min-h-12 w-full" onClick={onClose}>{t.done}</Button>
+          <button type="button" className="min-h-11 w-full text-center text-sm text-slate-500 underline underline-offset-2"
+            onClick={onNeverShow}>{t.never}</button>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
