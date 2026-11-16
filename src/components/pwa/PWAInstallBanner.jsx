@@ -1,66 +1,87 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { useLanguage } from '@/lib/LanguageContext';
 import PWAInstallModal from './PWAInstallModal';
 
-const TEXTS = {
-  en: { title: 'Install the App', sub: 'Add to home screen for best experience', install: 'Install', later: 'Later' },
-  ar: { title: 'تثبيت التطبيق', sub: 'أضفه للشاشة الرئيسية', install: 'تثبيت', later: 'لاحقاً' },
-  fa: { title: 'نصب برنامه', sub: 'به صفحه اصلی اضافه کنید', install: 'نصب', later: 'بعداً' },
+const SESSION_KEY = 'bizctrl:install-popup-shown:20261116';
+function alreadySeen() {
+  try { return sessionStorage.getItem(SESSION_KEY) === '1'; } catch { return false; }
+}
+function markSeen() {
+  try { sessionStorage.setItem(SESSION_KEY, '1'); } catch { /* Private browsing. */ }
+}
+const TEXT = {
+  en: { title: 'Install BizCTRL', sub: 'Open your business from your Home Screen', action: 'Install', guide: 'How to install', close: 'Not now' },
+  ar: { title: 'ثبّت BizCTRL', sub: 'افتح عملك مباشرة من الشاشة الرئيسية', action: 'تثبيت', guide: 'طريقة التثبيت', close: 'لاحقاً' },
+  fa: { title: 'نصب BizCTRL', sub: 'مستقیم از صفحۀ اصلی موبایل وارد شوید', action: 'نصب', guide: 'روش نصب', close: 'بعداً' },
 };
 
-export default function PWAInstallBanner() {
-  const { canInstall, isIOS, hasDeferredPrompt, triggerInstall, dismiss } = usePWAInstall();
-  const { lang: language } = useLanguage();
+export default function PWAInstallBanner({ autoOpen = false }) {
+  const install = usePWAInstall();
+  const { lang = 'en' } = useLanguage();
   const [showModal, setShowModal] = useState(false);
+  const [seen, setSeen] = useState(alreadySeen);
+  const t = TEXT[lang] || TEXT.en;
 
-  const tx = TEXTS[language] || TEXTS.en;
+  useEffect(() => {
+    if (!autoOpen || !install.canInstall || seen || install.isInstalled) return;
+    markSeen();
+    setSeen(true);
+    setShowModal(true);
+  }, [autoOpen, install.canInstall, install.isInstalled, seen]);
 
-  if (!canInstall) return null;
-
-  const handleInstallClick = () => {
-    if (isIOS || !hasDeferredPrompt) {
-      setShowModal(true);
-    } else {
-      triggerInstall();
+  const close = () => {
+    setShowModal(false);
+    install.dismiss();
+  };
+  const neverShow = () => {
+    install.neverShow();
+    setShowModal(false);
+  };
+  const clickInstall = async () => {
+    if (!install.isIOS && install.hasDeferredPrompt) {
+      const accepted = await install.triggerInstall();
+      if (accepted) { setShowModal(false); return; }
+      close();
+      return;
     }
+    setShowModal(true);
+    markSeen();
+    setSeen(true);
   };
 
-  if (showModal) {
-    return <PWAInstallModal onClose={() => { setShowModal(false); dismiss(); }} onNeverShow={() => setShowModal(false)} />;
-  }
+  if (install.isInstalled || (!showModal && (!install.canInstall || seen))) return null;
+
+  if (showModal) return (
+    <PWAInstallModal
+      isIOS={install.isIOS}
+      isIOSChrome={install.isIOSChrome}
+      isAndroid={install.isAndroid}
+      hasDeferredPrompt={install.hasDeferredPrompt}
+      triggerInstall={install.triggerInstall}
+      onClose={close}
+      onNeverShow={neverShow}
+    />
+  );
 
   return (
-    <div
-      className="fixed bottom-20 left-3 right-3 z-50"
-      style={{ animation: 'slideUp 0.35s ease-out' }}
-    >
-      <style>{`@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
-      <div className="bg-primary text-primary-foreground rounded-2xl shadow-2xl p-4 flex items-center gap-3">
-        <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0 text-xl">
-          🍽️
+    <aside aria-label={t.title} data-testid="pwa-install-invitation"
+      className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] inset-x-3 z-[70] mx-auto max-w-md rounded-2xl border border-cyan-300/40 bg-slate-950 p-3 text-white shadow-2xl">
+      <div className="flex items-center gap-3">
+        <img src="/icons/bizctrl-icon-192-v3.png" width="42" height="42" alt="BizCTRL" className="h-11 w-11 rounded-xl object-contain" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold">{t.title}</p>
+          <p className="mt-0.5 text-xs text-slate-300">{t.sub}</p>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm">{tx.title}</p>
-          <p className="text-xs text-primary-foreground/75 mt-0.5 leading-tight">{tx.sub}</p>
-        </div>
-        <Button
-          size="sm"
-          className="bg-white text-primary hover:bg-white/90 font-bold h-8 px-3 text-xs flex-shrink-0"
-          onClick={handleInstallClick}
-        >
-          {tx.install}
+        <Button type="button" onClick={clickInstall} className="min-h-11 shrink-0 bg-cyan-400 px-3 font-bold text-slate-950 hover:bg-cyan-300">
+          {install.isIOS || !install.hasDeferredPrompt ? t.guide : t.action}
         </Button>
-        <button
-          onClick={dismiss}
-          className="text-primary-foreground/60 hover:text-primary-foreground p-1 flex-shrink-0 touch-manipulation"
-          style={{ WebkitTapHighlightColor: 'transparent' }}
-        >
-          <X className="w-4 h-4" />
+        <button type="button" aria-label={t.close} onClick={close} className="grid h-11 w-8 shrink-0 place-items-center rounded-lg text-slate-300">
+          <X className="h-5 w-5" />
         </button>
       </div>
-    </div>
+    </aside>
   );
 }

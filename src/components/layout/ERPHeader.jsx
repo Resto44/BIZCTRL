@@ -328,7 +328,7 @@ function UserMenu() {
 // ─── Main ERPHeader ───────────────────────────────────────────────────────────
 export default function ERPHeader({ onMobileMenuToggle }) {
   return (
-    <header className="sticky top-0 z-50 flex min-h-[60px] w-full min-w-0 max-w-full shrink-0 items-center gap-1 border-b border-border bg-card/95 px-2 py-1 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md sm:gap-3 sm:px-4 sm:py-0">
+    <header className="sticky top-0 z-50 flex min-h-[60px] w-full min-w-0 max-w-full shrink-0 items-center gap-1 border-b border-border bg-card px-2 py-1 pt-[env(safe-area-inset-top,0px)] lg:bg-card/95 lg:backdrop-blur-md sm:gap-3 sm:px-4 sm:py-0">
       {/* Mobile menu toggle */}
       <Button
         type="button"

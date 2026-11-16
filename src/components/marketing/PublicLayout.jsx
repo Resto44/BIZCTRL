@@ -1,7 +1,8 @@
 import LanguageSwitcher from '@/components/shared/LanguageSwitcher';
 import BrandLogo from '@/components/BrandLogo';
 import { useLanguage } from '@/lib/LanguageContext';
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
+const PublicPWAInstallBanner = lazy(() => import('@/components/pwa/PWAInstallBanner'));
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -111,7 +112,7 @@ export function PublicLayout({ children }) {
 
   return (
     <div data-public-language={lang} className="public-landing min-h-screen overflow-x-hidden bg-slate-950 text-white">
-      <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/90 backdrop-blur-xl">
+      <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950 xl:bg-slate-950/90 xl:backdrop-blur-xl">
         {/* Mobile header has equal outer columns and an isolated LTR brand.
             RTL translation no longer mirrors/collapses the company wordmark. */}
         <div dir="ltr" className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_56px_minmax(0,1fr)] items-center gap-1 px-3 py-3 xl:hidden" data-testid="public-mobile-header">
@@ -185,6 +186,8 @@ export function PublicLayout({ children }) {
         </div>
         <div className="border-t border-white/10 px-4 py-5 text-center text-xs text-slate-500 sm:px-6">© {new Date().getFullYear()} BizCTRL. {tr('All rights reserved.')}</div>
       </footer>
+      {/* Only display install guidance when the real public page has mounted. */}
+      {!menuOpen && <Suspense fallback={null}><PublicPWAInstallBanner autoOpen /></Suspense>}
     </div>
   );
 }

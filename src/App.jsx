@@ -724,6 +724,18 @@ const AuthenticatedApp = () => {
   );
 };
 
+// Install guidance only on entry pages. Mount after initial React routing, not
+// inside preboot HTML, so it never interrupts the branded startup screen.
+const PublicPWAInstallBanner = lazy(() => import('@/components/pwa/PWAInstallBanner'));
+function PublicInstallEntry() {
+  const { pathname } = useLocation();
+  // The home route resolves authentication first; showing the popup there would
+  // cover the branded startup during slow session checks. PublicLayout owns the
+  // landing-page popup once marketing is actually rendered.
+  if (pathname !== '/erp-login') return null;
+  return <Suspense fallback={null}><PublicPWAInstallBanner autoOpen /></Suspense>;
+}
+
 // ── Root app ──────────────────────────────────────────────────────────────────
 // Customer Portal authenticates against its own verified customer invite.
 // Running the ERP AuthProvider here triggers an unrelated ERP user lookup
@@ -783,6 +795,7 @@ function App() {
             </Routes>
             </Suspense>
             <Toaster />
+            <PublicInstallEntry />
           </StandaloneCustomerAuthBoundary>
         </Router>
       </LanguageProvider>
