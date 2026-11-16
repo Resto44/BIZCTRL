@@ -12,10 +12,10 @@ const copy = {
   fa: { tagline: 'کنترول کسب‌وکار شما', status: 'در حال بازکردن داشبورد شما', foot: 'تمام کاروبارت در یک دید' },
 };
 
-export default function StartupLoadingScene({ lang = 'en', compact = false }) {
+export default function StartupLoadingScene({ lang = 'en' }) {
   const t = copy[lang] || copy.en;
   return (
-    <main className={`bzc-startup ${compact ? 'bzc-startup--inline' : 'bzc-startup--full'}`}
+    <main className="bzc-startup bzc-startup--full"
       role="status" aria-live="polite" aria-label={t.status} data-testid="bizctrl-startup-scene">
       <div className="bzc-startup__ambient bzc-startup__ambient--a" aria-hidden="true" />
       <div className="bzc-startup__ambient bzc-startup__ambient--b" aria-hidden="true" />
