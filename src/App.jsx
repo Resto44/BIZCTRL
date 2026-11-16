@@ -2,6 +2,8 @@ import React, { lazy, Suspense } from 'react';
 import {recoverModuleLoad} from '@/lib/moduleLoadRecovery';
 import {withStartupDeadline} from '@/lib/startupReadDeadline';
 import StartupLoadingScene from '@/components/StartupLoadingScene';
+import RouteLoadingFallback from '@/components/RouteLoadingFallback';
+import { hasERPWorkspaceMounted } from '@/lib/erpBootDisplayState';
 import {verifiedERPRootHome} from '@/lib/rootEntryDecision';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -169,7 +171,7 @@ const DriverDashboardERP    = lazy(() => import('@/pages/DriverDashboardERP'));
 const PortalOrderDispatch    = lazy(() => import('@/pages/PortalOrderDispatch'));
 
 // ── Shared page loading fallback ─────────────────────────────────────────────
-const PageLoader = ({ full = false }) => {
+const PageLoader = () => {
   const { lang = 'en' } = useLanguage();
   const [stalled, setStalled] = React.useState(false);
   React.useEffect(() => {
@@ -182,7 +184,7 @@ const PageLoader = ({ full = false }) => {
       : lang === 'ar'
         ? { title: 'توقف تحميل التطبيق', hint: 'قد يكون الاتصال أو تحميل ملفات الإصدار الجديد عالقاً. لم تتغير بياناتك.', retry: 'إعادة التحميل', login: 'صفحة الدخول' }
         : { title: 'App loading has stalled', hint: 'The connection or new app files may be stuck. Your records have not been changed.', retry: 'Reload app', login: 'Sign-in page' };
-    return <div role="alert" data-testid="erp-startup-stalled" className="flex min-h-[50vh] items-center justify-center p-5">
+    return <div role="alert" data-testid="erp-startup-stalled" className="flex min-h-dvh w-full items-center justify-center bg-background p-5">
       <div className="w-full max-w-sm rounded-xl border bg-card p-5 text-center shadow-sm">
         <h2 className="text-base font-bold">{copy.title}</h2>
         <p className="mt-2 text-sm text-muted-foreground">{copy.hint}</p>
@@ -193,14 +195,20 @@ const PageLoader = ({ full = false }) => {
       </div>
     </div>;
   }
-  return <StartupLoadingScene lang={lang} compact={!full} />;
+  // Branded full-viewport splash is permitted only before the ERP shell has ever mounted.
+  // Internal lazy route changes must never flash the launch scene or shrink to 52svh.
+  return !hasERPWorkspaceMounted()
+    ? <StartupLoadingScene lang={lang} />
+    : <RouteLoadingFallback fullPage />;
 };
 
 // Reuse the same CSS-only visual for ERP auth / restaurant / subscription reads,
 // without changing any request deadline, permission check or redirect.
 function StartupGateLoader() {
   const { lang = 'en' } = useLanguage();
-  return <StartupLoadingScene lang={lang} />;
+  return hasERPWorkspaceMounted()
+    ? <RouteLoadingFallback fullPage />
+    : <StartupLoadingScene lang={lang} />;
 }
 
 // Never mistake an unavailable authorization read for an empty business or
@@ -641,7 +649,7 @@ function RootEntryRoute() {
     return () => { cancelled = true; };
   }, [attempt, checkoutPlanId, navigate]);
 
-  if (decision === 'checking') return <PageLoader full />;
+  if (decision === 'checking') return <PageLoader />;
   if (decision === 'authorization-error') {
     return <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-100"><section className="max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 text-center"><h1 className="text-xl font-bold">Authorization check unavailable</h1><p className="mt-3 text-sm leading-6 text-slate-300">Your active session could not be validated for routing. No access has been granted or removed. Retry the server authorization check.</p><button type="button" className="mt-5 min-h-11 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950" onClick={() => setAttempt((value) => value + 1)}>Retry authorization check</button><p className="mt-4 text-xs text-slate-400">ERP users can open the secure login directly, without changing or resetting their account.</p><a href="/erp-login" className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-white">Open ERP login / ورود به ERP</a></section></main>;
   }

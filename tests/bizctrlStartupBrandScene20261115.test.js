@@ -22,6 +22,8 @@ describe('BizCTRL launch screen - fast and branded on iOS PWA and desktop',()=>{
  });
  it('renders crisp, reduced-motion-friendly CSS without external animation/font/video dependency',()=>{
   expect(html).toContain('min-height:100svh');
+  expect(html).toContain('min-height:100dvh');
+  expect(html).not.toContain('bzc-startup--inline');
   expect(html).toContain('env(safe-area-inset-bottom)');
   expect(html).toContain('prefers-reduced-motion:reduce');
   expect(html).toContain('bzc-startup-progress');
@@ -44,11 +46,15 @@ describe('BizCTRL launch screen - fast and branded on iOS PWA and desktop',()=>{
   expect(main).toContain('<App />');
   expect(main).not.toContain('setTimeout(() => document.getElementById');
   expect(app).toContain('import StartupLoadingScene');
-  expect(app).toContain('return <StartupLoadingScene lang={lang} compact={!full} />;');
+  expect(app).toContain('!hasERPWorkspaceMounted()');
+  expect(app).toContain('<RouteLoadingFallback fullPage />');
+  expect(scene).toContain('className="bzc-startup bzc-startup--full"');
+  expect(scene).not.toContain('compact');
   expect(app).toContain('function StartupGateLoader()');
-  expect(app).toContain('return <StartupLoadingScene lang={lang} />;');
-  expect(app).toContain("if (decision === 'checking') return <PageLoader full />;");
-  expect(app).toContain('const PageLoader = ({ full = false })');
+  expect(app).toContain('return hasERPWorkspaceMounted()');
+  expect(app).toContain(': <StartupLoadingScene lang={lang} />;');
+  expect(app).toContain("if (decision === 'checking') return <PageLoader />;");
+  expect(app).toContain('const PageLoader = ()');
   expect(app).toContain('if (isLoadingAuth)');
   expect(app).toContain('<StartupGateLoader />');
  });
