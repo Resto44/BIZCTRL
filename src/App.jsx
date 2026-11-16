@@ -171,7 +171,7 @@ const DriverDashboardERP    = lazy(() => import('@/pages/DriverDashboardERP'));
 const PortalOrderDispatch    = lazy(() => import('@/pages/PortalOrderDispatch'));
 
 // ── Shared page loading fallback ─────────────────────────────────────────────
-const PageLoader = ({ full = false }) => {
+const PageLoader = () => {
   const { lang = 'en' } = useLanguage();
   const [stalled, setStalled] = React.useState(false);
   React.useEffect(() => {
@@ -197,7 +197,7 @@ const PageLoader = ({ full = false }) => {
   }
   // Branded full-viewport splash is permitted only before the ERP shell has ever mounted.
   // Internal lazy route changes must never flash the launch scene or shrink to 52svh.
-  return full || !hasERPWorkspaceMounted()
+  return !hasERPWorkspaceMounted()
     ? <StartupLoadingScene lang={lang} />
     : <RouteLoadingFallback fullPage />;
 };
@@ -649,7 +649,7 @@ function RootEntryRoute() {
     return () => { cancelled = true; };
   }, [attempt, checkoutPlanId, navigate]);
 
-  if (decision === 'checking') return <PageLoader full />;
+  if (decision === 'checking') return <PageLoader />;
   if (decision === 'authorization-error') {
     return <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-100"><section className="max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 text-center"><h1 className="text-xl font-bold">Authorization check unavailable</h1><p className="mt-3 text-sm leading-6 text-slate-300">Your active session could not be validated for routing. No access has been granted or removed. Retry the server authorization check.</p><button type="button" className="mt-5 min-h-11 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950" onClick={() => setAttempt((value) => value + 1)}>Retry authorization check</button><p className="mt-4 text-xs text-slate-400">ERP users can open the secure login directly, without changing or resetting their account.</p><a href="/erp-login" className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-white">Open ERP login / ورود به ERP</a></section></main>;
   }
