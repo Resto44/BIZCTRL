@@ -42,6 +42,8 @@ jobs:
           name: language-coverage-audit
           path: reports/i18n-coverage-audit.json
       - run: pnpm run build
+      # Admin bundle has a separate entry graph and must pass before deployment.
+      - run: pnpm run build:platform
       - run: node scripts/build-automatic-report.mjs
       # Keep the separately deployed Supabase email worker in lock-step with
       # the Owner PDF. The packer refuses any bundle without Driver/Network
