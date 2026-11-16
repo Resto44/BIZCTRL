@@ -38,7 +38,7 @@ describe('BizCTRL install experience on iPhone Safari/Chrome and Android', () =>
   });
   it('gives distinct Safari and iPhone Chrome Share / Add to Home Screen steps', () => {
     expect(modal).toContain('isIOSChrome ? t.chrome : t.safari');
-    expect(modal).toContain('Share next to the address bar');
+    expect(modal).toContain('Share icon beside the address bar');
     expect(modal).toContain('Open as Web App');
     expect(modal).toContain('No App Store download');
     expect(modal).toContain('cannot install a web app from a webpage button');
