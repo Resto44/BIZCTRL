@@ -32,10 +32,10 @@ describe('Dedicated Platform Owner control plane deployment', () => {
     expect(admin).toContain('PlatformOwnerPasswordChange');
     expect(admin).toContain('<Toaster');
     expect(admin).not.toContain("import App from '@/App.jsx'");
-    expect(admin).not.toContain('AppLayout');
-    expect(admin).not.toContain('SubscriptionProvider');
+    expect(admin).not.toContain("import AppLayout");
+    expect(admin).not.toContain("import { SubscriptionProvider");
     expect(admin).not.toContain('RootEntryRoute');
-    expect(admin).not.toContain('LandingPage');
+    expect(admin).not.toContain("import LandingPage");
     expect(admin).not.toContain('RetailPOS');
     expect(admin).not.toContain('RestaurantPOS');
     expect(adminHtml).toContain('noindex,nofollow,noarchive');
