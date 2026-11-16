@@ -2,6 +2,8 @@ import React, { lazy, Suspense } from 'react';
 import {recoverModuleLoad} from '@/lib/moduleLoadRecovery';
 import {withStartupDeadline} from '@/lib/startupReadDeadline';
 import StartupLoadingScene from '@/components/StartupLoadingScene';
+import RouteLoadingFallback from '@/components/RouteLoadingFallback';
+import { hasERPWorkspaceMounted } from '@/lib/erpBootDisplayState';
 import {verifiedERPRootHome} from '@/lib/rootEntryDecision';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -182,7 +184,7 @@ const PageLoader = ({ full = false }) => {
       : lang === 'ar'
         ? { title: 'توقف تحميل التطبيق', hint: 'قد يكون الاتصال أو تحميل ملفات الإصدار الجديد عالقاً. لم تتغير بياناتك.', retry: 'إعادة التحميل', login: 'صفحة الدخول' }
         : { title: 'App loading has stalled', hint: 'The connection or new app files may be stuck. Your records have not been changed.', retry: 'Reload app', login: 'Sign-in page' };
-    return <div role="alert" data-testid="erp-startup-stalled" className="flex min-h-[50vh] items-center justify-center p-5">
+    return <div role="alert" data-testid="erp-startup-stalled" className="flex min-h-dvh w-full items-center justify-center bg-background p-5">
       <div className="w-full max-w-sm rounded-xl border bg-card p-5 text-center shadow-sm">
         <h2 className="text-base font-bold">{copy.title}</h2>
         <p className="mt-2 text-sm text-muted-foreground">{copy.hint}</p>
@@ -193,14 +195,20 @@ const PageLoader = ({ full = false }) => {
       </div>
     </div>;
   }
-  return <StartupLoadingScene lang={lang} compact={!full} />;
+  // Branded full-viewport splash is permitted only before the ERP shell has ever mounted.
+  // Internal lazy route changes must never flash the launch scene or shrink to 52svh.
+  return full || !hasERPWorkspaceMounted()
+    ? <StartupLoadingScene lang={lang} />
+    : <RouteLoadingFallback fullPage />;
 };
 
 // Reuse the same CSS-only visual for ERP auth / restaurant / subscription reads,
 // without changing any request deadline, permission check or redirect.
 function StartupGateLoader() {
   const { lang = 'en' } = useLanguage();
-  return <StartupLoadingScene lang={lang} />;
+  return hasERPWorkspaceMounted()
+    ? <RouteLoadingFallback fullPage />
+    : <StartupLoadingScene lang={lang} />;
 }
 
 // Never mistake an unavailable authorization read for an empty business or
