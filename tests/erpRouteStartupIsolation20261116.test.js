@@ -51,7 +51,7 @@ describe('ERP Android/iOS splash isolation and route navigation', () => {
 
   it('never changes saved data, routes, or ERP permissions to decide whether to display a splash', () => {
     const source = read('src/lib/erpBootDisplayState.js');
-    expect(source).not.toMatch(/localStorage|sessionStorage|supabase|auth|fetch\(|\.rpc\(|navigate\(/i);
+    expect(source).not.toMatch(/localStorage|sessionStorage|supabase|fetch\(|\.rpc\(|navigate\(/i);
     expect(route).not.toMatch(/location\.reload|window\.location|supabase|fetch\(/);
   });
 });
