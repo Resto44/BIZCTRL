@@ -1,91 +1,111 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-const DISMISS_KEY = 'pwa_install_dismissed_v2';
+// Presentation preferences only. Never store credentials, subscriptions or tenant data.
+const DISMISS_KEY = 'pwa_install_dismissed_20261116';
 const NEVER_SHOW_KEY = 'pwa_install_never_show';
 const MAX_DISMISSALS = 3;
+
+export function isInstalledWebApp(browser = window) {
+  return browser.matchMedia?.('(display-mode: standalone)')?.matches === true ||
+    browser.navigator?.standalone === true;
+}
+
+export function detectInstallBrowser(ua = '', platform = '', maxTouchPoints = 0) {
+  const ios = /iPad|iPhone|iPod/i.test(ua) ||
+    (platform === 'MacIntel' && maxTouchPoints > 1);
+  return {
+    isIOS: ios,
+    isIOSChrome: ios && /CriOS/i.test(ua),
+    isAndroid: /Android/i.test(ua),
+  };
+}
+
+function safeRead(key, storage = window.localStorage) {
+  try { return storage.getItem(key); } catch { return null; }
+}
+function safeWrite(key, value, storage = window.localStorage) {
+  try { storage.setItem(key, value); } catch { /* Private browsing can block storage. */ }
+}
 
 export function usePWAInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
-  const [isAndroid, setIsAndroid] = useState(false);
+  const [device, setDevice] = useState({ isIOS: false, isIOSChrome: false, isAndroid: false });
   const [canInstall, setCanInstall] = useState(false);
 
   useEffect(() => {
-    // Already running as installed PWA?
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone === true;
+    const current = detectInstallBrowser(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
+    setDevice(current);
 
-    if (standalone) {
-      setIsInstalled(true);
-      return; // never show banner in standalone
-    }
-
-    // User said "never show again"
-    if (localStorage.getItem(NEVER_SHOW_KEY) === '1') return;
-
-    // Too many dismissals
-    const dismissCount = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10);
-    if (dismissCount >= MAX_DISMISSALS) return;
-
-    const ua = navigator.userAgent;
-    const ios = /iphone|ipad|ipod/i.test(ua) && !/CriOS|FxiOS|OPiOS|mercury/i.test(ua);
-    const android = /android/i.test(ua);
-    setIsIOS(ios);
-    setIsAndroid(android);
-
-    if (ios) {
-      // iOS Safari: always show guided instructions (no native prompt)
-      // Small delay so it doesn't feel intrusive on first load
-      const t = setTimeout(() => setCanInstall(true), 3000);
-      return () => clearTimeout(t);
-    }
-
-    // Android / Desktop: wait for browser's beforeinstallprompt
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setCanInstall(true);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    window.addEventListener('appinstalled', () => {
+    if (isInstalledWebApp()) {
       setIsInstalled(true);
       setCanInstall(false);
-    });
+      return;
+    }
 
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    if (safeRead(NEVER_SHOW_KEY) === '1') return;
+    const dismissals = Number.parseInt(safeRead(DISMISS_KEY) || '0', 10);
+    if (Number.isFinite(dismissals) && dismissals >= MAX_DISMISSALS) return;
+
+    // iOS Safari AND iOS Chrome can offer Share -> Add to Home Screen; neither
+    // exposes beforeinstallprompt. Android supports native prompt when eligible.
+    const showManual = () => setCanInstall(true);
+    const timer = window.setTimeout(showManual, current.isIOS ? 1600 : 3500);
+
+    const onBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setDeferredPrompt(event);
+      setCanInstall(true);
+    };
+    const onInstalled = () => {
+      setIsInstalled(true);
+      setCanInstall(false);
+      setDeferredPrompt(null);
+    };
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onInstalled);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
   }, []);
 
   const triggerInstall = useCallback(async () => {
     if (!deferredPrompt) return false;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
-    if (outcome === 'accepted') {
-      setIsInstalled(true);
-      setCanInstall(false);
-      return true;
+    try {
+      await deferredPrompt.prompt(); // only inside the actual user tap
+      const choice = await deferredPrompt.userChoice;
+      setDeferredPrompt(null);
+      if (choice?.outcome === 'accepted') {
+        setIsInstalled(true);
+        setCanInstall(false);
+        return true;
+      }
+    } catch {
+      setDeferredPrompt(null);
     }
     return false;
   }, [deferredPrompt]);
 
   const dismiss = useCallback(() => {
-    const count = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10);
-    localStorage.setItem(DISMISS_KEY, String(count + 1));
+    const count = Number.parseInt(safeRead(DISMISS_KEY) || '0', 10);
+    safeWrite(DISMISS_KEY, String((Number.isFinite(count) ? count : 0) + 1));
     setCanInstall(false);
   }, []);
 
   const neverShow = useCallback(() => {
-    localStorage.setItem(NEVER_SHOW_KEY, '1');
+    safeWrite(NEVER_SHOW_KEY, '1');
     setCanInstall(false);
   }, []);
 
   return {
     canInstall,
     isInstalled,
-    isIOS,
-    isAndroid,
+    isIOS: device.isIOS,
+    isIOSChrome: device.isIOSChrome,
+    isAndroid: device.isAndroid,
     hasDeferredPrompt: !!deferredPrompt,
     triggerInstall,
     dismiss,
