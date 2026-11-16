@@ -442,13 +442,15 @@ function MoreMenu({ sections, can, onClose }) {
   ].filter(Boolean);
 
   return (
-    <div className="fixed inset-0 z-[60] overflow-hidden bg-slate-950/50 backdrop-blur-[2px]" onClick={onClose}>
+    // Full-viewport ERP workspace, not a short bottom sheet: the old 82dvh
+    // dialog left a dark, blurred scrim above the sheet and over the bottom nav.
+    // Safe areas are painted in the same solid color on iOS and Android.
+    <div data-testid="erp-more-fullscreen" className="fixed inset-0 z-[60] flex h-[100dvh] w-full max-w-full overflow-hidden bg-slate-50">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="more-control-title"
-        className="absolute inset-x-0 bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px))] flex h-[82dvh] max-h-[calc(100dvh-var(--bottom-nav-height)-env(safe-area-inset-bottom,0px))] w-full max-w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-slate-50 text-slate-950 shadow-2xl"
-        onClick={e => e.stopPropagation()}
+        className="flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-slate-50 pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] text-slate-950"
       >
         <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3.5">
           <div className="min-w-0">
