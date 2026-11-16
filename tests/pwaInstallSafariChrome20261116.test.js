@@ -7,6 +7,7 @@ const banner = readFileSync('src/components/pwa/PWAInstallBanner.jsx', 'utf8');
 const modal = readFileSync('src/components/pwa/PWAInstallModal.jsx', 'utf8');
 const hook = readFileSync('src/hooks/usePWAInstall.js', 'utf8');
 const layout = readFileSync('src/components/layout/AppLayout.jsx', 'utf8');
+const publicLayout = readFileSync('src/components/marketing/PublicLayout.jsx', 'utf8');
 const tour = readFileSync('src/components/onboarding/NewUserWelcomeTour.jsx', 'utf8');
 
 describe('BizCTRL install experience on iPhone Safari/Chrome and Android', () => {
@@ -23,7 +24,8 @@ describe('BizCTRL install experience on iPhone Safari/Chrome and Android', () =>
   });
   it('mounts the automatic invitation on real public landing and login, not preboot or sensitive invite routes', () => {
     expect(entry).toContain('function PublicInstallEntry()');
-    expect(entry).toContain("pathname !== '/' && pathname !== '/erp-login'");
+    expect(entry).toContain("pathname !== '/erp-login'");
+    expect(publicLayout).toContain('<PublicPWAInstallBanner autoOpen />');
     expect(entry).toContain('<PublicPWAInstallBanner autoOpen />');
     expect(entry).toContain('<PublicInstallEntry />');
     expect(layout).toContain('!tourOpen && !isNewSaaSUser(user?.created_at) && <PWAInstallBanner />');
