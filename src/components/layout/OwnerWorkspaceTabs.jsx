@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import RouteLoadingFallback from '@/components/RouteLoadingFallback';
 import { X } from 'lucide-react';
 import { useLocation, useNavigate, useOutlet } from 'react-router-dom';
 import { ERP_NAV_GROUPS } from './ERPSidebar';
@@ -166,7 +167,7 @@ export default function OwnerWorkspaceTabs() {
     element: cacheRef.current.get(tab.path),
   })), [tabs]);
 
-  if (!ownerWorkspace) return outlet;
+  if (!ownerWorkspace) return <Suspense fallback={<RouteLoadingFallback />}>{outlet}</Suspense>;
 
   return (
     <div className="w-full min-w-0 max-w-full">
@@ -181,7 +182,9 @@ export default function OwnerWorkspaceTabs() {
             data-owner-workspace-page={tab.path}
           >
             <WorkspaceTabVisibilityProvider active={tab.path === activePath}>
-              {tab.element}
+              <Suspense fallback={<RouteLoadingFallback />}>
+                {tab.element}
+              </Suspense>
             </WorkspaceTabVisibilityProvider>
           </section>
         ))}
