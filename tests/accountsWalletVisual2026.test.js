@@ -72,7 +72,9 @@ describe('Accounts & Wallet image-aligned ERP design',()=>{
     expect(landing).toContain('Wallet Banking Login');
     expect(landing).toContain("path:'/wallet-portal'");
     expect(landing).toContain("path:'/erp-login'");
-    expect(landing).toContain("path:'/platform-owner/login'");
+    // Administrative control plane is not a public customer-facing entry point.
+    expect(landing).not.toContain("path:'/platform-owner/login'");
+    expect(landing).not.toContain('Platform Owner');
     expect(landing).toContain('Wallet');
     expect(landing).toContain('Supplier invoices, customer credit and payroll remain in their dedicated ERP ledgers.');
     expect(login).toContain("import {peopleText} from '@/lib/peopleAccounts'");

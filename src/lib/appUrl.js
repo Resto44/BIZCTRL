@@ -7,6 +7,11 @@ export function getApplicationBaseUrl() {
 }
 
 export function getPlatformOwnerRecoveryRedirectUrl() {
+  // Separate admin deployment gets its own auth-storage origin and callback.
+  // Keep the existing URL for older live recovery emails until cutover.
+  if (typeof window !== 'undefined' && window.location.hostname === 'admin.mybizctrl.site') {
+    return 'https://admin.mybizctrl.site/platform-owner/new-owner-setup';
+  }
   return `${getApplicationBaseUrl()}/platform-owner/new-owner-setup`;
 }
 
