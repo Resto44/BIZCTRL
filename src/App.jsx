@@ -729,7 +729,10 @@ const AuthenticatedApp = () => {
 const PublicPWAInstallBanner = lazy(() => import('@/components/pwa/PWAInstallBanner'));
 function PublicInstallEntry() {
   const { pathname } = useLocation();
-  if (pathname !== '/' && pathname !== '/erp-login') return null;
+  // The home route resolves authentication first; showing the popup there would
+  // cover the branded startup during slow session checks. PublicLayout owns the
+  // landing-page popup once marketing is actually rendered.
+  if (pathname !== '/erp-login') return null;
   return <Suspense fallback={null}><PublicPWAInstallBanner autoOpen /></Suspense>;
 }
 
