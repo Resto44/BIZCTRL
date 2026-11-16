@@ -147,4 +147,46 @@ describe('mobile More and Control workspace', () => {
     expect(links.some((link) => link.props.href === '/sales')).toBe(true);
     expect(links.some((link) => link.props.href === '/purchases?create=1')).toBe(true);
   });
+  it('fills the mobile viewport without a dim black top or bottom strip and closes safely', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let renderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/owner-command-center']}><BottomNav /></MemoryRouter>
+        </QueryClientProvider>,
+      );
+    });
+    const moreButton = renderer.root.findAllByType('button').find(button =>
+      button.findAllByType('span').some(span => span.children.includes('more')),
+    );
+    await act(async () => moreButton.props.onClick());
+
+    const overlay = renderer.root.findByProps({ 'data-testid': 'erp-more-fullscreen' });
+    expect(overlay.props.className).toContain('fixed inset-0');
+    expect(overlay.props.className).toContain('h-[100dvh]');
+    expect(overlay.props.className).toContain('bg-slate-50');
+    expect(overlay.props.className).not.toContain('bg-slate-950/50');
+    expect(overlay.props.className).not.toContain('backdrop-blur');
+
+    const dialog = renderer.root.findByProps({ 'aria-labelledby': 'more-control-title' });
+    expect(dialog.props.className).toContain('h-full');
+    expect(dialog.props.className).toContain('pt-[env(safe-area-inset-top,0px)]');
+    expect(dialog.props.className).toContain('pb-[env(safe-area-inset-bottom,0px)]');
+    expect(dialog.props.className).not.toContain('82dvh');
+    expect(dialog.props.className).not.toContain('bottom-[calc');
+    expect(dialog.props.className).not.toContain('rounded-t');
+    expect(renderer.root.findAllByProps({ 'aria-label': 'Search ERP modules' })).toHaveLength(1);
+
+    const close = renderer.root.findByProps({ 'aria-label': 'Close More and Control' });
+    await act(async () => close.props.onClick());
+    expect(renderer.root.findAllByProps({ 'data-testid': 'erp-more-fullscreen' })).toHaveLength(0);
+    expect(renderer.root.findAllByType('button').some(button =>
+      button.findAllByType('span').some(span => span.children.includes('more')),
+    )).toBe(true);
+
+    await act(async () => renderer.unmount());
+    queryClient.clear();
+  });
+
 });
