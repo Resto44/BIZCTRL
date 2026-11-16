@@ -6,6 +6,7 @@ import path from 'node:path';
 // Platform Owner routes. The normal ERP app uses vite.config.js unchanged.
 export default defineConfig({
   root: path.resolve(process.cwd(), 'platform-console'),
+  publicDir: path.resolve(process.cwd(), 'public'),
   plugins: [react()],
   resolve: { alias: { '@': path.resolve(process.cwd(), 'src') } },
   build: {
