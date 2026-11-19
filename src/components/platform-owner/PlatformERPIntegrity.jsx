@@ -2,13 +2,14 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Database, RefreshCw, ShieldCheck } from 'lucide-react';
 import { platformOwnerApi } from '@/lib/platformOwnerApi';
+import { parsePlatformIntegritySnapshot } from '@/lib/platformIntegritySnapshot';
 import { Button } from '@/components/ui/button';
 
 const WORDS={
  en:{
   title:'ERP Integrity Center',subtitle:'Live read-only checks across accounting, tenant scope and access controls',
   scan:'Scan integrity',loading:'Checking live database…',error:'Integrity check failed. No records have been changed.',
-  total:'Records scanned',alerts:'Review flags',safe:'No flags detected',last:'Checked at',
+  tables:'Database tables checked',flagNote:'Findings can overlap on the same record. Branch checks are not counted twice.',total:'Financial records scanned',alerts:'Review flags',safe:'No flags detected',last:'Checked at',
   caution:'These are investigation flags, not automatic corrections. No invoice, amount, membership or organization is modified.',
   sales:'Sales invoices',supplier_invoices:'Supplier invoices',daily_sales:'Daily sales',
   branch_references:'Branch links',rls:'Database RLS',
@@ -21,7 +22,7 @@ const WORDS={
  fa:{
   title:'مرکز سلامت ERP',subtitle:'بررسی زنده و بدون تغییر اطلاعات حسابداری، سازمان‌ها و امنیت',
   scan:'بررسی دوباره',loading:'در حال بررسی دیتابیس…',error:'بررسی ناموفق بود. هیچ سندی تغییر نکرد.',
-  total:'تعداد رکوردها',alerts:'موارد نیازمند بررسی',safe:'مورد مشکوکی ثبت نشد',last:'زمان بررسی',
+  tables:'جدول‌های بررسی‌شده',flagNote:'یک سند ممکن است چند هشدار داشته باشد؛ بررسی شعبه دوباره به تعداد اسناد اضافه نمی‌شود.',total:'اسناد مالی بررسی‌شده',alerts:'موارد نیازمند بررسی',safe:'مورد مشکوکی ثبت نشد',last:'زمان بررسی',
   caution:'این‌ها هشدار بررسی هستند، نه اصلاح خودکار. هیچ فاکتور، مبلغ، کاربر یا سازمانی تغییر نمی‌کند.',
   sales:'فاکتورهای فروش',supplier_invoices:'فاکتورهای تأمین‌کننده',daily_sales:'فروشات روزانه',
   branch_references:'شناسه شعبه‌ها',rls:'امنیت دیتابیس (RLS)',
@@ -34,7 +35,7 @@ const WORDS={
  ar:{
   title:'مركز سلامة ERP',subtitle:'فحوصات حية للمالية وعزل المنظمات والأمان دون تعديل السجلات',
   scan:'إعادة الفحص',loading:'جارٍ فحص قاعدة البيانات…',error:'تعذر الفحص. لم تتغير أي سجلات.',
-  total:'إجمالي السجلات',alerts:'تحتاج مراجعة',safe:'لا توجد مخالفات ظاهرة',last:'تاريخ الفحص',
+  tables:'الجداول المفحوصة',flagNote:'قد يحمل السجل أكثر من تنبيه؛ فحوص الفروع لا تضاعف عدد السجلات.',total:'السجلات المالية المفحوصة',alerts:'تحتاج مراجعة',safe:'لا توجد مخالفات ظاهرة',last:'تاريخ الفحص',
   caution:'هذه تنبيهات للتحقيق وليست تصحيحات آلية. لا يتم تعديل الفواتير أو المبالغ أو الحسابات أو المنظمات.',
   sales:'فواتير المبيعات',supplier_invoices:'فواتير الموردين',daily_sales:'المبيعات اليومية',
   branch_references:'روابط الفروع',rls:'أمان قاعدة البيانات (RLS)',
@@ -87,10 +88,11 @@ export default function PlatformERPIntegrity({ lang='en' }){
  const query=useQuery({
    queryKey:['platform-owner','integrity'],
    queryFn:platformOwnerApi.erpIntegritySnapshot,
+   select:parsePlatformIntegritySnapshot,
    retry:false,staleTime:0,refetchOnMount:'always',
  });
  const groups=Array.isArray(query.data?.groups)?query.data.groups:[];
- const flags=groups.reduce((sum,item)=>sum+Math.max(0,Number(item.alerts)||0),0);
+ const flags=query.data?.flags;
  return <div dir={lang==='en'?'ltr':'rtl'} className="mx-auto max-w-5xl min-w-0 space-y-5">
    <div className="flex flex-wrap items-start justify-between gap-3">
      <div className="min-w-0">
@@ -114,7 +116,7 @@ export default function PlatformERPIntegrity({ lang='en' }){
        <div className="rounded-2xl border border-slate-200 bg-white p-4">
          <p className="text-sm font-semibold text-slate-600">{t.total}</p>
          <p className="mt-2 text-2xl font-black tabular-nums">
-           {groups.reduce((n,g)=>n+(Number.isFinite(Number(g.total))?Number(g.total):0),0)}
+           {query.data.records}
          </p>
        </div>
        <div className={'rounded-2xl border p-4 '+(flags?'border-amber-200 bg-amber-50':'border-emerald-200 bg-emerald-50')}>
@@ -122,6 +124,7 @@ export default function PlatformERPIntegrity({ lang='en' }){
          <p className="mt-2 text-2xl font-black tabular-nums">{flags}</p>
        </div>
      </div>
+     <p className="text-sm text-slate-600">{t.tables}: {query.data.tables} · {t.flagNote}</p>
      <div className="grid gap-3 md:grid-cols-2">
        {groups.map(g=><section key={g.key} className="min-w-0 rounded-2xl border bg-white p-4">
          <div className="flex items-start justify-between gap-3">
@@ -129,10 +132,10 @@ export default function PlatformERPIntegrity({ lang='en' }){
              <h2 className="font-extrabold text-slate-950">{t[g.key]||g.key}</h2>
              <p className="mt-1 text-xs leading-5 text-slate-600">{descriptions[g.key]||''}</p>
            </div>
-           {Number(g.alerts)>0?<span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-sm font-bold text-amber-900"><AlertTriangle className="size-4"/>{g.alerts}</span>
-           :<CheckCircle2 className="size-5 shrink-0 text-emerald-600"/>}
+           {g.findings>0?<span aria-label={`${t.alerts}: ${g.findings}`} className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-sm font-bold text-amber-900"><AlertTriangle className="size-4"/>{g.findings}</span>
+           :<CheckCircle2 aria-label={t.safe} className="size-5 shrink-0 text-emerald-600"/>}
          </div>
-         {g.total!==null&&g.total!==undefined&&<p className="mt-2 text-xs text-slate-500">{t.total}: <span className="font-bold tabular-nums">{g.total}</span></p>}
+         {g.total!==null&&g.total!==undefined&&<p className="mt-2 text-xs text-slate-500">{g.key==='rls'?t.tables:t.total}: <span className="font-bold tabular-nums">{g.total}</span></p>}
          <Details group={g} t={t}/>
        </section>)}
      </div>
