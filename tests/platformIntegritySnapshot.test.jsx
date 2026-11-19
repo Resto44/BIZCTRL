@@ -36,6 +36,19 @@ describe('Platform integrity reporting', () => {
     const data = snapshot(); data.groups[4] = data.groups[0];
     expect(() => parsePlatformIntegritySnapshot(data)).toThrow();
   });
+  it.each([
+    ['supplier_invoices', {alerts:0, overpaid:1}],
+    ['supplier_invoices', {alerts:21, overpaid:21}],
+    ['daily_sales', {alerts:0}],
+    ['daily_sales', {legacy_branch_name:4}],
+    ['daily_sales', {recent_missing_branch_id:4}],
+    ['sales', {negative_amounts:11}],
+    ['sales', {alerts:11}],
+    ['rls', {alerts:401}],
+  ])('rejects contradictory %s counters: %j', (key, values) => {
+    const data = snapshot(); Object.assign(data.groups.find(group => group.key === key), values);
+    expect(() => parsePlatformIntegritySnapshot(data)).toThrow('INVALID_PLATFORM_INTEGRITY_SNAPSHOT');
+  });
   it('renders an error on malformed success, then recovers after a valid retry', async () => {
     api.erpIntegritySnapshot.mockResolvedValueOnce({ groups: [] }).mockResolvedValueOnce(snapshot());
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });

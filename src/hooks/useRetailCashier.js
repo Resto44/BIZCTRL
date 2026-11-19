@@ -34,6 +34,7 @@ export function useRetailCashier(deviceId, scope, active = true, rpc = cashierRp
     const version = generation.current;
     try {
       const data = await rpc('cashier_snapshot', { p_device_id: deviceId });
+      if (data?.device?.id !== deviceId) throw new Error('Cashier snapshot could not be verified. Refresh to reconnect.');
       if (version === generation.current && !inFlight.current) apply(data);
       if (mounted.current) setConnected(true);
     } catch (e) {
@@ -44,6 +45,7 @@ export function useRetailCashier(deviceId, scope, active = true, rpc = cashierRp
     savePending(request);
     try {
       const data = await rpc('cashier_command', { p_device_id: deviceId, p_command: request.command, p_payload: request.payload, p_request_id: request.id });
+      if (data?.device?.id !== deviceId) throw new Error('Cashier response could not be verified. Retry the same action.');
       savePending(null); apply(data);
       if (mounted.current) { setError(null); setConnected(true); }
       return data;

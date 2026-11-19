@@ -25,6 +25,17 @@ export function parsePlatformIntegritySnapshot(data) {
       throw new Error('INVALID_PLATFORM_INTEGRITY_SNAPSHOT');
     }
     seen.add(group.key);
+    // Validate relationships as well as types. Inconsistent counters must not
+    // yield a green badge while the detail rows report known findings.
+    const invalid =
+      (group.key === 'sales' && (group.alerts > group.total || group.negative_amounts > group.total)) ||
+      (group.key === 'supplier_invoices' && (group.overpaid > group.total ||
+        group.missing_organization > group.total || group.alerts !== group.overpaid + group.missing_organization)) ||
+      (group.key === 'daily_sales' && (group.alerts !== group.missing_branch_id ||
+        group.missing_branch_id > group.total || group.legacy_branch_name > group.missing_branch_id ||
+        group.recent_missing_branch_id > group.missing_branch_id)) ||
+      (group.key === 'rls' && group.alerts > group.total);
+    if (invalid) throw new Error('INVALID_PLATFORM_INTEGRITY_SNAPSHOT');
     return { ...group, findings: group.alerts + (group.key === 'sales' ? group.negative_amounts : 0) };
   });
   return {
