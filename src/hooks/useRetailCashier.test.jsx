@@ -95,3 +95,27 @@ it('recovers an uncertain checkout then retries only the interrupted next order'
  expect(payments).toHaveLength(2);expect(payments[0][1]).toEqual(payments[1][1]);
  expect(mocks.rpc.mock.calls.filter(([,a])=>a.p_command==='new_sale').map(([,a])=>a.p_request_id)).toEqual([request,request]);
 });
+
+it.each(['FETCH','08007','40003'])('preserves payment recovery for ambiguous error code %s', async code => {
+ await act(async()=>root.render(<Harness/>));await flush();
+ mocks.rpc.mockImplementationOnce(async()=>({error:{code,message:'Completion unknown'}}));
+ await act(async()=>{await expect(api.command('checkout',{})).rejects.toMatchObject({code});});
+ const first=mocks.rpc.mock.calls.find(([,args])=>args.p_command==='checkout')[1];
+ expect(api.pending.id).toBe(first.p_request_id);
+ await act(async()=>{await api.retry();});
+ expect(mocks.rpc.mock.calls.filter(([,args])=>args.p_command==='checkout')[1][1]).toEqual(first);
+});
+it.each([null, {}, {device:{id:'other-device'}}])('keeps recovery when the command response is invalid: %j', async data => {
+ await act(async()=>root.render(<Harness/>));await flush();
+ mocks.rpc.mockImplementationOnce(async()=>({data,error:null}));
+ await act(async()=>{await expect(api.command('checkout',{})).rejects.toThrow('could not be verified');});
+ expect(api.pending.command).toBe('checkout');
+ const original=api.pending.id;
+ await act(async()=>{await api.retry();});
+ expect(mocks.rpc.mock.calls.filter(([,args])=>args.p_command==='checkout').map(([,args])=>args.p_request_id)).toEqual([original,original]);
+});
+it('does not show connected when a snapshot belongs to another device', async()=>{
+ mocks.rpc.mockResolvedValue({data:{device:{id:'other'}},error:null});
+ await act(async()=>root.render(<Harness/>));await flush();
+ expect(api.connected).toBe(false);expect(api.snapshot).toBeNull();
+});

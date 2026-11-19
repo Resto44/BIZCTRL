@@ -1,13 +1,13 @@
-import { purchaseOrderSupplierMessage } from '@/lib/purchaseOrderSupplierMessage';
+import { purchaseOrderSupplierMessage, parsePurchaseOrderItems } from '@/lib/purchaseOrderSupplierMessage';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
-import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { treasuryBranchDisplayName } from '@/lib/treasuryBranchDisplay';
 import { useAuth } from '@/lib/AuthContext';
+import { hasPendingReceipt } from '@/lib/purchaseReceiptRecovery';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -141,8 +141,8 @@ export default function PurchaseOrders() {
       ) : (
         <div className="space-y-3">
           {orders.map(order => {
-            const items = (() => { try { return JSON.parse(order.items || '[]'); } catch { return []; } })();
-            const canReceive = order.status === 'sent' || order.status === 'partial';
+            const items = parsePurchaseOrderItems(order.items);
+            const canReceive = order.status === 'sent' || order.status === 'partial' || hasPendingReceipt(user?.id, order);
             return (
               <Card key={order.id} className="p-4">
                 <div className="flex items-start justify-between gap-2 mb-2">
