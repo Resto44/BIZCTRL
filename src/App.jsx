@@ -1,4 +1,5 @@
 import React, { lazy, Suspense } from 'react';
+import AnalyticsConsent from '@/components/AnalyticsConsent';
 import {recoverModuleLoad} from '@/lib/moduleLoadRecovery';
 import {withStartupDeadline} from '@/lib/startupReadDeadline';
 import StartupLoadingScene from '@/components/StartupLoadingScene';
@@ -753,6 +754,7 @@ function App() {
     <QueryClientProvider client={queryClientInstance}>
       <LanguageProvider>
         <Router>
+          <AnalyticsConsent />
           <StandaloneCustomerAuthBoundary>
               <PlatformOwnerRecoveryCallbackRouter />
               <Suspense fallback={<PageLoader />}>
