@@ -67,3 +67,17 @@ describe('TikTok marketing pixel opt-in protection', () => {
     }
   });
 });
+
+describe('TikTok marketing preferences UI', () => {
+  it('provides explicit equal-weight allow/decline actions and a withdrawal control', async () => {
+    const { readFileSync } = await import('node:fs');
+    const jsx = readFileSync(new URL('../src/components/TikTokPixel.jsx', import.meta.url), 'utf8');
+    expect(jsx).toContain("choose('granted')");
+    expect(jsx).toContain("choose('denied')");
+    expect(jsx).toContain("setShowChoices(true)");
+    expect(jsx).toContain('aria-label="Change marketing tracking preferences"');
+    expect(jsx).toContain('window.dispatchEvent(new Event(');
+    expect(jsx).toContain('if (!pixel.enabled || pathname !==');
+    expect(jsx).toContain('href="/privacy"');
+  });
+});
