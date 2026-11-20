@@ -1,5 +1,17 @@
 # BizCTRL | TikTok Ads campaign draft — NOT launched
 
+## Budget authorization received 2026-11-21 — hard stop
+
+The user specified all of these in a single approval:
+- **150 SAR per day**
+- **7 days**
+- **50 SAR total maximum / hard spend cap**
+
+These instructions are mathematically inconsistent (150 SAR × 7 days = 1,050 SAR). **Treat 50 SAR as the binding maximum**, never infer authorization for 1,050 SAR. TikTok's published minimum spend ($50+ campaign budget; $20+ ad-group daily budget) also makes the stated 50 SAR total cap incompatible with the current standard Ads Manager budget thresholds. **Do not create or enable spend-bearing campaigns, use automatic billing, or increase the budget.**
+
+Required before live launch: explicit clarified budget and cap, connected TikTok advertiser account, real Pixel ID, consent and checkout event verification, and tests. Pixel and campaign remain non-live. Source: https://ads.tiktok.com/resources/help/article/budget (last updated July 2026).
+
+
 **Advertiser:** BizCTRL / @bizctrl26
 **Destination:** https://mybizctrl.site/#pricing
 **Primary business KPI:** verified new paid subscriptions / CAC
