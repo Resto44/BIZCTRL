@@ -45,7 +45,7 @@ export function createAnalytics({ window: win, document: doc, measurementId, pro
       loaded = true;
     }
     // Set safe defaults for automatic session/engagement events too.
-    command('set', page);
+    command('config', measurementId, { ...page, send_page_view: false });
     if (previous !== page.page_location) {
       command('event', 'page_view', { ...page, send_to: measurementId });
       previous = page.page_location;

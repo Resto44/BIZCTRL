@@ -19,6 +19,7 @@ describe('consent-gated GA4', () => {
     expect(doc.head.appendChild).toHaveBeenCalledTimes(1);
     expect(commands().find(c => c[0] === 'config')[2]).toMatchObject({ send_page_view: false, allow_google_signals: false, allow_ad_personalization_signals: false });
     expect(commands().filter(c => c[0] === 'event')).toHaveLength(2);
+    expect(commands().filter(c => c[0] === 'config').at(-1)[2]).toMatchObject({ page_location: 'https://mybizctrl.site/reports', send_page_view: false });
   });
   it('removes queries/fragments and never forwards document titles, IDs or referrers', () => {
     expect(analyticsPage('/reports?email=private@example.com#token')).toEqual({ page_location: 'https://mybizctrl.site/reports', page_title: 'BizCTRL | Reports', page_referrer: '' });
