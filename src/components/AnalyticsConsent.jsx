@@ -4,7 +4,7 @@ import { createAnalytics, ANALYTICS_CONSENT_KEY } from '@/lib/googleAnalytics';
 
 const analytics = createAnalytics({ window, document, measurementId: import.meta.env.VITE_GA_MEASUREMENT_ID, production: import.meta.env.PROD });
 
-// Background measurement only. Storage consent is always denied; no banner or button.
+// No banner. Only a previously saved explicit grant permits analytics cookies.
 export default function GoogleAnalytics() {
   const { pathname } = useLocation();
   useLayoutEffect(() => {

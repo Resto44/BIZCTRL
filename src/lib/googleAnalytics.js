@@ -25,19 +25,27 @@ export function createAnalytics({ window: win, document: doc, measurementId, pro
   const enabled = production && win.location.hostname === 'mybizctrl.site' && /^G-[A-Z0-9]+$/.test(measurementId || '');
   let loaded = false;
   let previous = null;
+  let activeConsent = null;
   const disableKey = `ga-disable-${measurementId}`;
   function command() { win.dataLayer.push(arguments); }
   function update(pathname) {
     if (!enabled) return;
     const page = analyticsPage(pathname);
     // Honor previous opt-outs and browser privacy signals without displaying UI.
-    const optedOut = readAnalyticsConsent({ getItem: key => win.localStorage.getItem(key) }) === 'denied' || win.navigator?.globalPrivacyControl === true || win.navigator?.doNotTrack === '1';
+    const savedConsent = readAnalyticsConsent({ getItem: key => win.localStorage.getItem(key) });
+    const optedOut = savedConsent === 'denied' || win.navigator?.globalPrivacyControl === true || win.navigator?.doNotTrack === '1';
+    const storageConsent = !optedOut && savedConsent === 'granted' ? 'granted' : 'denied';
     win[disableKey] = optedOut || !page;
+    if (storageConsent !== 'granted' && activeConsent !== 'denied') clearLegacyCookies();
+    if (loaded && activeConsent !== storageConsent) {
+      command('consent', 'update', { analytics_storage: storageConsent, ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+      activeConsent = storageConsent;
+    }
     if (win[disableKey]) { previous = null; return; }
     if (!loaded) {
-      clearLegacyCookies();
       win.dataLayer = win.dataLayer || [];
-      command('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+      command('consent', 'default', { analytics_storage: storageConsent, ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+      activeConsent = storageConsent;
       command('set', { ads_data_redaction: true, url_passthrough: false });
       command('js', new Date());
       command('config', measurementId, { ...page, send_page_view: false, allow_google_signals: false, allow_ad_personalization_signals: false, cookie_flags: 'SameSite=Lax;Secure' });
@@ -56,7 +64,7 @@ export function createAnalytics({ window: win, document: doc, measurementId, pro
     }
   }
   function clearLegacyCookies() {
-    // Remove cookies from the former opt-in implementation; never create new ones.
+    // Remove analytics cookies when consent is absent or withdrawn.
     for (const item of doc.cookie.split(';')) {
       const name = item.split('=')[0].trim();
       if (!/^_ga(?:_|$)/.test(name)) continue;

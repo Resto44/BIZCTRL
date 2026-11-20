@@ -24,9 +24,26 @@ describe('background cookieless analytics', () => {
     }
   });
   it('removes legacy analytics cookies without creating cookies or saving consent', () => {
-    const { analytics, writes, win, commands } = setup({}, 'granted'); analytics.update('/');
+    const { analytics, writes, win, commands } = setup(); analytics.update('/');
     expect(writes).toHaveLength(3); expect(writes.every(w => w.startsWith('_ga=;Max-Age=0;'))).toBe(true);
     expect(win.localStorage.setItem).not.toHaveBeenCalled(); expect(commands()[0][2].analytics_storage).toBe('denied');
+  });
+  it('uses only an existing explicit grant and preserves its cookies', () => {
+    const { analytics, commands, writes, win } = setup({}, 'granted'); analytics.update('/');
+    expect(commands()[0][2]).toEqual({ analytics_storage: 'granted', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+    expect(writes).toHaveLength(0); expect(win.localStorage.setItem).not.toHaveBeenCalled();
+  });
+  it('revokes a saved grant immediately and clears cookies when another tab opts out', () => {
+    const { analytics, win, commands, writes } = setup({}, 'granted'); analytics.update('/');
+    win.localStorage.getItem = () => 'denied'; analytics.update('/reports');
+    expect(win['ga-disable-G-TEST123']).toBe(true);
+    expect(commands().filter(c => c[0] === 'event')).toHaveLength(1);
+    expect(commands().at(-1)).toEqual(['consent','update',{analytics_storage:'denied',ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'}]);
+    expect(writes).toHaveLength(3);
+  });
+  it('browser privacy signals override existing grants', () => {
+    const {analytics,win,doc}=setup({},'granted'); win.navigator.globalPrivacyControl=true; analytics.update('/');
+    expect(doc.head.appendChild).not.toHaveBeenCalled();
   });
   it('deduplicates SPA views and updates safe defaults', () => {
     const { analytics, commands } = setup(); analytics.update('/'); analytics.update('/'); analytics.update('/reports');
@@ -47,6 +64,6 @@ describe('background cookieless analytics', () => {
   it('tolerates unavailable storage and renders no user interface', () => {
     expect(readAnalyticsConsent({getItem:()=>{throw Error('blocked');}})).toBeNull();
     const component = readFileSync(new URL('../src/components/AnalyticsConsent.jsx', import.meta.url),'utf8');
-    expect(component).toContain('return null;'); expect(component).not.toContain('<button'); expect(component).not.toContain('granted');
+    expect(component).toContain('return null;'); expect(component).not.toContain('<button'); expect(component).not.toContain('<section');
   });
 });
