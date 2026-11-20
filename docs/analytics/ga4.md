@@ -14,3 +14,9 @@ Use Realtime for receipt checks, Engagement / Pages and screens for page usage a
 Validation: tests/googleAnalytics.test.js covers initial/rejected consent, SPA deduplication, sanitization, excluded routes, withdrawal/regrant, environment guards and blocked storage. Build with the production measurement ID; deploy; visit supported pages, accept analytics, navigate between them and verify Realtime page titles. Also exercise Decline and Analytics preferences. Do not use real ERP records as test analytics payloads.
 
 To disable: remove VITE_GA_MEASUREMENT_ID and redeploy. No database migration or server secret is required.
+
+## Google managed tag container
+
+Google automatically upgraded this stream to Tag Manager container GTM-MDP2QT6P (account 6406826991, container 288015818). Published version 2, `BizCTRL consent-gated SPA analytics`, disables send_page_view, allow_google_signals and allow_ad_personalization_signals; uses safe default page_location/page_title/page_referrer; and unchecks Ignore duplicate instances of on-page configuration so SPA updates are honored. Keep these settings in sync with the app. The initial Google-generated version sent an additional raw-title pageview during initial testing; those early test events remain in the initial reporting period.
+
+Production release: PR #369, commit d3d633803d9bf13727c85b141e46fb8bc67dbfc7; Vercel dpl_FaJcozNgaUXREpp9CW8JZvwyACcN. CI completed successfully. Live test confirmed no Google script after Decline and receipt of sanitized Privacy and Contact pageviews after Allow analytics.
