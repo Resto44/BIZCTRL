@@ -27,14 +27,18 @@ export function createAnalytics({ window: win, document: doc, measurementId, pro
   let previous = null;
   const disableKey = `ga-disable-${measurementId}`;
   function command() { win.dataLayer.push(arguments); }
-  function update(consent, pathname) {
+  function update(pathname) {
     if (!enabled) return;
     const page = analyticsPage(pathname);
-    win[disableKey] = consent !== 'granted' || !page;
+    // Honor previous opt-outs and browser privacy signals without displaying UI.
+    const optedOut = readAnalyticsConsent({ getItem: key => win.localStorage.getItem(key) }) === 'denied' || win.navigator?.globalPrivacyControl === true || win.navigator?.doNotTrack === '1';
+    win[disableKey] = optedOut || !page;
     if (win[disableKey]) { previous = null; return; }
     if (!loaded) {
+      clearLegacyCookies();
       win.dataLayer = win.dataLayer || [];
-      command('consent', 'default', { analytics_storage: 'granted', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+      command('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+      command('set', { ads_data_redaction: true, url_passthrough: false });
       command('js', new Date());
       command('config', measurementId, { ...page, send_page_view: false, allow_google_signals: false, allow_ad_personalization_signals: false, cookie_flags: 'SameSite=Lax;Secure' });
       const script = doc.createElement('script');
@@ -51,20 +55,15 @@ export function createAnalytics({ window: win, document: doc, measurementId, pro
       previous = page.page_location;
     }
   }
-  function choose(value) {
-    try { win.localStorage.setItem(ANALYTICS_CONSENT_KEY, value); } catch { /* In-memory choice still applies. */ }
-    if (value === 'denied') {
-      win[disableKey] = true;
-      if (loaded) command('consent', 'update', { analytics_storage: 'denied' });
-      // Remove our first-party GA cookies when consent is withdrawn.
-      for (const item of doc.cookie.split(';')) {
-        const name = item.split('=')[0].trim();
-        if (!/^_ga(?:_|$)/.test(name)) continue;
-        for (const domain of ['', ';domain=mybizctrl.site', ';domain=.mybizctrl.site']) {
-          doc.cookie = `${name}=;Max-Age=0;path=/${domain};SameSite=Lax;Secure`;
-        }
+  function clearLegacyCookies() {
+    // Remove cookies from the former opt-in implementation; never create new ones.
+    for (const item of doc.cookie.split(';')) {
+      const name = item.split('=')[0].trim();
+      if (!/^_ga(?:_|$)/.test(name)) continue;
+      for (const domain of ['', ';domain=mybizctrl.site', ';domain=.mybizctrl.site']) {
+        doc.cookie = `${name}=;Max-Age=0;path=/${domain};SameSite=Lax;Secure`;
       }
-    } else if (loaded) command('consent', 'update', { analytics_storage: 'granted' });
+    }
   }
-  return { enabled, update, choose };
+  return { enabled, update };
 }
