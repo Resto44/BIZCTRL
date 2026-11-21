@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createTikTokPixel, TIKTOK_MARKETING_CONSENT_KEY } from '../src/lib/tiktokPixel';
 
 function setup(initial = null, options = {}) {
@@ -79,5 +79,30 @@ describe('TikTok marketing preferences UI', () => {
     expect(jsx).toContain('window.dispatchEvent(new Event(');
     expect(jsx).toContain('if (!pixel.enabled || pathname !==');
     expect(jsx).toContain('href="/privacy"');
+  });
+});
+
+ describe('TikTok SDK privacy boundaries', () => {
+  it('disables SDK history observation before any page is sent', () => {
+    const s = setup('granted'); s.pixel.update('/');
+    expect(s.win.ttq._o.C0123456789ABCDEFGHI.historyObserver).toBe(false);
+    expect(s.win.ttq[0][0]).toBe('holdConsent');
+  });
+  it('revokes on private-route navigation and cannot replay buffered data', () => {
+    const s = setup('granted'); s.pixel.update('/');
+    expect(s.pixel.update('/dashboard')).toBe(false);
+    expect(s.win.ttq.some(e => e[0] === 'revokeConsent')).toBe(true);
+    expect(s.pixel.update('/')).toBe(false);
+    expect(s.win.ttq.filter(e => e[0] === 'page')).toHaveLength(1);
+  });
+  it('blocks sensitive landing query strings and fragments', () => {
+    for (const data of [{search:'?email=private@example.com'}, {hash:'#access_token=secret'}]) {
+      const s = setup('granted'); Object.assign(s.win.location, data);
+      expect(s.pixel.update('/')).toBe(false); expect(s.scripts).toHaveLength(0);
+    }
+  });
+  it('allows only a bounded TikTok click ID for campaign attribution', () => {
+    const s = setup('granted'); s.win.location.search = '?ttclid=TEST_click-id.123';
+    expect(s.pixel.update('/')).toBe(true);
   });
 });

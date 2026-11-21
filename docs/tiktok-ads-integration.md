@@ -1,29 +1,20 @@
-# BizCTRL TikTok Ads — staged integration (not live yet)
+# BizCTRL TikTok Pixel
 
-**Status:** code scaffolding only. This branch intentionally sends **zero** TikTok events until an authorized campaign owner completes the prerequisites.
+Account: 7383351887828893712 (مطعم نجم الريان البخاري0622).
+Pixel: BizCTRL Production — `DC0KH2JC77U8SQE08E80`.
+Created in Events Manager on 2026-11-21. No paid advertising authorized; 50 SAR hard total ceiling.
 
-## Blockers before publishing or launching a paid campaign
+## Configuration
 
-1. Create the website data source in the intended TikTok Ads account (Tools → Events Manager → Connect Data Source → Web). Record the exact **Pixel ID**. Do not substitute a guessed ID.
-2. Set Vercel Production environment variable \`VITE_TIKTOK_PIXEL_ID\` to that ID. Never place an Events API access token in a \`VITE_*\` variable.
-3. Review and test the new **explicit marketing-consent user interface** against the live privacy notice, regional privacy laws and browser behavior. It stores the selected consent in localStorage key \`bizctrl.marketing-consent.v1\` to be \`granted\`, honors browser GPC/DNT, and does **not** silently grant consent. Pages under ERP, authentication, billing or customer portals are never instrumented.
-4. Publish the reviewed code after CI and privacy acceptance. In TikTok Events Manager verify the \`PageView\` event using Test Events and Diagnostics.
-5. Add \`CompleteRegistration\` only at a verified successful registration callback; never on a button click.
-6. Add \`CompletePayment\` only after the canonical Paddle webhook / server-side billing reconciliation verifies the **paid** subscription. Do not track a checkout open, pending payment, or success redirect as a confirmed purchase. If Events API is added, use a shared deduplication \`event_id\` with any browser event of the same purchase and follow consent requirements.
-7. Verify landing page, checkout, pricing, eligible countries, localization, and event attribution end-to-end before enabling paid Ads.
+Set `VITE_TIKTOK_PIXEL_ID` in Vercel production. No Events API token is included in client code.
+Automatic Advanced Matching OFF; enhanced data postback OFF; first-party cookies permitted only after explicit website marketing consent.
+SDK `historyObserver: false` prevents automatic SPA pageviews. The root landing page alone is eligible. Unknown query parameters, fragments and private referrers block loading; a bounded `ttclid` and public pricing/features anchors are permitted.
+Consent uses `bizctrl.marketing-consent.v1`, separately from Google Analytics. GPC and DNT override consent. No script loads before opt-in. On leaving the allowed context, consent is revoked and this document never re-grants, preventing replay of buffered private data. Changing a loaded Pixel's consent reloads the document.
 
-## Safe behavior in the proposed branch
+## Scope and verification
 
-- Only the public root marketing route \`/\` is eligible for a TikTok PageView.
-- No Pixel ID, no production environment, no explicit marketing consent, or privacy opt-out → **no TikTok script load**.
-- No user IDs, tenant IDs, query strings, financial records, email addresses, or ERP actions are manually sent as event properties.
-- This code introduces **no purchase attribution** until the verified server-side flow is integrated.
-- On an already loaded session, a subsequent opt-out invokes \`revokeConsent()\` if the SDK supports it and suppresses further app-triggered PageViews.
-- The new same-tab consent settings component dispatches \`bizctrl:marketing-consent-changed\` when a user changes consent; cross-tab changes are covered by the browser \`storage\` event.
-- Do not create or enable a paid campaign without explicit approved budget/cap and a connected advertiser account.
+Only PageView is implemented. CompleteRegistration and paid subscription events are NOT implemented or verified. Do not select these as campaign optimization goals until integrated with canonical, consent-aware server payment settlement and idempotent event IDs. Checkout open and redirect are not purchases.
 
-## Validation
+11 focused tests pass for loading, privacy signals, route boundaries, SDK history settings and consent withdrawal. Build and CI must pass before merge. Events Manager receipt must be checked separately after deployment; creation of a Pixel is not proof of receipt.
 
-Run \`pnpm test -- tests/tiktokPixel.test.js\` and \`pnpm build\` in CI. After actual Pixel setup, use the TikTok Pixel Helper and Test Events to verify the installed production version. These tests and live verification have **not** been run by this code change; **the real Pixel ID is still absent**.
-
-Reference: https://ads.tiktok.com/help/article/get-started-pixel?lang=en
+Official SDK documentation: https://business-api.tiktok.com/portal/docs/work-with-single-page-applications/v1.3

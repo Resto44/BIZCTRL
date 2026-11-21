@@ -29,7 +29,7 @@ function privacyOptOut() {
  * Consent can be withdrawn at any time using the privacy preferences button.
  */
 export default function TikTokPixel() {
-  const { pathname } = useLocation();
+  const { pathname, search, hash } = useLocation();
   const [choice, setChoice] = useState(savedChoice);
   const [showChoices, setShowChoices] = useState(() => savedChoice() === null);
 
@@ -48,7 +48,7 @@ export default function TikTokPixel() {
       window.removeEventListener('storage', sync);
       window.removeEventListener('bizctrl:marketing-consent-changed', refresh);
     };
-  }, [pathname]);
+  }, [pathname, search, hash]);
 
   // No marketing banners or scripts without a real Pixel ID and production origin.
   if (!pixel.enabled || pathname !== '/' || privacyOptOut()) return null;
@@ -65,6 +65,7 @@ export default function TikTokPixel() {
     setChoice(value);
     setShowChoices(false);
     window.dispatchEvent(new Event('bizctrl:marketing-consent-changed'));
+    if (document.getElementById('bizctrl-tiktok-pixel')) window.location.reload();
   }
 
   return (

@@ -41,6 +41,7 @@ export function createTikTokPixel({ window: win, document: doc, pixelId, product
   let loaded = false;
   let previousPath = null;
   let consentActive = false;
+  let stopped = false;
 
   function bootstrap() {
     win.TiktokAnalyticsObject = 'ttq';
@@ -59,7 +60,13 @@ export function createTikTokPixel({ window: win, document: doc, pixelId, product
     ttq._t = ttq._t || {};
     ttq._t[id] = Date.now();
     ttq._o = ttq._o || {};
-    ttq._o[id] = {};
+    ttq._o[id] = { historyObserver: false };
+    ttq.instance = function(pixel) {
+      const queue = ttq._i[pixel] || [];
+      for (const method of TTQ_METHODS) ttq.setAndDefer(queue, method);
+      return queue;
+    };
+    ttq.holdConsent();
     ttq._i[id]._u = 'https://analytics.tiktok.com/i18n/pixel/events.js';
 
     const script = doc.createElement('script');
@@ -72,16 +79,30 @@ export function createTikTokPixel({ window: win, document: doc, pixelId, product
   }
 
   function update(pathname) {
-    if (!enabled) return false;
+    if (!enabled || stopped) return false;
 
     const path = normalizePath(pathname);
-    const isAllowed = PUBLIC_MARKETING_PATHS.has(path);
+    // The SDK reads the document URL/referrer itself. Reject unknown query data
+    // rather than allowing private tokens or customer identifiers into payloads.
+    const query = new URLSearchParams(win.location.search || '');
+    const safeQuery = [...query].every(([key, value]) =>
+      key === 'ttclid' && /^[A-Za-z0-9._-]{1,1024}$/.test(value));
+    const safeHash = !win.location.hash || ['#pricing', '#features'].includes(win.location.hash);
+    let safeReferrer = !doc.referrer;
+    try {
+      const ref = new URL(doc.referrer);
+      safeReferrer = !ref.search && !ref.hash &&
+        (ref.hostname.endsWith('.tiktok.com') || ref.hostname === 'tiktok.com' ||
+          (ref.hostname === 'mybizctrl.site' && ref.pathname === '/'));
+    } catch { /* Empty or malformed referrers remain rejected unless empty. */ }
+    const isAllowed = PUBLIC_MARKETING_PATHS.has(path) && safeQuery && safeHash && safeReferrer;
     const consent = privacyAllows(win);
     if (!isAllowed || !consent) {
-      if (loaded && consentActive && !consent && typeof win.ttq?.revokeConsent === 'function') {
+      if (loaded && consentActive && typeof win.ttq?.revokeConsent === 'function') {
         win.ttq.revokeConsent();
       }
-      if (!consent) consentActive = false;
+      if (loaded) stopped = true; // No re-grant of potentially buffered private-route events.
+      consentActive = false;
       previousPath = null;
       return false;
     }
