@@ -62,9 +62,10 @@ export default function Purchases() {
   const { currency, lang } = useLanguage();
   const { activeRestaurant, branches } = useTenant();
   const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
-  const { role, can } = useRole();
+  const { role, can, user } = useRole();
   const qc = useQueryClient();
   const isOwner = role === ROLES.OWNER;
+  const canConfirmGoodsReceipt = isOwner || role === ROLES.MANAGER;
   const canDelete = role === ROLES.OWNER || role === ROLES.MANAGER || role === ROLES.GENERAL_MANAGER;
 
   const [showForm, setShowForm] = useState(false);
@@ -131,8 +132,8 @@ export default function Purchases() {
 
   const {data:deliveryReceipts=[],isLoading:deliveryReceiptsLoading,
     isError:deliveryReceiptsError,refetch:refetchDeliveryReceipts}=useQuery({
-    queryKey:['supplier-invoice-delivery-receipts',activeRestaurant?.id],
-    enabled:Boolean(isOwner&&activeRestaurant?.id),
+    queryKey:['supplier-invoice-delivery-receipts',activeRestaurant?.id,user?.id,role,selectedBranchId],
+    enabled:Boolean(canConfirmGoodsReceipt&&activeRestaurant?.id),
     queryFn:async()=>{
       const {data,error}=await supabase.rpc('erp_supplier_invoice_delivery_receipts',{
         p_restaurant_id:activeRestaurant.id
@@ -419,12 +420,12 @@ export default function Purchases() {
           onSharePDF={sharePDF}
           onPayInvoice={can?.createPurchases ? invoice => setPayingInvoice(invoice) : undefined}
           receiptByInvoice={receiptByInvoice}
-          deliveryReceiptsLoading={isOwner&&(deliveryReceiptsLoading||deliveryReceiptsError)}
-          onConfirmDelivery={isOwner&&!deliveryReceiptsError ? inv=>setReceivingInvoice(inv) : undefined}
+          deliveryReceiptsLoading={canConfirmGoodsReceipt&&(deliveryReceiptsLoading||deliveryReceiptsError)}
+          onConfirmDelivery={canConfirmGoodsReceipt&&!deliveryReceiptsError ? inv=>setReceivingInvoice(inv) : undefined}
         />
       )}
 
-      {isOwner&&deliveryReceiptsError&&<div role="alert"
+      {canConfirmGoodsReceipt&&deliveryReceiptsError&&<div role="alert"
         className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
         <span>{lang==='ar'?'تعذر التحقق من إثبات استلام المنتجات. أعد المحاولة قبل التأكيد.':lang==='fa'?'بررسی رسیدهای دریافت کالا ناموفق بود. قبل از تأیید دوباره تلاش کنید.':'Could not verify existing goods receipts. Retry before confirming delivery.'}</span>
         <Button type="button" size="sm" variant="outline" onClick={()=>refetchDeliveryReceipts()}>{lang==='ar'?'إعادة المحاولة':lang==='fa'?'تلاش دوباره':'Retry'}</Button>

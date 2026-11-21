@@ -51,7 +51,9 @@ describe('Owner verifies complete supplier invoice goods separately from payment
    read('../src/components/purchases/OwnerPurchaseGoodsReceipt.jsx')
   ]);
   expect(page).toContain("supabase.rpc('erp_supplier_invoice_delivery_receipts'");
-  expect(page).toContain('onConfirmDelivery={isOwner&&!deliveryReceiptsError');
+  expect(page).toContain('const canConfirmGoodsReceipt = isOwner || role === ROLES.MANAGER;');
+  expect(page).toContain('enabled:Boolean(canConfirmGoodsReceipt&&activeRestaurant?.id)');
+  expect(page).toContain('onConfirmDelivery={canConfirmGoodsReceipt&&!deliveryReceiptsError');
   expect(page).toContain('<OwnerPurchaseGoodsReceipt');
   expect(list).toContain('data-testid="owner-confirm-purchase-delivery"');
   expect(list).toContain('data-testid="supplier-invoice-goods-received-badge"');
