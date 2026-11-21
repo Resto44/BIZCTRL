@@ -1,5 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import GoogleAnalytics from '@/components/AnalyticsConsent';
+import TikTokPixel from '@/components/TikTokPixel';
 import {recoverModuleLoad} from '@/lib/moduleLoadRecovery';
 import {withStartupDeadline} from '@/lib/startupReadDeadline';
 import StartupLoadingScene from '@/components/StartupLoadingScene';
@@ -755,6 +756,7 @@ function App() {
       <LanguageProvider>
         <Router>
           <GoogleAnalytics />
+          <TikTokPixel />
           <StandaloneCustomerAuthBoundary>
               <PlatformOwnerRecoveryCallbackRouter />
               <Suspense fallback={<PageLoader />}>
