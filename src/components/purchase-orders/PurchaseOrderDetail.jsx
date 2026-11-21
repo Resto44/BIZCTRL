@@ -1,5 +1,5 @@
 import React from 'react';
-import {purchaseOrderSupplierMessage} from '@/lib/purchaseOrderSupplierMessage';
+import {purchaseOrderSupplierMessage, parsePurchaseOrderItems} from '@/lib/purchaseOrderSupplierMessage';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { treasuryBranchDisplayName } from '@/lib/treasuryBranchDisplay';
@@ -22,7 +22,7 @@ export default function PurchaseOrderDetail({ order, onBack }) {
   // All metadata is restricted to the active tenant; never rewrite the stored branch key.
   const { allBranches } = useTenant();
   const branchName = treasuryBranchDisplayName(order, allBranches, lang);
-  const items = (() => { try { return JSON.parse(order.items || '[]'); } catch { return []; } })();
+  const items = parsePurchaseOrderItems(order.items);
 
   const getMessage = () => purchaseOrderSupplierMessage(order,currency);
 

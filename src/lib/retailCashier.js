@@ -7,7 +7,10 @@ export const cashierRpc = async (name, args, client = supabase) => {
 };
 export const money = (value, currency = 'SAR') => `${currency} ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export const productName = (product, lang) => (lang === 'ar' || lang === 'fa' ? product.name_ar : product.name_en) || product.name || '';
-export const isDefiniteRejection = error => /^[0-9A-Z]{5}$/.test(error?.code || '') || ['PGRST301', 'PGRST302', 'PGRST202'].includes(error?.code);
+// A five-character transport code is not proof of rollback (e.g. FETCH or
+// PostgreSQL 08007/40003, where transaction completion is unknown).
+export const isDefiniteRejection = error => /^(22|23|28|42)[0-9A-Z]{3}$/.test(error?.code || '') ||
+  ['P0001', '40001', '40P01', 'PGRST301', 'PGRST302', 'PGRST202'].includes(error?.code);
 export function paymentBreakdown(total, mode, cash, card) {
   const cents = n => Math.round(Number(n) * 100);
   const due = cents(total);
