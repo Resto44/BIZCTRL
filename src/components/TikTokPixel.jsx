@@ -26,32 +26,37 @@ function privacyOptOut() {
 /**
  * Public-site advertising measurement only. No marketing scripts run before
  * explicit opt-in; the banner offers equally accessible allow / decline.
- * Consent can be withdrawn at any time using the privacy preferences button.
+ * Consent can be withdrawn at any time using the privacy preferences link in the public footer.
  */
 export default function TikTokPixel() {
   const { pathname, search, hash } = useLocation();
   const [choice, setChoice] = useState(savedChoice);
-  const [showChoices, setShowChoices] = useState(() => savedChoice() === null);
+  const [showChoices, setShowChoices] = useState(false);
 
   useEffect(() => {
     const refresh = () => {
       pixel.update(pathname);
       setChoice(savedChoice());
+      setShowChoices(false);
     };
     const sync = event => {
       if (event.key === TIKTOK_MARKETING_CONSENT_KEY || event.key === null) refresh();
     };
+    const openPreferences = () => setShowChoices(true);
     refresh();
+    window.addEventListener('bizctrl:open-marketing-preferences', openPreferences);
     window.addEventListener('storage', sync);
     window.addEventListener('bizctrl:marketing-consent-changed', refresh);
     return () => {
+      window.removeEventListener('bizctrl:open-marketing-preferences', openPreferences);
       window.removeEventListener('storage', sync);
       window.removeEventListener('bizctrl:marketing-consent-changed', refresh);
     };
   }, [pathname, search, hash]);
 
   // No marketing banners or scripts without a real Pixel ID and production origin.
-  if (!pixel.enabled || pathname !== '/' || privacyOptOut()) return null;
+  if (!pixel.enabled || privacyOptOut()) return null;
+  if (!showChoices && (pathname !== '/' || choice !== null)) return null;
 
   function choose(value) {
     try {
@@ -69,37 +74,35 @@ export default function TikTokPixel() {
   }
 
   return (
-    <>
-      {showChoices ? (
-        <section
-          role="region"
-          aria-label="Marketing tracking preferences"
-          className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-lg rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-900 shadow-xl"
-        >
-          <p className="font-semibold">Marketing measurement choices</p>
-          <p className="mt-1 text-slate-700">
-            If you allow it, BizCTRL uses TikTok Pixel on this public page to measure advertising visits.
-            We do not share restaurant data or payment details with TikTok. Tracking is off unless you agree.
-            You can change your choice any time.
-            {' '}<a className="underline" href="/privacy">Privacy policy</a>
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className="rounded-lg border border-slate-300 px-4 py-2 font-medium"
-              onClick={() => choose('denied')}>No, thanks</button>
-            <button type="button" className="rounded-lg bg-blue-700 px-4 py-2 font-medium text-white"
-              onClick={() => choose('granted')}>Allow marketing measurement</button>
-          </div>
-        </section>
-      ) : (
-        <button
-          type="button"
-          aria-label="Change marketing tracking preferences"
-          className="fixed bottom-3 left-3 z-[100] rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 shadow"
-          onClick={() => setShowChoices(true)}
-        >
-          Marketing privacy {choice === 'granted' ? '· On' : '· Off'}
-        </button>
-      )}
-    </>
+    <section
+      role="region"
+      aria-label="Marketing tracking preferences"
+      className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-lg rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-900 shadow-xl"
+    >
+      <p className="font-semibold">Marketing measurement choices</p>
+      <p className="mt-1 text-slate-700">
+        If you allow it, BizCTRL uses TikTok Pixel on this public page to measure advertising visits.
+        We do not share restaurant data or payment details with TikTok. Tracking is off unless you agree.
+        You can change your choice any time.
+        {' '}<a className="underline" href="/privacy">Privacy policy</a>
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="rounded-lg border border-slate-300 px-4 py-2 font-medium"
+          onClick={() => choose('denied')}>No, thanks</button>
+        <button type="button" className="rounded-lg bg-blue-700 px-4 py-2 font-medium text-white"
+          onClick={() => choose('granted')}>Allow marketing measurement</button>
+      </div>
+    </section>
+  );
+}
+
+/** An ordinary footer control; never a floating status badge. */
+export function MarketingPrivacyButton() {
+  if (!pixel.enabled || privacyOptOut()) return null;
+  return (
+    <button type="button" aria-label="Change marketing tracking preferences" className="w-fit text-start hover:text-white"
+      onClick={() => window.dispatchEvent(new Event('bizctrl:open-marketing-preferences'))}>
+      Marketing privacy
+    </button>
   );
 }

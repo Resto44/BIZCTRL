@@ -77,7 +77,7 @@ describe('TikTok marketing preferences UI', () => {
     expect(jsx).toContain("setShowChoices(true)");
     expect(jsx).toContain('aria-label="Change marketing tracking preferences"');
     expect(jsx).toContain('window.dispatchEvent(new Event(');
-    expect(jsx).toContain('if (!pixel.enabled || pathname !==');
+    expect(jsx).toContain("if (!showChoices && (pathname !== '/' || choice !== null)) return null;");
     expect(jsx).toContain('href="/privacy"');
   });
 });

@@ -1,4 +1,5 @@
 import LanguageSwitcher from '@/components/shared/LanguageSwitcher';
+import { MarketingPrivacyButton } from '@/components/TikTokPixel';
 import BrandLogo from '@/components/BrandLogo';
 import { useLanguage } from '@/lib/LanguageContext';
 import React, { lazy, Suspense, useEffect, useState } from 'react';
@@ -180,6 +181,7 @@ export function PublicLayout({ children }) {
               <a href="mailto:support@mybizctrl.site" dir="ltr" translate="no" className="w-fit max-w-full break-all text-cyan-300 underline underline-offset-4 hover:text-white">support@mybizctrl.site</a>
               <Link to="/terms" className="hover:text-white">{tr('Terms of Service')}</Link>
               <Link to="/privacy" className="hover:text-white">{tr('Privacy Policy')}</Link>
+              <MarketingPrivacyButton />
               <Link to="/refund" className="hover:text-white">{tr('Refund Policy')}</Link>
             </div>
           </div>
