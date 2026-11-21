@@ -53,7 +53,7 @@ import {
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { useLanguage } from '@/lib/LanguageContext';
-import { latestFinalizedDrawerCash, displayDrawerCash } from '@/lib/managerDrawerCash';
+import { normalizeManagerDrawerCash, displayDrawerCash } from '@/lib/managerDrawerCash';
 import { latestInventorySnapshots } from '@/lib/inventorySnapshotView';
 
 // ─── Inline SVG icons not in lucide ──────────────────────────────────────────
@@ -198,18 +198,15 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
     queryKey: ['mgr-verified-drawer-cash', restaurantId, branchId, branchKey, today],
     enabled: !!restaurantId && !!branchId,
     queryFn: async () => {
-      const base = () => supabase.from('daily_sales')
-        .select('id,date,closing_state,actual_cash,closing_cash,owner_cash_injection,finalized_at,updated_date,created_date')
-        .eq('restaurant_id', restaurantId)
-        .eq('closing_state', 'finalized')
-        .lte('date', today);
-      const canonical = base().eq('branch_id', branchId).order('date', { ascending: false }).order('finalized_at', { ascending: false }).limit(25);
-      const legacy = branchKey
-        ? base().eq('branch', branchKey).is('branch_id', null).order('date', { ascending: false }).order('finalized_at', { ascending: false }).limit(25)
-        : null;
-      const results = await Promise.all(legacy ? [canonical, legacy] : [canonical]);
-      for (const result of results) if (result.error) throw result.error;
-      return latestFinalizedDrawerCash(results.flatMap(result => result.data || []), today);
+      // Share the owner's verified physical-closing source. Finalized POS
+      // revenue rows have no cash count and must never hide the last count.
+      const { data, error } = await supabase.rpc('erp_owner_drawer_cash_asof', {
+        p_restaurant_id: restaurantId,
+        p_as_of_date: today,
+        p_branch_id: branchId,
+      });
+      if (error) throw error;
+      return normalizeManagerDrawerCash(data, branchId);
     },
     staleTime: 20000,
     refetchInterval: 60000,
@@ -441,6 +438,8 @@ function ManagerContent({ branchId, branchName, branchKey, restaurantId, busines
               <p className="mt-2 text-xs leading-5 text-slate-600">
                 {drawerCashError
                   ? (lang === 'fa' ? 'دریافت مانده صندوق ناموفق شد؛ عدد صفر فرض نشده است.' : lang === 'ar' ? 'تعذر قراءة رصيد الصندوق؛ لا نفترض أن الرصيد صفر.' : 'Drawer count unavailable; no zero balance is assumed.')
+                  : drawerCash?.reason === 'ambiguous_drawer'
+                  ? (lang === 'fa' ? 'مالکیت صندوق بین چند صندوقدار مشخص نیست؛ شمارش نیاز به بررسی دارد.' : lang === 'ar' ? 'ملكية الصندوق بين عدة أمناء غير واضحة؛ يلزم التحقق من الجرد.' : 'Multiple cashier identities; drawer count needs verification.')
                   : drawerCash?.amount === null
                   ? (lang === 'fa' ? 'شمارش نهایی تأییدشده برای این شعبه موجود نیست.' : lang === 'ar' ? 'لا توجد جردة نهائية مسجلة لهذا الفرع.' : 'No finalized physical count recorded for this branch.')
                   : (lang === 'fa' ? 'آخرین شمارش ثبت‌شده، نه مانده لحظه‌ای' : lang === 'ar' ? 'آخر مبلغ معدود ومسجل، وليس رصيداً لحظياً' : 'Last finalized physical count — not a live drawer reading')
