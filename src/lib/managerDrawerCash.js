@@ -1,4 +1,4 @@
-import { enteredDrawerCash } from '@/lib/executiveDrawerCash';
+import { enteredDrawerCash, normalizeDrawerCashAsOf } from '@/lib/executiveDrawerCash';
 
 /**
  * The last FINALIZED physical cash count for one authorized branch.
@@ -50,4 +50,19 @@ export function displayDrawerCash(amount, sourceCurrency) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(amount));
+}
+
+/** Same authoritative physical-closing payload as Owner, restricted to one branch. */
+export function normalizeManagerDrawerCash(payload, branchId) {
+  const result = normalizeDrawerCashAsOf(payload);
+  const detail = result.details[0];
+  if (!branchId || result.branches !== 1 || result.details.length !== 1 || detail?.branchId !== branchId) {
+    throw new Error('DRAWER_CASH_BRANCH_SCOPE_MISMATCH');
+  }
+  return {
+    amount: result.complete ? result.amount : null,
+    date: detail.date || null,
+    measuredAt: detail.countedAt || null,
+    reason: result.complete ? 'last_finalized_count' : detail.status || 'no_finalized_count',
+  };
 }

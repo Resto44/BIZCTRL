@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
-import {latestFinalizedDrawerCash,drawerCurrencyCode,displayDrawerCash} from '../src/lib/managerDrawerCash.js';
+import {latestFinalizedDrawerCash,normalizeManagerDrawerCash,drawerCurrencyCode,displayDrawerCash} from '../src/lib/managerDrawerCash.js';
 const manager=readFileSync('src/pages/ManagerDashboardERP.jsx','utf8');
 
 const physical={id:'count-a',date:'2026-10-20',closing_state:'finalized',actual_cash:16,closing_cash:16,owner_cash_injection:0,finalized_at:'2026-10-20T19:36:11Z'};
@@ -42,17 +42,39 @@ describe('Branch manager cash in drawer comes from a finalized physical count',(
  });
  it('scopes register reads to both tenant and branch and shows dated finalized result',()=>{
   expect(manager).toContain("queryKey: ['mgr-verified-drawer-cash', restaurantId, branchId, branchKey, today]");
-  expect(manager).toContain(".eq('restaurant_id', restaurantId)");
   expect(manager).toContain(".eq('branch_id', branchId)");
-  expect(manager).toContain(".eq('branch', branchKey).is('branch_id', null)");
-  expect(manager).toContain(".eq('closing_state', 'finalized')");
-  expect(manager).toContain(".lte('date', today)");
-  expect(manager).toContain('latestFinalizedDrawerCash');
+  expect(manager).toContain("supabase.rpc('erp_owner_drawer_cash_asof'");
+  expect(manager).toContain('p_restaurant_id: restaurantId');
+  expect(manager).toContain('p_branch_id: branchId');
+  expect(manager).toContain('p_as_of_date: today');
+  expect(manager).toContain('normalizeManagerDrawerCash(data, branchId)');
   expect(manager).toContain('drawerCashError');
   expect(manager).toContain('Last finalized physical count — not a live drawer reading');
   expect(manager).toContain('النقد المتبقي في الصندوق');
   expect(manager).toContain('پول باقی‌مانده داخل صندوق');
   expect(manager).toContain("businessCurrency={activeRestaurant?.currency || ''}");
   expect(manager).not.toContain("value={formatCurrency(kpis.cashTotal)}  icon={Wallet}");
+ });
+});
+
+const countPayload = {
+ basis: 'last_verified_physical_count_not_live_bank_balance', amount: 95,
+ branches: 1, missingBranches: 0, complete: true, asOfDate: '2026-11-21',
+ details: [{branchId: 'rayyan', status: 'verified', cash: 95, date: '2026-11-20', countedAt: '2026-11-19T22:21:25Z'}],
+};
+describe('Manager uses the owner physical count source', () => {
+ it('preserves the prior 95 SAR count and actual count date despite newer POS revenue', () => {
+  expect(normalizeManagerDrawerCash(countPayload, 'rayyan')).toMatchObject({amount:95, date:'2026-11-20'});
+ });
+ it('accepts a verified zero without inventing cash for missing or ambiguous counts', () => {
+  expect(normalizeManagerDrawerCash({...countPayload,amount:0,details:[{...countPayload.details[0],cash:0}]},'rayyan').amount).toBe(0);
+  for (const status of ['no_closing','uncounted','ambiguous_drawer']) {
+   expect(normalizeManagerDrawerCash({...countPayload,amount:null,complete:false,missingBranches:1,details:[{...countPayload.details[0],cash:null,reportedCash:95,status}]},'rayyan')).toMatchObject({amount:null,reason:status});
+  }
+ });
+ it('rejects another branch and empty or aggregate responses', () => {
+  expect(()=>normalizeManagerDrawerCash(countPayload,'other')).toThrow();
+  expect(()=>normalizeManagerDrawerCash(null,'rayyan')).toThrow();
+  expect(()=>normalizeManagerDrawerCash({...countPayload,branches:2},'rayyan')).toThrow();
  });
 });
