@@ -18,6 +18,24 @@ describe('supplier ledger view',()=>{
   expect(closing()).toBe('SAR 60.00');
   expect(JSON.stringify(tree.toJSON())).toContain('Totals and running balances keep the complete selected account scope.');
  });
+ it('shows paid invoices and payment history even when the ledger closes at zero',()=>{
+  const old=mocks.data;const open=vi.fn();
+  mocks.data={...old,invoices:[{...old.invoices[0],total_amount:135,paid_amount:135,status:'paid'}],payments:[{...old.payments[0],amount:135,payment_method:'cash'}]};
+  try{
+   act(()=>{tree=create(<SupplierLedger supplier={{id:'s'}} onOpenInvoice={open}/>);});
+   const rows=()=>tree.root.findAllByProps({'data-testid':'ledger-history-row'});
+   expect(tree.root.findByProps({'data-testid':'ledger-closing'}).children.join('')).toBe('SAR 0.00');
+   expect(rows().map(row=>row.props['data-record-type'])).toEqual(['invoice','payment']);
+   act(()=>tree.root.findByProps({'data-testid':'ledger-view-payments'}).props.onClick());
+   expect(rows()).toHaveLength(1);expect(rows()[0].props['data-record-type']).toBe('payment');
+   act(()=>tree.root.findByProps({'aria-label':'Search supplier, invoice or reference'}).props.onChange({target:{value:'INV1'}}));
+   expect(rows()).toHaveLength(1);
+   act(()=>tree.root.findAllByType('button').find(b=>b.children.includes('Invoice details')).props.onClick());
+   expect(open).toHaveBeenCalledWith(expect.objectContaining({id:'i'}));
+   act(()=>tree.root.findByProps({'data-testid':'ledger-view-invoices'}).props.onClick());
+   expect(rows().map(row=>row.props['data-record-type'])).toEqual(['invoice']);
+  }finally{mocks.data=old;}
+ });
  it('shows service errors without false zero balances',()=>{
   mocks.error=true;act(()=>{tree=create(<SupplierLedger/>);});
   expect(tree.root.findAllByProps({'data-testid':'ledger-closing'})).toHaveLength(0);
