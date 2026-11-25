@@ -30,10 +30,10 @@ const COPY = {
 };
 
 const SOCIALS = [
-  { key: 'facebook', label: 'Facebook', mark: 'f', env: 'VITE_SOCIAL_FACEBOOK_URL', tone: 'from-blue-600 to-blue-500' },
-  { key: 'youtube', label: 'YouTube', mark: '▶', env: 'VITE_SOCIAL_YOUTUBE_URL', tone: 'from-red-600 to-red-500' },
-  { key: 'snapchat', label: 'Snapchat', mark: 'S', env: 'VITE_SOCIAL_SNAPCHAT_URL', tone: 'from-yellow-300 to-yellow-200', markClass: 'text-slate-950' },
-  { key: 'instagram', label: 'Instagram', mark: '◎', env: 'VITE_SOCIAL_INSTAGRAM_URL', tone: 'from-fuchsia-600 via-rose-500 to-amber-400' },
+  { key: 'facebook', label: 'Facebook', mark: 'f', env: 'VITE_SOCIAL_FACEBOOK_URL', fallback: 'https://www.facebook.com/share/1CRWGaYunq/?mibextid=wwXIfr', tone: 'from-blue-600 to-blue-500' },
+  { key: 'youtube', label: 'YouTube', mark: '▶', env: 'VITE_SOCIAL_YOUTUBE_URL', fallback: 'https://youtube.com/@bizctrl?si=apkAq5Kn5ffTGr6d', tone: 'from-red-600 to-red-500' },
+  { key: 'snapchat', label: 'Snapchat', mark: 'S', env: 'VITE_SOCIAL_SNAPCHAT_URL', fallback: 'https://snapchat.com/t/Rclodgf8', tone: 'from-yellow-300 to-yellow-200', markClass: 'text-slate-950' },
+  { key: 'instagram', label: 'Instagram', mark: '◎', env: 'VITE_SOCIAL_INSTAGRAM_URL', fallback: 'https://www.instagram.com/bizctrl26/', tone: 'from-fuchsia-600 via-rose-500 to-amber-400' },
   { key: 'tiktok', label: 'TikTok', mark: '♪', env: 'VITE_SOCIAL_TIKTOK_URL', fallback: 'https://www.tiktok.com/@bizctrl26', tone: 'from-slate-950 via-slate-900 to-cyan-500' },
 ];
 
