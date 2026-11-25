@@ -63,6 +63,37 @@ describe('Owner order/sales source breakdown', () => {
     expect(report.reconciled).toBe(true);
   });
 
+  it('uses current localized names for the same stable source id, without changing archived sales or totals', () => {
+    const sales = [
+      { closing_state: 'finalized', sales_sources_json: [{source_id:'id-1',name_en:'Old label',name_ar:'قديم',amount:40}] },
+      { closing_state: 'locked', sales_sources_json: [{source_id:'id-1',name_en:'Older label',amount:30},{source_id:'deleted',name_en:'Historical source',amount:5}] },
+    ];
+    const sourceLabels = [
+      {id:'id-1',name_en:'New name',name_ar:'اسم جديد',name_fa:'نام جدید',is_active:false,included_in_revenue:false},
+      {id:'other',name_en:'Old label'},
+    ];
+    const before = JSON.stringify(sales);
+    for (const [lang,name] of [['en','New name'],['ar','اسم جديد'],['fa','نام جدید']]) {
+      const report = buildOwnerOrderSourceAnalytics({sales,sourceLabels,lang,verifiedSales:80});
+      expect(report.sources[0]).toMatchObject({key:'id-1',name,amount:70,closingCount:2});
+      expect(report.sources[1]).toMatchObject({key:'deleted',name:'Historical source',amount:5});
+      expect(report.allocatedTotal).toBe(75);
+      expect(report.difference).toBe(5);
+    }
+    expect(JSON.stringify(sales)).toBe(before);
+  });
+
+  it('does not guess renamed sources by label or an ambiguous legacy key', () => {
+    const report = buildOwnerOrderSourceAnalytics({
+      sales:[{closing_state:'finalized',sales_sources_json:[
+        {source_id:'missing',source_key:'cash',name_en:'Saved name',amount:12},
+        {source_key:'cash',name_en:'Legacy cash',amount:5},
+      ]}],
+      sourceLabels:[{id:'one',system_key:'cash',name_en:'Cash one'},{id:'two',system_key:'cash',name_en:'Cash two'}],
+    });
+    expect(report.sources.map(x=>x.name)).toEqual(['Saved name','Legacy cash']);
+  });
+
   it('wires the source card into the owner dashboard and preserves a separate payment mix', async () => {
     const [owner, executive, card] = await Promise.all([
       readFile(new URL('../src/pages/OwnerDashboard.jsx', import.meta.url), 'utf8'),
@@ -71,6 +102,10 @@ describe('Owner order/sales source breakdown', () => {
     ]);
     expect(owner).toContain('periodSales, revenueSources, lang,');
     expect(executive).toContain('<OwnerOrderSourcesAnalytics');
+    expect(executive).toContain('sales:periodSales,revenueSources,sourceLabels');
+    expect(owner).toContain("queryKey: ['owner-source-labels', activeRestaurant?.id, labelBranchIds]");
+    expect(owner).toContain("supabase.rpc('erp_sales_closing_branch_sources'");
+    expect(owner).toContain('p_include_inactive: true');
     expect(executive).toContain('snapshot-payment-mix');
     expect(card).toContain('snapshot-order-sources-analytics');
     expect(card).toContain("navigate('/sales-sources')");
