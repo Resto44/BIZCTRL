@@ -60,7 +60,7 @@ describe('Persistent canonical closing total', () => {
   });
 
   it('uses the same canonical total outside step content and inside both modal surfaces without moving posting actions', () => {
-    const source = readFileSync(new URL('../src/components/sales/UnifiedSalesClosing.jsx', import.meta.url),'utf8');
+    const source = readFileSync('src/components/sales/UnifiedSalesClosing.jsx','utf8');
     expect(source).toContain('const totalSales = sumClosingMoney(cashSales, networkTotal, creditTotal, otherPaymentTotal);');
     const sticky = '<StickyClosingTotal active={workspaceTabActive} totalSales={totalSales} currency={currency} lang={lang} />';
     expect(source).toContain(sticky);
