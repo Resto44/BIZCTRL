@@ -387,7 +387,8 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
   const finalConfirmation = useRef(false);
   const stepCopy = closingStepCopy[lang] || closingStepCopy.en;
   const [showBlockers, setShowBlockers] = useState(false);
-  const [showNetworkDetail, setShowNetworkDetail] = useState(false);
+  const ux = (en, ar, fa) => lang === 'fa' ? fa : lang === 'ar' ? ar : en;
+
   const [showFinalizeReview, setShowFinalizeReview] = useState(false);
   const formRef = useRef(null);
   const submissionInFlight = useRef(false);
@@ -1974,11 +1975,15 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           <div hidden={closingStep !== 0} data-testid="closing-step-sales">
           <section data-testid="closing-sales-entry-mode" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label={closingTr("Daily sales")}>
             <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-3 sm:px-5">
-              <div><h2 className="text-sm font-black text-slate-950">{lang === 'fa' ? 'فروش امروز' : lang === 'ar' ? 'مبيعات اليوم' : closingTr('Today sales')}</h2><p className="mt-0.5 text-[11px] text-slate-500">{lang === 'fa' ? 'فقط همین تاریخ و شیفت' : lang === 'ar' ? 'لهذا التاريخ والوردية فقط' : closingTr('This date and shift only')}</p></div>
+              <div><h2 className="text-sm font-black text-slate-950">{ux('Session sales','مبيعات الجلسة','فروش همین نوبت')}</h2><p className="mt-0.5 text-[11px] text-slate-500">{lang === 'fa' ? 'فقط همین تاریخ و شیفت' : lang === 'ar' ? 'لهذا التاريخ والوردية فقط' : closingTr('This date and shift only')}</p></div>
               <div className="text-right"><p className="text-[10px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش' : lang === 'ar' ? 'الإجمالي' : closingTr('Total sales')}</p><Money currency={currency} value={totalSales} className="text-xl font-black text-blue-700" /></div>
             </div>
             <div className="space-y-3 p-3.5 sm:p-5">
-              <details className="rounded-lg border border-slate-100 p-2"><summary className="min-h-10 cursor-pointer text-xs text-slate-500">{lang === 'fa' ? 'روش ثبت فروش' : lang === 'ar' ? 'طريقة إدخال المبيعات' : closingTr('Sales entry options')}</summary><div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
+                <strong className="block text-slate-900">{ux('Manual / offline entry','إدخال يدوي / أوفلاين','ثبت دستی / آفلاین')}</strong>
+                <span>{ux('Enter only sales for this session.','أدخل مبيعات هذه الجلسة فقط.','فقط فروش همین نوبت را وارد کنید.')}</span>
+              </div>
+              {automaticTotalsEnabled && <>              <details className="rounded-lg border border-slate-100 p-2"><summary className="min-h-10 cursor-pointer text-xs text-slate-500">{lang === 'fa' ? 'روش ثبت فروش' : lang === 'ar' ? 'طريقة إدخال المبيعات' : closingTr('Sales entry options')}</summary><div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[11px] font-bold text-slate-500">{lang === 'fa' ? 'روش ثبت' : lang === 'ar' ? 'طريقة الإدخال' : closingTr('Entry mode')}</span>
                 <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1" role="group" aria-label={closingTr("Sales entry mode")}>
                   <button type="button" data-testid="sales-entry-manual" aria-pressed={salesEntryMode === 'manual'} className="min-h-9 rounded-md bg-white px-3 text-xs font-black text-blue-700 shadow-sm" onClick={() => setSalesEntryMode('manual')}>{lang === 'fa' ? 'دستی / آفلاین' : lang === 'ar' ? 'يدوي / أوفلاين' : closingTr('Manual / Offline')}</button>
@@ -1986,17 +1991,26 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 </div>
               </div>
               </details>
-              <div data-testid="offline-sales-audit" className="grid min-w-0 grid-cols-1 items-end gap-2.5 min-[360px]:grid-cols-2">
-                <div className="flex min-w-0 flex-col justify-end">
-                  <Label htmlFor="quick-closing-cashSales" className="mb-1.5 block min-h-10 text-xs font-bold text-slate-700">{lang === 'fa' ? 'فروش نقدی قبل از پرداخت‌ها' : lang === 'ar' ? 'مبيعات نقدية قبل المدفوعات' : closingTr('Cash sales before payments')}</Label>
-                  <ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} disabled={useAutomaticSales || isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" />
-                </div>
-                <div className="flex min-w-0 flex-col justify-end">
-                  <Label htmlFor={`quick-closing-network-${posEntries[0]?.id || 'empty'}`} className="mb-1.5 block min-h-10 text-xs font-bold text-slate-700">{lang === 'fa' ? 'شبکه / کارت' : lang === 'ar' ? 'شبكة / بطاقة' : closingTr('Network / Card')}</Label>
-                  {posEntries[0] && <ClosingNumericInput id={`quick-closing-network-${posEntries[0].id}`} value={posEntries[0].amount ?? ''} onChange={value => updatePos(posEntries[0].id, 'amount', value)} prefix={currency} disabled={isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" />}
-                </div>
-              </div>
-              {posEntries[0] && <div data-testid="closing-primary-network-selector" className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-2.5">{networkSelector(posEntries[0])}</div>}
+</>}
+              <div data-testid="offline-sales-audit" className="space-y-3">
+                <section data-testid="closing-cash-sales-card" className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3">
+                  <div className="mb-3 flex items-center gap-2"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700"><Banknote className="h-5 w-5" /></span><div className="min-w-0"><Label htmlFor="quick-closing-cashSales" className="block text-sm font-black text-slate-900">{ux('Cash sales','المبيعات النقدية','فروش نقدی')}</Label><p className="text-xs leading-4 text-slate-600">{ux('Before payments; not the drawer balance.','قبل المدفوعات؛ وليس رصيد الصندوق.','قبل از پرداخت‌ها؛ نه مانده صندوق.')}</p></div></div>
+                  <ClosingNumericInput id="quick-closing-cashSales" value={cashSalesInput} onChange={updateCashSales} prefix={currency} disabled={useAutomaticSales || isSubmitting} inputClassName="h-12 min-w-0 border-emerald-200 bg-white text-base font-black" />
+                </section>
+                <section id="quick-closing-pos" data-testid="closing-network-sales-card" className="min-w-0 space-y-3 rounded-2xl border border-blue-200 bg-blue-50/40 p-3">
+                  <div className="flex items-center gap-2"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-100 text-blue-700"><CreditCard className="h-5 w-5" /></span><div className="min-w-0"><h3 className="text-sm font-black text-slate-900">{ux('Network / card sales','مبيعات الشبكة والبطاقة','فروش شبکه و کارت')}</h3><p className="text-xs leading-4 text-slate-600">{ux('Choose an account, then enter its amount.','اختر الحساب ثم أدخل المبلغ.','ابتدا حساب و سپس مبلغ همان حساب را وارد کنید.')}</p></div></div>
+                  {posLoading && <p role="status" className="text-xs text-slate-600">{ux('Loading network accounts…','جارٍ تحميل الحسابات…','در حال بارگذاری حساب‌ها…')}</p>}
+                  <div data-testid="closing-extra-network" className="space-y-2.5">
+                    {posEntries.map((entry,index) => <div key={entry.id} className="min-w-0 space-y-2 rounded-xl border border-blue-100 bg-white p-3">
+                      <div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-blue-700" dir="ltr">#{index + 1}</span>{index > 0 && <Button type="button" size="icon" variant="ghost" className="h-10 w-10 text-red-700" onClick={() => removePos(entry.id)} disabled={isSubmitting} aria-label={closingTr("Remove network total")}><Trash2 className="h-4 w-4" /></Button>}</div>
+                      <div data-testid={index === 0 ? 'closing-primary-network-selector' : 'closing-network-selector'}>{networkSelector(entry)}</div>
+                      <Label htmlFor={`quick-closing-network-${entry.id}`} className="block text-xs font-bold text-slate-700">{ux('Card amount','مبلغ البطاقة','مبلغ کارت')}</Label>
+                      <ClosingNumericInput id={`quick-closing-network-${entry.id}`} value={entry.amount ?? ''} onChange={value => updatePos(entry.id, 'amount', value)} prefix={currency} disabled={isSubmitting} inputClassName="h-12 min-w-0 border-slate-200 bg-white text-base font-black" />
+                    </div>)}
+                  </div>
+                  <Button type="button" data-testid="closing-add-network-toggle" variant="outline" className="min-h-12 w-full justify-center rounded-xl border-blue-200 bg-white text-sm font-bold text-blue-700" onClick={addPos} disabled={!canAddNetworkRow}><PlusCircle className="me-1.5 h-4 w-4" />{ux('Add network account','إضافة حساب شبكة','افزودن حساب شبکه')}</Button>
+                  {!canAddNetworkRow && !posLoading && !posUnavailable && !isSubmitting && <p className="text-xs leading-4 text-slate-600">{ux('Select an account in the previous row; an unused account is needed to add another.','اختر حساب الصف السابق؛ يلزم حساب متاح لإضافة صف آخر.','حساب ردیف قبلی را انتخاب کنید؛ برای افزودن ردیف، حساب آزاد لازم است.')}</p>}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-blue-100 pt-2"><span className="text-xs font-semibold text-slate-600">{ux('Entered card total','إجمالي البطاقات المدخلة','مجموع کارت‌های واردشده')}</span><Money currency={currency} value={manualNetworkTotal} className="text-base font-black text-blue-700" /></div>
               {!posLoading && !posUnavailable && selectedBranchId && posDevices.length === 0 && (
                 <div data-testid="closing-network-empty-state" role="status" className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
                   <p>{lang === 'fa' ? 'برای این شعبه حساب شبکه فعال پیدا نشد. از مدیریت شبکه حساب را در شعبه درست ایجاد یا فعال کنید؛ سپس فهرست را تازه کنید.' : lang === 'ar' ? 'لا يوجد حساب شبكة نشط لهذا الفرع. أضف الحساب أو فعّله في إدارة الشبكات، ثم حدّث القائمة.' : 'No active network account for this branch. Add or activate one in Network Management, then refresh this list.'}</p>
@@ -2009,22 +2023,19 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
               {posUnavailable && <p role="alert" className="text-sm text-red-700">{lang === 'fa' ? 'حساب‌های شبکه بارگذاری نشد.' : lang === 'ar' ? 'تعذر تحميل حسابات الشبكة.' : closingTr('Network accounts could not load.')}<Button type="button" variant="outline" onClick={() => reloadNetworks()}>↻</Button></p>}
               {duplicateNetworkAccount && <p data-testid="closing-duplicate-network-warning" role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs font-bold text-amber-900">{networkDuplicateMessage}</p>}
               {inlineErrors.pos && <p role="alert" className="text-sm text-red-700">{closingTr(inlineErrors.pos)}</p>}
-              {(posEntries.length > 1 || showNetworkDetail) && <div data-testid="closing-extra-network" className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
-                {posEntries.slice(1).map(entry => <div key={entry.id} className="grid min-w-0 grid-cols-[1fr_auto] items-end gap-2">
-                  <div className="col-span-2 min-w-0">{networkSelector(entry)}</div>
-                  <span className="min-w-0 flex-1"><ClosingNumericInput id={`quick-closing-network-${entry.id}`} value={entry.amount ?? ''} onChange={value => updatePos(entry.id, 'amount', value)} prefix={currency} disabled={isSubmitting} inputClassName="h-11 bg-white" /></span>
-                  <Button type="button" size="icon" variant="ghost" onClick={() => removePos(entry.id)} disabled={isSubmitting} aria-label={closingTr("Remove network total")}><Trash2 className="h-4 w-4" /></Button>
-                </div>)}
-                <Button type="button" variant="outline" size="sm" className="min-h-10 bg-white" onClick={addPos} disabled={!canAddNetworkRow} title={!canAddNetworkRow ? (lang === 'fa' ? 'برای افزودن ردیف، ابتدا حساب آزاد داشته باشید و ردیف خالی را تکمیل کنید.' : lang === 'ar' ? 'اختر حساباً متاحاً وأكمل الصف الفارغ أولاً.' : 'Select an available account and complete the empty row first.') : undefined}><PlusCircle className="mr-1.5 h-4 w-4" />{lang === 'fa' ? 'ترمینال دیگر' : lang === 'ar' ? 'إضافة جهاز' : closingTr('Add network total')}</Button>
-              </div>}
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => {setShowFullDetails(true);}} className="flex min-h-12 min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label={closingTr("Edit customer credit sales")}><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'فروش قرضه' : lang === 'ar' ? 'البيع الآجل' : closingTr('Credit sales')}</span><Money currency={currency} value={creditTotal} className="text-sm font-black text-violet-700" /></button>
-                <button type="button" onClick={() => setShowFullDetails(true)} className="flex min-h-12 min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left" aria-label={closingTr("Edit additional sales sources")}><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'منابع دیگر' : lang === 'ar' ? 'مصادر أخرى' : closingTr('Other sources')}</span><Money currency={currency} value={Math.max(0, totalSales - cashSales - networkTotal - creditTotal)} className="text-sm font-black text-slate-900" /></button>
+                </section>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <span className="text-[11px] text-slate-500">{lang === 'fa' ? 'POS اختیاری؛ فروش تکراری ثبت نکنید' : lang === 'ar' ? 'POS اختياري؛ تجنّب تكرار البيع' : closingTr('POS optional · Do not duplicate posted sales')}</span>
-                <button type="button" className="min-h-9 text-[11px] font-bold text-blue-700 underline" onClick={() => setShowNetworkDetail(v => !v)} aria-expanded={showNetworkDetail} data-testid="closing-add-network-toggle">{showNetworkDetail ? (lang === 'fa' ? 'بستن' : lang === 'ar' ? 'إخفاء' : closingTr('Hide')) : (lang === 'fa' ? 'شبکه بیشتر' : lang === 'ar' ? 'شبكة إضافية' : closingTr('More network'))}</button>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button type="button" onClick={() => {setShowFullDetails(true);}} className="flex min-h-14 min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-start" aria-label={closingTr("Edit customer credit sales")}><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'فروش قرضه' : lang === 'ar' ? 'البيع الآجل' : closingTr('Credit sales')}</span><Money currency={currency} value={creditTotal} className="text-sm font-black text-violet-700" /></button>
+                <button type="button" onClick={() => setShowFullDetails(true)} className="flex min-h-14 min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-start" aria-label={closingTr("Edit additional sales sources")}><span className="text-xs font-semibold text-slate-600">{lang === 'fa' ? 'منابع دیگر' : lang === 'ar' ? 'مصادر أخرى' : closingTr('Other sources')}</span><Money currency={currency} value={Math.max(0, totalSales - cashSales - networkTotal - creditTotal)} className="text-sm font-black text-slate-900" /></button>
               </div>
+
+              <section data-testid="closing-cash-payments-link" className="min-w-0 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold text-slate-900">{ux('Recorded cash payments','المدفوعات النقدية المسجلة','پرداخت‌های نقدی ثبت‌شده')}</h3>{cashContextReady && !cashLedgerLoading && !cashLedgerUnavailable ? <Money currency={currency} value={reconciliation.cashOut} className="text-base font-black text-amber-900" /> : <span className="text-xs text-slate-500">—</span>}</div>
+                <p className="mt-1 text-xs leading-4 text-slate-600">{ux('Not deducted from sales. Review in the cash count step.','لا تخصم من المبيعات؛ راجعها في خطوة الصندوق.','از مبلغ فروش کم نمی‌شود؛ در مرحله صندوق بررسی کنید.')}</p>
+                <Button type="button" variant="outline" className="mt-2 min-h-11 w-full bg-white text-xs font-bold" disabled={isSubmitting} onClick={() => goToClosingStep(1)}>{ux('Review cash & payments','مراجعة الصندوق والمدفوعات','بررسی صندوق و پرداخت‌ها')}<ChevronRight className="ms-1 h-4 w-4 rtl:rotate-180" /></Button>
+              </section>
+              <p className="text-[11px] text-slate-500">{closingTr('POS optional · Do not duplicate posted sales')}</p>
               {(manualCashSales > 0 || initial?.sales_notes) && <details className="rounded-lg border border-slate-100 p-2.5"><summary className="cursor-pointer text-[11px] font-bold text-slate-600">{lang === 'fa' ? 'یادداشت فروش (اختیاری)' : lang === 'ar' ? 'ملاحظات البيع (اختياري)' : closingTr('Sale note / reference (optional)')}</summary><Textarea id="offline-sales-reference" value={form.sales_notes || ''} onChange={e => set('sales_notes', e.target.value)} className="mt-2 min-h-14 bg-white" disabled={isSubmitting} /></details>}
             </div>
           </section>
