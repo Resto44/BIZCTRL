@@ -2185,7 +2185,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
           </div>
           <Sheet open={Boolean(workspaceTabActive && showFullDetails)} onOpenChange={isOpen => {if (workspaceTabActive) setShowFullDetails(isOpen);}}>
-            <SheetContent side="bottom" className="z-[70] flex h-[min(94dvh,960px)] max-h-[94dvh] w-full flex-col gap-0 overflow-hidden rounded-t-2xl border-slate-200 bg-slate-50 px-0 pb-0 pt-4 sm:mx-auto sm:max-w-4xl" data-testid="closing-advanced-sheet" onOpenAutoFocus={event => {
+            <SheetContent side="bottom" className="z-50 flex h-[min(94dvh,960px)] max-h-[94dvh] w-full flex-col gap-0 overflow-hidden rounded-t-2xl border-slate-200 bg-slate-50 px-0 pb-0 pt-4 sm:mx-auto sm:max-w-4xl" data-testid="closing-advanced-sheet" onOpenAutoFocus={event => {
                 event.preventDefault();
                 requestAnimationFrame(() => { scrollToDetails(detailAnchor.current); detailScrollRef.current?.focus({preventScroll:true}); });
               }}>
