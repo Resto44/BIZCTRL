@@ -197,9 +197,9 @@ function OwnerDashboardContent() {
     },
   });
   const sourceLabels = useMemo(() => [...new Map([
-    ...scopedSourceLabels,
+    ...(scopedSourceLabels || revenueSources || []),
     ...(isAllBranches && role === 'owner' ? branchLabelsQuery.data || [] : []),
-  ].filter(s=>s?.id).map(s=>[String(s.id),s])).values()], [scopedSourceLabels, isAllBranches, role, branchLabelsQuery.data]);
+  ].filter(s=>s?.id).map(s=>[String(s.id),s])).values()], [scopedSourceLabels, revenueSources, isAllBranches, role, branchLabelsQuery.data]);
   const sourceLabelsUnavailable = Boolean(sourceLabelError || sourceLabelLoading ||
     (isAllBranches && role === 'owner' && (branchLabelsQuery.isError || branchLabelsQuery.isLoading)));
 
