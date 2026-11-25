@@ -235,7 +235,9 @@ describe('Unified Sales Closing workflow contract', () => {
     expect(workspace).toContain('Fixed and variable expenses are supplied only by the canonical server cash');
     expect(workspace).not.toContain(".from('expenses')");
     expect(workspace).toContain("nextErrors.actualCash = 'Enter the physically counted Actual Cash (0 or positive, up to two decimal places).'");
-    expect(workspace).toContain('focusField(firstError)');
+    expect(workspace).toContain("focusField(firstError === 'reconciliation' ? 'actualCash' : firstError)");
+    expect(workspace).toContain("firstError === 'pos' ? 'quick-closing-pos' : 'offline-sales-reference'");
+    expect(workspace).toContain("openDetails(firstError === 'credit' ? 'credit' : firstError === 'driverSources' ? 'sources' : firstError.startsWith('custom_') ? 'fields' : 'context')");
     expect(workspace).toContain('Closing already completed for this branch and shift.');
     expect(sales).toContain("import { closingSaveErrorMessage, recordClosingOwnerPayment, saveClosingSession } from '@/lib/closing/ClosingRepository';");
     expect(sales).toContain('const saved = await saveClosingSession({ payload, closingId: editing?.id || null });');
