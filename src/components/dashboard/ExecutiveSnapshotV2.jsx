@@ -84,14 +84,14 @@ export default function ExecutiveSnapshotV2({model,copy}) {
   const {
     periodMetrics={},previousPeriodMetrics={},revenueTrend=[],periodKey='today',
     periodLabel,formatMoney,hasQueryError,accountingProvisional,drawerCash,receivables,payables,scopedAlerts=[],
-    periodSales=[],revenueSources=[],lang='en', previousRevenueTrend=[], reportPeriod, changeReportPeriod,
+    periodSales=[],revenueSources=[],sourceLabels=revenueSources,sourceLabelsUnavailable=false,lang='en', previousRevenueTrend=[], reportPeriod, changeReportPeriod,
   }=model;
   const presentation=useMemo(()=>buildExecutiveSnapshotPresentation({
     periodMetrics,previousPeriodMetrics,revenueTrend,periodKey,
   }),[periodMetrics,previousPeriodMetrics,revenueTrend,periodKey]);
   const sourceBreakdown=useMemo(()=>buildOwnerOrderSourceAnalytics({
-    sales:periodSales,revenueSources,verifiedSales:presentation.sales,lang,
-  }),[periodSales,revenueSources,presentation.sales,lang]);
+    sales:periodSales,revenueSources,sourceLabels,verifiedSales:presentation.sales,lang,
+  }),[periodSales,revenueSources,sourceLabels,presentation.sales,lang]);
   const prev=previousPeriodMetrics;
   const methods=presentation.methods;
   const gradient=methods.reduce((acc,method)=>{
@@ -290,7 +290,7 @@ export default function ExecutiveSnapshotV2({model,copy}) {
 
     <OwnerOrderSourcesAnalytics
       sales={periodSales} revenueSources={revenueSources} verifiedSales={presentation.sales}
-      formatMoney={formatMoney} lang={lang} periodLabel={periodLabel} hasQueryError={hasQueryError} report={sourceBreakdown}
+      formatMoney={formatMoney} lang={lang} periodLabel={periodLabel} hasQueryError={hasQueryError} sourceLabelsUnavailable={sourceLabelsUnavailable} report={sourceBreakdown}
     />
 
     <section data-testid="snapshot-related-financials" className="min-w-0 rounded-[1.55rem] border border-border/80 bg-card p-3.5 shadow-sm sm:p-5">
