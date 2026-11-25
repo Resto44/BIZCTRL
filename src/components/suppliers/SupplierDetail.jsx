@@ -1,4 +1,4 @@
-import React,{useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {supabase} from '@/api/supabaseClient';
 import {useTenant} from '@/lib/TenantContext';
@@ -27,6 +27,9 @@ export default function SupplierDetail({supplier,onBack}) {
  const {activeRestaurantId,activeRestaurant,isBranchScoped,isManager,managerBranchObject}=useTenant();
  const restaurantId=activeRestaurantId||activeRestaurant?.id;const restricted=isBranchScoped||isManager;const branch=restricted?managerBranchObject:null;
  const {can}=useRole();const qc=useQueryClient();const [action,setAction]=useState(null);
+ const actionRef=useRef(null);const historyRef=useRef(null);const ordersRef=useRef(null);const pdfRef=useRef(null);
+ useEffect(()=>{if(action)actionRef.current?.scrollIntoView({block:'start',behavior:'auto'});},[action]);
+ const jump=ref=>ref.current?.scrollIntoView({block:'start',behavior:'auto'});
  const financial=useQuery({queryKey:['supplier-ledger',restaurantId,restricted,branch?.id,branch?.key],queryFn:()=>fetchSupplierLedger(supabase,{restaurantId,branch}),enabled:Boolean(restaurantId&&(!restricted||branch?.id))});
  const orders=useQuery({queryKey:['supplier-workspace-orders',restaurantId,supplier.id,branch?.id],queryFn:()=>readAllPortalRows(()=>{let q=supabase.from('purchase_orders').select('*').eq('restaurant_id',restaurantId).eq('supplier_id',supplier.id).order('id');if(branch)q=q.eq('branch_id',branch.id);return q;}),enabled:Boolean(restaurantId&&(!restricted||branch?.id))});
  const invoices=(financial.data?.invoices||[]).filter(i=>i.supplier_id===supplier.id);
@@ -40,12 +43,17 @@ export default function SupplierDetail({supplier,onBack}) {
   <header className="flex flex-wrap items-center gap-3"><Button variant="ghost" onClick={onBack}>{t.back}</Button><h2 className="text-xl font-bold">{supplier.name}</h2></header>
   <Card className="flex flex-wrap gap-4 p-3 text-sm">{supplier.phone&&<a href={`tel:${supplier.phone}`} dir="ltr">{supplier.phone}</a>}{supplier.email&&<a href={`mailto:${supplier.email}`}>{supplier.email}</a>}</Card>
   <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">{can.createPurchases&&<><Button onClick={()=>setAction({type:'invoice'})}>{t.invoice}</Button><Button variant="outline" onClick={()=>setAction({type:'choose-payment'})}>{t.payment}</Button></>}{can.updatePurchaseOrders&&<Button variant="outline" onClick={()=>setAction({type:'order'})}>{t.order}</Button>}</div>
-  {action&&<div className="rounded-xl border-2 border-primary/30 p-3">
+  <nav className="grid grid-cols-3 gap-2" aria-label={t.account}>
+   <Button type="button" variant="outline" className="min-h-11 whitespace-normal text-xs" onClick={()=>jump(historyRef)}>{lang==='fa'?'تاریخچه حساب':lang==='ar'?'سجل الحساب':'Account history'}</Button>
+   <Button type="button" variant="outline" className="min-h-11 whitespace-normal text-xs" onClick={()=>{if(ordersRef.current)ordersRef.current.open=true;jump(ordersRef);}}>{t.orders}</Button>
+   <Button type="button" variant="outline" className="min-h-11 whitespace-normal text-xs" onClick={()=>{if(pdfRef.current)pdfRef.current.open=true;jump(pdfRef);}}>{t.pdf}</Button>
+  </nav>
+  {action&&<div ref={actionRef} className="scroll-mt-16 rounded-xl border-2 border-primary/30 p-3">
    {action.type==='invoice'&&<PurchaseInvoiceForm key={action.invoice?.id||'new'} supplier={supplier} invoice={action.invoice} onSuccess={refresh} onCancel={()=>setAction(null)}/>}
    {action.type==='order'&&<PurchaseOrderForm key={action.order?.id||'new'} supplier={supplier} order={action.order} onSaved={refresh} onClose={()=>setAction(null)}/>}
    {action.type==='payment'&&<SupplierWorkspacePayment key={action.invoice.id} invoice={action.invoice} onSaved={refresh} onClose={()=>setAction(null)}/>}
    {action.type==='choose-payment'&&<div className="space-y-2"><h3>{t.choose}</h3>{invoices.filter(i=>Number(i.total_amount)>Number(i.paid_amount||0)&&!['draft','cancelled','rejected'].includes(i.status)).map(i=><Button key={i.id} variant="outline" className="me-2" onClick={()=>setAction({type:'payment',invoice:i})}>{i.invoice_number || i.id.slice(0,8)} · {i.currency} {Number(i.total_amount)-Number(i.paid_amount||0)}</Button>)}<Button variant="ghost" onClick={()=>setAction(null)}>{t.close}</Button></div>}
-   {action.type==='view'&&<div className="space-y-2"><h3 className="font-bold">{t.details}: {action.invoice.invoice_number}</h3><p className="text-xs">{t.review}</p><p>{action.invoice.date} · {action.invoice.currency} {action.invoice.total_amount} · {action.invoice.status}</p><p className="whitespace-pre-wrap">{action.invoice.notes}</p>{supplierOrderItems(action.invoice.items).map((item,i)=><p key={i} className="text-sm">{item.product_name || item.name} · {item.qty || item.quantity} × {item.unit_price || item.price}</p>)}{(financial.data?.payments||[]).filter(p=>p.invoice_id===action.invoice.id).map(p=><p key={p.id} className="text-sm">{p.date} · {p.amount} · {p.payment_method} · {p.notes}</p>)}{can.createPurchases&&action.invoice.status==='draft'&&<Button onClick={()=>setAction({type:'invoice',invoice:action.invoice})}>{t.edit}</Button>}<Button variant="outline" onClick={()=>setAction(null)}>{t.close}</Button></div>}
+   {action.type==='view'&&<div className="space-y-2"><h3 className="font-bold">{t.details}: {action.invoice.invoice_number}</h3><p className="text-xs">{t.review}</p><p>{action.invoice.date} · {action.invoice.currency} {action.invoice.total_amount} · {action.invoice.status}</p><p className="whitespace-pre-wrap">{action.invoice.notes}</p>{supplierOrderItems(action.invoice.items).map((item,i)=><p key={i} className="text-sm">{item.product_name || item.name} · {item.qty || item.quantity} × {item.unit_price || item.price}</p>)}{(financial.data?.payments||[]).filter(p=>p.invoice_id===action.invoice.id&&(!p.supplier_id||p.supplier_id===supplier.id)).map(p=><p key={p.id} className="text-sm">{p.date} · {p.amount} · {p.payment_method} · {p.notes}</p>)}{can.createPurchases&&action.invoice.status==='draft'&&<Button onClick={()=>setAction({type:'invoice',invoice:action.invoice})}>{t.edit}</Button>}<Button variant="outline" onClick={()=>setAction(null)}>{t.close}</Button></div>}
   </div>}
   <section data-testid="supplier-open-invoices" className="space-y-2 rounded-xl border p-3">
     <h3 className="font-bold">{lang==='fa'?'فاکتورهای باقی‌مانده':lang==='ar'?'الفواتير غير المسددة':'Outstanding invoices'} ({openInvoices.length})</h3>
@@ -62,10 +70,10 @@ export default function SupplierDetail({supplier,onBack}) {
         onClick={()=>setAction({type:'payment',invoice})}>{t.payment}</Button>}
     </div>)}
   </section>
-  <SupplierLedger supplier={supplier} onPayInvoice={can.createPurchases?invoice=>{if(canPaySupplierInvoice(invoice))setAction({type:'payment',invoice});}:undefined} onOpenInvoice={invoice=>setAction({type:'view',invoice})}/>
-  <details className="rounded-xl border p-3"><summary className="cursor-pointer font-semibold">{t.orders} ({orders.data?.length||0})</summary><div className="mt-3 space-y-2">{(orders.data||[]).map(order=><Card className="p-3" key={order.id}><p>{order.order_number} · {order.created_date?.slice(0,10)} · {order.status}</p>{supplierOrderItems(order.items).map((item,i)=><p key={i} className="text-xs">{item.product_name} · {item.qty} × {item.unit_price}</p>)}{can.updatePurchaseOrders&&order.status==='draft'&&<Button size="sm" variant="outline" onClick={()=>setAction({type:'order',order})}>{t.edit}</Button>}</Card>)}</div></details>
+  <section ref={historyRef} className="scroll-mt-16"><SupplierLedger supplier={supplier} onPayInvoice={can.createPurchases?invoice=>{if(canPaySupplierInvoice(invoice))setAction({type:'payment',invoice});}:undefined} onOpenInvoice={invoice=>setAction({type:'view',invoice})}/></section>
+  <details ref={ordersRef} className="scroll-mt-16 rounded-xl border p-3"><summary className="cursor-pointer font-semibold">{t.orders} ({orders.data?.length||0})</summary><div className="mt-3 space-y-2">{(orders.data||[]).map(order=><Card className="p-3" key={order.id}><p>{order.order_number} · {order.created_date?.slice(0,10)} · {order.status}</p>{supplierOrderItems(order.items).map((item,i)=><p key={i} className="text-xs">{item.product_name} · {item.qty} × {item.unit_price}</p>)}{can.updatePurchaseOrders&&order.status==='draft'&&<Button size="sm" variant="outline" onClick={()=>setAction({type:'order',order})}>{t.edit}</Button>}</Card>)}</div></details>
   <details className="rounded-xl border p-3"><summary className="cursor-pointer font-semibold">{t.contract}</summary><SupplierContractTab key={currentSupplier.updated_date} supplier={currentSupplier} readOnly={!can.manageSuppliers}/></details>
   <details className="rounded-xl border p-3"><summary className="cursor-pointer font-semibold">{t.prices}</summary>{invoices.flatMap(inv=>supplierOrderItems(inv.items).map((item,i)=><p key={`${inv.id}-${i}`} className="py-2 text-sm">{inv.date} · {inv.invoice_number} · {item.product_name} · {inv.currency} {item.unit_price || item.price || 0}</p>))}</details>
-  <details className="rounded-xl border p-3"><summary className="cursor-pointer font-semibold">{t.pdf}</summary><SupplierStatement supplier={supplier}/></details>
+  <details ref={pdfRef} className="scroll-mt-16 rounded-xl border p-3"><summary className="cursor-pointer font-semibold">{t.pdf}</summary><SupplierStatement supplier={supplier}/></details>
  </div>;
 }

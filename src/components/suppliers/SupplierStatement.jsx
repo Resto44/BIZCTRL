@@ -43,6 +43,10 @@ export default function SupplierStatement({ supplier }) {
   const group = ledger.groups.find(g=>g.currency===selectedCurrency) || ledger.groups.find(g=>g.currency===currency) || ledger.groups[0];
   const statementCurrency = group?.currency || currency;
   const invoices = (group?.invoices || []).map(row=>({...row,amount:row.total_amount,paid_amount:row.ledgerPaid,status:row.ledgerRemaining<=0?'paid':row.ledgerPaid>0?'partial':'unpaid'}));
+  const history = group?.rows || [];
+  const historyCopy = lang==='fa' ? {title:'گردش حساب',invoice:'فاکتور',payment:'پرداخت',reference:'مرجع',balance:'مانده',debit:'بدهکار',credit:'بستانکار'} : lang==='ar' ? {title:'حركة الحساب',invoice:'فاتورة',payment:'دفعة',reference:'المرجع',balance:'الرصيد',debit:'مدين',credit:'دائن'} : {title:'Transaction history',invoice:'Invoice',payment:'Payment',reference:'Reference',balance:'Balance',debit:'Debit',credit:'Credit'};
+  const invoiceNumbers = new Map(invoices.map(row=>[row.id,row.invoice_number]));
+  const historyRef = row => row.ref.invoice_number || invoiceNumbers.get(row.ref.invoice_id) || row.ref.invoice_id || row.ref.id;
   const totalInvoiced = group?.invoiced || 0;
   const totalPaid = group?.paid || 0;
   const totalOutstanding = group?.closing || 0;
@@ -118,6 +122,27 @@ export default function SupplierStatement({ supplier }) {
         y += 8;
       });
 
+      if (history.length) {
+        doc.addPage(); y = 20;
+        const historyWidths = [23,25,47,28,28,29];
+        const historyHeaders = [t('date'),loc('Type'),historyCopy.reference,historyCopy.debit,historyCopy.credit,historyCopy.balance];
+        const historyHeader = () => {
+          draw(historyCopy.title, mainX, y, {bold:true,size:12}); y += 5;
+          doc.setFillColor(51,65,85); doc.rect(pageLeft,y,180,8,'F');
+          let x=rtl?pageRight:pageLeft;
+          historyHeaders.forEach((value,i)=>{const w=historyWidths[i];if(rtl)x-=w;draw(value,rtl?x+w-2:x+2,y+5.5,{bold:true,size:8,color:[255,255,255],align:rtl?'right':'left',maxWidth:w-3});if(!rtl)x+=w;});
+          y+=10;
+        };
+        historyHeader();
+        history.forEach((row,index)=>{
+          if(y>260){doc.addPage();y=20;historyHeader();}
+          doc.setFillColor(...(index%2?[248,250,252]:[255,255,255]));doc.rect(pageLeft,y-1,180,8,'F');
+          const values=[row.date,row.type==='invoice'?historyCopy.invoice:historyCopy.payment,historyRef(row),number(row.debit),number(row.credit),number(row.balance)];
+          let x=rtl?pageRight:pageLeft;
+          values.forEach((value,i)=>{const w=historyWidths[i];if(rtl)x-=w;draw(value,rtl?x+w-2:x+2,y+5,{size:7.5,align:rtl?'right':'left',maxWidth:w-3,...(i>=3?{rtl:false}:{})});if(!rtl)x+=w;});y+=8;
+        });
+      }
+      if(y>260){doc.addPage();y=20;}
       y += 8;
       draw(loc('This is a computer-generated statement. Please contact us for any discrepancies.'), pageW / 2, y, { size: 8, color: [100, 116, 139], align: 'center' });
       const count=doc.getNumberOfPages();
@@ -147,11 +172,15 @@ export default function SupplierStatement({ supplier }) {
 
       {overdueInvoices.length > 0 && <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-red-500 shrink-0" /><p className="text-xs text-red-700 font-medium">{translateLiteral('{{count}} overdue invoice(s)', { count: overdueInvoices.length })}</p></div>}
 
-      <Button className="w-full gap-2" onClick={generatePDF} disabled={generating || invoices.length === 0 || ledger.issues.length > 0}>
+      <Button className="w-full gap-2" onClick={generatePDF} disabled={generating || history.length === 0 || ledger.issues.length > 0}>
         {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
         {generating ? translateLiteral('Generating PDF...') : translateLiteral('Generate Statement PDF')}
       </Button>
 
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold">{historyCopy.title} ({history.length})</h3>
+        {history.map(row=><div key={row.id} className="rounded-lg border p-2 text-xs"><div className="flex flex-wrap justify-between gap-2"><strong>{row.type==='invoice'?historyCopy.invoice:historyCopy.payment} · {row.date}</strong><strong dir="ltr">{statementCurrency} {number(row.type==='invoice'?row.debit:-row.credit)}</strong></div><p className="break-all text-muted-foreground">{historyRef(row)}</p><p>{historyCopy.balance}: <span dir="ltr">{statementCurrency} {number(row.balance)}</span></p></div>)}
+      </div>
       <div className="space-y-2">
         <h3 className="text-sm font-semibold">{t('invoice')} ({invoices.length})</h3>
         {invoices.length === 0 ? <p className="text-sm text-muted-foreground text-center py-6">{translateLiteral('No invoices recorded')}</p> : invoices.map((invoice) => (
