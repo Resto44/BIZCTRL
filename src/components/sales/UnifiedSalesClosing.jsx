@@ -60,6 +60,7 @@ import { useSalesSources } from '@/hooks/useSalesSources';
 import { useSalesClosingCustomization } from '@/lib/SalesClosingCustomizationContext';
 import { buildSalesSourceClosingSnapshots, driverSourceEntryAmounts, driverSourcePaymentBreakdown, driverSourceTodayTotal, salesSourceTodayTotal } from '@/lib/salesSourceClosingLifecycle';
 import ClosingNumericInput from '@/components/sales/ClosingNumericInput';
+import StickyClosingTotal, { ClosingLiveTotal } from '@/components/sales/ClosingLiveTotal';
 import CustomerCreditSalesSource from '@/components/sales/CustomerCreditSalesSource';
 import SimpleClosingCash from '@/components/sales/SimpleClosingCash';
 import ClosingCashSalesSources from '@/components/sales/ClosingCashSalesSources';
@@ -1932,6 +1933,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
 
   return (
     <form id="erp-sales-closing-form" ref={formRef} onSubmit={handleSubmit} className="min-w-0">
+      <StickyClosingTotal active={workspaceTabActive} totalSales={totalSales} currency={currency} lang={lang} />
       {!initial?.id && <p className="mb-3 rounded-xl bg-blue-50 p-3 text-sm font-semibold text-blue-800" data-testid="incremental-closing-hint">{lang === 'fa' ? 'فقط فروش این نوبت را وارد کنید. داشبورد مجموع تمام کلوزینگ‌های امروز را نشان می‌دهد.' : lang === 'ar' ? 'أدخل مبيعات هذه الجلسة فقط. تعرض لوحة التحكم مجموع إقفالات اليوم.' : 'Enter sales for this session only. The dashboard adds all of today’s closings.'}</p>}
       {/* Embedded in the ERP page scroller: a second momentum scroller with
           percentage height can clip expanded content on iOS after keyboard use. */}
@@ -2004,7 +2006,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
           <section data-testid="closing-sales-entry-mode" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label={closingTr("Daily sales")}>
             <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-3 sm:px-5">
               <div><h2 className="text-sm font-black text-slate-950">{ux('Session sales','مبيعات الجلسة','فروش همین نوبت')}</h2><p className="mt-0.5 text-[11px] text-slate-500">{lang === 'fa' ? 'فقط همین تاریخ و شیفت' : lang === 'ar' ? 'لهذا التاريخ والوردية فقط' : closingTr('This date and shift only')}</p></div>
-              <div className="text-right"><p className="text-[10px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش' : lang === 'ar' ? 'الإجمالي' : closingTr('Total sales')}</p><Money currency={currency} value={totalSales} className="text-xl font-black text-blue-700" /></div>
             </div>
             <div className="space-y-3 p-3.5 sm:p-5">
               <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
@@ -2193,6 +2194,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
                 <SheetTitle className="text-base font-black text-slate-950">{lang === 'fa' ? 'جزئیات پیشرفتهٔ کلوزینگ' : lang === 'ar' ? 'تفاصيل إقفال المبيعات' : closingTr('Advanced closing details')}</SheetTitle>
                 <SheetDescription className="text-xs">{ux('Edits remain in the form. Final posting is in the Review step.','تبقى التعديلات في النموذج؛ الاعتماد من خطوة التأكيد.','تغییرات در فرم می‌مانند؛ ثبت نهایی در مرحله تأیید است.')}</SheetDescription>
               </SheetHeader>
+              <div className="shrink-0 px-3 pb-2"><ClosingLiveTotal totalSales={totalSales} currency={currency} lang={lang} compact /></div>
               <nav className="grid shrink-0 grid-cols-2 gap-1 border-y border-slate-200 bg-white p-2 sm:grid-cols-4" aria-label={closingTr("Advanced Closing Details")} data-testid="closing-detail-navigation">
                 {[[ 'context',ux('Branch & shift','الفرع والوردية','شعبه و شیفت')],['sources',ux('Sales sources','مصادر المبيعات','منابع فروش')],['credit',ux('Customers & credit','العملاء والآجل','مشتری و قرضه')],['fields',ux('Extra fields','حقول إضافية','فیلدهای تکمیلی')]].map(([section,label]) => <button key={section} type="button" aria-current={detailSection === section ? 'location' : undefined} onClick={() => scrollToDetails(section)} className={`min-h-11 rounded-lg px-2 text-xs font-bold ${detailSection === section ? 'bg-blue-100 text-blue-800' : 'text-slate-600'}`}>{label}</button>)}
               </nav>
@@ -2231,10 +2233,6 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             Keep actions in normal document flow, after every Closing field. */}
         <div className="mx-auto max-w-4xl">
           {closingStep > 0 && <Button type="button" variant="ghost" className="mb-2 min-h-11" disabled={isSubmitting} onClick={() => goToClosingStep(closingStep - 1)}>{stepCopy.back}</Button>}
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold text-slate-500">{lang === 'fa' ? 'مجموع فروش همین شیفت' : lang === 'ar' ? 'مجموع مبيعات الوردية' : closingTr('Shift sales total')}</span>
-            <Money currency={currency} value={totalSales} className="text-lg font-black text-slate-900" />
-          </div>
           {ledgerOverdrawn && canSaveClosingDraft && <p role="status" className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{lang === 'fa' ? 'فروش و شمارش نقد را با «ذخیره برای بررسی» نگه دارید. کلوزینگ تا رفع اختلاف پیش‌نویس می‌ماند؛ لازم نیست برای ادامه تمویل ثبت کنید.' : lang === 'ar' ? 'احفظ المبيعات والعد النقدي عبر «حفظ للمراجعة». يبقى الإقفال مسودة حتى معالجة الفرق؛ لا يلزم تسجيل تمويل للمتابعة.' : 'Save sales and the cash count with “Save for review”. The closing remains a draft until the difference is reviewed; recording funding is not required to save.'}</p>}
           <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2">
             <Button type="submit" data-closing-intent="draft" variant={ledgerOverdrawn ? "default" : "outline"} className="min-h-12 min-w-0 rounded-xl px-2 text-xs font-bold sm:text-sm" onClick={() => flushSync(() => setRequestedClosingState('draft'))} disabled={!canSaveClosingDraft || isSubmitting || purchasesLoading || cashLedgerLoading || cashLedgerUnavailable || !cashContextReady}><Save className="mr-1 h-4 w-4 shrink-0" />{ledgerOverdrawn ? (lang === 'fa' ? 'ذخیره برای بررسی' : lang === 'ar' ? 'حفظ للمراجعة' : 'Save for review') : (lang === 'fa' ? 'ذخیره موقت' : lang === 'ar' ? 'حفظ المسودة' : closingTr('Save Draft'))}</Button>
@@ -2256,6 +2254,7 @@ export default function UnifiedSalesClosing({ initial, onSubmit, onCancel, onNew
             <DialogTitle className="text-left text-lg font-black">{lang === 'fa' ? 'تأیید نهایی کلوزینگ' : lang === 'ar' ? 'تأكيد إقفال المبيعات' : closingTr('Confirm sales closing')}</DialogTitle>
             <DialogDescription className="text-left text-xs">{closingBranchLabel} · {closingTr(form.shift)} · {form.date}</DialogDescription>
           </DialogHeader>
+          <div className="sticky top-0 z-10 bg-background py-1"><ClosingLiveTotal totalSales={totalSales} currency={currency} lang={lang} compact /></div>
           <div className="space-y-3">
             {activeFundingPlan && <p className="rounded-xl bg-blue-50 p-3 text-sm font-bold" data-testid="funding-final-confirmation">{lang === 'fa' ? 'با ثبت نهایی تأیید می‌کنم این نقد از والت دریافت شده است؛ تمویل و کلوزینگ با هم ثبت شوند.' : lang === 'ar' ? 'أؤكد استلام النقد من المحفظة؛ يُسجل التمويل والإقفال معاً.' : 'I confirm this cash was received from the selected wallet. Post the wallet funding and closing together.'} <span dir="ltr">{activeFundingPlan.amount.toFixed(2)} {currency}</span> · {activeFundingPlan.source === 'restaurant' ? (lang === 'fa' ? 'والت ریستورنت' : lang === 'ar' ? 'محفظة المطعم' : 'Restaurant wallet') : (lang === 'fa' ? 'والت اونر' : lang === 'ar' ? 'محفظة المالك' : 'Owner wallet')}</p>}
             <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-xs">
