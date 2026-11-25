@@ -48,6 +48,7 @@ const headerLinks = [
   { label: 'Features', href: '/#features' },
   { label: 'Industries', href: '/#industries' },
   { label: 'Pricing', href: '/#pricing' },
+  { label: 'Tutorials', href: '/#tutorials' },
   { label: 'Contact', to: '/contact' },
 ];
 

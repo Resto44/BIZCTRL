@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import PublicPricingCards from '@/components/marketing/PublicPricingCards';
 import LandingMarketingShowcase from '@/components/marketing/LandingMarketingShowcase';
+import SocialTutorialLinks from '@/components/marketing/SocialTutorialLinks';
 import { useLanguage } from '@/lib/LanguageContext';
 import { ContentSection, PRODUCT_DESCRIPTION, PublicHero, PublicLayout, SectionHeading, usePublicPageMetadata } from '@/components/marketing/PublicLayout';
 import { usePublicPlanCatalog } from '@/lib/usePublicPlanCatalog';
@@ -205,6 +206,10 @@ export default function LandingPage() {
         {catalogPlans.length > 0 && <PublicPricingCards plans={catalogPlans} compact onStartFree={beginPlanCheckout} onContactSales={contactSales} busyPlanId={checkoutPlanId} disabled={isLoadingAuth} enterpriseContactMode />}
         {checkoutNotice && <p role="status" className="mx-auto mt-6 max-w-3xl rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-5 py-4 text-center text-sm leading-6 text-cyan-50">{checkoutNotice}</p>}
 
+      </ContentSection>
+
+      <ContentSection id="tutorials">
+        <SocialTutorialLinks theme="dark" />
       </ContentSection>
 
       <ContentSection>

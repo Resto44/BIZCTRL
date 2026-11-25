@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SupportTicketForm from '@/components/support/SupportTicketForm';
+import SocialTutorialLinks from '@/components/marketing/SocialTutorialLinks';
 import {
   HeadphonesIcon, Plus, Clock, CheckCircle2, MessageSquare,
   Paperclip, Mic, ChevronRight, RefreshCw
@@ -222,7 +223,10 @@ export default function Support() {
       <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label={helpCopy.title}>
         {[['guides', helpCopy.title], ['tickets', lbl.my_tickets]].map(([tab, label]) => <Button key={tab} variant={(showTickets ? 'tickets' : 'guides') === tab ? 'default' : 'outline'} aria-pressed={(showTickets ? 'tickets' : 'guides') === tab} onClick={() => setParams(current => { const next = new URLSearchParams(current); next.set('tab', tab); return next; }, { replace: true })}>{label}</Button>)}
       </div>
-      {!showTickets ? <HelpCenter dashboardPath={dashboardPath} /> : isError ? <div role="alert" className="rounded-xl border p-4"><p>{language === 'fa' ? 'تیکت‌ها دریافت نشد.' : language === 'ar' ? 'تعذر تحميل التذاكر.' : 'Could not load support tickets.'}</p><Button className="mt-3" onClick={() => refetch()}>{language === 'fa' ? 'تلاش دوباره' : language === 'ar' ? 'إعادة المحاولة' : 'Retry'}</Button></div> : isLoading ? (
+      {!showTickets ? <>
+        <SocialTutorialLinks className="mb-6" />
+        <HelpCenter dashboardPath={dashboardPath} />
+      </> : isError ? <div role="alert" className="rounded-xl border p-4"><p>{language === 'fa' ? 'تیکت‌ها دریافت نشد.' : language === 'ar' ? 'تعذر تحميل التذاكر.' : 'Could not load support tickets.'}</p><Button className="mt-3" onClick={() => refetch()}>{language === 'fa' ? 'تلاش دوباره' : language === 'ar' ? 'إعادة المحاولة' : 'Retry'}</Button></div> : isLoading ? (
         <p className="text-center text-sm text-muted-foreground py-8">{lbl.loading}</p>
       ) : tickets.length === 0 ? (
         <div className="text-center py-16">
