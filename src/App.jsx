@@ -154,6 +154,7 @@ const SerialNumbers       = lazy(() => import('@/pages/retail/SerialNumbers'));
 
 // Load marketing, policies and registration only on their own routes.
 const LandingPage = lazy(() => import('@/pages/LandingPage'));
+const PublicDemoCatalog = lazy(() => import('@/pages/PublicDemoCatalog'));
 const TermsPage = lazy(() => import('@/pages/PublicPages').then(m => ({ default: m.TermsPage })));
 const PrivacyPage = lazy(() => import('@/pages/PublicPages').then(m => ({ default: m.PrivacyPage })));
 const RefundPage = lazy(() => import('@/pages/PublicPages').then(m => ({ default: m.RefundPage })));
@@ -786,6 +787,7 @@ function App() {
               <Route path="/supplier-registration" element={<LegacyInvitationRedirect />} />
               {/* ── Public marketing and policy pages ── */}
               <Route path="/" element={<RootEntryRoute />} />
+              <Route path="/demo" element={<PublicDemoCatalog />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/refund" element={<RefundPage />} />

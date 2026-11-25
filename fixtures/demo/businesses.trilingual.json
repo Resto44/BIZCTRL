@@ -1,0 +1,1285 @@
+{
+  "schema_version": 1,
+  "synthetic": true,
+  "notes": [
+    "Catalog fixture only. Not a database migration. No real email, phone, credential, financial amount or authenticated account is included.",
+    "S03 supermarket uses canonical retail mode because the database enum has no supermarket value.",
+    "Role labels are display labels, not permission grants. Dedicated authenticated owner accounts must be established through normal onboarding before loading each tenant."
+  ],
+  "businesses": [
+    {
+      "code": "R01",
+      "business_type": "restaurant",
+      "business_name": {
+        "en": "Royal Taste Restaurant",
+        "ar": "مطعم المذاق الملكي",
+        "fa": "رستورانت طعم سلطنتی"
+      },
+      "currency": "SAR",
+      "is_demo": true,
+      "items": [
+        {
+          "sku": "DEMO-R01-001",
+          "supplier": {
+            "en": "Prime Poultry",
+            "ar": "الدواجن المتميزة",
+            "fa": "مرغداری ممتاز"
+          },
+          "category": {
+            "en": "Poultry",
+            "ar": "الدواجن",
+            "fa": "مرغ و طیور"
+          },
+          "subcategory": {
+            "en": "Fresh Chicken",
+            "ar": "الدجاج الطازج",
+            "fa": "مرغ تازه"
+          },
+          "product": {
+            "en": "Whole Chicken 1 KG",
+            "ar": "دجاج كامل 1 كيلو",
+            "fa": "مرغ کامل ۱ کیلو"
+          },
+          "unit": "piece",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-002",
+          "supplier": {
+            "en": "Golden Harvest",
+            "ar": "الحصاد الذهبي",
+            "fa": "برداشت طلایی"
+          },
+          "category": {
+            "en": "Grains",
+            "ar": "الحبوب",
+            "fa": "غلات"
+          },
+          "subcategory": {
+            "en": "Basmati Rice",
+            "ar": "أرز بسمتي",
+            "fa": "برنج باسمتی"
+          },
+          "product": {
+            "en": "Basmati Rice 40 KG",
+            "ar": "أرز بسمتي 40 كيلو",
+            "fa": "برنج باسمتی ۴۰ کیلو"
+          },
+          "unit": "bag",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-003",
+          "supplier": {
+            "en": "Royal Meat Supply",
+            "ar": "اللحوم الملكية",
+            "fa": "گوشت سلطنتی"
+          },
+          "category": {
+            "en": "Meat",
+            "ar": "اللحوم",
+            "fa": "گوشت"
+          },
+          "subcategory": {
+            "en": "Fresh Lamb",
+            "ar": "لحم الضأن الطازج",
+            "fa": "گوشت گوسفند"
+          },
+          "product": {
+            "en": "Lamb Meat 10 KG",
+            "ar": "لحم ضأن 10 كيلو",
+            "fa": "گوشت گوسفند ۱۰ کیلو"
+          },
+          "unit": "box",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-004",
+          "supplier": {
+            "en": "Premium Beef Co.",
+            "ar": "شركة اللحوم الفاخرة",
+            "fa": "شرکت گوشت ممتاز"
+          },
+          "category": {
+            "en": "Meat",
+            "ar": "اللحوم",
+            "fa": "گوشت"
+          },
+          "subcategory": {
+            "en": "Fresh Beef",
+            "ar": "لحم البقر الطازج",
+            "fa": "گوشت گاو"
+          },
+          "product": {
+            "en": "Beef 10 KG",
+            "ar": "لحم بقر 10 كيلو",
+            "fa": "گوشت گاو ۱۰ کیلو"
+          },
+          "unit": "box",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-005",
+          "supplier": {
+            "en": "Green Valley Foods",
+            "ar": "أغذية الوادي الأخضر",
+            "fa": "مواد غذایی دره سبز"
+          },
+          "category": {
+            "en": "Vegetables",
+            "ar": "الخضروات",
+            "fa": "سبزیجات"
+          },
+          "subcategory": {
+            "en": "Fresh Vegetables",
+            "ar": "الخضروات الطازجة",
+            "fa": "سبزیجات تازه"
+          },
+          "product": {
+            "en": "Tomato 5 KG",
+            "ar": "طماطم 5 كيلو",
+            "fa": "بادنجان رومی ۵ کیلو"
+          },
+          "unit": "box",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-006",
+          "supplier": {
+            "en": "Fresh Garden",
+            "ar": "الحديقة الطازجة",
+            "fa": "باغ تازه"
+          },
+          "category": {
+            "en": "Vegetables",
+            "ar": "الخضروات",
+            "fa": "سبزیجات"
+          },
+          "subcategory": {
+            "en": "Root Vegetables",
+            "ar": "الخضروات الجذرية",
+            "fa": "سبزیجات ریشه‌ای"
+          },
+          "product": {
+            "en": "Potato 10 KG",
+            "ar": "بطاطس 10 كيلو",
+            "fa": "کچالو ۱۰ کیلو"
+          },
+          "unit": "bag",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-007",
+          "supplier": {
+            "en": "Sunrise Farms",
+            "ar": "مزارع الشروق",
+            "fa": "مزارع آفتاب"
+          },
+          "category": {
+            "en": "Fruits",
+            "ar": "الفواكه",
+            "fa": "میوه‌جات"
+          },
+          "subcategory": {
+            "en": "Citrus Fruits",
+            "ar": "الحمضيات",
+            "fa": "مرکبات"
+          },
+          "product": {
+            "en": "Orange 10 KG",
+            "ar": "برتقال 10 كيلو",
+            "fa": "مالته ۱۰ کیلو"
+          },
+          "unit": "box",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-008",
+          "supplier": {
+            "en": "Golden Oil Trading",
+            "ar": "تجارة الزيت الذهبي",
+            "fa": "تجارت روغن طلایی"
+          },
+          "category": {
+            "en": "Cooking Oils",
+            "ar": "زيوت الطبخ",
+            "fa": "روغن خوراکی"
+          },
+          "subcategory": {
+            "en": "Vegetable Oil",
+            "ar": "الزيوت النباتية",
+            "fa": "روغن نباتی"
+          },
+          "product": {
+            "en": "Sunflower Oil 18 L",
+            "ar": "زيت دوار الشمس 18 لتر",
+            "fa": "روغن آفتابگردان ۱۸ لیتر"
+          },
+          "unit": "bottle",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-009",
+          "supplier": {
+            "en": "Royal Spice",
+            "ar": "التوابل الملكية",
+            "fa": "ادویه سلطنتی"
+          },
+          "category": {
+            "en": "Spices",
+            "ar": "البهارات",
+            "fa": "ادویه‌جات"
+          },
+          "subcategory": {
+            "en": "Mixed Spices",
+            "ar": "البهارات المشكلة",
+            "fa": "ادویه مخلوط"
+          },
+          "product": {
+            "en": "Biryani Spice 1 KG",
+            "ar": "بهارات برياني 1 كيلو",
+            "fa": "ادویه بریانی ۱ کیلو"
+          },
+          "unit": "pack",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-010",
+          "supplier": {
+            "en": "Pure Dairy",
+            "ar": "الألبان النقية",
+            "fa": "لبنیات خالص"
+          },
+          "category": {
+            "en": "Dairy",
+            "ar": "منتجات الألبان",
+            "fa": "لبنیات"
+          },
+          "subcategory": {
+            "en": "Fresh Milk",
+            "ar": "الحليب الطازج",
+            "fa": "شیر تازه"
+          },
+          "product": {
+            "en": "Milk 1 L",
+            "ar": "حليب 1 لتر",
+            "fa": "شیر ۱ لیتر"
+          },
+          "unit": "bottle",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-011",
+          "supplier": {
+            "en": "Fresh Cream Foods",
+            "ar": "أغذية القشطة الطازجة",
+            "fa": "لبنیات تازه"
+          },
+          "category": {
+            "en": "Dairy",
+            "ar": "منتجات الألبان",
+            "fa": "لبنیات"
+          },
+          "subcategory": {
+            "en": "Yogurt",
+            "ar": "الزبادي",
+            "fa": "ماست"
+          },
+          "product": {
+            "en": "Yogurt 2 KG",
+            "ar": "زبادي 2 كيلو",
+            "fa": "ماست ۲ کیلو"
+          },
+          "unit": "pack",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-012",
+          "supplier": {
+            "en": "Ocean Fresh",
+            "ar": "المحيط الطازج",
+            "fa": "اقیانوس تازه"
+          },
+          "category": {
+            "en": "Seafood",
+            "ar": "المأكولات البحرية",
+            "fa": "محصولات دریایی"
+          },
+          "subcategory": {
+            "en": "Frozen Fish",
+            "ar": "الأسماك المجمدة",
+            "fa": "ماهی منجمد"
+          },
+          "product": {
+            "en": "Salmon 5 KG",
+            "ar": "سلمون 5 كيلو",
+            "fa": "ماهی سالمون ۵ کیلو"
+          },
+          "unit": "box",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-013",
+          "supplier": {
+            "en": "Arctic Foods",
+            "ar": "الأغذية القطبية",
+            "fa": "مواد غذایی قطبی"
+          },
+          "category": {
+            "en": "Frozen Foods",
+            "ar": "الأغذية المجمدة",
+            "fa": "مواد غذایی منجمد"
+          },
+          "subcategory": {
+            "en": "Frozen Vegetables",
+            "ar": "الخضروات المجمدة",
+            "fa": "سبزیجات منجمد"
+          },
+          "product": {
+            "en": "French Fries 2.5 KG",
+            "ar": "بطاطس مقلية 2.5 كيلو",
+            "fa": "کچالوی خلالی ۲.۵ کیلو"
+          },
+          "unit": "pack",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-014",
+          "supplier": {
+            "en": "Golden Bakery",
+            "ar": "المخبز الذهبي",
+            "fa": "نانوایی طلایی"
+          },
+          "category": {
+            "en": "Bakery",
+            "ar": "المخبوزات",
+            "fa": "محصولات نانوایی"
+          },
+          "subcategory": {
+            "en": "Bread",
+            "ar": "الخبز",
+            "fa": "نان"
+          },
+          "product": {
+            "en": "Pita Bread 50 PCS",
+            "ar": "خبز عربي 50 حبة",
+            "fa": "نان عربی ۵۰ عدد"
+          },
+          "unit": "pack",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-015",
+          "supplier": {
+            "en": "Crystal Water",
+            "ar": "مياه الكريستال",
+            "fa": "آب کریستال"
+          },
+          "category": {
+            "en": "Beverages",
+            "ar": "المشروبات",
+            "fa": "نوشیدنی‌ها"
+          },
+          "subcategory": {
+            "en": "Drinking Water",
+            "ar": "مياه الشرب",
+            "fa": "آب آشامیدنی"
+          },
+          "product": {
+            "en": "Water 330 ML × 40",
+            "ar": "مياه 330 مل × 40",
+            "fa": "آب ۳۳۰ میل × ۴۰"
+          },
+          "unit": "carton",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-016",
+          "supplier": {
+            "en": "Refresh Drinks",
+            "ar": "المشروبات المنعشة",
+            "fa": "نوشیدنی‌های تازه"
+          },
+          "category": {
+            "en": "Beverages",
+            "ar": "المشروبات",
+            "fa": "نوشیدنی‌ها"
+          },
+          "subcategory": {
+            "en": "Soft Drinks",
+            "ar": "المشروبات الغازية",
+            "fa": "نوشابه‌های گازدار"
+          },
+          "product": {
+            "en": "Cola 330 ML × 24",
+            "ar": "كولا 330 مل × 24",
+            "fa": "نوشابه کولا ۳۳۰ میل × ۲۴"
+          },
+          "unit": "carton",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-017",
+          "supplier": {
+            "en": "Tropical Juice",
+            "ar": "العصائر الاستوائية",
+            "fa": "آبمیوه استوایی"
+          },
+          "category": {
+            "en": "Beverages",
+            "ar": "المشروبات",
+            "fa": "نوشیدنی‌ها"
+          },
+          "subcategory": {
+            "en": "Fruit Juice",
+            "ar": "عصائر الفواكه",
+            "fa": "آبمیوه"
+          },
+          "product": {
+            "en": "Mango Juice 1 L",
+            "ar": "عصير مانجو 1 لتر",
+            "fa": "آبمیوه آم ۱ لیتر"
+          },
+          "unit": "bottle",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-018",
+          "supplier": {
+            "en": "Smart Packaging",
+            "ar": "التغليف الذكي",
+            "fa": "بسته‌بندی هوشمند"
+          },
+          "category": {
+            "en": "Packaging",
+            "ar": "مواد التغليف",
+            "fa": "بسته‌بندی"
+          },
+          "subcategory": {
+            "en": "Food Containers",
+            "ar": "عبوات الطعام",
+            "fa": "ظروف غذا"
+          },
+          "product": {
+            "en": "Meal Box 100 PCS",
+            "ar": "علب وجبات 100 حبة",
+            "fa": "ظرف غذا ۱۰۰ عدد"
+          },
+          "unit": "pack",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-019",
+          "supplier": {
+            "en": "Pure Clean Supply",
+            "ar": "توريدات النظافة النقية",
+            "fa": "تجهیزات نظافت پاک"
+          },
+          "category": {
+            "en": "Cleaning Supplies",
+            "ar": "مواد التنظيف",
+            "fa": "مواد نظافتی"
+          },
+          "subcategory": {
+            "en": "Detergents",
+            "ar": "المنظفات",
+            "fa": "مواد شوینده"
+          },
+          "product": {
+            "en": "Dishwashing Liquid 5 L",
+            "ar": "سائل غسيل الصحون 5 لتر",
+            "fa": "مایع ظرف‌شویی ۵ لیتر"
+          },
+          "unit": "bottle",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-020",
+          "supplier": {
+            "en": "Elite Kitchen Supply",
+            "ar": "نخبة تجهيزات المطابخ",
+            "fa": "تجهیزات آشپزخانه ممتاز"
+          },
+          "category": {
+            "en": "Kitchen Supplies",
+            "ar": "مستلزمات المطبخ",
+            "fa": "لوازم آشپزخانه"
+          },
+          "subcategory": {
+            "en": "Disposable Items",
+            "ar": "مستلزمات الاستخدام الواحد",
+            "fa": "لوازم یک‌بارمصرف"
+          },
+          "product": {
+            "en": "Food Gloves 100 PCS",
+            "ar": "قفازات طعام 100 حبة",
+            "fa": "دستکش غذایی ۱۰۰ عدد"
+          },
+          "unit": "box",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-R01-021",
+          "supplier": {
+            "en": "Prime Poultry",
+            "ar": "الدواجن المتميزة",
+            "fa": "مرغداری ممتاز"
+          },
+          "category": {
+            "en": "Raw Materials",
+            "ar": "المواد الخام",
+            "fa": "مواد اولیه"
+          },
+          "subcategory": {
+            "en": "Fresh Chicken",
+            "ar": "الدجاج الطازج",
+            "fa": "مرغ تازه"
+          },
+          "product": {
+            "en": "Chicken 10 KG",
+            "ar": "دجاج 10 كيلو",
+            "fa": "مرغ ۱۰ کیلو"
+          },
+          "unit": "box",
+          "restaurant_product_type": "raw_material"
+        }
+      ]
+    },
+    {
+      "code": "C02",
+      "business_type": "cafe",
+      "business_name": {
+        "en": "Aroma Coffee",
+        "ar": "مقهى أروما",
+        "fa": "کافه آروما"
+      },
+      "currency": "SAR",
+      "is_demo": true,
+      "items": [
+        {
+          "sku": "DEMO-C02-001",
+          "supplier": {
+            "en": "Royal Coffee",
+            "ar": "القهوة الملكية",
+            "fa": "قهوه سلطنتی"
+          },
+          "category": {
+            "en": "Coffee",
+            "ar": "القهوة",
+            "fa": "قهوه"
+          },
+          "subcategory": {
+            "en": "Coffee Beans",
+            "ar": "حبوب القهوة",
+            "fa": "دانه قهوه"
+          },
+          "product": {
+            "en": "Arabica Coffee 1 KG",
+            "ar": "قهوة أرابيكا 1 كيلو",
+            "fa": "قهوه عربیکا ۱ کیلو"
+          },
+          "unit": "bag",
+          "restaurant_product_type": "raw_material"
+        },
+        {
+          "sku": "DEMO-C02-002",
+          "supplier": {
+            "en": "Pure Dairy",
+            "ar": "الألبان النقية",
+            "fa": "لبنیات خالص"
+          },
+          "category": {
+            "en": "Dairy",
+            "ar": "الألبان",
+            "fa": "لبنیات"
+          },
+          "subcategory": {
+            "en": "Fresh Milk",
+            "ar": "الحليب الطازج",
+            "fa": "شیر تازه"
+          },
+          "product": {
+            "en": "Milk 1 L",
+            "ar": "حليب 1 لتر",
+            "fa": "شیر ۱ لیتر"
+          },
+          "unit": "bottle",
+          "restaurant_product_type": "raw_material"
+        }
+      ]
+    },
+    {
+      "code": "S03",
+      "business_type": "retail",
+      "business_name": {
+        "en": "Global Fresh Market",
+        "ar": "أسواق جلوبال فريش",
+        "fa": "سوپرمارکت گلوبال"
+      },
+      "currency": "SAR",
+      "is_demo": true,
+      "items": [
+        {
+          "sku": "DEMO-S03-001",
+          "supplier": {
+            "en": "Fresh World",
+            "ar": "عالم المنتجات الطازجة",
+            "fa": "جهان مواد تازه"
+          },
+          "category": {
+            "en": "Groceries",
+            "ar": "المواد الغذائية",
+            "fa": "مواد غذایی"
+          },
+          "subcategory": {
+            "en": "Pasta",
+            "ar": "المعكرونة",
+            "fa": "مکرونی"
+          },
+          "product": {
+            "en": "Pasta 500 G",
+            "ar": "معكرونة 500 غرام",
+            "fa": "مکرونی ۵۰۰ گرام"
+          },
+          "unit": "pack",
+          "restaurant_product_type": null
+        },
+        {
+          "sku": "DEMO-S03-002",
+          "supplier": {
+            "en": "Crystal Drinks",
+            "ar": "مشروبات الكريستال",
+            "fa": "نوشیدنی کریستال"
+          },
+          "category": {
+            "en": "Beverages",
+            "ar": "المشروبات",
+            "fa": "نوشیدنی‌ها"
+          },
+          "subcategory": {
+            "en": "Soft Drinks",
+            "ar": "المشروبات الغازية",
+            "fa": "نوشابه"
+          },
+          "product": {
+            "en": "Cola 330 ML",
+            "ar": "كولا 330 مل",
+            "fa": "کولا ۳۳۰ میل"
+          },
+          "unit": "piece",
+          "restaurant_product_type": null
+        }
+      ]
+    },
+    {
+      "code": "R04",
+      "business_type": "retail",
+      "business_name": {
+        "en": "Nova Retail",
+        "ar": "متاجر نوفا",
+        "fa": "فروشگاه نوا"
+      },
+      "currency": "SAR",
+      "is_demo": true,
+      "items": [
+        {
+          "sku": "DEMO-R04-001",
+          "supplier": {
+            "en": "Nova Electronics",
+            "ar": "نوفا للإلكترونيات",
+            "fa": "الکترونیک نوا"
+          },
+          "category": {
+            "en": "Electronics",
+            "ar": "الإلكترونيات",
+            "fa": "الکترونیک"
+          },
+          "subcategory": {
+            "en": "Smartphones",
+            "ar": "الهواتف الذكية",
+            "fa": "موبایل هوشمند"
+          },
+          "product": {
+            "en": "Nova X1 Smartphone",
+            "ar": "هاتف نوفا X1",
+            "fa": "موبایل نوا X1"
+          },
+          "unit": "piece",
+          "restaurant_product_type": null
+        },
+        {
+          "sku": "DEMO-R04-002",
+          "supplier": {
+            "en": "Smart Accessories",
+            "ar": "الإكسسوارات الذكية",
+            "fa": "لوازم جانبی هوشمند"
+          },
+          "category": {
+            "en": "Accessories",
+            "ar": "الإكسسوارات",
+            "fa": "لوازم جانبی"
+          },
+          "subcategory": {
+            "en": "Chargers",
+            "ar": "الشواحن",
+            "fa": "چارجرها"
+          },
+          "product": {
+            "en": "USB-C Charger 30W",
+            "ar": "شاحن 30 واط",
+            "fa": "چارجر ۳۰ وات"
+          },
+          "unit": "piece",
+          "restaurant_product_type": null
+        }
+      ]
+    },
+    {
+      "code": "W05",
+      "business_type": "warehouse",
+      "business_name": {
+        "en": "Atlas Warehouse",
+        "ar": "مستودعات أطلس",
+        "fa": "انبار اطلس"
+      },
+      "currency": "SAR",
+      "is_demo": true,
+      "items": [
+        {
+          "sku": "DEMO-W05-001",
+          "supplier": {
+            "en": "Atlas Logistics",
+            "ar": "أطلس للخدمات اللوجستية",
+            "fa": "لوژستیک اطلس"
+          },
+          "category": {
+            "en": "Storage Supplies",
+            "ar": "مستلزمات التخزين",
+            "fa": "لوازم انبارداری"
+          },
+          "subcategory": {
+            "en": "Pallets",
+            "ar": "منصات التحميل",
+            "fa": "پالت"
+          },
+          "product": {
+            "en": "Wooden Pallet",
+            "ar": "منصة خشبية",
+            "fa": "پالت چوبی"
+          },
+          "unit": "piece",
+          "restaurant_product_type": null
+        },
+        {
+          "sku": "DEMO-W05-002",
+          "supplier": {
+            "en": "Global Packaging",
+            "ar": "التغليف العالمي",
+            "fa": "بسته‌بندی جهانی"
+          },
+          "category": {
+            "en": "Packaging",
+            "ar": "مواد التغليف",
+            "fa": "بسته‌بندی"
+          },
+          "subcategory": {
+            "en": "Carton Boxes",
+            "ar": "صناديق الكرتون",
+            "fa": "جعبه‌های کارتنی"
+          },
+          "product": {
+            "en": "Large Carton Box",
+            "ar": "صندوق كرتون كبير",
+            "fa": "کارتن بزرگ"
+          },
+          "unit": "piece",
+          "restaurant_product_type": null
+        }
+      ]
+    },
+    {
+      "code": "F06",
+      "business_type": "factory",
+      "business_name": {
+        "en": "Prime Industries",
+        "ar": "الصناعات المتميزة",
+        "fa": "صنایع ممتاز"
+      },
+      "currency": "SAR",
+      "is_demo": true,
+      "items": [
+        {
+          "sku": "DEMO-F06-001",
+          "supplier": {
+            "en": "Prime Metals",
+            "ar": "المعادن الممتازة",
+            "fa": "فلزات ممتاز"
+          },
+          "category": {
+            "en": "Raw Materials",
+            "ar": "المواد الخام",
+            "fa": "مواد اولیه"
+          },
+          "subcategory": {
+            "en": "Steel",
+            "ar": "الفولاذ",
+            "fa": "فولاد"
+          },
+          "product": {
+            "en": "Steel Sheet 2 MM",
+            "ar": "لوح فولاذ 2 مم",
+            "fa": "ورق فولادی ۲ میلی‌متر"
+          },
+          "unit": "piece",
+          "restaurant_product_type": null
+        },
+        {
+          "sku": "DEMO-F06-002",
+          "supplier": {
+            "en": "Industrial Solutions",
+            "ar": "الحلول الصناعية",
+            "fa": "راهکارهای صنعتی"
+          },
+          "category": {
+            "en": "Industrial Parts",
+            "ar": "القطع الصناعية",
+            "fa": "قطعات صنعتی"
+          },
+          "subcategory": {
+            "en": "Fasteners",
+            "ar": "المثبتات",
+            "fa": "اتصالات"
+          },
+          "product": {
+            "en": "Industrial Bolt M10",
+            "ar": "مسمار صناعي M10",
+            "fa": "پیچ صنعتی M10"
+          },
+          "unit": "piece",
+          "restaurant_product_type": null
+        }
+      ]
+    },
+    {
+      "code": "P07",
+      "business_type": "pharmacy",
+      "business_name": {
+        "en": "LifeCare Pharmacy",
+        "ar": "صيدلية لايف كير",
+        "fa": "دواخانه لایف‌کر"
+      },
+      "currency": "SAR",
+      "is_demo": true,
+      "items": [
+        {
+          "sku": "DEMO-P07-001",
+          "supplier": {
+            "en": "Life Medical Supply",
+            "ar": "لايف للمستلزمات الطبية",
+            "fa": "تجهیزات طبی لایف"
+          },
+          "category": {
+            "en": "Medical Supplies",
+            "ar": "المستلزمات الطبية",
+            "fa": "لوازم طبی"
+          },
+          "subcategory": {
+            "en": "First Aid",
+            "ar": "الإسعافات الأولية",
+            "fa": "کمک‌های اولیه"
+          },
+          "product": {
+            "en": "Sterile Bandage",
+            "ar": "ضمادة معقمة",
+            "fa": "بانداژ استریل"
+          },
+          "unit": "pack",
+          "restaurant_product_type": null
+        },
+        {
+          "sku": "DEMO-P07-002",
+          "supplier": {
+            "en": "Pure Health",
+            "ar": "الصحة النقية",
+            "fa": "سلامت خالص"
+          },
+          "category": {
+            "en": "Personal Care",
+            "ar": "العناية الشخصية",
+            "fa": "مراقبت شخصی"
+          },
+          "subcategory": {
+            "en": "Oral Care",
+            "ar": "العناية بالفم",
+            "fa": "مراقبت دهان"
+          },
+          "product": {
+            "en": "Toothpaste 100 ML",
+            "ar": "معجون أسنان 100 مل",
+            "fa": "کریم دندان ۱۰۰ میل"
+          },
+          "unit": "piece",
+          "restaurant_product_type": null
+        }
+      ]
+    },
+    {
+      "code": "C08",
+      "business_type": "clinic",
+      "business_name": {
+        "en": "Elite Medical Center",
+        "ar": "مركز النخبة الطبي",
+        "fa": "مرکز طبی ممتاز"
+      },
+      "currency": "SAR",
+      "is_demo": true,
+      "items": [
+        {
+          "sku": "DEMO-C08-001",
+          "supplier": {
+            "en": "Elite Medical",
+            "ar": "النخبة الطبية",
+            "fa": "تجهیزات طبی ممتاز"
+          },
+          "category": {
+            "en": "Medical Equipment",
+            "ar": "الأجهزة الطبية",
+            "fa": "دستگاه‌های طبی"
+          },
+          "subcategory": {
+            "en": "Diagnostic Devices",
+            "ar": "أجهزة التشخيص",
+            "fa": "دستگاه‌های تشخیص"
+          },
+          "product": {
+            "en": "Digital Thermometer",
+            "ar": "ميزان حرارة رقمي",
+            "fa": "ترمومتر دیجیتال"
+          },
+          "unit": "piece",
+          "restaurant_product_type": null
+        },
+        {
+          "sku": "DEMO-C08-002",
+          "supplier": {
+            "en": "Care Equipment",
+            "ar": "معدات الرعاية",
+            "fa": "تجهیزات مراقبتی"
+          },
+          "category": {
+            "en": "Consumables",
+            "ar": "المستهلكات الطبية",
+            "fa": "مواد مصرفی طبی"
+          },
+          "subcategory": {
+            "en": "Medical Gloves",
+            "ar": "القفازات الطبية",
+            "fa": "دستکش طبی"
+          },
+          "product": {
+            "en": "Examination Gloves",
+            "ar": "قفازات الفحص",
+            "fa": "دستکش معاینه"
+          },
+          "unit": "box",
+          "restaurant_product_type": null
+        }
+      ]
+    },
+    {
+      "code": "W09",
+      "business_type": "wholesale",
+      "business_name": {
+        "en": "Global Trade",
+        "ar": "التجارة العالمية",
+        "fa": "تجارت جهانی"
+      },
+      "currency": "SAR",
+      "is_demo": true,
+      "items": [
+        {
+          "sku": "DEMO-W09-001",
+          "supplier": {
+            "en": "Global Imports",
+            "ar": "الاستيراد العالمي",
+            "fa": "واردات جهانی"
+          },
+          "category": {
+            "en": "Bulk Foods",
+            "ar": "المواد الغذائية بالجملة",
+            "fa": "مواد غذایی عمده"
+          },
+          "subcategory": {
+            "en": "Sugar",
+            "ar": "السكر",
+            "fa": "بوره"
+          },
+          "product": {
+            "en": "Sugar 50 KG",
+            "ar": "سكر 50 كيلو",
+            "fa": "بوره ۵۰ کیلو"
+          },
+          "unit": "bag",
+          "restaurant_product_type": null
+        },
+        {
+          "sku": "DEMO-W09-002",
+          "supplier": {
+            "en": "Royal Distribution",
+            "ar": "التوزيع الملكي",
+            "fa": "توزیع سلطنتی"
+          },
+          "category": {
+            "en": "Bulk Drinks",
+            "ar": "المشروبات بالجملة",
+            "fa": "نوشیدنی عمده"
+          },
+          "subcategory": {
+            "en": "Bottled Water",
+            "ar": "المياه المعبأة",
+            "fa": "آب بوتلی"
+          },
+          "product": {
+            "en": "Water 40 Bottles",
+            "ar": "مياه 40 عبوة",
+            "fa": "آب ۴۰ بوتل"
+          },
+          "unit": "carton",
+          "restaurant_product_type": null
+        }
+      ]
+    },
+    {
+      "code": "S10",
+      "business_type": "services",
+      "business_name": {
+        "en": "Smart Services",
+        "ar": "الخدمات الذكية",
+        "fa": "خدمات هوشمند"
+      },
+      "currency": "SAR",
+      "is_demo": true,
+      "items": [
+        {
+          "sku": "DEMO-S10-001",
+          "supplier": {
+            "en": "Smart Tools",
+            "ar": "الأدوات الذكية",
+            "fa": "ابزار هوشمند"
+          },
+          "category": {
+            "en": "Maintenance",
+            "ar": "الصيانة",
+            "fa": "تعمیرات"
+          },
+          "subcategory": {
+            "en": "Hand Tools",
+            "ar": "الأدوات اليدوية",
+            "fa": "ابزار دستی"
+          },
+          "product": {
+            "en": "Tool Kit",
+            "ar": "حقيبة أدوات",
+            "fa": "جعبه ابزار"
+          },
+          "unit": "piece",
+          "restaurant_product_type": null
+        },
+        {
+          "sku": "DEMO-S10-002",
+          "supplier": {
+            "en": "Pure Clean",
+            "ar": "النظافة النقية",
+            "fa": "نظافت پاک"
+          },
+          "category": {
+            "en": "Cleaning Supplies",
+            "ar": "مواد التنظيف",
+            "fa": "مواد نظافتی"
+          },
+          "subcategory": {
+            "en": "Detergents",
+            "ar": "المنظفات",
+            "fa": "مواد شوینده"
+          },
+          "product": {
+            "en": "Cleaning Liquid 5 L",
+            "ar": "سائل تنظيف 5 لتر",
+            "fa": "مایع نظافت ۵ لیتر"
+          },
+          "unit": "bottle",
+          "restaurant_product_type": null
+        }
+      ]
+    },
+    {
+      "code": "O11",
+      "business_type": "other",
+      "business_name": {
+        "en": "Horizon Business",
+        "ar": "أعمال الأفق",
+        "fa": "تجارت افق"
+      },
+      "currency": "SAR",
+      "is_demo": true,
+      "items": [
+        {
+          "sku": "DEMO-O11-001",
+          "supplier": {
+            "en": "Horizon Trading",
+            "ar": "تجارة الأفق",
+            "fa": "تجارت افق"
+          },
+          "category": {
+            "en": "Office Supplies",
+            "ar": "اللوازم المكتبية",
+            "fa": "لوازم اداری"
+          },
+          "subcategory": {
+            "en": "Stationery",
+            "ar": "القرطاسية",
+            "fa": "قرطاسیه"
+          },
+          "product": {
+            "en": "A4 Paper 500 Sheets",
+            "ar": "ورق A4 عدد 500",
+            "fa": "کاغذ A4 بسته ۵۰۰"
+          },
+          "unit": "pack",
+          "restaurant_product_type": null
+        },
+        {
+          "sku": "DEMO-O11-002",
+          "supplier": {
+            "en": "Office Plus",
+            "ar": "أوفيس بلس",
+            "fa": "آفیس پلاس"
+          },
+          "category": {
+            "en": "General Products",
+            "ar": "المنتجات العامة",
+            "fa": "محصولات عمومی"
+          },
+          "subcategory": {
+            "en": "Office Furniture",
+            "ar": "الأثاث المكتبي",
+            "fa": "اثاث اداری"
+          },
+          "product": {
+            "en": "Office Chair",
+            "ar": "كرسي مكتبي",
+            "fa": "چوکی اداری"
+          },
+          "unit": "piece",
+          "restaurant_product_type": null
+        }
+      ]
+    }
+  ],
+  "branch_names": [
+    {
+      "en": "Headquarters",
+      "ar": "المقر الرئيسي",
+      "fa": "دفتر مرکزی"
+    },
+    {
+      "en": "Main Branch",
+      "ar": "الفرع الرئيسي",
+      "fa": "شعبه اصلی"
+    },
+    {
+      "en": "Downtown Branch",
+      "ar": "فرع وسط المدينة",
+      "fa": "شعبه مرکز شهر"
+    },
+    {
+      "en": "North Branch",
+      "ar": "الفرع الشمالي",
+      "fa": "شعبه شمالی"
+    },
+    {
+      "en": "South Branch",
+      "ar": "الفرع الجنوبي",
+      "fa": "شعبه جنوبی"
+    },
+    {
+      "en": "Central Warehouse",
+      "ar": "المستودع المركزي",
+      "fa": "انبار مرکزی"
+    }
+  ],
+  "people": [
+    {
+      "display_role": "owner",
+      "name": {
+        "en": "Adam Morgan",
+        "ar": "آدم مورغان",
+        "fa": "آدم مورگان"
+      }
+    },
+    {
+      "display_role": "general_manager",
+      "name": {
+        "en": "Omar Hassan",
+        "ar": "عمر حسن",
+        "fa": "عمر حسن"
+      }
+    },
+    {
+      "display_role": "branch_manager",
+      "name": {
+        "en": "Sara Ahmed",
+        "ar": "سارة أحمد",
+        "fa": "سارا احمد"
+      }
+    },
+    {
+      "display_role": "accountant",
+      "name": {
+        "en": "Daniel Wilson",
+        "ar": "دانيال ويلسون",
+        "fa": "دانیال ویلسون"
+      }
+    },
+    {
+      "display_role": "cashier",
+      "name": {
+        "en": "Alex Smith",
+        "ar": "أليكس سميث",
+        "fa": "الکس اسمیت"
+      }
+    },
+    {
+      "display_role": "employee",
+      "name": {
+        "en": "David Miller",
+        "ar": "ديفيد ميلر",
+        "fa": "دیوید میلر"
+      }
+    },
+    {
+      "display_role": "driver",
+      "name": {
+        "en": "Ali Rahman",
+        "ar": "علي رحمن",
+        "fa": "علی رحمان"
+      }
+    },
+    {
+      "display_role": "supplier",
+      "name": {
+        "en": "James Carter",
+        "ar": "جيمس كارتر",
+        "fa": "جیمز کارتر"
+      }
+    },
+    {
+      "display_role": "customer",
+      "name": {
+        "en": "Sophia Brown",
+        "ar": "صوفيا براون",
+        "fa": "سوفیا براون"
+      }
+    }
+  ]
+}
