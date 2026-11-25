@@ -177,7 +177,31 @@ function OwnerDashboardContent() {
   const branchSignature = useMemo(() => normalizedBranches.map((branch) => String(branch.id || branch.key)).join('|'), [normalizedBranches]);
   const { realtimeStatus } = useOwnerDashboardRealtime(activeRestaurant?.id, branches);
   const { alerts: persistedActiveAlerts, isLoading: loadingActiveAlerts } = useActiveAlerts();
-  const { revenueSources } = useSalesSources({ branchId: isAllBranches ? undefined : selectedBranchId, branchKey: isAllBranches ? undefined : selectedBranchKey });
+  const { revenueSources, allSources: scopedSourceLabels, error: sourceLabelError, isLoading: sourceLabelLoading } = useSalesSources({ branchId: isAllBranches ? undefined : selectedBranchId, branchKey: isAllBranches ? undefined : selectedBranchKey, includeInactive: true });
+  // The all-branches closing catalog intentionally exposes global sources only.
+  // Read branch labels through the existing authorized RPC, for display only.
+  const labelBranchIds = useMemo(() => [...new Set(normalizedBranches.map(b => b.id).filter(Boolean))].sort(), [normalizedBranches]);
+  const branchLabelsQuery = useQuery({
+    queryKey: ['owner-source-labels', activeRestaurant?.id, labelBranchIds],
+    enabled: Boolean(activeRestaurant?.id && role === 'owner' && isAllBranches && labelBranchIds.length),
+    staleTime: 30_000,
+    queryFn: async () => {
+      const rows = await Promise.all(labelBranchIds.map(async branchId => {
+        const { data, error } = await supabase.rpc('erp_sales_closing_branch_sources', {
+          p_restaurant_id: activeRestaurant.id, p_branch_id: branchId, p_include_inactive: true,
+        });
+        if (error) throw error;
+        return Array.isArray(data) ? data : [];
+      }));
+      return [...new Map(rows.flat().filter(s=>s?.id).map(s=>[String(s.id),s])).values()];
+    },
+  });
+  const sourceLabels = useMemo(() => [...new Map([
+    ...(scopedSourceLabels || revenueSources || []),
+    ...(isAllBranches && role === 'owner' ? branchLabelsQuery.data || [] : []),
+  ].filter(s=>s?.id).map(s=>[String(s.id),s])).values()], [scopedSourceLabels, revenueSources, isAllBranches, role, branchLabelsQuery.data]);
+  const sourceLabelsUnavailable = Boolean(sourceLabelError || sourceLabelLoading ||
+    (isAllBranches && role === 'owner' && (branchLabelsQuery.isError || branchLabelsQuery.isLoading)));
 
   const handlePDF = async () => {
     if (pdfBusy.current || !can.viewReports || !activeRestaurant?.id) return;
@@ -476,7 +500,7 @@ function OwnerDashboardContent() {
 
   const model = useMemo(() => ({
     formatMoney, periodMetrics, previousPeriodMetrics, periodSalesChange, periodLabel, periodKey: activePeriod,
-    periodSales, revenueSources, lang, periodPurchases, previousPeriodSales, previousPeriodPurchases,
+    periodSales, revenueSources, lang, periodPurchases, previousPeriodSales, previousPeriodPurchases, sourceLabels, sourceLabelsUnavailable,
     branchRankings, scopedAlerts, inventoryOverview, receivables, receivablesStatus: creditLedgerAudit.status === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : customerCreditPosition.status, receivablesCount: customerCreditPosition.count, creditLedgerAudit, payables, cashRegister, drawerCash,
     consumption, priceReport, supplierComparisons, branchPriceInconsistencies, priceHistory,
     previousRevenueTrend, reportPeriod: period, changeReportPeriod,
@@ -485,7 +509,7 @@ function OwnerDashboardContent() {
     canOpenCopilot: role === 'owner' && subscriptionActive && hasFeature('ai_copilot') && Boolean(activeRestaurant?.id) && Boolean(user?.id),
     openCopilot: () => setCopilotOpen(true), copilotLabel,
     openQuickAddBranch: () => setQuickAddBranchOpen(true), loadingActiveAlerts, hasQueryError, accountingProvisional, pendingExpenseCount,
-  }), [previousRevenueTrend, period, changeReportPeriod, branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, accountingProvisional, pendingExpenseCount, loadingActiveAlerts, payables, periodLabel, activePeriod, periodSales, periodPurchases, previousPeriodSales, previousPeriodPurchases, revenueSources, lang, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, customerCreditPosition.status, customerCreditPosition.count, creditLedgerAudit, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel, subscriptionActive, hasFeature]);
+  }), [previousRevenueTrend, period, changeReportPeriod, branchPriceInconsistencies, branchRankings, cashRegister, drawerCash, consumption, expenseGroups, formatMoney, inventoryOverview, hasQueryError, accountingProvisional, pendingExpenseCount, loadingActiveAlerts, payables, periodLabel, activePeriod, periodSales, periodPurchases, previousPeriodSales, previousPeriodPurchases, revenueSources, sourceLabels, sourceLabelsUnavailable, lang, periodMetrics, periodPurchaseQuantity, periodSalesChange, previousPeriodMetrics, priceHistory, priceReport, receivables, customerCreditPosition.status, customerCreditPosition.count, creditLedgerAudit, revenueTrend, role, scopedAlerts, setSelectedBranchId, supplierComparisons, supplierCount, activeRestaurant?.id, user?.id, copilotLabel, subscriptionActive, hasFeature]);
 
   if (loading) return <DashboardSkeleton />;
 

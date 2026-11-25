@@ -14,6 +14,7 @@ const COPY = {
     empty: 'No source-level entries were recorded in finalized closings for this period.',
     mismatch: 'Source allocations differ from verified sales by',
     note: 'Source entries are a breakdown, not additional revenue or a count of individual orders.',
+    labelSync: 'Current source names are syncing or unavailable. Saved closing names may be shown.',
     unavailable: 'Source breakdown could not be verified. Refresh the sales records.',
   },
   fa: {
@@ -26,6 +27,7 @@ const COPY = {
     empty: 'در این بازه جزئیات منابع در کلوزینگ‌های تأییدشده ثبت نشده است.',
     mismatch: 'اختلاف جزئیات منابع با فروش تأییدشده:',
     note: 'ارقام منابع فقط تفکیک فروش هستند؛ نه درآمد اضافه و نه تعداد سفارش‌ها.',
+    labelSync: 'نام‌های فعلی منابع در حال همگام‌سازی یا در دسترس نیستند؛ ممکن است نام ثبت‌شده در کلوزینگ نمایش داده شود.',
     unavailable: 'دیتای منابع قابل تأیید نیست. ریکوردهای فروش را دوباره تازه کنید.',
   },
   ar: {
@@ -38,13 +40,14 @@ const COPY = {
     empty: 'لا توجد تفاصيل للمصادر في الإقفالات المعتمدة لهذه الفترة.',
     mismatch: 'فرق تفصيل المصادر عن المبيعات المعتمدة:',
     note: 'تفاصيل المصادر ليست إيرادات إضافية ولا تمثل عدد الطلبات الفردية.',
+    labelSync: 'تجري مزامنة أسماء المصادر الحالية أو أنها غير متاحة؛ قد تظهر الأسماء المحفوظة في الإقفال.',
     unavailable: 'لا يمكن التحقق من بيانات المصادر. أعد تحديث سجلات المبيعات.',
   },
 };
 
 export default function OwnerOrderSourcesAnalytics({
   sales = [], revenueSources = [], verifiedSales = 0,
-  formatMoney, lang = 'en', periodLabel = '', hasQueryError = false, report: sharedReport = null,
+  formatMoney, lang = 'en', periodLabel = '', hasQueryError = false, sourceLabelsUnavailable = false, report: sharedReport = null,
 }) {
   const navigate = useNavigate();
   const copy = COPY[lang] || COPY.en;
@@ -83,6 +86,7 @@ export default function OwnerOrderSourcesAnalytics({
               <strong data-testid="owner-source-count" className="mt-1 block text-xl font-black tabular-nums text-foreground">{report.sources.length}</strong>
             </div>
           </div>
+          {sourceLabelsUnavailable && <p role="status" className="mt-2 text-xs text-muted-foreground">{copy.labelSync}</p>}
           <div className="mt-3 space-y-2.5">
             {report.sources.slice(0, 8).map((source, index) => (
               <div data-testid="owner-source-row" key={source.key} className="min-w-0">

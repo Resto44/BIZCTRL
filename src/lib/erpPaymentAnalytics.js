@@ -17,11 +17,11 @@ export const PAYMENT_BUCKETS = Object.freeze([
   {key:'other',color:'#f59e0b'},
 ]);
 
-export function sourceDisplayName(entry, lang='en', config=null) {
+export function sourceDisplayName(entry, lang='en', config=null, preferCurrent=false) {
   const fields = lang === 'ar' ? ['name_ar','name_en','name_fa','name','label']
     : lang === 'fa' ? ['name_fa','name_ar','name_en','name','label']
     : ['name_en','name_ar','name_fa','name','label'];
-  for (const row of [entry,config]) for(const field of fields) {
+  for (const row of (preferCurrent ? [config,entry] : [entry,config])) for(const field of fields) {
     const name=String(row?.[field] ?? '').trim();
     if(name && !uuid.test(name)) return name.slice(0,75);
   }

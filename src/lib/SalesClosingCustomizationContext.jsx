@@ -133,7 +133,10 @@ export function SalesClosingCustomizationProvider({ children }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_closing_config', filter: `restaurant_id=eq.${restaurantId}` }, () => queryClient.invalidateQueries({ queryKey: configKey }))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_closing_fields', filter: `restaurant_id=eq.${restaurantId}` }, () => queryClient.invalidateQueries({ queryKey: fieldsKey }))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_methods', filter: `restaurant_id=eq.${restaurantId}` }, () => queryClient.invalidateQueries({ queryKey: paymentMethodsKey }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_sources', filter: `restaurant_id=eq.${restaurantId}` }, () => queryClient.invalidateQueries({ queryKey: sourceQueryKey }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_sources', filter: `restaurant_id=eq.${restaurantId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: sourceQueryKey });
+        queryClient.invalidateQueries({ queryKey: ['owner-source-labels', restaurantId] });
+      })
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [configKey, fieldsKey, paymentMethodsKey, queryClient, restaurantId, sourceQueryKey]);
@@ -197,9 +200,13 @@ export function SalesClosingCustomizationProvider({ children }) {
       if (error) throw error;
       return data;
     },
-    onSuccess: (savedSource, source) => {
+    onSuccess: async (savedSource, source) => {
       mergeSourceCache({ ...savedSource, ...source, id: savedSource?.id || source.id });
       queryClient.invalidateQueries({ queryKey: sourceQueryKey, refetchType: 'none' });
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['sales_sources_active', restaurantId], type: 'active' }),
+        queryClient.invalidateQueries({ queryKey: ['owner-source-labels', restaurantId] }),
+      ]);
     },
   });
 
@@ -208,9 +215,13 @@ export function SalesClosingCustomizationProvider({ children }) {
       const { error } = await supabase.from('sales_sources').delete().eq('id', source.id);
       if (error) throw error;
     },
-    onSuccess: (_, source) => {
+    onSuccess: async (_, source) => {
       sourcePatchesRef.current.set(source.id, false);
       queryClient.invalidateQueries({ queryKey: ['sales_sources_active', restaurantId], refetchType: 'none' });
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['sales_sources_active', restaurantId], type: 'active' }),
+        queryClient.invalidateQueries({ queryKey: ['owner-source-labels', restaurantId] }),
+      ]);
     },
   });
 

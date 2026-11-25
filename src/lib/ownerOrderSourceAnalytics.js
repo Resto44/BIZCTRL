@@ -20,7 +20,7 @@ const parseEntries = (raw) => {
   }
 };
 
-export function buildOwnerOrderSourceAnalytics({ sales = [], revenueSources = [], lang = 'en', verifiedSales = 0 } = {}) {
+export function buildOwnerOrderSourceAnalytics({ sales = [], revenueSources = [], sourceLabels = revenueSources, lang = 'en', verifiedSales = 0 } = {}) {
   const configs = new Map();
   for (const source of revenueSources) {
     for (const key of [source.id, source.source_key, source.system_key]) {
@@ -28,6 +28,21 @@ export function buildOwnerOrderSourceAnalytics({ sales = [], revenueSources = []
     }
   }
 
+  // Names are presentation only. Do not use inactive/new master settings
+  // to change the financial treatment of historical closing amounts.
+  const labelsById = new Map();
+  const labelsByKey = new Map();
+  const ambiguousKeys = new Set();
+  for (const source of sourceLabels) {
+    if (source?.id) labelsById.set(String(source.id), source);
+    for (const rawKey of [source?.source_key, source?.system_key]) {
+      const key = String(rawKey || '').trim();
+      if (!key || ambiguousKeys.has(key)) continue;
+      if (labelsByKey.has(key) && labelsByKey.get(key) !== source) {
+        labelsByKey.delete(key); ambiguousKeys.add(key);
+      } else labelsByKey.set(key, source);
+    }
+  }
   const totals = new Map();
   for (const closing of sales) {
     if (closing?.closing_state && !['finalized', 'locked'].includes(String(closing.closing_state).toLowerCase())) continue;
@@ -39,10 +54,13 @@ export function buildOwnerOrderSourceAnalytics({ sales = [], revenueSources = []
       if (config?.included_in_revenue === false) continue;
       const value = amount(entry.amount ?? entry.today_amount);
       if (value <= 0) continue;
+      const currentLabel = entry.source_id
+        ? labelsById.get(String(entry.source_id).trim())
+        : labelsByKey.get(String(entry.source_key || '').trim());
       const previous = totals.get(key);
       totals.set(key, {
         key,
-        name: sourceDisplayName(entry, lang, config),
+        name: sourceDisplayName(entry, lang, currentLabel, true),
         amount: (previous?.amount || 0) + value,
         closingCount: (previous?.closingCount || 0) + 1,
       });
