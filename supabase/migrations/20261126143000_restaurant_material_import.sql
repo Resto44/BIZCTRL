@@ -4,7 +4,7 @@ returns jsonb language plpgsql security invoker set search_path=public,pg_temp a
 declare r jsonb; prepared jsonb='[]'; errors jsonb='[]'; c uuid; sub uuid; child uuid; unit_value text; brand_value text; n int; idx int=0; v_sku text; v_barcode text; cost numeric; price numeric; vat numeric; mn numeric; mx numeric; wp numeric; mp numeric; category_name text; p jsonb; job uuid;
 begin
  if auth.uid() is null or public.erp_current_role() is distinct from 'owner' or not coalesce(public.erp_can_write_module_scope_text(p_restaurant_id::text,null,'updateInventory'),false) then raise exception 'Access denied' using errcode='42501'; end if;
- if not exists(select 1 from public.restaurants where id=p_restaurant_id and lower(coalesce(nullif(btrim(business_type),''),business_mode)) in ('restaurant','cafe')) then raise exception 'Restaurant or cafe required';end if;
+ if not exists(select 1 from public.restaurants where id=p_restaurant_id and lower(coalesce(nullif(btrim(business_type::text),''),business_mode::text)) in ('restaurant','cafe')) then raise exception 'Restaurant or cafe required';end if;
  if jsonb_typeof(p_rows) is distinct from 'array' then raise exception 'Invalid rows';end if;
  if jsonb_array_length(p_rows) not between 1 and 500 then raise exception 'Import 1 to 500 rows';end if;
  if p_commit then perform pg_advisory_xact_lock(hashtextextended(p_restaurant_id::text,0));end if;
