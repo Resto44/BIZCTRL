@@ -366,7 +366,7 @@ function GeneralProductManagement() {
       {barcodeRequest && barcodeRequest.restaurantId === restaurantId && barcodeRequest.locationKey === location.key && canImportProductSpreadsheet && <ProductBarcodeDialog key={`${restaurantId}:${barcodeRequest.product?.id || 'picker'}`} restaurantId={restaurantId} initialProduct={barcodeRequest.product} onClose={() => setBarcodeRequest(null)} onChanged={invalidateProductData} />}
 
       <ProductDialog open={showCreate} onOpenChange={setShowCreate} title="Create master product">
-        <ProductMasterForm manageBrands={manageBrands} onSubmit={handleProductSave} key={restaurantId} onCancel={() => setShowCreate(false)} />
+        <ProductMasterForm onSubmit={handleProductSave} manageBrands={manageBrands} key={restaurantId} onCancel={() => setShowCreate(false)} />
       </ProductDialog>
 
       <ProductDialog open={Boolean(editing)} onOpenChange={(open) => { if (!open) setEditing(null); }} title="Edit master product">
