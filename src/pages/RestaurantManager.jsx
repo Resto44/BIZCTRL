@@ -90,7 +90,7 @@ export default function RestaurantManager() {
     try {
       const result = await updateRestaurant(editingBusiness.id, { name });
       if (result?.id !== editingBusiness.id || result?.name !== name) throw Error(rename.failed);
-      queryClient.setQueriesData({queryKey:['restaurants']}, old => Array.isArray(old) ? old.map(r => r.id === result.id ? {...r,name:result.name} : r) : old);
+      queryClient.setQueryData(['restaurants', user?.id, user?.role], old => Array.isArray(old) ? old.map(r => r.id === result.id ? {...r,name:result.name} : r) : old);
       await Promise.allSettled([
         queryClient.invalidateQueries({queryKey:['restaurants']}),
         queryClient.invalidateQueries({queryKey:['portal-identity']})
@@ -242,7 +242,7 @@ export default function RestaurantManager() {
                   {r.address && <p className="text-xs text-muted-foreground">{r.address}</p>}
                 </div>
               </div>
-              <div className="flex shrink-0 flex-wrap justify-end gap-1 items-center">
+              <div className="flex shrink-0 flex-wrap justify-end gap-1 items-center max-w-[48%]">
                 {r.id !== activeRestaurant?.id && (
                   <Button size="sm" variant="outline" onClick={() => setActiveRestaurant(r.id)}>
                     <Star className="w-3 h-3 mr-1" /> Select
@@ -254,7 +254,7 @@ export default function RestaurantManager() {
                 <Button type="button" size="icon" variant="outline" className="h-10 w-10" aria-label={rename.title + ": " + r.name} title={rename.title} data-testid="edit-business-name" disabled={saving || renaming} onClick={() => openRename(r)}>
                   <Pencil className="h-4 w-4" />
                 </Button>
-                <Button size="icon" variant="ghost" className="text-destructive h-8 w-8" onClick={() => handleDeleteRestaurant(r.id)}>
+                <Button size="icon" variant="ghost" className="text-destructive h-8 w-8" disabled={renaming} onClick={() => handleDeleteRestaurant(r.id)}>
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </div>
