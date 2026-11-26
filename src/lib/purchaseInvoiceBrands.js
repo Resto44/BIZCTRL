@@ -51,6 +51,8 @@ export function selectPurchaseProduct(item, product) {
     ...item,
     product_id: product.id,
     product_name: product.name || '',
+    category_id: product.category_id || item.category_id || '',
+    subcategory_id: product.subcategory_id || item.subcategory_id || '',
     brand: normalizeProductBrand(product.brand),
     unit: product.unit || item.unit,
     // A defined zero price is valid and should not inherit a prior product's cost.
