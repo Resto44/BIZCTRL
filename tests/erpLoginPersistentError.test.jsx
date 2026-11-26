@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import {act, create} from 'react-test-renderer';
-import {MemoryRouter} from 'react-router-dom';
+import {MemoryRouter,Routes,Route} from 'react-router-dom';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 const mock = vi.hoisted(() => ({signIn:vi.fn(),signOut:vi.fn(),rpc:vi.fn()}));
 vi.mock('@/api/supabaseClient',()=>({supabase:{auth:{getSession:async()=>({data:{session:null}}),signInWithPassword:mock.signIn,signOut:mock.signOut},rpc:mock.rpc}}));
@@ -23,6 +23,16 @@ async function mount(){
 }
 async function submit(){await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));}
 describe('persistent portal sign-in feedback',()=>{
+ it('returns directly to the public root from a fresh portal URL and preserves the credential back action',async()=>{
+  await act(async()=>{tree=create(<MemoryRouter initialEntries={['/erp-login?role=manager']}><Routes><Route path="/erp-login" element={<ERPLogin/>}/><Route path="/" element={<div data-testid="landing-destination"/>}/></Routes></MemoryRouter>);});
+  const link=()=>tree.root.findAllByType('a').find(a=>a.props['data-testid']==='portal-back-to-landing');
+  expect(link().props.href).toBe('/');
+  act(()=>tree.root.findAllByType('button').find(b=>b.children.includes('Back to portal selection')).props.onClick());
+  expect(link().props.href).toBe('/');
+  act(()=>link().props.onClick({button:0,preventDefault(){},defaultPrevented:false,metaKey:false,altKey:false,ctrlKey:false,shiftKey:false}));
+  expect(tree.root.findByProps({'data-testid':'landing-destination'})).toBeTruthy();
+  expect(mock.signOut).not.toHaveBeenCalled();
+ });
  it('keeps a rejected login visible after the toast and allows retry',async()=>{
   mock.signIn.mockResolvedValue({error:{message:'Invalid login credentials'}});
   await mount();await submit();
