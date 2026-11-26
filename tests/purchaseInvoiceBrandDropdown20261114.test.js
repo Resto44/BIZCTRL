@@ -18,9 +18,10 @@ const products=[
 ];
 
 describe('Purchase Invoice brand selector ERP',()=>{
-  it('shows saved brands from the same tenant Product Master and matching catalog, deduplicated',()=>{
+  it('shows only brands of matching supplier products, deduplicated',()=>{
     const supplierProducts=products.filter(p=>p.supplier_id===supplierA);
-    expect(purchaseBrandOptions(supplierProducts,'',['Sanita','PepSI',' pepsi ','کاسه'])).toEqual(expect.arrayContaining(['Sanita','PepSI','سنوايت','کاسه']));
+    expect(purchaseBrandOptions(supplierProducts,'',['Sanita','PepSI',' pepsi ','کاسه'])).toEqual(expect.arrayContaining(['Sanita','سنوايت']));
+    expect(purchaseBrandOptions(supplierProducts,'',['PepSI','کاسه'])).toHaveLength(2);
     expect(purchaseBrandOptions(supplierProducts).filter(name=>name.toLowerCase()==='sanita')).toHaveLength(1);
     expect(purchaseBrandOptions([], 'Legacy brand')).toEqual(['Legacy brand']);
     expect(purchaseBrandOptions([], '', [])).toEqual([]);
@@ -68,8 +69,8 @@ describe('Purchase Invoice brand selector ERP',()=>{
     expect(brand).toBeGreaterThan(-1);
     expect(product).toBeGreaterThan(brand);
     expect(code).toContain('aria-label="Select product brand"');
-    expect(code).toContain("queryKey: ['product-brand-choices', restaurantId]");
-    expect(code).toContain('fetchProductBrandChoices(supabase, restaurantId)');
+    expect(code).toContain('purchaseBrandOptions(categoryProducts, selectedBrand)');
+    expect(code).toContain('data-testid="purchase-matching-products"');
     expect(code).toContain('const visibleProducts = purchaseProductsForBrand(categoryProducts, selectedBrand)');
     expect(code).toContain("updateItem(item._id, 'selected_product', product)");
     expect(code).toContain('return normalizePurchaseLine(clearPurchaseProductForFilter(item, field, value))');
