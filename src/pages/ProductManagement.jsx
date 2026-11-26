@@ -12,6 +12,7 @@ import ProductMasterWorkspace from '@/components/products/ProductMasterWorkspace
 import ProductBarcodeDialog from '@/components/products/ProductBarcodeDialog';
 import ProductMasterForm from '@/components/products/ProductMasterForm';
 import ProductUnitManager from '@/components/products/ProductUnitManager';
+import ProductBrandManager,{brandCopy} from '@/components/products/ProductBrandManager';
 import InventoryTransactionForm from '@/components/products/InventoryTransactionForm';
 import EnterpriseCategoryManager from '@/components/categories/CategoryManager';
 import { Button } from '@/components/ui/button';
@@ -63,7 +64,7 @@ export default function ProductManagement() {
 function GeneralProductManagement() {
   const { activeRestaurant, branches = [] } = useTenant();
   const { role } = useRole();
-  const { formatMoney } = useLanguage();
+  const { formatMoney,lang } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -92,6 +93,9 @@ function GeneralProductManagement() {
   const [showStockDialog, setShowStockDialog] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   const [showUnits, setShowUnits] = useState(false);
+  const [showBrands,setShowBrands]=useState(false);
+  const manageBrands=role===ROLES.OWNER;
+  useEffect(()=>setShowBrands(false),[restaurantId]);
   const selectedBranch = selectedLocation === 'all'
     ? null
     : branches.find((branch) => String(branch.id || branch.key || branch.branch_key) === selectedLocation) || null;
@@ -324,7 +328,7 @@ function GeneralProductManagement() {
       <ProductMasterWorkspace
         restaurantId={restaurantId}
         restaurantPortal={restaurantPortal}
-        catalogContent={restaurantPortal ? <RawMaterialCatalog products={products} onEdit={setEditing} onAdd={() => setShowCreate(true)} onManageCategories={() => setShowCategories(true)} onManageUnits={() => setShowUnits(true)} money={formatMoney}/> : null}
+        catalogContent={restaurantPortal ? <RawMaterialCatalog products={products} onEdit={setEditing} onAdd={() => setShowCreate(true)} onManageCategories={() => setShowCategories(true)} onManageUnits={() => setShowUnits(true)} onManageBrands={manageBrands?()=>setShowBrands(true):undefined} money={formatMoney}/> : null}
         snapshot={snapshot}
         categories={categories}
         transactions={transactions}
@@ -353,6 +357,8 @@ function GeneralProductManagement() {
         onNavigate={navigate}
         onManageCategories={() => setShowCategories(true)}
         onManageUnits={() => setShowUnits(true)}
+        onManageBrands={manageBrands?()=>setShowBrands(true):undefined}
+        brandManagementLabel={brandCopy(lang).title}
         onDataChanged={invalidateProductData}
         canImportProductSpreadsheet={canImportProductSpreadsheet}
         canDeleteProducts={canDeleteProducts}
@@ -361,11 +367,11 @@ function GeneralProductManagement() {
       {barcodeRequest && barcodeRequest.restaurantId === restaurantId && barcodeRequest.locationKey === location.key && canImportProductSpreadsheet && <ProductBarcodeDialog key={`${restaurantId}:${barcodeRequest.product?.id || 'picker'}`} restaurantId={restaurantId} initialProduct={barcodeRequest.product} onClose={() => setBarcodeRequest(null)} onChanged={invalidateProductData} />}
 
       <ProductDialog open={showCreate} onOpenChange={setShowCreate} title="Create master product">
-        <ProductMasterForm onSubmit={handleProductSave} key={restaurantId} onCancel={() => setShowCreate(false)} />
+        <ProductMasterForm onSubmit={handleProductSave} manageBrands={manageBrands} key={restaurantId} onCancel={() => setShowCreate(false)} />
       </ProductDialog>
 
       <ProductDialog open={Boolean(editing)} onOpenChange={(open) => { if (!open) setEditing(null); }} title="Edit master product">
-        {editing ? <ProductMasterForm key={`${restaurantId}:${editing.id}`} initial={editing} onSubmit={handleProductSave} onCancel={() => setEditing(null)} /> : null}
+        {editing ? <ProductMasterForm manageBrands={manageBrands} key={`${restaurantId}:${editing.id}`} initial={editing} onSubmit={handleProductSave} onCancel={() => setEditing(null)} /> : null}
       </ProductDialog>
 
       <Dialog open={showStockDialog} onOpenChange={(open) => { setShowStockDialog(open); if (!open) setAdjustTarget(null); }}>
@@ -402,6 +408,7 @@ function GeneralProductManagement() {
         </DialogContent>
       </Dialog>
 
+      {manageBrands&&<Dialog open={showBrands} onOpenChange={setShowBrands}><DialogContent className="max-h-[92dvh] overflow-y-auto rounded-2xl sm:max-w-2xl"><DialogHeader><DialogTitle>{brandCopy(lang).manage}</DialogTitle></DialogHeader><ProductBrandManager key={restaurantId} restaurantId={restaurantId} lang={lang}/></DialogContent></Dialog>}
       <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => { if (!open) setDeleting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>

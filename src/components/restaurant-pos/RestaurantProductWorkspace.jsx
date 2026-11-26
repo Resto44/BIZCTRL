@@ -96,12 +96,12 @@ export default function RestaurantProductWorkspace({rawMaterials}) {
  </main>;
 }
 
-export function RawMaterialCatalog({products,onEdit,onAdd,onManageCategories,onManageUnits,money}) {
+export function RawMaterialCatalog({products,onEdit,onAdd,onManageCategories,onManageUnits,onManageBrands,money}) {
  const {lang}=useLanguage();const labels=restaurantProductCopy(lang);const [search,setSearch]=useState('');
  const matches=products.filter(p=>[p.name,p.name_ar,p.name_fa,p.sku,p.product_id].join(' ').toLocaleLowerCase().includes(search.toLocaleLowerCase()));
  return <section className={panel}>
   <h2 className="text-xl font-black">{labels.materials}</h2><p className="my-2 text-sm text-slate-500">{labels.materialHint}</p>
-  <div className="my-4 flex flex-wrap gap-2"><button className={primary} onClick={onAdd}><Plus size={18}/>{labels.materials}</button><Link className={button} to="/purchase-orders">{labels.purchase}</Link><button className={button} onClick={onManageCategories}>{restaurantCopy(lang).category}</button><button className={button} onClick={onManageUnits}>{lang==='ar'?'الوحدات':lang==='fa'?'واحدها':'Units'}</button></div>
+  <div className="my-4 flex flex-wrap gap-2"><button className={primary} onClick={onAdd}><Plus size={18}/>{labels.materials}</button><Link className={button} to="/purchase-orders">{labels.purchase}</Link><button className={button} onClick={onManageCategories}>{restaurantCopy(lang).category}</button><button className={button} onClick={onManageUnits}>{lang==='ar'?'الوحدات':lang==='fa'?'واحدها':'Units'}</button>{onManageBrands&&<button type="button" className={button} onClick={onManageBrands}>{lang==='ar'?'العلامات التجارية':lang==='fa'?'برندها':'Brands'}</button>}</div>
   <input className={input} type="search" aria-label={labels.rawSearch} placeholder={labels.rawSearch} value={search} onChange={e=>setSearch(e.target.value)}/>
   <div className="mt-4 divide-y">{matches.slice(0,200).map(p=><div className="flex flex-wrap items-center justify-between gap-3 py-4" key={p.id}><div><strong>{restaurantProductName(p,lang)}</strong><p className="text-sm text-slate-500">{p.sku||p.product_id} · {p.unit} · {money(p.default_cost||p.purchase_cost||0)}</p></div><button className={button} aria-label={labels.edit+' '+p.name} onClick={()=>onEdit(p)}><Pencil size={16}/></button></div>)}</div>
   {!matches.length&&<p className="py-8 text-center text-slate-500">{labels.rawEmpty}</p>}

@@ -100,6 +100,8 @@ const EnterpriseProductCatalogView = function EnterpriseProductCatalog({
   onNavigate,
   onManageCategories,
   onManageUnits,
+  onManageBrands,
+  brandManagementLabel='Brands',
   onDataChanged,
   openImportSignal = 0,
   canImportProductSpreadsheet = false,
@@ -255,6 +257,7 @@ const EnterpriseProductCatalogView = function EnterpriseProductCatalog({
         <span className="ml-auto flex gap-2">
           <Button variant="outline" size="sm" className="rounded-lg" onClick={onManageCategories}><Tag className="mr-1.5 h-4 w-4" />Categories</Button>
           <Button variant="outline" size="sm" className="rounded-lg" onClick={onManageUnits}><Settings2 className="mr-1.5 h-4 w-4" />Units</Button>
+          {onManageBrands&&<Button variant="outline" size="sm" className="rounded-lg" onClick={onManageBrands}><Tag className="me-1.5 h-4 w-4"/>{brandManagementLabel}</Button>}
           {onBarcode && <Button variant="outline" size="sm" className="rounded-lg" onClick={() => onBarcode()}><Barcode className="mr-1.5 h-4 w-4" />Create Barcode</Button>}
           <Button variant="outline" size="sm" className="hidden rounded-lg sm:inline-flex" onClick={() => onNavigate('/retail/barcode')}><ScanBarcode className="mr-1.5 h-4 w-4" />Scanner</Button>
         </span>

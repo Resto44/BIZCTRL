@@ -14,6 +14,7 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { existingProductBrand, fetchProductBrandChoices, normalizeProductBrand } from '@/lib/productBrands';
 import ProductBrandPicker from '@/components/products/ProductBrandPicker';
+import ProductBrandManager, {useBrandMaster,brandCopy} from '@/components/products/ProductBrandManager';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useWorkspaceCustomization } from '@/lib/WorkspaceCustomizationContext';
@@ -132,7 +133,7 @@ function ProductContext({ form, erp, onEdit }) {
   );
 }
 
-export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
+export default function ProductMasterForm({ initial, onSubmit, onCancel, manageBrands = false }) {
   const { activeRestaurant, branches } = useTenant();
   const queryClient = useQueryClient();
   const retailInventory = isSupermarketProductPortal(activeRestaurant);
@@ -174,6 +175,8 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
     queryFn: () => fetchProductBrandChoices(supabase, activeRestaurant.id),
     enabled: Boolean(activeRestaurant?.id), staleTime: 5 * 60 * 1000, retry: 1,
   });
+  const brandMaster=useBrandMaster(activeRestaurant?.id);
+  const [brandManagerOpen,setBrandManagerOpen]=useState(false);
   const { data: units = [] } = useQuery({
     queryKey: ['product_units', activeRestaurant?.id],
     queryFn: () => base44.entities.ProductUnit.list('sort_order', 200),
@@ -337,7 +340,10 @@ export default function ProductMasterForm({ initial, onSubmit, onCancel }) {
           <Field label={t('unit')}><Select value={form.unit || '__none__'} onValueChange={(value) => set('unit', value === '__none__' ? '' : value)}><SelectTrigger><SelectValue placeholder={t('select')} /></SelectTrigger><SelectContent><SelectItem value="__none__">— Select —</SelectItem>{units.map((unit) => <SelectItem key={unit.id} value={unit.abbreviation || unit.name || unit.id}>{unit.name}{unit.abbreviation ? ` (${unit.abbreviation})` : ''}</SelectItem>)}</SelectContent></Select></Field>
           {isProductFieldVisible('brand') && <Field label={t('brand')} required={isProductFieldRequired('brand')}>
             <ProductBrandPicker value={form.brand || ''} onChange={(value) => set('brand', value)}
-              brands={productBrands} loading={brandsLoading} error={brandsError} lang={lang} />
+              brands={productBrands} masterBrands={brandMaster.data||[]} loading={brandsLoading||brandMaster.isPending} error={brandsError||brandMaster.isError} lang={lang} strictCatalog allowNew={manageBrands} onManage={manageBrands?()=>setBrandManagerOpen(true):undefined} />
+            {(brandMaster.isError||brandsError)&&<Button type="button" variant="outline" onClick={()=>{brandMaster.refetch();queryClient.invalidateQueries({queryKey:['product-brand-choices',activeRestaurant?.id]});}}>{brandCopy(lang).retry}</Button>}
+            {manageBrands&&<Button type="button" variant="outline" className="mt-2 min-h-11 w-full" onClick={()=>setBrandManagerOpen(v=>!v)}>{brandManagerOpen?brandCopy(lang).back:brandCopy(lang).manage}</Button>}
+            {manageBrands&&brandManagerOpen&&<div className="mt-2 rounded-xl border p-3"><ProductBrandManager key={activeRestaurant?.id} restaurantId={activeRestaurant?.id} lang={lang} initialAdd onSelected={brand=>{set('brand',brand);setBrandManagerOpen(false);}}/></div>}
           </Field>}
           <Field label="Primary supplier"><Select value={form.supplier_id || '__none__'} onValueChange={(value) => set('supplier_id', value === '__none__' ? '' : value)}><SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger><SelectContent><SelectItem value="__none__">— None —</SelectItem>{suppliers.map((supplier) => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent></Select></Field>
           {isProductFieldVisible('status') && <Field label={t('status')} required={isProductFieldRequired('status')}><Select value={form.status || 'active'} onValueChange={(value) => set('status', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">{t('active')}</SelectItem><SelectItem value="inactive">{t('inactive')}</SelectItem><SelectItem value="discontinued">{t('discontinued')}</SelectItem></SelectContent></Select></Field>}
