@@ -28,11 +28,10 @@ export async function fetchBrandMaster(db,restaurantId) {
   }
 }
 export async function saveBrandMaster(db,restaurantId,form) {
-  const names=brandMasterPayload(form);
-  const payload={...names,is_active:form.is_active!==false};
+  const payload=form.id&&form.statusOnly?{is_active:form.is_active!==false}:{...brandMasterPayload(form),is_active:form.is_active!==false};
   const query=form.id
     ? db.from('product_brand_master').update(payload).eq('restaurant_id',restaurantId).eq('id',form.id)
-    : db.from('product_brand_master').insert({...payload,restaurant_id:restaurantId,brand:normalizeProductBrand(form.brand||names.name_en)});
+    : db.from('product_brand_master').insert({...payload,restaurant_id:restaurantId,brand:normalizeProductBrand(form.brand||payload.name_en)});
   const {data,error}=await query.select('id,brand,name_en,name_ar,name_fa,is_active').single();
   if(error)throw error;
   if(!data?.id)throw new Error('Brand save not verified');
