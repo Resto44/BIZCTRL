@@ -374,12 +374,12 @@ export async function parseRestaurantMaterialSpreadsheet(file) {
   };
   for(const field of NUMERIC_FIELDS)numeric(raw[field],field);
   if(extra.category_l1&&String(extra.category_l1).trim().toLowerCase()!==String(row.category||'').toLowerCase())result.errors.push({row:row._rowNumber,sku:row.sku,field:'category',message:'Category differs between worksheets'});
-  return {...row,subcategory:String(extra.subcategory_l2||raw.subcategory||'').trim(),child_category:String(extra.child_category_l3||raw.child_category||'').trim(),wholesale_price:numeric(extra.wholesale_price_sar??raw.wholesale_price,'wholesale_price'),minimum_selling_price:numeric(extra.minimum_price_sar??raw.minimum_selling_price,'minimum_selling_price')};
+  return {...row,supplier:String(extra.supplier||extra.primary_supplier||extra.supplier_id||raw.supplier||raw.primary_supplier||raw.supplier_name||raw.supplier_id||'').trim(),subcategory:String(extra.subcategory_l2||raw.subcategory||'').trim(),child_category:String(extra.child_category_l3||raw.child_category||'').trim(),wholesale_price:numeric(extra.wholesale_price_sar??raw.wholesale_price,'wholesale_price'),minimum_selling_price:numeric(extra.minimum_price_sar??raw.minimum_selling_price,'minimum_selling_price')};
  });
  return {...result,validRows:rows,invalidRowCount:new Set(result.errors.map(x=>x.row)).size};
 }
 export function downloadRestaurantMaterialTemplate(){
- const headers=[...PRODUCT_IMPORT_COLUMNS.map(c=>c.key),'subcategory','child_category','wholesale_price','minimum_selling_price'];
- const row=headers.map(k=>({name:'Basmati Rice',sku:'RM-001',name_en:'Basmati Rice',name_ar:'أرز بسمتي',name_fa:'برنج باسمتی',category:'Rice & grains',subcategory:'Rice',brand:'',unit:'KG',purchase_cost:5.5,selling_price:8,tax_rate:15,min_stock:10,max_stock:100,status:'active'}[k]??''));
+ const headers=[...PRODUCT_IMPORT_COLUMNS.map(c=>c.key),'subcategory','child_category','wholesale_price','minimum_selling_price','supplier'];
+ const row=headers.map(k=>({name:'Basmati Rice',sku:'RM-001',name_en:'Basmati Rice',name_ar:'أرز بسمتي',name_fa:'برنج باسمتی',category:'Rice & grains',subcategory:'Rice',brand:'',supplier:'',unit:'KG',purchase_cost:5.5,selling_price:8,tax_rate:15,min_stock:10,max_stock:100,status:'active'}[k]??''));
  triggerDownload(new Blob([createProductImportTemplate({headers,rows:[row],sheetName:'Master Products'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'bizctrl-restaurant-materials.xlsx');
 }
