@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { buildProductControlSnapshot, productIdentity } from '@/lib/productControlCenter';
 import useProductPriceRules from '@/hooks/useProductPriceRules';
 import { getProductCatalogCounts, setBranchProductAssortment } from '@/lib/productCatalogRepository';
+import RestaurantMaterialImport from '@/components/restaurant-pos/RestaurantMaterialImport';
 import RestaurantProductWorkspace, { RawMaterialCatalog } from '@/components/restaurant-pos/RestaurantProductWorkspace';
 import { restaurantMaterialFilter } from '@/lib/restaurantProducts';
 import { isRestaurantPOSPortal, isSupermarketProductPortal } from '@/lib/productImportAccess';
@@ -94,6 +95,8 @@ function GeneralProductManagement() {
   const [showCategories, setShowCategories] = useState(false);
   const [showUnits, setShowUnits] = useState(false);
   const [showBrands,setShowBrands]=useState(false);
+  const [materialImport,setMaterialImport]=useState(false);
+  useEffect(()=>setMaterialImport(false),[restaurantId]);
   const manageBrands=role===ROLES.OWNER;
   useEffect(()=>setShowBrands(false),[restaurantId]);
   const selectedBranch = selectedLocation === 'all'
@@ -328,7 +331,7 @@ function GeneralProductManagement() {
       <ProductMasterWorkspace
         restaurantId={restaurantId}
         restaurantPortal={restaurantPortal}
-        catalogContent={restaurantPortal ? <RawMaterialCatalog products={products} onEdit={setEditing} onAdd={() => setShowCreate(true)} onManageCategories={() => setShowCategories(true)} onManageUnits={() => setShowUnits(true)} onManageBrands={manageBrands?()=>setShowBrands(true):undefined} money={formatMoney}/> : null}
+        catalogContent={restaurantPortal ? <RawMaterialCatalog products={products} onEdit={setEditing} onAdd={() => setShowCreate(true)} onManageCategories={() => setShowCategories(true)} onManageUnits={() => setShowUnits(true)} onManageBrands={manageBrands?()=>setShowBrands(true):undefined} onImport={manageBrands?()=>setMaterialImport(true):undefined} money={formatMoney}/> : null}
         snapshot={snapshot}
         categories={categories}
         transactions={transactions}
@@ -408,6 +411,7 @@ function GeneralProductManagement() {
         </DialogContent>
       </Dialog>
 
+      {restaurantPortal&&manageBrands&&materialImport&&<RestaurantMaterialImport key={restaurantId} restaurantId={restaurantId} lang={lang} onClose={()=>setMaterialImport(false)} onImported={async()=>{await invalidateProductData();await queryClient.invalidateQueries({queryKey:['product-brand-choices',restaurantId]});await queryClient.invalidateQueries({queryKey:['product-brand-usage',restaurantId]});}}/>}
       {manageBrands&&<Dialog open={showBrands} onOpenChange={setShowBrands}><DialogContent className="max-h-[92dvh] overflow-y-auto rounded-2xl sm:max-w-2xl"><DialogHeader><DialogTitle>{brandCopy(lang).manage}</DialogTitle></DialogHeader><ProductBrandManager key={restaurantId} restaurantId={restaurantId} lang={lang}/></DialogContent></Dialog>}
       <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => { if (!open) setDeleting(null); }}>
         <AlertDialogContent>
