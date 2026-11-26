@@ -60,6 +60,7 @@ export default function Suppliers() {
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
+      if(productIds.length&&!canAssign)throw Error('Product assignment is not authorized');
       if(canAssign&&productIds.length){
         const {data:result,error}=await supabase.rpc('erp_save_supplier_catalog',{p_restaurant_id:activeRestaurantId,p_supplier_id:editing?.id||null,p_contact:data,p_product_ids:productIds});
         if(error)throw error;
@@ -85,7 +86,7 @@ export default function Suppliers() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['suppliers'] });
-      for(const key of ['suppliers_org','supplier-catalog-products','purchase_products_filtered','products','product-brand-usage','product-brand-choices'])qc.invalidateQueries({queryKey:[key]});
+      for(const key of ['suppliers_org','restaurant-import-suppliers','supplier-catalog-products','purchase_products_filtered','products','product-brand-usage','product-brand-choices'])qc.invalidateQueries({queryKey:[key]});
       closeForm();
     },
     onError: (err) => {
