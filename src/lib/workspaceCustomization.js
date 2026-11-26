@@ -12,7 +12,7 @@ export const WORKSPACE_MODULE_CATALOG = Object.freeze([
   { key: 'purchase', label: 'Purchases', group: 'Operations', paths: ['/purchases', '/purchase-orders', '/procurement-dashboard', '/enterprise-purchases'] },
   { key: 'expenses', label: 'Expenses', group: 'Finance', paths: ['/expenses'] },
   { key: 'inventory', label: 'Inventory', group: 'Inventory', paths: ['/inventory', '/inventory-transfers', '/inventory-waste', '/inventory-forecast', '/inventory-command-center'] },
-  { key: 'product_management', label: 'Products', group: 'Inventory', paths: ['/products', '/product-management'] },
+  { key: 'product_management', label: 'Products', group: 'Inventory', paths: ['/products', '/product-management', '/brand-analytics'] },
   { key: 'supplier_management', label: 'Suppliers', group: 'Operations', paths: ['/suppliers', '/supplier-ledger', '/supplier-portal'] },
   { key: 'treasury', label: 'Treasury', group: 'Finance', paths: ['/treasury', '/wallet-banking', '/sponsor-treasury'] },
   { key: 'debt_management', label: 'Debts & receivables', group: 'Finance', paths: ['/debts', '/debt-management', '/customer-management', '/loyalty-v2', '/loyalty-program'] },
