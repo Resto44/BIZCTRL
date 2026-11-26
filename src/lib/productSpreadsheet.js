@@ -124,9 +124,11 @@ function extractSharedStrings(entries) {
   return [...document.getElementsByTagNameNS('*', 'si')].map((item) => item.textContent || '');
 }
 
-function extractFirstWorksheetPath(entries) {
+function extractFirstWorksheetPath(entries, sheetName) {
   const workbook = parseXml(readZipEntry(entries, 'xl/workbook.xml'), 'Workbook');
-  const sheet = workbook.getElementsByTagNameNS('*', 'sheet')[0];
+  const sheets = [...workbook.getElementsByTagNameNS('*', 'sheet')];
+  const sheet = sheetName ? sheets.find(item=>item.getAttribute('name')===sheetName) : sheets[0];
+  if(sheetName&&!sheet)return null;
   if (!sheet) throw new Error('The Excel workbook does not contain a worksheet.');
   const relationshipId = sheet.getAttribute('r:id') || sheet.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
   const relationships = parseXml(readZipEntry(entries, 'xl/_rels/workbook.xml.rels'), 'Workbook relationships');
@@ -137,9 +139,10 @@ function extractFirstWorksheetPath(entries) {
   return normalizeZipPath(target.startsWith('/') ? target : `xl/${target}`);
 }
 
-function extractWorksheetMatrix(entries) {
+function extractWorksheetMatrix(entries, sheetName) {
   const sharedStrings = extractSharedStrings(entries);
-  const sheetPath = extractFirstWorksheetPath(entries);
+  const sheetPath = extractFirstWorksheetPath(entries, sheetName);
+  if(!sheetPath)return [];
   const worksheet = parseXml(readZipEntry(entries, sheetPath), 'Worksheet');
   return [...worksheet.getElementsByTagNameNS('*', 'row')].map((rowElement) => {
     const row = [];
@@ -344,4 +347,39 @@ export function downloadProductImportErrors(errors) {
   const rows = errors.map((error) => [error.row, error.sku, error.name, error.field, error.message]);
   const contents = `\uFEFF${[header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
   triggerDownload(new Blob([contents], { type: 'text/csv;charset=utf-8' }), 'biz-control-product-import-errors.csv');
+}
+
+/** Restaurant import uses the same first-sheet format, with optional setup sheet joined by SKU. */
+export async function parseRestaurantMaterialSpreadsheet(file) {
+ const records=await parseProductSpreadsheet(file);
+ if(records.length>500)throw new Error('Restaurant import supports up to 500 rows per file.');
+ let setup=[];
+ if(file.name.toLowerCase().endsWith('.xlsx'))setup=matrixToRecords(extractWorksheetMatrix(unzipSync(new Uint8Array(await file.arrayBuffer())),'Restaurant Setup'));
+ const bySku=new Map();
+ for(const row of setup){
+  const sku=String(row.sku||'').trim().toUpperCase();
+  if(!sku||bySku.has(sku))throw new Error('Missing or duplicate SKU in Restaurant Setup.');
+  bySku.set(sku,row);
+ }
+ const sourceKeys=new Set(records.map(r=>String(r.sku||r.barcode||'').trim().toUpperCase()));
+ for(const sku of bySku.keys())if(!sourceKeys.has(sku))throw new Error('Restaurant Setup contains SKU absent from Master Products: '+sku);
+ const result=validateProductImport(records);
+ const rows=result.validRows.map(row=>{
+  const raw=records[row._rowNumber-2], extra=bySku.get(row.sku)||{};
+  const numeric=(value,field)=>{
+   if(value==null||String(value).trim()==='')return 0;
+   const n=Number(value);
+   if(!Number.isFinite(n)||n<0){result.errors.push({row:row._rowNumber,sku:row.sku,field,message:'Invalid nonnegative number'});return 0;}
+   return n;
+  };
+  for(const field of NUMERIC_FIELDS)numeric(raw[field],field);
+  if(extra.category_l1&&String(extra.category_l1).trim().toLowerCase()!==String(row.category||'').toLowerCase())result.errors.push({row:row._rowNumber,sku:row.sku,field:'category',message:'Category differs between worksheets'});
+  return {...row,subcategory:String(extra.subcategory_l2||raw.subcategory||'').trim(),child_category:String(extra.child_category_l3||raw.child_category||'').trim(),wholesale_price:numeric(extra.wholesale_price_sar??raw.wholesale_price,'wholesale_price'),minimum_selling_price:numeric(extra.minimum_price_sar??raw.minimum_selling_price,'minimum_selling_price')};
+ });
+ return {...result,validRows:rows,invalidRowCount:new Set(result.errors.map(x=>x.row)).size};
+}
+export function downloadRestaurantMaterialTemplate(){
+ const headers=[...PRODUCT_IMPORT_COLUMNS.map(c=>c.key),'subcategory','child_category','wholesale_price','minimum_selling_price'];
+ const row=headers.map(k=>({name:'Basmati Rice',sku:'RM-001',name_en:'Basmati Rice',name_ar:'أرز بسمتي',name_fa:'برنج باسمتی',category:'Rice & grains',subcategory:'Rice',brand:'',unit:'KG',purchase_cost:5.5,selling_price:8,tax_rate:15,min_stock:10,max_stock:100,status:'active'}[k]??''));
+ triggerDownload(new Blob([createProductImportTemplate({headers,rows:[row],sheetName:'Master Products'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'bizctrl-restaurant-materials.xlsx');
 }
