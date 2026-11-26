@@ -3,7 +3,7 @@ import {peopleText} from '@/lib/peopleAccounts';
 import HelpLink from '@/components/help/HelpLink';
 import BrandLogo from '@/components/BrandLogo';
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
 import { ROLES, ROLE_HOME } from '@/lib/RoleContext';
 import { Button } from '@/components/ui/button';
@@ -199,7 +199,13 @@ export default function ERPLogin() {
       </div>
 
       <div className="relative w-full max-w-2xl">
-        <div className="mb-3 text-end text-slate-200"><HelpLink guide="start" /></div>
+        <nav className="mb-4 flex flex-wrap items-center justify-between gap-3 text-slate-200">
+          <Link to="/" data-testid="portal-back-to-landing" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+            <ArrowLeft aria-hidden="true" className={`h-4 w-4 shrink-0 ${lang==='ar'||lang==='fa'?'rotate-180':''}`} />
+            {lang==='fa'?'برگشت به صفحه اصلی':lang==='ar'?'العودة إلى الصفحة الرئيسية':'Back to Home'}
+          </Link>
+          <HelpLink guide="start" />
+        </nav>
         {/* Header */}
         <BrandLogo className="mx-auto mb-6 h-20 w-auto max-w-full" />
         <div className="text-center mb-8">
