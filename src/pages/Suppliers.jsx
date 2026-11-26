@@ -14,6 +14,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Pencil, Trash2, Truck, Phone, CreditCard, MapPin } from 'lucide-react';
 import { useTenant } from '@/lib/TenantContext';
 import SupplierDetail from '@/components/suppliers/SupplierDetail';
+import SupplierCatalogPicker from '@/components/suppliers/SupplierCatalogPicker';
+import {useRole,ROLES} from '@/lib/RoleContext';
 import {supabase} from '@/api/supabaseClient';
 import {readAllPortalRows} from '@/lib/portalReliability';
 import PortalDataState from '@/components/shared/PortalDataState';
@@ -30,7 +32,11 @@ export default function Suppliers() {
   const { lang } = useLanguage();
   const m = ui[lang] || ui.en;
   const qc = useQueryClient();
-  const { ownerFilter, activeRestaurantId, orgId } = useTenant();
+  const { ownerFilter, activeRestaurantId, activeRestaurant, orgId } = useTenant();
+  const {role,can}=useRole();
+  const canAssign=role===ROLES.OWNER&&can.manageSuppliers&&can.updateInventory;
+  const [productIds,setProductIds]=useState([]);
+  const [saveError,setSaveError]=useState('');
   const [searchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -54,6 +60,12 @@ export default function Suppliers() {
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
+      if(canAssign&&productIds.length){
+        const {data:result,error}=await supabase.rpc('erp_save_supplier_catalog',{p_restaurant_id:activeRestaurantId,p_supplier_id:editing?.id||null,p_contact:data,p_product_ids:productIds});
+        if(error)throw error;
+        if(!result?.supplier_id||result.assigned!==productIds.length)throw Error('Supplier assignments not verified');
+        return result;
+      }
       const payload = {
         ...data,
         ...(ownerFilter || {}),
@@ -73,11 +85,12 @@ export default function Suppliers() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['suppliers'] });
+      for(const key of ['suppliers_org','supplier-catalog-products','purchase_products_filtered','products','product-brand-usage','product-brand-choices'])qc.invalidateQueries({queryKey:[key]});
       closeForm();
     },
     onError: (err) => {
       console.error('[Suppliers] Mutation error:', err);
-      alert(err.message || 'An unknown error occurred during save');
+      setSaveError(err.message || 'An unknown error occurred during save');
     }
   });
   const deleteMutation = useMutation({
@@ -85,9 +98,11 @@ export default function Suppliers() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['suppliers'] }); setDeleteId(null); },
   });
 
-  const openAdd = () => { setEditing(null); setForm(emptyForm); setShowForm(true); };
-  const openEdit = (s) => { setEditing(s); setForm({ name: s.name, phone: s.phone || '', email: s.email || '', address: s.address || '', notes: s.notes || '' }); setShowForm(true); };
+  const openAdd = () => { setProductIds([]);setSaveError(''); setEditing(null); setForm(emptyForm); setShowForm(true); };
+  const openEdit = (s) => { setProductIds([]);setSaveError(''); setEditing(s); setForm({ name: s.name, phone: s.phone || '', email: s.email || '', address: s.address || '', notes: s.notes || '' }); setShowForm(true); };
   const closeForm = () => { setShowForm(false); setEditing(null); };
+
+  useEffect(()=>{setShowForm(false);setEditing(null);setProductIds([]);setSaveError('');setSelectedSupplier(null);},[activeRestaurantId]);
 
   if (isLoading) return <PortalDataState loading/>;
   if (isError) return <PortalDataState onRetry={refetch}/>;
@@ -150,8 +165,8 @@ export default function Suppliers() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent>
+      <Dialog open={showForm} onOpenChange={v=>{if(!saveMutation.isPending)setShowForm(v);}}>
+        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl" dir={lang==='en'?'ltr':'rtl'}>
           <DialogHeader><DialogTitle>{editing ? m.edit_supplier : m.add_supplier}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             {[['name', m.name], ['phone', m.phone], ['email', m.email], ['address', m.address], ['notes', m.notes]].map(([field, label]) => (
@@ -160,9 +175,11 @@ export default function Suppliers() {
                 <Input value={form[field]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
               </div>
             ))}
+            {canAssign&&(!editing||(editing.status===true&&!editing.branch_id))&&showForm&&<SupplierCatalogPicker key={activeRestaurantId+':'+(editing?.id||'new')} restaurant={activeRestaurant} restaurantId={activeRestaurantId} supplierId={editing?.id} lang={lang} selected={productIds} onChange={setProductIds} disabled={saveMutation.isPending}/>}
+            {saveError&&<p role="alert" className="text-sm text-red-700">{saveError}</p>}
             <div className="flex gap-2 pt-2">
-              <Button className="flex-1" onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending}>{m.save}</Button>
-              <Button variant="outline" className="flex-1" onClick={closeForm}>{m.cancel}</Button>
+              <Button className="flex-1" onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending||!form.name.trim()}>{m.save}</Button>
+              <Button variant="outline" className="flex-1" disabled={saveMutation.isPending} onClick={closeForm}>{m.cancel}</Button>
             </div>
           </div>
         </DialogContent>
