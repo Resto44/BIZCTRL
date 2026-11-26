@@ -374,7 +374,10 @@ export async function parseRestaurantMaterialSpreadsheet(file) {
   };
   for(const field of NUMERIC_FIELDS)numeric(raw[field],field);
   if(extra.category_l1&&String(extra.category_l1).trim().toLowerCase()!==String(row.category||'').toLowerCase())result.errors.push({row:row._rowNumber,sku:row.sku,field:'category',message:'Category differs between worksheets'});
-  return {...row,supplier:String(extra.supplier||extra.primary_supplier||extra.supplier_id||raw.supplier||raw.primary_supplier||raw.supplier_name||raw.supplier_id||'').trim(),subcategory:String(extra.subcategory_l2||raw.subcategory||'').trim(),child_category:String(extra.child_category_l3||raw.child_category||'').trim(),wholesale_price:numeric(extra.wholesale_price_sar??raw.wholesale_price,'wholesale_price'),minimum_selling_price:numeric(extra.minimum_price_sar??raw.minimum_selling_price,'minimum_selling_price')};
+  const mainSupplier=String(raw.supplier||raw.primary_supplier||raw.supplier_name||raw.supplier_id||'').trim();
+  const setupSupplier=String(extra.supplier||extra.primary_supplier||extra.supplier_name||extra.supplier_id||'').trim();
+  if(mainSupplier&&setupSupplier&&mainSupplier.toLowerCase()!==setupSupplier.toLowerCase())result.errors.push({row:row._rowNumber,sku:row.sku,field:'supplier',message:'Supplier differs between worksheets'});
+  return {...row,supplier:mainSupplier||setupSupplier,subcategory:String(extra.subcategory_l2||raw.subcategory||'').trim(),child_category:String(extra.child_category_l3||raw.child_category||'').trim(),wholesale_price:numeric(extra.wholesale_price_sar??raw.wholesale_price,'wholesale_price'),minimum_selling_price:numeric(extra.minimum_price_sar??raw.minimum_selling_price,'minimum_selling_price')};
  });
  return {...result,validRows:rows,invalidRowCount:new Set(result.errors.map(x=>x.row)).size};
 }
