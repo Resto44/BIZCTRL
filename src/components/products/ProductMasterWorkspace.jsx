@@ -523,6 +523,7 @@ export default function ProductMasterWorkspace({
   onNavigate,
   onManageCategories,
   onManageUnits,
+  onManageBrands,
   onDataChanged,
   canImportProductSpreadsheet = false,
   canDeleteProducts = false,
@@ -583,7 +584,7 @@ export default function ProductMasterWorkspace({
       </header>
 
       {activePage === 'overview' ? <OverviewPage snapshot={snapshot} money={money} onAdd={onAdd} onImport={openCatalogImport} onBarcode={onBarcode} onNavigate={onNavigate} onChangePage={setActivePage} canImportProductSpreadsheet={canImportProductSpreadsheet} /> : null}
-      {activePage === 'catalog' ? (catalogContent || <EnterpriseProductCatalog restaurantId={restaurantId} branches={branches} selectedLocation={selectedLocation} categories={categories} money={money} onAdd={onAdd} onEdit={onEdit} onBarcode={onBarcode} onDelete={onDelete} onNavigate={onNavigate} onManageCategories={onManageCategories} onManageUnits={onManageUnits} onDataChanged={onDataChanged} openImportSignal={catalogImportSignal} canImportProductSpreadsheet={canImportProductSpreadsheet} canDeleteProducts={canDeleteProducts} />) : null}
+      {activePage === 'catalog' ? (catalogContent || <EnterpriseProductCatalog restaurantId={restaurantId} branches={branches} selectedLocation={selectedLocation} categories={categories} money={money} onAdd={onAdd} onEdit={onEdit} onBarcode={onBarcode} onDelete={onDelete} onNavigate={onNavigate} onManageCategories={onManageCategories} onManageUnits={onManageUnits} onManageBrands={onManageBrands} onDataChanged={onDataChanged} openImportSignal={catalogImportSignal} canImportProductSpreadsheet={canImportProductSpreadsheet} canDeleteProducts={canDeleteProducts} />) : null}
       {activePage === 'inventory' ? <InventoryPage snapshot={snapshot} transactions={transactions} branches={branches} selectedLocation={selectedLocation} money={money} onAdjust={onAdjust} onNavigate={onNavigate} /> : null}
       {activePage === 'pricing' ? <PricingPage snapshot={snapshot} suppliers={suppliers} transactions={transactions} rules={priceRules} setRules={setPriceRules} saveRules={savePriceRules} savingRules={savingPriceRules} money={money} onReview={onEdit} onNavigate={onNavigate} /> : null}
     </div>
