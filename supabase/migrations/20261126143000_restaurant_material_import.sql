@@ -1,3 +1,16 @@
+create table public.restaurant_material_import_jobs (
+ id uuid primary key default gen_random_uuid(),
+ restaurant_id uuid not null references public.restaurants(id),
+ file_name text not null,
+ created_rows integer not null check(created_rows between 1 and 500),
+ created_by uuid not null default auth.uid(),
+ created_at timestamptz not null default now()
+);
+alter table public.restaurant_material_import_jobs enable row level security;
+revoke all on public.restaurant_material_import_jobs from public,anon,authenticated;
+grant select,insert on public.restaurant_material_import_jobs to authenticated;
+create policy material_import_jobs_read on public.restaurant_material_import_jobs for select to authenticated using (public.erp_current_role()='owner' and public.erp_can_write_module_scope_text(restaurant_id::text,null,'updateInventory'));
+create policy material_import_jobs_write on public.restaurant_material_import_jobs for insert to authenticated with check (created_by=auth.uid() and public.erp_current_role()='owner' and public.erp_can_write_module_scope_text(restaurant_id::text,null,'updateInventory'));
 -- Restaurant raw-material imports: atomic, create-only, existing RLS and capacity triggers.
 create or replace function public.erp_import_restaurant_materials(p_restaurant_id uuid,p_rows jsonb,p_file_name text,p_commit boolean default false)
 returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
@@ -39,7 +52,7 @@ begin
  end loop;
  if jsonb_array_length(errors)>0 then return jsonb_build_object('ready',jsonb_array_length(prepared),'errors',errors,'created',0);end if;
  if not p_commit then return jsonb_build_object('ready',jsonb_array_length(prepared),'errors',errors,'created',0);end if;
- insert into public.product_import_jobs(restaurant_id,file_name,file_type,status,total_rows,processed_rows,created_rows,completed_at) values(p_restaurant_id,left(coalesce(p_file_name,'materials.xlsx'),255),case when lower(p_file_name) like '%.csv' then 'csv' else 'xlsx' end,'completed',idx,idx,idx,now()) returning id into job;
+ insert into public.restaurant_material_import_jobs(restaurant_id,file_name,created_rows) values(p_restaurant_id,left(coalesce(p_file_name,'materials.xlsx'),255),idx) returning id into job;
  for p in select value from jsonb_array_elements(prepared) loop
  insert into public.products(restaurant_id,product_id,sku,barcode,name,name_en,name_ar,name_fa,category_id,subcategory_id,category,unit,brand,purchase_cost,default_cost,selling_price,default_price,tax_rate,min_stock,max_stock,current_stock,status,is_active,restaurant_product_type,custom_attributes)
  values(p_restaurant_id,gen_random_uuid()::text,p->>'sku',p->>'barcode',p->>'name',p->>'name_en',p->>'name_ar',p->>'name_fa',(p->>'category_id')::uuid,(p->>'subcategory_id')::uuid,p->>'category',p->>'unit',p->>'brand',(p->>'purchase_cost')::numeric,(p->>'purchase_cost')::numeric,(p->>'selling_price')::numeric,(p->>'selling_price')::numeric,(p->>'tax_rate')::numeric,(p->>'min_stock')::numeric,(p->>'max_stock')::numeric,0,p->>'status',p->>'status'='active','raw_material',p->'custom_attributes');
