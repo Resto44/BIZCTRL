@@ -33,6 +33,7 @@ import useProductPriceRules from '@/hooks/useProductPriceRules';
 import { getProductCatalogCounts, setBranchProductAssortment } from '@/lib/productCatalogRepository';
 import RestaurantMaterialImport from '@/components/restaurant-pos/RestaurantMaterialImport';
 import RestaurantProductWorkspace, { RawMaterialCatalog } from '@/components/restaurant-pos/RestaurantProductWorkspace';
+import {readAllPortalRows} from '@/lib/portalReliability';
 import { restaurantMaterialFilter } from '@/lib/restaurantProducts';
 import { isRestaurantPOSPortal, isSupermarketProductPortal } from '@/lib/productImportAccess';
 
@@ -64,7 +65,7 @@ export default function ProductManagement() {
 
 function GeneralProductManagement() {
   const { activeRestaurant, branches = [] } = useTenant();
-  const { role } = useRole();
+  const { role,can } = useRole();
   const { formatMoney,lang } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -105,7 +106,7 @@ function GeneralProductManagement() {
 
   const productsQuery = useQuery({
     queryKey: ['products', restaurantId, restaurantPortal ? 'raw' : 'all'],
-    queryFn: () => base44.entities.Product.filter({ restaurant_id: restaurantId, ...restaurantMaterialFilter(activeRestaurant) }, '-created_date', PRODUCT_QUERY_LIMIT),
+    queryFn: () => restaurantPortal ? readAllPortalRows(()=>supabase.from('products').select('*').eq('restaurant_id',restaurantId).eq('restaurant_product_type','raw_material').order('created_date',{ascending:false}).order('id')) : base44.entities.Product.filter({ restaurant_id: restaurantId }, '-created_date', PRODUCT_QUERY_LIMIT),
     enabled: Boolean(restaurantId),
     staleTime: 30_000,
   });
@@ -216,6 +217,16 @@ function GeneralProductManagement() {
     queryClient.invalidateQueries({ queryKey: ['erp-master-catalog'] }),
     queryClient.invalidateQueries({ queryKey: ['erp-master-catalog-counts'] }),
   ]);
+
+  const archiveRawMaterials = async (ids,archived) => {
+    if(!restaurantPortal||role!==ROLES.OWNER||!can.updateInventory||!restaurantId)throw Error('Access denied');
+    const {data,error}=await supabase.rpc('erp_set_raw_material_archived',{p_restaurant_id:restaurantId,p_ids:ids,p_archived:archived});
+    if(error)throw error;
+    if(data!==ids.length)throw Error('Unexpected updated count');
+    queryClient.setQueryData(['products',restaurantId,'raw'],rows=>(rows||[]).map(p=>ids.includes(p.id)?{...p,is_active:!archived,status:archived?'inactive':'active'}:p));
+    await Promise.allSettled([invalidateProductData(),...['purchase_products_filtered','supplier-catalog-products','product-brand-usage','product-brand-choices','restaurant-pos-setup','restaurant-menu-catalog'].map(key=>queryClient.invalidateQueries({queryKey:[key]}))]);
+    return data;
+  };
 
   const syncInventoryRows = async ({ product, rows, enabled }) => {
     if (canImportProductSpreadsheet) return [];
@@ -331,7 +342,7 @@ function GeneralProductManagement() {
       <ProductMasterWorkspace
         restaurantId={restaurantId}
         restaurantPortal={restaurantPortal}
-        catalogContent={restaurantPortal ? <RawMaterialCatalog products={products} onEdit={setEditing} onAdd={() => setShowCreate(true)} onManageCategories={() => setShowCategories(true)} onManageUnits={() => setShowUnits(true)} onManageBrands={manageBrands?()=>setShowBrands(true):undefined} onImport={manageBrands?()=>setMaterialImport(true):undefined} money={formatMoney}/> : null}
+        catalogContent={restaurantPortal ? <RawMaterialCatalog key={restaurantId} products={products} onArchive={manageBrands&&can.updateInventory?archiveRawMaterials:undefined} loading={productsQuery.isPending} loadError={productsQuery.isError} onRetry={productsQuery.refetch} onEdit={setEditing} onAdd={() => setShowCreate(true)} onManageCategories={() => setShowCategories(true)} onManageUnits={() => setShowUnits(true)} onManageBrands={manageBrands?()=>setShowBrands(true):undefined} onImport={manageBrands?()=>setMaterialImport(true):undefined} money={formatMoney}/> : null}
         snapshot={snapshot}
         categories={categories}
         transactions={transactions}
