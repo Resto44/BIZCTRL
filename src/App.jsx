@@ -77,6 +77,7 @@ const SalesInvoices       = lazy(() => import('./pages/SalesInvoices'));
 const Purchases           = lazy(() => import('./pages/Purchases'));
 const Expenses            = lazy(() => import('@/pages/Expenses'));
 const ProductManagement   = lazy(() => import('@/pages/ProductManagement'));
+const BrandAnalyticsPage  = lazy(() => import('@/pages/BrandAnalyticsPage'));
 const Inventory           = lazy(() => import('@/pages/Inventory'));
 const InventoryTransfer   = lazy(() => import('@/pages/InventoryTransfer'));
 const InventoryWaste      = lazy(() => import('@/pages/InventoryWaste'));
@@ -389,6 +390,7 @@ const SubscribedRoutes = () => {
 
         {/* ── Inventory ── */}
         <Route path="/product-management" element={<RoleGuard permission="viewInventory"><ProductManagement /></RoleGuard>} />
+        <Route path="/brand-analytics" element={<ERPRoleGuard allowedRoles={['owner']}><RoleGuard permission="viewInventory"><BrandAnalyticsPage /></RoleGuard></ERPRoleGuard>} />
         <Route path="/products" element={<Navigate to="/product-management" replace />} />
         <Route path="/inventory" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="overview" fallback={<Inventory />} /></RoleGuard>} />
         <Route path="/inventory/stock" element={<RoleGuard permission="viewInventory"><RetailInventoryRoute page="stock" /></RoleGuard>} />

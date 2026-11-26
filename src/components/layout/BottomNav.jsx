@@ -92,6 +92,7 @@ const MORE_PERMISSION_BY_PATH = {
   '/sales/invoices': 'viewSales',
   '/inventory': 'viewInventory',
   '/product-management': 'viewInventory',
+  '/brand-analytics': 'viewInventory',
   '/inventory-waste': 'viewInventory',
   '/purchases': 'viewPurchases',
   '/suppliers': 'viewSuppliers',
@@ -152,6 +153,7 @@ const MORE_SECTIONS_OWNER_RESTAURANT = [
   {
     title: 'Analytics',
     items: [
+      { path: '/brand-analytics', icon: BarChart3, labelKey: 'brand_analytics' },
       { path: '/network-management',        icon: Building2,   labelKey: 'network_management' },
       { path: '/bi-center',                 icon: BarChart3,   labelKey: 'bi_center' },
       { path: '/reports',                   icon: TrendingUp,  labelKey: 'reports' },
@@ -218,6 +220,7 @@ const MORE_SECTIONS_OWNER_RETAIL = [
   {
     title: 'Analytics',
     items: [
+      { path: '/brand-analytics', icon: BarChart3, labelKey: 'brand_analytics' },
       { path: '/network-management',        icon: Building2,   labelKey: 'network_management' },
       { path: '/reports',                   icon: TrendingUp,  labelKey: 'reports' },
       { path: '/profit-loss',               icon: Wallet,      labelKey: 'profit_loss' },
@@ -320,7 +323,7 @@ const CONTROL_GROUPS = [
     title: 'Stock & Products',
     icon: Package,
     iconClass: 'bg-orange-500 text-white',
-    paths: ['/inventory', '/product-management', '/inventory-waste', '/retail/barcode', '/retail/sku', '/retail/variants', '/retail/batches', '/retail/expiry', '/retail/serials'],
+    paths: ['/inventory', '/product-management', '/brand-analytics', '/inventory-waste', '/retail/barcode', '/retail/sku', '/retail/variants', '/retail/batches', '/retail/expiry', '/retail/serials'],
   },
   {
     key: 'finance',
@@ -655,6 +658,7 @@ const BottomNav = memo(function BottomNav() {
           .filter((item) => {
             if (item.path === '/restaurant/pos' && !restaurant) return false;
             if (item.path === '/restaurant/kitchen' && !restaurant) return false;
+            if (item.path === '/brand-analytics' && role !== ROLES.OWNER) return false;
             const permission = MORE_PERMISSION_BY_PATH[item.path];
             return (item.path !== '/retail/cashier' || commerce) && (!permission || can[permission]) && !hidden.has(item.path) && isWorkspacePathEnabled(configuration, item.path);
           })
@@ -662,7 +666,7 @@ const BottomNav = memo(function BottomNav() {
       }))
       .filter((section) => section.items.length > 0);
     return { visibleNav, moreSections };
-  }, [baseMoreSections, baseNav, can, configuration, commerce, lang, restaurant]);
+  }, [baseMoreSections, baseNav, can, configuration, commerce, lang, restaurant, role]);
 
   return (
     <>

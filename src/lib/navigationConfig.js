@@ -246,6 +246,7 @@ export const ALL_NAV_ITEMS = [
 
 
   // ── ANALYTICS (Shared) ─────────────────────────────────────────────────────
+  { path: '/brand-analytics', label: 'Brand Analytics', icon: BarChart3, mode: 'all', group: NAV_GROUPS.ANALYTICS, permission: 'viewInventory', roles: ['owner'] },
   {
     path: '/reports',
     label: 'Reports',
