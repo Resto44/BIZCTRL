@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
+import {fetchScopedPurchaseProducts,fetchAlternateSupplierProductIds} from '@/lib/purchaseInvoiceBrands';
+import {restaurantMaterialFilter} from '@/lib/restaurantProducts';
 import { useTenant } from '@/lib/TenantContext';
 
 /**
@@ -7,28 +9,16 @@ import { useTenant } from '@/lib/TenantContext';
  * Used in Purchase Invoice flow: Supplier → Product Category → Subcategory → Product
  */
 export function useProductCategoriesBySupplier(supplierId) {
-  const { activeRestaurantId } = useTenant();
+  const { activeRestaurantId,activeRestaurant } = useTenant();
 
   const { data: categories = [], isLoading } = useQuery({
     queryKey: ['product_categories_by_supplier', supplierId, activeRestaurantId],
     queryFn: async () => {
       if (!supplierId || !activeRestaurantId) return [];
 
-      // Query to get all product categories that have products from this supplier
-      const { data, error } = await supabase
-        .from('products')
-        .select('category_id')
-        .eq('supplier_id', supplierId)
-        .eq('restaurant_id', activeRestaurantId)
-        .is('category_id', 'not.is.null');
-
-      if (error) {
-        console.error('Error fetching product categories by supplier:', error);
-        return [];
-      }
-
-      // Get unique category IDs
-      const categoryIds = [...new Set(data.map(p => p.category_id))];
+      const ids=await fetchAlternateSupplierProductIds(supabase,activeRestaurantId,supplierId);
+      const data=await fetchScopedPurchaseProducts(supabase,{restaurant_id:activeRestaurantId,supplier_id:supplierId,...restaurantMaterialFilter(activeRestaurant)},ids);
+      const categoryIds=[...new Set(data.map(p=>p.category_id).filter(Boolean))];
 
       if (categoryIds.length === 0) return [];
 
