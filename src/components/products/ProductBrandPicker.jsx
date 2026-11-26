@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Check, Plus, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import {brandKey,brandLabel,brandMatches,mergeBrandMaster} from '@/lib/productBrandMaster';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   cleanProductBrands, existingProductBrand, normalizeProductBrand,
@@ -39,19 +40,21 @@ const copy = {
  * Never guess a brand for a new product; preserve the exact saved brand on edits.
  */
 export default function ProductBrandPicker({
-  value = '', onChange, brands = [], loading = false, error = false, lang = 'en',
+  value = '', onChange, brands = [], loading = false, error = false, lang = 'en', masterBrands = [], onManage, allowNew = true,
 }) {
   const t = copy[lang] || copy.en;
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState('');
-  const options = useMemo(() => cleanProductBrands(brands, adding ? '' : value), [brands, value, adding]);
+  const master = useMemo(()=>mergeBrandMaster(masterBrands,brands),[masterBrands,brands]);
+  const labels = useMemo(()=>new Map(master.map(row=>[brandKey(row.brand),row])),[master]);
+  const options = useMemo(() => cleanProductBrands(master.filter(row=>row.is_active!==false).map(row=>row.brand), adding ? '' : value), [master, value, adding]);
   const normalized = normalizeProductBrand(value);
   const selected = existingProductBrand(options, normalized) || normalized;
   const selectedKey = selected ? `brand:${selected}` : '__none__';
   const matching = useMemo(() => {
     const needle = normalizeProductBrand(search).toLocaleLowerCase();
-    return options.filter(brand => !needle || brand.toLocaleLowerCase().includes(needle));
-  }, [options, search]);
+    return options.filter(brand => brandMatches(labels.get(brandKey(brand)) || {brand},needle));
+  }, [options, search, labels]);
   // Keep the currently selected brand inside Radix Select even if it is
   // past the first 120 search results, so edit mode never blanks the value.
   const visible = matching.slice(0, 120);
@@ -62,6 +65,8 @@ export default function ProductBrandPicker({
       setAdding(false);
       onChange('');
     } else if (key === '__new__') {
+      if(onManage){onManage();return;}
+      if(!allowNew)return;
       setAdding(true);
       setSearch('');
       onChange('');
@@ -83,7 +88,7 @@ export default function ProductBrandPicker({
 
   return (
     <div className="min-w-0 space-y-2" data-testid="product-brand-picker">
-      {options.length > 20 && !adding && <div className="relative">
+      {options.length > 0 && !adding && <div className="relative">
         <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
         <Input aria-label={t.search} placeholder={t.search} value={search}
           onChange={event => setSearch(event.target.value)}
@@ -100,11 +105,11 @@ export default function ProductBrandPicker({
             <SelectItem key={brand} value={`brand:${brand}`}>
               <span className="inline-flex min-w-0 items-center gap-2">
                 {selected === brand && !adding ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
-                <span className="truncate">{brand}</span>
+                <span className="truncate">{brandLabel(labels.get(brandKey(brand)) || {brand},lang)}{labels.get(brandKey(brand))?.is_active===false ? (lang==='fa'?' (غیرفعال)':lang==='ar'?' (مؤرشفة)':' (Archived)'):''}</span>
               </span>
             </SelectItem>
           ))}
-          <SelectItem value="__new__"><span className="inline-flex items-center gap-2 font-bold text-blue-600"><Plus className="h-4 w-4" />{t.add}</span></SelectItem>
+          {allowNew&&<SelectItem value="__new__"><span className="inline-flex items-center gap-2 font-bold text-blue-600"><Plus className="h-4 w-4" />{t.add}</span></SelectItem>}
         </SelectContent>
       </Select>
       {!adding && matching.length > 120 && <p className="text-xs text-slate-500">{t.more}</p>}
