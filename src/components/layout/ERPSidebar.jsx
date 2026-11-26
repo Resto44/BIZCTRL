@@ -142,6 +142,7 @@ export const ERP_NAV_GROUPS = [
     label: 'Analytics & Reports',
     items: [
       { path: '/reports',         label: 'Reports',         icon: BarChart3, permission: 'viewReports' },
+      { path: '/brand-analytics', label: 'Brand Analytics', icon: BarChart3, permission: 'viewInventory', roles: ['owner'] },
       { path: '/oracle-analytics',label: 'Oracle Analytics',icon: Zap,       permission: 'viewReports' },
       { path: '/bi-center',       label: 'Business Intelligence',icon: BarChart3, permission: 'viewReports' },
       { path: '/branch-analytics',label: 'Branch Analytics',icon: GitBranch, permission: 'viewReports' },
@@ -174,7 +175,7 @@ const MOBILE_NAV_SECTIONS = [
     icon: BarChart3,
     paths: [
       '/sales-dashboard', '/ceo-dashboard', '/reports', '/oracle-analytics',
-      '/bi-center', '/branch-analytics', '/alerts',
+      '/bi-center', '/branch-analytics', '/brand-analytics', '/alerts',
     ],
   },
   {
@@ -359,9 +360,9 @@ function MobileOwnerMenu({ activeRestaurant, can, role, location, navigationGrou
   const searchedSections = useMemo(() => sections.map((section) => ({
     ...section,
     items: normalizedSearch
-      ? section.items.filter((item) => `${item.label} ${section.label}`.toLocaleLowerCase().includes(normalizedSearch))
+      ? section.items.filter((item) => `${item.label} ${translateLiteral(item.label)} ${section.label} ${translateLiteral(section.label)}`.toLocaleLowerCase().includes(normalizedSearch))
       : section.items,
-  })).filter((section) => section.items.length > 0), [normalizedSearch, sections]);
+  })).filter((section) => section.items.length > 0), [normalizedSearch, sections, translateLiteral]);
 
   const todayActions = [
     can.viewSales && {
@@ -778,7 +779,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
               <Star className="w-3 h-3" /> {translateLiteral('Favorites')}
             </span>
             <div className="px-2 space-y-0.5">
-              {favorites.map(fav => (
+              {favorites.filter(fav => fav.path !== '/brand-analytics' || (role === 'owner' && can.viewInventory && navigationGroups.some(g=>g.items.some(i=>i.path===fav.path)))).map(fav => (
                 <NavItem
                   key={fav.path}
                   item={{ path: fav.path, label: fav.label, icon: Star }}
@@ -800,7 +801,7 @@ export default function ERPSidebar({ collapsed, onToggle, mobile = false, onNavi
               <Clock className="w-3 h-3" /> {translateLiteral('Recent')}
             </span>
             <div className="px-2 space-y-0.5">
-              {recentPages.slice(0, 5).map(page => (
+              {recentPages.filter(page => page.path !== '/brand-analytics' || (role === 'owner' && can.viewInventory && navigationGroups.some(g=>g.items.some(i=>i.path===page.path)))).slice(0, 5).map(page => (
                 <NavItem
                   key={page.path}
                   item={{ path: page.path, label: page.label, icon: Clock }}
