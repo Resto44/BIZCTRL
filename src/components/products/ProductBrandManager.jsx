@@ -34,7 +34,7 @@ export default function ProductBrandManager({restaurantId,lang='en',onSelected,i
    setError('');setMessage('');
    if(!form||['name_en','name_ar','name_fa'].some(k=>!String(form[k]||'').trim())){setError(t.required);return;}
    const key=brandKey(form.brand||form.name_en);
-   if(rows.some(r=>brandKey(r.brand)===key && r.id!==form.id && !(form.brand&&!r.id))){setError(t.duplicate);return;}
+   if(rows.some(r=>(brandKey(r.brand)===key||['name_en','name_ar','name_fa'].some(k=>brandKey(form[k])&&brandKey(form[k])===brandKey(r[k]))) && !(r.id&&r.id===form.id) && !(form.brand&&!r.id))){setError(t.duplicate);return;}
    mutation.mutate(form);
  };
  const busy=master.isPending||legacy.isPending||mutation.isPending;
