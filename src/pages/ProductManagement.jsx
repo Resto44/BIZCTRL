@@ -358,6 +358,7 @@ function GeneralProductManagement() {
         onManageCategories={() => setShowCategories(true)}
         onManageUnits={() => setShowUnits(true)}
         onManageBrands={manageBrands?()=>setShowBrands(true):undefined}
+        brandManagementLabel={brandCopy(lang).title}
         onDataChanged={invalidateProductData}
         canImportProductSpreadsheet={canImportProductSpreadsheet}
         canDeleteProducts={canDeleteProducts}
