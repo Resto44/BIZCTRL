@@ -41,7 +41,7 @@ describe('Purchase Invoice cannot post a priced, brand-only empty product line',
   expect(selected).toMatchObject({product_id:'p1',product_name:'أرز هندي 10 كغ',unit_cost:76,line_total:76});
   expect(autoSelectPurchaseBrandProduct({...old,product_name:'Manual item'},fixture[0]).product_id).toBe('');
   expect(autoSelectPurchaseBrandProduct({...old,product_id:'existing'},fixture[0]).product_id).toBe('existing');
-  expect(form).toContain("if (productsLoading || !selectedBrand || item.product_id");
+  expect(form).toContain("if (productsLoading || productsError || !selectedBrand || item.product_id");
   expect(form).toContain("updateItem(item._id, 'auto_scoped_product', soleProduct)");
  });
  it('changing a category, brand or supplier still clears stale selected product ID and price',()=>{
@@ -71,8 +71,9 @@ describe('Purchase Invoice cannot post a priced, brand-only empty product line',
   expect(form).toContain("if (soleProduct) updateItem(item._id, 'auto_scoped_product', soleProduct)");
   expect(catalogHook).toContain('restaurant_id: activeRestaurantId');
   expect(catalogHook).toContain('productCategoryId && { category_id: productCategoryId }');
-  expect(catalogHook).toContain('return fetchCatalog(baseFilter)');
-  expect(catalogHook).toContain('if (supplierProducts?.length) return supplierProducts');
+  expect(catalogHook).toContain('subcategoryId && { subcategory_id: subcategoryId }');
+  expect(catalogHook).toContain('supplierId && { supplier_id: supplierId }');
+  expect(catalogHook).not.toContain('return fetchCatalog(baseFilter)');
   expect(catalogHook).not.toContain('base44.entities.Product.list()');
  });
 });
