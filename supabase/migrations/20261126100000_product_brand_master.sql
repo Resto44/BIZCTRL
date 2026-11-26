@@ -12,6 +12,9 @@ create table public.product_brand_master (
   created_at timestamptz not null default now(),
   unique (restaurant_id,brand_key)
 );
+create unique index product_brand_master_en_unique on public.product_brand_master (restaurant_id, lower(btrim(regexp_replace(name_en, '[[:space:]]+', ' ', 'g'))));
+create unique index product_brand_master_ar_unique on public.product_brand_master (restaurant_id, lower(btrim(regexp_replace(name_ar, '[[:space:]]+', ' ', 'g')))) where name_ar is not null;
+create unique index product_brand_master_fa_unique on public.product_brand_master (restaurant_id, lower(btrim(regexp_replace(name_fa, '[[:space:]]+', ' ', 'g')))) where name_fa is not null;
 alter table public.product_brand_master enable row level security;
 revoke all on public.product_brand_master from public, anon, authenticated;
 grant select, insert (restaurant_id,brand,name_en,name_ar,name_fa,is_active), update (name_en,name_ar,name_fa,is_active) on public.product_brand_master to authenticated;
