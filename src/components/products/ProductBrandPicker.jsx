@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Check, Plus, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import BrandLogo from '@/components/products/BrandLogo';
 import {brandKey,brandLabel,brandMatches,mergeBrandMaster} from '@/lib/productBrandMaster';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -105,6 +106,7 @@ export default function ProductBrandPicker({
             <SelectItem key={brand} value={`brand:${brand}`}>
               <span className="inline-flex min-w-0 items-center gap-2">
                 {selected === brand && !adding ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                {labels.get(brandKey(brand))?.image_url&&<BrandLogo url={labels.get(brandKey(brand)).image_url} className="h-6 w-6"/>}
                 <span className="truncate">{brandLabel(labels.get(brandKey(brand)) || {brand},lang)}{labels.get(brandKey(brand))?.is_active===false ? (lang==='fa'?' (غیرفعال)':lang==='ar'?' (مؤرشفة)':' (Archived)'):''}</span>
               </span>
             </SelectItem>
