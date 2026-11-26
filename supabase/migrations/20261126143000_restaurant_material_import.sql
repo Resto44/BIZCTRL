@@ -1,7 +1,7 @@
 -- Restaurant raw-material imports: atomic, create-only, existing RLS and capacity triggers.
 create or replace function public.erp_import_restaurant_materials(p_restaurant_id uuid,p_rows jsonb,p_file_name text,p_commit boolean default false)
 returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
-declare r jsonb; prepared jsonb='[]'; errors jsonb='[]'; c uuid; sub uuid; child uuid; unit_value text; brand_value text; n int; idx int=0; sku text; barcode text; cost numeric; price numeric; vat numeric; mn numeric; mx numeric; wp numeric; mp numeric; category_name text; p jsonb; job uuid;
+declare r jsonb; prepared jsonb='[]'; errors jsonb='[]'; c uuid; sub uuid; child uuid; unit_value text; brand_value text; n int; idx int=0; v_sku text; v_barcode text; cost numeric; price numeric; vat numeric; mn numeric; mx numeric; wp numeric; mp numeric; category_name text; p jsonb; job uuid;
 begin
  if auth.uid() is null or public.erp_current_role() is distinct from 'owner' or not coalesce(public.erp_can_write_module_scope_text(p_restaurant_id::text,null,'updateInventory'),false) then raise exception 'Access denied' using errcode='42501'; end if;
  if not exists(select 1 from public.restaurants where id=p_restaurant_id and lower(coalesce(nullif(btrim(business_type),''),business_mode)) in ('restaurant','cafe')) then raise exception 'Restaurant or cafe required';end if;
@@ -11,9 +11,9 @@ begin
  for r in select value from jsonb_array_elements(p_rows) loop
  idx=idx+1;
  begin
- sku=upper(btrim(coalesce(r->>'sku','')));barcode=nullif(btrim(r->>'barcode'),'');
- if sku='' or length(sku)>120 or length(btrim(coalesce(r->>'name','')))=0 then raise exception 'Name and SKU required';end if;
- if exists(select 1 from public.products x where x.restaurant_id=p_restaurant_id and (upper(btrim(x.sku))=sku or (barcode is not null and btrim(x.barcode)=barcode))) or exists(select 1 from jsonb_array_elements(prepared) x where x->>'sku'=sku or (barcode is not null and x->>'barcode'=barcode)) then raise exception 'Existing or duplicate SKU/barcode; no overwrite';end if;
+ v_sku=upper(btrim(coalesce(r->>'sku','')));v_barcode=nullif(btrim(r->>'barcode'),'');
+ if v_sku='' or length(v_sku)>120 or length(btrim(coalesce(r->>'name','')))=0 then raise exception 'Name and SKU required';end if;
+ if exists(select 1 from public.products x where x.restaurant_id=p_restaurant_id and (upper(btrim(x.sku))=v_sku or (v_barcode is not null and btrim(x.barcode)=v_barcode))) or exists(select 1 from jsonb_array_elements(prepared) x where x->>'sku'=v_sku or (v_barcode is not null and x->>'barcode'=v_barcode)) then raise exception 'Existing or duplicate SKU/barcode; no overwrite';end if;
  select count(*),(array_agg(id))[1],(array_agg(name))[1] into n,c,category_name from public.product_categories where restaurant_id=p_restaurant_id and parent_id is null and coalesce(is_active,true) and lower(btrim(name))=lower(btrim(r->>'category'));
  if n<>1 then raise exception 'Select an existing unique active main category';end if;
  sub=null;child=null;
@@ -33,8 +33,8 @@ begin
  if brand_value is null then raise exception 'Register an active brand first';end if;
  end if;
  cost=coalesce((r->>'purchase_cost')::numeric,0);price=coalesce((r->>'selling_price')::numeric,0);vat=coalesce((r->>'tax_rate')::numeric,0);mn=coalesce((r->>'min_stock')::numeric,0);mx=coalesce((r->>'max_stock')::numeric,0);wp=coalesce((r->>'wholesale_price')::numeric,0);mp=coalesce((r->>'minimum_selling_price')::numeric,0);
- if least(cost,price,vat,mn,mx,wp,mp)<0 or greatest(cost,price,mn,mx,wp,mp)>1000000000 or vat>100 or mp>price or (mx>0 and mn>mx) or (r->>'status') not in ('active','inactive','discontinued') then raise exception 'Invalid pricing, stock limits or status';end if;
- prepared=prepared||jsonb_build_array(jsonb_build_object('sku',sku,'barcode',barcode,'name',btrim(r->>'name'),'name_en',nullif(btrim(r->>'name_en'),''),'name_ar',nullif(btrim(r->>'name_ar'),''),'name_fa',nullif(btrim(r->>'name_fa'),''),'category_id',c,'subcategory_id',sub,'category',category_name,'unit',unit_value,'brand',brand_value,'purchase_cost',cost,'selling_price',price,'tax_rate',vat,'min_stock',mn,'max_stock',mx,'status',r->>'status','custom_attributes',jsonb_build_object('__erp_master',jsonb_build_object('product_type','stock','costing_method','weighted_average','track_inventory',true,'allow_negative_stock',false,'sellable',false,'purchasable',true,'pos_visibility','hidden','price_includes_tax',false,'wholesale_price',wp,'minimum_selling_price',mp,'child_category_id',child))));
+ if least(cost,price,vat,mn,mx,wp,mp)<0 or greatest(cost,price,mn,mx,wp,mp)>1000000000 or vat>100 or mp>price or (mx>0 and mn>mx) or coalesce(r->>'status','') not in ('active','inactive','discontinued') then raise exception 'Invalid pricing, stock limits or status';end if;
+ prepared=prepared||jsonb_build_array(jsonb_build_object('sku',v_sku,'barcode',v_barcode,'name',btrim(r->>'name'),'name_en',nullif(btrim(r->>'name_en'),''),'name_ar',nullif(btrim(r->>'name_ar'),''),'name_fa',nullif(btrim(r->>'name_fa'),''),'category_id',c,'subcategory_id',sub,'category',category_name,'unit',unit_value,'brand',brand_value,'purchase_cost',cost,'selling_price',price,'tax_rate',vat,'min_stock',mn,'max_stock',mx,'status',r->>'status','custom_attributes',jsonb_build_object('__erp_master',jsonb_build_object('product_type','stock','costing_method','weighted_average','track_inventory',true,'allow_negative_stock',false,'sellable',false,'purchasable',true,'pos_visibility','hidden','price_includes_tax',false,'wholesale_price',wp,'minimum_selling_price',mp,'child_category_id',child))));
  exception when others then errors=errors||jsonb_build_array(jsonb_build_object('row',idx+1,'sku',sku,'message',sqlerrm));end;
  end loop;
  if jsonb_array_length(errors)>0 then return jsonb_build_object('ready',jsonb_array_length(prepared),'errors',errors,'created',0);end if;
