@@ -5,12 +5,9 @@
  */
 import { cleanProductBrands, normalizeProductBrand } from './productBrands.js';
 
-export function purchaseBrandOptions(products = [], savedBrand = '', organizationBrands = []) {
-  // Combine brands found in the current supplier/category with the verified
-  // organization vocabulary shared with Product Master. Never use global brands.
+export function purchaseBrandOptions(products = [], savedBrand = '') {
   const mapped = (Array.isArray(products) ? products : []).map(product => product?.brand);
-  const shared = Array.isArray(organizationBrands) ? organizationBrands : [];
-  return cleanProductBrands([...mapped, ...shared], savedBrand);
+  return cleanProductBrands(mapped, savedBrand);
 }
 
 export function purchaseProductsForBrand(products = [], brand = '') {
@@ -59,4 +56,25 @@ export function selectPurchaseProduct(item, product) {
     // A defined zero price is valid and should not inherit a prior product's cost.
     unit_cost: product.default_cost ?? product.purchase_cost ?? 0,
   };
+}
+
+/** No implicit fallback: each filter applies on the same tenant-scoped query.
+ * Paginate so a brand is not lost beyond the default API row limit. */
+export async function fetchScopedPurchaseProducts(db, filters) {
+ if (!filters?.restaurant_id || (!filters.category_id && !filters.supplier_id)) return [];
+ const rows=[];
+ for(let offset=0;;offset+=500) {
+  let q=db.from('products').select('id,name,name_en,name_ar,name_fa,sku,barcode,brand,unit,default_cost,purchase_cost,category_id,subcategory_id,supplier_id,restaurant_id,restaurant_product_type,is_active,status');
+  for(const [key,value] of Object.entries(filters))if(value)q=q.eq(key,value);
+  const {data,error}=await q.order('id').range(offset,offset+499);
+  if(error)throw error;
+  if(!Array.isArray(data))throw new Error('Invalid product response');
+  rows.push(...data.filter(p=>p.is_active!==false&&!['inactive','discontinued'].includes(p.status)));
+  if(data.length<500)break;
+ }
+ return rows.sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+}
+export function searchPurchaseProducts(products, search) {
+ const q=normalizeProductBrand(search).toLocaleLowerCase();
+ return (products||[]).filter(p=>!q||[p.name,p.name_en,p.name_ar,p.name_fa,p.sku,p.barcode].some(v=>normalizeProductBrand(v).toLocaleLowerCase().includes(q)));
 }
