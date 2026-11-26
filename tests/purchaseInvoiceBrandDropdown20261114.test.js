@@ -69,7 +69,7 @@ describe('Purchase Invoice brand selector ERP',()=>{
     expect(brand).toBeGreaterThan(-1);
     expect(product).toBeGreaterThan(brand);
     expect(code).toContain('aria-label="Select product brand"');
-    expect(code).toContain('purchaseBrandOptions(categoryProducts, selectedBrand)');
+    expect(code).toContain('purchaseBrandDiscovery({categoryProducts:discoveryProducts,supplierProducts:categoryProducts');
     expect(code).toContain('data-testid="purchase-matching-products"');
     expect(code).toContain('const visibleProducts = purchaseProductsForBrand(categoryProducts, selectedBrand)');
     expect(code).toContain("updateItem(item._id, 'selected_product', product)");
