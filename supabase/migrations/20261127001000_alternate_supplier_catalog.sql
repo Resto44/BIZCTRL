@@ -10,13 +10,13 @@ alter table public.product_alternate_suppliers enable row level security;
 revoke all on public.product_alternate_suppliers from public,anon,authenticated;
 grant select,insert on public.product_alternate_suppliers to authenticated;
 create policy alternate_supplier_read on public.product_alternate_suppliers for select to authenticated using (
- public.erp_current_role() <> 'supplier' and exists(select 1 from public.products p where p.id=product_id and p.restaurant_id=product_alternate_suppliers.restaurant_id)
- and exists(select 1 from public.suppliers s where s.id=supplier_id and s.restaurant_id=product_alternate_suppliers.restaurant_id)
+ public.erp_current_role() <> 'supplier' and exists(select 1 from public.products p where p.id=product_alternate_suppliers.product_id and p.restaurant_id=product_alternate_suppliers.restaurant_id)
+ and exists(select 1 from public.suppliers s where s.id=product_alternate_suppliers.supplier_id and s.restaurant_id=product_alternate_suppliers.restaurant_id)
 );
 create policy alternate_supplier_insert on public.product_alternate_suppliers for insert to authenticated with check (
  public.erp_current_role()='owner' and public.erp_can_write_module_scope_text(restaurant_id::text,null,'manageSuppliers') and public.erp_can_write_module_scope_text(restaurant_id::text,null,'updateInventory')
- and exists(select 1 from public.products p where p.id=product_id and p.restaurant_id=product_alternate_suppliers.restaurant_id and coalesce(p.is_active,true) and coalesce(p.status,'active') not in ('inactive','discontinued'))
- and exists(select 1 from public.suppliers s where s.id=supplier_id and s.restaurant_id=product_alternate_suppliers.restaurant_id and s.status is true and s.branch_id is null)
+ and exists(select 1 from public.products p where p.id=product_alternate_suppliers.product_id and p.restaurant_id=product_alternate_suppliers.restaurant_id and coalesce(p.is_active,true) and coalesce(p.status,'active') not in ('inactive','discontinued'))
+ and exists(select 1 from public.suppliers s where s.id=product_alternate_suppliers.supplier_id and s.restaurant_id=product_alternate_suppliers.restaurant_id and s.status is true and s.branch_id is null)
 );
 -- Atomic supplier contact and primary-product assignment. No reassignment or financial writes.
 create or replace function public.erp_save_supplier_catalog(p_restaurant_id uuid,p_supplier_id uuid,p_contact jsonb,p_product_ids uuid[])
