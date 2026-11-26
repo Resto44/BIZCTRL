@@ -494,6 +494,20 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
   const resolvedVatNumber = vatNumber || selectedSupplier?.vat_number || selectedSupplier?.tax_number || '';
   const resolvedPaymentTerms = paymentTerms || selectedSupplier?.payment_terms || '';
 
+  const changeInvoiceSupplier = value => {
+                const selected = suppliers.find(record => record.id === value);
+                // Changing the invoice supplier invalidates the formerly
+                // selected brand/product/cost even if it came from another
+                // supplier's draft. A payable may never silently mix parties.
+                if (String(form.supplier_id || '') !== String(value)) {
+                  setItems(previous => previous.map(line => normalizePurchaseLine(
+                    clearPurchaseProductForFilter(line, 'supplier_id', value),
+                  )));
+                }
+                setForm(current => ({ ...current, supplier_id: value, supplier_name: selected?.name || '', supplier_email: selected?.email || '' }));
+                setPaymentTerms(selected?.payment_terms || '');
+                setVatNumber(selected?.vat_number || selected?.tax_number || '');
+              };
   // ── Totals ─────────────────────────────────────────────────────────────
   const totals = calcInvoiceTotals(items, additionalCosts);
   const batchGroups = multiSupplierMode ? (() => {
@@ -1040,6 +1054,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
             </p>}
           </Card>}
 
+          {!multiSupplierMode && <Card className="space-y-2 border-blue-200 bg-white p-3" data-testid="purchase-quick-supplier"><Label>{lang==='ar'?'المورد':lang==='fa'?'سپلایر':'Supplier'} *</Label><Select disabled={Boolean(supplier)||saving} value={form.supplier_id||undefined} onValueChange={changeInvoiceSupplier}><SelectTrigger className="h-11"><SelectValue placeholder={lang==='ar'?'اختر المورد':lang==='fa'?'انتخاب سپلایر':'Select supplier...'}/></SelectTrigger><SelectContent>{suppliers.map(record=><SelectItem key={record.id} value={String(record.id)}>{record.name}</SelectItem>)}</SelectContent></Select></Card>}
           <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
             <button type="button" onClick={() => setShowLineItems(value => !value)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left sm:px-5" aria-expanded={showLineItems}>
               <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-blue-600 text-white"><Package className="h-5 w-5" /></span>
@@ -1060,20 +1075,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
 
           {!multiSupplierMode && <InvoiceAccordion title="Supplier" subtitle={selectedSupplier?.name || form.supplier_name} icon={UserRound} verified={Boolean(form.supplier_id || form.supplier_name.trim())} open={openSection === 'supplier'} onToggle={() => setOpenSection(current => current === 'supplier' ? null : 'supplier')}>
             <div className="space-y-3">
-              <div><Label className="text-xs text-slate-600">Supplier *</Label><Select disabled={Boolean(supplier)} value={form.supplier_id} onValueChange={value => {
-                const selected = suppliers.find(record => record.id === value);
-                // Changing the invoice supplier invalidates the formerly
-                // selected brand/product/cost even if it came from another
-                // supplier's draft. A payable may never silently mix parties.
-                if (String(form.supplier_id || '') !== String(value)) {
-                  setItems(previous => previous.map(line => normalizePurchaseLine(
-                    clearPurchaseProductForFilter(line, 'supplier_id', value),
-                  )));
-                }
-                setForm(current => ({ ...current, supplier_id: value, supplier_name: selected?.name || '', supplier_email: selected?.email || '' }));
-                setPaymentTerms(selected?.payment_terms || '');
-                setVatNumber(selected?.vat_number || selected?.tax_number || '');
-              }}><SelectTrigger className="mt-1 h-11 rounded-xl bg-white"><SelectValue placeholder="Select supplier..." /></SelectTrigger><SelectContent>{suppliers.map(supplier => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent></Select>{!form.supplier_id && <Input value={form.supplier_name} onChange={event => setForm(current => ({ ...current, supplier_name: event.target.value }))} placeholder="Or type supplier name" className="mt-2 h-11 rounded-xl bg-white" />}</div>
+              <div><Label className="text-xs text-slate-600">Supplier *</Label><Select disabled={Boolean(supplier)} value={form.supplier_id} onValueChange={changeInvoiceSupplier}><SelectTrigger className="mt-1 h-11 rounded-xl bg-white"><SelectValue placeholder="Select supplier..." /></SelectTrigger><SelectContent>{suppliers.map(supplier => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent></Select>{!form.supplier_id && <Input value={form.supplier_name} onChange={event => setForm(current => ({ ...current, supplier_name: event.target.value }))} placeholder="Or type supplier name" className="mt-2 h-11 rounded-xl bg-white" />}</div>
               <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs text-slate-600">Invoice number</Label><Input value={form.invoice_number} onChange={event => setForm(current => ({ ...current, invoice_number: event.target.value }))} className="mt-1 h-10 bg-white" /></div><div><Label className="text-xs text-slate-600">Currency</Label><Select value={form.currency} onValueChange={value => setForm(current => ({ ...current, currency: value }))}><SelectTrigger className="mt-1 h-10 bg-white"><SelectValue /></SelectTrigger><SelectContent>{CURRENCIES.map(currency => <SelectItem key={currency} value={currency}>{currency}</SelectItem>)}</SelectContent></Select></div></div>
               <div className="grid grid-cols-2 gap-2"><div><Label className="text-xs text-slate-600">Invoice date</Label><Input type="date" value={form.date} onChange={event => setForm(current => ({ ...current, date: event.target.value }))} className="mt-1 h-10 bg-white" /></div><div><Label className="text-xs text-slate-600">VAT number</Label><Input value={resolvedVatNumber} onChange={event => setVatNumber(event.target.value)} inputMode="numeric" className="mt-1 h-10 bg-white" placeholder="VAT number" /></div></div>
             </div>
