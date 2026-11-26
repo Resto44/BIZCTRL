@@ -86,7 +86,7 @@ export default function Suppliers() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['suppliers'] });
-      for(const key of ['suppliers_org','restaurant-import-suppliers','supplier-catalog-products','purchase_products_filtered','products','product-brand-usage','product-brand-choices'])qc.invalidateQueries({queryKey:[key]});
+      for(const key of ['suppliers_org','restaurant-import-suppliers','supplier-catalog-products','supplier-alternate-links','product_categories_by_supplier','purchase_products_filtered','products','product-brand-usage','product-brand-choices'])qc.invalidateQueries({queryKey:[key]});
       closeForm();
     },
     onError: (err) => {

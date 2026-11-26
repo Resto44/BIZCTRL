@@ -62,19 +62,39 @@ export function selectPurchaseProduct(item, product) {
 
 /** No implicit fallback: each filter applies on the same tenant-scoped query.
  * Paginate so a brand is not lost beyond the default API row limit. */
-export async function fetchScopedPurchaseProducts(db, filters) {
+export async function fetchAlternateSupplierProductIds(db,restaurantId,supplierId) {
+ if(!restaurantId||!supplierId)return [];
+ const ids=[];
+ for(let offset=0;;offset+=500){
+  const {data,error}=await db.from('product_alternate_suppliers').select('product_id').eq('restaurant_id',restaurantId).eq('supplier_id',supplierId).order('product_id').range(offset,offset+499);
+  if(error)throw error;
+  if(!Array.isArray(data))throw Error('Invalid supplier catalog response');
+  ids.push(...data.map(r=>r.product_id));
+  if(data.length<500)break;
+ }
+ return ids;
+}
+export async function fetchScopedPurchaseProducts(db, filters, alternateIds=[]) {
  if (!filters?.restaurant_id || (!filters.category_id && !filters.supplier_id)) return [];
  const rows=[];
+ const read=async(scope,ids)=>{
  for(let offset=0;;offset+=500) {
   let q=db.from('products').select('id,name,name_en,name_ar,name_fa,sku,barcode,brand,unit,default_cost,purchase_cost,category_id,subcategory_id,supplier_id,restaurant_id,restaurant_product_type,is_active,status');
-  for(const [key,value] of Object.entries(filters))if(value)q=q.eq(key,value);
+  for(const [key,value] of Object.entries(scope))if(value)q=q.eq(key,value);
+  if(ids)q=q.in('id',ids);
   const {data,error}=await q.order('id').range(offset,offset+499);
   if(error)throw error;
   if(!Array.isArray(data))throw new Error('Invalid product response');
   rows.push(...data.filter(p=>p.is_active!==false&&!['inactive','discontinued'].includes(p.status)));
   if(data.length<500)break;
  }
- return rows.sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+ };
+ await read(filters);
+ if(filters.supplier_id&&alternateIds.length){
+  const {supplier_id,...scope}=filters;
+  for(let i=0;i<alternateIds.length;i+=100)await read(scope,alternateIds.slice(i,i+100));
+ }
+ return [...new Map(rows.map(p=>[p.id,p])).values()].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
 }
 export function searchPurchaseProducts(products, search) {
  const q=normalizeProductBrand(search).toLocaleLowerCase();

@@ -27,7 +27,7 @@ describe('Supplier catalog and restaurant supplier import',()=>{
   const picker=readFileSync('src/components/suppliers/SupplierCatalogPicker.jsx','utf8');
   const importer=readFileSync('src/components/restaurant-pos/RestaurantMaterialImport.jsx','utf8');
   expect(supplier).toContain("supabase.rpc('erp_save_supplier_catalog'");
-  expect(picker).toContain('disabled={disabled||linked}');
+  expect(picker).toContain('disabled={disabled||own}');
   expect(importer).toContain("supabase.rpc('erp_import_restaurant_materials_v2'");
   expect(importer).toContain('supplier:r.supplier||defaultSupplier');
   expect(importer).toContain('setReady(false)');
