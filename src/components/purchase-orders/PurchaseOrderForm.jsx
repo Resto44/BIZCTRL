@@ -1,4 +1,3 @@
-import {fetchAlternateSupplierProductIds} from '@/lib/purchaseInvoiceBrands';
 import { restaurantMaterialFilter } from '@/lib/restaurantProducts';
 import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -74,17 +73,7 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
       rows.push(...(data || []));
       if (!data || data.length < 500) break;
     }
-    if(supplierId){
-      const ids=await fetchAlternateSupplierProductIds(supabase,activeRestaurantId,supplierId);
-      for(let i=0;i<ids.length;i+=100){
-        let query=supabase.from('products').select('*').eq('restaurant_id',activeRestaurantId).in('id',ids.slice(i,i+100)).or('is_active.eq.true,is_active.is.null');
-        if(materialType)query=query.eq('restaurant_product_type',materialType);
-        const {data,error}=await query;
-        if(error)throw error;
-        rows.push(...(data||[]).map(p=>({...p,alternate_supplier_id:supplierId})));
-      }
-    }
-    return [...new Map(rows.filter(p=>p.product_id&&p.name&&!['inactive','discontinued'].includes(p.status)).map(p=>[p.id,p])).values()];
+    return rows.filter(p => p.product_id && p.name);
   };
   const { data: products = [],isLoading:productsLoading,isFetching:productsFetching,isError:productsError,refetch:reloadProducts } = useQuery({
     queryKey:['products',activeRestaurantId,form.supplier_id,'purchase-materials',materialType || 'all'],
@@ -121,7 +110,7 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
   });
   const matchProduct = p => [p.name,p.name_ar,p.name_en,p.name_fa,p.sku,p.barcode,p.product_id]
     .some(value => String(value || '').toLocaleLowerCase().includes(productSearch.trim().toLocaleLowerCase()));
-  const eligibleProducts = products.filter(p=>p.supplier_id===form.supplier_id||p.alternate_supplier_id===form.supplier_id);
+  const eligibleProducts = products.filter(p=>p.supplier_id===form.supplier_id);
   const catalogReady = Boolean(form.supplier_id && !productsLoading && !productsFetching && !productsError && eligibleProducts.length);
 
 
@@ -139,7 +128,7 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
   };
 
   const handleItemProduct = (idx, productId) => {
-    const p = eligibleProducts.find(x => x.product_id === productId);
+    const p = products.find(x => x.product_id === productId && x.supplier_id === form.supplier_id);
     if (!p) return;
     setValidationError('');
     setItems(items => items.map((it, i) => i === idx ? { ...it, product_id: productId, product_name: p.name, unit: p.unit || '', unit_price: p.default_cost ?? p.purchase_cost ?? 0 } : it));
@@ -159,7 +148,7 @@ export default function PurchaseOrderForm({ order, supplier = null, onClose, onS
       setValidationError('Expected delivery cannot be before the order date.');return;
     }
     if(!catalogReady||assignment.isPending){setValidationError('Supplier products are not ready. Retry after loading.');return;}
-    if(!items.length||items.some(i=>!i.product_id||!eligibleProducts.some(p=>p.product_id===i.product_id)||Number(i.qty)<=0||!Number.isFinite(Number(i.qty))||!Number.isFinite(Number(i.unit_price))||Number(i.unit_price)<0)){
+    if(!items.length||items.some(i=>!i.product_id||!products.some(p=>p.product_id===i.product_id&&p.supplier_id===form.supplier_id)||Number(i.qty)<=0||!Number.isFinite(Number(i.qty))||!Number.isFinite(Number(i.unit_price))||Number(i.unit_price)<0)){
       setValidationError('Add at least one product with a valid quantity and price.');return;
     }
     
