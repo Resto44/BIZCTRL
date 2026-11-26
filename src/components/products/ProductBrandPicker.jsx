@@ -13,7 +13,7 @@ const copy = {
     search: 'Search existing brands', new: 'New brand name',
     newHint: 'A new brand appears in this list after the product is saved.',
     empty: 'No brands have been recorded for this business yet.',
-    error: 'Could not load saved brands. You can still enter a brand manually.',
+    error: 'Could not load saved brands. Retry before changing the brand.',
     loading: 'Loading saved brands…', more: 'Refine the search to find more brands',
   },
   ar: {
@@ -21,7 +21,7 @@ const copy = {
     search: 'بحث عن علامة تجارية', new: 'اسم العلامة الجديدة',
     newHint: 'تظهر العلامة الجديدة في القائمة بعد حفظ المنتج.',
     empty: 'لا توجد علامات تجارية مسجلة لهذا النشاط بعد.',
-    error: 'تعذّر تحميل العلامات. يمكنك إدخال اسم جديد يدويًا.',
+    error: 'تعذّر تحميل العلامات. أعد المحاولة قبل تغيير العلامة.',
     loading: 'جارٍ تحميل العلامات…', more: 'ابحث بالاسم لعرض علامات أخرى',
   },
   fa: {
@@ -29,7 +29,7 @@ const copy = {
     search: 'جستجوی برندهای ثبت‌شده', new: 'نام برند جدید',
     newHint: 'برند جدید پس از ذخیره محصول در فهرست ظاهر می‌شود.',
     empty: 'هنوز برای این کسب‌وکار برندی ثبت نشده است.',
-    error: 'بارگذاری برندها ناموفق بود. می‌توانید برند جدید وارد کنید.',
+    error: 'بارگذاری برندها ناموفق بود. پیش از تغییر برند دوباره تلاش کنید.',
     loading: 'بارگذاری برندها…', more: 'برای دیدن برندهای دیگر جستجو کنید',
   },
 };
@@ -40,7 +40,7 @@ const copy = {
  * Never guess a brand for a new product; preserve the exact saved brand on edits.
  */
 export default function ProductBrandPicker({
-  value = '', onChange, brands = [], loading = false, error = false, lang = 'en', masterBrands = [], onManage, allowNew = true,
+  value = '', onChange, brands = [], loading = false, error = false, lang = 'en', masterBrands = [], onManage, allowNew = true, strictCatalog = false,
 }) {
   const t = copy[lang] || copy.en;
   const [adding, setAdding] = useState(false);
@@ -94,7 +94,7 @@ export default function ProductBrandPicker({
           onChange={event => setSearch(event.target.value)}
           className="h-10 ps-9 text-base sm:text-sm" />
       </div>}
-      <Select value={adding ? '__new__' : selectedKey} onValueChange={choose}>
+      <Select value={adding ? '__new__' : selectedKey} onValueChange={choose} disabled={strictCatalog&&(loading||error)}>
         <SelectTrigger className="h-11 min-w-0 w-full bg-white text-start text-base sm:text-sm dark:bg-slate-950"
           aria-label={t.select} data-testid="product-brand-select">
           <SelectValue placeholder={t.select} />
