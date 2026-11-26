@@ -9,9 +9,10 @@
  * drives all module availability via BusinessModeContext.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTenant } from '@/lib/TenantContext';
 import { useRole } from '@/lib/RoleContext';
+import { useLanguage } from '@/lib/LanguageContext';
 import { useSubscription } from '@/lib/SubscriptionContext';
 import { subscriptionLimitErrorMessage, subscriptionLimitMessage } from '@/lib/subscriptionLimits';
 import PageHeader from '@/components/shared/PageHeader';
@@ -20,9 +21,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Trash2, Building2, GitBranch, Star, UtensilsCrossed, ShoppingBag, AlertCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Building2, GitBranch, Star, UtensilsCrossed, ShoppingBag, AlertCircle } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
@@ -31,10 +32,18 @@ import BusinessTypeSelector from '@/components/shared/BusinessTypeSelector';
 import { supabase } from '@/api/supabaseClient';
 import { cn } from '@/lib/utils';
 
+export const businessRenameCopy = lang => ({
+ en:{title:'Edit business name',label:'Business name',hint:'Change the display name only. Business type, branches and existing records stay unchanged.',invalid:'Enter a name of 1–150 characters.',unavailable:'Business is no longer available. Refresh and try again.',failed:'Name change could not be confirmed.',success:'Business name updated',save:'Save name',saving:'Saving…',cancel:'Cancel'},
+ ar:{title:'تعديل اسم النشاط التجاري',label:'اسم النشاط التجاري',hint:'غيّر الاسم فقط. يبقى نوع النشاط والفروع والسجلات الحالية دون تغيير.',invalid:'أدخل اسماً من 1 إلى 150 حرفاً.',unavailable:'النشاط غير متاح. حدّث الصفحة وحاول مجدداً.',failed:'تعذر تأكيد تغيير الاسم.',success:'تم تحديث اسم النشاط',save:'حفظ الاسم',saving:'جارٍ الحفظ…',cancel:'إلغاء'},
+ fa:{title:'ویرایش نام کسب‌وکار',label:'نام کسب‌وکار',hint:'فقط نام تغییر می‌کند. نوع کسب‌وکار، شعبه‌ها و سوابق موجود بدون تغییر می‌مانند.',invalid:'نامی بین ۱ تا ۱۵۰ حرف وارد کنید.',unavailable:'کسب‌وکار در دسترس نیست. صفحه را تازه کنید.',failed:'تغییر نام تأیید نشد.',success:'نام کسب‌وکار به‌روزرسانی شد',save:'ذخیره نام',saving:'در حال ذخیره…',cancel:'لغو'}
+}[lang] || businessRenameCopy('en'));
+
 export default function RestaurantManager() {
   const { user } = useAuth();
-  const { restaurants, activeRestaurant, setActiveRestaurant, allBranches, updateRestaurantBranches, createRestaurant, refetchRestaurants } = useTenant();
+  const { restaurants, activeRestaurant, setActiveRestaurant, allBranches, updateRestaurantBranches, createRestaurant, updateRestaurant, refetchRestaurants } = useTenant();
   const { role } = useRole();
+  const { lang,dir } = useLanguage();
+  const rename = businessRenameCopy(lang);
   const { withinLimit, usage, limits, planName } = useSubscription();
   const queryClient = useQueryClient();
 
@@ -48,10 +57,53 @@ export default function RestaurantManager() {
   });
   const [branchForm, setBranchForm] = useState({ key: '', label: '', manager_email: '' });
   const [saving, setSaving] = useState(false);
+  const [editingBusiness, setEditingBusiness] = useState(null);
+  const [businessName, setBusinessName] = useState('');
+  const [renameError, setRenameError] = useState('');
+  const [renaming, setRenaming] = useState(false);
+  const renameLock = useRef(false);
 
   if (role !== 'owner') {
     return <div className="p-8 text-center text-muted-foreground">Owner access required.</div>;
   }
+
+  const openRename = (business) => {
+    setEditingBusiness({ id: business.id, name: business.name });
+    setBusinessName(business.name || '');
+    setRenameError('');
+  };
+  const closeRename = () => {
+    if (renameLock.current) return;
+    setEditingBusiness(null);
+    setRenameError('');
+  };
+  const handleRename = async (event) => {
+    event.preventDefault();
+    if (renameLock.current || !editingBusiness || role !== 'owner') return;
+    const name = businessName.trim();
+    if (!name || name.length > 150) { setRenameError(rename.invalid); return; }
+    if (!restaurants.some(r => r.id === editingBusiness.id)) { setRenameError(rename.unavailable); return; }
+    if (name === editingBusiness.name) { closeRename(); return; }
+    renameLock.current = true;
+    setRenaming(true);
+    setRenameError('');
+    try {
+      const result = await updateRestaurant(editingBusiness.id, { name });
+      if (result?.id !== editingBusiness.id || result?.name !== name) throw Error(rename.failed);
+      queryClient.setQueriesData({queryKey:['restaurants']}, old => Array.isArray(old) ? old.map(r => r.id === result.id ? {...r,name:result.name} : r) : old);
+      await Promise.allSettled([
+        queryClient.invalidateQueries({queryKey:['restaurants']}),
+        queryClient.invalidateQueries({queryKey:['portal-identity']})
+      ]);
+      setEditingBusiness(null);
+      toast.success(rename.success);
+    } catch (err) {
+      setRenameError(rename.failed + (err?.message ? ' — ' + err.message : ''));
+    } finally {
+      renameLock.current = false;
+      setRenaming(false);
+    }
+  };
 
   const handleCreateRestaurant = async () => {
     if (!restForm.name) { toast.error('Restaurant name is required'); return; }
@@ -180,17 +232,17 @@ export default function RestaurantManager() {
         {restaurants.map(r => (
           <Card key={r.id} className={cn('p-4', r.id === activeRestaurant?.id && 'ring-2 ring-primary')}>
             <div className="flex items-start justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 {getBusinessModeIcon(r.business_mode)}
                 <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold">{r.name}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold break-words min-w-0">{r.name}</p>
                     {getBusinessModeBadge(r.business_mode)}
                   </div>
                   {r.address && <p className="text-xs text-muted-foreground">{r.address}</p>}
                 </div>
               </div>
-              <div className="flex gap-1.5 items-center">
+              <div className="flex shrink-0 flex-wrap justify-end gap-1 items-center">
                 {r.id !== activeRestaurant?.id && (
                   <Button size="sm" variant="outline" onClick={() => setActiveRestaurant(r.id)}>
                     <Star className="w-3 h-3 mr-1" /> Select
@@ -199,6 +251,9 @@ export default function RestaurantManager() {
                 {r.id === activeRestaurant?.id && (
                   <Badge className="bg-primary/10 text-primary text-xs">Active</Badge>
                 )}
+                <Button type="button" size="icon" variant="outline" className="h-10 w-10" aria-label={rename.title + ": " + r.name} title={rename.title} data-testid="edit-business-name" disabled={saving || renaming} onClick={() => openRename(r)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
                 <Button size="icon" variant="ghost" className="text-destructive h-8 w-8" onClick={() => handleDeleteRestaurant(r.id)}>
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
@@ -245,6 +300,26 @@ export default function RestaurantManager() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!editingBusiness} onOpenChange={open => { if (!open) closeRename(); }}>
+        <DialogContent className="max-w-sm max-h-[90dvh] overflow-y-auto" dir={dir}>
+          <DialogHeader>
+            <DialogTitle>{rename.title}</DialogTitle>
+            <DialogDescription>{rename.hint}</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleRename}>
+            <div>
+              <Label htmlFor="business-edit-name">{rename.label}</Label>
+              <Input id="business-edit-name" className="mt-1 min-h-11" value={businessName} maxLength={150} required disabled={renaming} onChange={e => {setBusinessName(e.target.value);setRenameError('');}} />
+            </div>
+            {renameError && <p role="alert" className="text-sm text-destructive">{renameError}</p>}
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" className="min-h-11 flex-1" disabled={renaming || !businessName.trim() || businessName.trim() === editingBusiness?.name}>{renaming ? rename.saving : rename.save}</Button>
+              <Button type="button" variant="outline" className="min-h-11 flex-1" disabled={renaming} onClick={closeRename}>{rename.cancel}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* ── New Business Dialog ─────────────────────────────────────────────── */}
       <Dialog open={showNewRestaurant} onOpenChange={setShowNewRestaurant}>
