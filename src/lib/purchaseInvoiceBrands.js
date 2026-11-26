@@ -80,3 +80,15 @@ export function searchPurchaseProducts(products, search) {
  const q=normalizeProductBrand(search).toLocaleLowerCase();
  return (products||[]).filter(p=>!q||[p.name,p.name_en,p.name_ar,p.name_fa,p.sku,p.barcode].some(v=>normalizeProductBrand(v).toLocaleLowerCase().includes(q)));
 }
+
+/** Brand discovery is independent of supplier eligibility; only the strict
+ * product result may be used to select an invoice item. */
+export function purchaseBrandDiscovery({categoryProducts=[],supplierProducts=[],masterBrands=[],categorySelected=false,savedBrand='' }={}) {
+ const archived=new Set(masterBrands.filter(r=>r.is_active===false).map(r=>normalizeProductBrand(r.brand).toLocaleLowerCase()));
+ const names=[...categoryProducts,...supplierProducts].map(p=>p.brand);
+ if(!categorySelected)names.push(...masterBrands.filter(r=>r.is_active!==false).map(r=>r.brand));
+ return cleanProductBrands(names.filter(b=>!archived.has(normalizeProductBrand(b).toLocaleLowerCase())),savedBrand);
+}
+export function unassignedPurchaseProducts(categoryProducts=[],brand='') {
+ return purchaseProductsForBrand(categoryProducts,brand).filter(p=>!p.supplier_id);
+}

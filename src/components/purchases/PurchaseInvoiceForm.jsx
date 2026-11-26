@@ -16,12 +16,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
+import {fetchBrandMaster,brandLabel,brandKey,brandMatches} from '@/lib/productBrandMaster';
 import { useTenant } from '@/lib/TenantContext';
 import { useAuth } from '@/lib/AuthContext';
 import { usePurchaseProductsByCategory } from '@/hooks/usePurchaseProductsByCategory';
 import {
-  purchaseBrandOptions, purchaseProductsForBrand, purchaseProductBrand,
-  clearPurchaseProductForFilter, selectPurchaseProduct, searchPurchaseProducts,
+  purchaseProductsForBrand, purchaseProductBrand,
+  clearPurchaseProductForFilter, selectPurchaseProduct, searchPurchaseProducts, purchaseBrandDiscovery, unassignedPurchaseProducts,
 } from '@/lib/purchaseInvoiceBrands';
 import {firstIncompletePurchaseProductLine, uniquePurchaseProductForBrand, autoSelectPurchaseBrandProduct} from '@/lib/purchaseInvoiceProductSelection';
 import { usePurchaseCategoriesHierarchy } from '@/hooks/usePurchaseCategoriesHierarchy';
@@ -99,6 +100,8 @@ function PurchaseInvoiceItemRow({
   suppliers,
   multiSupplierMode,
   lang,
+  masterBrands = [],
+  masterBrandsError = false,
   categories,
   categoriesTree,
   missingProduct = false,
@@ -115,15 +118,19 @@ function PurchaseInvoiceItemRow({
   // Fetch products for this item's category/subcategory and supplier
   // Calling hook here is safe because it's the top level of this component
   const { products: categoryProducts = [], isLoading: productsLoading, isError: productsError, refetch: retryProducts } = usePurchaseProductsByCategory(item.category_id, itemSupplierId, item.subcategory_id);
-  // Brands come from this same tenant-, category-, and supplier-filtered
-  // catalog, not an unrelated company brand or another supplier.
+  // Discover category brands independently of supplier eligibility. Never use this wider list to select a purchase product.
+  const {products: discoveryProducts=[],isLoading:discoveryLoading,isError:discoveryError,refetch:retryDiscovery}=usePurchaseProductsByCategory(item.category_id, '', item.subcategory_id);
   const selectedBrand = purchaseProductBrand(categoryProducts, item.product_id, item.brand);
-  const brandOptions = purchaseBrandOptions(categoryProducts, selectedBrand);
+  const brandOptions=purchaseBrandDiscovery({categoryProducts:discoveryProducts,supplierProducts:categoryProducts,masterBrands,categorySelected:Boolean(item.category_id),savedBrand:selectedBrand});
+  const brandLabels=new Map(masterBrands.map(r=>[brandKey(r.brand),r]));
+  const unassigned=itemSupplierId?unassignedPurchaseProducts(discoveryProducts,selectedBrand):[];
+  const countForBrand=b=>purchaseProductsForBrand(categoryProducts,b).length;
+  const help=lang==='ar'?{none:'لا توجد علامات مطابقة لهذه الفئة.',unassigned:'منتجات دون مورد أساسي (غير قابلة للاختيار هنا)',assign:'اربط المنتجات بالمورد المطلوب من إدارة المنتجات ثم حدّث القائمة.',refresh:'تحديث القائمة',error:'تعذر تحميل بعض العلامات.',all:'كل العلامات'}:lang==='fa'?{none:'برند مطابق این دسته‌بندی وجود ندارد.',unassigned:'محصولات بدون سپلایر اصلی (غیرقابل انتخاب در این فاکتور)',assign:'در Product Management محصولات را به سپلایر موردنظر وصل کنید، سپس لیست را تازه‌سازی کنید.',refresh:'تازه‌سازی لیست',error:'بارگذاری بخشی از برندها ناموفق بود.',all:'همه برندها'}:{none:'No brands match this category.',unassigned:'Products without Primary Supplier (not selectable here)',assign:'Assign the intended supplier in Product Management, then refresh this list.',refresh:'Refresh list',error:'Some brand data could not be loaded.',all:'All brands'};
   const visibleProducts = purchaseProductsForBrand(categoryProducts, selectedBrand);
   const matchedProducts=searchPurchaseProducts(visibleProducts,productSearch);
   const query = brandSearch.trim().toLocaleLowerCase();
   const visibleBrands = brandOptions.filter(name =>
-    !query || name.toLocaleLowerCase().includes(query) || name === selectedBrand,
+    !query || name.toLocaleLowerCase().includes(query) || brandMatches(brandLabels.get(brandKey(name))||{},query) || name === selectedBrand,
   );
   useEffect(() => { setBrandSearch('');setProductSearch('');setProductLimit(20); }, [item.category_id, item.subcategory_id, itemSupplierId, selectedBrand]);
   // A slow mobile connection can resolve the category product list after the
@@ -263,16 +270,17 @@ function PurchaseInvoiceItemRow({
               <SelectValue placeholder="Select brand" />
             </SelectTrigger>
             <SelectContent className="max-h-[min(50dvh,360px)]">
-              <SelectItem value="__all__">— All brands —</SelectItem>
+              <SelectItem value="__all__">— {help.all} —</SelectItem>
               {visibleBrands.map(brand => (
-                <SelectItem key={brand} value={`brand:${brand}`}>{brand}</SelectItem>
+                <SelectItem key={brand} value={`brand:${brand}`}>{brandLabel(brandLabels.get(brandKey(brand))||{brand},lang)}{itemSupplierId?` · ${countForBrand(brand)}`:""}</SelectItem>
               ))}
               {brandOptions.length === 0 && <div className="p-2 text-xs text-slate-500">
-                {productsLoading ? 'Loading brands...' : 'No brands saved for this business yet. Add them in Product Master.'}
+                {productsLoading || (item.category_id&&discoveryLoading) ? copy.loading : discoveryError||masterBrandsError ? help.error : help.none}
               </div>}
             </SelectContent>
           </Select>
-
+          {(discoveryError||masterBrandsError)&&<p role="alert" className="text-xs text-amber-700">{help.error}</p>}
+          {itemSupplierId&&unassigned.length>0&&<div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900" data-testid="purchase-unassigned-products"><strong>{help.unassigned}: {unassigned.length}</strong><p className="mt-1">{unassigned.slice(0,10).map(p=>p['name_'+lang]||p.name).join(' · ')}</p><p className="mt-1">{help.assign}</p><Button type="button" variant="outline" size="sm" className="mt-2" onClick={()=>{retryProducts();retryDiscovery();}}>{help.refresh}</Button></div>}
         </div>
         <div className="min-w-0">
           <Label className="mb-1 block text-xs font-semibold text-slate-700">Product *</Label>
@@ -486,6 +494,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
   });
 
   const {lang}=useLanguage();
+  const {data:masterBrands=[],isError:masterBrandsError}=useQuery({queryKey:['product-brand-master',restaurantId],queryFn:()=>fetchBrandMaster(supabase,restaurantId),enabled:!!restaurantId,staleTime:30000,retry:1});
 
   // Use hierarchical categories hook
   const { categories, tree: categoriesTree } = usePurchaseCategoriesHierarchy();
@@ -1065,7 +1074,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
               <div className="hidden grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] border-t border-slate-200 bg-slate-50 px-5 py-2.5 text-[11px] font-medium text-slate-500 sm:grid">
                 <span>Item</span><span>Unit</span><span>Qty</span><span>Unit Cost</span><span className="text-right">Total</span><span />
               </div>
-              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} lang={lang} categories={categories} categoriesTree={categoriesTree} missingProduct={invalidLineId===item._id} />)}</div>
+              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} lang={lang} masterBrands={masterBrands} masterBrandsError={masterBrandsError} categories={categories} categoriesTree={categoriesTree} missingProduct={invalidLineId===item._id} />)}</div>
               <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 sm:px-5">
                 <Button type="button" variant="ghost" onClick={addItem} className="h-9 gap-2 px-0 font-bold text-blue-700 hover:bg-transparent"><Plus className="h-5 w-5 rounded-full border border-blue-600 p-0.5" /> Add Item</Button>
                 <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{items.length} item{items.length === 1 ? '' : 's'}</span>
