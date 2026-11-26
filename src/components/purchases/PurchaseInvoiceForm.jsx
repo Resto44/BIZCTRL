@@ -15,13 +15,13 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
-import { fetchProductBrandChoices } from '@/lib/productBrands';
+import { useLanguage } from '@/lib/LanguageContext';
 import { useTenant } from '@/lib/TenantContext';
 import { useAuth } from '@/lib/AuthContext';
 import { usePurchaseProductsByCategory } from '@/hooks/usePurchaseProductsByCategory';
 import {
   purchaseBrandOptions, purchaseProductsForBrand, purchaseProductBrand,
-  clearPurchaseProductForFilter, selectPurchaseProduct,
+  clearPurchaseProductForFilter, selectPurchaseProduct, searchPurchaseProducts,
 } from '@/lib/purchaseInvoiceBrands';
 import {firstIncompletePurchaseProductLine, uniquePurchaseProductForBrand, autoSelectPurchaseBrandProduct} from '@/lib/purchaseInvoiceProductSelection';
 import { usePurchaseCategoriesHierarchy } from '@/hooks/usePurchaseCategoriesHierarchy';
@@ -98,8 +98,7 @@ function PurchaseInvoiceItemRow({
   supplierId,
   suppliers,
   multiSupplierMode,
-  organizationBrands,
-  brandsError,
+  lang,
   categories,
   categoriesTree,
   missingProduct = false,
@@ -110,27 +109,31 @@ function PurchaseInvoiceItemRow({
   const [expanded, setExpanded] = useState(() => !item.product_name && !item.product_id);
   useEffect(() => { if (missingProduct) setExpanded(true); }, [missingProduct]);
   const [brandSearch, setBrandSearch] = useState('');
+  const [productSearch,setProductSearch]=useState('');
+  const [productLimit,setProductLimit]=useState(20);
+  const copy=lang==='ar'?{matches:'المنتجات المطابقة',search:'بحث بالاسم أو الرمز أو الباركود',none:'لا توجد منتجات مرتبطة بهذه التصفية. تحقق من المورد الأساسي في بطاقة المنتج.',error:'تعذر تحميل المنتجات. أعد المحاولة.',retry:'إعادة المحاولة',more:'عرض المزيد',loading:'جارٍ تحميل المنتجات…'}:lang==='fa'?{matches:'محصولات مطابق فیلتر',search:'جستجو با نام، SKU یا بارکد',none:'محصول مطابق یافت نشد. سپلایر اصلی را در Product Master بررسی کنید.',error:'بارگذاری محصولات ناموفق بود؛ دوباره تلاش کنید.',retry:'تلاش دوباره',more:'نمایش بیشتر',loading:'در حال بارگذاری محصولات…'}:{matches:'Matching products',search:'Search by name, SKU or barcode',none:'No products match these filters. Check Primary Supplier in Product Master.',error:'Could not load products. Retry.',retry:'Retry',more:'Show more',loading:'Loading products…'};
   // Fetch products for this item's category/subcategory and supplier
   // Calling hook here is safe because it's the top level of this component
-  const { products: categoryProducts = [], isLoading: productsLoading } = usePurchaseProductsByCategory(item.category_id, itemSupplierId, item.subcategory_id);
+  const { products: categoryProducts = [], isLoading: productsLoading, isError: productsError, refetch: retryProducts } = usePurchaseProductsByCategory(item.category_id, itemSupplierId, item.subcategory_id);
   // Brands come from this same tenant-, category-, and supplier-filtered
   // catalog, not an unrelated company brand or another supplier.
   const selectedBrand = purchaseProductBrand(categoryProducts, item.product_id, item.brand);
-  const brandOptions = purchaseBrandOptions(categoryProducts, selectedBrand, organizationBrands);
+  const brandOptions = purchaseBrandOptions(categoryProducts, selectedBrand);
   const visibleProducts = purchaseProductsForBrand(categoryProducts, selectedBrand);
+  const matchedProducts=searchPurchaseProducts(visibleProducts,productSearch);
   const query = brandSearch.trim().toLocaleLowerCase();
   const visibleBrands = brandOptions.filter(name =>
     !query || name.toLocaleLowerCase().includes(query) || name === selectedBrand,
   );
-  useEffect(() => { setBrandSearch(''); }, [item.category_id, item.subcategory_id, item.supplier_id]);
+  useEffect(() => { setBrandSearch('');setProductSearch('');setProductLimit(20); }, [item.category_id, item.subcategory_id, itemSupplierId, selectedBrand]);
   // A slow mobile connection can resolve the category product list after the
   // brand is chosen. Reconcile that *same scoped catalog* when it arrives,
   // selecting only a unique product and never replacing a manually typed name.
   useEffect(() => {
-    if (productsLoading || !selectedBrand || item.product_id || String(item.product_name || '').trim()) return;
+    if (productsLoading || productsError || !selectedBrand || item.product_id || String(item.product_name || '').trim()) return;
     const soleProduct = uniquePurchaseProductForBrand(categoryProducts, selectedBrand);
     if (soleProduct) updateItem(item._id, 'auto_scoped_product', soleProduct);
-  }, [productsLoading, selectedBrand, categoryProducts, item._id, item.product_id, item.product_name, updateItem]);
+  }, [productsLoading, productsError, selectedBrand, categoryProducts, item._id, item.product_id, item.product_name, updateItem]);
 
   // Mobile number keyboards can emit input before change. Use the same canonical
   // state update for both events so quantity, cost, discount, and tax always
@@ -253,9 +256,9 @@ function PurchaseInvoiceItemRow({
               const brand = value === '__all__' ? '' : value.slice(6);
               updateItem(item._id, 'brand', brand);
               const soleProduct = uniquePurchaseProductForBrand(categoryProducts, brand);
-              if (soleProduct) updateItem(item._id, 'auto_scoped_product', soleProduct);
+              if (soleProduct && !productsLoading && !productsError) updateItem(item._id, 'auto_scoped_product', soleProduct);
             }}
-            disabled={!item.category_id && !itemSupplierId}>
+            disabled={productsLoading || productsError || (!item.category_id && !itemSupplierId)}>
             <SelectTrigger className="h-11 w-full min-w-0 bg-white text-sm" aria-label="Select product brand">
               <SelectValue placeholder="Select brand" />
             </SelectTrigger>
@@ -269,14 +272,14 @@ function PurchaseInvoiceItemRow({
               </div>}
             </SelectContent>
           </Select>
-          {brandsError && <p className="mt-1 text-xs text-amber-700">Could not load all saved brands; available category brands remain selectable.</p>}
+
         </div>
         <div className="min-w-0">
           <Label className="mb-1 block text-xs font-semibold text-slate-700">Product *</Label>
           <Select value={item.product_id || undefined} onValueChange={v => {
             const product = visibleProducts.find(p => String(p.id) === String(v));
             if (product) updateItem(item._id, 'selected_product', product);
-          }} disabled={!item.category_id && !itemSupplierId}>
+          }} disabled={productsLoading || productsError || (!item.category_id && !itemSupplierId)}>
             <SelectTrigger data-testid="purchase-brand-filtered-product" className="h-11 text-sm w-full min-w-0" aria-label="Select purchase product">
               <SelectValue placeholder={(item.category_id || itemSupplierId) ? (visibleProducts.length === 0 ? 'No matching products.' : 'Select...') : 'Select category or supplier first'} />
             </SelectTrigger>
@@ -288,6 +291,14 @@ function PurchaseInvoiceItemRow({
               )}
             </SelectContent>
           </Select>
+          {(item.category_id || itemSupplierId) && <div className="mt-2 space-y-2 rounded-lg border bg-white p-2" data-testid="purchase-matching-products">
+            <p className="text-xs font-bold">{copy.matches}: {productsLoading || productsError ? '—' : visibleProducts.length}</p>
+            {productsError ? <div role="alert" className="text-xs text-red-700">{copy.error} <Button type="button" size="sm" variant="outline" onClick={()=>retryProducts()}>{copy.retry}</Button></div> : productsLoading ? <p role="status" className="text-xs">{copy.loading}</p> : visibleProducts.length===0 ? <p className="text-xs text-amber-700">{copy.none}</p> : <>
+              <Input type="search" value={productSearch} onChange={e=>{setProductSearch(e.target.value);setProductLimit(20);}} placeholder={copy.search} aria-label={copy.search} className="h-10"/>
+              <div className="max-h-60 overflow-y-auto space-y-1">{matchedProducts.slice(0,productLimit).map(p=><button key={p.id} type="button" aria-pressed={String(item.product_id)===String(p.id)} onClick={()=>updateItem(item._id,'selected_product',p)} className="flex w-full min-h-11 flex-wrap items-center justify-between gap-1 rounded-md border px-2 py-2 text-start text-xs aria-pressed:border-blue-500 aria-pressed:bg-blue-50"><span className="min-w-0 break-words"><strong>{p['name_'+lang]||p.name}</strong><span className="block text-slate-500">{p.sku||p.barcode||''} · {p.unit||''}</span></span><span className="font-bold tabular-nums">{Number(p.default_cost??p.purchase_cost??0).toFixed(2)}</span></button>)}</div>
+              {matchedProducts.length===0&&<p className="text-xs text-slate-500">{copy.none}</p>}{matchedProducts.length>productLimit&&<Button type="button" size="sm" variant="outline" onClick={()=>setProductLimit(n=>n+20)}>{copy.more}</Button>}
+            </>}
+          </div>}
           {!item.product_id && (
             <>
               <p className={`mt-1 text-xs ${missingProduct?'font-bold text-red-700':'text-amber-700'}`}>
@@ -474,16 +485,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
     enabled: !!restaurantId,
   });
 
-  // Share the same RLS-scoped saved brands as Product Master.
-  // The category/supplier filtered products remain the only source of selectable
-  // Product IDs; brand names alone never authorize a different supplier item.
-  const { data: organizationBrands = [], isError: brandsError } = useQuery({
-    queryKey: ['product-brand-choices', restaurantId],
-    queryFn: () => fetchProductBrandChoices(supabase, restaurantId),
-    enabled: Boolean(restaurantId),
-    staleTime: 5 * 60 * 1000,
-    retry: 1,
-  });
+  const {lang}=useLanguage();
 
   // Use hierarchical categories hook
   const { categories, tree: categoriesTree } = usePurchaseCategoriesHierarchy();
@@ -1048,7 +1050,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
               <div className="hidden grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] border-t border-slate-200 bg-slate-50 px-5 py-2.5 text-[11px] font-medium text-slate-500 sm:grid">
                 <span>Item</span><span>Unit</span><span>Qty</span><span>Unit Cost</span><span className="text-right">Total</span><span />
               </div>
-              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} organizationBrands={organizationBrands} brandsError={brandsError} categories={categories} categoriesTree={categoriesTree} missingProduct={invalidLineId===item._id} />)}</div>
+              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} lang={lang} categories={categories} categoriesTree={categoriesTree} missingProduct={invalidLineId===item._id} />)}</div>
               <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 sm:px-5">
                 <Button type="button" variant="ghost" onClick={addItem} className="h-9 gap-2 px-0 font-bold text-blue-700 hover:bg-transparent"><Plus className="h-5 w-5 rounded-full border border-blue-600 p-0.5" /> Add Item</Button>
                 <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{items.length} item{items.length === 1 ? '' : 's'}</span>
