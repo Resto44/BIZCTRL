@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { readAllPortalRows } from '@/lib/portalReliability';
 import { useTenant } from '@/lib/TenantContext';
 
 /**
@@ -10,14 +11,9 @@ import { useTenant } from '@/lib/TenantContext';
 export function usePurchaseCategoriesHierarchy() {
   const { activeRestaurantId } = useTenant();
 
-  const { data: categories = [], isLoading } = useQuery({
+  const { data: categories = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['product_categories_hierarchy', activeRestaurantId],
-    queryFn: () =>
-      base44.entities.ProductCategory.filter(
-        activeRestaurantId ? { restaurant_id: activeRestaurantId, is_active: true } : { is_active: true },
-        'sort_order',
-        500
-      ),
+    queryFn: () => readAllPortalRows(()=>supabase.from('product_categories').select('*').eq('restaurant_id',activeRestaurantId).eq('is_active',true).order('sort_order').order('id')),
     enabled: !!activeRestaurantId,
     staleTime: 30000,
   });
@@ -118,6 +114,8 @@ export function usePurchaseCategoriesHierarchy() {
     tree,
     leafCategories,
     isLoading,
+    isError,
+    refetch,
     buildTree,
     getLeafCategories,
     getParentOptions,
