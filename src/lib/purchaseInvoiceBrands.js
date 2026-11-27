@@ -38,7 +38,12 @@ export function clearPurchaseProductForFilter(item, field, value) {
     if (field === 'category_id') {
       updated.subcategory_id = '';
       updated.brand = '';
-    } else if (field === 'subcategory_id' || field === 'supplier_id') {
+    } else if (field === 'supplier_id') {
+      updated.category_id = '';
+      updated.category = '';
+      updated.subcategory_id = '';
+      updated.brand = '';
+    } else if (field === 'subcategory_id') {
       updated.brand = '';
     }
   }
@@ -111,4 +116,17 @@ export function purchaseBrandDiscovery({categoryProducts=[],supplierProducts=[],
 }
 export function unassignedPurchaseProducts(categoryProducts=[],brand='') {
  return purchaseProductsForBrand(categoryProducts,brand).filter(p=>!p.supplier_id);
+}
+
+/** Derive category choices from the same eligible supplier products used in
+ * purchase selection. Only actual category_id values are selectable; a child
+ * stored as subcategory_id belongs in the separate subcategory control. */
+export function supplierPurchaseCategoryOptions(categories=[],products=[],categoryId='') {
+ const active=(categories||[]).filter(c=>c.is_active!==false);
+ const categoryIds=new Set((products||[]).map(p=>p.category_id).filter(Boolean));
+ const subIds=new Set((products||[]).filter(p=>p.category_id===categoryId).map(p=>p.subcategory_id).filter(Boolean));
+ return {
+  categories:active.filter(c=>categoryIds.has(c.id)),
+  subcategories:active.filter(c=>c.parent_id===categoryId&&subIds.has(c.id)),
+ };
 }
