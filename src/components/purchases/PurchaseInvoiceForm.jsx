@@ -22,7 +22,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { usePurchaseProductsByCategory } from '@/hooks/usePurchaseProductsByCategory';
 import {
   purchaseProductsForBrand, purchaseProductBrand,
-  clearPurchaseProductForFilter, selectPurchaseProduct, searchPurchaseProducts, purchaseBrandDiscovery, unassignedPurchaseProducts,
+  clearPurchaseProductForFilter, selectPurchaseProduct, searchPurchaseProducts, purchaseBrandDiscovery, unassignedPurchaseProducts, supplierPurchaseCategoryOptions,
 } from '@/lib/purchaseInvoiceBrands';
 import {firstIncompletePurchaseProductLine, uniquePurchaseProductForBrand, autoSelectPurchaseBrandProduct} from '@/lib/purchaseInvoiceProductSelection';
 import { usePurchaseCategoriesHierarchy } from '@/hooks/usePurchaseCategoriesHierarchy';
@@ -104,10 +104,20 @@ function PurchaseInvoiceItemRow({
   masterBrandsError = false,
   categories,
   categoriesTree,
+  categoriesLoading,
+  categoriesError,
+  retryCategories,
   missingProduct = false,
 }) {
-  const subcategories = categories.filter(category => category.parent_id === item.category_id);
   const itemSupplierId = multiSupplierMode ? item.supplier_id : supplierId;
+  const {products: supplierCatalog=[],isLoading:supplierCatalogLoading,isError:supplierCatalogError,refetch:retrySupplierCatalog}=usePurchaseProductsByCategory('',itemSupplierId,'');
+  const scopedCategories=supplierPurchaseCategoryOptions(categories,supplierCatalog,item.category_id);
+  const categoryPending=categoriesLoading || (!!itemSupplierId && supplierCatalogLoading);
+  const categoryFailed=categoriesError || (!!itemSupplierId && supplierCatalogError);
+  const categoryBlocked=categoryPending||categoryFailed||(multiSupplierMode&&!itemSupplierId);
+  const subcategories=categoryBlocked?[]:itemSupplierId?scopedCategories.subcategories:categories.filter(category=>category.parent_id===item.category_id);
+  const categoryCopy=lang==='ar'?{label:'فئة المنتج',sub:'الفئة الفرعية',choose:'اختر الفئة',loading:'جارٍ تحميل الفئات…',none:'لا توجد فئات مرتبطة بهذا المورد.',error:'تعذر تحميل فئات المورد.',supplier:'اختر المورد أولاً',retry:'إعادة المحاولة',stale:'الفئة المحفوظة غير متاحة لهذا المورد. اختر فئة مناسبة.',noSub:'لا توجد فئات فرعية'}:lang==='fa'?{label:'دسته محصول',sub:'زیردسته',choose:'انتخاب دسته',loading:'در حال بارگذاری دسته‌ها…',none:'هیچ دسته‌ای به محصولات این سپلایر مرتبط نیست.',error:'بارگذاری دسته‌های سپلایر ناموفق بود.',supplier:'ابتدا سپلایر را انتخاب کنید',retry:'تلاش دوباره',stale:'دسته ذخیره‌شده برای این سپلایر موجود نیست. دسته مناسب را انتخاب کنید.',noSub:'زیردسته موجود نیست'}:{label:'Product Category',sub:'Sub-category',choose:'Select category',loading:'Loading categories…',none:'No categories linked to this supplier.',error:'Could not load supplier categories.',supplier:'Select supplier first',retry:'Retry',stale:'Saved category is not available for this supplier. Select a valid category.',noSub:'No sub-categories'};
+  const categoryLabel=c=>c?.['name_'+lang]||c?.name||'';
   const selectedItemSupplier = multiSupplierMode ? suppliers.find(s => String(s.id) === String(item.supplier_id)) : null;
   const [expanded, setExpanded] = useState(() => !item.product_name && !item.product_id);
   useEffect(() => { if (missingProduct) setExpanded(true); }, [missingProduct]);
@@ -206,45 +216,45 @@ function PurchaseInvoiceItemRow({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="min-w-0">
-          <Label className="text-[10px] text-muted-foreground">Product Category *</Label>
-          <Select value={item.category_id} onValueChange={v => {
+          <Label className="text-[10px] text-muted-foreground">{categoryCopy.label} *</Label>
+          <Select value={item.category_id || undefined} disabled={categoryBlocked} onValueChange={v => {
             const cat = categories.find(c => c.id === v);
             updateItem(item._id, 'category_id', v);
             updateItem(item._id, 'category', cat?.name || '');
           }}>
-            <SelectTrigger className="h-8 text-xs w-full min-w-0">
-              <SelectValue placeholder="Select..." />
+            <SelectTrigger className="h-8 text-xs w-full min-w-0" aria-label={categoryCopy.label} data-testid="purchase-scoped-category">
+              <SelectValue placeholder={categoryPending?categoryCopy.loading:multiSupplierMode&&!itemSupplierId?categoryCopy.supplier:categoryCopy.choose} />
             </SelectTrigger>
             <SelectContent>
-              {categoriesTree.map(rootCat => (
+              {itemSupplierId ? scopedCategories.categories.map(cat => (
+                <SelectItem key={cat.id} value={cat.id}>{cat.icon || '📦'} {categoryLabel(cat)}</SelectItem>
+              )) : categoriesTree.map(rootCat => (
                 <div key={rootCat.id}>
-                  <SelectItem value={rootCat.id}>
-                    {rootCat.icon || '📦'} {rootCat.name}{rootCat.branch_id ? ' · Branch' : ''}
-                  </SelectItem>
-                  {rootCat.children && rootCat.children.length > 0 && (
-                    rootCat.children.map(childCat => (
-                      <SelectItem key={childCat.id} value={childCat.id} className="pl-6">
-                        └─ {childCat.icon || '📦'} {childCat.name}
-                      </SelectItem>
-                    ))
-                  )}
+                  <SelectItem value={rootCat.id}>{rootCat.icon || '📦'} {categoryLabel(rootCat)}{rootCat.branch_id ? ' · Branch' : ''}</SelectItem>
+                  {(rootCat.children || []).map(childCat => (
+                    <SelectItem key={childCat.id} value={childCat.id} className="pl-6">└─ {childCat.icon || '📦'} {categoryLabel(childCat)}</SelectItem>
+                  ))}
                 </div>
               ))}
             </SelectContent>
           </Select>
+          {categoryFailed ? <div role="alert" className="mt-1 text-xs text-destructive">{categoryCopy.error} <Button type="button" variant="outline" size="sm" onClick={()=>{retryCategories();if(itemSupplierId)retrySupplierCatalog();}}>{categoryCopy.retry}</Button></div>
+            : !categoryBlocked && itemSupplierId && scopedCategories.categories.length===0 ? <p className="mt-1 text-xs text-amber-700">{categoryCopy.none}</p>
+            : !categoryBlocked && itemSupplierId && item.category_id && !scopedCategories.categories.some(c=>c.id===item.category_id) ? <p role="alert" className="mt-1 text-xs text-amber-700">{categoryCopy.stale}</p> : null}
         </div>
         <div className="min-w-0">
-          <Label className="text-[10px] text-muted-foreground">Sub-category</Label>
-          <Select value={item.subcategory_id} onValueChange={v => {
-            updateItem(item._id, 'subcategory_id', v);
-          }} disabled={!item.category_id || subcategories.length === 0}>
-            <SelectTrigger className="h-8 text-xs w-full min-w-0" disabled={!item.category_id || subcategories.length === 0}>
-              <SelectValue placeholder={item.category_id ? (subcategories.length ? "Select..." : "No sub-categories") : "Select category first"} />
+          <Label className="text-[10px] text-muted-foreground">{categoryCopy.sub}</Label>
+          <Select value={item.subcategory_id || '__all__'} onValueChange={v => {
+            updateItem(item._id, 'subcategory_id', v==='__all__'?'':v);
+          }} disabled={categoryBlocked || !item.category_id || subcategories.length === 0}>
+            <SelectTrigger className="h-8 text-xs w-full min-w-0" aria-label={categoryCopy.sub} data-testid="purchase-scoped-subcategory">
+              <SelectValue placeholder={categoryCopy.noSub} />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="__all__">{lang==='ar'?'كل الفئات الفرعية':lang==='fa'?'همه زیردسته‌ها':'All subcategories'}</SelectItem>
               {subcategories.map(subCat => (
                 <SelectItem key={subCat.id} value={subCat.id}>
-                  {subCat.icon || '📦'} {subCat.name}
+                  {subCat.icon || '📦'} {categoryLabel(subCat)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -497,7 +507,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
   const {data:masterBrands=[],isError:masterBrandsError}=useQuery({queryKey:['product-brand-master',restaurantId],queryFn:()=>fetchBrandMaster(supabase,restaurantId),enabled:!!restaurantId,staleTime:30000,retry:1});
 
   // Use hierarchical categories hook
-  const { categories, tree: categoriesTree } = usePurchaseCategoriesHierarchy();
+  const { categories, tree: categoriesTree, isLoading:categoriesLoading, isError:categoriesError, refetch:retryCategories } = usePurchaseCategoriesHierarchy();
 
   const selectedSupplier = suppliers.find(s => s.id === form.supplier_id);
   const resolvedVatNumber = vatNumber || selectedSupplier?.vat_number || selectedSupplier?.tax_number || '';
@@ -510,7 +520,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
                 // supplier's draft. A payable may never silently mix parties.
                 if (String(form.supplier_id || '') !== String(value)) {
                   setItems(previous => previous.map(line => normalizePurchaseLine(
-                    clearPurchaseProductForFilter(line, 'supplier_id', value),
+                    clearPurchaseProductForFilter({...line,supplier_id:form.supplier_id||''}, 'supplier_id', value),
                   )));
                 }
                 setForm(current => ({ ...current, supplier_id: value, supplier_name: selected?.name || '', supplier_email: selected?.email || '' }));
@@ -1074,7 +1084,7 @@ export default function PurchaseInvoiceForm({ invoice = null, supplier = null, o
               <div className="hidden grid-cols-[minmax(0,1.4fr)_90px_122px_90px_100px_34px] border-t border-slate-200 bg-slate-50 px-5 py-2.5 text-[11px] font-medium text-slate-500 sm:grid">
                 <span>Item</span><span>Unit</span><span>Qty</span><span>Unit Cost</span><span className="text-right">Total</span><span />
               </div>
-              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} lang={lang} masterBrands={masterBrands} masterBrandsError={masterBrandsError} categories={categories} categoriesTree={categoriesTree} missingProduct={invalidLineId===item._id} />)}</div>
+              <div>{items.map((item, idx) => <PurchaseInvoiceItemRow key={item._id} item={item} idx={idx} itemsCount={items.length} updateItem={updateItem} removeItem={removeItem} supplierId={form.supplier_id} suppliers={suppliers} multiSupplierMode={multiSupplierMode} lang={lang} masterBrands={masterBrands} masterBrandsError={masterBrandsError} categories={categories} categoriesTree={categoriesTree} categoriesLoading={categoriesLoading} categoriesError={categoriesError} retryCategories={retryCategories} missingProduct={invalidLineId===item._id} />)}</div>
               <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 sm:px-5">
                 <Button type="button" variant="ghost" onClick={addItem} className="h-9 gap-2 px-0 font-bold text-blue-700 hover:bg-transparent"><Plus className="h-5 w-5 rounded-full border border-blue-600 p-0.5" /> Add Item</Button>
                 <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{items.length} item{items.length === 1 ? '' : 's'}</span>
