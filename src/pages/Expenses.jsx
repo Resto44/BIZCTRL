@@ -27,6 +27,9 @@ import { expenseMonthModel, riyadhCurrentMonth } from '@/lib/expenseInvoiceMonth
 import { Dialog as ScanDialog, DialogContent as ScanDialogContent, DialogHeader as ScanDialogHeader, DialogTitle as ScanDialogTitle } from '@/components/ui/dialog';
 import { useNotify } from '@/lib/useNotify';
 import { useTenant } from '@/lib/TenantContext';
+import { useRole } from '@/lib/RoleContext';
+import { employeeFixedBudget } from '@/lib/employeeFixedBudget';
+import { readAllPortalRows } from '@/lib/portalReliability';
 import { useBranchScope } from '@/lib/BranchScopeContext';
 
 function ExpenseForm({ initial, onSubmit, onCancel, categories, isSaving = false }) {
@@ -132,6 +135,7 @@ function ExpenseForm({ initial, onSubmit, onCancel, categories, isSaving = false
 export default function Expenses() {
   const { t, currency, lang } = useLanguage();
   const { branches, ownerFilter, activeRestaurant } = useTenant();
+  const { role, user, can } = useRole();
   const { selectedBranchId, selectedBranchKey, isAllBranches, setSelectedBranchId } = useBranchScope();
   const qc = useQueryClient();
   const notif = useNotify();
@@ -148,19 +152,19 @@ export default function Expenses() {
     en:{month:'Calendar month (Saudi time)',type:'Expense type',all:'All types',
       fixed:'Fixed monthly',variable:'Variable / occasional',category:'Category',allCategories:'All categories',
       actual:'Recorded expenses',actualFixed:'Fixed expense records',actualVariable:'Variable expense records',
-      budget:'Configured fixed monthly budget',budgetNote:'Current category settings, not historical payment. The fixed budget is NOT added to recorded spending.',
+      budget:'Configured fixed monthly budget',budgetNote:'Current budget settings, not historical payments. The fixed budget is NOT added to recorded spending.',
       monthlyNote:'Only entries dated in the selected month are counted. Change month to inspect older records.',
       entries:'Records'},
     ar:{month:'الشهر (بتوقيت السعودية)',type:'نوع المصروف',all:'كل الأنواع',
       fixed:'ثابت شهري',variable:'متغير / حسب الحاجة',category:'الفئة',allCategories:'كل الفئات',
       actual:'مصروفات الشهر المسجلة',actualFixed:'المصروفات الثابتة المسجلة',actualVariable:'المصروفات المتغيرة المسجلة',
-      budget:'ميزانية الثابت الشهري المحددة',budgetNote:'هذه إعدادات الفئات الحالية وليست دفعة تاريخية. لا نضيف الميزانية مرة ثانية إلى المصروفات.',
+      budget:'ميزانية الثابت الشهري المحددة',budgetNote:'هذه الميزانية الحالية وليست دفعة تاريخية. لا نضيف الميزانية مرة ثانية إلى المصروفات.',
       monthlyNote:'يعرض السجل مصروفات الشهر المحدد فقط؛ يمكن اختيار شهر سابق.',
       entries:'سجل'},
     fa:{month:'ماه (به وقت عربستان)',type:'نوع مصرف',all:'همه',
       fixed:'ثابت ماهانه',variable:'متغیر / موردی',category:'دسته',allCategories:'همه دسته‌ها',
       actual:'مصارف ثبت‌شدهٔ ماه',actualFixed:'مصارف ثابت ثبت‌شده',actualVariable:'مصارف متغیر ثبت‌شده',
-      budget:'بودجهٔ ثابت ماهانهٔ تنظیم‌شده',budgetNote:'مبلغ از تنظیمات فعلی دسته‌هاست، نه سند پرداخت تاریخی. بودجه دوباره به مصرف واقعی جمع نمی‌شود.',
+      budget:'بودجهٔ ثابت ماهانهٔ تنظیم‌شده',budgetNote:'این بودجه فعلی است، نه سند پرداخت تاریخی. بودجه دوباره به مصرف واقعی جمع نمی‌شود.',
       monthlyNote:'فقط رکوردهای همین ماه شمرده می‌شود؛ برای دیدن ماه‌های گذشته ماه را عوض کنید.',
       entries:'رکورد'},
   }[lang]||{};
@@ -194,7 +198,29 @@ export default function Expenses() {
     enabled: Boolean(activeRestaurant?.id),
   });
 
-  const { data: categories = [] } = useExpenseCategories();
+  const { data: categories = [], isSuccess: categoriesReady } = useExpenseCategories();
+  // Salaries are sensitive: use the existing employee read RLS plus payroll permission.
+  // Only owners see the all-branch payroll budget; scoped users see an authorized branch.
+  const payrollAllowed = role === 'owner' || (can?.viewPayroll === true && can?.viewEmployees === true && !isAllBranches && !!selectedBranchId);
+  const payrollBudget = useQuery({
+    queryKey:['employee-fixed-budget',activeRestaurant?.id,user?.id,role,isAllBranches?'all':selectedBranchId,selectedBranchKey],
+    enabled:!!activeRestaurant?.id && payrollAllowed,
+    staleTime:0,
+    queryFn:()=>readAllPortalRows(()=>{
+      let q=supabase.from('employees').select('id,restaurant_id,branch_id,branch,is_active,base_salary,salary,joining_date,hire_date')
+        .eq('restaurant_id',activeRestaurant.id).order('id');
+      if(!isAllBranches) {
+        if(!selectedBranchId||!selectedBranchKey)throw Error('Branch scope unavailable');
+        q=q.or(`branch_id.eq.${selectedBranchId},and(branch_id.is.null,branch.eq.${selectedBranchKey})`);
+      }
+      return q;
+    }),
+  });
+  const payrollCopy={
+    en:{title:'Employee base salaries · monthly budget',combined:'Total fixed monthly budget',manual:'Configured category budget',note:'Current active employee base salaries, full monthly amounts. Not a historical payroll statement or payment. Salary payments remain separate. Do not enter the same salaries as a manual monthly budget.',count:'Active employees',conflict:'A manual salary budget also exists. The combined total is withheld to prevent double counting; review the salary category configuration.',unavailable:'Salary budget could not be loaded. Category budget excludes automatic salaries.',restricted:'Automatic salary budget requires payroll and employee access.',retry:'Retry'},
+    ar:{title:'الرواتب الأساسية للموظفين · ميزانية شهرية',combined:'إجمالي الميزانية الشهرية الثابتة',manual:'ميزانية الفئات المحددة',note:'الرواتب الأساسية الحالية للموظفين النشطين بمبالغ شهرية كاملة، وليست كشفاً تاريخياً أو دفعة. دفع الرواتب منفصل. لا تسجل الرواتب نفسها مرة أخرى كميزانية يدوية.',count:'الموظفون النشطون',conflict:'توجد ميزانية رواتب يدوية أيضاً. لم يتم جمع الإجمالي منعاً للتكرار؛ راجع إعدادات فئة الرواتب.',unavailable:'تعذر تحميل ميزانية الرواتب. ميزانية الفئات لا تشمل الرواتب التلقائية.',restricted:'عرض ميزانية الرواتب يتطلب صلاحية الرواتب والموظفين.',retry:'إعادة المحاولة'},
+    fa:{title:'معاش پایه کارمندان · بودجه ماهانه',combined:'مجموع بودجه مصارف ثابت ماهانه',manual:'بودجه تنظیم‌شده دسته‌ها',note:'معاش پایه فعلی کارمندان فعال، به مبلغ کامل ماهانه؛ نه گزارش تاریخی معاش و نه سند پرداخت. پرداخت معاش جداگانه است. معاش یکسان را دوباره به‌عنوان بودجه دستی درج نکنید.',count:'کارمندان فعال',conflict:'بودجه دستی معاش هم وجود دارد. برای جلوگیری از دوباره‌شماری، مجموع ترکیبی نشان داده نمی‌شود؛ تنظیمات دسته معاش را بررسی کنید.',unavailable:'بودجه معاش بارگیری نشد. بودجه دسته‌ها شامل معاش خودکار نیست.',restricted:'نمایش بودجه معاش به دسترسی معاش و کارمندان نیاز دارد.',retry:'تلاش دوباره'}
+  }[lang]||{title:'Employee base salaries · monthly budget',combined:'Total fixed monthly budget',manual:'Configured category budget',note:'Current monthly base salaries, not a payment. Avoid duplicate manual salary budgets.',count:'Active employees',conflict:'Review manual salary budget before combining.',unavailable:'Salary budget unavailable.',restricted:'Payroll permission required.',retry:'Retry'};
 
   const getCatById = (id) => categories.find(c => c.id === id);
   const getCatDisplayName = (categoryId) => {
@@ -312,6 +338,10 @@ export default function Expenses() {
     month:expenseMonth,type:expenseType,categoryId:expenseCategory,
     branchId:isAllBranches?null:selectedBranchId,
   });
+  const payrollModel=payrollAllowed && payrollBudget.isSuccess && categoriesReady ? employeeFixedBudget(payrollBudget.data,categories,{
+    restaurantId:activeRestaurant?.id,branchId:isAllBranches?null:selectedBranchId,branchKey:selectedBranchKey,branches,configuredFixed:model.configuredFixed,
+  }):null;
+  const combinedBudget=payrollModel?.combined;
   const filtered=model.visible;
   const expenseDisplayName=cat=>lang==='fa'?(cat.name_fa||cat.name):
     lang==='ar'?(cat.name_ar||cat.name):cat.name;
@@ -390,12 +420,25 @@ export default function Expenses() {
               [labels.actual,model.recordedTotal,'text-red-700'],
               [labels.actualFixed,model.recordedFixed,'text-blue-700'],
               [labels.actualVariable,model.recordedVariable,'text-amber-700'],
-              [labels.budget,model.configuredFixed,'text-slate-700'],
+              [combinedBudget!=null?payrollCopy.combined:labels.budget,combinedBudget??model.configuredFixed,'text-slate-700'],
             ].map(([title,value,color])=><Card key={title} className="min-w-0 p-3">
               <p className="text-[11px] leading-4 text-muted-foreground">{title}</p>
               <p className={`mt-1 break-words text-base font-bold tabular-nums ${color}`}>{formatCurrency(value,currency)}</p>
             </Card>)}
           </div>
+          {payrollAllowed ? <Card className="mb-3 space-y-2 p-3" data-testid="employee-fixed-budget">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold">{payrollCopy.title}</p>
+              {payrollModel && <p className="font-bold tabular-nums text-blue-700">{formatCurrency(payrollModel.salary,currency)}</p>}
+            </div>
+            {payrollBudget.isError ? <div role="alert" className="space-y-2 text-xs text-destructive">{payrollCopy.unavailable}<Button size="sm" variant="outline" onClick={()=>payrollBudget.refetch()}>{payrollCopy.retry}</Button></div>
+              : !payrollModel ? <p className="text-xs text-muted-foreground">{t('loading')}</p>
+              : <>
+                <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><span>{payrollModel.count} {payrollCopy.count}</span><span>{payrollCopy.manual}: {formatCurrency(model.configuredFixed,currency)}</span></div>
+                {payrollModel.manualSalaryConflict && <p role="alert" className="text-xs text-amber-700">{payrollCopy.conflict}</p>}
+              </>}
+            <p className="text-xs text-muted-foreground">{payrollCopy.note}</p>
+          </Card> : <p className="mb-3 text-xs text-muted-foreground">{payrollCopy.restricted}</p>}
           <p className="mb-3 text-xs text-muted-foreground">{labels.budgetNote} · {model.recordCount} {labels.entries}</p>
           <ExpensePurchaseHistory restaurantId={activeRestaurant?.id}
             branchId={selectedBranchId} branchKey={selectedBranchKey}

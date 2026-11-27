@@ -100,6 +100,7 @@ export default function Employees({ embedded = false }) {
       qc.invalidateQueries({ queryKey: ['kiosk-employee-list'] });
       qc.invalidateQueries({ queryKey: ['payroll-employees'] });
       qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['employee-fixed-budget'] });
       setShowForm(false); setEditing(null); setForm(emptyForm);
       toast.success(tr('Employee saved'));
     },
@@ -120,6 +121,7 @@ export default function Employees({ embedded = false }) {
       qc.invalidateQueries({ queryKey: ['employee-center-directory'] });
       qc.invalidateQueries({ queryKey: ['kiosk-employee-list'] });
       qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['employee-fixed-budget'] });
       setDeleteId(null); toast.success(tr('Employee archived; historical records preserved'));
     },
     onError: error => toast.error(error.message),
